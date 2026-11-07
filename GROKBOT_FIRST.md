@@ -1,0 +1,5720 @@
+
+# GROKBOT FIRST — Skeleton Completionist Engineering Constitution
+**Document ID:** SKL-GROK-FIRST-2026-11-07
+**Repository:** https://github.com/Apeloff1/Skeleton
+**Audit baseline:** main at e00bfb0809b34573c2df313ea16e17fd10bead38
+**Audience:** one coordinating Grokbot and eleven equal-capability specialist bots, twelve active bots total
+**Scope:** secure local-first AI game production, original-world generation, complete playable games, asset and media pipelines, knowledge, integration, deployment, commercialization and independent assurance
+**Status:** living, source-anchored implementation constitution — NOT a claim of implementation, certification or one-million-word completion
+**Delivery rule:** code, interoperable interfaces, real runnable examples, actual target-machine evidence, and independent playtests outrank catalog size, files, LOC, commits, and prose length.
+
+> Treat the existing product as an ambitious but incompletely integrated first draft. Every feature is suspect until it works in a representative real user journey. Critical gaps block release regardless of how much neighboring software is present. Do not delete prior work or replace canonical owners. Diagnose, consolidate, implement, validate, then promote through existing protected release gates.
+
+## Master index
+
+- 00. Reading protocol, provenance and nonclaims
+- 01. Product north star and nonnegotiable user journeys
+- 02. Source audit: what exists, what is known to fail, and what remains unverified
+- 03. Gap taxonomy and severe risk register
+- 04. Completion doctrine, maturity rubric and proof levels
+- 05. Twelve-bot ownership and conflict-free coordination
+- 06. Execution dependency graph, first-install critical path and release stages
+- 07. Common architectural contracts and schemas
+- 08. Cross-cutting security, rights and operator-control invariants
+- 09. Universal acceptance matrix and game-quality proof
+- 10. Work-order format, lifecycle, quotas and scheduling rules
+- 11. Twelve detailed bot backlogs (indexed BOT-01..BOT-12)
+- 12. Frontier innovations, provocative gap challenges and optional high-risk research
+- 13. Whole-product integration campaigns and adversarial red-team matrix
+- 14. Release gates, artifact provenance, certification, and rollback
+- 15. Expansion ledger toward one million meaningful words
+- 16. Source and competitive benchmark references
+- 17. Second-pass source census and falsifiable implementation-gap index
+- 18. Bot federation protocol: exact contracts, state machines and handoffs
+- 19. Golden game engineering reference: concrete vertical slices
+- 20. Exact machine-contract reconciliation
+- 21. Integration architecture for authored playable games
+- 22. First-install critical seam
+- 23. Third-pass source-grounded module audit
+- 24. Canonical machine-authority and readiness reconciliation
+- 25. Critical-path guarded local AI engineering
+- 26. Concrete playable-game compiler and visual acceptance
+- 27. Repository object census and unresolved unknowns
+- 28. Frontier-comparison laboratory
+- 29. Workable integration contract catalog
+- 30. Twelve-bot executable vertical slices
+- 31. Exact-head CI incident triage and repair order
+- 32. Existing 421-volume masterplan review crosswalk
+- 33. Existing 42-task P0 construction queue reconciliation
+
+## 00. Reading protocol, provenance and nonclaims
+
+This file is the **first document read by Grokbot**. An executor must read Sections 00–10 before any planning or mutation, then its assigned BOT chapter and the relevant cross-bot dependencies. A verifier must independently reread the originating work order, exact code changes, tests, and live artifact rather than repeating the builder's claims.
+
+The repository default branch and PRs were inspected through an authenticated GitHub connector on 2026-11-07. A direct container-side git clone was attempted and failed because DNS resolution of github.com was unavailable. This is not a complete local checkout, whole-tree object census or full automated test run. The baseline is therefore a grounded **risk and completion plan**, not an assertion that every file was inspected. The first bot task is to obtain a complete verified clone or equivalent Git object snapshot, retain exact tree/object proofs, recursively inventory every tracked path and reconcile the findings here. The audit must include submodules, Git LFS, generated and ignored artifacts, license files, tags, hidden CI paths, active draft PR heads and migration manifests, not just README-level surfaces. Do not mark the census complete until a verified enumeration with counts, hashes, missing-object detection and visibility limitations is attached.
+
+Interpretation classes: **OBSERVED** means directly inspected source/document/path; **SELF-REPORTED** means repository docs/PR descriptions claim a behavior; **CANDIDATE** means open PR or staged code without merged/full qualification; **BLOCKED** means a recorded unmet contract; **UNKNOWN** means no relevant proof was obtained; **PROPOSED** means a new build target. The existence of a class/module, fixture, CLI command, smoke test or named feature is never proof of successful user workflow. Present implementation levels separately for source presence, compilation, unit proof, integration proof, live engine interaction, physical target test and independent release approval.
+
+### Current inspected anchors
+| Anchor | Observed/recorded significance | Required follow-up |
+|---|---|---|
+| README.md | Mainline v16, canonical Godot brief-to-project path, first-install tester release explicitly not ready; many game/media surfaces are not complete play | Run golden briefs end to end on real engine, inspect human interaction |
+| pyproject.toml | Python 3.11+, FastAPI/Mongo and numerous Jeeves, training, builder and native entrypoints | Runtime dependency, import and executable ownership census |
+| frontend/package.json | Expo-router application with extensive targeted JS tests and UI scopes | Full web build, native compatibility, accessibility, Playwright and device journeys |
+| skeleton/app/manifest.json | Five-service planned topology; default four services plus optional Chroma; explicit ingress and secrets | Verify runtime graph/health and live mounted routes |
+| machine/ai_first_install.json | First-install implementation candidate and stable-secret invariants | Fresh install, upgrade, target laptop acceptance |
+| machine/ai_master_plan.json | 421 declared volumes, 20 thematic parts, 29 laws, 8 vertical slices, multi-layer maturity policy | Do not confuse plan size with completed work; derive gap-by-gap proof |
+| machine/ai_build_queue.json | Forty-two P0 tasks; explicit task dependency and accountability model | Map every bot work order to existing tasks and avoid duplicate authorities |
+| machine/ai_file_tree.json | 182 migration mappings, 181 native AI owners, staged mirror, unsigned verification/cutover | Reconcile parity and independent exact-head cutover evidence |
+| docs/APP_ASSEMBLY.md | Real named frontend/backend/engine/Mongo/Chroma topology; explicit Chroma persistence warning | Non-destructive migration and actual restore checks |
+| docs/ai/CONSUMER_READINESS_2026-10-31.md | Guard bootstrap, local chat, Chroma, payments, real Windows qualification and source-scan blockers | Maintain release hold while repairs are proven |
+| docs/qa/GUARDED_LOCAL_READINESS_2026-10-28.md | Shared epoch, backend writer custody, reviewer, tokenizer and actual Mongo topology still require integration | Build closed authority path, verify fail-closed behavior |
+| skeleton/forge/game_build_queue.py | Bounded game.build handler/queue, 120-second dispatch cap | Test end-to-end deadline, durable idempotence, generated project and proof |
+| skeleton/ai/runtime/operational_ai/laptop_runtime/README.md | Real GGUF and SQLite candidate, desktop workbench, separate native proof | Perform live GGUF/WSL/device tests; source-level casebooks are insufficient |
+| backend/core/dragon_crawler.py | Scoped Mongo crawl operations, leases, budgets, worker handles | Prove legal/technical transport, source grant, real backend bridge and withdrawal |
+| frontend/src/features/Jeeves/CrawlerWorkspace.tsx | Crawler workspace, authentication controls and frontend state machinery | Browser-driven authenticated capture/review and denied-action tests |
+| PR #4875 | Broad first-install candidate, 1,860 changed paths at observed head 646526a88f3406d4a9c3b0c253417ccdabdc919a | Candidate != merged/certified; evaluate latest exact head and failing gates |
+| PR #4876 | Dragon research/Atlas draft, 1,981 changed paths including large shared AI-tree overlays; head 14d8613cc2a9e7f465b8817623f5b78ad782d9a3 | Current-head targeted adapter/mirror checks succeeded; draft, broad skipped checks and deployment/release holds remain |
+| PR #4870 | AI mirror reconciliation stack, 1,667 changed paths | Determine canonical source, semantic parity and source pin breakage |
+| PR #4872 | First-install and backend/native bridge patch set | Test independently and reconcile into approved integration head |
+| PR #4686 | Very large offline cognition/reliability source candidate | Validate true runtime behavior; casebook quantity does not certify native operation |
+
+### External frontier reference baseline
+As of this audit, Godot's official release policy lists 4.7 as supported and 4.8 as development; actual project toolchains must be pinned from a verified stable artifact, not blindly upgraded by language-model advice. Engine Grounding, Artifact Completeness and Interactive Verification are explicit, useful evaluation dimensions in GameCraft-Bench (2026). GameXpert-Bench evaluates generation, defect repair and optimization as distinct skills. GameASG-Bench highlights the discrepancy between average check pass and strict whole-task pass. These findings justify independent input-driven play, rendering checks, and cumulative regressions at every integration milestone. Sources appear in Section 16. Do not extrapolate benchmark numbers into a claim about this repo without running an independently comparable suite.
+
+## 01. Product north star
+
+Skeleton must become a **coherent original-game production operating system**. A user with a legitimate brief, an appropriately provisioned local model, and admitted compiler/media tools should be able to turn an idea into an original playable product through one consistent cockpit. The workflow spans brief, design charter, prototype, playable iteration, assets, world state, characters, animation, audio, cinematics, content systems, game AI, QA, optimization, export, signing, distribution and post-launch repair. Multiple genres and engine targets are optional compatibility profiles, not excuses for unfinished base quality.
+
+### Mandatory user journeys, named J-01..J-18
+| ID | Journey | Hard exit condition |
+|---|---|---|
+| J-01 | First install on new Windows 11/WSL2 laptop | Setup is reachable even if engine unavailable; exact recovery steps, real local AI after trusted guard and model activation |
+| J-02 | Air-gapped native Jeeves | Actual verified GGUF dialogue, bounded cancellation and durable SQLite restart |
+| J-03 | From natural-language brief to a complete 2D game | User controls character, can win/lose/retry, sees assets/UI/audio, save/reload and actual engine boot |
+| J-04 | From brief to complete 3D game slice | Real models/materials, lighting, camera, collision, input and replay on target |
+| J-05 | Human in visual editor | Change a scene, character, quest and gameplay rule, undo, save, rebuild and observe effect |
+| J-06 | Agent assists without taking unauthorized control | One bounded proposal -> preview -> human approval -> canonical commit -> independent test |
+| J-07 | Dynamic story campaign | Reach at least two causally distinct valid endings, inspect choices and replay seeds |
+| J-08 | World simulation | NPCs remember events; factions, time and economy evolve without breaking quests |
+| J-09 | Assets & media | Original sourced/rights-cleared art, animation, effects, voice/audio and cinematic sequences actually render/play |
+| J-10 | Dragon grounded research | Owner-scoped lawful capture -> quote -> approve -> cite -> use in design -> withdraw -> invalidation |
+| J-11 | Game bug repair | Reproduce failing play trace; propose minimal patch; demonstrate regression pass and new play evidence |
+| J-12 | Generate, test and improve gameplay quality | Baseline/candidate run on held-out seeds, independent player judge and measured accepted improvement |
+| J-13 | Offline studio recovery | Crash/power loss in save/build/crawl/model call; restart without duplication or data loss |
+| J-14 | Cross-target export | Generate verified playable web+desktop packages; unsupported device features fail explicitly |
+| J-15 | Publish original work | Verify attribution/rights, SBOM, vulnerability policy, metadata, game package and rollback path |
+| J-16 | Multi-person production | Join scoped project, edit with conflict handling, audit decisions, review rights |
+| J-17 | Portfolio project management | Multiple projects, isolated identities/permissions, reusable permitted assets, cost budgets |
+| J-18 | Durable game maintenance | Save migration, hotfix, telemetry with consent, dependency updates, replayable QA and release chain |
+
+A **first-install-ready** release must meet J-01, J-02, J-03, J-05, J-06, J-11, J-13 and J-14 for declared targets, plus applicable identity/rights/security gates. A later fully capable studio must prove all eighteen. Marketing-level “full” requires explicit feature/target matrix, not an unfalsifiable global label.
+
+## 02. Source diagnosis: critical missing seams
+
+1. **Local AI guard composition:** docs say the default local provider enforces a sealed-context guard yet default Compose lacks its trusted bootstrap. Do not bypass it. Share a fenced epoch across backend/engine, establish writer custody, real independent reviewer and tokenizer attestation; preserve historical stores.
+2. **Mongo source authority:** default standalone Mongo cannot provide the primary-bound linearizable reads needed for the documented fence. Replica-set topology and real concurrent write tests are acceptance dependencies.
+3. **Chroma storage:** the /data write path mismatches the existing volume mount and full mode is blocked. Preserve both legacy sources and prove a non-destructive migration; do not silently recreate containers.
+4. **Windows reality:** a previous hosted installer test is not current-head or target laptop proof. Independently qualify Windows 11/WSL2, Docker, verified GGUF runtime, browser UI, actual Godot and disk-pressure/restart.
+5. **Game completeness:** mainline README describes Godot 4 generation and CORE_LOOP_OK proof but says sprites, meshes, audio, complete input-driven play, multiplayer and driving simulation are not finished. Code for any of these on draft heads must be evaluated as candidates until real adoption and proof.
+6. **Quality confounds:** simulation traces, model judging and source-side fixtures alone do not prove player enjoyment, comprehensible feedback or export-ready polish. Require independent play, human reports and improvement tests.
+7. **AI migration custody:** staged mirrors and unsigned implementation+verification signoffs create accidental split brain risk. Complete exact source object and semantic parity audits before cutover.
+8. **Dragon Atlas integration:** PR #4876 remains draft; its latest-head targeted backend adapter and mirror checks succeeded on 2026-11-07, superseding earlier failed runs. Deployment-matched authenticated Mongo/transport and release qualification remain unverified.
+9. **Native laptop workbench:** source docs describe genuine GGUF/SQLite paths and distinguish native receipt quality from input-driven studio integration. Bridge tools only via approved, finite, authenticated contracts.
+10. **Payments/marketplace:** checkout and premium upgrade lack atomic settlement and verified entitlement delivery. Preserve holds until webhook replay, concurrent settlement and consumer recovery are proven.
+11. **Historical security:** readiness docs report historical secret findings and frontend dependency advisory. Triage every real secret, rotate if necessary and reject blanket suppression.
+12. **Unbounded feature catalogs:** hundreds of plan volumes and thousands of paths create false-completion risk. Attach claims to landed exact SHA, tested binaries, actual device trace and independent owner.
+13. **PR overlaps:** active PR stacks contain shared AI mirror and game-forge paths; avoid mechanically merging same assets from #4870/#4875/#4876 without overlap/dependency resolution.
+14. **Toolchain correctness:** host glibc binaries are not valid merely because an Alpine service mounts them; compiler/emulator rights, ABI, sandbox, firmware and hardware are separate admission requirements.
+15. **Content quality:** original asset and story generation requires provenance, style continuity, animation+audio integration, playable tests and an explicit distinction between placeholders and shipped content.
+16. **Autonomy/authority:** automated workers must not promote their own spec, acquire rights, spend unlimited money, modify private credentials, merge unqualified PRs or claim launch readiness without independent evidence.
+
+## 03. Gap taxonomy and prioritization
+
+Use the following stable priorities: **P0** release-blocking system reality and user data safety; **P1** finished single-player vertical slice; **P2** integrated professional creator workflow; **P3** advanced simulation and multiplatform; **P4** frontier research experiments. Ranking within a priority: actual user harm > unavailability > broken core loop > irreversible asset loss > rights exposure > build cost > UX debt > aesthetic polish > optional breadth. A newly found blocker can supersede a backlog lane only with recorded evidence and critical-path rationale.
+
+Work IDs are BOT-NN-WMM. Each work ID MUST reference canonical owner paths, a source head, dependency IDs, existing masterplan/queue links if applicable, an implementation delta, expected user effect, deterministic checks, adverse tests, live proof, and independent reviewer. Mark **UNKNOWN** rather than inventing absence from limited sampling. Feature statuses: discovery / planned / source-candidate / compilation-proven / integration-proven / play-proven / target-proven / independently-verified / released. Refuse automatic transitions.
+
+## 04. Completion doctrine
+
+### Maturity levels
+- M0 inventory only: name and ownership without runtime proof.
+- M1 spec: schemas, finite permissions, behavior and failure semantics reviewed.
+- M2 implementation: concrete executable code, static inspection, unit and type tests.
+- M3 integrated: canonical API/CLI/UI/queue/database/engine path passes with real dependencies.
+- M4 interactive: actual input-driven test, scene rendering, feedback, save, crash and replay.
+- M5 target: real target OS/hardware, long-run resource/thermal constraints, representative users.
+- M6 release: independently approved exact-head security, artifact, licensing and rollback evidence.
+No level may be skipped. An M2 module in a 1000-file PR is **not** an M5 feature. Completion numerator counts accepted user journeys, not generated LOC.
+
+### Quantified acceptance score
+Measure weighted journey completion, severity-weighted unresolved blockers, actual play coverage, platform qualification, source/right provenance and independent tests. Report six axes separately: reliability; accessibility; creative control; game quality; toolchain coverage; privacy/security. A composite index is for navigation only and cannot cancel a hard failed gate. Disaggregate performance by device profile (low-memory, medium laptop, GPU workstation), input device, network condition, game genre, accessibility option and install lifecycle.
+
+### “Beast mode” means integration, not opaqueness
+A labyrinth of components is acceptable only when boundaries are typed, owned, observable, explainable, versioned, testable and fully recoverable. Complexity without meaningful user capability is negative engineering value. Favor a small path that can make one exceptional game over 10000 inactive modules. The frontier target is trustworthy production throughput: one prompt creates a compelling editable game; an agent can *play* it, detect a meaningful defect, fix it and preserve all existing functionality.
+
+## 05. The 12-bot federation
+
+| Bot | Exclusive primary remit | Boundary | First major result |
+|---|---|---|---|
+| BOT-01 | First install, deployment, persistence recovery | skeleton/app, installers, Compose, Windows | trusted local AI and clean install |
+| BOT-02 | Canonical architecture, data contracts, ledgers | architecture, identity, schemas, lineage | one authoritative and audited state model |
+| BOT-03 | Jeeves runtime, native model, cognition | skeleton/ai/runtime, model/runtime/training | real guarded inference with durable tooling |
+| BOT-04 | Creative director and autonomous studio | Jeeves agents, forge orchestration | bounded agent generates/repairs full game |
+| BOT-05 | Worlds, narrative, canon, simulation | worlds, quest/story/state | causally correct persistent world |
+| BOT-06 | Gameplay, physics, NPC intelligence | game/gameplay, combat/input | complete controller-driven core gameplay |
+| BOT-07 | Procedural game and level generation | game builder/procgen | varied solvable replayable campaigns |
+| BOT-08 | Art, asset, animation, cinematics, audio | asset/media pipelines | real output integrated in play |
+| BOT-09 | Godot/web/mobile/desktop/retro builds | compiler/toolchains/export | verified playable target packages |
+| BOT-10 | Dragon crawler, lawful knowledge and Atlas | webcrawler/Dragon backend | live authorized capture-to-game bridge |
+| BOT-11 | Creator UX, collaboration, commerce | frontend/product/backend UI | cohesive usable visual studio |
+| BOT-12 | Integration, red-team, QA and releases | CI, assurance, repo/cross-plane checks | independent exact-head acceptance |
+
+### Concurrency and ownership law
+Twelve bots means at most **twelve authorized concurrent bot roles**, not twelve overlapping writers. Each work order has exactly one owning bot. Cross-bot patches require an interface contract and the dependent bot's review. BOT-12 owns verification but cannot fabricate test evidence or overrule security holds. BOT-01 controls installation and state migration. BOT-02 controls schema and authority changes. BOT-03 controls inference activation and resource fences. BOT-09 controls target toolchains. BOT-10 controls crawler transport/rights. Product-facing changes require BOT-11 review. Frontend design, structured objects and binary artifacts remain canonical owner outputs; a new assistant chat log is not a second data store.
+
+### Federation operating cycle
+1. Snapshot main, candidate PR heads, CI and source state. Pin exact SHAs and working path leases.
+2. Apply preflight admission: actor/tenant rights; permissions; disk/memory/time; branch graph; edit scope.
+3. BOT-02 issues schema/interface constraints; each bot derives a finite artifact and acceptance dossier.
+4. Partition by unique owner and changed-path overlap. Serialise conflicting mutations.
+5. Build only affected graph nodes; run focused checks after **complete** code edits rather than continuously mutating untested half-steps.
+6. Run integration tests with real service, client and game engine when required. Produce signed evidence where policy demands it.
+7. BOT-12 independently reviews current head, observed executable/game, adverse conditions, security scans and source rights.
+8. On conflict, fail, drift, source revocation or device uncertainty, preserve draft with recorded next blocker.
+9. Merge only per existing protected branch policy; release only after separate human/operator authorization.
+10. Feed defects back to originating owner; no circular self-approval, phantom status or default retry storm.
+
+## 06. Critical path and implementation sequence
+
+```text
+P0-A: Source/object census and PR conflict map (02+12)
+       -> P0-B: trusted authority & model bootstrap (01+02+03)
+       -> P0-C: install + backend + native + browser + storage (01+03+11)
+       -> P0-D: basic real Godot vertical slice (04+06+08+09)
+       -> P0-E: actual independent play and repair (04+09+12)
+       -> P0-F: cold restart, backup/restore and target laptop (01+02+12)
+       -> P0-G: exact-head protected release candidate (12; human approval)
+
+P1: Full 2D genre kit -> visual world editor -> authored assets -> quest + save
+P2: Complete 3D slice -> physics, rigs, cameras, sound -> gameplay QA
+P3: Narrative/campaign -> procedural safety -> adaptive NPC/director
+P4: Dragon lawful research -> referenced knowledge -> approved mechanics
+P5: Multi-agent studio -> project branching, reviews, code+no-code parity
+P6: Desktop/web/mobile/export, mods, collaboration and commerce
+P7: Frontier R&D: real-time synthesis, world digital twins, neural asset tooling,
+    interactive self-play, emergent complex narrative, higher-end engines;
+    no release claim before replacement of hypotheses with runtime proof.
+```
+
+Within any milestone, unblock the next real user journey before increasing catalog breadth. A 10x file-count gain that leaves the install broken has zero critical-path credit. Prefer source-closed modifications over parallel PR floods. Explicitly bind source, test and device receipts to the same final SHA.
+
+## 07. Common architectural contracts
+
+Every substantial subsystem must expose these typed interfaces, retaining existing canonical names where already present:
+
+- **Principal:** tenant, actor, capability grants, consent/rights, role, session and private audit identity.
+- **WorkIntent:** request id, source head, desired project revision, schema, finite tools/actions/model calls, deadline, budget, priority, dependency refs and explicit operator authorizations.
+- **Plan:** immutable source-and-input commitments, ordered DAG tasks, intended side effects, reversible/irreversible stages and materialized manifests.
+- **WorkLease:** exactly scoped resource reservation, physical worker token, heartbeat epoch, cancellation, join and idempotent recovery.
+- **Artifact:** source lineage, content digest, media type, size, game-target profile, rights, compiler/model/tool receipts, immutable URL/reference and retention.
+- **Evidence:** type, source head, host profile, method, original trace/log, digest, observation time, pass/fail/skip classification, bounded redactions, verifier identity and chain.
+- **GameSnapshot:** project id, revision, RNG algorithm/seed, scene/world/quest graph IDs, asset refs, player state, compatible save schema and event ledger.
+- **EditorCommand:** exact owner/revision, typed mutation and preview/undo semantics with deterministic validation; model output is merely a proposal.
+- **BuildContract:** source tree, pinned toolchain, target capabilities, dependency graph, compilation, interactive proof and packaging expectations.
+- **ReleaseCandidate:** immutable aggregate of verified artifacts and independent approvals; cannot be inferred from all-green summary without exact-head checks.
+
+A contract's version must be public to all consuming bots. Breakages require a migration test matrix, not separate undocumented variants. Unknown versions fail closed. HTTP, CLI, frontend and native desktop project the same state rather than creating shadow-truth. No untrusted document grants permissions, no implicit internet for offline work, no inherited owner privilege and no synthetic evidence.
+
+### Suggested work order shape
+```yaml
+schema: skeleton.grokbot.work_order.v1
+id: BOT-06-W01
+bot: BOT-06
+status: discovery
+priority: P0
+source:
+  repo: Apeloff1/Skeleton
+  main_sha: e00bfb0809b34573c2df313ea16e17fd10bead38
+  candidate_head: null
+ownership:
+  canonical_paths: []
+  integration_paths: []
+  intersecting_prs: []
+dependencies: []
+user_journeys: [J-03]
+requirements:
+  current_behavior: "unknown until executable proof"
+  intended_behavior: "real input-driven, finishable loop"
+  authority: "gameplay runtime and canonical game project"
+  fail_closed_cases: []
+deliverables:
+  source_changes: []
+  golden_games: []
+  migration_changes: []
+  proof_receipts: []
+verification:
+  focused: []
+  integrated: []
+  interactive: []
+  target: []
+  adversarial: []
+  independent_reviewer: BOT-12
+promotion:
+  source_exact_head: null
+  required_workflows: []
+  known_holds: []
+  result: not_claimed
+```
+
+## 08. Cross-cutting invariants
+
+**S-01** Model output is always untrusted until typed, admitted and committed by an owner.
+**S-02** Every external source and binary preserves consent, rights, origin, hashes, expiry and withdrawal propagation.
+**S-03** All remote interactions use explicit network/host/IP/redirect protection and finite byte/time/page budgets; no SSRF or implicit credential forwarding.
+**S-04** All file operations on untrusted roots use descriptor-relative bounds or equivalent safe primitives, no parent symlink traversal, no TOCTOU assumption, no unbounded reads.
+**S-05** Never log secrets, full prompts, raw untrusted HTML, private source bodies or sensitive credentials into public PR/CI receipts.
+**S-06** Tenant, principal, source and project identities are bound at creation, reading, mutation, scheduling, background work, export and retention.
+**S-07** Missing/uncertain source authority, primary fencing, signatures, entitlement and native worker join are denial conditions.
+**S-08** Payments require atomic idempotent settlement, verified webhook identity, entitlements and refund/reversal consistency.
+**S-09** Unsafe model/asset/media rights disallow generation, voice cloning, publication and training until explicitly approved.
+**S-10** Offline mode does not hide a hosted fallback or silent telemetry.
+**S-11** A tool's ability to produce a source file is not permission to run arbitrary executable instructions.
+**S-12** Hardware overload, disk exhaustion and cancellation must degrade use safely, retaining evidence and recoverability.
+**S-13** Replay, resume and retry cannot double count game events, AI inference, payments, crawls, training or artifact publication.
+**S-14** A sandbox cannot be bypassed by compatibility code, plugin, import, archive extraction or indirect subprocess.
+**S-15** Autosave, branch switching, merges and migrations are transactionally safe and independent of LLM promises.
+**S-16** Unfinished PRs stay drafts or otherwise explicitly blocked; passed sibling jobs are not overall qualification.
+**S-17** All critical claims reference actual current source, host, workload and observed behavior; no paper-only certification.
+**S-18** Every subsystem supports accessible operation, diagnosable failure and reversible correction where possible.
+
+## 09. Universal proof matrix
+
+| Probe | Required meaning |
+|---|---|
+| Static source | syntax, typing, lint, contract, SBOM and ownership consistency |
+| Unit | deterministic pure-contract behavior, bounds, state machines and adverse inputs |
+| Integration | actual backend/engine/queue/database/filesystem/identity path, not mocked siblings |
+| Native | actual loaded GGUF, compiler, Godot, emulator or platform binary at admitted pinned version |
+| Interactive | recorded player inputs, observed state transitions, frames, audio where applicable and finished core loop |
+| Crash/fault | process kill, network outage, stale lease, concurrent writer, low disk/memory, restart and source revocation |
+| Security | threat model, fuzzing, malicious payloads, path races, permission isolation, dependency+malware+secret gates |
+| Accessibility | keyboard/controller/touch navigation, assistive text/audio, reduced motion, contrast and captions |
+| Performance | startup p50/p95/p99, frame pacing, memory/VRAM, CPU utilization, model tokens/sec, long-run leaks |
+| Quality | blind human observation, independent UI agent play, objective success/fail, comparative held-out regressions |
+| Target | exact OS/device/toolchain build, executable start, file IO, rights, save/resume and uninstall/update |
+| Release | verified artifact, source exact SHA, approvals, rollback, independent attestation and support docs |
+
+### Minimum golden games
+G1: top-down action shooter with waves, movement/combat, HUD, inventory/resource sink and victory. G2: platformer with actual grounded jumps, collisions, hazards, camera and level finish. G3: roguelike RPG with generation seed, inventory, dialogue, quest and save/reload. G4: 3D exploratory micro-world with full input, collisions, NPC, animation and spatial audio. G5: driving/racing demonstration with genuine steering/traction/checkpoints. G6: strategy/puzzle with solvable state transitions. Each is a distinct code/asset/runtime artifact, not merely a manifest entry; mark unsupported exports as held. At least one broken golden fixture must be diagnosed and repaired using Jeeves through a human-approved patch and independently replayed proof.
+
+Acceptance for a single game is conjunctive: install/load AND input AND scene render AND objective AND reward/failure AND restart/save AND target ABI AND no fatal error. No averaging across these conditions.
+
+## 10. Work scheduling, mutation and evidence
+
+Each bot accepts only bounded tasks within its write authority. Work-ready means necessary source objects exist; dependencies are merged or explicitly available as isolated tested inputs; owner is uniquely assigned; tests are known; no active hold is hidden. A “workload” is not counted as delivered until remote GitHub contains actual code changes and a machine-verifiable change SHA. PR creation and test dispatch are separately tracked. Push failures, tool outages, branch drift and GitHub permission restrictions are explicit blocked conditions, never simulated success.
+
+Every 12-bot cycle: obtain exact branch refs; update discrepancy registry; select dependency-unblocked high-priority jobs; reserve paths; implement one complete coherent subsystem; run focused tests; run integration and playtest if needed; independently review; publish draft PR or append to existing owning PR; surface failures with first reproducible blocker; release path leases. Where PR edits overlap, stop and reconcile against upstream commit DAG before any merge. Do not force-update main, override branch protections or suppress security blockers. Budget remaining time, disk, latency, physical worker slots and model context, with a terminating plan on exhaustion.
+
+**Source of truth:** Git object+receipt > executed test > verified runtime artifact > PR description > README > planning metadata > agent statement. Disagreeing lower-priority records become a tracked discrepancy, not silently rewritten truth.
+
+---
+
+# 11. Detailed twelve-bot backlog and technical design dossiers
+
+These work orders are **proposed completeness obligations**, not claims that a feature is absent or unfinished until exact source/runtime evidence identifies its current maturity. Each task must be reconciled with an existing owner and PR before editing. Work IDs remain stable across revisions and are meant to drive GitHub issues, artifact manifests and test plans. Detailed source authority and exact accepted interfaces are to be concretized from the full clone, never invented. All baseline/test results are UNKNOWN until evidenced.
+
+## BOT-01 — First install, hardware, native recovery and deployment
+
+**Primary owner boundary:** skeleton/app, scripts/install_app.py, scripts/windows, docker-compose.yml, machine/ai_first_install.json. **Default priority:** P0. **Coordination edges:** 01->02/03/11/12. **Integration contract:** bot 01 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-01-W01 — Clean-host installation transaction
+
+**Capability and expected mechanism.** Stage preflight, private configuration, dependency installation, volumes, service boot, readiness and atomic install receipt. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Interrupted staging must preserve old installation and demand an explicit resumable action. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Windows/WSL2 and Linux fresh installs with reboot at each transaction boundary. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W02 — Trusted sealed-context guard startup
+
+**Capability and expected mechanism.** Connect common Mongo epoch, backend writer authority, bounded reviewer, tokenizer attestation and canonical engine without runtime bypass. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Missing verifier, unsigned policy, unknown writer or insufficient privileges blocks inference. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Real backend-engine-Mongo-replica integration with adversarial stale-writer traces. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W03 — Replicated Mongo epoch custody
+
+**Capability and expected mechanism.** Establish replica-set authority, primary-bound read concern, idempotent migrations, persisted epoch and writer fencing. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Primary transition or split epoch cannot admit writes or create divergent histories. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Concurrent mutation and primary loss/recovery on two real application processes. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W04 — Chroma persistence reconciliation
+
+**Capability and expected mechanism.** Inventory legacy container /data and named volume, backup both, compare digests and migrate into qualified durable mount. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unknown divergent histories are quarantined; do not recreate/remove old container. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Backups restored to isolated volume and exact query/readback equivalence independently checked. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W05 — First-run setup isolation
+
+**Capability and expected mechanism.** Serve setup UI independent of Mongo/backend/guard/AI readiness and show exact categorized failure. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Setup never claims inference, payments, crawler or model availability from service health alone. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Disable each dependent service and verify setup renders and guides actionable recovery. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W06 — Windows standalone installer
+
+**Capability and expected mechanism.** Package pinned Python, launcher, signed manifest, safe uninstall, repair and first-start UI. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never silently remove state, leak private passwords or claim a hardware run from hosted CI. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Exact-head hosted Windows build followed by physical Windows 11 laptop install, repair, upgrade, rollback. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W07 — WSL2 and Docker alignment
+
+**Capability and expected mechanism.** Detect WSL distro, architecture, Docker integration, file mount paths, ports, DNS and CPU/IO quotas. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Refuse invalid ABI and absent daemon instead of attempting privileged auto-installs. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cold launch, Docker reset, WSL restart, sleep/wake and browser-origin smoke. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W08 — Offline install artifact
+
+**Capability and expected mechanism.** Package pinned application images, runtime, opt-in models, legal toolchains, checksums and licenses as staged bundle. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Missing optional model never triggers hidden online fetching or fallback. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Fully disconnected install with explicit negative cases and local GGUF inference. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W09 — Resource preflight estimator
+
+**Capability and expected mechanism.** Probe real RAM, VRAM, disk, swap, CPU, thermal signals, cgroup and model footprint before admission. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No speculative capacity overcommit; unknown telemetry means conservative limited mode. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Low-RAM, disk-full, GPU-unavailable and competing-worker pressure benchmark. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W10 — Native GGUF first conversation
+
+**Capability and expected mechanism.** Guide user through source-approved model, hash, template, runtime, owner state and durable chat. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Invalid artifact, missing tokenizer or absent guard fails closed with safe diagnosis. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** End-to-end live model reply, cancellation, reopen, token count and unchanged existing sessions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W11 — State and credential initialization
+
+**Capability and expected mechanism.** Create private durable secrets, owner setup, service credentials, permissions and index bootstrap once. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No shared admin password, first-user elevation or secret echo in logs. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Fresh and repeated install compare stable identity/secret bytes with no plaintext leak. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W12 — Upgrade migration manager
+
+**Capability and expected mechanism.** Version manifests, schema migrations, backup snapshots, compatibility mapping, app and model updates. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unsafe downgrade or unsupported source state blocks before mutation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Historical installation upgrade, state graph hash comparison and cold restore. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W13 — Installer rollback and repair
+
+**Capability and expected mechanism.** Reconstruct component state by receipts without deleting external Docker assets. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Failure halfway through package replacement retains known-good launcher and data. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Kill process during extract, configure, service boot and finalize; inspect recovery. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W14 — Startup supervision
+
+**Capability and expected mechanism.** Bind service health, dependency order, jittered bounded retries, failure categories and authenticated readiness. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Infinite restart loops and force-recreation under data uncertainty forbidden. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Restart engine/backend/Mongo individually and validate truthful health transitions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W15 — Operating system lifecycle
+
+**Capability and expected mechanism.** Manage suspend/resume, shutdown, power loss and local-network change with durable worker join. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Interrupted tasks remain pending or terminal until physical worker outcome known. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Target laptop lid close/reopen, WSL termination and corrupted-cache reproduction. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W16 — User data backup control
+
+**Capability and expected mechanism.** Define complete backup of Mongo, SQLite, Chroma, assets, keys, manifests and saves with compatible consistency points. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Partial snapshot is not presented as recoverable; do not rotate keys during backup. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Offline restore into clean host with per-object checksum and logical integrity queries. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W17 — Runtime model manager
+
+**Capability and expected mechanism.** List verified model profiles, download/provision, storage accounting, choose active model, rollback selection. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never overwrite old checkpoint or silently convert model template. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Test switching chat/coding profile while preserving established receipts and sessions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W18 — GPU driver and ABI qualification
+
+**Capability and expected mechanism.** Detect native provider backends, architecture, driver, Vulkan/Metal/CUDA options and fallback CPU admission. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** A mounted binary path is not proof of ABI; no implicit arbitrary executable. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Per-device executable smoke and memory-pressure proof of selected backend. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W19 — Dependency update pipeline
+
+**Capability and expected mechanism.** Pin image digest, Python/npm dependency set, runtime build inputs, SBOM and vulnerability status. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unreviewed transitive dependency cannot silently promote release. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Rebuild image with exact source head, compare staged receipts and independent dependency gate. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W20 — Engine and compiler installer
+
+**Capability and expected mechanism.** Offer pinned Godot and user-authorized optional SDKs/cores with explicit provenance and legal boundaries. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No unauthorized firmware/ROM/SDK downloads or root privilege. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Actual Godot headless boot and licensed optional native target smoke. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W21 — Service diagnostics archive
+
+**Capability and expected mechanism.** Produce bounded redacted sanitized support packet containing service status, versions, source head and failing gate. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Omit prompts, secret values and raw captured pages. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Reviewer can reproduce failure from sanitized artifact while secret canary tests stay clean. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W22 — Real release channels
+
+**Capability and expected mechanism.** Define nightly/beta/stable attested manifest, update and support policy. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unknown binary signing provenance blocks stable artifact. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Signed source-exact installer, independent QA and rollback practice. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W23 — Install accessibility
+
+**Capability and expected mechanism.** Make setup keyboard navigable, localized, reduced-motion and screen-reader legible. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Recovery prompts cannot require mouse-only or network access. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Accessibility audit including failed-backend state and mobile-width browser. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-01-W24 — Targeted installation endurance
+
+**Capability and expected mechanism.** Sustain repeated upgrade/repair/reboot cycles on constrained laptop. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No SQLite journal leakage, data loss, handle leak or cumulative model download. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** 20-cycle qualification with snapshots and independent metrics. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-01 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
+
+## BOT-02 — Canonical architecture, ownership, state, schemas and integrity
+
+**Primary owner boundary:** machine/architecture.json, machine/ai_file_tree.json, skeleton/app, skeleton/api, backend/core, skeleton/provenance. **Default priority:** P0. **Coordination edges:** 02->all. **Integration contract:** bot 02 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-02-W01 — Repository source/object census
+
+**Capability and expected mechanism.** Enumerate tracked files, Git objects, submodules, LFS, generated routes, canonical providers, all open PR overlays. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Partial search results must be labeled partial and never imply complete audit. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Independently count and hash full tree against pinned main and candidate refs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W02 — Single-authority topology
+
+**Capability and expected mechanism.** Assign one owner per storage mutation, workspace, ledger, AI provider, game editor, renderer and export. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Duplicate live writer must be quarantined or converted into read-only facade. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Build endpoint-to-owner map and prove side-effect path from UI/API/CLI. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W03 — Domain entity schema registry
+
+**Capability and expected mechanism.** Version Project, World, Scene, Asset, Actor, Quest, Build, Capture, Model, WorkOrder, Receipt and Rights. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unknown versions and nondeterministic coercion rejected before mutation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Backward/forward compatibility fixtures plus normalized serialization roundtrip. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W04 — Event journal determinism
+
+**Capability and expected mechanism.** Define event IDs, idempotency, ordered append, transactional snapshots and source digest commitments. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Lost or reordered events cannot produce false accepted state. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cold replay of varied game/crawl/bot histories produces identical state digest. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W05 — Workspace branch and revision system
+
+**Capability and expected mechanism.** Enable project edit isolation, snapshots, merge, semantic conflicts, undo/redo and restoration. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Last writer cannot silently replace a newer revision. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Concurrent editor/model mutations with revision compare-and-swap. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W06 — Model-to-command authority bridge
+
+**Capability and expected mechanism.** Compile proposed tool actions into typed, validated, scoped deterministic commands. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Prompt injection or generated JSON cannot mint a capability or grant. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Property tests on malformed tool outputs, grants and parser boundaries. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W07 — Cross-store identity and epoch
+
+**Capability and expected mechanism.** Bind backend Mongo, engine Mongo, SQLite and asset storage to consistent tenant/project/epoch. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Quiescence assertion does not imply known writers stopped. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Mixed-version writer fencing, restart and replica-set failure suites. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W08 — Physical-resource reservation ledger
+
+**Capability and expected mechanism.** Account CPU, GPU, RAM, disk, network and worker capacity with lease ownership and actual join. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Timeout cannot release a physically running native process. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Double-booking and cancellation race stress with bounded physical resources. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W09 — Immutable artifact content store
+
+**Capability and expected mechanism.** Use content digests, immutable storage refs, provenance, per-tenant ACL and consistent lifecycle. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** GC cannot delete live referenced content or expose another tenant. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Corrupted-object, dedup/refcount and concurrent publication tests. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W10 — Rights and source lineage graph
+
+**Capability and expected mechanism.** Propagate attribution, license, consent, source origin, revocation and dependency invalidation. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Invalidated rights cannot survive in cached recommendations or exports. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Transitive withdrawal through derived mechanic, asset, knowledge and model inputs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W11 — Game snapshot schema
+
+**Capability and expected mechanism.** Represent world/scene/quest, actor, economy, RNG, AI, controller, audio and save compatibility. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unknown action/entity or mismatched level seed blocks recovery. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Stable save/replay across cold restart and committed migration. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W12 — Canonical build dependency DAG
+
+**Capability and expected mechanism.** Track source edits -> generated assets -> Godot project -> playtest -> package -> release. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Stale downstream proof cannot remain valid after source change. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Single-file mutation invalidation reaches exactly affected proofs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W13 — API and CLI parity
+
+**Capability and expected mechanism.** Unify public route schemas, command errors, identity, limits, pagination and idempotency. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No shadow ownership via duplicate API entrypoints. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Property-based CLI vs authenticated HTTP side-by-side comparison. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W14 — Eventual consistency disclosure
+
+**Capability and expected mechanism.** Classify linearizable, snapshot and eventual reads; expose stale/unknown state intentionally. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Uncertain currency/entitlement/auth state never treated as confirmed. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Network partition tests for each observable consistency contract. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W15 — Type-safe extension registry
+
+**Capability and expected mechanism.** Register plugins, genres, codecs, engines and resource adapters by explicit versioned capabilities. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** New plugin cannot bypass sandbox, network, payment or content policy. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Unknown capability schema rejection and signed package import tests. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W16 — Schema migration engine
+
+**Capability and expected mechanism.** Plan monotonic migration revisions, backups, readback and interrupted replay. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Migration does not fabricate missing records or silently rewrite history. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Mid-migration process kill, restart, drift and downgrade tests. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W17 — Multi-tenant authorization graph
+
+**Capability and expected mechanism.** Enforce scoped principal roles, project grants, group membership and least privilege. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Cross-tenant lookup must not reveal object existence by timing or error. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Fuzz endpoints, jobs, exports and caches with owner/tenant swaps. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W18 — Audit and privacy lifecycle
+
+**Capability and expected mechanism.** Configure retention, export, tombstones, erasure eligibility and historical evidence custody. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Delete request cannot erase unrelated tenants or preserve withdrawn source in retrieval. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cascaded deletion and recovery policy tests over all stores. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W19 — Package and artifact interchange
+
+**Capability and expected mechanism.** Encode stable typed manifests for worlds, assets, builds, mods and external toolchains. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Path traversal, zip bombs and unsupported codec fail before side effects. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Import/export roundtrip on mixed-size original user-owned projects. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W20 — Dependency-aware GC
+
+**Capability and expected mechanism.** Remove expired bytes and checkpoints only after committed ownership and legal hold checks. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Race between writer and collector cannot delete active artifacts. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Fault injection around publication, lease release and object retirement. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W21 — Query planner and indexes
+
+**Capability and expected mechanism.** Offer bounded world, spatial, graph and text search using declared indexes. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Query complexity cap must prevent memory exhaustion and cross-project leakage. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Large synthetic-world benchmarks, index rebuild and low-memory fault cases. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W22 — Semantic mirror and facade retirement
+
+**Capability and expected mechanism.** Reconcile 182 mapped files, 181 native owners, import routes, AST/byte parity and cutover signoffs. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Staged mirror not authoritative while signed cutover missing. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Exact-head AI-tree validator, semantic parity and independent evidence. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W23 — Architecture lint and dependency banlist
+
+**Capability and expected mechanism.** Prevent forbidden imports, bypasses, cyclical services, hidden providers and duplicate app creation. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Inadmissible dependency cannot be excused as mere compatibility. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Static dependency graph plus runtime import/route trace. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-02-W24 — Formal ownership and decision log
+
+**Capability and expected mechanism.** Require ADR for authority changes, source migrations and irreversible behavior changes. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No assistant may silently edit state-owner contract in another bot's lane. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** ADR to code to test and signoff linked at final SHA. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-02 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
+
+## BOT-03 — Jeeves native intelligence, cognition, resource fabric and tool supervision
+
+**Primary owner boundary:** skeleton/ai/runtime, skeleton/ai/model_runtime, skeleton/ai/training, skeleton/ai/agents/jeeves. **Default priority:** P0/P1. **Coordination edges:** 03->01/02/04/10/12. **Integration contract:** bot 03 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-03-W01 — Real local inference activation
+
+**Capability and expected mechanism.** Wire verified GGUF runtime, model digest, tokenizer, template, backend and guarded engine. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never claim model quality from provisioned file alone. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Live response/cancellation/cold restart on installed laptop. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W02 — Adaptive hardware admission
+
+**Capability and expected mechanism.** Plan context, batch, threads, GPU offload, RAM/VRAM, swap and disk spill from measured signals. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Overcommit, thermal overload and unknown system memory fail into conservative limits. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Sustained inference under CPU/GPU/swap pressure and physical worker audit. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W03 — Durable instruction hierarchy
+
+**Capability and expected mechanism.** Keep system, user, tools and external evidence roles separate with provenance and finite serialization. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Role delimiter injection and untrusted page text never become privileged. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Native GGUF adversarial test with exact serialized token frames. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W04 — Model tool planner
+
+**Capability and expected mechanism.** Parse typed JSON tool intents, schema check, dry-run and require scoped grants. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Invalid or ambiguous action has no side effect. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Adversarial tool argument corpus through real owner APIs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W05 — Live token stream and commit protocol
+
+**Capability and expected mechanism.** Deliver incremental output with ordered chunk IDs, cancel and final durable checkpoint. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Partial output never authorizes a code commit or release. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Backpressure, client disconnect and retry replay without duplicate inference. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W06 — Long-context relevance manager
+
+**Capability and expected mechanism.** Budget instructions, source facts, history, task plans and summaries with verifiable omission metadata. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never silently drop an active grant or confuse prior tenant history. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Long project conversation retrieval + position-swap stress. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W07 — Project-scoped durable memory
+
+**Capability and expected mechanism.** Store reviewed facts/preferences, code decisions, correction history and explicit retention policy. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Source revocation removes eligibility without rewriting unrelated chat. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Memory restart, selective erase and stale-snapshot tests. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W08 — Multi-model capability routing
+
+**Capability and expected mechanism.** Route optional specialized small/large local and hosted models by explicit policy and measured task ability. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Offline user never silently sends data to remote host. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Each configured route records model identity and privacy decision. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W09 — Native execution spine recovery
+
+**Capability and expected mechanism.** Persist request, lease, action, receipt and cold restart, with exactly-once committed side effects. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Timed-out worker retains physical slot; uncertain result blocks replay. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Kill child during token, patch, tool and commit phases. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W10 — Model output validation firewall
+
+**Capability and expected mechanism.** Check schema, token/control delimiters, UTF-8, max output, finiteness, budgets and typed constraints. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Invalid finish/tool shape denied before owner mutation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Fuzz tokenizer, model output and tool parse with zero unsafe mutations. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W11 — Source-bound coding agent
+
+**Capability and expected mechanism.** Supply authorized source snapshots, patch proposals and exact file hash custody. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No arbitrary filesystem, shell command or unreviewed auto-apply. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Generate/edit code, apply only after user grant, run real diff/test. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W12 — Independent review deliberation
+
+**Capability and expected mechanism.** Use separately configured finite critical reviewer on same immutable candidate and source. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Mere repeated sampling by same model is not represented as independent. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Review disagreement and failed-attestation trace. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W13 — Creative/game-design specialty profiles
+
+**Capability and expected mechanism.** Register bounded game systems roles with genre/engine domain constraints. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No profile may invent compiler/toolchain readiness. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Compare game design outputs on fixed held-out brief families. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W14 — Retrieval + knowledge synthesis
+
+**Capability and expected mechanism.** Fuse lexical, embeddings, graph, reviewed notes and source-cited retrieval. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Withdrawn or unlicensed text must be excluded before prompt formation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Source dependency revocation with RAG cache invalidation. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W15 — Agent planning with checkpoints
+
+**Capability and expected mechanism.** Turn broad goals into atomic tasks, expected artifacts, budgets and evidence gates. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Infinite loops, deadlocks and unbounded tool costs terminate honestly. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Interrupt and resume multi-step game editing campaign without repeats. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W16 — Model candidate evaluation
+
+**Capability and expected mechanism.** Test code generation, debugging, visual reasoning, narrative and tool correctness separately. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** One aggregate win rate cannot certify every game family. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Held-out tasks, real engine evaluation and error taxonomies. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W17 — On-device inference optimization
+
+**Capability and expected mechanism.** Profile KV cache quantization, prompt reuse, prefill, microbatching and speculative decode where safe. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Speedup claim needs measured TTFT and output correctness tradeoff. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Reproducible low/medium/high spec device benchmark. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W18 — Optional multimodal perception
+
+**Capability and expected mechanism.** Admit image, sound, frame, log and scene graph observations through typed bounded readers. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** External binary cannot execute or smuggle privileged instructions. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Real visual bug detection from Godot screenshot with verified image custody. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W19 — Private network listener hardening
+
+**Capability and expected mechanism.** Enforce loopback origin, bearer, host, CORS, finite reads and anti-CSRF where relevant. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No unauthorized remote access to local project prompts or model. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** HTTP Host/Origin and token abuse on localhost and LAN adversaries. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W20 — Native adapter training
+
+**Capability and expected mechanism.** Support explicit licensed datasets, preprocessing, isolation, validation and real weight/adapter changes. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** A Q-learning game policy update is not transformer weight training. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Parameter delta, held-out gain and reproducible checkpoint lineage. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W21 — Preference optimization lifecycle
+
+**Capability and expected mechanism.** Gather operator consent, preference pairs, judge blinding and regression tests. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never contaminate held-out test data or silently train on crawler pages. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Model comparison on previously unseen original game tasks. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W22 — Context and tool budget accounting
+
+**Capability and expected mechanism.** Attribute tokens, tool calls, CPU seconds, GPU bytes, deadline and storage to exact work. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No work that exceeds grant or hides pending physical costs. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Concurrent stress of 12 bots with conservative admission. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W23 — Explainable agent trace
+
+**Capability and expected mechanism.** Show plan, selected evidence, proposed mutations, tool admission and validation without private prompt leak. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Redact secrets; do not expose raw proprietary source in public logs. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Reviewer reconstructs a safe high-level action chain from receipt. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W24 — Inference security isolation
+
+**Capability and expected mechanism.** Separate untrusted model/runtime process from host secrets and arbitrary file writing. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unsafe model file or executable cannot escape admitted sandbox. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Malicious weight/archive/runtime tests and permission scans. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-03-W25 — Quality-aware abstention
+
+**Capability and expected mechanism.** Teach assistant to report unknown and request missing source authority instead of fabricating success. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No hallucinated API route, game build or tool result presented as observed. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Blind golden defects where correct behavior is explicit abstention. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-03 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
+
+## BOT-04 — Game studio director, hierarchical agent orchestration and production planning
+
+**Primary owner boundary:** skeleton/ai/agents/jeeves, skeleton/forge, skeleton/automation, skeleton/jeeves. **Default priority:** P1. **Coordination edges:** 04->02/03/05/06/07/08/09/11/12. **Integration contract:** bot 04 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-04-W01 — Brief-to-design charter
+
+**Capability and expected mechanism.** Transform natural language into versioned scope, genre, fantasy, core loop, technology and target profiles. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unresolved choices become operator-reviewable assumptions, not invented commitments. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Brief edits regenerate impacted spec only while preserving approved choices. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W02 — Role-specialist virtual studio
+
+**Capability and expected mechanism.** Provide producer, designer, engineer, writer, level artist, animator, sound designer, QA and build roles. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Specialists do not self-approve their own release, rights or security outcomes. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Multi-role rehearsal with separated source, critique and adoption evidence. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W03 — Plan DAG and milestone synthesis
+
+**Capability and expected mechanism.** Decompose game design into stable ordered artifacts with acceptance tests and dependencies. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Plans are finite, coherent and cannot skip a critical playable dependency. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Complete small 2D game graph with traceable source-to-export path. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W04 — Authoritative tool invocation
+
+**Capability and expected mechanism.** Bind each AI action to typed game-editor/compiler API and explicit grant. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Text-only completions and hallucinated tools never mutate source. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Execute authorized edit/build/review/export from real user workbench. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W05 — Iterative creative prototyping
+
+**Capability and expected mechanism.** Generate multiple coherent candidates, compare gameplay and adopt chosen implementation. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Candidate selection cannot silently overwrite approved content. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Blind playtest comparison with retained screenshots, metrics and reason. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W06 — Playable-first production scheduling
+
+**Capability and expected mechanism.** Prioritize input, scene, feedback, victory/defeat and build before optional lore catalog. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Deadline pressure cannot create a shell game of metadata-only completion. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Timed game-jam brief produces a finishable build. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W07 — Agent-driven diagnostic repair
+
+**Capability and expected mechanism.** Capture real compiler/engine/gameplay failure and propose targeted bounded patch. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never declare repaired based solely on successful code generation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Inject real collision/quest/save bug, replay before and after. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W08 — Studio asset brief pipeline
+
+**Capability and expected mechanism.** Convert design/scene rules to structured art, animation, audio and license briefs. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Media request cannot bypass content rights or source provenance. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Art bundle matches actual run-time rig/scene/use requirements. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W09 — Production board observability
+
+**Capability and expected mechanism.** Expose current milestone, blocked dependencies, owner, cost, evidence and next action. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** UI never fabricates progress by counting drafted documentation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Refresh live work graph while process and network faults occur. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W10 — Human-in-the-loop approval
+
+**Capability and expected mechanism.** Offer diff, predicted change scope, reversible preview and explicit consent per risk class. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No unattended destructive edit, spend or publication from agent intent. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Human rejects a proposal and history remains unchanged. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W11 — Adversarial design critique
+
+**Capability and expected mechanism.** Check loop quality, pacing, difficulty, novelty, retention ethics and player agency. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Model self-critique alone cannot establish enjoyment. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Compare against actual human/game-agent observations and issue false-positive analysis. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W12 — Production memory and art continuity
+
+**Capability and expected mechanism.** Record approved style bible, design laws, canon, team decisions and asset reuse. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Memory invalidation occurs on rights withdrawal or project branch. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Regenerate one level without losing character art consistency. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W13 — Cross-role conflict reconciliation
+
+**Capability and expected mechanism.** Apply semantic merge for story, code, assets and economy with audit of disputed edits. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Conflicting authorities never silently last-write-wins. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Simultaneous writers trigger bounded conflict review. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W14 — Campaign planning at scale
+
+**Capability and expected mechanism.** Coordinate chapters, acts, scenes and large quest networks with content-percentage gates. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** A thousand empty scene manifests count as zero realized content. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Source-backed playable campaign sample and topology solver. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W15 — Design-to-engine trace
+
+**Capability and expected mechanism.** Maintain mapping from original brief to concrete script, scene, asset and test. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Missing requirement trace blocks completion. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Bidirectional trace drill from gameplay feature to design/user acceptance. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W16 — Auto playtester commissioning
+
+**Capability and expected mechanism.** Invoke independent game player with private rubric, input actions and screenshots. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Builder cannot alter judge rubric or claim from canned input. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Repeatable counterexample gameplay trace and repair loop. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W17 — User-controlled creativity slider
+
+**Capability and expected mechanism.** Offer style, novelty, fidelity, complexity and safety targets with explicit budget/quality tradeoff. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Feature changes cannot override data/license constraints. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Same seed/profile comparison on diverse briefs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W18 — Integrated level pacing director
+
+**Capability and expected mechanism.** Coordinate encounters, loot, narrative beats, travel and rest windows with measurable challenge. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Director cannot produce required inaccessible quest/room. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Simulated player policies detect pacing softlocks. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W19 — Persistent project campaigns
+
+**Capability and expected mechanism.** Resume multi-week plans with durable tasks, per-step receipts and bounded context recovery. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Replanning does not repeat succeeded financial/build/crawl actions. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cold resume campaign after multiple source revisions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W20 — Genre-specific production kits
+
+**Capability and expected mechanism.** Define minimal complete ARPG, platformer, shooter, strategy, RPG, simulator and puzzle packages. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unsupported engine variants declared upfront. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** At least one real finished golden game in each claimed genre. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W21 — Project-wide refactoring steward
+
+**Capability and expected mechanism.** Plan scene/entity ID changes, import updates and save migrations as coherent transactions. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Never leave broken cross-module references or accidental schema drift. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Safe rename/refactor of in-use quest, NPC and world asset. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W22 — Autonomous workload fairness
+
+**Capability and expected mechanism.** Schedule 12 bots with admission and priorities respecting physical worker/branch restrictions. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No noisy role can starve core install, compiler or QA. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Reproducible fairness/cancellation run under CPU pressure. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W23 — Reconciliation with backlog truth
+
+**Capability and expected mechanism.** Cross-reference 421 volumes/42 P0 tasks to real current source/evidence. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Already-built work should be improved, not recoded as duplicate system. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Gap registry lists implemented vs documented vs candidate with citations. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-04-W24 — Final game design signoff
+
+**Capability and expected mechanism.** Produce independent review-ready release rationale, open limitations and test proofs. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No role may self-certify overall product or origin rights. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Human operator sees precise satisfied and unsatisfied journeys. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-04 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
+
+## BOT-05 — Causal worlds, narrative lattice, canon, characters and social simulation
+
+**Primary owner boundary:** skeleton/ai/agents/jeeves/worlds, skeleton/game/world, skeleton/forge. **Default priority:** P1/P2. **Coordination edges:** 05->02/04/06/07/08. **Integration contract:** bot 05 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-05-W01 — Multiworld spatial scene graph
+
+**Capability and expected mechanism.** Represent worlds, maps, regions, portals, coordinates and layered traversal in canonical graph. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Orphan transitions and invalid parent-child cycles denied. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Load, visit, save and replay five connected world locations. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W02 — Longform story hierarchy
+
+**Capability and expected mechanism.** Support prologue, chapters, acts, scenes, interlude and multiple endings with meaningful causality. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Capacity for 100/1000/9999 is not a promise that content is meaningful. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Validate scene substance, narrative objectives and game transitions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W03 — Consequence and choice ledger
+
+**Capability and expected mechanism.** Bind decisions to characters, quests, faction state and story endings with causal effects. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Player action cannot retroactively change witnessed history unnoticed. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Two seeded runs reach distinct endings with traceable witness events. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W04 — NPC motivations and emotions
+
+**Capability and expected mechanism.** Model goals, trust, needs, memory, beliefs and character development separately. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Agent knowledge cannot exceed observed game state by default. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** NPC revises behavior appropriately after player betrayal or help. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W05 — Faction diplomacy and politics
+
+**Capability and expected mechanism.** Support treaties, wars, reputation, trade, territorial control and resource pressure. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Conflicts cannot bypass world-law, save or quest authority. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Multi-faction simulation with post-restart deterministic history. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W06 — Economy and markets
+
+**Capability and expected mechanism.** Model resource extraction, prices, producers, sinks, barter and scarcity with constraints. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Reject impossible minting, negative budgets and circular free rewards. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Long-horizon economy tests for inflation/exploit and player viability. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W07 — Quest graph and recovery
+
+**Capability and expected mechanism.** Express objectives, dependencies, time gates, failure, alternative route and completion witness. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Softlocks and unreachable required keys invalidate generation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Model-check small quest topology and agent-play representative campaign. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W08 — Dialogue-state compiler
+
+**Capability and expected mechanism.** Generate branching dialogue anchored to exact actor knowledge, relationship and choice state. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Dialogue cannot claim a fact unknown to speaker or incompatible with canon. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Interactive dialogue replay under changing game state. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W09 — Temporal mechanics
+
+**Capability and expected mechanism.** Track calendars, weather, seasons, daily NPC schedules and causal time rules. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Time travel or save changes cannot break temporal ordering without explicit rules. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Roundtrip schedule under save/load, pause, fast travel and replay. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W10 — Environmental storytelling
+
+**Capability and expected mechanism.** Place interactive clues, locations, collectibles, sound and visuals supporting plot. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Clues must exist in exported playable scene not only source prose. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Player obtains clue through actual interaction and quest updates. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W11 — Ecology, biomes and habitats
+
+**Capability and expected mechanism.** Model food webs, terrain, hazards, settlement influences and biome transitions. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Ecosystem cannot generate impossible essential resources or impassable default path. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Seeded 1000-tick ecology stability and traversal test. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W12 — Character arc planner
+
+**Capability and expected mechanism.** Track setup, disruption, agency, change and payoff per character. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Character scenes without progression do not qualify as arc beats. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Narrative consistency rubric on divergent playthroughs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W13 — Lore contradiction graph
+
+**Capability and expected mechanism.** Compare new facts against approved canon and provenance, return localized conflicts. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Canon cannot silently overwrite signed player history. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Inject contradicting faction origin and verify explicit review. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W14 — Multiending satisfiability
+
+**Capability and expected mechanism.** Ensure all advertised endings have reachable and distinct requirements. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Arbitrarily named copies of same terminal scene are not distinct. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Solver witnesses and controller-driven replays for each ending. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W15 — World event director
+
+**Capability and expected mechanism.** Create dynamic bounded events from state predicates and budgeted randomness. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Events cannot destroy mandatory quest entity without a recovery path. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Event stress includes cancellation/replay and critical quest preservation. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W16 — Cross-world migration
+
+**Capability and expected mechanism.** Preserve inventories, quest flags, companion state, physics profile and rights across transitions. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Duplicate avatars and identity drift cause denial. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** World portal journey twice, including network interruption and recovery. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W17 — Save compatibility mapping
+
+**Capability and expected mechanism.** Migrate campaign state and actor IDs across content releases. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Missing old state is quarantined instead of fabricated. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Save in old campaign, update content, resume with identical confirmed choices. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W18 — Cultural worldbuilding toolkit
+
+**Capability and expected mechanism.** Generate original religions, customs, design languages, settlements and languages as fiction. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Avoid plagiarism and unsupported real-world cultural appropriation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Human review of generated lore plus source provenance checks. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W19 — Social relationship simulation
+
+**Capability and expected mechanism.** Network reputation, friendships, rivalries, trust, rumor propagation and cooperative goals. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Social edges must remain finite and appropriately scoped. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Small-town simulation yields interpretable relationship changes. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W20 — Moral choice and player agency
+
+**Capability and expected mechanism.** Support tradeoffs and lasting player-visible consequences without manipulative dark patterns. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Director cannot fake meaningful choice where actions converge indistinguishably. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Paired alternative input traces and outcome comparison. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W21 — Dynamic world continuity editor
+
+**Capability and expected mechanism.** Permit human changes to canon with impact prediction, diff and explicit migration. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Approved canon cannot be regenerated away casually. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Editing capital-city status propagates to scenes, dialogue, routes and saves. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W22 — Localization-aware storytelling
+
+**Capability and expected mechanism.** Support tone, pronouns, world-specific grammar and longform narrative translation memory. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Localized text cannot leak spoiler state or misrepresent game rules. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Multi-language dialogue functional playtest with captions and UI fit. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W23 — NPC offscreen simulation
+
+**Capability and expected mechanism.** Run schedules and faction events efficiently without simulating irrelevant full scenes. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Event catch-up cannot replay duplicate economy/quest commits. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Travel far away then return; world state consistent and resource bounded. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-05-W24 — World debugging and time travel
+
+**Capability and expected mechanism.** Expose causal inspection, state snapshot diffs and controlled deterministic rewind. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Undo of irreversible out-of-world action forbidden. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Rewind user game action without reverting payment/source rights evidence. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-05 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
+
+## BOT-06 — Gameplay, mechanics, combat, physics, navigation and competitive systems
+
+**Primary owner boundary:** skeleton/game/gameplay, skeleton/ai/game_builder, skeleton/forge. **Default priority:** P1. **Coordination edges:** 06->02/05/07/08/09/12. **Integration contract:** bot 06 must produce schema-bound deliverables under the existing application authority and obtain peer review for every touched cross-bot file. **Required feedback:** an observable user workflow improvement, tests at the actual owner boundary, negative/abuse cases, and independent receipt. Any unverified feature remains tagged CANDIDATE/UNKNOWN even if a class or PR exists.
+
+### BOT-06-W01 — Real core game loop
+
+**Capability and expected mechanism.** Implement title/start, control, objective, feedback, win/lose, restart and exit in actual target runtime. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** A printed CORE_LOOP_OK marker without input does not satisfy interactive acceptance. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Live controller script completes shooter/platformer/roguelike. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W02 — Input abstraction and remapping
+
+**Capability and expected mechanism.** Support keyboard, mouse, gamepad, touch, rebinding, focus and assistive alternatives. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unsupported or disconnected device fails visibly without stuck movement. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Browser and Godot input replay, keyboard-only UI and controller hotplug. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W03 — Deterministic fixed timestep
+
+**Capability and expected mechanism.** Separate tick simulation, render interpolation, collision and consistent seeds. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Variable FPS must not change core state beyond declared numerical tolerance. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cross-FPS replay at 30/60/120 and slow machine conditions. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W04 — 2D and 3D locomotion
+
+**Capability and expected mechanism.** Include grounded jumps, sprint, dash, swim, climb, flight, camera and navigation options. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Movement states cannot pass through colliders or permanently disable controls. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Golden controller traces traverse all declared movement verbs. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W05 — Combat architecture
+
+**Capability and expected mechanism.** Define attack windows, hitboxes, hurtboxes, projectiles, damage, armor, status and recovery. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Infinite attack loop, unearned hits and invincibility exploits denied. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Real combat against moving adversary, victory and defeat paths. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W06 — Enemy AI behavior trees
+
+**Capability and expected mechanism.** Support patrol, investigate, engage, retreat, pursue and contextual action with finite compute budget. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** AI does not read hidden player data unless game rules explicitly allow. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Trace adversary decisions across cover, obstacles and concealment. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W07 — Tactical action planning
+
+**Capability and expected mechanism.** GOAP, utility scoring, hierarchical tasks and fallback policies for advanced NPCs. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Expensive planning cannot starve interactive frame budget. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** High actor-count and unexpected environment stress. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W08 — Encounter generator
+
+**Capability and expected mechanism.** Place enemies, hazards, rewards and objectives according to readable challenge constraints. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Cannot spawn opponents inside walls, inaccessible rooms or on player without warning. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Agent-run encounter fairness and difficulty curves. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W09 — Progression and build system
+
+**Capability and expected mechanism.** Implement XP, skills, levels, equipment and respec with testable character math. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Negative resources or dominant exploits cannot bypass progression. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Diverse seeded build trajectories finish campaign. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W10 — Inventory/ownership model
+
+**Capability and expected mechanism.** Support slots, weight, durability, stacking, equipment, loot and atomic transfers. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Crash cannot duplicate item, lose committed currency or cross tenant. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Concurrent pickup, drop, craft, trade and save stress. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W11 — Crafting and resource chains
+
+**Capability and expected mechanism.** Define recipes, prerequisites, stations, crafting time and economy sinks. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Reject zero-cost cycles producing unlimited valuable resources. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Graph solver for crafting chains and runtime completion. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W12 — Vehicle movement and racing
+
+**Capability and expected mechanism.** Implement actual steering, traction, throttle, collision, checkpoint and lap behavior. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Kinematic visual demo is not claimed as driving simulation. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Interactive lap completion with controller, collisions and braking. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P0. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W13 — Stealth detection and cover
+
+**Capability and expected mechanism.** Model line-of-sight, audibility, alert state, cover and decoy stimuli. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Player must receive explainable feedback and adversaries respect occlusion. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Stealth route completed and detected under controlled action traces. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W14 — Puzzle and maze runtime
+
+**Capability and expected mechanism.** Generate solvable puzzles, visible feedback, hints, progress and reset. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Unsolvable seed blocked or shipped with explicit impossible-state evidence. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Solver witnesses and blind human player completion. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W15 — Platformer collision precision
+
+**Capability and expected mechanism.** Handle coyote time, jump buffers, ledges, moving platforms and one-way surfaces. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No physics clipping, jitter or invisible collisions that destroy fairness. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Interactive platformer route with recorded jump timings. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W16 — Strategy and simulation turn engine
+
+**Capability and expected mechanism.** Support action phases, pathing, economy, unit orders and deterministic conflict resolution. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Illegal turn transitions and double moves rejected. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Seeded strategy battle with reproducible outcomes. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W17 — Cooperative multiplayer base
+
+**Capability and expected mechanism.** Use authoritative tick state, sessions, identity, reconciliation and deterministic rollback where appropriate. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Client cannot grant own items, warp, or impersonate other player. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Two-client latency/drop test with reconnect and state parity. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W18 — Save and reload of live game
+
+**Capability and expected mechanism.** Persist player, physics, inventory, quest, RNG, world time, AI and pending events atomically. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Duplicate or partial saves never become silently preferred. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Kill game during checkpoint and verify correct subsequent load. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W19 — Dynamic difficulty and assist
+
+**Capability and expected mechanism.** Adapt challenge with declared ranges, choices and accessibility preferences. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Invisible unfair adjustments or removal of meaningful outcomes prohibited. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Distinct difficulty settings reach valid win/lose loops. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W20 — Gameplay analytics with consent
+
+**Capability and expected mechanism.** Track input-derived failure patterns, completion curves and navigation bottlenecks. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** No analytics without consent, raw personal data or hidden network telemetry. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Offline no-telemetry proof and deletion/export functional test. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W21 — Exploit and balance solver
+
+**Capability and expected mechanism.** Model combat effectiveness, loot rarity, experience and economy under varied bot policies. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Failure to find an exploit is not proof none exists; report search envelope. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Property tests plus Monte Carlo seeded optimization study. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W22 — High-agent-count performance
+
+**Capability and expected mechanism.** Bound physics, pathfinding, memory and rendering with LOD/culling and job budget. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Degraded mode must remain playable instead of dropping essential gameplay updates. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** 10/100/1000 actor load bench per supported target. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W23 — Audio/visual gameplay feedback
+
+**Capability and expected mechanism.** Couple gameplay event bus to HUD, animation, sound, VFX and accessibility cues. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Missing effects detected by interaction-level checks not ignored as cosmetic. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Attack and objective trigger visible and audible actual runtime response. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W24 — Anti-cheat and authority hardening
+
+**Capability and expected mechanism.** Protect multiplayer score, movement, rewards and shared inventories. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Client-provided state is not treated as authoritative. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Forged network commands and replayed reward transactions denied. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+### BOT-06-W25 — Mechanic portability contracts
+
+**Capability and expected mechanism.** State exact Godot/web/native capability requirements and fallback behavior per mechanic. Implement this as a typed, observable, versioned, deterministic contract within the assigned canonical owner. Define the user-visible entry action, durable resource/asset identities, limits and how an operator can inspect/undo the resulting change where reversible. Scope exactly which target/genre/platform variants this work order will actually support; describe unsupported variants explicitly.
+
+**Adversarial and recovery obligations.** Export cannot silently omit essential player actions. Add finite admission, cancellation and idempotent recovery when the operation has side effects. Record independently observable error classifications, make stale source/proofs ineligible, preserve existing trusted artifacts and avoid replacing an authorized older implementation merely to increase file count.
+
+**Acceptance evidence.** Cross-target feature-negotiation and live game parity suite. The proof dossier must contain repository source SHA, precise commands/test harness, software/hardware/toolchain versions, expected and actual outputs, tests of rejected inputs, meaningful performance/resource budgets and a reproducible artifact or trace. Require BOT-12 independent review of a final candidate head; source-only fixtures do not elevate an interactive or platform claim. **Default priority:** P1/P2. **Current maturity:** to be determined by executable census.
+
+
+**BOT-06 exit dossier:** enumerate implemented versus planned rows, dependencies merged or isolated, open bugs, exact target and engine versions, project data migration status, functional UX tests, security holds, unfinished platforms and independent acceptance signoff. A bot does not achieve closure merely by exhausting its list; its user journey must work.
+
+# 11 (continued). Detailed work orders for bots 07 through 12
+
+## BOT-07 — Procedural level generation, playable worlds, genre kits and balancing
+
+**Primary owner paths:** skeleton/ai/game_builder, skeleton/ai/agents/jeeves/worlds, skeleton/forge. **Priority envelope:** P1/P2. **Integration relationships:** 07->02/04/05/06/08/09/12. The bot must examine merged code, independent PR candidates and existing masterplan rows before deciding whether to build, improve, unify or reject a feature. All proposed capabilities begin at UNKNOWN maturity until evidenced. No platform and no declared engine support is automatically implied by a spec. Every relevant user action must show an actual durable result.
+
+### BOT-07-W01 — Constraint-based spatial generator
+
+**Feature outcome and technical implementation.** Build dungeons, towns, routes and arenas from geometry, connectivity, item-gate and traversal constraints. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Reject maps with unreachable exits, key loops, nonfunctional geometry or invalid spawn points. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Path solver plus interactive run through multiple generated seeds. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W02 — Grammar-driven content synthesis
+
+**Feature outcome and technical implementation.** Express authored content grammar for objectives, encounter design, biome style and story beats with versioned rules. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Repetitious empty scene spam cannot count as original game content. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Semantic diversity and human readability audit on generated assets/scenes. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W03 — Procedural overworlds
+
+**Feature outcome and technical implementation.** Generate hierarchical continents, settlements, dungeons, hubs and transport routes with deterministic identities. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Missing portal or conflicting coordinates block scene publication. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Cross-region travel and stable save/load replay. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W04 — Voxel/heightfield terrain synthesis
+
+**Feature outcome and technical implementation.** Support terrain mesh, erosion, roads, caves, navmesh and collision with finite spatial constraints. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Impassable mission-critical path and excessive render mesh rejected. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Procedural terrain test with actual controller and performance receipts. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W05 — Biome and ecological placement
+
+**Feature outcome and technical implementation.** Co-generate weather, resources, vegetation, fauna, hazards and scenic story landmarks. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Essential quest resource never generated into inaccessible region. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Seeded resource-availability solver plus runtime traversal. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W06 — Quest-level co-design
+
+**Feature outcome and technical implementation.** Align narrative prerequisites with physical level layout, loot keys and objective placement. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Cannot ask player for an object obtainable only after required lock. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Formal constraint proof and blind player run. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W07 — Encounter distribution and pacing
+
+**Feature outcome and technical implementation.** Place enemy mix, cover, hazard, recovery and reward according to skill curve and declared target. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No unavoidable lethal spawn without telegraph and counterplay. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Simulated novice/expert play through progression curve. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W08 — Dynamic difficulty envelopes
+
+**Feature outcome and technical implementation.** Adjust enemy count, supplies and puzzle complexity within authored fairness constraints. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Challenge adaptation never rewrites live seeded save imperceptibly. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Baseline/candidate difficulty trace with user-visible changes. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W09 — Loot tables and rarity balancing
+
+**Feature outcome and technical implementation.** Define loot probabilities, deterministic random seeds, economy sinks and scarcity targets. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Reject farmable zero-cost duplication loops and impossible drop quests. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Large seeded simulations with confidence intervals and negative seed cases. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W10 — Procedural quest templates
+
+**Feature outcome and technical implementation.** Synthesize meaningful short quests conditioned on world predicates, NPC relationships and events. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Duplicate shallow fetch quests and generic filler fail content quality gate. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Coherence review plus player actions changing world state. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W11 — Puzzle generation with solution witnesses
+
+**Feature outcome and technical implementation.** Generate mazes, switch circuits, logic, tactical puzzles with proof of solvability. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Generator must fail closed when solution witness unavailable. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Independent solver and actual input replay validate solution. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W12 — PCG determinism and seed versioning
+
+**Feature outcome and technical implementation.** Version RNG, algorithm, engine, source assets and constraints in a reproducible generation manifest. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Changed algorithm without migration must not silently alter old saved world. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Same pinned inputs produce same scene/quest digests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W13 — Adversarial content test agents
+
+**Feature outcome and technical implementation.** Train/evaluate multiple heuristic exploration policies to find deadlocks and exploits. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No artificial test player may give success without observable game event. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Minimized reproducible counterexample seeds with replay logs. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W14 — Novelty and repetition scoring
+
+**Feature outcome and technical implementation.** Compare topology, dialogue, mechanics, silhouette and item distribution against content corpus. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Large volume of cloned scenes cannot yield high uniqueness score. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Diversity report tied to human review and held-out game families. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W15 — Contextual encounter variation
+
+**Feature outcome and technical implementation.** Generate story-relevant faction, biome, terrain and player-build-specific encounters. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No incompatible NPC/loot/faction state may be spawned. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Constraint engine plus deterministic game frame evidence. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W16 — Real-time world chunk streaming
+
+**Feature outcome and technical implementation.** Partition scenes and data by level of detail, player proximity, memory pressure and visibility. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Worker eviction cannot delete referenced interactive objects or history. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Long-distance travel under constrained RAM with stable frame pacing. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W17 — Procedural settlement architecture
+
+**Feature outcome and technical implementation.** Create buildable towns with roads, doors, interiors, NPC schedules and economy links. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Houses cannot be inaccessible or collide with world portals. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Human walks between structures and interacts with residents. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W18 — Multi-genre generative templates
+
+**Feature outcome and technical implementation.** Cover shooter, RPG, platformer, roguelike, puzzle, tactics, sandbox and racing with dedicated rule kits. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** One generic scene with a changed label is not genre coverage. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** At least one genuinely different playable exported golden build per admitted genre. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W19 — Narrative branch generation
+
+**Feature outcome and technical implementation.** Compose alternative arcs with choice predicates, stakes and valid endings. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Causal branches cannot converge into mislabeled identical outcomes without rationale. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Solver+player witnesses for distinct choices/endings. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W20 — Procedural motion/animation briefs
+
+**Feature outcome and technical implementation.** Generate compatible art/animation needs from mechanics and entity topology. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Producer cannot handoff missing collision, rig and interaction annotations. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** End-to-end scene creation with asset import and displayed action. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W21 — World repair and regenerate-local
+
+**Feature outcome and technical implementation.** Edit only selected bad procedural region while preserving world seed lineage and approved hand work. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Whole-world random reset or unrelated story rewrite is forbidden. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Surgical repair before/after diff and unchanged unrelated level checks. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W22 — Adaptive content streaming
+
+**Feature outcome and technical implementation.** Generate/compile background scenes ahead of player under finite CPU/storage budgets. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Background activity never stalls critical gameplay or bypasses safety. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Cold load, disk pressure, cancellation and offline test. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W23 — Replayable live event generation
+
+**Feature outcome and technical implementation.** Spawn seasonal/boss/social events from canon predicates and explicit budgets. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Duplicate or unreachable events cannot corrupt quest state. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** World-time replay, skip-ahead and idempotent event journal tests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W24 — Physical simulation constraints
+
+**Feature outcome and technical implementation.** Generate terrain/water/weather hazards compatible with actual engine physics and navigation. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Physically contradictory terrain blocks or colliders fail build. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Real engine collision and route traces with reproducible states. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-07-W25 — Generator performance and budget
+
+**Feature outcome and technical implementation.** Measure generation wall time, memory, disk, binary size and graph solving complexity. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Worst-case seed cannot run unbounded or hang compiler queue. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Exhaustive adversarial small cases and sampled large-world stress. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+
+**BOT-07 closure rule:** all declared feature types have interoperable contracts; exact product journeys pass on supported targets; negative, rights, accessibility and performance obligations are satisfied; bugs/rejected candidates are retained in accountability; independent BOT-12 review agrees with source state. An undocumented limitation is a gap even if the implementation happens to work.
+
+## BOT-08 — Art, 2D/3D media, rigging, cinematics, audio, shaders and presentation
+
+**Primary owner paths:** skeleton/ai/forge, skeleton/ai/game_builder, frontend/src/features, skeleton/forge. **Priority envelope:** P1/P2. **Integration relationships:** 08->02/05/06/07/09/11/12. The bot must examine merged code, independent PR candidates and existing masterplan rows before deciding whether to build, improve, unify or reject a feature. All proposed capabilities begin at UNKNOWN maturity until evidenced. No platform and no declared engine support is automatically implied by a spec. Every relevant user action must show an actual durable result.
+
+### BOT-08-W01 — Safe and provenance-bound asset ingestion
+
+**Feature outcome and technical implementation.** Import user-owned images, 3D models, textures, voice, sound and fonts with exact license and content hashes. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Symlink race, archive bomb, unsupported executable and revocation block adoption. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Malicious format and safe fixture corpus with real import. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W02 — 2D sprites and tilesets
+
+**Feature outcome and technical implementation.** Generate or author original sprite sheets, tile maps, UI icons, parallax and character directions. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Metadata-only sprite entries or invisible textures cannot pass. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Actual rendered Godot sprite with animation and input event. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W03 — 3D mesh modeling workflow
+
+**Feature outcome and technical implementation.** Supply procedural mesh construction, UVs, topology, materials and collision shapes. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Nonmanifold or oversized geometry must trigger review/repair. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Mesh displayed in target engine with collision, shadow and scale. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W04 — 3D asset LOD and optimization
+
+**Feature outcome and technical implementation.** Manage high/medium/low geometry, texture mipmaps, batching and streaming. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Aggressive optimization must not break interactions or silhouettes. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** p95 frame and VRAM before/after on 3D scene. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W05 — PBR/stylized materials
+
+**Feature outcome and technical implementation.** Build shader graphs, material parameters, normal maps, roughness and stylized presets. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Missing shader dependency cannot silently render blank or pink. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Automated material preview in target renderer. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W06 — Character rig and skinning
+
+**Feature outcome and technical implementation.** Construct bone topology, weights, IK targets, sockets and mesh deformations. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Invalid skeleton or missing retarget map denies animation publication. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Real skeleton pose, attack/locomotion and camera tests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W07 — Animation graphs
+
+**Feature outcome and technical implementation.** Combine idle, walk, jump, climb, hit, attack, death and expression into finite state machine. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Impossible transitions and stuck states surface as gameplay failures. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Complete game-action trace triggers correct animation sequence. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W08 — Motion retargeting
+
+**Feature outcome and technical implementation.** Transfer compatible skeleton motion to original characters with constraints. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Scale/handedness mismatch must not silently distort critical contact. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Before/after motion render and foot-slide metrics. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W09 — Blendshape and facial animation
+
+**Feature outcome and technical implementation.** Expose expressions, phonemes, gaze, blinks and dialogue-linked performance. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Facial stream cannot require voice identity data without consent. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Cutscene with audio-cued mouth motion and context-aware expression. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W10 — Cinematic timeline editing
+
+**Feature outcome and technical implementation.** Compose shots, keyframes, cuts, camera transitions, subtitles, cues and interactive branching. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Timeline cannot steal controls without explicit restore or become unskippable by accident. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Scrub, branch, skip, resume and export a scripted cutscene. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W11 — Cinematography grammar
+
+**Feature outcome and technical implementation.** Use composition, gaze, depth, lighting, occlusion and emotional framing as authorable constraints. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Camera cannot hide essential player actions or create nausea-inducing forced movement. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Visual frame comparisons and player control tests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W12 — Game-state-driven animation
+
+**Feature outcome and technical implementation.** Bind gameplay and story events to state machines with versioned event names. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Scripted event cannot reference nonexisting scene actor or expired state. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Active in-game story beat fires visible matching animation. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W13 — Particles, VFX and weather
+
+**Feature outcome and technical implementation.** Generate safe bounded emitters, trails, decals, dust, rain and impact effects. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Invalid GPU shader or unbounded particle count fails resource admission. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Real gameplay hit with consistent visual feedback and performance metrics. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W14 — Realtime light and shadows
+
+**Feature outcome and technical implementation.** Author directional/local lighting, exposure, volumetric effects and fallback settings. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No invisible navigation due to artistic lighting or incompatible target. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Visual regression and contrast checks on representative hardware. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W15 — Audio asset composition
+
+**Feature outcome and technical implementation.** Create original musical themes, adaptive loops, ambience, UI cues and gameplay stingers. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Output must be actual playable audio file with cleared rights, not a description. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Export in multiple codecs; listen/measure loop seam and in-game trigger. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W16 — Procedural sound design
+
+**Feature outcome and technical implementation.** Build attack, footsteps, collision, environment, UI and positional sound via source synthesis. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Missing audio references are blocking if brief explicitly requires sound. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Live audio event capture with content/level validation. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W17 — Spatial sound and mixing
+
+**Feature outcome and technical implementation.** Occlusion, reverberation, positional cues, side-chain ducking and accessibility controls. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Spatial audio cannot mislead critical hazard warning or blast loudness. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** In-game acoustic positioning and user volume/mono tests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W18 — Voice dialogue rights workflow
+
+**Feature outcome and technical implementation.** Author or record narration with verified identity/consent, translation and retake controls. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Disallow unauthorized celebrity/actor voice imitation or undisclosed recordings. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Signed performer consent and verified audio playback where used. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W19 — Subtitle and dialogue timing
+
+**Feature outcome and technical implementation.** Synchronize text, speaker IDs, phonemes, voice and user text speed settings. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Missing caption for required voiced information fails accessibility. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Real cutscene transcript timing and screen-reader check. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W20 — Asset style bible and continuity
+
+**Feature outcome and technical implementation.** Encode palette, proportions, silhouette, material language, cost and emotional mood per project. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** AI iteration must not discard human-edited character identity. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Regenerate side scene and compare approved main cast continuity. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W21 — Texture/atlas compiler
+
+**Feature outcome and technical implementation.** Pack textures, validate color space, dedupe, mip and compression for each target. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Exceeding texture size/format caps must block unsupported target. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Godot/web build runtime check and package size metrics. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W22 — Media build pipeline
+
+**Feature outcome and technical implementation.** Encode normalized files, thumbnails, previews, licenses and immutable variant provenance. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Failed codec process cannot leave publicly visible corrupt artifact. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Interrupted transform, digest mismatch and clean resume test. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W23 — Player-facing capture tools
+
+**Feature outcome and technical implementation.** Record reproducible gameplay clips, trailers, screenshots and replay edits from real game. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Promotional video cannot be generated from nonexistent gameplay while claiming evidence. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Bind captures to source/game seed, input and frame logs. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W24 — Human creative override
+
+**Feature outcome and technical implementation.** Support manual editing of art, rigs, audio and cinematics with semantic diff and revision branch. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Automatic update cannot silently overwrite approved art or rights. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Manual edit persists through bot regeneration and target export. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W25 — Narrative audiovisual accessibility
+
+**Feature outcome and technical implementation.** Captions, speaker cues, high-contrast visuals, color-safe signaling, motion reduction and descriptive audio. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Gameplay objective cannot rely exclusively on color, hearing or camera shake. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Independent accessibility run through gold game sequence. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-08-W26 — Media quality measurement
+
+**Feature outcome and technical implementation.** Collect objective animation continuity, collision timing, shader compile and audio clipping metrics. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Single subjective model score cannot certify polished visuals/audio. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Automated metrics paired with blinded human aesthetic review. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+
+**BOT-08 closure rule:** all declared feature types have interoperable contracts; exact product journeys pass on supported targets; negative, rights, accessibility and performance obligations are satisfied; bugs/rejected candidates are retained in accountability; independent BOT-12 review agrees with source state. An undocumented limitation is a gap even if the implementation happens to work.
+
+## BOT-09 — Godot/compiler toolchain, project interoperability, packaging and cross-platform release
+
+**Primary owner paths:** skeleton/forge, skeleton/ai/game_builder, scripts/game, toolchain installers. **Priority envelope:** P0/P2. **Integration relationships:** 09->01/02/06/07/08/11/12. The bot must examine merged code, independent PR candidates and existing masterplan rows before deciding whether to build, improve, unify or reject a feature. All proposed capabilities begin at UNKNOWN maturity until evidenced. No platform and no declared engine support is automatically implied by a spec. Every relevant user action must show an actual durable result.
+
+### BOT-09-W01 — Canonical Godot 4 project builder
+
+**Feature outcome and technical implementation.** Generate scene tree, input actions, GDScript, assets, signal wiring, save code and gameplay export. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Generated code must not be shell-injection path, placeholder-only or invalid in engine. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Headless load, controller play, full win/lose and restart. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W02 — Target feature negotiation
+
+**Feature outcome and technical implementation.** Map mechanics/physics/media/saves to explicit Godot/web/mobile/retro target capabilities. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Unsupported mechanic must reject or request explicit reviewed downgrade. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Build requirements matrix and reject unknown platform capability. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W03 — Game intermediate representation
+
+**Feature outcome and technical implementation.** Compile canonical typed game spec into engine-specific assets with reversible provenance. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Lossy conversion of required mechanic or rights metadata blocked. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** IR to Godot and web differential semantics tests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W04 — WebGL/HTML5 playable export
+
+**Feature outcome and technical implementation.** Produce sandboxed downloadable browser game with real input, audio and persistence. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Static webpage that only displays game metadata not accepted as game. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Chromium + Firefox interaction and frame capture. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W05 — Windows game package
+
+**Feature outcome and technical implementation.** Build actual game executable, assets, dependency license bundle and safe user data location. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Installer must not require admin or overwrite unrelated saves. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Physical Windows launch, controller completion and uninstall preservation. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W06 — Linux desktop package
+
+**Feature outcome and technical implementation.** Bundle native libraries or document dependency ABI with deterministic packaging. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Alpine/host ABI mismatch not hidden by source success. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Real Linux executable interaction with scene and audio. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W07 — macOS packaging
+
+**Feature outcome and technical implementation.** Provide signed/notarized path when credentials and target host legitimately available. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Cross-compile success not represented as macOS launch proof. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Actual macOS startup and input/gameplay test before target approval. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W08 — Android game export
+
+**Feature outcome and technical implementation.** Implement touch controls, lifecycle, permissions, asset packaging and performance profile. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No network, mic or tracking permission without clear need. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Real Android device install, suspend/resume and finishable game. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W09 — iOS game export
+
+**Feature outcome and technical implementation.** Provide Xcode/target constraints, touch/input and app-store privacy declarations. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Lacking Apple tooling/device must remain unqualified. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Real iPhone target, test and publishing readiness only if available. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W10 — Homebrew/retro targets
+
+**Feature outcome and technical implementation.** Use approved toolchains, firmware rights, ROM budgets and emulator/hardware parity. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No commercial ROM/firmware acquisition or unsupported ABI bypass. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Real accepted homebrew test artifact on approved emulator/core. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W11 — Source export
+
+**Feature outcome and technical implementation.** Package original complete editable project, manifests, licenses and source hashes. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Source-only export never counts as playable binary. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Re-import into fresh workspace and rebuild game successfully. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W12 — Asset compatibility pipeline
+
+**Feature outcome and technical implementation.** Convert meshes, audio, textures, sprites and animation to platform resource profiles. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Missing asset in exported scene blocks success. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Engine render/audio capture against produced package. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W13 — Compiler error localization
+
+**Feature outcome and technical implementation.** Map compile/parse/link failures to exact authored file, generated source and design step. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No retry budget reset or arbitrary generated code execution. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Real compiler failure repair to tested, bounded patch. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W14 — CI build isolation
+
+**Feature outcome and technical implementation.** Run scripts and binary builds in sandbox with pinned inputs, deadlines and filesystem bounds. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Build plugin cannot access host secrets or arbitrary network. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Malicious build config denied in isolated worker. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W15 — Build artifact reproducibility
+
+**Feature outcome and technical implementation.** Seal source SHA, toolchain digest, env, options and package bytes or explain nondeterminism. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Unknown reused artifact or stale head blocked. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Independent repeated builds with declared acceptable digest/tolerance. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W16 — Runtime testing harness
+
+**Feature outcome and technical implementation.** Instrument input, snapshots, frames, logs, audio, victory predicates and player telemetry. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** CORE_LOOP_OK string alone not full interactive acceptance. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Headless plus GUI playthrough on finished golden games. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W17 — Performance and optimization profiles
+
+**Feature outcome and technical implementation.** Build baseline/optimized variants measuring draw calls, CPU, VRAM and load time. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Optimization cannot introduce gameplay regression. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Target device performance and replay comparison. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W18 — Game patch/delta updater
+
+**Feature outcome and technical implementation.** Produce verified update manifest, content delta and atomic rollback of saves/assets. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Interrupted patch cannot corrupt install or make old saves invisible. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Kill process during delta apply and resume safely. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W19 — Modding and extensibility
+
+**Feature outcome and technical implementation.** Export signed constrained data/script plugin APIs and permission manifests. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Arbitrary mod cannot access filesystem/secrets/network beyond grant. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Adversarial mod and compatibility tests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W20 — Interoperable project import
+
+**Feature outcome and technical implementation.** Accept legitimate user-owned Godot/Unity-like scene/material data under bounded safe parsers. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Proprietary or executable imports require explicit rights and isolated transform. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Import sample user-provided project and preserve playable semantics. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W21 — Storefront packaging
+
+**Feature outcome and technical implementation.** Create compliant icon, trailer, metadata, screenshots, ratings, credits and platform-specific bundle. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Marketing ready does not equal rights, payment or platform approval. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Reviewable packaging dossier with verified source assets. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W22 — Console platform path
+
+**Feature outcome and technical implementation.** Define licensed SDK authorization, hardware testing and legal release prerequisites. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Public repo cannot promise certified proprietary console binaries. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Explicit hold until platform-holder tools and approval provided. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W23 — Multiplayer server exports
+
+**Feature outcome and technical implementation.** Package authoritative server/session state with migration and exposed-port controls. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Client and server version mismatch cannot silently corrupt state. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Reconnect, latency and malicious-client test. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W24 — Game save portability
+
+**Feature outcome and technical implementation.** Export versioned save data preserving player agency, original assets and privacy policy. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Incompatible save migration cannot fabricate player choices. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Transfer save between two declared compatible targets and replay. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W25 — Engine upgrade manager
+
+**Feature outcome and technical implementation.** Treat engine minor/major changes as compatibility and binary requalification campaign. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Do not switch to unverified beta engine just for newest label. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Run matrix on pinned stable supported Godot and feature migration tests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-09-W26 — Release binary supply chain
+
+**Feature outcome and technical implementation.** Produce signed checksums, SBOM, provenance, reproducible build receipt and rollback package. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Unsigned or ancestor-verified executable cannot become stable release. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Independently verify artifact digest against exact codehead and signing identity. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+
+**BOT-09 closure rule:** all declared feature types have interoperable contracts; exact product journeys pass on supported targets; negative, rights, accessibility and performance obligations are satisfied; bugs/rejected candidates are retained in accountability; independent BOT-12 review agrees with source state. An undocumented limitation is a gap even if the implementation happens to work.
+
+## BOT-10 — Dragon crawler, Atlas research campaigns, permissioned source knowledge and game learning bridge
+
+**Primary owner paths:** skeleton/ai/webcrawler, backend/core/dragon_crawler.py, backend/routes/dragon_academy.py, frontend/src/features/Jeeves. **Priority envelope:** P0/P2. **Integration relationships:** 10->02/03/04/11/12. The bot must examine merged code, independent PR candidates and existing masterplan rows before deciding whether to build, improve, unify or reject a feature. All proposed capabilities begin at UNKNOWN maturity until evidenced. No platform and no declared engine support is automatically implied by a spec. Every relevant user action must show an actual durable result.
+
+### BOT-10-W01 — Signed authorized crawl request
+
+**Feature outcome and technical implementation.** Bind owner, tenant, consent, source rights, purpose, hosts and finite request/page/byte budgets. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Missing consent/expired permission prohibits new acquisition without override. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Live authenticated route and denied-scope tests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W02 — SSRF-safe network capture
+
+**Feature outcome and technical implementation.** Normalize host/IP, redirects, DNS rebinding and blocked private address ranges. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No localhost, cloud metadata or internal API fetching via untrusted seed. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Controlled adversarial DNS/redirect/IPv6/private-IP scenarios. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W03 — Robots and lawful source policy
+
+**Feature outcome and technical implementation.** Respect legal/terms/operator grants, crawl delays and source-specific restrictions. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Source availability is not an automatic copyright/license grant. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Policy matrix with express denial of prohibited hosts. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W04 — Bounded crawl scheduler
+
+**Feature outcome and technical implementation.** Persist frontier, per-host fairness, leases, request/deadline reservations and resumable slices. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Crash cannot repeat consumed grant or expand host scope. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Multi-host fairness and worker restart without excess requests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W05 — Differential recrawl pipeline
+
+**Feature outcome and technical implementation.** Use ETag/Last-Modified, digest comparison, content revision and freshness windows. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Stale or changed evidence cannot silently retain old acceptance. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Real versioned controlled website and source update trace. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W06 — HTML/structured content extraction
+
+**Feature outcome and technical implementation.** Parse pages, semantic sections, title, accessible text, tables and anchors safely. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Active content/scripts and embedded instructions remain inert untrusted data. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Known fixtures and real pages retain exact text/citation offsets. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W07 — Research Atlas graph
+
+**Feature outcome and technical implementation.** Link source, passage, claim, topic, contradiction, review and game-design use. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** UI representation cannot imply backend bridge exists when route unmounted. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Authenticated Atlas open/search/cite against actual backend. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W08 — Source dependency and revocation
+
+**Feature outcome and technical implementation.** Maintain transitive graph with erasure, withdrawal and refreshed citation validity. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** A withdrawn source cannot reappear via cache or training/reference store. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Withdraw source and verify every dependent projection becomes invalid. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W09 — Injection and low-signal quarantine
+
+**Feature outcome and technical implementation.** Recognize instruction hijacks, deceptive metadata, missing provenance and truncated pages. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Quarantined content never promoted into trusted model system instructions. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Adversarial page test suite across prompt and evidence consumption. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W10 — Campaign objectives and stop policy
+
+**Feature outcome and technical implementation.** Define research goals, question tree, budget, information gain and clear termination. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Bot cannot expand purpose, budget or target by self-authorized planning. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Campaign stops on budget, novelty floor, consent expiry and owner request. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W11 — Cross-document corroboration
+
+**Feature outcome and technical implementation.** Compare primary and secondary sources, time, dependency, duplicate upstream origins. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Repeated syndicated claims do not count as independent evidence. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Contradictory controlled source experiment with lineage flags. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W12 — Evidence quality scoring
+
+**Feature outcome and technical implementation.** Grade citation specificity, source trust, recency, relevance and contradictory signals. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Scores remain observations, not proof of truth or source license. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Known gold/false source pairs with calibrated abstention. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W13 — Reviewed mechanic inspiration
+
+**Feature outcome and technical implementation.** Translate admitted observations into original mechanic hypotheses with owner approval. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Copying protected passages into game content without license denied. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Reviewer approves original mechanic, exports game with only eligible facts. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W14 — Research-to-world integration
+
+**Feature outcome and technical implementation.** Bind approved observations to world/quest/asset briefs as derived references and limits. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Source withdrawal must invalidate affected generated candidates. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Gameplay world regen after revoked supporting research. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W15 — Live frontend crawl workbench
+
+**Feature outcome and technical implementation.** Implement typed capture, status, review, export, erasure and failure UX. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** UI must reject unauthorized action without fake optimistic completion. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Browser authenticated capture and owner/user role switching. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W16 — Dragon Atlas backend adapter
+
+**Feature outcome and technical implementation.** Connect #4876 bridge to authoritative Mongo campaign/claim data with policy validation. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Do not clear backend-route hold from source-only UI tests. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Reproduce bridge test failure then exact-head focused integration. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W17 — Source-document integrity
+
+**Feature outcome and technical implementation.** Bind retained text SHA, byte size, Unicode offsets and anchored passages. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Cached citation cannot silently refer to revised different page. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Exact passage re-resolution on dynamic source revisions. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W18 — Crawler worker process custody
+
+**Feature outcome and technical implementation.** Track physical executor join, cancellation, heartbeat and crash recovery distinctly. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Expired lease is not evidence worker has terminated. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Kill/wake and delayed worker stress without double reservation. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W19 — Multilingual research and quotes
+
+**Feature outcome and technical implementation.** Retain language, script, encoding and source-offset semantics across extraction/translation. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Unreviewed machine translation is not a source-original quote. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Side-by-side multilingual passage citations and rights. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W20 — Crawler privacy controls
+
+**Feature outcome and technical implementation.** Redact private content, avoid accidental credentials and minimize source-data exposure. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Personal source export not available to unrelated tenant or viewer. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Cross-role export/erase and redacted logging audits. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W21 — Research cache correctness
+
+**Feature outcome and technical implementation.** Cache only immutable source snapshot eligible under current consent and revision. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Consent revocation cannot be bypassed by offline cached response. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Stale-cache isolation and explicit offline-only reading. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W22 — Forensic hash-chain journals
+
+**Feature outcome and technical implementation.** Record command, worker receipt, source outcome and version-CAS as tamper-evident lineage. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Tampered journal invalidates downstream evidence and campaign result. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Replay corruption, missing event and out-of-order manifest tests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W23 — Research suggestion ranking
+
+**Feature outcome and technical implementation.** Rank useful legitimate sources from admitted frontier without unsolicited new host crawling. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Discovery suggestions are advisory, not network grants. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** User approval before any new-source/host acquisition. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W24 — Dragon companion and practice
+
+**Feature outcome and technical implementation.** Reflect legitimate observed research sessions as companion progression and learning aids. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Pet XP does not equal verified scientific knowledge or trained model weights. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Compare reported XP against actual committed activities. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W25 — Knowledge source lifecycle UX
+
+**Feature outcome and technical implementation.** Provide review queues, approve/reject, citations, withdrawal and replayable reason logs. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** One-click approval cannot promote unauthorized source content. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Reviewer role and source revocation end-to-end browser test. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-10-W26 — Campaign scale performance
+
+**Feature outcome and technical implementation.** Measure per-host throughput, memory, extracted bytes, queue depth and source freshness under limits. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Unbounded spidering, giant HTML and slow remote transport rejected. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Constrained site and intermittent network pressure test. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+
+**BOT-10 closure rule:** all declared feature types have interoperable contracts; exact product journeys pass on supported targets; negative, rights, accessibility and performance obligations are satisfied; bugs/rejected candidates are retained in accountability; independent BOT-12 review agrees with source state. An undocumented limitation is a gap even if the implementation happens to work.
+
+## BOT-11 — Visual studio product, creator experience, collaboration, accessibility and monetization
+
+**Primary owner paths:** frontend, backend/routes, skeleton/app, skeleton/forge. **Priority envelope:** P1/P3. **Integration relationships:** 11->01/02/03/04/05/06/08/09/10/12. The bot must examine merged code, independent PR candidates and existing masterplan rows before deciding whether to build, improve, unify or reject a feature. All proposed capabilities begin at UNKNOWN maturity until evidenced. No platform and no declared engine support is automatically implied by a spec. Every relevant user action must show an actual durable result.
+
+### BOT-11-W01 — Unified creator cockpit
+
+**Feature outcome and technical implementation.** Unite setup, Jeeves, worlds, Dragon, build, asset library and operations in one consistent navigation. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No duplicated hidden project identity or inconsistent route auth. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Fresh owner completes idea-to-play journey from landing screen. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W02 — Real visual scene editor
+
+**Feature outcome and technical implementation.** Provide hierarchy, canvas/viewport, property inspector, gizmos and typed editing operations. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Drag/drop and editor controls must write canonical project state not local demo only. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Open project, move actor, save and see change in exported Godot game. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W03 — Node graph and scripting parity
+
+**Feature outcome and technical implementation.** Author behavior, dialogue, quest and effects through graphs synchronized with typed code. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Unsupported graph nodes must not silently vanish on export. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Edit via graph, inspect code, change code and roundtrip same behavior. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W04 — Embedded playable preview
+
+**Feature outcome and technical implementation.** Let user launch actual game with input, debug controls, frame capture and restart. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Screenshot-only preview does not count as interactive. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Use editor preview to complete golden platformer and observe persistence. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W05 — Editor undo/redo
+
+**Feature outcome and technical implementation.** Persist reversible commands, selection history, branching checkpoints and semantic diff. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** An agent edit cannot erase human work or bypass revision check. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Multiple undo/redo cycles with cold restart and conflict. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W06 — Project templates and onboarding
+
+**Feature outcome and technical implementation.** Offer proven original-game starting kits with asset manifests and game-loop tutorial. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Template cover image without runnable engine is ineligible. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** New account makes first successful playable edit quickly. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W07 — Jeeves conversation UX
+
+**Feature outcome and technical implementation.** Show model readiness, sources, tools, reason for blocked actions, controlled streaming and durable sessions. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Rendered assistant text not treated as committed artifact. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Authenticated source-bound chat with real model + tool approval. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W08 — Collaborator invitations and roles
+
+**Feature outcome and technical implementation.** Invite users to a project with scoped editor, reviewer and viewer access. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Invite link/role must not leak private model, source or external vault data. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Three-account tenant isolation and invitation revocation tests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W09 — Realtime collaboration CRDT/OT
+
+**Feature outcome and technical implementation.** Converge concurrent scene/text edits with branching, conflict detection and offline rejoin. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Last-writer-wins across structured world/quest edges prohibited. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Two clients offline edit then reconcile without lost data. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W10 — Review and annotation system
+
+**Feature outcome and technical implementation.** Pin comments, design critiques and approval to scene/asset/source revision. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Resolved review cannot apply silently to changed underlying artifact. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Reviewer sees stale annotation and re-review requirement. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W11 — Visual production board
+
+**Feature outcome and technical implementation.** Show deliverable DAG, bot ownership, running jobs, budgets, blocked tests and exact PR refs. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Dashboard cannot represent queued/pending checks as successful. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Compare UI status to actual GitHub/owner receipts. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W12 — Creator asset gallery
+
+**Feature outcome and technical implementation.** Search licenses, thumbnails, rigs, materials and media variants by real provenance. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Withdrawn or unlicensed asset cannot be rediscovered via gallery. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Source withdraw and permission-specific search tests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W13 — World editor interaction
+
+**Feature outcome and technical implementation.** Author characters, settlements, quests, maps, dialogue and timeline on canonical graph. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No write through a second disconnected frontend state store. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Multi-step scene + quest edit makes actual game behavior change. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W14 — Localization infrastructure
+
+**Feature outcome and technical implementation.** Support interface and game text, pluralization, RTL/layout and translation management. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Missing translations declared fallback rather than broken control. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Browser and game play at representative languages/screen sizes. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W15 — Responsive and offline UX
+
+**Feature outcome and technical implementation.** Work on desktop, mobile-width browsers and optionally offline project editing with finite sync. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Offline mode must not invent successful server commits. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Disconnected user modifies local draft then explicit reconciliation. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W16 — Keyboard/gamepad accessibility
+
+**Feature outcome and technical implementation.** Navigate cockpit, scene editor and game preview without pointer-only interaction. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Essential workflows fail if only drag gesture exists. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Automated axe/keyboard/manual screen-reader and controller audit. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W17 — Motion, color and audio accessibility
+
+**Feature outcome and technical implementation.** Reduced animation, captions, contrast, focus, large text and mono-audio controls. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Games cannot rely solely on inaccessible sensory channel. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Accessible golden game run plus UI contract checks. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W18 — Private user account and portfolio
+
+**Feature outcome and technical implementation.** Manage projects, owned licenses, public pages, versions, provenance and privacy settings. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Private content must never appear in public search or analytics. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Viewer vs owner vs collaborator result isolation. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W19 — Template/plugin marketplace
+
+**Feature outcome and technical implementation.** Curate signed original templates, kits and extensions with permission/compatibility manifest. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Unverified plugin not executable as host process. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Safe sandbox test and approved package lifecycle. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W20 — Payments and entitlement ledger
+
+**Feature outcome and technical implementation.** Design atomic idempotent checkout, settlement, refunds, upgrades and scoped entitlements. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Duplicate webhook/downgrade cannot double charge or grant wrong owner. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Concurrency/replay fixtures and provider-bound verified delivery. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W21 — Creator publishing flow
+
+**Feature outcome and technical implementation.** Collect game metadata, rights, credits, ratings and storefront-specific export readiness. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Listing does not imply legal or platform certification. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Publish candidate held until independent source and binary verification. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W22 — Playtest user research panel
+
+**Feature outcome and technical implementation.** Capture consented user sessions, notes, bug repro, fun metrics and video artifacts. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Tests must separate simulated telemetry from human player judgment. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Blind playtest and feedback linked to exact game build. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W23 — Studio knowledge/search
+
+**Feature outcome and technical implementation.** Search own projects, authored source, versions, tasks and admitted research with project/rights scope. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Search result cannot reveal private deleted/withdrawn source. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Mixed-tenant and redaction index test. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W24 — Gamified Dragon companion
+
+**Feature outcome and technical implementation.** Render companion progression, journaling and bounded practice without confusing trust. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Companion visual flair cannot become evidence of research truth. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Test experience on low-power reduced-motion devices. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W25 — Help, diagnostics and recovery UX
+
+**Feature outcome and technical implementation.** Explain nonfunctional services, needed models/cores and exact action to fix. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** UI error must not tell owner to disable guard or delete volumes. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Fault each backend dependency and evaluate actionable diagnosis. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-11-W26 — Creator support and updates
+
+**Feature outcome and technical implementation.** Surface verified release notes, backup/restore, known limitations, privacy and rollback. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No misleading “ready” badge when target/platform unqualified. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** App version and supported-target reporting match artifacts. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+
+**BOT-11 closure rule:** all declared feature types have interoperable contracts; exact product journeys pass on supported targets; negative, rights, accessibility and performance obligations are satisfied; bugs/rejected candidates are retained in accountability; independent BOT-12 review agrees with source state. An undocumented limitation is a gap even if the implementation happens to work.
+
+## BOT-12 — Assurance, security, independent gameplay QA, exact-head CI and release governance
+
+**Primary owner paths:** scripts/check_*.py, .github/workflows, skeleton/testing, backend/tests, frontend/scripts. **Priority envelope:** P0. **Integration relationships:** 12->all. The bot must examine merged code, independent PR candidates and existing masterplan rows before deciding whether to build, improve, unify or reject a feature. All proposed capabilities begin at UNKNOWN maturity until evidenced. No platform and no declared engine support is automatically implied by a spec. Every relevant user action must show an actual durable result.
+
+### BOT-12-W01 — Full-source inventory and discrepancy
+
+**Feature outcome and technical implementation.** Obtain complete clone, object-level tree, PR set, file hashes, architecture/manifest conformity. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Partial snapshots and search results cannot certify entire repository. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Independent compare Git object tree, plan registry and artifact manifests. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W02 — Exact-head workflow reconciliation
+
+**Feature outcome and technical implementation.** Enumerate required workflows by event/branch/PR SHA, versions, outputs and statuses. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Skipped, queued, cancelled, ancestor and superseded checks are not passes. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** GitHub API proof of all mandatory named jobs at exact final head. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W03 — P0 gate execution campaign
+
+**Feature outcome and technical implementation.** Run architecture, provider guard, assembly, security, frontend, backend, game, native and storage suites. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** One succeeded sibling cannot waive a failed architecture or adapter job. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Record first failing step, repair then rerun all impacted checks. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W04 — Independent game play agent
+
+**Feature outcome and technical implementation.** Control real Godot/browser game through legal observable inputs and compare expected state. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Model judge cannot read builder private answer or grant itself success. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Blind self-play on golden games with saved trace, screenshots and fail logs. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W05 — GameCraft-like acceptance benchmark
+
+**Feature outcome and technical implementation.** Assess engine grounding, full artifact completeness and actual interactive success by genre. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Static success marker insufficient for full-task pass. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Curate 2D/3D tasks and score conjunctive input/state/render requirements. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W06 — Bug detection and repair benchmark
+
+**Feature outcome and technical implementation.** Inject real gameplay, compiler, asset, UX and save defects; evaluate diagnosis/repair. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Test harness cannot leak secret fix or allow skipping hard case. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Independent reproduction before/after patch with regression run. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W07 — Cumulative optimization benchmark
+
+**Feature outcome and technical implementation.** Measure multiple chained edits maintaining prior function while improving targeted metric. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Optimizer cannot claim progress by dropping features. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Six-turn project evolution with strict overall task pass. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W08 — Threat model and trust boundaries
+
+**Feature outcome and technical implementation.** Inventory prompt injection, SSRF, deserialization, build sandbox, rights, privilege and third-party supply chain. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Security pass cannot be inferred from absence of alerts in narrow test. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Cross-plane attack tree, test fixtures and manual review. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W09 — Secret scanning and remediation
+
+**Feature outcome and technical implementation.** Review historical and current findings, decide real vs fixture, rotate confirmed exposed credentials. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Never blanket suppress unknown tokens or publish them in report. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Classified finding ledger, rotation proof and final secret gates. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W10 — Filesystem and archive fuzzing
+
+**Feature outcome and technical implementation.** Race symlinks, parent swaps, hard links, FIFOs, zip bombs and image/audio decompression. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Any unsafe path or unbounded content fails before read/write. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Cross-platform safe descriptor test and sandbox isolation. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W11 — Mongo/SQLite/Chroma fault matrix
+
+**Feature outcome and technical implementation.** Simulate primary loss, journal interruption, disk exhaustion, clone conflicts and restore. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Uncertain commit cannot be counted as success. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Real database kill and recovery with authoritative readback. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W12 — Physical worker accounting
+
+**Feature outcome and technical implementation.** Verify deadlines, cancellations, leases, native worker join, token cost and queue fairness. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Timed-out process cannot release capacity until physical exit. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Stress twelve-bot workload with resource and crash logs. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W13 — Installer hardware test
+
+**Feature outcome and technical implementation.** Validate clean Windows 11/WSL2 Docker and local GGUF activation on owner-like machine. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Hosted CI is not a physical-device acceptance substitute. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Signed tested host report with full first-install user journey. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P0. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W14 — Accessible UX/game testing
+
+**Feature outcome and technical implementation.** Review screen reader, keyboard, controller, captions, contrast, reduced motion and seizure triggers. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Essential creator workflows inaccessible cannot be marked complete. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Automated+manual accessibility tests on actual runtime. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W15 — Performance and long-run soak
+
+**Feature outcome and technical implementation.** Capture p50/p95/p99 startup, frame time, memory, GPU, model throughput, disk, recovery tails. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Averages cannot hide severe 99th percentile stalls. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Endurance test with explicit target hardware and sample logs. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W16 — Rights and licensing certification
+
+**Feature outcome and technical implementation.** Audit models, toolchains, fonts, audio, assets, sources, game content and distribution terms. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Missing source license or withdrawal blocks dependent release. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Origin/attribution manifest and removed-source artifact test. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W17 — Financial security verification
+
+**Feature outcome and technical implementation.** Confirm payment provider webhook, settlement, charge retries, refunds and entitlements. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No checkout release until atomic concurrent settlement is proven. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Replay, reorder, forged webhook and timeout cases. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W18 — Malware and dependency gates
+
+**Feature outcome and technical implementation.** Scan code, archives, media, generated artifacts and pinned dependency graph. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Executable-looking media or unknown archive cannot be trusted by extension. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Policy corpus plus real malware/dependency scanning. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W19 — Release provenance and signing
+
+**Feature outcome and technical implementation.** Verify source tree, all required CI, package digest, SBOM, approvals and independent signer. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Never promote on docs-only/ancestor/mock-only evidence. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Rebuild exact source and verify signature/transparency trail. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W20 — Disaster recovery rehearsal
+
+**Feature outcome and technical implementation.** Restore user installation, asset graph, model receipts, games and saves from known backup. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Successful archive creation is not proof archive can restore. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Cold isolated restore and actual game play from recovered snapshot. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W21 — PR dependency and conflict solver
+
+**Feature outcome and technical implementation.** Map stacked branches, overlapping files, changes moved to main and necessary rebase. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Never mass merge incompatible PRs or force over branch protection. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Graph-based conflict-free merge readiness per exact head. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W22 — Regression test quality audit
+
+**Feature outcome and technical implementation.** Find tautological mocks, false-positive fixtures, setup bypasses and brittle source assertions. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Passing tests that never exercise behavior do not qualify. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Mutation testing and live boundary tests with injected defects. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W23 — Quality and human feedback review
+
+**Feature outcome and technical implementation.** Blind score mechanic clarity, audiovisual feedback, engagement and accessibility alongside objective tests. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Model's subjective praise is not independent or release evidence. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Third-party player panel comparing candidate with baseline. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W24 — Documentation-to-runtime truth
+
+**Feature outcome and technical implementation.** Reconcile README, manifest, setup guide, playbook, source, UI and release notes. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Guide cannot promise features blocked or missing in target build. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Follow documentation from clean host and log actual deviation. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W25 — Release hold and risk communication
+
+**Feature outcome and technical implementation.** Distinguish open unknown, confirmed blocker, waived scoped risk, accepted target and release decision. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** Bot cannot unilaterally waive critical trust or content-rights holds. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Human operator sees exact gate IDs, evidence and unresolved risk. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+### BOT-12-W26 — Final product acceptance scorecard
+
+**Feature outcome and technical implementation.** Compute journey success, genre/platform coverage, risk, resource, accessibility and defect regression. Trace this change from its design/game/source event through canonical API, versioned state, representation, worker or editor, and the target runtime where applicable. Record exactly which subsystem owns the mutation, expected user control, rollback semantics and what happens when a dependent game asset/model/engine is missing. Build one complete representative outcome before multiplying variations.
+
+**Failure, integrity and safe limits.** No completion percentage from file counts or test total alone. Include bounded input/byte/complexity/clock budgets, actor/tenant/permission and current-head checks as appropriate. Preserve human-authored revisions and don't replay already-committed effects. Invalidate outdated previews, game build outputs and source-derived knowledge when authoritative inputs change. A source file, unverified fixture or generated documentation never qualifies as gameplay.
+
+**Completion proof and target behavior.** Independent reproducible multi-axis score tied to shipped artifacts. Capture commands, toolchain versions, actual created files, test output and negative cases on the originating final SHA. Where user experience is material, require independent in-game/button-level interaction, visible output, meaningful player response and save/restart trace. BOT-12 must independently verify before release promotion. **Priority:** P1/P2/P3. **Status:** UNKNOWN until current-tree census and proof review.
+
+
+**BOT-12 closure rule:** all declared feature types have interoperable contracts; exact product journeys pass on supported targets; negative, rights, accessibility and performance obligations are satisfied; bugs/rejected candidates are retained in accountability; independent BOT-12 review agrees with source state. An undocumented limitation is a gap even if the implementation happens to work.
+
+# 12. Frontier research, discontinuous capability gains and optional expansion
+
+The following are not assumed to exist. They are **R-series research initiatives** that must enter production only after an independent functional proof, targeted threat assessment and no degradation of P0/P1 use. All research targets are subordinated to true game-creation capability. The fact that a model can generate source or art is not evidence that it can author a working playable game. Each proposal needs a minimal experiment, rejected cases, reproducible baseline and an adoption threshold.
+
+### R-001 — Neuro-symbolic scene intelligence
+
+**Involved bots:** 02+03+05. **Research path:** Integrate typed semantic scene graphs with language/vision interpretation, keeping graph state authoritative and neural guesses provisional. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** A model that labels a scene incorrectly cannot move an object or rewrite story state without editor grant. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Blind object-interaction reasoning plus scene replay. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-002 — Interactive world digital twin
+
+**Involved bots:** 02+05+06. **Research path:** Create a deterministic inspectable shadow model of world mechanics, economy, quest predicates and NPC schedules to predict consequences before committing changes. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Predictions must expose error bands and not claim correspondence without observed game samples. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Predict quest breakage then verify real seeded run. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-003 — Continuous game quality laboratory
+
+**Involved bots:** 04+06+12. **Research path:** Build a closed benchmark loop that generates playable candidate, measures play, localizes defect, applies reviewed repair and reruns held-out scenarios. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Prevent benchmark contamination and closed-loop grader hacking by separating builder and judge. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Independent play agent flags a nontrivial bug and confirms repair. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-004 — Semantic editable game IR
+
+**Involved bots:** 02+07+09. **Research path:** Represent abilities, animation needs, events, objectives and save semantics as a stable engine-agnostic model. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Engine compilation not permitted to erase essential mechanics silently. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Same IR exports two targets with documented fidelity delta. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-005 — Neural asset inverse design
+
+**Involved bots:** 03+08. **Research path:** Infer original geometry/material/rig requirements from source-approved design art or sketches using typed structured scene constraints. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Untrusted image content never authorizes scraping/training or copyrighted content duplication. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Reconstruct functional object and inspect actual rendered scene. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-006 — Player-driven narrative intelligence
+
+**Involved bots:** 04+05+06. **Research path:** Adapt narrative beats from causal world state, player decisions and explicit guardrails without inventing canonical memories. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Never retroactively revise confirmed player choice history. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Different player actions cause consistent distinct in-game scenes. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-007 — Procedural storytelling solver
+
+**Involved bots:** 05+07. **Research path:** Use formal reachability/constraint satisfaction to keep large branching narratives consistent and finishable. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** When a branch becomes unreachable, deny generation and expose minimal counterexample. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Prove reachable endings through solver and actual player actions. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-008 — Semantic failure slicing
+
+**Involved bots:** 04+09+12. **Research path:** Generate minimal reproduction from failing frame/input/scene state and locate responsible code/asset/quest dependencies. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not assume traceback alone identifies first causal defect. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Bug minimized into small reproducible trace then fixed. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-009 — Differential engine compiler
+
+**Involved bots:** 02+09+12. **Research path:** Compile one typed game feature to two engines and use stable input/state witnesses to compare behavior. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Divergence must be reported rather than normalized into false parity. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Cross-engine camera/input/quest comparison suite. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-010 — Neural cinematography supervisor
+
+**Involved bots:** 05+08+11. **Research path:** Use temporal composition and scene context to propose camera/light/music cuts with director-controlled overrides. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No cutscene may trap user input or violate motion-reduction settings. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Blind viewer comprehension study and skip/resume checks. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-011 — Resource-driven runtime topology
+
+**Involved bots:** 01+03. **Research path:** Adapt CPU/GPU/VRAM/RAM/swap/disk inference and game previews using predictive capacity admission. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot claim free memory from OS page cache while native work unresolved. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Pressure matrix, restart, and measured user responsiveness. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-012 — Game studio project graph RAG
+
+**Involved bots:** 02+03+04. **Research path:** Retrieve exact project code, scene, quests, approved lore and test failures through versioned graph queries and citations. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No source from stale branch, withdrawn grant or other project. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Agent explains correct code/quest connection under branch changes. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-013 — Agent self-play curriculum
+
+**Involved bots:** 03+06+12. **Research path:** Train evaluators on increasingly complex consented original games with held-out evaluation. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Don't promote trained evaluator on its own training episodes. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Held-out game-agent performance plus human alignment review. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-014 — Procedural 3D topology control
+
+**Involved bots:** 07+08. **Research path:** Combine grammar and geometry constraints to create cities, roads, caves, ecosystems and interactive placement. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No physically unsupported path or inaccessible interactable structure. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** 3D navigation/physics full-world traversal. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-015 — Automated art continuity review
+
+**Involved bots:** 08+12. **Research path:** Compare character silhouette, palette, rig, facial geometry and material across generated sequences. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Avoid claiming aesthetic identity from single-image cosine similarity. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Independent visual continuity judgment across scene revisions. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-016 — Live shader optimization
+
+**Involved bots:** 08+09. **Research path:** Compile and optimize target-aware shaders, with fallbacks for GPU feature sets and conservative performance profiling. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not silently erase essential visual cues. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Compare real device frame pacing and semantic feedback. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-017 — Game feel optimization
+
+**Involved bots:** 06+12. **Research path:** Optimize input latency, camera damping, jump buffering, impact feedback and audio response using recorded play. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** A faster framerate cannot substitute for coherent controller feedback. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Blind preference trial with matched controls and replay. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-018 — Audio state composer
+
+**Involved bots:** 05+08. **Research path:** Generate original layered musical loops synchronized to world state, combat and narrative beats with rights-bound sources. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not use unauthorized copyrighted melody reproduction. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** In-game music transitions, loop quality and source attestation. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-019 — Interoperable multiplayer rollback
+
+**Involved bots:** 02+06+09. **Research path:** Use authoritative ticks, input prediction and rollback with digest-bound state and deterministic replay. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Client cannot self-award resources or alter server state. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Two-client packet-loss and desync recovery game. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-020 — Multiplayer shared world director
+
+**Involved bots:** 04+05+06. **Research path:** Coordinate goals, factions and encounters across cooperative players using fair group adaptation. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** One player cannot invalidate another's confirmed main quest progress. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Two-player divergent-action and reconciliation scenarios. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-021 — Narrative language localization engine
+
+**Involved bots:** 03+05+11. **Research path:** Maintain semantic state, canonical named entities, speaker style and accessibility during translation. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Localization may not invent quest flags, rewards or spoilers. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Multi-lingual playtester verifies quest equivalence. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-022 — Offline-first creator collaboration
+
+**Involved bots:** 02+11. **Research path:** Version conflict-aware project assets and graph edits for disconnected artists/engineers with later reconciliation. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Avoid last-writer-wins on noncommutative scene and graph mutations. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Two-device offline conflict merge with reviewed outcome. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-023 — Whole-game proof generator
+
+**Involved bots:** 06+09+12. **Research path:** Create executable acceptance journeys from design specs, including setup, gameplay, reward, fail and save. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No passing test based only on declared manifest file. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Independent executable acceptance fixture for new genre. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-024 — Rights-aware synthetic design knowledge
+
+**Involved bots:** 03+10. **Research path:** Produce original design hypotheses from licensed and reviewed observations without copying protected page content. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Source withdrawal invalidates every derived active prompt or asset. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Withdrawing source removes its claim from next design run. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-025 — Provenance-sensitive procedural training
+
+**Involved bots:** 03+07+10. **Research path:** Train procedural generators only on lawful original or licensed data with dataset lineage and contamination checks. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No uncontrolled crawler-to-training path. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Lineage audit, held-out quality and revocation simulation. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-026 — Adaptive creative budgeting
+
+**Involved bots:** 01+03+04. **Research path:** Choose model calls, GPU time, media fidelity and asset iterations under explicit user time/cost/quality budgets. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not overspend because model predicts higher quality. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Budget-constrained studio run meets requested game scope. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-027 — Causal debugging cockpit
+
+**Involved bots:** 02+04+11. **Research path:** Show exactly why a world event happened, which source state changed, and how to reproduce it. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Privacy limits must redact unavailable private source data. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Owner click-to-trace from failed in-game quest to event/command. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-028 — World rewind with immutable rights
+
+**Involved bots:** 02+05. **Research path:** Allow gameplay time-travel and alternative narrative exploration while preserving external audit/payment/source authority. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Never roll back real-world payments or source revocations when rewinding fiction. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Game rewind replay without cross-store privilege confusion. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-029 — Simulation-driven economy balancing
+
+**Involved bots:** 05+06+07. **Research path:** Optimize sinks, drops, crafting and quest rewards with multiple play styles and long-horizon stochastic checks. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Avoid a single optimizer exploiting scoring loopholes. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Economy remains viable under exploit-seeking synthetic agents. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-030 — Dynamic NPC social intelligence
+
+**Involved bots:** 03+05. **Research path:** Use context-bounded causal memory and utility planners for NPC collaboration and conflict in evolving towns. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** NPCs cannot omnisciently cite secrets or private player identity. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Town memory consistency through save/load and player misdirection. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-031 — Adaptive difficulty without dark patterns
+
+**Involved bots:** 04+06+11. **Research path:** Provide transparent adjustable challenge and player agency, not covert engagement-maximization. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Respect accessibility and do not manipulate users with opaque wagering mechanics. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Human review of fairness and player-controlled settings. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-032 — Developer co-pilot in visual scene
+
+**Involved bots:** 03+04+11. **Research path:** Ground agent edits to selected viewport object, inspector schema, script snippet and current source revision. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No model may edit unselected assets without explicit scoped grant. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Natural-language scene change followed by undo and engine preview. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-033 — Constraint solver for cinematic staging
+
+**Involved bots:** 05+08. **Research path:** Place characters/cameras/props while respecting dialogue beats, visible action and collision constraints. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not block essential player route or cause clipping. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Cutscene staged and verified through engine frames. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-034 — Game asset graph optimization
+
+**Involved bots:** 02+08+09. **Research path:** Deduplicate, stream, compress and LOD shared media under immutable source/provenance refs. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No rights-mixing or identity collisions from dedup. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Cross-scene reuse preserves correct rights and visual assets. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-035 — Shadow build and replay validation
+
+**Involved bots:** 01+09+12. **Research path:** Compile proposed game changes into isolated sandbox, run blind tests before affecting published project. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No preview artifact should masquerade as approved release. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Failing change held while previous stable game remains playable. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-036 — Hotfix and migration assistant
+
+**Involved bots:** 02+04+09. **Research path:** Propose scoped repairs to game code, save formats and existing user-created content with migration plan. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Avoid automatic destructive schema rewrites. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Hotfix after real save migration with rollback. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-037 — Project quality contract compiler
+
+**Involved bots:** 04+12. **Research path:** Turn genre brief and acceptance goals into versioned gameplay, audio, visual, UX and performance test obligations. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not let generator and evaluator use same undisclosed mutable rubric. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Locked rubric seeded before model action and independently scored. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-038 — Human/AI comparative design loop
+
+**Involved bots:** 04+11+12. **Research path:** A/B user-observed game versions across mechanics/feedback/story rather than model self-scoring. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Respect informed user feedback/consent and avoid deceptive exposure. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Blind comparative playtest with confidence intervals. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-039 — Long-form quest continuity engine
+
+**Involved bots:** 02+05+07. **Research path:** Satisfy global predicates across 100 chapters, 1000 acts and 9999 scenes without empty filler. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Scale capacities should not imply generated depth. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Longform graph validated and sampled actual gameplay. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-040 — Self-healing build execution
+
+**Involved bots:** 01+04+09. **Research path:** Read true compiler errors, apply bounded owner-approved patch and re-run proof under one deadline. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No unbounded repair loop or failure concealment. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Real build failure recovered within finite rounds. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-041 — Frontier genre synthesizer
+
+**Involved bots:** 04+06+07. **Research path:** Combine distinct systems into newly coherent genres using explicit mechanical constraints and user goals. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Novelty label does not certify fun or original IP rights. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** User can complete unique prototype with tested rules. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-042 — Designer-facing economy workbench
+
+**Involved bots:** 05+06+11. **Research path:** Visualize sources, sinks, prices, progression and simulation outcomes with reversible tuning. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Values edited in UI must affect actual running economy. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Tune a craft exploit, rerun simulation, verify fix. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-043 — Cross-media provenance ledger
+
+**Involved bots:** 02+08+10. **Research path:** Trace generated or transformed audio, image, animation and text to source rights and model/tool receipts. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot publish media with uncertain license or revoked input. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Audit generated scene media to exact permitted source. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-044 — Accessible game generation policies
+
+**Involved bots:** 04+06+08+11. **Research path:** Require captions, remappable controls, feedback redundancy and navigation in generated game plan. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** A11y cannot be entirely deferred as polish. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Input/play, reduced-motion and subtitles through complete game. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-045 — Live cost/pressure governor
+
+**Involved bots:** 01+03+12. **Research path:** Reserve and meter GPU tokens, memory, storage and external API costs as shared physical resources. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Unknown cost or timed-out physical child cannot be treated as free. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** 12-concurrent-bot capacity and cancellation fairness. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-046 — Review-safe external tool ecosystem
+
+**Involved bots:** 02+04+11+12. **Research path:** Offer plugins/add-ons under declared version, capabilities, network and filesystem restrictions. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Signed extension cannot bypass granted scope via subprocess. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Malicious plugin fixture rejected and incident trace. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-047 — Studio provenance export
+
+**Involved bots:** 02+09+12. **Research path:** Package editable game, source receipts, license manifest, QA replay and signed build context together. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No artifact claimed as verified merely because uploaded. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Fresh host independently rebuilds and plays distributed game. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-048 — Originality and plagiarism review
+
+**Involved bots:** 05+08+10+12. **Research path:** Compare generated work with authorized source corpus and human review before publication. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not use unlicensed datasets as training or similarity index. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** High-similarity candidate quarantined and revised with new original asset. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-049 — Emulator-to-real-device parity
+
+**Involved bots:** 06+09+12. **Research path:** Compare declared homebrew mechanics, timing, controller and memory behavior across approved core and hardware. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Emulator compatibility not automatic physical console approval. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Exact target binaries tested with documented tolerances. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-050 — Interactive AI debugging observability
+
+**Involved bots:** 03+04+11. **Research path:** Show inference state, tool grant, source changes and exact failure receipt without exposing hidden prompts. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot leak privileged secrets or raw source bodies via log UI. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Owner sees actionable error path and privacy redaction. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-051 — Chronological world replay
+
+**Involved bots:** 02+05+12. **Research path:** Allow deterministic replay of quest/faction/economy transitions with path-independent state hashes. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Replay inconsistency must block publication and trigger investigation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Replay 10000 committed events after power loss. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-052 — Graph compression for giant campaigns
+
+**Involved bots:** 02+05+07. **Research path:** Store large world DAGs through deduplicated shards, efficient indexes and deterministic content-addressed chunking. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Compression cannot erase event dependencies or cause hidden drift. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Large campaign load and localized edit performance bound. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-053 — Visual world blueprint compiler
+
+**Involved bots:** 04+07+08+11. **Research path:** Turn hand sketches, maps and annotated mood boards into editable world/scene specs and actual scenes. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Visual inference remains proposal requiring owner confirmation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Sketch-to-3D scene with manual edit and actual traversal. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-054 — Nondestructive generative editing
+
+**Involved bots:** 02+08+11. **Research path:** Use layers, variants, semantic asset edits and reversible bindings rather than repeatedly regenerating all files. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Approved art preserved through novel batch generation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Edit rig/material and compare alternate branches without loss. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-055 — Adaptive NPC accessibility
+
+**Involved bots:** 05+06+11. **Research path:** Provide readable cues, dialogue pacing, subtitles and player-controlled guidance for dynamic NPCs. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Dynamic speech cannot omit critical quest content without textual alternative. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Accessible NPC quest with variable rate/control settings. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-056 — World state selective synchronization
+
+**Involved bots:** 02+05+06. **Research path:** Synchronize only relevant multiplayer/streaming graph subsets while preserving canonical ordering. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Client subset cannot assert unknown global world state as authority. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Large co-op world sync with late-join and isolation tests. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-057 — Real-time voice direction
+
+**Involved bots:** 03+05+08. **Research path:** Generate lawful original voice performance from user-authorized actor/profile with lip sync and emotional constraints. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No identity imitation without valid performer consent. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Scene with sourced voice, captions and editable emotional markers. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-058 — Physics-informed procedural animation
+
+**Involved bots:** 06+08. **Research path:** Blend IK and motion planning to handle uneven terrain, impacts and object contact. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Contact errors cannot bypass collision/animation synchronization. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Walk/climb/carry tests with animation and collision evidence. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-059 — Automated level fairness witness
+
+**Involved bots:** 06+07+12. **Research path:** Find a feasible no-hit or recoverable play route for claimed challenge modes. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Mathematical solver alone insufficient if engine physics differs. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Independent controller trace demonstrates claimed reachable route. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-060 — Procedural adversary AI with policy bounds
+
+**Involved bots:** 03+06. **Research path:** Generate novel enemy policies using simulation/utility constraints while remaining interpretable and budgeted. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not accidentally turn NPC policy into network/host agent. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Novel foe plays fairly and respects real turn/tick semantics. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-061 — Narrative safety and content settings
+
+**Involved bots:** 05+11. **Research path:** Offer configurable content warnings, controls, privacy and age-appropriate variation. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot silently censor/transform user-authored approved content without review. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** User changes content mode and gameplay remains consistent. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-062 — Game-driven research planner
+
+**Involved bots:** 04+10. **Research path:** Identify specific mechanics needing external research; request approved lawfully scoped capture and review. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No model-driven open internet without operator grant. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Research finding leads to an original reviewed mechanic. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-063 — Automated source credibility graph
+
+**Involved bots:** 02+10. **Research path:** Separate primary observation, quotation, interpretation and derived claim, with temporal confidence. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Repeated syndicated content does not count as independent corroboration. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Conflicting-source chain reveals true common origin. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-064 — 3D coauthoring and semantic merge
+
+**Involved bots:** 02+08+11. **Research path:** Merge mesh/material/rig changes at semantic object layer under project revision. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Concurrent edit cannot create silent corrupt geometry. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Two artist edits resolve with explicit conflict report. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-065 — Adaptive on-device render/AI scheduling
+
+**Involved bots:** 01+03+09. **Research path:** Prioritize interactive frame and user input over background model generation, with GPU memory admission. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Creative worker cannot freeze gameplay or destabilize OS. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Run model and Godot preview concurrently on constrained laptop. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-066 — Project graph visual debugger
+
+**Involved bots:** 02+04+05+11. **Research path:** Display source-to-canon-to-game dependencies and highlight stale or invalid claims. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot mark missing evidence green through UI stale cache. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Visual inspection finds source revocation impacting quest. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-067 — Unattended safe overnight campaigns
+
+**Involved bots:** 01+02+04+12. **Research path:** Execute preauthorized bounded offline tasks with checkpoint, budget and review queue. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No auto-release, source scope expansion, checkout or unlimited cloud spend. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Crash-resilient long run generates reviewable draft outcomes. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-068 — Transactional asset replacement
+
+**Involved bots:** 02+08+09. **Research path:** Stage new media and validate all references before switching current world version. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Missing texture/audio/animation must leave previous game usable. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Kill process mid texture update, verify old game intact. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-069 — Composable genre SDK
+
+**Involved bots:** 06+07+09. **Research path:** Expose versioned mechanics and scene systems that can be mixed without hidden cross-genre coupling. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Composed systems must retain unique gameplay and valid resource budgets. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Combine racing and narrative quest into real playable microgame. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-070 — AI-initiated tests under permission
+
+**Involved bots:** 03+04+12. **Research path:** Allow model to request authorized tests and interpret results as evidence while verifier remains independent. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Tool output cannot self-promote a new grant or bypass review. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Agent selects right test for compiler error and surfaces exact result. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-071 — Reproducible player trajectory dataset
+
+**Involved bots:** 06+12. **Research path:** Capture consented anonymized controller input, world state, frame/audio and outcomes as benchmark cases. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No hidden identifiers or replay of unrelated personal data. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Replay held-out trajectory and reproduce objective event. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-072 — Automatic regression localization
+
+**Involved bots:** 02+09+12. **Research path:** Compare source commits, gameplay replays and artifacts to isolate first change introducing failure. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not assume arbitrary ancestor check success applies to current candidate. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Binary search commits with stable failing game test. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-073 — Cinematic-aware gameplay continuity
+
+**Involved bots:** 05+06+08. **Research path:** Maintain player state and quest effects across interactive/cinematic boundaries. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cutscene must not duplicate rewards or consume input twice. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Skip/cancel/resume cutscene without quest or inventory corruption. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-074 — Narrative item lore synthesis
+
+**Involved bots:** 05+07+08. **Research path:** Generate item descriptions, visual motifs and gameplay utility from causal world history. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Lore cannot claim gameplay mechanics not implemented. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Player acquires item with accurate written and observed effect. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-075 — AI studio explainability and policy UI
+
+**Involved bots:** 02+03+11. **Research path:** Expose why tool operation was admitted/denied and which contracts it invoked. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot reveal hidden backend secrets or internal reviewer material. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Human owner can approve or reject based on clear scope and cost. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-076 — Game completeness formal grammar
+
+**Involved bots:** 04+06+12. **Research path:** Specify minimum complete game evidence as typed, executable obligations by genre and target. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** A model must not declare done before required interactive observations. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Conjunctive test of objective/input/save/restart/render/audio where required. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-077 — Human agency-preserving world events
+
+**Involved bots:** 05+06. **Research path:** Let NPC director create consequential events without overriding player choice history. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot hard-code player failure to force designed storyline. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Player can choose alternate outcomes and remain on valid branch. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-078 — Continuous render diff triage
+
+**Involved bots:** 08+09+12. **Research path:** Store exact frame captures at locked states and compare geometry, layout, visibility and accessibility. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Nondeterministic antialiasing should be tolerance-bound not blindly ignored. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Spot missing HUD/mesh/lighting regressions on identical input. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-079 — Playable package self-diagnostics
+
+**Involved bots:** 01+09+11. **Research path:** Export game with safe crash report and clear missing-runtime/dependency diagnosis. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No private development credentials shipped in user game. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Fresh nondeveloper machine identifies and fixes missing dependency. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-080 — Cross-platform memory/CPU governor
+
+**Involved bots:** 01+03+06. **Research path:** Share resource measurements for inference, media compilation, game preview and playtest with priority tiers. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Throttling must preserve real-time input responsiveness. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Mixed workload under memory, thermal and disk pressure. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-081 — Large-world spatial reasoning agent
+
+**Involved bots:** 03+05+07. **Research path:** Ground reasoning in authoritative nav/scene state and solved paths instead of text hallucinations. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Agent must acknowledge inaccessible locations. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Goal planning tested on changing multilevel maze. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-082 — Interactive procedural tool tutorials
+
+**Involved bots:** 04+11. **Research path:** Teach new creator features inside actual editable game project with deterministic examples. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Documentation cannot claim a disabled feature works. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Beginner completes visual edit and engine playtest guided by UI. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-083 — Multi-project asset reuse graph
+
+**Involved bots:** 02+08+11. **Research path:** Permit explicit rights-scoped reuse of original assets across projects without shared mutable ownership. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Revocation or client change in one project cannot corrupt others. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Clone licensed asset, evolve one variant, compare isolation. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-084 — Game economy automated audit
+
+**Involved bots:** 05+06+12. **Research path:** Run exploit-seeking policies across prices, drops, crafting, faction trade and persistence. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Never infer no exploit from one short simulation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Counterexample to free currency loop found and fixed. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-085 — Synthetic social-world actor laboratory
+
+**Involved bots:** 04+05+12. **Research path:** Run deterministic multi-agent social scenarios with clear human-authored goals and constraints. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Never turn fictional actor intelligence into unbounded real-world contact automation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Observe NPC interactions and resource cost over 1000 world turns. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-086 — Offline media synthesis safety
+
+**Involved bots:** 03+08. **Research path:** Deliver real on-device image/audio material generation when lawful compatible models are available. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No silent hosted generation or synthetic file placeholder passed as art. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Actual locally rendered sprite/audio artifact with source/model rights. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-087 — Project production cost forecasting
+
+**Involved bots:** 01+04+11. **Research path:** Estimate render, model, build, storage and QA budgets from real historical receipts. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Forecasts must provide bounds and uncertainty, not guaranteed output. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Compare estimate to completed pilot project and update calibration. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-088 — Third-party plugin dependency vetting
+
+**Involved bots:** 02+09+12. **Research path:** Scan licenses, package capabilities, code execution surface, security reports and version compatibility. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Unsigned/unreviewed plugin quarantined prior to import. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Exercise malicious package fixtures and benign install. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-089 — Dynamic content moderation with operator controls
+
+**Involved bots:** 05+08+11. **Research path:** Offer configurable content, dialogue and presentation constraints appropriate to user and platform. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not erase creative source or conceal changes under safety rewrite. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Preview adjustments and audit trail in story and audio. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-090 — Whole-app resilient workspace mode
+
+**Involved bots:** 01+02+11. **Research path:** Keep user drafts safe through backend outage and provide read-only/offline edit queues with explicit sync. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Never show successful server save when only local draft exists. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Disconnect network, edit, reconnect and resolve source revision conflict. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-091 — Autonomous bug reproduction planner
+
+**Involved bots:** 03+04+12. **Research path:** Use code+state+UI traces to propose a minimal reproducer using real tools under a budget. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Cannot fabricate a passing reproduction or execute arbitrary shell as model suggestion. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** From user bug report to exact failing controller trace. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-092 — Sandboxed script VM for game mods
+
+**Involved bots:** 02+06+09. **Research path:** Provide finite host API for player-authored behaviors with capabilities and deterministic execution. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Mod cannot exfiltrate secrets, launch shell or mutate another save. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Malicious bytecode/script test denied with reproducible message. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-093 — Scene semantics to sensory cues
+
+**Involved bots:** 05+06+08. **Research path:** Make damage, rewards, quest discoveries and relationships visible/audible/tactile according to settings. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Required objective signal must have accessible fallback. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Blind user tester understands action outcome through available cues. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-094 — High-density bot planning ledger
+
+**Involved bots:** 02+04+12. **Research path:** Coordinate 12 agents by independent path leases, dependency constraints, physical capacity and immutable reports. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No shared path overwritten by concurrent agents. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Twelve-job conflict and race test with exact file/head receipts. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-095 — SOTA comparison harness
+
+**Involved bots:** 09+12. **Research path:** Benchmark installed Skeleton against supported published tests for Godot build, game fix and game optimization. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** No cherry-picked suite presented as global market leadership. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Publish method, seeds, versioned targets and strict pass rate. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-096 — User-controlled full studio portability
+
+**Involved bots:** 01+02+09+11. **Research path:** Export complete editable studio project with assets, dependencies, rights, model/toolchain hints and migration receipts. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Portable bundle cannot contain private token or unauthorized third-party asset. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Import to clean host and rebuild same golden game. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-097 — Novel simulation education mode
+
+**Involved bots:** 04+05+06. **Research path:** Reuse original world/editor/gameplay components for interactive scientific, historical and engineering simulations. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not market educational simulation as verified science without model validation. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Interactive parameter changes produce source-grounded simulated behavior. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-098 — Interactive visualization authoring
+
+**Involved bots:** 03+04+07+11. **Research path:** Use game engine and director to create explorable data/world visualizations with provenance and accessible control. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Do not reinterpret numeric data without traceable conversion. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** User imports approved dataset and navigates a true 3D visualization. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-099 — Accessible training-world sandbox
+
+**Involved bots:** 04+05+06+11. **Research path:** Let users build ethical training scenarios, interactive tutorials and simulations using same original-game tools. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** Domain-specific safety/legal approvals remain external. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Complete interactive tutorial with measurable learning objective. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+### R-100 — Multimodal agent application builder extension
+
+**Involved bots:** 02+03+04. **Research path:** Reuse Jeeves tool/compiler/QA boundaries for non-game original applications only after game baseline stable. Begin with a bounded published hypothesis and a frozen real-user/game baseline. Identify all canonical schema touch points, required typed tools, resource limits, source-rights and operator controls; create a reversible candidate that can be tested without replacing a working path.
+
+**Safety and failure:** New domain cannot erode P0 install and user-game quality. Candidate must expose uncertainty, preserve source custody and honor existing private/offline and version contracts. Failure is an informative experiment, not a reason to silently relax grants or claim performance. **Proof requirement:** Produce a small safe application with same proof and rollback model. Adoption requires measured improvement over the same task with no regressions in core control, accessibility, security, recovery, cost and game quality. Record rejected variants rather than deleting counterexamples.
+
+
+# 13. Whole-product integration campaigns and adversarial matrix
+
+Every IC campaign is a **conjunctive** product experiment with a signed immutable brief, fixed accepted toolchain, source SHA, actor role, state seed, expected behaviors and independently replayable evidence. A failure in one critical component invalidates the overall campaign. Each listed bot must contribute real code/evidence, but only one integration owner may coordinate the release head. BOT-12 is required to review results independently.
+
+## IC-01 — First clean install to local inference
+
+**Responsible participants:** BOT-01, BOT-02, BOT-03, BOT-11, BOT-12. **Scenario:** Cold Windows/WSL2 host, Docker running, no preexisting model. Setup must appear, owner setup must be explicit, model provisioning must verify source, trusted guard must activate and real GGUF must reply. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Intentional faults: missing daemon, stale Mongo primary, insufficient disk, malformed model, wrong tokenizer and restart during provisioning. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Full source-bound install receipt plus screen recording, active model hash, real reply and successful cold reopen. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-02 — Single-prompt playable top-down shooter
+
+**Responsible participants:** BOT-04, BOT-06, BOT-07, BOT-08, BOT-09, BOT-11, BOT-12. **Scenario:** Brief -> design spec -> generated assets/input/physics/combat -> Godot package -> user finishes wave and spends earned salvage -> replay. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: invisible sprite, missing attack signal, combat damage exploit, engine parse error and controller focus loss. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Frame+input+audio+state/save evidence across win/lose/retry. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-03 — Platformer with real physics
+
+**Responsible participants:** BOT-04, BOT-06, BOT-07, BOT-08, BOT-09, BOT-12. **Scenario:** Produce original geometry, moving hazards, collisions, jump/timing, game state and full successful traversal. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: impossible jump, dropped input, frame-rate-dependent collision and malformed moving platform. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Deterministic replay at multiple FPS and real engine playable package. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-04 — 3D micro-world game
+
+**Responsible participants:** BOT-04, BOT-05, BOT-06, BOT-07, BOT-08, BOT-09, BOT-11, BOT-12. **Scenario:** Generate character rig, material, camera, 3D scene, NPC, quests and sound; user interacts and completes objective. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: missing shader, malformed skeleton, unlit objective, collider trap and audio cues missing. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Actual real-time rendered GPU/CPU target run and independent player success. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-05 — Causal story branch
+
+**Responsible participants:** BOT-02, BOT-04, BOT-05, BOT-06, BOT-07, BOT-11, BOT-12. **Scenario:** Two different player choices alter NPC memory, factions, quest, dialogue and ending with valid source-traced state. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: rewound state, stale story cue, impossible quest and changed character fact. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Independent replay of both endings and graph solver witnesses. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-06 — Dynamic social/economic world
+
+**Responsible participants:** BOT-02, BOT-05, BOT-06, BOT-07, BOT-12. **Scenario:** Run repeatable economy, faction and NPC schedules that change with player actions across thousands of ticks. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: free-currency exploit, NPC omniscience, schedule conflict and stale ledger. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** State digest, long-run bounded resource use and actual displayed changes. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-07 — Visual editor human/AI joint work
+
+**Responsible participants:** BOT-02, BOT-03, BOT-04, BOT-05, BOT-08, BOT-11, BOT-12. **Scenario:** Human selects and edits actor, agent proposes scene/quest improvement, user approves, game rebuild reflects effect. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: overlapping edits, revoked grant, stale source and undo after crash. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Canonical command receipts and verified before/after game behavior. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-08 — Dragon lawful research to design
+
+**Responsible participants:** BOT-02, BOT-03, BOT-04, BOT-10, BOT-11, BOT-12. **Scenario:** Owner grants specific source host, captures bounded page, approves evidence, uses it as original mechanic inspiration. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: SSRF, malicious prompt injection, expired consent, withdrawal and source revision. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Live backend+browser trace plus withdrawal invalidating generated references. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-09 — Autonomous game bug repair
+
+**Responsible participants:** BOT-03, BOT-04, BOT-06, BOT-09, BOT-11, BOT-12. **Scenario:** Inject collision or quest bug, ask Jeeves to find minimal failing trace, propose bounded patch, human accepts, tests rerun. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: reviewer prompt contamination, fabricated success and patch causing unrelated regression. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Pre-patch failure, source diff, post-patch interactive success and negative tests. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-10 — Crash-resilient campaign
+
+**Responsible participants:** BOT-01, BOT-02, BOT-03, BOT-04, BOT-05, BOT-09, BOT-12. **Scenario:** Long-run campaign generates scenes/builds and snapshots, loses engine, recovers without duplicate code or content. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: process kill mid-write, stale lease, disk full and repeated client retry. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Exact count/event ledger, no duplication, consistent source/project head. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-11 — Audio/visual game polish
+
+**Responsible participants:** BOT-04, BOT-06, BOT-08, BOT-09, BOT-11, BOT-12. **Scenario:** Original audiovisual game pack with actual sprites/rigs, feedback, HUD, sound, cinematic and accessibility modes. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: silent audio clip, disjoint rig, zero contrast, animation trap and corrupt texture. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Independent playback and accessibility study with frame/audio artifact. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-12 — Cross-platform export
+
+**Responsible participants:** BOT-01, BOT-02, BOT-06, BOT-08, BOT-09, BOT-11, BOT-12. **Scenario:** Build game once for declared web+desktop targets and retain source and rights manifests. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: ABI mismatch, missing codec, save migration error and unsupported mobile features. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Real target launches, input traces, source exact-head and package provenance. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-13 — Marketplace original game release
+
+**Responsible participants:** BOT-02, BOT-08, BOT-09, BOT-10, BOT-11, BOT-12. **Scenario:** Only after payment and rights guards: list, buy, entitle, download, refund and revoke content as applicable. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: forged webhook, concurrent duplicate settlement and stale entitlement. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Provider-bound atomic consistency and legal/source manifest proof. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-14 — Collaborative story editing
+
+**Responsible participants:** BOT-02, BOT-04, BOT-05, BOT-08, BOT-11, BOT-12. **Scenario:** Two project editors work on dialogue, rig and world scene offline; merge with clear review and game rebuild. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: conflict, lost permissions and deleted source. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Conflict-free final state or explicit unresolved merge; no silent loss. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-15 — World simulation on low-RAM laptop
+
+**Responsible participants:** BOT-01, BOT-03, BOT-05, BOT-06, BOT-07, BOT-09, BOT-12. **Scenario:** Run real local model and game preview concurrently while creator edits interactive world. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: pressure spikes, swap thrash, GPU unavailable and native cancellation tail. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** No host OOM, bounded memory and maintained user input responsiveness. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-16 — Original game patch & save migration
+
+**Responsible participants:** BOT-01, BOT-02, BOT-04, BOT-05, BOT-06, BOT-09, BOT-12. **Scenario:** Update game content schema preserving old player choices, inventory and quests with rollback. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: mid-upgrade outage and incompatible save. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Old save boots in new game or produces clearly protected incompatibility outcome. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-17 — Original media rights withdrawal
+
+**Responsible participants:** BOT-02, BOT-04, BOT-05, BOT-08, BOT-09, BOT-10, BOT-11, BOT-12. **Scenario:** Remove permission for one source image/audio; invalidate every derived asset, preview and release candidate. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: cached library, version branch, offline package and mixed tenant reference. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Asset audit and denial of every now-ineligible derivation. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+## IC-18 — Full first-install release rehearsal
+
+**Responsible participants:** BOT-01, BOT-02, BOT-03, BOT-04, BOT-05, BOT-06, BOT-07, BOT-08, BOT-09, BOT-10, BOT-11, BOT-12. **Scenario:** Run all mandatory first-install journeys from clean target machine using current exact release artifact and independently reviewed source. Store the exact user intent and project revision before creating any system work; use authenticated canonical commands and capture actual state changes from the final runtime. The user/independent player must be able to see the effect rather than trusting status words.
+
+**Required negative campaign:** Faults: each failed hard gate, skipped job, stale artifact and source drift. The test must distinguish retryable interruption from terminal error, verify that no stale work has committed after cancellation, and preserve existing source/keys/assets/saves. Inject failure at both the beginning and end of at least one durable transaction. **Release-quality evidence:** Signed release decision packet listing exact pass/fail, approvals and remaining scope holds. Include target environment and executable/artifact, exact head, step timestamps, blocked states and independent review, not only unit fixtures.
+
+
+## 13.1 Multi-dimensional adversarial coverage
+
+No single continuous green CI bar is sufficient. At each IC test campaign, sample the following axes and record N/A with an explicit reason, not a silent skip:
+
+- **Identity:** owner, viewer, editor, collaborator, revoked grant, wrong tenant, missing consent, expired session, deactivated user.
+- **Data revision:** exact current head, stale branch, crossed project, mismatched artifact hash, obsolete save schema, withdrawn source, renamed actor ID, source edited after proof.
+- **Filesystem:** symlink leaf, swapped parent directory, hardlink, FIFO, sparse giant file, unreadable file, ownership/ACL mismatch, zip slip, zip bomb, race during publication.
+- **Service health:** UI alone, backend alone, engine alone, Mongo alone, Chroma alone, network isolation, driver loss, corrupt/cold cache, incomplete installation.
+- **Scheduling:** duplicate request, speculative double worker, stale lease, cancellation while worker alive, expired resource grant, callback timeout, admission pressure, priority starvation.
+- **Playability:** no input, stuck key, impossible jump, missing enemy, unearned reward, broken checkpoint, save corrupt, quest softlock, game exit unreachable, unseen critical text.
+- **World consistency:** NPC omniscience, timeline paradox, faction mutation without reason, offscreen resource inflation, duplicate event, orphan scene, invalid portal, unreachable ending.
+- **Art and media:** blank/magenta mesh, absent animation, missing collision, unlicensed music, clipped audio, stale camera target, unreadable subtitles, severe motion effects.
+- **Model trust:** system-role spoof, tool argument injection, hallucinated tool, stale source summary, incomplete output, tokenizer mismatch, reviewer not independent, budget exhaustion.
+- **Network/crawler:** forged host, DNS rebinding, redirect to private net, decompression bomb, malicious document instructions, consent expiry, source withdrawal, offline replay.
+- **Build/export:** wrong compiler target, incompatible ABI, missing asset, nondeterministic seed, invalid signing receipt, binary missing, game launch with no interactive success.
+- **Target environments:** Linux x86-64, Windows 11/WSL2, physical laptop CPU-only, compatible GPU, low disk, low RAM, battery saver, suspend/resume, real mobile where claimed.
+- **Economy/payment:** concurrent settlement, duplicate or forged webhook, currency mismatch, refund/reversal, stale entitlements, paid feature revoked incorrectly.
+- **Internationalization:** RTL, long translated labels, unsupported glyphs, audio/captions diverge, language-specific input or menu ordering, screen-reader pronunciation.
+- **Performance:** p50/p95/p99 latency, startup, TTFT, GPU occupancy, CPU load, game frame time, content compile time, save/restore, maximum object and scene counts.
+- **Privacy:** prompt history, raw source pages, credentials in stdout, telemetry without consent, cross-tenant inference cache, game exports containing owner/private path.
+
+### Concrete first-install acceptance protocol
+
+1. Select one released candidate exact SHA and record its source tree/commit/branch graph. Collect declared required workflows.
+2. Validate schema/architecture ownership and canonical AI mirror parity, then all independent security/quality gates.
+3. Verify artifact provenance, installer identity, license/SBOM and model/runtime source. No fresh hidden downloads in offline mode.
+4. Execute a true clean-machine setup under target Windows 11/WSL2, without privileged shortcuts, documenting ports and data locations.
+5. Prove setup UI remains available with backend intentionally unavailable; recover and observe truthful service readiness.
+6. Bootstrap owner account explicitly without committing any secret and demonstrate a viewer cannot escalate.
+7. Configure verified GGUF and trusted guard; activate real guarded chat through canonical engine and record receipt.
+8. Create a new original top-down game from a natural-language brief. Inspect the versioned design spec and generated files.
+9. Import original sprite/audio/collider assets, compile with real supported Godot, play by real input, reach win and failure conditions.
+10. Save game and project, reboot, reload and verify event, RNG, inventory and quest correctness; ensure no duplicate agent actions.
+11. Ask Jeeves to make an authorized visible design change, preview its diff, reject one bad candidate, approve a safe one and recompile.
+12. Inject a gameplay error and prove bot can reproduce, propose repair and pass independent replay under a bounded budget.
+13. Export a source package and a playable binary. Verify actual download byte identity and run target executable.
+14. Exercise Dragon only under explicit authorized source grant; withdraw source and check invalidation if Dragon is included in that release scope.
+15. Fault power, network, storage pressure and worker cancellation at least once and prove recoverability with protected data.
+16. Have BOT-12 verify exact installed artifact, evidence and source SHA independently; secure operator signs release decision.
+17. Recheck that frontend, CLI, docs, runtime receipts and release status match. Unknown or absent target behavior stays on hold.
+
+### Workstream overlap controls
+
+Bots 01/02/03 must converge on the same Mongo epoch and local guard without setting a shadow config. Bots 04/05/06/07 own design and simulation rules but cannot publish incompatible project state; every game mechanic must have a real renderer/engine target. Bots 08/09 coordinate asset budgets and legal provenance; an asset generated but not loaded is no more finished than a source file that never compiles. Bot 10's research grant never becomes model training consent. Bot 11 cannot create duplicate authority just to make a panel responsive. Bot 12 cannot “fix” hard failures by changing expected fixtures to weaker semantics. Conflicting PRs must be isolated/rebased/reconciled with actual diff and exact-head source checks.
+
+## 13.2 Red-team drills by release phase
+
+**Pre-install:** malicious archive, unsafe path extraction, old environment secrets, dependency tamper, release artifact mismatch, insufficient disk and unsupported OS/CPU. **First boot:** missing database primary, engine denied, frontend-only startup, model corrupt, guard absent and stale session credentials. **Creation:** prompt injection in design brief, hostile imported project, unsigned toolchain, unbounded world generator and malformed asset. **Play:** inconsistent physics seeds, nonfunctional button, crash during save, race between enemy action and cutscene and third-party mod. **Agent:** oversized context, invented tool, tool call after cancellation, stale source drift, misleading success test and malicious README instructions. **Research:** SSRF, unauthorized new host, consent expiry, source withdrawal and misattributed quotation. **Publication:** unverified artifact, stale checkout, malicious dependency, missing license, duplicate payment, bad entitlement and compromised signing key. **Maintenance:** hotfix with incompatible save, corrupted backup, partial migration, rollback with live clients and lost user-authored changes.
+
+For every drill, require an expected deny/recover/allow state; exactly one authoritative final outcome; bounded bytes/time/resource use; reproducible evidence; and a clear operator recovery action. A drill without a pass/fail oracle is a discussion topic, not a test.
+
+# 14. Release governance, evidence and acceptance
+
+## 14.1 Mandatory release holds
+- Default guarded local AI not proven active on target system: hold first install AI claim.
+- Shared Mongo epoch/writer authority not proven under real primary-bound reads: hold guarded AI.
+- Optional Chroma durable migration not proven: hold full-profile persistence; preserve legacy state.
+- Pending, skipped, failed, superseded or ancestor exact-head CI: hold merge/release scope.
+- Unqualified target Windows 11/WSL2/Docker/GGUF: hold physical laptop usability claim.
+- Game built but no independently verified input-driven finished loop: hold “complete game builder” claim.
+- External data used without current approved rights: hold knowledge/training/generated artifact distribution.
+- Checkout/entitlement concurrency and webhook authority unproven: hold marketplace/premium checkout.
+- Unreviewed security incidents or suspected exposed credentials: hold release affected by risk.
+- Unproven native/emulator hardware or licensed compiler profile: hold corresponding target claims.
+- Unreviewed overlap in stacked PRs or AI mirror source migration: hold unsafe merge.
+- Failed independent security, accessibility or recovery gate: hold corresponding release.
+
+A scoped experimental nightly may be authorized by appropriate maintainer policy only if it is clearly identified as unsupported and never contradicts a hard safety/rights constraint. No claim of full app launch is inferred from a source green check, model response, one golden game, or a large merged PR.
+
+## 14.2 Evidence packet schema
+
+An acceptance packet must include:
+- immutable source commit, PR and merge-base SHAs, canonical tree/object identity and modified path inventory;
+- executable/artifact hash, toolchain and model digests, dependency/SBOM data and source/asset licensing;
+- test suite name, command, host identity class (not private address), runtime version and exact input fixtures;
+- stdout/stderr/log hash or private sanitized artifact reference, timestamps, resource envelope and per-assertion outcome;
+- separate results for source test, real service, playable user input, target machine, source rights, accessibility and security;
+- original failure and fix causal chain, rerun scope and regressions, pending/unsupported/failed/blocked classifications;
+- independent validator's signature or attested identity where enabled by policy, plus exact scope and expiration;
+- deploy/rollback instructions and explicit operator release decision;
+- no secrets, raw prompts, scraped pages or unsafe media payloads in public logs.
+
+## 14.3 Metrics and realistic completion percent
+
+Compute maturity at **journey×target×quality dimension**, not line-count. For instance, playable 2D shooter on Chromium may be M4, while untested Android build is M1. Overall first-install acceptance is **false** until all required journey gates succeed conjunctively. Report a weighted scope percentage only with both numerator and denominator, and state unknown outcomes. Large catalogs and generated placeholder files count as zero implementation progress. Rejected candidates remain discoverable as evidence of learning and risk.
+
+# 15. Index expansion ledger toward one million meaningful words
+
+The owner requested a **one-million-word indexed source document**. The document presently represents the completed initial engineering constitution plus hundreds of detailed task specifications and research entries, not one million words. **Do not fake the count by repeating boilerplate or duplicating test matrices.** Continue expanding into the same single root file in reviewable commits only when additions are grounded in actual sources, new architectural decisions, code contracts, concrete defects and reproduced evidence. The file must remain navigable by stable IDs, topical headings, searchable cross-references and bot-specific reading slices.
+
+### Final desired word allocation for substantive expansion
+| Responsibility | Eventual unique word budget | Coverage required before declaring its tranche complete |
+|---|---:|---|
+| BOT-01 | 83,334 | complete host/platform inventory, real setup lifecycle, migration runbooks, hardware profiles and fault logs |
+| BOT-02 | 83,334 | entity schemas, source ownership, graph and data migrations, formal authority, all consistency rules |
+| BOT-03 | 83,334 | model/runtime procedures, token/tool proofs, memory and pressure, training lineage and agent evaluation |
+| BOT-04 | 83,334 | creative workflow design, role contracts, plan/repair and multistep full-game campaigns |
+| BOT-05 | 83,334 | world/quest/narrative semantics, consistency proofs, NPC/economy simulations and campaign examples |
+| BOT-06 | 83,333 | gameplay architecture and engine runnable behaviors, controller traces and exploit cases |
+| BOT-07 | 83,333 | procedural generation algorithms, seeds, solver witnesses and diverse example projects |
+| BOT-08 | 83,333 | real asset/audio/rig/scene pipeline, provenance, quality criteria and rendered media proofs |
+| BOT-09 | 83,333 | engine/compiler target compatibility, build artifacts, runtime and publishing matrices |
+| BOT-10 | 83,333 | Dragon crawler network/source policy, citation, campaign and live integration contracts |
+| BOT-11 | 83,333 | complete user journeys, UX/editor/collaboration/commerce/a11y flows and real user trials |
+| BOT-12 | 83,332 | full independent QA, threats, incident recovery, exact-head CI and release evidence |
+| **Total** | **1,000,000** | unique, traceable, materially useful wording — not a release or quality proxy |
+
+Expansion phases must not presume bots can run asynchronously without a configured and actually executing automation. Each added entry should include reason, observed source, target behavior, architecture, graph dependencies, implementation, failure cases, tests, reproducible proof and status. The word budget is a **writing allocation**, not a mandate to delay engineering, and not evidence that a feature exists. If the 1m target conflicts with first-install engineering, release quality and useful source truth, prioritize working software and continue the document as an honest evolving artifact.
+
+### Bot-specific document navigation
+Grokbot reads 00–10 and 14–15 first, picks blocked critical-path work, then routes to BOT-NN chapter and matching IC/R entries. BOT-12 requires the relevant cross-bot owners and frozen acceptance packet before starting independent tests. Full-source census must fill a cross-reference from every encountered code symbol/manifest/CI workflow to affected BOT work orders; every active PR overlap must be indexed by number and SHA. Keep an append-only change note with commit, authoring bot, added/changed IDs and evidence source. Prefer dense machine-readable data tables and developer-oriented examples inside this same file to generic essays.
+
+# 16. Source and benchmark references
+
+**Repo anchors (inspected through GitHub connector, baseline 2026-11-07):**
+- https://github.com/Apeloff1/Skeleton/blob/main/README.md
+- https://github.com/Apeloff1/Skeleton/blob/main/pyproject.toml
+- https://github.com/Apeloff1/Skeleton/blob/main/frontend/package.json
+- https://github.com/Apeloff1/Skeleton/blob/main/skeleton/app/manifest.json
+- https://github.com/Apeloff1/Skeleton/blob/main/machine/ai_master_plan.json
+- https://github.com/Apeloff1/Skeleton/blob/main/machine/ai_build_queue.json
+- https://github.com/Apeloff1/Skeleton/blob/main/machine/ai_file_tree.json
+- https://github.com/Apeloff1/Skeleton/blob/main/machine/ai_first_install.json
+- https://github.com/Apeloff1/Skeleton/blob/main/docs/APP_ASSEMBLY.md
+- https://github.com/Apeloff1/Skeleton/blob/main/docs/qa/GUARDED_LOCAL_READINESS_2026-10-28.md
+- https://github.com/Apeloff1/Skeleton/blob/main/docs/ai/CONSUMER_READINESS_2026-10-31.md
+- https://github.com/Apeloff1/Skeleton/blob/main/docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md
+- https://github.com/Apeloff1/Skeleton/pull/4875
+- https://github.com/Apeloff1/Skeleton/pull/4876
+- https://github.com/Apeloff1/Skeleton/pull/4870
+- https://github.com/Apeloff1/Skeleton/pull/4872
+
+**External methodological references (research baseline, verify latest before implementation):**
+- Godot stable support policy: https://docs.godotengine.org/en/stable/about/release_policy.html
+- GameCraft-Bench, Godot interactive game completion: https://arxiv.org/abs/2606.17861
+- GameXpert-Bench, generation/repair/optimization lifecycle: https://arxiv.org/abs/2608.21833
+- GameASG-Bench, strict game behavior evaluation: https://arxiv.org/abs/2609.21293
+- GUI Agents for Continual Game Generation, playable GUI judgment: https://aclanthology.org/2026.findings-emnlp.1100/
+
+**Editorial closure:** Every build work order must tie to a code change and actual user capability; every acceptance claim must tie to source and executable proof; every denied or incomplete condition stays visible. A fully functioning, trustworthy studio can grow into a much larger frontier platform only if its first real install, first real game and first real recovery remain consistently excellent.
+
+
+# 17. Second-pass source census and falsifiable implementation-gap index
+
+**Census provenance:** the local container's HTTPS git transport could not resolve \`github.com\`, including a direct \`git ls-remote\` attempt. GitHub's authenticated repository and Git-tree GET interface was used instead, pinned to main commit \`e00bfb0809b34573c2df313ea16e17fd10bead38\`. This is a real Git-tree-level path inventory, substantially more direct than searching README descriptions, but it is not a local clone or execution environment. The root tree was fetched without truncation; the recursive \`skeleton/\` response was flagged \`truncated=true\`; the relevant large subtrees below were individually fetched with \`truncated=false\`. For a complete audit, obtain an actual clone or descend into *every* \`skeleton/\` direct child and verify that none truncates. The inability to clone is a deployment/tool-transport limitation of this review session, not necessarily a failure of the application's own installer.
+
+## 17.1 Actual tree topology sample
+
+| Pinned tree | Git-tree entries returned | Blob entries | Traversal status | Technical interpretation |
+|---|---:|---:|---|---|
+| \`.github/\` | 536 | 531 | Full recursive subtree | Very broad workflow/instruction surface; automated CI policy census is critical |
+| \`backend/\` | 2,753 | 2,658 | Full recursive subtree | Large application/router/identity surface that must connect to one engine |
+| \`frontend/\` | 1,136 | 1,011 | Full recursive subtree | Expo frontend substantial; UX assertions need browser/device proof |
+| \`docs/\` | 3,191 | 3,012 | Full recursive subtree | Documentation breadth cannot serve as release acceptance |
+| \`machine/\` | 704 | 674 | Full recursive subtree | Multiple construction and evidence authorities; dependency drift risk |
+| \`scripts/\` | 595 | 587 | Full recursive subtree | Qualification, generation and install commands should be classified by side effects |
+| \`tests/\` | 2,401 | 2,368 | Full recursive subtree | Test volume is large; distinguish pure fixture from executable integration |
+| \`satellites/\` | 12,604 | 11,733 | Full recursive subtree | Many satellite packages need actual runtime relevance and reuse policies |
+| \`skeleton/\` | 70,096 | 68,666 | **Truncated** | Never report these as an exact total |
+| \`skeleton/ai/\` | 21,860 | 21,054 | Full recursive subtree | Many AI agents/runtime/research/build tools; root has many ownership planes |
+| \`skeleton/jeeves/\` | 9,227 | 9,045 | Full recursive subtree | Large Jeeves ecosystem catalog and native fabric; qualify true execution paths |
+| \`skeleton/testing/\` | 5,542 | 5,521 | Full recursive subtree | Many source-level tests; independent live game QA still required |
+| \`skeleton/forge/\` | 1,681 | 1,647 | Full recursive subtree | Ten 150-file mechanic/domain families plus canonical game builder |
+| \`skeleton/game/\` | 926 | 853 | Full recursive subtree | Many gameplay and deterministic-contract implementations |
+| \`skeleton/automation/\` | 306 | 300 | Full recursive subtree | Worker/agent/supervisor subsystems, potential parallel owners |
+| \`skeleton/simulation/\` | 779 | 765 | Full recursive subtree | Physics and simulation reference families; verify actual game integration |
+| \`skeleton/app/\` | 165 | 164 | Full recursive subtree | Install, app status, CLI, runtime and setup surfaces |
+| \`skeleton/godot/\` | 4 | 4 | Full recursive subtree | Tiny alternate Godot exporter family, not canonical Godot product by itself |
+| \`skeleton/world/\` | 2 | 2 | Full recursive subtree | A minimal alternate world namespace; canonical world owner must be resolved |
+
+The ten \`skeleton/forge/*_v1/v2\` domains contain approximately 153 paths each, reflecting many independent deterministic mechanics and contracts. The existence of files named \`ammo.py\`, \`economy.py\`, \`boss.py\`, \`quest.py\` or \`rig.py\` is useful but insufficient: it does not prove a shared update loop or target-rendered play. One inspected \`skeleton/forge/game_mechanics_v2/ammo.py\` implements a bounded deterministic ammo state transition and replay receipt; its acceptance into a shooter requires mapping that operation to an actual input event, renderer, projectile budget, inventory, sound, collision and saved player state. Domain modules should be re-used rather than replaced, but their user-level wiring must be demonstrated.
+
+### Source anchor resolution protocol
+
+The root \`AGENTS.md\` is a mandatory construction bootstrap listing machine manifests, architecture, capability interfaces, state topology, runtime schemas, and the construction manual in a particular order. **Do not use this GROKBOT_FIRST document to supersede those authorities.** Grokbot can read this navigation overview first, but before modifying source must read and obey \`AGENTS.md\` and its ordered documents. \`BOT_BRIEF.md\` defines historical work-unit and ownership practice. Its staging/claim rules may be stricter than this proposal and must be reconciled with the current maintainer's explicitly approved execution process, not silently ignored. For every implementation task, write down which authoritative rule it satisfies and which potential rule conflict needs owner review.
+
+The published \`.github/GROK_AUTH_SETUP.md\` describes a classic GitHub PAT with \`repo\`, \`workflow\`, \`admin:repo_hook\` and \`admin:org_hook\` permissions for tasks including file updates and PR creation. Treat this as a **least-privilege review candidate**: routine draft-PR writing does not itself establish a need for broad organization webhook administration. Prefer appropriately scoped GitHub App permissions/fine-grained credentials, credential rotation and an explicit security-approved token policy. Do not collect, print, store or request a PAT in a repository document. Never assume a documented third-party app UI setting or login method is a current verified supported workflow.
+
+## 17.2 Directly inspected source seams and regression guards
+
+### GAP-SRC-001: Canonical game builder declares substantial unfinished output
+\`skeleton/forge/game_builder.py\` defines \`RUN_SCHEMA=skeleton.game_builder_run.v1\` and a finite 120-second default deadline. Its \`STUBBED\` contract explicitly identifies authored sprites, meshes and audio; input-driven play beyond headless core-loop proof; multiplayer, persistence beyond an economy ledger and store packaging; model proposals; and vehicle dynamics beyond a single kinematic proof. These are **declared gaps in the canonical path**, not guesses. An integration bot should first decide which existing alternate paths can safely supply a real capability. Add a portable game-proof adapter that uses the same source version and game world state, and keep the existing default output honest until independent user input is observed.
+
+**Architecture acceptance:** a real player and independent replay agent must move, aim, attack, collect, win, lose, save, resume and close a built Godot project. The operator must be able to open the project, inspect authored scene/scripts/assets, apply a local change and export the result. A proof-marker string can be retained as a smoke signal but not as the complete criterion. Include in each game bundle a machine-readable \`playable_proof.json\` with input trace and target-version evidence, retaining the original builder receipt.
+
+### GAP-SRC-002: Logical animation reference has no skeletal renderer
+\`skeleton/ai/game_builder/advanced_animation_runtime.py\` explicitly computes animation state, blend and optional root motion without rendering bone meshes or importing foreign rigs. It is a genuine reference simulation. Bridge it into a named engine target via a typed skeleton, clip, keyframe, attachment and material map. Preserve deterministic event IDs, timing and state; do not invent animation data when required source assets do not exist. Verify foot contact and input-to-frame behavior, not only state names.
+
+**Intermediate implementation gate:** adopt an original 2D character with real sprite frames or a simple 3D rig, state transitions for idle, walk, jump, attack and defeat, and a repeated event replay. The acceptance transcript should include transition state, actual animation player event, source clip digest, rendered frame identity and the input that caused it. A clip with missing mesh/atlas is invalid. This work belongs to BOT-08 with BOT-06 and BOT-09 integration reviewers.
+
+### GAP-SRC-003: Logical audio reference has no actual waveform production
+\`skeleton/ai/game_builder/advanced_audio_runtime.py\` explicitly provides a deterministic authored cue scheduler, priority stealing, ducking and spatial gain logic without wave synthesis or sound-card access. Extend *through* the canonical media owner into actual original/approved audio assets, encoded loop files, engine audio bus, positional emitter and audio observation fixture. Do not replace the mixer with an ungoverned second audio engine. Verify level normalization, clipping, seamless loops, caption equivalents and player feedback.
+
+**Intermediate implementation gate:** a shooter actually produces a pickup cue, hit sound, combat loop and success/failure sound at runtime; an audio test observes decoded samples or an engine capture from known input. If environment sound capture is unavailable, mark audio target unqualified rather than claiming an authored mixer equals delivered sound.
+
+### GAP-SRC-004: Advanced Godot export is intentionally genre-limited
+\`skeleton/ai/game_builder/advanced_godot_export.py\` states the independently replayable native adapter is only for the \`puzzle\` family and other advanced families fail closed *through that adapter*. Other files, including \`advanced_racing_godot.py\`, offer separate source-level Godot bridges. Do not rewrite this as a blanket statement that Skeleton has no racing or shooter adapter; instead inventory each genre's actual target path and build a coherent capability/quality matrix: what accepts an editor source, what exports runnable GDScript, what plays interactively, and what receives independent hardware testing.
+
+**Integration gate:** every advertised genre receives its own runnable fixture, clear input mapping, game-state schema and import/export path. Unsupported mechanics must be rejected by exact target negotiation; a generic fallback cannot silently degrade the player experience.
+
+### GAP-SRC-005: Alternate \`skeleton/godot/export_100x.py\` is a tiny hash stub
+The inspected file is roughly 480 characters, with a \`GodotExport100x.emit_pack\` method that checks a \`.tscn\` suffix and returns a SHA-256 of the name. Despite its descriptive module banner, it does not emit actual project contents. This is an **observed misleading name-to-capability mismatch**. Do not treat it as the canonical exporter or delete it blindly; find all imports and existing tests, classify as stub/compatibility, consolidate any caller toward the real \`skeleton/forge/game_builder.py\` and target-aware exporter, or explicitly retire via an approved migration and tests.
+
+**Audit test:** call the function and inspect actual return type: it cannot substitute for a \`project.godot\` manifest and a loadable \`.tscn\`. Any assertion that this namespace alone produces a complete Godot pack is a failed documentation/code contract. Fix the product claim, not just the banner.
+
+### GAP-SRC-006: Pure art acceptance is not target rendering
+\`skeleton/game/art_acceptance.py\` is a stdlib-only visual checker over supplied pixel rows/masks and explicitly does not perform GPU rendering or image decoding. It can assess palette/contrast/silhouette over observed pixels, but cannot establish that the current game actually renders those pixels. Preserve the deterministic checker; add frame acquisition through Godot/browser, versioned screenshot provenance, tolerance-calibrated visual changes and a missing-render failure state.
+
+### GAP-SRC-007: Deterministic game runtime is separate from engine certification
+\`skeleton/ai/game_builder/advanced_gameplay_runtime.py\` describes an eight-family integer-only replay/reference engine; it explicitly does not certify native engine, publication or hardware. \`skeleton/game/gameplay/game_vertical_acceptance.py\` verifies gameplay and portable save but excludes device, authorization, publisher and release certification. These can become *reference oracles* for native packages. Build differential input sequences, compare event-level state with actual Godot results under versioned tolerances, and keep scope labels accurate.
+
+### GAP-SRC-008: Native web maze is a real distinct product path
+\`skeleton/ai/game_builder/PLAYABLE_GAME.md\` documents an original offline HTML5 maze: seeded DFS generation, a bounded BFS solve witness, keyboard/touch play, hazard/collectible/exit rules, replay export and separate Python verification. **Do not classify all browser game capability as absent.** Independently execute this existing path on a clean browser, assess its true visual/play quality, and bridge its project, replay, editor, rights and reporting semantics into the unified Studio cockpit. A small complete runnable game can be a better product seed than many unintegrated advanced subsystems.
+
+### GAP-SRC-009: Existing app assembly and secret bootstraps are not blank slates
+\`skeleton/app/assembly.py\` defines a stable service manifest and ingress boundary. \`skeleton/app/setup_runtime.py\` contains idempotent secret bootstrap and a process lock with symlink/inode defenses. \`skeleton/app/installer.py\` is transaction-oriented. Preserve the existing semantics and work on documented *missing integration and target qualification* rather than regenerating a new installer service.
+
+### GAP-SRC-010: Webcrawler authority is layered
+\`skeleton/ai/webcrawler/operations.py\` defines a pure bounded crawl protocol, with conservative limits and unreviewed external material. \`backend/core/dragon_crawler.py\` provides owner-scoped Mongo application state and worker coordination. \`skeleton/ai/webcrawler/operations.py\` does not own a new database/scheduler. New research intelligence must integrate through these existing authorities. A second crawler network service under a new bot name would violate the system's ownership model.
+
+## 17.3 Architecture debt register grounded in the tree
+
+- **Namespace proliferation:** top-level \`skeleton/ai\`, \`skeleton/jeeves\`, \`skeleton/game\`, \`skeleton/forge\`, \`skeleton/world\`, \`skeleton/godot\`, and \`skeleton/simulation\` contain overlapping terminology. The required repair is a tested ownership/call graph, not a mass rename without import parity.
+- **Frameworks versus target adapters:** source-level state machines for animation/audio/combat/quests are valuable if actual game runtime adapters import and use them. Build cross-plane contract proofs before adding more parallel reference families.
+- **Catalog-evidence asymmetry:** thousands of documented systems and test fixtures do not by themselves establish a shipped target. Every production claim needs one artifact whose behavior a person can observe.
+- **Generated mechanical breadth:** equal-sized module cohorts can be legitimate; they can also mask boilerplate. Measure per-domain actual reachable call graph, user-visible behavior and intentionally distinct mechanics, not just file size or manifest cardinality.
+- **Single-game baseline first:** the smallest finished action game plus editable save/preview/export path is the optimum reference point for full-stack migration. Freeze optional expansion while first-install blockers remain unresolved.
+- **Source QA maturity:** the repo itself already distinguishes pure logical acceptance from hardware release. Grokbot should preserve this existing conservative stance while building missing end-to-end evidence.
+- **Security guide drift:** operator instructions that mention broad personal access tokens or old service paths should be audited as a first-install user-safety issue, not pasted into new bots' prompts.
+- **Plan registry synchronization:** no completion tracker may mark BOT tasks landed by finding only their expected filename; require the immutable artifact+work order acceptance packet.
+
+# 18. Bot federation protocol: exact contracts, state machines and handoffs
+
+This section specifies **proposed integration APIs**, not existing endpoints. Before implementation BOT-02 must reconcile names with \`machine/capability_interfaces.json\`, \`machine/state_topology.json\`, \`machine/ai_runtime_schemas.json\`, the Builder Plane, canonical job queue and provider bootstrap. Any field incompatible with an existing authoritative contract must be recorded as an ADR-backed migration, not invented as an independent parallel API.
+
+## 18.1 Core causality and physical-work principles
+
+A bot has three distinct kinds of state: **intended work**, **committed software change**, and **observed user/runtime effect**. These must never be conflated. A proposal is immutable and carries a digest. Admission performs authorization and reserves a finite budget, but admission is not execution. A physical worker can be running after a logical deadline expires; its credit is released only after actual join and reconciliation. A commit may have occurred before the receipt is returned; retry must read back the exact state before applying a second time. A code commit can be valid without achieving the requested game behavior; a successful test can be real but stale relative to a newer source head.
+
+### Work order state transition specification
+
+\`\`\`
+DISCOVERED
+    -> CLASSIFIED (owner, baseline, risk, source objects known)
+    -> PLANNED (frozen acceptance criteria, dependencies, budget)
+    -> ADMITTED (current rights, leases, source head, finite resources)
+    -> EXECUTING (one physical worker token, no competing owner write)
+    -> SOURCE_COMMITTED (remote branch SHA and changed-path manifest)
+    -> FOCUSED_PROVEN (syntax/type/domain/negative checks at exact SHA)
+    -> INTEGRATED_PROVEN (canonical API/CLI/UI and target dependency)
+    -> PLAY_PROVEN (if user gameplay/UX is claimed)
+    -> DEVICE_PROVEN (if physical target is claimed)
+    -> INDEPENDENTLY_VERIFIED
+    -> REVIEW_READY
+    -> MERGE_ELIGIBLE (only when protected rules allow)
+    -> MERGED
+    -> RELEASE_CANDIDATE
+    -> RELEASED (human/authorized approval, artifact provenance)
+\`\`\`
+
+Failure alternatives are \`BLOCKED_PRECONDITION\`, \`INTERRUPTED_RECOVERABLE\`, \`FAILED_TERMINAL\`, \`REJECTED_SECURITY\`, \`REJECTED_RIGHTS\`, \`SUPERSEDED_SOURCE\` and \`CANCELLED_JOIN_PENDING\`. Avoid a single ambiguous “failed” string that conflates code syntax, missing hardware, safety denial, network exhaustion or stale CI. Store a source-specific recovery action for each state. A new worker must not inherit the authority of a predecessor whose lease has not physically closed. A successful child job can never advance a parent beyond its weakest required gate.
+
+### Suggested immutable work-order receipt
+
+~~~json
+{
+  "schema_version": "skeleton.grokbot.work_receipt.v1",
+  "work_id": "BOT-06-W01",
+  "controller": "grokbot",
+  "owner_bot": "BOT-06",
+  "repo": "Apeloff1/Skeleton",
+  "base_commit": "e00bfb0809b34573c2df313ea16e17fd10bead38",
+  "source_commit": null,
+  "actor": {"tenant": "scoped-tenant", "subject": "authorized-owner"},
+  "project": {"id": "project-identity", "revision": 1},
+  "resources": {
+    "admission_id": "immutable-admission",
+    "clock_deadline_s": 900,
+    "max_model_calls": 8,
+    "max_tools": 16,
+    "max_physical_workers": 1,
+    "max_disk_bytes": 1073741824
+  },
+  "authorities": {
+    "source_lease": "branch-and-path-bound-lease",
+    "tool_grant": "signed-finite-grant",
+    "approval_id": null
+  },
+  "changes": {
+    "content_manifest_sha256": null,
+    "changed_paths": [],
+    "branch": null
+  },
+  "evidence": {
+    "focused": [],
+    "integrated": [],
+    "interactive": [],
+    "device": [],
+    "security": [],
+    "rights": []
+  },
+  "status": "PLANNED",
+  "known_holds": ["exact-head-ci", "real-playtest"],
+  "independent_verifier": null
+}
+~~~
+
+Everything shown here is illustrative: there is no implication those exact route fields are already mounted. Empty \`source_commit\` or \`approval_id\` means the source/result remains unapproved. Values such as tenant IDs and paths must be opaque and environment-specific; never copy account credentials into an artifact.
+
+## 18.2 Cross-bot change authority
+
+**BOT-01 to BOT-02:** proposes a migration from an old storage topology to a new schema/epoch, with a reversible plan and quiescence evidence. BOT-02 accepts or blocks the authoritative structure. BOT-12 independently verifies backup and restore.
+
+**BOT-02 to BOT-03:** establishes principal/tenant/project schemas, tool grants, request and memory write identities, epoch and idempotency. BOT-03 may load a model and request tools only under those contracts. BOT-01 verifies runtime/deployment compatibility.
+
+**BOT-03 to BOT-04:** delivers an inference request interface and typed tool-intent parser; the director cannot rely on a model to execute a free-form command as trusted source. Review and planner results include actual model/version receipt and disclosure of omitted context.
+
+**BOT-04 to BOT-05:** submits world/narrative intents under an authorized project revision, keeping specified player agency and campaign goals. BOT-05 returns a structured canon/quest/world diff, not merely text.
+
+**BOT-05 to BOT-06:** defines functional player-visible consequences: an NPC favors the player, a faction attacks, a door unlocks, a skill activates, an economy price changes. BOT-06 must implement these as real game state transitions with input and feedback.
+
+**BOT-06 to BOT-07:** supplies primitive traversal/encounter/resource rules and a formally testable win predicate. BOT-07 cannot generate a terrain/quest configuration unless BOT-06 can solve and actually simulate the essential loop.
+
+**BOT-07 to BOT-08:** outputs scene geometry and entity placeholders with asset briefs, size/LOD constraints, collision/rig requirements, emotional style and target budgets. BOT-08 returns real source artifacts, not a catalog-only label.
+
+**BOT-08 to BOT-09:** supplies licensed content-addressed files and typed scene links. BOT-09 must verify that every required sound/mesh/sprite/animation is included in a compatible exported game and has a runtime reference.
+
+**BOT-09 to BOT-11:** supplies preview/executable metadata, file digest, target status and actual render/play receipts. The frontend must not replace a missing runtime with a mocked success screen.
+
+**BOT-10 to BOT-04:** gives reviewed, scoped evidence observations; the director can use these as inspiration with rights constraints but cannot make the crawler a system prompt or training source.
+
+**BOT-11 to BOT-02:** uses canonical typed commands for edits, saves, collaboration and project identities; a local optimistic UI state is not the durable store.
+
+**BOT-12 to all:** validates product truth; the verifier is independent of the coder and cannot mutate a candidate merely to make its own test pass. If source drift occurs, require reruns at the final source head.
+
+## 18.3 Conflict graph with authoritative locks
+
+Partition write ownership by exact canonical repository paths and domain entities, not only by bot name. Some files (e.g., app assembly, model authority, game project schema, API router) are high-contention integration hubs. A lock must encode the Git source head, branch, path set, project revision (if any), operation ID, lease epoch and real worker identity. Before a bot changes a file it must check whether another bot/PR already owns a competing edit. A conflict is not automatically resolved by choosing the newest timestamp.
+
+Source publication contract: given source head H and admitted change set C, calculate the intended result tree T and ensure H has not moved under the write. Commit immutable T to the bot's branch; if the ref advanced, reconcile against the new head or fail. Never use \`force=true\` to solve a routine collision. If the bot is writing to its own draft branch and lease checks fail, stop and inspect. Distinguish Git working tree existence from GitHub branch acceptance.
+
+### Coordination starvation and fairness
+
+Assign strict \`P0\` service quality capacity to BOT-01/02/03/06/09/12. Reserve one QA slot to keep verification independent of build waves. Use weighted fair queueing within the remaining budget, but no role may hoard write leases while waiting for a model or remote CI. Publish per-bot utilization, blocked duration, tasks ready versus tasks runnable, and net *accepted* features per hour. A bot that produces ten large drafts without functioning core game/playtest is not making ten units of product progress.
+
+## 18.4 Proposed artifact interfaces
+
+| Type | Producer -> consumer | Required fields | Invalidation trigger | Proof |
+|---|---|---|---|---|
+| GameDesignSpec | 04 -> 05/06/07/08/09 | schema, brief digest, genre, scope, loop, target | brief/project revision | feature traces to real gameplay |
+| WorldGraph | 05 -> 06/07/09/11 | world IDs, scene nodes, edges, canon, quests, invariants | canon or scene change | graph reachability and save replay |
+| MechanicsBundle | 06 -> 07/08/09 | actions, parameters, ticks, state, events, assertions | mechanic revision | source state vs target input differential |
+| LevelGenerationPlan | 07 -> 05/06/08 | geometry, seed, required mechanics, routes, entities | source/seed/version change | feasible traversal witness |
+| MediaManifest | 08 -> 09/11 | file digests, license, codecs, skeletal compatibility, budgets | asset or rights change | loaded frames/audio in runtime |
+| BuildManifest | 09 -> 11/12 | toolchain, input hashes, output binaries, target, ABI | source or compiler change | executable replay on target |
+| ResearchObservation | 10 -> 04/05/08 | source, passage, rights, consent, review identity, withdrawal fence | source revision/withdrawal | current citation and legal re-use |
+| UICommand | 11 -> 02/04/05 | principal, project, revision, typed mutation, idempotency | auth/revision change | durable owner receipt and visible effect |
+| ReleaseEvidence | 12 -> maintainer | source, target artifact, checks, gameplay, risk, verifier | any required input change | independent whole-app acceptance |
+| RecoveryManifest | 01 -> 02/03/12 | backup sets, state digests, schema, secrets custody, restore steps | source/state migration | cold restore and replay |
+
+### Game target feature-negotiation contract
+
+~~~yaml
+schema: skeleton.game.target_capabilities.proposal.v1
+target: godot4.desktop
+runtime:
+  requires_actual_engine: true
+  engine_major: 4
+features:
+  keyboard_input: required
+  controller_input: required_for_declared_support
+  save_load: required
+  2d_physics: required
+  runtime_animation: required_if_authoring_animation
+  spatial_audio: requires_media_asset_and_engine
+  multiplayer: unsupported_until_independent_test
+  3d_vehicle_dynamics: unsupported_until_input_and_physics_proof
+  native_device_qualification: independent_gate
+translation_rules:
+  unsupported_essential_feature: reject
+  unsupported_optional_feature: request_explicit_downgrade
+  placeholder_asset: not_release_ready
+proof:
+  static_compile: separate
+  headless_smoke: separate
+  input_driven_play: separate
+  physical_target: separate
+~~~
+
+This is deliberately a proposal; existing Godot exporter and native game profile names must prevail when authoritative. Its purpose is to prevent a visual novel renderer from silently substituting for a physics racing engine.
+
+## 18.5 Release claim grammar
+
+Use language that maps directly to evidence. \`source-defined\`: module/doc exists. \`contract-proven\`: deterministic focused tests executed on exact SHA. \`service-proven\`: live API with real database/engine. \`game-proven\`: actual player-visible input, progression and state. \`target-proven\`: exact physical device/ABI. \`release-approved\`: independent policy and operator signoff. Never use \`complete\`, \`production\`, \`shipped\`, \`first-install-ready\` or \`SOTA\` without a declared scope and documented complete evidence. A model output is a suggestion. A disabled UI button is not a live feature. A hosted Windows smoke test is not a specific owner's laptop test.
+
+# 19. Golden game engineering reference: concrete vertical slices
+
+A complete game is a **finite interactive system** with a working loop, meaningful player decisions, visible/audio feedback, progression/failure, state persistence as promised and a runnable package on a target. The current canonical compiler has a 120-second request-level deadline; build a small authentic game that finishes within admitted budgets before proposing giant procedural campaigns. To meet the 12-bot objective, separate game *design* from *engine output*, but require both to share a single canonical state and proof lineage.
+
+## 19.1 G1 Ash-Tunnel original top-down action shooter
+
+### Design and intended player experience
+A small originally themed top-down salvage game: the player enters a series of industrial chambers, clears enemies, collects salvage, returns to a terminal, chooses a defensive upgrade and completes a final wave. Each chamber includes navigable obstacles, visible enemy telegraphs, a finite ammunition or energy mechanic, resource pickup, damage feedback and restart. The theme, names and artwork are original and parameterized, not copied from an existing game or generated web source. A simple but polished design prioritizes input readability, snappy hit feedback, deliberate enemy strategies and a clear endpoint.
+
+### Minimum source and target object plan
+- **Project:** \`project.godot\`, input actions, save schema, source/rights manifest, scope/spec digest, target version.
+- **Scenes:** start menu, world root, player, enemy, projectile, obstacle/tilemap, pickup, HUD, upgrade console and win/lose.
+- **Scripts:** typed input mapping; fixed-tick movement/aim; collision and damage; encounter wave; inventory/salvage ledger; UI binding; save/load; event bus; terminal upgrade.
+- **Media:** original sprite and frame atlas for player/enemy/projectiles/pickups; simple animation states; hit/pickup/upgrade/win audio; HUD icons and accessible text labels.
+- **State:** deterministic session seed, player HP, position, ammo/energy, salvage, current wave, upgrades, enemy and projectile states, world object/quest ledger and last committed checkpoint.
+- **Proof:** a recorded input sequence completes wave one, earns salvage, buys a permitted upgrade, survives or loses, completes terminal wave, writes an actual save and reloads without duplicating rewards. Headless Godot smoke and input-driven real engine proof are separate.
+
+### Minimal state transition table
+| Event | Preconditions | Committed mutations | Observables | Failure |
+|---|---|---|---|---|
+| START | menu, authorized project | start session with fixed seed | player appears and HUD updates | missing scene/input mapping blocks |
+| MOVE | player alive, valid directional action | player location / tick | character moves/collision respects tile | wall hit does not alter tile |
+| FIRE | ammo > 0, cooldown satisfied | consume ammo, spawn projectile once | muzzle effect, sound, projectile | no ammunition gives clear feedback |
+| ENEMY_HIT | valid projectile collision, alive enemy | reduce HP, consume projectile | enemy hurt animation, damage cue | stale projectile ID ignored |
+| ENEMY_DEATH | HP <= 0, not previously rewarded | remove enemy, grant salvage once | drop, score/HUD change | duplicate event cannot mint salvage |
+| BUY_UPGRADE | at terminal, sufficient earned salvage | subtract salvage, activate one upgrade | stats/HUD visibly change | insufficient balance denies cleanly |
+| SAVE | current source/game schema matches | atomic checkpoint with digest | save indicator and resume slot | partial save not published |
+| LOAD | matching game/source/compatible save | restore committed state | same HP/wave/upgrades/position | incompatible version explicit hold |
+| WIN | final objective met and all dependencies valid | terminal win event and score snapshot | success scene/audio/menu | cannot win with enemy count > 0 |
+| FAIL | HP <= 0 or declared fail condition | terminal fail event, no further damage | defeat screen/restart | no stuck half-alive state |
+
+### Integration handoff sequence
+BOT-04 produces a versioned brief and criterion; BOT-05/07 define chamber progression and objective graph; BOT-06 implements movements, combat, salvage and input; BOT-08 produces visible/audio original assets; BOT-09 packages Godot; BOT-11 offers visual edit and preview; BOT-12 plays and verifies. BOT-02 owns the shared state/event/asset schemas; BOT-03 may propose fixes through typed controlled tools; BOT-01 proves fresh install/engine readiness. Every stage emits exact input/output digests and an explicit blocker on missing dependencies. Do not credit the game as complete if any essential step is placeholder-only.
+
+### Failure-injection specification
+1. Press fire twice before cooldown. Expected one projectile and one decrement.
+2. Hit wall while moving diagonally. Expected no clipped movement or invisible teleport.
+3. Collect the same drop after save/load. Expected no duplicate salvage.
+4. Exit during upgrade transaction. Expected either old state or new state, not half-spent currency.
+5. Delete sprite atlas from export. Expected target preflight failure, not invisible player.
+6. Remove audio decoder. Expected explicit target limitation or failure for required sound.
+7. Run at 30/60/120 FPS. Expected deterministic simulation within declared tolerance.
+8. Kill game during checkpoint. Expected known valid slot or recovered prior save.
+9. Change project source after validation. Expected stale playproof/export invalidated.
+10. Submit forged client win event. Expected rejection absent authoritative objective state.
+11. Use keyboard and declared gamepad. Both must support full loop.
+12. Enable captions/reduced motion. Feedback remains understandable.
+
+## 19.2 G2 original 2D precision platformer
+
+The platformer must have an actual continuous input model, ground collision, jump impulse, gravity, moving platform, hazard, checkpoint, interactive objective, camera and level-end event. A jump route solver can generate suggested input timing, but an *actual engine trace* proves traversability. Keep movement physics fixed-step and controller inputs timestamped to ensure reproducible behavior under frame jitter. Require informative coyote time, jump buffering and forgiving collision within authored bounds, but let the player inspect/tune those values in an editor rather than burying them in a generated script.
+
+### Mandatory obstacles
+- Single jump and release: demonstrate apex and ground recapture.
+- Multi-platform climb: no unreachable gap.
+- Moving platform: both rider attachment and dismount.
+- Hazard gauntlet: damage is visible and checkpoints are fair.
+- Optional collectible: accessible without mandatory extra death.
+- Goal gate: cannot finish before required objective completion.
+- Save/restart: checkpoint resumes with intact collectibles and death count.
+
+**Critical proofs:** player physically traverses a timed path with raw input replay and state snapshots; static topological BFS alone does not prove a physically solvable jump. Visual accessibility must show hazard vs safe platform using shape or animation as well as color. A platformer can be M4 only after the user reaches an actual end scene and returns to menu.
+
+## 19.3 G3 roguelike RPG with persistent world choices
+
+The game combines procedural rooms, controlled encounter progression, combat, an NPC dialogue option that changes a quest, a consumable or crafted item, an inventory, save/reload and at least two endings with distinct world-state predicates. Procedural rooms retain a seed/algorithm version and content digest, so old saves do not silently regenerate into different layouts when the generator changes. NPC knowledge stays bounded by observed events. A quest solver produces reachable paths, and independent runtime play proves at least one path per ending.
+
+### Cross-system dependencies
+- Reward economy depends on enemy and quest event identities; replay cannot double grant.
+- Item crafting depends on source/recipe state and stock; negative inventory is impossible.
+- Dialogue depends on NPC memory/canon and explicit player choice; not arbitrary LLM text.
+- Procedural dungeon placement must honor quest-key access and both win routes.
+- Save contains player, world seed, quest graph, NPC memory, inventory and event ledger.
+- User edits quest via UI; previously committed saves are migrated or explicitly incompatible.
+
+### Mandatory negative cases
+An NPC references an unfound clue; a quest key spawns behind its own locked door; an item is spent twice under concurrent actions; dialogue branch is absent after reload; source design changed but outdated world receipt is reused; a source-owned concept is withdrawn; game update removes an active quest ID. Each must yield an attributable denial or approved migration rather than silent corruption.
+
+## 19.4 G4 exploratory original 3D micro-world
+
+Build a walkable original 3D environment using actual geometry, camera, lighting, materials, colliders, one animated character or NPC, one dialogue, one world interaction, one cinematic cue, sound with captions and an objective. This is the smallest 3D game that can prove the real 3D media and engine pipeline. A logical physics or animation state transition without visible mesh and device-rendered motion does not count. A kinematic-only vehicle attached to the project is not evidence of driving unless an actual steering/braking/lap loop is exercised.
+
+### Independent acceptance
+1. Camera starts in valid position with world visibly rendered and accessible controls.
+2. Player walks between locations without clipping through terrain or objects.
+3. NPC animation responds to conversation and completion event.
+4. Voice/audio if present is sourced and captioned; missing sound is recorded as unsupported.
+5. Lighting/shadows do not make objectives unreadable.
+6. Player uses real interaction prompt, updates quest and reaches ending.
+7. Save/load preserves scene state, character pose/state identity and quest completion.
+8. The game target is independently launched on declared hardware, not only in a source fixture.
+
+## 19.5 G5 vehicle simulator/racing slice
+
+A real driving game needs velocity, lateral motion, steering, brake/traction response, collision, track checkpoints and lap completion under actual controller input. The existing advanced racing source path may already implement a portion of these in Godot; the task is to inventory and qualify it, then repair only failures. A screen that updates an abstract kinematic variable is not sufficient. Disallow source-level simulator state from claiming tire realism or hardware certification unless physically measured.
+
+### Observable route
+Start -> throttle and steer -> encounter obstacle/collision -> correct drift/braking -> reach sequential checkpoint IDs -> complete timed lap -> view finish/results -> restart with same seed -> load recorded trajectory. Capture user input and game telemetry with exact tick timestamps, acceleration, speed, rotation, traction, fuel/damage if enabled, checkpoint order and results. Use source/physics tolerance comparisons, not byte-identical floating-point across unrelated devices. Validate keyboard, gamepad and target-specific input mapping separately. Include collision and out-of-bounds recovery.
+
+## 19.6 G6 strategy / logic puzzle
+
+A turn-based tactics or puzzle target may be small but must be meaningfully interactive: action selection, legal turn/state transition, enemy or puzzle response, visible board, victory and restart. Use the already documented offline HTML5 maze and advanced puzzle native adapter as high-value seeds rather than rebuilding an abstract puzzle engine. Verify every authored action by the independent Python/game reference oracle where applicable; browser client traces are untrusted until verified against the same world digest.
+
+## 19.7 Universal game quality gates
+
+The following thresholds are **acceptance policies to be agreed for a concrete release profile**, not measured claims:
+
+1. Player input is responsive enough for the genre and stays interactive during AI background work.
+2. Required instructions and objective are understandable without reading implementation docs.
+3. The full loop can be completed and restarted by a first-time human tester.
+4. Visible state feedback corresponds to authoritative events, including damage, inventory and quest rewards.
+5. There are no known progression softlocks in golden seeds.
+6. Fatal engine errors, missing project dependencies and broken startup are zero for the claimed run.
+7. Save/load faithfully preserves all promised player/state details.
+8. Source, license, media and toolchain provenance are sufficient for lawful distribution in declared channels.
+9. Performance budget applies to a specified machine and scene, not an abstract claim of “fast.”
+10. AI changes must not regress existing locked acceptance evidence.
+11. Accessibility mode remains viable and retains the same essential objectives.
+12. New game generation is bounded and honest on failure; if the model cannot make the requested game, it returns partial work with exact blockers.
+
+### Instrumentation and evidence dossier
+
+Attach \`gameplay_trace.json\` with immutable package/scene/seed identity, tick IDs, input events, authoritative state diffs and objective states. Attach selected frame screenshots, audio-signal checks where applicable, the headless engine log, target launch command, benchmark hardware profile, input device and finish-state proof. The exact filenames are illustrative until aligned with existing canonical outputs. Store traces under existing artifact/QA authority rather than inventing a new storage service.
+
+### Template: complete-game acceptance test in pseudocode
+
+~~~python
+def verify_playable_game(game_package, target, input_trace, expected):
+    assert package_digest(game_package) == expected.package_digest
+    assert target.is_explicitly_admitted()
+    process = launch_real_game_engine(game_package, target)
+    try:
+        assert process.opened_scene(expected.start_scene)
+        assert process.rendered_nonempty_frame()
+        assert process.accepted_input_device(expected.input_device)
+        for action in input_trace:
+            process.send_timed_action(action)
+            assert process.maintains_control_and_state_invariants()
+        actual = process.read_authoritative_game_state()
+        assert actual.objective == expected.objective
+        assert actual.finished_with_verified_event()
+        assert actual.reward_ledger_has_no_duplicates()
+        assert save_and_reload_roundtrip(process, expected.save_snapshot)
+    finally:
+        process.terminate_and_join()
+    return independently_sign_current_head_trace()
+~~~
+
+This pseudocode is a **test design**, not an executable implementation or a claim those helper functions exist. BOT-09 and BOT-12 must implement it using the real existing Godot/project owner, safe test harness and source-custody rules. An “agent played game” claim must state whether it actually controlled the renderer through inputs or simply replayed source-side moves.
+
+
+
+# 20. Exact machine-contract reconciliation: reuse the active AI control plane
+
+The prior sections described portable **proposal** schemas to make bot responsibilities intelligible. This section resolves those abstractions against concrete machine contracts read at main \`e00bfb0809b34573c2df313ea16e17fd10bead38\`: \`machine/architecture.json\`, \`machine/ai_app_construction.json\`, \`machine/capability_interfaces.json\`, \`machine/state_topology.json\`, \`machine/ai_runtime_schemas.json\` and \`machine/ai_closure_evidence.json\`. These files are already authoritative within Skeleton. The integration plan is **not** permission to introduce a fresh operation store, AI executor, model SDK owner, workflow bus, shared root or state backend.
+
+## 20.1 Canonical zone boundaries are build laws
+
+The architecture registry defines product, application, engine, acceleration, data, machine, tooling and knowledge zones. The product zone corresponds to \`frontend/\`; application to \`backend/\`; engine to \`skeleton/\`; acceleration to native/JVM parts; data to declared databases and mounts; machine to \`machine/\` and \`.machine/\`; tooling to \`scripts/\` and \`.github/\`; knowledge to docs and tests. Most work of these twelve bots is cross-zone by nature, but dependencies may only follow the declared direction and must not transfer target ownership.
+
+**Product UX (BOT-11):** may request commands and display project/game state through application/engine APIs but must not become a durable database or store provider credentials. A new React state library is not a substitute for a canonical game project revision. A browser route that appears during backend outage must show the difference between a local draft and committed server state.
+
+**Application API (BOT-01/04/10/11):** owns authenticated public business workflows and product command admission. Engine messages are delegated, never direct hosted provider requests from a backend compatibility module. When engine transport is configured and unavailable, the backend must not silently attempt the same model action locally; the existing \`backend/core/engine_client.py\` explicitly documents this fail-closed rule.
+
+**Engine (BOT-02/03/04/05/06/07/08/09/10):** owns AI generation/orchestration, memory, verification, governed tooling and engine-side game computation. It can use declared native accelerators and data services but cannot absorb public app routing or create an unapproved second provider owner.
+
+**Native acceleration (BOT-03/06/08/09):** accelerates a canonical operation under a verified ABI and resource budget. It cannot alter business policy simply because it is faster, and Python or other deterministic fallbacks must remain semantically explicit.
+
+**Data and machine policies (BOT-02/12):** declare authority and evidence but do not run business logic. Tooling may inspect and validate engine/app and create governed Git work orders, but cannot quietly become a second runtime state owner.
+
+### Architectural lint challenge
+
+A BOT-12 source graph validator should reconstruct imports and transport relationships, flag active provider SDK imports outside \`skeleton/provider_runtime.py\`, direct frontend-to-DB references, undocumented workers, extra FastAPI application instances, duplicate route mounts, and generated executables written outside admitted artifact roots. The validator should report an explicit error even when a code path is not covered by tests. A false positive must be resolved through an architecture-reviewed exception, not by disabling the gate globally. Its output should include source SHA, path, symbol/edge, declared versus observed zone, severity and an automated example of the offending call path. Reviewers may approve an exception only with equivalent controls and a proof that the exception is narrow and finite.
+
+## 20.2 Existing typed records: reuse names and invariants
+
+The current \`machine/ai_runtime_schemas.json\` specifies canonical JSON, bounded scalar conventions, opaque IDs, normalized UTC timestamps, lowercase SHA-256 digests, ordered arrays unless otherwise declared, money as decimal plus currency and unknown-field rejection for command records. The active record set includes \`OperationEnvelope\`, \`ResourceBudget\`, \`ConversationThread\`, \`ConversationMessage\`, \`ContextSegment\`, \`ContextEnvelope\`, \`AIExecutionRequest\`, \`AgentTurn\`, \`ProviderToolDefinition\`, \`ProviderToolCall\`, \`ProviderUsage\`, \`ProviderResponse\`, \`ToolExecutionRequest\`, \`ToolExecutionReceipt\`, \`MemoryRecord\`, \`VerificationReceipt\`, \`AIExecutionResult\`, \`DelegatedAuthority\`, \`EngineExecutionCommand\`, \`StreamEvent\`, \`AIError\`, \`ProviderRequest\`, \`RouteDecision\` and \`EvidenceReference\`.
+
+The Grokbot work-order model should **bind to** these records where it initiates AI work, not create a second incompatible serialization. For example, a bot's desired action becomes an admitted \`OperationEnvelope\`/AI execution/typed tool proposal; its principal and tenant narrow through \`DelegatedAuthority\`; source data contributes evidence segments to \`ContextEnvelope\`; provider traffic is a \`ProviderRequest\` whose authority remains the canonical provider; approved tool work yields a \`ToolExecutionReceipt\`; postcondition review yields a \`VerificationReceipt\`; completion flows into \`AIExecutionResult\` and the existing operation stream. Separate Grokbot document-only metadata can index these existing IDs, but should not store a competing operation result with independent rules.
+
+### Exact record-to-product seam map
+
+| Existing type | Game-studio connection | Additional acceptance obligation |
+|---|---|---|
+| OperationEnvelope | Game goal, edit/build/play/repair process identity | No project mutation outside admitted operation and revision |
+| ResourceBudget | Game generator context, tools, CPU/GPU worker, artifact bytes and wall time | Admission covers actual media/compiler resources; no hidden unlimited work |
+| ConversationThread/Message | Human and Jeeves creator discussion, branch, references | User can resume and safely regenerate without rewriting historical approvals |
+| ContextSegment/Envelope | Game brief, world canon, current code, tool schema, source-passages | Budget/context omission must be visible and scope-safe |
+| AIExecutionRequest | Finite high-level production plan and stop policy | The worker must halt when required prerequisites remain unproved |
+| AgentTurn | One proposed design/code/media/tool decision | A turn cannot claim a side effect merely by emitting text |
+| ProviderToolDefinition/Call | Approved editor/crawler/compiler commands | Unknown tool and unexpected arguments denied |
+| ToolExecutionRequest/Receipt | Real target editor mutation, engine playtest or export | Receipt references exact game asset/source revision and worker outcome |
+| ProviderUsage/Response | Native/hosted model use and output | Usage/cost/finish reason reconciled into budget; abstention normal |
+| MemoryRecord | Scoped approved game-design preference or source observation | Rights, retention, project scope and revocation propagate |
+| VerificationReceipt | Source compile, game replay, UI preview, target, adverse test | A source-only test cannot claim device or interactive quality |
+| AIExecutionResult | End of authorized production work | “Succeeded” requires declared work-order postconditions, not release overall |
+| DelegatedAuthority | Backend-to-engine command/actor custody | Child privileges cannot widen origin grants |
+| EngineExecutionCommand | Actual model/control request | Backend compatibility code cannot execute provider fallback |
+| StreamEvent | UI progress and tool/cancel feedback | Durable stream is derived from operation outbox, not source of canonical state |
+| AIError | Typed failure messages, retry behavior and safe UX | Error text must be user-safe and never include private prompts/credentials |
+| RouteDecision | Local/hosted selected model under privacy/capacity policy | Same request cannot be invisibly rerouted to a different authority |
+| EvidenceReference | Exact source snippet, asset, test trace or project document | Missing/withdrawn/stale sources lose eligibility |
+
+Each record must have a canonical parser, deterministic serialization, bounded field size, schema version, safe public error and identity/tenant tests. Bot-specific fields belong in existing versioned extension patterns if allowed, with a migration and independent consumer tests. Use the current construction validators and CI workflow rather than weakening them when proposing these additions.
+
+## 20.3 State topology: authoritative versus derived is non-negotiable
+
+The state registry lists **27 distinct logical state domains**. Among them are authoritative backend-core Mongo state, authoritative engine Mongo state, conversation threads/messages, canonical AI memory, the operation-state SQLite ledger, cognitive execution/checkpoint SQLite, tool-idempotency, human approval, usage and final-result ledgers, governance lifecycle SQLite, Jeeves game-learning workspace Mongo, Dragon crawler Mongo, Dragon reviewed design knowledge and practice files. It also explicitly distinguishes seeded content, swarm scratch, Chroma/vector indexes, process-local retrieval memory, manual snapshots and durable event projections. They do not all carry the same recovery authority.
+
+### Full domain decision index
+
+| State domain ID | Authority class in registry | Failure and proposed game-studio handling |
+|---|---|---|
+| backend-core-app-state | authoritative | Preserve product accounts/projects and current game creation metadata before traffic |
+| backend-seeded-content | derived | Rebuild from reviewed source/seed, never use as only evidence of owner content |
+| backend-swarm-scratch | scratch | Discard or recompute from committed operation; do not recover a stale worker by scratch alone |
+| engine-mongo-state | authoritative | Preserve engine memory and identities; fence writes during epoch/migration |
+| backend-rag-local-chroma | derived | Mongo-first canonical knowledge; rebuild local vector projection after source restore |
+| optional-vector-index | derived | Re-index only eligible current sources; do not promote index cache to truth |
+| canonical-operation-state | authoritative | Preserve monotonic operation version and outbox pending publication identities |
+| operation-event-stream | durable-projection | Resume exact sequence, dedupe dispatch, never change canonical operation result |
+| in-process-retrieval-memory | derived | Drop safely on restart; never claim retained knowledge without canonical source |
+| manual-memory-snapshots | recovery-aid | Recovery snapshots require explicit operator approval, not automatic promotion |
+| cognitive-execution-ledger | authoritative | Restore turn/checkpoint identity and only then resume model work |
+| tool-idempotency-ledger | authoritative | Prevent double tool execution, duplicate world edits or repeated paid actions |
+| human-approval-ledger | authoritative | Retain exact scope, content revision, actor and approved intent through restart |
+| execution-usage-ledger | authoritative | Reconcile remaining tokens/cost/physical occupancy before new work |
+| final-ai-result-ledger | authoritative | Preserve terminal result identity and reject conflicting replay claims |
+| conversation-thread-state | authoritative | Preserve branch identity, owner, title, revisions and role scope |
+| conversation-message-state | authoritative | Preserve sequence/author/content references and no post-hoc role substitution |
+| verification-receipt-ledger | authoritative | Ensure postconditions and external evidence are bound to right execution |
+| governance-lifecycle-registry | authoritative | Retain data deletion/consent/legal holds and versioned governance decisions |
+| canonical-ai-memory-records | authoritative | Restore reviewed memory and tombstones before rebuilding retrieval |
+| local-reference-provenance | conditional-authoritative | Check the exact condition for promotion before relying on a local source snapshot |
+| jeeves-game-learning-workspace | authoritative | Restore policies, lessons, player observation and project progress exactly |
+| dragon-crawler-application | authoritative | Restore owner-scoped campaign, grants, consumed credits and capture receipts |
+| backend-curiosity-file-state | authoritative | Retain existing curiosity files/identity, not generic cache |
+| dragon-reviewed-design-knowledge | authoritative | Preserve human-reviewed source learning and rights/withdrawal state |
+| dragon-conversation-micro-projection | derived | Rebuild only from approved Dragon knowledge and eligible conversation lineage |
+| dragon-practice-state | authoritative | Recover practice/XP evidence separately from crawler truth or training weights |
+
+The list is an **index of existing declared domains**, not a claim each storage migration has been physically tested on current release hardware. Full restore requires an order: bring up/authenticate Mongo; verify app/engine authoritative namespaces, conversation and governance; restore/reconcile canonical memory and operation ledgers; restore tool approval/idempotency, usage, execution/checkpoints and terminal results; restore event projection only from verified operation outbox; rebuild Chroma and process caches; verify source/rights fence; enable traffic last. This order is adapted from the source \`recovery_order\`, not a newly invented storage hierarchy.
+
+### Recovery algorithm: intended semantics
+
+~~~text
+enter RECOVERY_HOLD:
+  reject new mutating browser, agent, research and build commands
+  retain source/artifact permissions and private backups
+  establish exclusive maintenance lease with current store identity
+  inspect physical worker state; do not assume expired lease means exit
+  authenticate and restore authoritative Mongo and SQLite by declared topology
+  compare retained records, indexes, root digests, version monotonicity
+  reconcile pending external side effects via exact idempotency receipts
+  restore governance and source revocation before activating readers
+  only after authoritative stores reconcile, rebuild derived indexes
+  inspect every skipped or uncertain record as a bounded quarantine item
+  independently run restore-game, restore-chat and restore-research journeys
+  release hold after explicit operator+verifier decision and health evidence
+~~~
+
+The algorithm should be implemented using existing CLI/maintenance owners and deployed guards. It must never automatically delete a live Docker volume, overwrite a divergent Mongo namespace, replace a user-owned game save with a synthetic starter save, or discard pending human approvals. New “automatic self-healing” code that does any of those is a regression regardless of how many recovery tests it reports.
+
+## 20.4 Closure ledger status versus product release reality
+
+The machine \`ai_closure_evidence.json\` records fourteen named P0 gap entries, including provider-surface convergence, cost admission, state authority, memory, conversation, tool runtime, context compiler, provider interaction, verification evidence, execution, engine/application boundary, streaming and golden journeys. Their recorded \`implementation_state\` is \`complete\` in the inspected JSON, and sample entries show a \`gap_status\`/\`closure_decision\` of \`closed\`. That is **planning/ledger status** and represents existing work: a completionist bot should not simply re-create those components. It does **not** override the separate first-install readiness blockers, exact-head qualification, physical laptop tests, Chroma persistence and end-user game completeness.
+
+To reconcile, join the P0 gap ledger to actual artifacts and the new mandatory journeys. Example: a streaming gap may be closed for committed operation events while current native GGUF still provides only post-commit chunking; an engine application boundary may exist while guarded local model bootstrap cannot activate in Compose; a golden-journeys gap may reflect narrow AI response contract tests while game builder end-to-end play remains incomplete. A correct completion metric distinguishes the **contract closure** from the **conjunctive installed product behavior**. Only reopen a closed P0 task if its own original contract regressed; otherwise create a dependent end-user integration task and preserve original signoff history.
+
+### Compatibility and evidence rules
+
+- A schema registry entry does not prove a currently running route or a production device.
+- An implementation ledger marked complete does not automatically satisfy an extended product acceptance scenario.
+- A new Grokbot contract must be checked against declared machine/architecture zone DAG before code.
+- The external provider ownership invariant is existing law, not optional optimization.
+- Distinguish privacy and rights authority from user-facing generated entertainment content.
+- An experimental branch may add a test adapter only if it does not become a hidden second production owner.
+- Any source, branch, toolchain or model revision invalidates tests bound to an older exact head, according to their actual dependency scope.
+
+# 21. Integration architecture for authored playable games
+
+The goal is **not** to invent another game engine. Skeleton already has multiple game libraries, deterministic simulation modules, Godot generators, a real HTML5 maze path, project workflows, game-learning, world editing, the frontend and a canonical builder. The main technical problem is deciding which source is canonical, wiring its runtime behavior into one user journey and proving the generated project does what it says. The architecture below is a **target design and implementation sequence**, not a claim the current code already exports every feature.
+
+## 21.1 Seven-stage game compiler pipeline
+
+**Stage A — design intent:** take the author's brief and optional structured constraints; parse into the existing \`skeleton.game_design_spec.v1\` identity through \`skeleton/forge/game_design_spec.py\` where the canonical path applies. Constrain target/genre/scope, reject unrecognized engine requests, preserve original brief digest and project tenancy. For existing game types (e.g., the HTML5 maze) preserve their current intent schema and adapt through a reviewed conversion rather than forcing incompatible fields. Human acceptance owns the design choice.
+
+**Stage B — canonical feature graph:** resolve mechanics, story, asset needs and export targets into explicit requirements. Model each requirement as ID + behavior + owner + dependency + acceptance oracle + target capability. Examples: \`MOVE-01\` means a player can move on an input device; \`HIT-01\` means projectile can damage a qualified enemy exactly once; \`QUEST-01\` means an objective becomes satisfied through permitted inputs; \`SOUND-01\` means real audio samples play on the accepted device. A requirement that cannot map to a runtime action is planned, not implemented.
+
+**Stage C — authored state and playable rules:** select approved deterministic game components from \`skeleton/game/gameplay\`, \`skeleton/forge\`, \`skeleton/ai/game_builder\` and, if applicable, \`skeleton/jeeves\`. Preserve their rule semantics while compiling to a game world model with stable entity IDs, controller inputs, collision behavior and event effects. Avoid duplicate “source-of-truth” tables in frontend and engine; the engine game script is an executable realization of the agreed rules.
+
+**Stage D — actual asset/media materialization:** produce content-addressed meshes, sprite atlases, audio files, animation clips, materials, text, fonts and any shader with explicit size, format, license and platform capability. A logical audio cue or animation state is insufficient for this stage unless the target game intentionally ships soundless or static content and the design spec allows it. In that case the scope must be declared, not quietly counted as full media capability.
+
+**Stage E — engine adaptation and packaging:** compile the canonical spec and resolved assets into Godot project files or the declared web/native subset. Ensure fixed source roots, safe writes, bounded paths, target engine compatibility and reproducible manifest. Imported or AI-authored executable scripts are controlled by the existing game source admission and sandbox; never execute arbitrary model text on the host. Make explicit any engine feature difference and reject essential unsupported mechanics.
+
+**Stage F — executable proof and iterative repair:** run format/parse/static checks, then target-engine headless boot, then actual input-driven gameplay tests. The existing builder has a finite prove-and-repair path: extend its evidence quality rather than creating an unbounded second repair loop. A model may propose a patch; only current source and owner approval permit an edit, which invalidates downstream proof until rerun.
+
+**Stage G — owner adoption and distribution:** let creator preview in a real browser/game engine and inspect which acceptance criteria were observed. On approval, commit project source, export playable packages, attach rights and build metadata, and preserve save/replay compatibility policy. Source export and binary export are separately verifiable results. A client clicking “Download” is not proof the bytes arrived; for a release claim, compare actual downloaded file digest on target.
+
+### Transition guards
+
+A stage can advance only when all required outputs exist, are current and pass the typed contract. Missing optional media may result in an intentionally scoped downgrade; missing required player controls blocks the project. Changes to the approved design spec invalidate affected generated rules, scenes, media and tests by dependency graph, not indiscriminately. Changes to the canonical game state schema require compatibility migration and verified existing saves. Source/rights revocation must remove eligibility of derived assets or research even if runtime assets are technically readable.
+
+## 21.2 Input-to-gameplay chain
+
+The actual player input path should be auditable end-to-end:
+
+~~~text
+Input device (keyboard/controller/touch)
+  -> binding registry (device, mapping version, user remap, accessibility)
+  -> game input event (tick, player, command ID, bounded parameters)
+  -> authoritative mechanic predicate (alive? cooldown? has resources? can move?)
+  -> deterministic state transition and event identity
+  -> rendering, animation, sound, HUD and haptic feedback projections
+  -> save/event journal and client-visible result
+  -> independent gameplay trace and postcondition verifier
+~~~
+
+Every arrow needs evidence. A line of generated GDScript that defines \`move\` but is never bound to an input action does not count as player mobility. A combat state transition that modifies an integer but never changes an enemy sprite or HUD is a logic component, not complete gameplay feedback. A sound event without samples is a cue plan. A physics module never invoked by the target player body is source breadth, not in-game physics.
+
+The design intentionally separates **authority** (state transition) and **presentation** (frames/audio). Presentation may lag, but cannot display a reward as committed before the true event owner has confirmed it. A screenshot should bind source state and renderer version; a missing screenshot is “not observed,” not an implied pass. Multiplayer requires an additional authoritative server boundary and cannot reuse local client input as trusted state without validation.
+
+### Deterministic controller harness, conceptual shape
+
+~~~python
+@dataclass(frozen=True)
+class InputStep:
+    tick: int
+    player_id: str
+    action: str
+    arguments: dict[str, object]
+    expected_event_codes: tuple[str, ...]
+
+@dataclass(frozen=True)
+class GameplayWitness:
+    source_digest: str
+    project_revision: int
+    target: str
+    renderer_version: str
+    seed: int
+    input_steps_digest: str
+    final_state_digest: str
+    objective_reached: bool
+    actual_event_codes: tuple[str, ...]
+    screenshots: tuple[str, ...]
+    audio_evidence_refs: tuple[str, ...]
+    save_reopen_digest: str | None
+~~~
+
+This is an example data model, not a direct import into existing code. Merge it only through BOT-02 schema review and existing game acceptance contracts. The decisive evidence is observation of the **actual target process**, with bounded input and a verified logical final state. For continuous real-time actions, represent press/release and timing rather than relying on one symbolic “move right” per turn.
+
+## 21.3 Physics and controls integration specification
+
+**Movement:** define an input sample rate and target frame/tick cadence, normalize analogue axes, apply dead zone, map buttons by user profile, and use an explicit focus/disconnect policy. Prevent stateful keys from remaining pressed after window focus loss. Implement separate world movement from camera movement; camera interpolation cannot change physics state.
+
+**Collision:** preserve canonical geometry scale, collision layer/mask and collider type through generation and Godot import. Each actor needs an authoritative collision volume; visuals alone cannot establish collision. Moving platforms and enemies must not force the player through walls or produce motion that diverges by frame rate without a declared tolerance.
+
+**Combat:** order input acceptance, cooldown, projectile creation, collision, damage, reward and deletion as a deterministic sequence. Each action has an event ID; each enemy death can award only once. UI, sound and animation subscribe to committed events rather than independently modifying HP/inventory. Avoid embedding “combat outcome” proofs in test-only Python that never run inside the exported game.
+
+**Vehicles:** declare separate kinematic demonstration versus physically playable driving. Actual steering, throttle, braking, traction, collision and lap checkpoints must be tested in the target runtime. A car model and a function labeled \`vehicle_dynamics\` are not enough. Preserve tests for both smooth input and sudden direction changes at speed.
+
+**Save/load:** choose a clear checkpoint transaction boundary; capture player/world/quest/physics/RNG state while invalidating transient effects such as half-finished GPU emitters appropriately. On load, reconstruct deterministic world and resume event IDs without duplicate rewards. A failed save is a blocked/incomplete state, never silent reset.
+
+### Negative test examples
+
+- A controller disconnects while attack held; the character must stop issuing actions rather than attack forever.
+- The player is knocked into a moving obstacle while saving; the save must represent a legal stable state or retain prior checkpoint.
+- A scripted cinematic ends while input focus has moved; user control must be restored intentionally.
+- A game frame rate drops below designed target; simulation never moves an actor through a blocked collider.
+- Two project revisions share an entity label but not entity ID; old save must not map inventory to wrong actor.
+- A reward event arrives after player death; declared event ordering decides whether it commits, with no duplicate issuance.
+- A generated enemy lacks a valid sprite/rig; game build should fail if that visual is required by the brief.
+- A deleted quest actor appears in authored dialogue; world consistency gate should identify which scene and source transition is stale.
+- A cancelled build has produced some media; artifact publication must remain quarantined until all required outputs and rights exist.
+- An AI tool proposes disabling collision to pass a test; independent functional proof should reject semantic degradation.
+
+## 21.4 Art, animation and cinematics production chain
+
+The **asset brief** must contain required dimensions/proportions, art direction, target engine/profile, palette, original-work/rights constraints, intended game events and LOD/resource envelope. BOT-08 may use a lawful on-device or hosted media generator through the existing provider authority where configured, or a deterministic procedural tool, but should never pretend that a model text response is a created sprite. Every actual output is a file with checksum, format metadata, dimensions/duration, license/provenance and human-review state.
+
+**2D sprite production:** one actor should have consistent silhouette across idle/move/attack/hurt/death, oriented correctly for gameplay direction, with an atlas that fits target memory. Temporal coherence and transparency should be measured. A generated sprite atlas is incomplete if the Godot \`AnimatedSprite2D\` or equivalent reference points to nonexistent frames.
+
+**3D geometry:** generate valid mesh scale, UV mapping, collision proxy, materials and at least one appropriate LOD. Texture formats and shader features depend on target GPU. Large complex meshes and rigs should be decomposed into admitted stages, retaining source/performance receipts. Do not call an asset “3D-ready” merely because vertex data exists in a JSON reference.
+
+**Rigging:** define bone hierarchy, bind pose, weights, retarget map, IK constraints and clip duration. Animation has named state transitions linked to actual game events. Validate bad foot contact, clipping, invalid keyframe indices, impossible transitions and asset dependency mismatch. A logical animation state without target mesh playback remains a reference-only feature.
+
+**Cinematography:** store a timeline containing cut/keyframe, camera target, sound cue, subtitle, character pose, interactive branch and skip/resume state. The player must retain accessibility settings and an intentional way to skip/pause. A cutscene cannot spend resources, complete quests or award items twice when rewound or skipped.
+
+**Art-directed acceptance:** use existing pixel-based art checker where useful, but collect real frames from the final renderer. Measure silhouette/contrast/readability and frame-to-frame continuity. Avoid ungrounded numerical artistic scores. At least one blinded human reviewer should assess whether the player can identify the controlled character, enemy hazards, objectives and world affordances.
+
+### Critical animation timekeeping rule
+
+Use a single declared simulation clock and explicit projection clocks. Game event tick, render interpolation time, audio sample clock and cinematic timeline may differ, but their conversion rules are versioned. Game logic should not depend on a rendering frame having been displayed. Sound/animation cancellation must not undo an already committed gameplay event. A skip command may seek the cutscene visual timeline while preserving or explicitly committing narrative consequences once.
+
+## 21.5 Real audio subsystem: convert logical cues to audible content
+
+The existing advanced audio scheduler can remain the deterministic decision layer. Extend its accepted result into a media pipeline with actual sound data and an engine mixer. A minimal robust implementation includes:
+
+1. A verified/rights-approved original cue asset with sample rate, channels, duration, loudness and codec.
+2. A content-addressed source reference and decode path that fails safely on malformed data.
+3. A target engine audio bus mapping for effects, music, dialogue, ambience and optional spatial position.
+4. A command-to-cue bridge from actual committed gameplay event (hit, pickup, action denied, quest updated, victory) to scheduled playback.
+5. Volume/ducking controls that respect user settings, bounded simultaneous voices and priority.
+6. Sound accessibility alternatives: captions, visual indicator or haptic where available for critical information.
+7. An observation harness that detects nonempty decoded samples or records actual target audio output and checks clipping/loop quality.
+8. Packaging verification that every required referenced cue is included and loads successfully after export.
+9. Cleanup of temp PCM/caches after process interruption without deleting approved source.
+10. Rights/attribution in creator export, especially for performer voice and third-party licensed material.
+
+**Failure handling:** missing audio file, sample-rate mismatch, corrupt header, unauthorized voice, unsupported codec, excessive memory or sound server unavailable should each produce a typed outcome. A game that does not require sound can explicitly proceed in muted mode; a game whose objective relies on sound must provide an accessible equivalent or fail its acceptance. Never generate or clone a person's real voice without the appropriate rights/consent.
+
+## 21.6 Game-world narrative-to-runtime bridge
+
+World state is not complete when a paragraph says “the guard trusts the player.” That fact must change an actual in-game predicate such as access to a door, combat hostility, quest dialogue, price, trade menu or ending. Encode world facts as scoped, versioned declarations with actor/target IDs; feed them into the existing simulation and game command plane. A quest step produces an event that can be recovered and observed. NPC private memory and player-visible consequences are distinct; don't make every NPC omniscient.
+
+For each story beat, define: \`preconditions\`, \`trigger\`, \`state effects\`, \`observable effects\`, \`failure alternatives\`, \`replay identity\`, \`required assets\`, \`localization\` and \`test witness\`. If the player can take two paths, run both with physically valid input actions. An ending's name is not enough: it must be reachable from a genuine state difference.
+
+A procedural narrative generator should be constrained by the current world graph, quest solver and game mechanics. It cannot invent an object that never spawns or a location unreachable by movement. Large generated chapters should be evaluated through a semantic density measure: unique meaningful decisions, distinct interactive consequences, state-bearing encounters and recoverable story continuity, rather than raw scene count.
+
+## 21.7 Game creation as a reversible developer workflow
+
+The creator should see a meaningful diff between game revision N and candidate N+1: changed scenes, rules, asset hashes, scripts, supported targets, save compatibility and invalidated play tests. The AI may propose that an enemy gain a dash attack, but its plan should specify the required animation, hitbox/telegraph, balance change and tests; an unmaterialized enemy ability is not complete. When user accepts, the platform runs only admitted changes, with an atomic project revision update.
+
+If the build fails, preserve approved revision N and the failed candidate separately. A retry can modify only the candidate and must re-run affected tests. Undo restores the exact prior authoritative source/asset graph and avoids rolling back unrelated legal, financial or identity state. Users must be able to export both a source archive and a playable game package, plus an evidence summary explaining the differences.
+
+# 22. First-install critical seam: actionable implementation and verification
+
+This chapter gives the 12 bots a concrete high-priority engineering program for the app's documented blockers. It does not assume authorization to modify production Mongo, install host drivers, rotate credentials or merge PRs. A real migration requires a separate review and backup.
+
+## 22.1 Shared Mongo epoch and guarded local AI bootstrap
+
+**Current documented concern:** backend and engine use different logical databases, the backend's conversation writer and the engine memory writer lack a shared trusted epoch bootstrap in default Compose, and the default standalone Mongo cannot satisfy the desired primary-bound linearizable source checks. Merely adding a guard object or forwarding a header cannot prove writer fencing. The existing engine backend credential boundary must remain canonical.
+
+**Proposed migration design, review required:**
+
+1. Freeze the authoritative current user/tenant identity and store list; inventory all backend conversation writers, engine memory writers, native restore paths, administrative tools and old service versions.
+2. Define shared epoch collection, writer principal, signed attestation and source snapshot boundary in the current architecture/state contracts. Both logical databases retain their own data; only the fence authority is deliberately shared.
+3. Qualify a Mongo deployment topology supporting the required primary read concern. Use the existing Compose and provisioned credentials; avoid inventing a new datastore.
+4. Obtain an operator-approved quiescent maintenance window with observed writer shutdown, not simply an API claim.
+5. Back up both Mongo namespaces and engine SQLite receipts with integrity data and an independent restore test.
+6. Initialize missing epoch records through an idempotent migration bound to verified tenant/actor identities; malformed or conflicting old records go into a quarantine report.
+7. Register every known writer with epoch checking and least privilege. A stale worker after restart must be unable to mutate conversation/memory state.
+8. Bootstrap an independently pinned reviewer and tokenizer attestation matching the actual loaded model; verify the reviewer cannot be replaced by user/request text.
+9. Activate local provider through the current guarded engine owner only when all dependencies are verified. Avoid env/request bypass or fallback to hosted provider.
+10. Run paired backend+engine tests with actual Mongo, stale epoch, revoked writer, failover, restart and old-version access.
+11. Run one real GGUF user conversation end to end, then verify durable thread and context source commit identities.
+12. Only after first-install+device proof may the UI describe guarded local inference as available; otherwise display precise diagnostic state.
+
+**Isolation invariant:** an epoch record is not an authorization token; ordinary bearer/session, tenant rights, source permissions and physical model admission remain necessary. A stale epoch makes mutations ineligible even if a user is authenticated. The reviewer is independent of untrusted model input; source documents are evidence, not instructions. A failed boot should preserve state, display safe diagnostics and avoid a silent new-model download.
+
+### Failure and restore matrix
+| Fault | Expected service state | Data policy | Verification |
+|---|---|---|---|
+| Mongo standalone without required semantics | guarded model denied | no migration/overwrite | primary read concern check |
+| Replica-set primary changes | in-flight writer fenced or retried only by owner | preserve old committed data | concurrent writer/epoch test |
+| Engine memory store unavailable | guarded model denied or explicit degraded mode if allowed by spec | no new memory accepted | missing-store runtime guard |
+| Backend writer unregistered | reject before mutation | no auto-registration by data request | independent writer enumeration |
+| Reviewer cannot attest | fail-closed model activation | retain existing installed model | mismatched review digest |
+| Tokenizer mismatch | fail closed | no fallback to guessed token framing | actual loaded GGUF attestation |
+| Restart during migration | migration interrupted, operator-visible | resume by receipt, no second initialization | before/after count and digest |
+| Old service tries to write | denied as stale/unregistered | no lost newer changes | multi-version integration |
+| Model produces empty/malformed response | normalized model failure | do not commit assistant reply as success | native refusal/input test |
+| Backend offline but frontend runs | setup remains accessible, unavailable status visible | no simulated auth/save | browser isolated-service test |
+
+## 22.2 Chroma dual-store custody and safe recovery
+
+Mainline docs warn that the optional Chroma full profile is blocked because the image writes to \`/data\` while an existing volume was mounted at \`/chroma/chroma\`. There may be important data in the container's writable \`/data\`; removing/recreating the container would destroy its layer. The application must **not** treat the named volume as automatically covering the true store. The safe path is non-destructive inventory, backup, verification, operator-approved migration and restore demonstration.
+
+### Candidate procedure
+- Identify current container/image digest, config \`persist_path\`, storage mount layout, actual \`/data\` files and legacy volume, *without* running a destructive compose command.
+- Block full-profile mutation and establish exclusive maintenance window with all Chroma writers stopped.
+- Capture separate immutable backups for container writable directory and named volume, including SQLite WAL and SHM/journals if present; record file digests and parent identities.
+- Restore each backup in an isolated test environment; compare collection IDs, document IDs, vectors and metadata to the source snapshot at consistent points.
+- If two stores differ, classify conflicts by collection and source authority; do not naively concatenate or choose “newest timestamp.”
+- Define the correct durable volume mapping for the pinned Chroma image and prove persistence over container recreation.
+- Rebuild purely derived projections from authoritative Mongo only after rights and history are verified; do not discard unique source records by assuming all vector data is derived.
+- Validate memory and Dragon knowledge retrieval after restart, source revocation and migration; ensure no cross-tenant projection leaks.
+- Document exact operator steps, backup destination, rollback mechanism, risk acceptance and final source/target digest witnesses.
+- Keep \`--full\` blocked until a real restore/upgrade route passes; release hold can be scoped to the optional Chroma profile while default lexical mode remains available.
+
+**Failure case emphasis:** a data backup that cannot be opened in an isolated restore is not a backup. A Chroma health endpoint returning 200 after a migrated container does not prove prior documents survived. Do not conflate \`backend-rag-local-chroma\` derived state with \`optional-vector-index\` if they have separate physical stores and lifecycle rules.
+
+## 22.3 Whole-device first-install path
+
+Define two profiles: **Core Studio** (four-service Compose and optional verified local AI) and **Standalone Native Jeeves** (independently installed GGUF desktop/CLI without Docker). Do not promise they offer identical game-builder features until shared contracts and integration tests prove parity. Clearly distinguish optional Godot/native compiler SDK installations.
+
+The Core Studio path must test:
+
+- Host prerequisites (Windows/WSL2/Docker, CPU architecture, file system, user permissions, network availability for initial dependencies).
+- Token/secret generation and stable identity on repeated setup, with no shared admin password.
+- Service health and the setup page as distinct available/degraded states.
+- Model rights/provisioning and actual model load under trusted guard.
+- Backend/engine API route compatibility and mounted critical paths.
+- One authenticated original game creation, real Godot/project output, actual player action and save.
+- App stop/restart with preserved Mongo/SQLite/asset state.
+- Source update/rebuild without deleting user data.
+- Browser/launcher availability during temporary backend outage.
+- Diagnostics, capacity monitoring, file permissions, log redaction and safe uninstall behavior.
+
+The Standalone Native Jeeves path must test:
+
+- Model weight digest and runtime ABI before load.
+- User-scoped private SQLite state directory and authorized principal.
+- Real turn with system/history/user role frame and tokenizer attestation as applicable.
+- Cancellation and worker join, reload of session and non-duplication of tool work.
+- Offline/loopback-only behavior as declared; no hidden network.
+- Tool proposal never automatically applies game source mutation.
+- Integration with game studio only through explicit versioned approved exchange.
+- Clear limitation statements when GPU mode, Windows device or large context has not been qualified.
+
+### Cold installation attack drills
+
+Simulate a pre-existing modified \`.env\` containing a legitimate private Mongo URL, a private password file with incorrect permissions, an occupied frontend port, a symlinked destination directory, an unsupported CPU executable, a dependency checksum mismatch and insufficient free disk. For each, preflight should reject or preserve user state with a clear error. An installer that “repairs” by overwriting an arbitrary remote URI is unsafe. A launcher that opens the product UI while protected AI is unavailable is correctly degraded, not “fully installed with local AI.”
+
+## 22.4 Exact-head qualification and physical acceptance
+
+The validation path must record the source SHA for every test run and its mandatory job. A PR may be mergeable in Git's conflict sense while still failing security, design, target-runtime or release evidence. A sibling job passing does not certify failed architecture or policy checks. Owner-scoped Dragon Atlas failures on older PR #4876 heads were superseded by successful targeted source checks at head 14d8613c; live backend/Mongo and broader required checks still need independent qualification. PR #4875 may be a substantial integrated candidate but remains a candidate until its **current** exact head has the required independent checks and physical target evidence.
+
+An independent acceptance owner should choose the smallest critical-path next test at each stage. Example: if source architecture conformance fails, repair that before long device tests; if a model cannot activate because guard is missing, verify guard integration before downloading new weights; if Godot game compiles but player cannot fire, repair input-to-project wiring before generating another catalog of encounter definitions.
+
+### Mandatory blocker-to-repair priority
+| Blocker class | Correct smallest next proof | Prohibited shortcut |
+|---|---|---|
+| No trusted local guard | Real backend/engine primary epoch and reviewer activation test | Disable guard or use synthetic pass |
+| Native inference not observed | Actual GGUF runtime + tokenizer source receipt | Infer quality from model file existence |
+| Game not interactive | Controller action -> target state -> rendered feedback | Static \`CORE_LOOP_OK\` string only |
+| Atlas backend bridge fails | Reproduce adapter/policy integration at exact PR head | Update UI type only or claim from fixture |
+| AI-tree parity drift | Exact tree/canonical import/semantic parity reconciliation | Blanket mark mirror equivalent |
+| Chroma persistence mismatch | Non-destructive backup and isolated restore | Recreate container without custody |
+| Stale PR required checks | Current source SHA and necessary job reruns | Borrow green checks from ancestor |
+| Payment settlement not atomic | Real CAS/transaction + duplicate webhook negative proof | Enable checkout from UI smoke |
+| Windows host not qualified | Fresh hardware install and first-game journey | Treat hosted Windows source CI as device proof |
+| Asset has unreviewed rights | Current explicit provenance/authorization | Remove attribution to make export pass |
+
+# 23. Third-pass source-grounded module audit and implementation evidence
+
+This section corrects the normal failure mode of large AI-assisted project audits: inferring functionality from directory names, and then calling every incomplete path a missing module. The inspection baseline is the main Git tree at e00bfb0809b34573c2df313ea16e17fd10bead38. The GitHub tree endpoint returns accurate immutable tree/object identities for retrieved paths, but the complete skeleton/ tree response is truncated at 70,096 returned entries. Consequently, neither these counts nor a README inventory is a verified complete checkout. The direct git clone attempt from the current container was blocked by DNS resolution of github.com. A true full clone/object census remains an open first task.
+
+## 23.1 Verifiable tree cardinality and source scope
+
+| Mainline subtree | Git tree inspection | Observed file count | Qualification meaning |
+|---|---|---:|---|
+| .github | recursive tree complete | 531 | Workflows and policy assets exist; only executed current-head jobs can establish gating |
+| backend | recursive tree complete | 2,658 | API, gameforge, knowledge and data source families; behavior not inferred from count |
+| frontend | recursive tree complete | 1,011 | Expo route/product workspace plus numerous targeted JS tests; screen-level proof still needed |
+| machine | recursive tree complete | 674 | Machine contracts, accountability, navigation; records do not confer running readiness |
+| tests | recursive tree complete | 2,368 | Tests and fixtures; must inspect which are mocks, source contracts or actual interactive execution |
+| skeleton/ai/agents | recursive tree complete | 9,045 | Jeeves ecosystem and specialist agent objects; verify actual orchestration and host effects |
+| skeleton/ai/runtime | recursive tree complete | 8,854 | Operational AI, cognition, native runtime and gates; actual model/physical pressure tests independent |
+| skeleton/ai/game_builder | recursive tree complete | 457 | Multiple game families and build paths; evaluate each target/genre separately |
+| skeleton/ai/webcrawler | recursive tree complete | 355 | Research transport, extraction, source custody; live grant/route integration separately required |
+| skeleton/game/gameplay | recursive tree complete | 346 | Game loops, campaigns and local play; verify those are exported to target runtimes |
+| skeleton/game/generation | recursive tree complete | 101 | Generation and semantic wrappers; identify the true implementation module for each |
+| skeleton/game/render | recursive tree complete | 25 | Render-contract wrappers and shared reference runtime; does not by itself prove GPU renderer |
+| skeleton/jeeves/worlds | recursive tree complete | 144 | World/campaign/canon/scene authoring; current code quality unknown until owner tests |
+| skeleton/ai/agents/jeeves | child of inspected agents tree | many thousands | Large ecosystem trees often feature source catalogs; one-pass user journey proof still essential |
+
+**Critical interpretation:** the observed mainline is not a toy without code. It is a very large repo with considerable *candidate surface*, notably 4,109 paths under operational_ai/offline_cognition and 1,113 under operational_ai/reliability_fabric inside the AI runtime tree; the huge source breadth may conceal incomplete integration and verification. Avoid sweeping rewrites. The completionist challenge is to turn existing code paths into one current, reproducible product and retire redundant facades only after exact import and semantic parity proof.
+
+## 23.2 Inspected implementation seams, by file identity
+
+**SRC-001 — logical audio is not rendered sound.** In skeleton/ai/game_builder/advanced_audio_runtime.py the module explicitly calls itself a “Source-authored logical audio mixer and finite cue scheduler.” It advances integer-sample timing, supports channels, ducking, spatial gain and bounded action commands, and says “No wave synthesis or sound card access is claimed.” This is genuine state-processing behavior, not a finished playable audio subsystem. BOT-08 must find the actual audio file producer and engine import boundary, then prove that a combat cue is audibly played in the exported target game. Do not rewrite its logical mixer merely to claim new audio generation. Define an explicit handoff from AudioCueState to bound audio bytes/stream, source-license record, playback event and observed capture.
+
+**SRC-002 — animation state is not skeletal rendering.** skeleton/ai/game_builder/advanced_animation_runtime.py advances authored finite animation states, root motion and events. Its own documentation says it “does not render bone meshes, import foreign rigs or execute authored scripts.” BOT-08 and BOT-06 must bridge this model to an actual rig/clip/skin/engine animation graph. Required tests: real jump transition drives appropriate animation; root motion and collision remain consistent; interrupted save and restore preserves current state; human changes rig mappings without losing authored source. Do not label the existing runtime a fake; label it logical-reference-complete but render-bridge-unproven.
+
+**SRC-003 — one Godot adapter explicitly limits its family.** skeleton/ai/game_builder/advanced_godot_export.py describes a playable Godot 4 adapter for original puzzle scenes and says only puzzle is covered by **that adapter**. It includes GDScript authored rules and a separate Python expectation that may be compared to native state. This is more meaningful than a manifest-only export, but the module alone cannot certify all genres. BOT-09 must inventory other per-genre exporters before declaring missing support.
+
+**SRC-004 — other advanced native adapters do exist.** skeleton/ai/game_builder/advanced_racing_godot.py includes a separate original Godot racing GDScript runtime with acceleration, steering, braking, nitro, grip, tire condition, engine damage, fuel, pits, hazards and lap state, including explicit fields for proof parity. Thus a blanket assertion that “racing Godot is absent” would be wrong. The remaining question is target-device playability: actual controller input, real-time collision/traction, multiple frames, packagable graphics/audio, performance, game completion and reproducible save/replay. BOT-06/BOT-09 should qualify existing behavior first and add only missing user-observable layers.
+
+**SRC-005 — several render modules are re-export facades.** skeleton/game/render/render_graph.py re-exports RenderContractError, RenderGraph and RenderPass from flgb_render_runtime; mesh_pipeline.py re-exports MeshArtifact; shader_compilation.py re-exports shader-contract classes. Such files are interfaces, not standalone feature implementations. Audit the shared flgb_render_runtime and callers before proposing a new render service. Ask whether its data model reaches Godot/GPU pixels and whether the product uses the authored artifacts. If not, establish a verified compiler/renderer bridge with proper budget and asset custody rather than inventing a second scene graph.
+
+**SRC-006 — some generation modules are similarly re-export surfaces.** skeleton/game/generation/character_generation.py and encounter_generation.py re-export types/functions from flgb_generation_core. The canonical logic and tests must be traced into their real definitions, not counted again per facade. If the behavior is only a deterministic reference, its proper next maturity stage may be integrated visualization and independent play, not additional factory wrappers.
+
+**SRC-007 — the native HTML maze is a distinct real product path.** skeleton/ai/game_builder/PLAYABLE_GAME.md documents a standalone browser HTML5 maze from a validated design intent, with movement, hazards, score, levels, undo and replay. It is turn-based, not proof of a 3D engine or realtime action combat. Treat it as a legitimate small golden game candidate and verify actual browser gameplay before expanding its claims. Do not replace it with another generic game template; preserve user-owned projects and reuse its source-lineage and game-state patterns where compatible.
+
+**SRC-008 — source migration and repeated ecosystems are a high-risk seam.** The mainline has both skeleton/jeeves/worlds and skeleton/ai/agents/jeeves/worlds; large mirrored AI trees are currently staged under machine/ai_file_tree.json. PRs #4870, #4875 and #4876 overlap many of the same high-cardinality files and game-forge families. Require object-level copy/mirror classification, semantic parity checks, import reachability, one actual owner and explicit cutover signoffs before promotion. Beware a “repair” that merely copies a newer enormous draft tree on top of another with different source pins.
+
+**SRC-009 — source first-install is not a blank page.** skeleton/app/manifest.json already specifies the service topology and first-install docs describe operator setup, local model preparation, protected secrets, and health/doctor. BOT-01 should repair documented breakpoints through existing entrypoints rather than create another installer or write a competing Compose stack. First-install reality depends on source-exact provider bootstrap, real data topology and target hardware.
+
+**SRC-010 — Dragon has separate capture and source truth.** backend/core/dragon_crawler.py uses CORE_DB for owner-scoped durable application operations and delegates crawl objects to skeleton.ai.webcrawler.operations. That authority distinction should survive Atlas growth. The Dragon UI can display a planned campaign without granting transport rights. PR #4876 must not be considered backend-mounted or released solely because a client-side panel and policies exist. A failing adapter job or architecture job is a genuine hold.
+
+## 23.3 Source-level verification questions per subsystem
+
+**Rendering:** Which function emits executable draw calls versus normalized scene/render descriptions? Which actual target engine consumes material, mesh, camera, light and particle contracts? Are frames captured from the packaged game or a Python reference? Does a shader compile in the same graphics API used by the release? Is texture provenance bound to source rights and target compression? Does a material survive source edit and hot reload?
+
+**Animation:** Is a rig real geometry with skin weights? Do poses change mesh vertices in exported game? Do root-motion deltas synchronize collision? Are input-driven attacks and NPC gestures visible? Can transitions be cancelled, reset, serialized and replayed? Does LOD preserve character silhouette?
+
+**Audio:** Is any real PCM/OGG/WAV audio produced or imported? Are loudness, loop seams, decoding and licensing checked? Does the runtime emit cues to a real mixer and sound card? Can browser autoplay policies block first sound? Is there a caption/text fallback? Does voice identity have active consent?
+
+**World and story:** Does a world graph reach the current game scene controller and save state? Are NPC beliefs causally restricted to witnessed facts? Can player decisions cause distinct valid endings in a controller-driven game? Do time, faction and economy state remain consistent across load and version upgrades?
+
+**Gameplay:** Is the input model real keyboard/controller/touch input? Are movement, collision, combat and rewards rendered and deterministic under frame variation? Can a game end and restart? Does enemy AI affect gameplay beyond recorded proposals? Are progress and save files owned by an authoritative game instance?
+
+**Compiler:** Is there one approved target binary/engine receipt? Are generated scripts safe from untrusted code execution? Does the toolchain really exist on the machine? Do export assets load on a clean host? Are source manifests and binary rights complete?
+
+**Research:** Are source rights, purpose and consent current at every asynchronous step? Are page offsets exact? Are citations reverified after revisions? Can source withdrawal propagate to all dependent designs and media? Does any untrusted page content enter system-level prompts? Are DNS/redirect/worker limits observed by network code rather than merely recorded in planner metadata?
+
+**AI:** Has a real GGUF been loaded with the expected tokenizer and chat template, and has one useful output been observed? Are physical workers accounted for after cancellation? Does the source snapshot define exactly what the agent can see? Can tool intents be denied without partial side effects? Are model quality benchmarks independent of authored fixtures?
+
+**Product:** Does the current UI route invoke the canonical API or display local demos? Can a creator recover from a disabled engine without losing unsaved edits? Does the user actually control and inspect bot work? Can a screen reader and controller navigate essential workflows? Do marketplace buttons deliver atomic entitlements or merely represent a planned store?
+
+**Quality and release:** Does each CI check bind to the final source head? Are golden playtests executed on the exported binary? Does a source-scan pass distinguish findings from absent tests? Are negative cases real and representative? Does the release packet include a real physical Windows test where Windows is claimed?
+
+# 24. Canonical machine-authority and product-readiness reconciliation
+
+The root AGENTS.md instructs every AI contributor to read twelve canonical authorities before code mutation. This Grokbot plan is **subordinate** to those machine contracts. It is a completion program and cross-source audit, not an alternative architecture or another AI control plane. BOT-02 must deny any work order that creates undeclared providers, long-running services, capability planes or duplicate owner roots before updating and independently validating those authorities.
+
+## 24.1 Mandatory preflight read sequence
+
+1. machine/manifest.json — active repository and assembly mapping.
+2. machine/architecture.json — zone and canonical runtime/source ownership, architecture tag arch-map/v3.7.
+3. machine/ai_app_construction.json — 27 construction planes, admission, proof and lifecycle policy.
+4. machine/capability_interfaces.json — 86 declared runtime and acceptance relationships; every edge has a contract.
+5. machine/state_topology.json — ten physical stores, 27 state domains and 24 state flows; trust derived vs authoritative.
+6. machine/ai_runtime_schemas.json — typed canonical provider-neutral records and cross-record invariants.
+7. machine/ai_capabilities.json — ten registered product capability IDs with separate implementation states.
+8. machine/ai_implementation_handoff.json — fourteen P0 gap handoff entries and established owner paths.
+9. machine/ai_closure_evidence.json — evidence and closure decisions; fourteen recorded entries.
+10. machine/enterprise_ai_superiority.json — comparator and superior-system proof rules, separate from implementation.
+11. machine/enterprise_ai_implementation_notes_index.json — L00–L13 implementation dossier policy for 421 volumes.
+12. docs/AI_APP_CONSTRUCTION_MANUAL.md — human explanation of assembly, boundaries and validators.
+
+**Conformance baseline:** machine/ai_app_construction.json declares 17 construction gaps as “closed” in its machine register, and machine/ai_closure_evidence.json has 14 matching evidence entries marked closed. This is not contradictory to a recorded unqualified consumer installation: the closed machine construction gaps describe a narrower source/contract maturity than a fresh Windows laptop with active guarded inference, user-flow gameplay and qualified delivery. The planner must preserve these historical closed statuses unless a specific live regression requires reopening under the canonical process. Do not relabel every already-closed architecture gap as open merely because a production feature remains unavailable. Instead open a separate **product integration/qualification** task referencing the historical closure contract and current missing acceptance evidence.
+
+## 24.2 Registered capability maturity snapshots
+
+| Registered capability | Source-declared implementation state | What remains to prove before claiming finished product |
+|---|---|---|
+| assistant.text | partial | actual configured provider + protected context, real response, durable chat, target install |
+| assistant.retrieval_grounded | partial | authorized source, citation verification, revocation/revision handling on current runtime |
+| assistant.tool_read | partial | actual governed tool execution, owner scope, typed receipt and negative test |
+| assistant.tool_write | partial | approval/idempotency, physical side-effect, rollback and independent verification |
+| assistant.artifact_qa | partial | real ingested artifact with scan/extract and truthful evidence result |
+| media.image_generate | present_transport_partial_product | real image bytes/artifact and rights, user-visible studio use, exact target confirmation |
+| media.image_edit | present_transport_partial_product | source-authorized edit, preserved original/rights, real output and roundtrip |
+| media.speech_synthesis | present_transport_partial_product | real audio, source and consent, safe output artifact and in-game playback |
+| assistant.background_agent | partial | durable bounded worker authority, recovery, application side effects and operator control |
+| game.native_delivery | present_source_delivery_partial_native_release | actual approved target executable plus source/lesson/custody and device qualification |
+
+**Crosswalk discipline:** never create a new “media generator” service to bypass media.image_generate or media.speech_synthesis readiness. Never let a gameplay agent call raw provider SDK in a feature module; route credential-bearing activations through skeleton/provider_runtime.py as AGENTS.md requires. Existing backend/core/ai_provider.py is compatibility-only. An instruction-bearing page retrieved by Dragon is evidence, not a higher-priority role.
+
+## 24.3 State topology authority routing
+
+The 27 logical domains in machine/state_topology.json include backend-core-app-state, backend-seeded-content, backend-swarm-scratch, engine-mongo-state, backend-rag-local-chroma, optional-vector-index, canonical-operation-state, operation-event-stream, in-process-retrieval-memory, manual-memory-snapshots, cognitive-execution-ledger, tool-idempotency-ledger, human-approval-ledger, execution-usage-ledger, final-ai-result-ledger, conversation-thread-state, conversation-message-state, verification-receipt-ledger, governance-lifecycle-registry, canonical-ai-memory-records, local-reference-provenance, jeeves-game-learning-workspace, dragon-crawler-application, backend-curiosity-file-state, dragon-reviewed-design-knowledge, dragon-conversation-micro-projection and dragon-practice-state.
+
+These are **not** 27 databases that must all be copied. The canonical topology assigns each logical domain to a physical store and role. Chroma and process memory are rebuildable where declared derived. SQLite receipts may be authoritative for a specific operation only under its canonical owner. The Dragon micro-projection is not a second canonical transcript; it is a discardable projection of committed message refs. Snapshot files are not replacements for live backup/restore. The build plan must use each domain's declared migration, retention, backup and consistency semantics instead of deriving authority from whichever data directory a developer finds first.
+
+### Concrete reconciliation protocol
+
+For each state domain, require its existing manifest owner, current runtime writers, read path, source-of-truth role, schema/version, backup/restore format, index/projection dependencies and migration proof. Compare runtime observed writers with machine/state_topology; mismatches become an authority incident, not an excuse to copy state blindly. When repairing one domain, quiesce and fence only as supported by the active architecture; no destructive operation is allowed merely because an AI agent asserts it is safe.
+
+After any restored or migrated primary state, validate tenant/object identity, ordering, canonical digests and current rights before reconstructing derived caches. Replay uncertain tool execution only through the committed idempotency ledger. Replay chat only from the canonical message/operation records, not from model transcripts in temporary client memory. Restore financial entitlement ledgers before allowing charge retry or paid export. Resume user game sessions from committed game state and versioned save migration, never from a model summary.
+
+## 24.4 Existing schema vocabulary and non-duplication rule
+
+The runtime schema catalog already names OperationEnvelope, ResourceBudget, ConversationThread, ConversationMessage, ContextSegment, ContextEnvelope, AIExecutionRequest, AgentTurn, ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderResponse, ToolExecutionRequest, ToolExecutionReceipt, MemoryRecord, VerificationReceipt, AIExecutionResult, DelegatedAuthority, EngineExecutionCommand, StreamEvent, AIError, ProviderRequest, RouteDecision, EvidenceReference, ToolCallProposal, ArtifactRecord, ReleaseEvidence, AdmissionDecision and many additional related types. The Grokbot work-order shape is a **planning projection**, not a replacement for these runtime records. Production entities must extend/reuse current records only after canonical contract changes. A model cannot directly mint an OperationEnvelope or DelegatedAuthority; authenticated deterministic owners create or validate them and grant only finite capabilities.
+
+### Cross-record proof clauses
+
+- Tenant and actor lineages must remain linked across message, operation, execution, tool, memory, verification and result.
+- ContextEnvelope digest must bind exact model-visible source snapshot used by the relevant AgentTurn.
+- Offered tool definitions must contain each later ProviderToolCall tool_id; unknown tools fail before execution.
+- Argument digest for executed tool calls must match the originating model proposal after canonical normalization and operator approval.
+- AIExecutionResult must reference verification for the same candidate/result lineage.
+- Assistant messages must reference the canonical execution result, not arbitrary text supplied by browser or provider.
+- A completed StreamEvent only references an operation after its durable AIExecutionResult exists.
+- ResourceBudget token/time/cost/physical-worker reservations must be finite and cannot be widened by downstream model decisions.
+- A source or project revision change invalidates the exact proofs that depend on its digest, without destroying unrelated reviewed state.
+- A bot that cannot prove exact owner authority must stop and return an admissible failure with no side effect.
+
+## 24.5 Cross-bot exact ownership map from canonical planes
+
+| Primary bot | Existing planes/interfaces principally affected | Required partner review |
+|---|---|---|
+| 01 Install | deployment-release, configuration-secrets, resilience, data-persistence, engine-api | 02,03,12 |
+| 02 Architecture | foundation, identity, data-persistence, jobs-durability, artifact-files, governance | all affected owners |
+| 03 AI | model-provider, model-routing, prompt-context, memory, retrieval, cost-capacity | 02,04,12 |
+| 04 Director | orchestration, reasoning-verification, tool-runtime, jobs-durability | 02,03,05,06,12 |
+| 05 Worlds | product/domain game state via canonical project owner, not a new runtime plane | 02,06,07,09 |
+| 06 Gameplay | product game state, simulation, declared tool/build interfaces | 02,05,07,09,12 |
+| 07 Procedural | existing generation/build domains and artifact authority | 02,05,06,08,09 |
+| 08 Media | existing media provider and artifact-files authority, scene/render contracts | 02,03,06,09 |
+| 09 Export | deployment-release, artifact-files, tool-runtime, engine-api | 01,02,06,08,12 |
+| 10 Dragon | retrieval, governance, feedback-learning, data-persistence and existing capture owner | 02,03,04,11,12 |
+| 11 Product | product-experience, application-api, identity and declared views of every source | owners of affected records |
+| 12 Assurance | observability, evaluation, security-safety, resilience and release acceptance | independent of code author |
+
+These mappings are conceptual responsibility allocations for work planning. They do not transfer authority away from the machine contract. If a work order's desired source change implies a new plane, BOT-02 must explicitly change and validate the canonical machine graph *before* feature code lands. No undocumented service, database, model executor or direct vendor-SDK call may slip in under “bleeding edge.”
+
+# 25. Critical-path guarded local AI engineering implementation
+
+The most urgent missing customer experience is not another advanced model feature. It is a stable end-to-end application in which a fresh laptop can activate a real local model behind the required security/authority guard, create/edit a game and recover from failure. The following is a design proposal to be verified against final source and current PR heads; it does not pretend that unexecuted new code exists.
+
+## 25.1 Shared epoch activation sequence
+
+**Step A — discover current writers.** Inventory backend/core/conversations and its writer classes; engine memory repositories and their separately selected Mongo logical databases; administrative/scripted writers; old Docker images; alternate project APIs; job workers; import paths; and direct database clients. Record exact deployment principal, auth domain, code SHA and database permission profile per writer. Distinguish source presence from registered active writer; system integrity requires both.
+
+**Step B — map shared epoch identity.** Define one explicit canonical source-epoch authority accessible to both backend and engine without unbounded backend code imports into engine images. Pin the same Mongo replica-set deployment and verified epoch collection identity, with a bounded authenticated interface to verify writer custody. The backend and engine may retain separate historical data databases, but epoch fencing must not be split across independent collections merely because both are named similarly.
+
+**Step C — establish trusted bootstrap.** The engine's local provider must load valid architectural acknowledgement, independently managed reviewer, current source reader and tokenizer attestation tied to the actual GGUF backend. Read required files and state from trusted application composition, not arbitrary user request or environment strings with disable toggles. If a trusted dependency cannot be activated, return the established public readiness code rather than raw exception or prompt-bearing stderr. Do not silently switch to hosted inference.
+
+**Step D — preserve live data before authority migration.** Quiescence must be verified at the deployment boundary and through writer leases/DB permissions, not inferred from a process sleep or an operator checkbox. Take consistent backups of both existing logical databases, conversation threads and messages; record object digests, tenant counts, indexes, migration revision and all ambiguous/in-flight records. Write an irreversible-recovery warning before altering any owner collection. Historical unconfirmed records remain quarantined, not auto-initialized or erased.
+
+**Step E — migrate and fence.** Under explicit authorized maintenance, make epoch records for eligible existing identities through a versioned idempotent migration. Reject stale writer tokens and mixed-version deployments that cannot enforce epoch in mutation transaction/readback. Require primary-bound linearizable reads where the policy depends on them. In degraded replica-set conditions, deny protected inference/mutation and preserve recovery. Test writer revocation and repair from persisted records after abrupt restart.
+
+**Step F — activate inference only on observed trust.** Prove the backend and engine see the same authority with current epoch, real protected reader and verified tokenizer. Then activate actual GGUF under finite memory/token/worker budgets and observe a real conversation turn using the canonical ingress. The receipt must bind active model bytes, source SHA, prompt/context projection identity, operator principal, final output and successful acknowledgement. Missing physical GPU or real model is a hold, not a synthetic pass.
+
+### Required negative acceptance matrix
+
+| Failure | Expected safe result | Persistence expectation |
+|---|---|---|
+| Backend connects to different epoch collection | deny guarded AI and dependent protected writes | old tenant and chat state untouched |
+| Mongo standalone without required primary semantics | protected guard cannot claim readiness | no invented epoch or blind migration |
+| Engine lacks backend writer-custody proof | deny provider activation | present actionable code, not raw internal trace |
+| Reviewer missing or policy untrusted | deny local provider | keep model installation and previous sessions |
+| Tokenizer does not match active model | block admission | no output counted as trusted completion |
+| Writer lease expired but process still running | physical capacity retained, stale write denied | no duplicate reservation or commit |
+| Old backend version attempts chat mutation | fence/quarantine | historical messages not silently rewritten |
+| Shutdown during epoch migration | restart into explicit reconciliation | backup, journal and pre-migration records preserved |
+| Client resubmits same idempotency key with changed request | reject mismatch | no repeat AI inference or side effects |
+| User edits source during model turn | stale tool proposal denied/revalidated | canonical source remains newer revision |
+
+### Probe ordering
+
+Validate architecture and active machine receipts first, then safe Mongo topology, then source epoch/writer custody, then reviewer/tokenizer, then actual GGUF, then user chat, and finally tool-authorized game work. Starting with a costly model acquisition when the guard is missing only wastes resources. In the first-install UI, show each dependency with separate observed state and recovery instructions; never communicate “ready” from successful weight download.
+
+## 25.2 Chroma migration design without data loss
+
+The recorded mismatch is pinned Chroma's /data persistence against a named volume previously mounted at /chroma/chroma. Treat both old /data container layer and the old volume as potentially meaningful. A dual-backup is mandatory before any mount/layout change. The workflow should stop writers, preserve old container and volume identities, perform a bounded consistent copy/backup with SQLite journals, verify digest and logical collection counts, and stage a new durable /data mount. Rebuild derived vector projections only from authoritative source where policy allows; never overwrite original isolated snapshots to make a test pass.
+
+A real acceptance case must remove/recreate only the **new test** Chroma container after a migration and show all intended vectors/metadata remain queryable. Include changes to index version and source rights and demonstrate deletion/revocation in rebuilt caches. If contents conflict or it is unclear which source is newer, stop for human reconciliation with both copies retained. The ordinary app default can still work with bounded lexical retrieval; do not block an otherwise safe first-run setup on optional Chroma.
+
+## 25.3 Installer transaction model
+
+Treat installation as a staged transaction with explicitly irreversible boundaries. Phases: inspect host, inspect existing install, authenticate/digest source packages, verify disk and capacity, prepare private secrets, establish immutable stable IDs, stage images/dependencies, create/verify data volumes, apply schema migrations with backup, start frontend independently, start backend and engine under valid dependencies, verify per-service health, configure optional runtime/model, exercise first-user and first-game journey, publish installed-version receipt.
+
+The installer may detect and recommend Docker/WSL/driver repairs, but should not change host privileges or managed unrelated containers automatically. A failed stage returns clear correctable steps and retains the last known good data. A resumed run must not regenerate private service identities, duplicate indexes, double-pull model weights or reset a used owner account. When the product intentionally runs without AI weights, the UI distinguishes “app usable” from “AI unavailable,” preserving source editing and honest preview/doctor behavior.
+
+### Physical laptop acceptance dossier
+
+Record Windows build, CPU architecture, RAM and free disk class, WSL distribution/kernel, Docker Desktop/Compose versions, Python/runtime and model GGUF identity, Godot executable, service topology, published ports, and source exact SHA. Do not put machine serial numbers, personal files or private network addresses into public evidence. Exercise install, suspend, restart, local model response, game build and interactive play, safe uninstall/repair and restore. One hosted Windows installer job can support source quality; it cannot replace this full target proof.
+
+# 26. Concrete playable-game compiler, runtime and visual acceptance
+
+A “build” result is a graph of typed project objects, source code, assets, executable target and test observations. The builder must keep the natural-language brief immutable and distinguish source synthesis from verified gameplay. Current README describes deterministic Godot generation, a bounded repair loop and core-loop marker; treat those as valuable starting points and go beyond them with actual controller-driven play and source-bound runtime evidence.
+
+## 26.1 Canonical seven-handoff pipeline (design proposal)
+
+**H1 brief → game design specification.** Freeze requested genre, fantasy, player verbs, objective, target, accessibility, offline requirement and finite scope. Make all assumed constraints explicit. Failure: unbounded “make any game” request cannot become an uncontrolled multi-month campaign without operator consent. Success: validated versioned design with testable game-loop acceptance.
+
+**H2 design → simulation/scene/world IR.** Build typed actors, collision shapes, gameplay rules, inventories, enemies, levels, world state, quest graph, asset requirements and start/win/lose predicates. Define RNG algorithm and seed. Failure: missing player/controller, unwinnable story branch or unsupported required target semantics blocks next stage. Success: deterministic graph with solvability witnesses where applicable.
+
+**H3 IR → original asset and media requirements.** Materialize meshes/sprites, textures, fonts, animations, sound cues, music/cinematic cues and player UI where the brief needs them. Keep original authorship, rights and source refs. Failure: an AudioCueState without PCM or audible engine event is incomplete when game requires sound. Success: actual media bytes or explicit declared fallback loaded by target.
+
+**H4 IR/assets → engine-specific source.** Use pinned stable Godot/toolchain and versioned script/source schema to create scene tree, input map, signals and gameplay code. Failure: unsupported engine feature or import ambiguity blocks rather than silently dropping a necessary verb. Success: inspectable and buildable original project including all assets.
+
+**H5 engine source → playable proof.** Boot actual engine and record runtime version, startup logs, interactive inputs, frames and game-state changes. Must show player movement, mechanic actuation, objective progression, failure feedback and win/restart; only an optional structural smoke may rely on a printed marker. Success: independent game player completes declared goal using real input.
+
+**H6 playable proof → quality and repair.** Compare to baseline on held-out seeds, input latency, frame pacing, collision, audio, quest fairness and accessibility. Human/model-independent play review can reject dull or confusing games without asserting objective defect. Use bounded minimal repairs with source current-head guard; every repair invalidates affected receipts and reruns tests.
+
+**H7 approved candidate → export/release.** Emit actual target package plus editable source, rights manifest, engine digest, save compatibility and player-accessibility settings. Run the installed/exported game on a clean compatible host. Failure: download prepared but not delivered, unverified executable, unresolved license or missing target launch evidence stays held. Success: code/source and actual game are separately verifiably available.
+
+## 26.2 Input-driven acceptance trace design
+
+Define a **test-only** normalized controller trace bound to actual engine/application state. It is not another canonical runtime authority or a substitute for engine state; it is evidence. Required fields in every recorded step: game project digest; executable digest; engine version; time/tick; input device; normalized button/axis action; previous and next relevant state digest; observed player transform; objective/health/inventory change; captured frame/audio artifact refs where applicable; and assertion outcome.
+
+The trace driver must interact through the real game's declared input API, not mutate the internal gameplay state directly as a shortcut. If a deterministic fixture injects state for testing, label it setup and perform at least one independent non-cheating full playthrough. To verify a finishable shooter, the test moves, aims, fires, observes enemy hit, receives earned salvage, purchases upgrade, completes waves and restarts. To verify a platformer, it moves through colliders, jumps over a hazard, lands on platform, reaches exit and preserves progress after save/reopen. To verify RPG, it obtains a quest, updates relevant world and inventory state, chooses a branch and returns to save.
+
+### Controller-to-game correctness predicates
+
+- Movement input changes player transform in the intended direction under collision bounds; movement stops after key release and UI focus loss.
+- Attack input spawns a real permitted hit/hurt action, consumes appropriately capped resources, triggers animation/effect/audio and changes enemy health only upon valid collision.
+- Player damage respects invulnerability/recovery and updates HUD/inventory feedback with a corresponding observed state transition.
+- Quest completion requires a real witnessed action, not a model or generated script claiming a flag.
+- Victory requires objective predicates, and defeat respects health/time/other declared failure conditions; both show recoverable end-state UI.
+- Save atomically captures player, world, quest, RNG and versioned asset references; restore matches canonical checkpoint even after crash.
+- New engine target or code revision invalidates old runtime proof unless the exact compatibility policy accepts it with tested coverage.
+- If a bot cannot physically run the actual game, the work order stays at source or integration maturity; it cannot self-certify M4/M5.
+
+## 26.3 Visual and audible production proof
+
+Three kinds of evidence must remain separate: (a) a logical cue/animation/camera model, (b) a transformed asset or source file, and (c) the target runtime producing actual pixels/audio in response to game events. An animation state machine can be correct without imported skeletons; an audio cue scheduler can be correct without wave synthesis; a renderer contract can be correct without GPU draw calls. The final full-game target requires the bridge all the way to (c) for declared media.
+
+**Art:** inspect at least one frame with an actual actor sprite/mesh, readable HUD and environment. For 3D, prove geometry normals, material and lighting under target renderer. Expose render provenance and handle missing textures safely. **Animation:** show idle-to-move, attack/hit, death/restart transitions through real engine and compare state to model. **Sound:** capture actual played audio after gameplay event with clipping/volume/caption checks. **Cinematic:** show skip, pause, cue alignment, camera target preservation and safe return to controls. **Accessibility:** duplicate critical feedback across text/shape/audio as applicable, with reduced motion/captions and remapping.
+
+## 26.4 Genre-specific acceptance beyond source-file generation
+
+**Top-down shooter:** baseline must support free movement, aim, enemy collision, ammo/heat if used, visible projectiles or hit effects, actual damage and score/loot, wave progression, resource sink, victory, defeat and restart. Advanced layer adds meaningful enemy tactics, environmental hazards, upgrades and multiple weapons without invalidating the baseline.
+
+**Precision platformer:** baseline must handle fixed-step collision, jump buffer, coyote time, moving platforms, hazards, checkpoints and goal. Advanced layer adds climbing, grappling, wall jump and expressive character animation only after the basic jump engine is verified at varied framerates.
+
+**Roguelike RPG:** baseline must offer seed-bound level, movement, combat/encounter, inventory, dialogue and one quest with valid ending. Advanced layer adds procedural economy, social world, branching progression and permanent death/retry under explicit rules.
+
+**3D exploration:** baseline needs actual move/camera, mesh collider, interactive NPC, quest item and complete objective, with spatial audio/animation where required. Advanced layer adds rigged companions, climbing, weather, ecosystem and streaming without destroying frame pacing.
+
+**Racing:** baseline needs actual player steering/throttle/brake, defined track, collision or boundary behavior, checkpoint/lap validation, finish and restart. Existing advanced_racing_godot.py may implement native GDScript logic; it must be tested rather than assumed absent. Advanced layer adds tire/weather physics, opponent AI, pits and force feedback under specific target capability checks.
+
+**Strategy/puzzle:** baseline must expose valid interactive moves, state transition rules, loss/win or solvability, hints/reset and audit of chosen path. Advanced layer adds multiple intelligent opponent policies and procedural generators without unfair impossible states.
+
+**Cross-genre:** a genre kit is accepted only if its distinctive mechanic is executable and observable. Renaming a HUD or changing a seed is not an additional genre. Human/AI agents must actually play the result through the declared engine target.
+
+## 26.5 Cross-bot game production handoff gates
+
+BOT-04 freezes brief and plan; BOT-05 checks canon and quest reachability; BOT-06 establishes observable mechanics; BOT-07 emits solvable spatial variation; BOT-08 provides playable media/animation/audio assets; BOT-09 compiles and runs an actual engine; BOT-11 exposes human editing and preview controls; BOT-12 independently validates game quality, user journey, origin rights, accessibility and release evidence. BOT-01/02/03 enforce operating environment, source state and protected model tooling. At each handoff, owner publishes an exact artifact digest and acceptance predicate. A downstream owner can reject incompatible inputs but cannot silently mutate upstream authoritative state to make tests pass. Revisions replay only the affected dependency subgraph.
+
+# 27. Repository object-census execution and unresolved unknowns
+
+## 27.1 Required complete clone/object procedure
+
+When a trusted environment has GitHub network access, perform a complete full-history or explicitly scoped source clone from the approved owner repository, recording the remote URL, target branch, exact commit SHA, object completeness and any LFS/submodule limitation. Use safe detached checkout for investigation, not a persistent write-capable runtime before admission. In this environment, direct git access failed DNS resolution and has **not** been reclassified as success. The GitHub API tree inspections are strong current-source evidence for queried trees, but cannot replace all needed blobs, Git history or executable tests.
+
+Suggested read-only source-census commands to execute on a network-capable checked-out host:
+
+~~~bash
+git remote -v
+git rev-parse --show-toplevel
+git rev-parse HEAD
+git status --porcelain=v1
+git fsck --full --no-reflogs
+git ls-tree -r --full-tree HEAD | wc -l
+git ls-files -z | python -c 'import sys; print(len(sys.stdin.buffer.read().split(b"\0"))-1)'
+git submodule status --recursive
+git lfs ls-files
+~~~
+
+Do not automatically declare an LFS/submodule discrepancy an error; investigate expected source ownership and rights. A count from a truncated recursive GitHub API response must be labeled a lower bound. Count code/fixtures/assets/docs/workflows separately. Verify if any directories contain generated caps/redundant mirrors without testing their loaded/executed role. Compute syntax, import/dependency and call-edge coverage independently from path names. Read all launch entrypoints, route mounting, worker dispatch, actual compiler and filesystem operations before declaring a feature missing.
+
+## 27.2 Exhaustive inspection order for large trees
+
+1. Repository metadata: remote, branch protections where permitted, main head, Git tree, license and AGENTS.md. Confirm current PR #4880 is documentation-only and note its draft status.
+2. Machine constitution: all mandatory twelve documents, exact architecture zones, state domains, typed records, ten capabilities, 17 closed construction gaps and required enterprise proof.
+3. Default first install: Docker/engine/backend/frontend/Chroma, installer/doctor/setup, private secrets, data restoration and actual model activation.
+4. Product frontend: Expo router route graph, auth scopes, Jeeves chat, game learning, crawler, game editor, build status and publishing.
+5. API: backend/server.py and mounted routes; skeleton/api/server.py/create_app, engine client, authenticated tool/queue boundaries and response schemas.
+6. Game: forge/game_builder, game_build_queue, advanced genre exporters, game/gameplay and game/generation, Godot and HTML5 bundles, actual render/audio integration.
+7. Native AI: runtime model/operational AI, SQLite, guard, tokenizer, model installer, pressure supervisor and real source agent.
+8. Dragon: frontend crawler, backend/core/dragon_crawler.py, core webcrawler, source rights and backend Atlas bridge.
+9. Assurance: workflows, required checks, security scans, live game tests, physical device and head/current artifact receipts.
+10. Overlay candidates: PRs #4870/#4872/#4875/#4876 and other current draft PRs; compare changed paths, source pins, dependency heads and expected cutover.
+11. Historical acceptance: source-backed tests, expected vs actually observed behavior, legacy archive, schema/gate drift and test fixture limitations.
+12. Human value: time-to-first-playable, difficulty of editor changes, quality of produced games, asset polish, accessibility, user trust and disaster recovery.
+
+## 27.3 Unknowns that must not be upgraded to facts
+
+A source path named “advanced” may still contain a simulator, proof object, facade or real runtime; inspect its imports and actual side effects before grading. Godot adapters may be genre-specific and have distinct feature coverage, so one adapter's limitation does not negate another. A source queue may be durable on Mongo for some operations and in-process for fallback under limited modes; discover actual current dispatch paths before generalizing. Runtime screenshots do not prove source-and-binary identity without receipts. A GitHub job success does not prove a local-device test. A CI workflow skipped under PR filters is not a pass. An AGENTS.md construction gap marked closed does not prove end-user experience, yet also should not be reopened on speculation.
+
+Any proposed fix should be written as a source-hypothesis test: **Observed:** precise file, line/function, run or artifact. **Impact:** failed user journey. **Minimal repair:** existing canonical owner with bounded behavior. **Negative oracle:** condition that must remain denied. **Proof:** focused test and real integration if needed. **Promotion:** exact final source head and independent approval. Unsupported leaps in reasoning must become investigative tasks, not unapproved PR mutations.
+
+# 28. Frontier-comparison laboratory: reproducible SOTA without misleading wins
+
+Frontier-grade quality must be measured against real tools and locked, interactive tasks. The three relevant published 2026 research baselines are complementary, not interchangeable:
+
+- GameCraft-Bench (Luo et al., June 2026, arXiv:2606.17861) formalizes Engine Grounding, Artifact Completeness and Interactive Verification across 140 Godot tasks and fifteen game families. The point is that plausible scripts and project manifests often fail to become complete interactive games.
+- GameXpert-Bench (Chen et al., August 2026, arXiv:2608.21833) separates GameGen (97 generation tasks across eleven genres), GameFix (100 repair tasks derived from fifty game levels) and GameOpt (seventeen six-turn optimization chains, 102 requests). It emphasizes the entire production lifecycle and cumulative regression safety.
+- GameASG-Bench (Zhang et al., September 2026, arXiv:2609.21293) declares legal player-level interfaces, starting scenarios and core behavior in advance; its 47 browser-native tasks expose how mean check pass rate can be much higher than strict whole-task pass.
+- The official Godot archive as checked on 2026-11-07 lists 4.7.2 as the latest stable patch and 4.8-beta2 as preview, with release 4.8 not stable. Do not silently move production to a beta. Pin versions to real downloadable licensed binaries and prove migration. Source: https://godotengine.org/download/archive/.
+
+These benchmarks are relevant comparison methodology, not evidence that Skeleton has been run on them. Building a locally invented easier test and declaring SOTA would be misleading. The goal is to construct **an independent, reproducible comparison laboratory** with a declared workload, deterministic evaluators, actual Godot/HTML5 target runtimes and separated builder/judge privileges. Whether a specific external benchmark can be redistributed or used commercially must be verified from its current license and dataset terms; do not infer rights from an arXiv abstract.
+
+## 28.1 Benchmark hierarchy and anti-gaming design
+
+**Track C0 — source/contract.** Static compile, type, schema, source ownership and resource/security compliance. It detects malformed output but cannot establish game completeness.
+
+**Track C1 — asset/project completeness.** A package contains all declared scenes, scripts, input maps, executable targets, models, original sprites/meshes, media and manifest/rights. Checker inspects actual bytes and file references, not model prose.
+
+**Track C2 — real runtime.** Launch target under pinned supported Godot or browser, exercise player input, observe state transitions, finish objective, run failure/retry and save/reload. Assertions depend on actual game behavior.
+
+**Track C3 — product usability.** Human-independent UI agent and at least one separate blind reviewer test onboarding, controller response, presentation and accessible feedback. A creator can adjust a design element and see the change in the playable output.
+
+**Track C4 — development process.** Report cost, wall time, number of attempts, repair count, operator intervention, child worker concurrency, failure recovery and source/artifact lineage. A fast but unsafe agent is not superior.
+
+**Track C5 — generalization.** Lock unseen briefs, altered item/quest names, alternative art themes, target differences and minor negative perturbations. A solution trained on benchmark fixtures without transfer does not count as general capability.
+
+The primary game result must be conjunctive: every essential requirement present, executable target starts, player input works, objective is reachable, game state is consistent, and no release-blocking security/license defect. Publish per-condition pass and strict task pass separately. A game can have 95% per-assertion average and still fail if one required victory or input check is broken. Use confidence intervals, workload sizes, censored timeouts, held-out seeds and all failed task IDs, not cherry-picked examples.
+
+## 28.2 Benchmark custody and independent evaluation controls
+
+1. Freeze task source, evaluator version, engine binary digest, runner host capacity and input/seed corpus before an agent starts the game. Give the builder only the stated player-visible interface and permitted development APIs, never hidden evaluator files.
+2. Assign at least one separate verification principal or process to the judge. Its trusted prompts and test predicates must be inaccessible as mutable builder workspace files.
+3. Record an immutable task ID, brief digest, legal capabilities, allowed project target and time/resources. Limit retries; a restart cannot reset cost or failure counts.
+4. Require actual output tree and binary. A text response, project blueprint or static screenshot cannot satisfy C2.
+5. Run public tests for debugging feedback, then frozen hidden/cross-seed tests after candidate is sealed. Preserve the builder's full source revision graph and selected final revision.
+6. Use a deterministic input driver with visible observed state. For Godot, integrate an approved debug/test protocol or frame/controller harness; for browser, exercise real DOM/canvas controls. Do not mutate game variables behind the player's back to pass required outcomes.
+7. When judges use vision or text models, compare against deterministic state or video witness, report disagreements and calibrate against independent humans. Neither one benchmark score nor one human's taste is a universal quality result.
+8. Publish exact cost basis, including model inference time, token counts, local GPU occupancy and compiler/playtest resources. Hidden hosted costs or worker persistence invalidate cost claims.
+9. Re-run against a clean target host, not a dirty developer checkout that supplies missing dependencies through PATH or cached media.
+10. If the agent proposes a fix after failure, require a new final source SHA and rerun the affected task plus cumulative regression set.
+11. Attribute hardware limitations separately from agent defects, but do not count hardware failures as product successes. Unknown becomes a held result with reproducible diagnosis.
+12. Compare to a stable Skeleton baseline on the *same* tasks and machine before claiming improvement. Relative advantage must not cancel security, rights, data loss or accessibility regressions.
+
+## 28.3 Proposed internal benchmark task collection
+
+The following task families are original proposed obligations, not representations of external benchmark datasets:
+
+| Task ID | Family and hidden perturbation | Essential success witness |
+|---|---|---|
+| GB-001 | Top-down shooter, swapped enemy speed and map dimensions | move, aim, attack, earn resource, win and restart |
+| GB-002 | Precision platformer, randomized coyote/buffer timings | real controller traverses ledge and moving platform fairly |
+| GB-003 | Roguelike RPG, alternate seed and loot rarity | quest, inventory, combat and save remains consistent |
+| GB-004 | First-person 3D exploration, camera sensitivity variation | player finds and uses actual 3D interactable |
+| GB-005 | Racing simulation, weather and tire-profile variation | real steering, braking, pit behavior and legitimate lap |
+| GB-006 | Strategy tactics, starting-position permutation | valid turn resolution and reachable winner |
+| GB-007 | Logic puzzle, rearranged switch/wall layout | independent solver+player complete without illegal state mutation |
+| GB-008 | Narrative quest, changed NPC belief and faction history | distinct correct branch, dialogue consistency and ending |
+| GB-009 | Interactive cinematics, interrupted playback and captions | skip/resume control restores player state with no duplicated reward |
+| GB-010 | Audio-heavy action, muted accessibility variant | actual audio and redundant textual/visual event signal |
+| GB-011 | Asset replacement, revoked source and incompatible model | previous approved game remains playable and denied asset excluded |
+| GB-012 | Source-driven editing, agent given stale project revision | conflicts are surfaced and human changes not overwritten |
+| GB-013 | Crash at save checkpoint, repeat transaction | exactly one committed reward and reproducible reload |
+| GB-014 | No-network local game creation | zero unexpected external calls and complete playable package |
+| GB-015 | Cross-target export with unsupported GPU shader | explicit capability denial or operator-approved fallback |
+| GB-016 | Combined build/repair/optimize chain | six source revisions preserve all previously satisfied game behaviors |
+
+Each family must be expanded by multiple original content variants and different target constraints, not by renaming file headers. Define source permissions, input action schema, target machine, expected state witnesses, difficulty envelope and failure conditions in canonical data. Keep evaluator implementation private from the candidate agent. Add adversarial tasks where the safest correct answer is to refuse an impossible target/unsupported license rather than generating deceptive output.
+
+## 28.4 Original game quality rubric
+
+**Player comprehension:** the player can identify goal, constraints, feedback, threats and controls without reading developer code. Measure confusion and misleading cues.
+
+**Mechanic integrity:** actions respond predictably, controls respect physical rules, progression is reachable and failure is attributable to player decisions rather than bugs.
+
+**Aesthetic coherence:** assets belong to a consistent visual language, animation and audio match events, camera and lighting preserve necessary perception, and text remains legible.
+
+**Narrative agency:** when the game promises meaningful choice, divergent actions have witnessed causal differences; there is no invisible forced ending or fabricated NPC memory.
+
+**Completeness:** title, help, main loop, win, lose, retry, save/restart where required, real package and source manifests all work from the installed artifact.
+
+**Performance and accessibility:** target framerate and input latency meet declared envelopes, background model work does not stall the game, and essential information has accessible alternatives.
+
+**Creative differentiation:** a generated game has distinct mechanics and authored content beyond a renamed public tutorial. Originality is not proved by automated similarity alone and must still pass source-rights review.
+
+**Maintenance:** creator can open, inspect, change, test and export the project again after app restart; hidden generator state is not the only way to modify it.
+
+Use an agreed numerical rubric as auxiliary data and retain direct qualitative observations, but hard essential mechanics are not averaged into an aesthetic score. Every new model/renderer/genre release should pass a regression suite of fixed golden projects plus new unseen tasks.
+
+# 29. Workable integration-contract catalog for the twelve-bot federation
+
+The machine architecture already has 86 runtime/acceptance interface edges and a typed schema catalog. This chapter does not create another parallel schema system. It describes **proposed typed interface requirements** for game-specific seams, to be reconciled into the canonical owners before implementation. An exact schema may already exist under another name; BOT-02 must identify and extend that owner rather than minting duplicate IDs.
+
+## 29.1 Product capability and trust envelope
+
+Any externally initiated game action should enter through canonical authentication and project scope. The envelope binds actor, tenant, project/source revision, job and operation ID, idempotency key, finite physical resource budget, deadline, tool/target capability grant and audit context. A browser sends a request; it never becomes the authoritative owner of the source revision or game state merely by including a field. The backend validates principal and route, the engine validates the delegated action, the canonical owner commits and emits a versioned receipt. If the route needs a model, the provider boundary performs admission/architecture acknowledgement before I/O.
+
+**Acceptance:** deny missing/mismatched tenant, expired grant, changed revision, recycled key with changed payload, cost cap exceeded and unsupported action; preserve existing state and produce a stable public error classification. A validated action should return one committed current revision, not a speculative success.
+
+## 29.2 Brief, design and project manifest
+
+A natural-language brief is human input, possibly containing quoted external source, so treat it as untrusted data. The design spec must record scope/genre, required targets, original content intent, core loop, start/win/lose/retry conditions, player verbs, camera, art/audio/accessibility needs and explicit unresolved choices. Existing skeleton.game_design_spec.v1 is a starting contract. A detailed game plan references this immutable brief and pinning identity. On approved revision, invalidation should be targeted: an art palette change need not invalidate unrelated economy source, while a player movement rule change must invalidate play tests that depend on it.
+
+**Acceptance:** a structured game input cannot bypass project owner scope or mutate target/genre outside approved intent. A plan that lacks a win/fail condition cannot be certified as a finished-game plan. Run source-golden tests for shooter, platformer, RPG and one adversarial impossible brief.
+
+## 29.3 World and scene graph
+
+Every spatial game project needs persistent world/scene/object identity, collision/navigation relations, source rights and revision support. A scene reference points to exact asset and script versions, not merely names. A world transition must specify entry/exit spawn, player/inventory transfer, quest-world transfer, save migration and version-compatible target. For 3D, transform coordinate system, units, scale, handedness, material, skin and collision must be explicit.
+
+**Acceptance:** reject orphan scene references, duplicate object IDs, invalid transforms, nonfinite coordinates, missing physical mesh colliders, unregistered portal and old-save incompatible transition. Test a player traveling through two worlds, saving, restarting and returning to an unchanged quest objective.
+
+## 29.4 Player controller and action semantics
+
+A controller contract lists physical inputs, normalized action names, actions per frame/tick, pause/focus semantics, remapping and accessibility. Simulated agents should use the same player-level input path as humans when establishing playable proof. Authoritative gameplay may apply validated input and produce tick-bound state events, but the test harness must not directly set objective success.
+
+**Acceptance:** input-down/up, analog dead zone, keyboard overlap, window focus loss, gamepad disconnect and touch gesture all have deterministic safe transitions. Input replay at different frame pacing should preserve essential state within stated tolerance. Define missing hardware as an unsupported target, not a passing skip.
+
+## 29.5 Gameplay events and side-effect idempotency
+
+Player actions yield events such as move, attack, hit, pickup, craft, quest advance, faction change, reward, save and death. Events need stable IDs, tick ordering, authority, source/rule identity, preconditions and durable receipts for externally relevant consequences. A reward should not appear twice because a frame callback, network client or AI agent retries after a timeout.
+
+**Acceptance:** two identical pickup commands with the same committed event ID yield at most one inventory increment. Changing item cost between initiation and commit requires version-CAS or denial. Crash after reservation but before acknowledgment must reconcile exact authoritative outcome before retry.
+
+## 29.6 Narrative and choice graph
+
+Quest nodes bind objectives, dependencies, actor knowledge, branch predicates, rewards, failure alternatives and endings. A canonical story graph records witnessed player choices, not guessed model summaries. Offscreen NPC belief updates must cite observed game events or declare rumors with uncertainty. A story line cannot retrospectively invent a player having helped a faction.
+
+**Acceptance:** compile a quest dependency graph with independent reachability proof and an actual playthrough. Test unknown actor, unavailable item, missed timed opportunity, source revision after quest start, contradictory canon and two distinct endings. Provide authored repair options rather than silently converting an impossible campaign into a fake completion.
+
+## 29.7 Economy, inventory and crafting
+
+Currencies and resources are bounded quantitative state. Define integer/decimal precision and exact transaction scope; recipes express consumed inputs, produced outputs, stations, time and skills. Shop purchases require verified inventory/currency on current revision, and crafting must not create a free-positive-value cycle unless explicitly permitted as game design. The engine must preserve reward/consumption ordering.
+
+**Acceptance:** negative quantities, overflow, race between purchase/trade, duplicate pickup and kill/resume mid-craft are rejected or reconciled. A long-run simulation must search for inflation, softlocks and dominant exploits. The editor must show actual economic effect when modifying a recipe.
+
+## 29.8 Encounter and progression
+
+Generated encounters require valid spatial spawn, faction/biome/character context, appropriate difficulty, readable telegraph and resource rewards. Progression curves are tied to actual player actions and chosen difficulty, not static text. A mandatory enemy should never spawn inside an unreachable room or permanently disable key progression without repair.
+
+**Acceptance:** seed search with solver and player bots; run unknown/randomized seeds, high/low skill policies, audio/visual cue absence and save after boss defeat. Record difficulty and fairness observations separately from hard reachability proof.
+
+## 29.9 Procedural level and seed
+
+Store algorithm version, input constraints, deterministic seed and output graph digest. Physical reachability, gate-key semantics, authored object preservation and resource availability form the hard generation contract. Large-world streaming divides content into chunks but does not change the canonical global graph.
+
+**Acceptance:** same exact source/algorithm/seed generates same structure; regeneration with a new algorithm declares a migration. For every advertised ending/exit, at least one valid path witness must exist in the authored graph and pass actual controller constraints. A solver route that a human cannot traverse due to collision timing does not count.
+
+## 29.10 Asset and multimedia provenance
+
+An asset record needs source rights, tool/model/import version, content digest, variant, source image/audio/mesh/rig identity, target format and current eligibility. Media created from external references must record how rights were established and how future withdrawal affects it. Logical animation/audio descriptors must be linked to real clips/PCM and target engine events when the user-facing feature requires actual media.
+
+**Acceptance:** malformed SVG/3D/zip/audio content is denied before host execution, giant decompression and symlink races are bounded, unlicensed content not exported, and withdrawn source invalidates descendants including thumbnails and cached material. The exported game actually uses the approved asset bytes.
+
+## 29.11 Rig, animation and root-motion coupling
+
+The animation state machine binds rig bone topology, skin weights, clip duration, root motion, attack windows, transition rules and event notifications. Rendering must show actual object transform/pose, and physics must own collision separately from purely visual root motion where declared. Avoid a state-model implementation that does not affect the final scene.
+
+**Acceptance:** walk/run/jump/attack/death shows correct visible pose and event timings. Save/reload during partial animation, pausing and changing frame rate must not duplicate sound/reward or displace the actor. A rig mismatch must deny publication before a target build.
+
+## 29.12 Audio file, mixer and subtitle coupling
+
+The audio source asset/stream, cue schedule, environment, spatial listener, gain, sample rate, clip length and author rights must be explicit. If local sound synthesis is unsupported, the pipeline can use a verified user-owned clip; it should not claim synthetic audio generation by returning a logical sound descriptor. Captions and alternate visual/text cue are required for essential story or hazard information.
+
+**Acceptance:** in actual Godot/browser game, attacking triggers audible sound with measured bounded loudness, stopping action cancels/finishes cue per design, dynamic music changes on scene state, and muting still leaves essential cues accessible. Audio artifact hashes and visual frame/interaction traces must refer to same game release.
+
+## 29.13 Cinema and camera control
+
+A cinematic timeline specifies scene/shot, target actors, camera, subtitles, audio, player input lock, skip, rewind/pause and final state transfer. An interactive cutscene may branch on canonical story facts, but should not grant gameplay rewards twice when skipped or replayed. Camera safety includes readable gameplay, reduced motion and a valid restoration path.
+
+**Acceptance:** begin, pause, skip, resume, restart during transition and restore old save without deadlock. Screen-reader/caption needs must remain intact. Compare actual rendered frames and camera target movement, not merely JSON timelines.
+
+## 29.14 Godot source and runtime proof
+
+A build manifest commits game design, generated script files, engine version, assets, input map, game target and export settings. Headless Godot boot can be an early gate, but the final acceptance must use a controller driver to interact with game objects, finish/lose/retry and record audio/visual feedback. Independent test data and target binaries are tied to the same source and toolchain digests.
+
+**Acceptance:** code compile/scene import, input→state→frame, save/reopen, byte-identical installed package proof and portable execution. If one target lacks an essential feature, build should return a declared incompatibility unless an explicit user-approved downgrade produces an equivalently playable game.
+
+## 29.15 Web/browser game target
+
+HTML5/browser packaging requires content security boundary, canvas and accessible alternative, keyboard/touch/gamepad handling where promised, persistent local save, image/audio decode, proper focus and no external network dependency when offline is claimed. A browser-rendered desktop wrapper may be valid, but is not automatically native OS game certification.
+
+**Acceptance:** run packaged game in a clean browser, verify no resource 404s or CSP violations, produce frame/input traces, test reload and browser storage, measure actual audio playback after user gesture and separate web from Windows native acceptance.
+
+## 29.16 Native/retro toolchain
+
+A platform profile contains target CPU/ABI, compiler version/hash, permitted SDKs, rights, core/firmware identities, sandbox and memory/ROM constraints. The builder must not quietly acquire proprietary SDKs or firmware. Approved compilers may be installed only via operator-granted provisioner and pinned source. A source manifest that says “console” does not prove a real playable binary.
+
+**Acceptance:** run actual compiler, approved emulator/native target if available, input-driven game and exact export verification. A missing legal SDK or physical hardware keeps that target unqualified while valid other targets remain usable.
+
+## 29.17 Dragon approved research
+
+A research request binds owner/tenant, purpose, host set, page/request/byte budget, consent, rights and expiry before network transport. The canonical crawler records source snapshots and exact passage/claim identities. Review authorization is separate from capture authorization. A source quote must remain inert external text even when it contains malicious instructions.
+
+**Acceptance:** host/redirect/DNS policy, text offset/digest, source revision, review action and withdrawal semantics. Confirm the existing backend route actually invokes the correct campaign owner and that PR #4876 adapter failures are repaired without weakening the policy contract.
+
+## 29.18 Knowledge-to-game derivation
+
+A reviewed source fact may inform an original design decision through a derived reference, not become privileged model instruction or automatically licensed game media. Define the proposal and approval step, original game mechanic representation and transitive source dependency. If the source is withdrawn, queued proposals, accepted but unpublished game revisions and caches must be re-evaluated.
+
+**Acceptance:** lawful capture→review→original game design→implemented mechanic→user-play evidence→source withdrawal invalidation with no unintended removal of unrelated independently sourced content.
+
+## 29.19 Jeeves tool action and project revision
+
+Jeeves receives a versioned view of the game and proposed typed action definitions. A user-authorized edit cannot exceed its scope, and a stale source revision cannot be invisibly overwritten by a previous model turn. A model description of an edit is not an edit; the canonical owner commits structured changes and returns receipt.
+
+**Acceptance:** model selects valid tool, operator accepts exact args hash, side effect commits once, project revision changes, target game behavior reflects it and denial of changed args does nothing. Independent reviewer must not use builder's self-reported “done” as proof.
+
+## 29.20 Installation and local model admission
+
+An installation receipt binds app source, stable private identities, service topology, installed model runtime and safe operations; it must not leak private credential values. Native model activation requires actual pinned bytes, tokenizer/backend and trusted guard, not just a path. Physical workers must be accounted for until joined even when callers time out.
+
+**Acceptance:** clean setup and restart under bounded resources, model corruption/guard missing and Mongo primary failure all reported honestly, no duplicate model download, true local reply and user project state preserved.
+
+## 29.21 Publication, commerce and entitlement
+
+A game release candidate references exact source/artifacts, rights and platform proof; storefront metadata is a presentation of that immutable candidate. If payment features are enabled, atomic settlement and entitlement updates need provider-authenticated idempotent events, with reversal/refund handling. A UI checkout simulation is not delivery.
+
+**Acceptance:** current source/rights validation, download checksum and actual target play; duplicate/forged payments denied, concurrent order settlement linearized, entitlement revocation and audit, no private source leaked by public game listing.
+
+## 29.22 Failure, incident and rollback
+
+A failure record connects operation, source head, detection time, affected owner, severity, last good state, irreversible effects and repair/recovery plan. Recovery is not a blind retry; use authoritative state and idempotency to determine whether the side effect occurred. The system must retain evidence and allow explicit operator continuation.
+
+**Acceptance:** process kill during model, build, save, crawl and install phases; restart and compare ledger/object counts; independently confirm no repeated effect, no lost accepted state and truthful UI. If authority remains uncertain, hold further mutation until reviewed reconciliation.
+
+# 30. Twelve-bot first executable vertical slices and cross-role handoff order
+
+The goal is **twelve coordinated bots shipping one product**, not twelve teams filing impressive but disconnected catalogs. A bot's initial assignment is a narrow, complete executable vertical slice with typed inputs/outputs, a real user effect, adverse proof and ownership reconciliation. These initial slices are launch-path proposals, not executed changes.
+
+| Bot | First implementable slice | Input | Required delivered output | Hard proof |
+|---|---|---|---|---|
+| BOT-01 | guarded local first-run completion | clean approved install | setup, healthy services, verified GGUF, safe recovery | real target host, cold reboot and chat |
+| BOT-02 | unified source+state authority reconciliation | main and candidate PR tree | authoritative graph, exact source refs, missing proofs | architecture validators and mutation fence tests |
+| BOT-03 | model-to-approved-edit execution | project snapshot and real local model | typed proposed edit committed once | real GGUF + tool receipt + replay protection |
+| BOT-04 | single-brief playable studio orchestration | original shooter brief | design→game build→playtest→repair campaign | bounded full tool run with source/proof links |
+| BOT-05 | playable causal quest with alternate ending | authored story/world | valid quest states, NPC memory and real branching | actual player replay of both endings |
+| BOT-06 | complete controller-driven core action | scene/asset/game design | movement, damage, feedback, objective, save | real input/physics/gameplay trace |
+| BOT-07 | generated solvable scene + variation | seed/constraints | graph, target scene, solution witness | valid traversal through multiple seeds |
+| BOT-08 | one integrated audiovisual character | asset brief/game action | real sprite/mesh, rig/animation, audio and cue | actual rendered and audible target runtime |
+| BOT-09 | one polished target export | approved project tree | Godot/web/desktop package and source | clean-host executable player journey |
+| BOT-10 | lawfully cited mechanic inspiration | bounded crawl grant | source→review→original design dependency | live capture and transitive withdrawal |
+| BOT-11 | visible end-to-end creator workbench | authenticated owner | project create/edit/build/play/download journey | browser/controller UX and accessible feedback |
+| BOT-12 | independent playable-release verifier | candidate source, build and briefs | locked independent run and acceptance dossier | source exact-head, real target, negative suite |
+
+## 30.1 Dependency-resolved execution waves
+
+**Wave A — read-only census and authority.** BOT-02 and BOT-12 obtain exact source objects and current PR dependency graph. BOT-01 identifies true setup/runtime missing dependencies; BOT-03 identifies model activation trust. BOT-09 discovers actual Godot/target binary identity. BOT-10 verifies existing Dragon routes/policies rather than adding new network service. No broad parallel mutations until owner conflict map and contracts exist.
+
+**Wave B — protect first install.** BOT-01, BOT-02 and BOT-03 close the live Mongo epoch/guard/bootstrap path through canonical code, with BOT-12 focused evidence. BOT-11 ensures setup remains accessible even while backend/engine unhealthy. This wave is accepted only after real local inference and recovery; it cannot be replaced by another launch script or model data download.
+
+**Wave C — minimum amazing game.** BOT-04 coordinates one original top-down shooter. BOT-06 implements deterministic player/enemy actions. BOT-07 provides solvable levels. BOT-08 ensures real media. BOT-09 compiles and boots the exported game. BOT-05 provides one meaningfully reactive quest/world state. BOT-11 exposes an editable project workspace. BOT-12 runs the game independently from install to victory and restart. The output is a coherent game, not a concatenation of successful library tests.
+
+**Wave D — developer edit/repair loop.** Let Jeeves inspect game source and runtime failure, propose a typed minimal patch, route through human review, commit at current head, compile and replay independent tests. Enforce no hidden file access, no denied rights and no action under stale project revisions.
+
+**Wave E — world/asset depth.** Extend from the proven minimal game into a 3D micro-world with rigging, collision and spatial sound, plus procedural and narrative complexity. All earlier golden projects remain regression fixtures. Adopt new effects only if actual gameplay is better, not merely source volume larger.
+
+**Wave F — broader targets and lawful knowledge.** Qualify more declared exporters, mobile/controller profiles, Dragon research-to-design and marketplace only after relevant rights and payment holds are addressed. Maintain a per-target support matrix, not a global “all platforms” claim.
+
+**Wave G — independent release and ongoing hardening.** BOT-12 rechecks the final source SHA, artifacts, all required workflows and physical device evidence; user explicitly authorizes releases. Reconcile every draft PR and open blocker, then follow policy-managed merges, updates, saves and rollback.
+
+## 30.2 Bot handoff acceptance laws
+
+- Every owned artifact has a unique canonical owner and current source revision.
+- Upstream may propose but cannot force downstream acceptance; incompatible payload produces a documented typed denial.
+- Every refusal includes a user-facing recovery route and a programmer-facing stable error classification without secrets.
+- Critical dependency tests use actual upstream implementation or a true representative approved emulator. Mocks are allowed for unit isolation but cannot elevate end-to-end proof.
+- The receiving bot checks source/rights/identity/expiry and does not trust a prior agent's self-described result.
+- Affected downstream evidence is invalidated on upstream revision, while unrelated stable user edits are preserved.
+- Bot task completion requires remote source artifact and proof; a planning comment without code is not a feature delivery.
+- Parallelism is bounded by path overlap, object authority, physical workers and token/cost budgets, not a configured number of “virtual agents.”
+- BOT-12 cannot be author and independent final verifier of the same risky change.
+- Existing machine gap closure and source-migration signoff cannot be overwritten by the Grokbot document. Their canonical procedures remain authoritative.
+- No bot may promote a source, rights-sensitive content, payment, unpublished game or protected release without explicit authorized review.
+- High throughput is measured in accepted coherent user functionality, not the number of draft PRs.
+
+## 30.3 Concrete acceptance sequence for the first coordinated game
+
+1. Input a new top-down action brief in the product UI as authenticated owner.
+2. Obtain validated game design spec with exact requested fantasy, core loop, target and allowed media/rights.
+3. Build a minimal scene containing player start, traversable arena, three enemies, resource reward, upgrade station and explicit victory/defeat state.
+4. Show a controller input map and actual movement. Verify event path through game runtime, not only local UI highlight.
+5. Attack one enemy, observe collision/damage, visible effect and optional actual sound under correct settings.
+6. Defeat required enemies, earn non-duplicated salvage, spend the salvage at an upgrade station and observe its effect on subsequent gameplay.
+7. Trigger both defeat and victory through independent action traces, with working retry and restart.
+8. Save state before an upgrade and restart game; confirm item, health, quest/wave progress and RNG are preserved accurately.
+9. Ask Jeeves to add one level obstacle, review proposed edit, accept, build and verify that the new obstacle is physically present and navigable.
+10. Introduce a recoverable bug, get a minimal failing trace, review the patch and demonstrate that all prior player actions still succeed.
+11. Compile the actual game package under a pinned engine with complete original source/asset references and rights manifest.
+12. Download/export, run on a clean compatible host, play through and verify the binary/artifact exactly matches the accepted source.
+13. Kill one worker during an asynchronous action and confirm no duplicated build, charge, source mutation or user state loss.
+14. Have BOT-12 independently verify current head, security/rights and gameplay, then record the exact scope of supported target and remaining holds.
+
+## 30.4 Immediate source conflicts requiring explicit disposition
+
+**PR #4875:** broad first-install qualification candidate with shared AI-tree overlays. Determine whether its current source is based on the expected parents, which exact-head jobs ran, whether per-service readiness and real native inference are observed, and whether hardware/device evidence exists. Do not treat its changed-file count as a pass.
+
+**PR #4876:** Dragon Atlas/backend research draft with substantial Jeeves mirror and game-forge overlap. Earlier adapter/policy/architecture failures occurred on ancestor heads; current head 14d8613c passes targeted backend, campaign, frontend and mirror jobs. Preserve draft, broad skipped-check, source-rights, deployment and release holds.
+
+**AI migration registry:** staged mirrors with implementation and verification signoffs awaiting current-head proof. Determine source-of-truth for each mapping, compile actual import graph, and require AST/byte parity or explicit recorded exceptions. BOT-02 controls planned cutover, BOT-12 verifies independently.
+
+**Release protection:** repository and workflow policy determine whether a branch can merge. A PR that is Git-mergeable may lack current-head required checks; skip/cancel/pending are not green. The Grokbot planning PR #4880 is documentation-only and intentionally a draft. It must not be used as authorization to mass merge other PRs.
+
+## 30.5 First 36 source-bound tickets
+
+| Ticket | Owning bot | Code/evidence starting point | Output and dependency |
+|---|---|---|---|
+| F-001 | 02 | main tree, machine/architecture.json | exact owner graph; precondition all other mutations |
+| F-002 | 12 | .github workflows and PR current heads | required-check inventory; precondition promotion |
+| F-003 | 01 | skeleton/app/manifest.json + installer | unbroken setup/doctor service graph |
+| F-004 | 02 | machine/state_topology.json | Mongo epoch/writer custody ownership dossier |
+| F-005 | 03 | operational_ai/laptop_runtime | active model/tokenizer/guard acceptance |
+| F-006 | 01 | Compose and guarded readiness docs | isolated safe persistence migration plan |
+| F-007 | 11 | frontend setup and product routes | UI still accessible during engine failure |
+| F-008 | 09 | Godot exporter and target manifests | actual compiler/toolchain support inventory |
+| F-009 | 06 | skeleton/game/gameplay | one complete controller-driven core action |
+| F-010 | 07 | skeleton/game/generation | traversable finite level with seed witness |
+| F-011 | 08 | advanced_animation_runtime and media | rendered visible animation mapping |
+| F-012 | 08 | advanced_audio_runtime and media | actual audible cue in game |
+| F-013 | 04 | forge/game_build_queue.py | bounded game build/repair DAG |
+| F-014 | 12 | first-install physical test harness | clean-host native and browser proof |
+| F-015 | 05 | skeleton/jeeves/worlds | one stateful NPC and reachable quest branch |
+| F-016 | 11 | editor/playable preview | human changes a scene and sees result |
+| F-017 | 03 | tool-runtime source and project memory | authorized source-bound Jeeves edit |
+| F-018 | 12 | gameplay acceptance harness | real input→state→render and win/retry |
+| F-019 | 02 | machine/ai_file_tree.json | staged mirror parity, import and cutover proof |
+| F-020 | 10 | backend/core/dragon_crawler.py | lawful source grant, capture and revocation |
+| F-021 | 10 | PR #4876 bridge paths | authenticated actual Atlas backend projection |
+| F-022 | 04 | game builder repair protocol | failing engine log→reviewed minimal patch |
+| F-023 | 09 | golden game target and export | source+playable binary on clean host |
+| F-024 | 06 | inventory/economy/game mechanics | earned reward, single spend and save |
+| F-025 | 05 | branch/character memory | alternative valid ending replay |
+| F-026 | 07 | generated spatial campaign | multiple seeds preserving solvability |
+| F-027 | 08 | 3D asset pipeline | rigged textured object truly rendered |
+| F-028 | 09 | 3D Godot project | actual 3D navigation/physics target |
+| F-029 | 03 | local model and runtime worker | real memory/pressure/cancellation proof |
+| F-030 | 01 | installer/backup/restore | safe crash/restart and state recovery |
+| F-031 | 11 | account/project collaboration | editor/viewer/owner isolation and accessibility |
+| F-032 | 10 | approved source-to-mechanic | original mechanic with revocation test |
+| F-033 | 12 | corruption and exploit corpus | security/QA regression across source head |
+| F-034 | 09 | package/signing/SBOM | reproducible release-candidate artifact |
+| F-035 | 02 | normalized release evidence registry | exact source and proof chain |
+| F-036 | 12 | final source, target host and artifacts | independently reviewed release packet |
+
+Each F-ticket should expand into actual source, acceptance and release-evidence issues only after source census and overlap review. Do not create 36 redundant modules or PRs purely because this table exists.
+
+# 31. November 7 exact-head CI triage and source-grounded repair queue
+
+This register corrects earlier sections and replaces ancestor failure speculation with current evidence. Each recorded result binds to a particular GitHub commit SHA and workflow run; after the head changes it becomes historical. All release and rights/security holds remain intact. This document plans work and does not implement these repairs.
+
+## 31.1 Candidate states and chronological accuracy
+
+| Candidate | Reviewed exact head | Most important observed status |
+|---|---|---|
+| PR #4876 Dragon Atlas | 14d8613cc2a9e7f465b8817623f5b78ad782d9a3 | Targeted Dragon backend adapter, campaign source, frontend, integrated mirror, native SQLite and workflow security jobs SUCCESS; draft; broad App Foundation, Backend Quality, Merge Readiness, Malware and Artifact Policy SKIPPED |
+| PR #4875 first-install | 646526a88f3406d4a9c3b0c253417ccdabdc919a | Fifteen individual workflows SUCCESS including Windows Installer, backend, guarded local source, and malware; composite Merge Readiness FAILED |
+| PR #4880 planning document | 877fafd515a3521aa97dc156bb85f568139e9072 prior to this update | Repository Hygiene and Secret Scanning SUCCESS; other documentation-filtered workflows SKIPPED; draft |
+
+The older PR #4876 backend adapter run 42330942316 was against head f0b328315825e53368637c85f9275bb8d6422178. Its failing test job raised CrawlOperationError: source MIME inference receipt mismatch in 31 of 38 tests during fixture snapshot reconstruction. The fixture was a synthetic legacy source that did not supply the optional MIME extension. The inspected CrawlRun.from_snapshot validator requires the complete three-field MIME receipt only when any field of the extension is present. It is important to preserve this fail-closed behavior; should such regression recur, repair the fixture to omit all new fields for true legacy data or provide all three coherent fields, never teach the validator to admit inconsistent content. The latest-head targeted adapter run is successful, so that ancestor failure should not be reported as current.
+
+The older PR #4876 integrated mirror run 42331436570 was against head e60701e8f0813ea6a9ca01d04c8d2396011eaba6. The validator then found missing mirrored Jeeves world modules, missing forge subfamilies, three missing audio-extension paths and unclassified skeleton/mass_build and skeleton/perf_profiler roots. The current-head integrated mirror run succeeded. These historical details remain useful as a regression counterexample, but the present task is deployment-matched Mongo/backend bridge verification and required broad workflow coverage, not replaying obsolete repair instructions.
+
+Success on a source-level adapter or mirror test does not establish authorized live capture, external network safety under deployment, Mongo primary race behavior, runtime worker custody or a release-certified Dragon app. PR #4876 remains a draft. No GitHub branch status, code review or UI badge may convert skipped mandatory checks into passes.
+
+## 31.2 First-install PR #4875: current composite gate failure
+
+The current Merge Readiness workflow for PR #4875 is run 42370464271 at head 646526a88f3406d4a9c3b0c253417ccdabdc919a. In this run, Canonical Domain Suite shards 0, 1, 2, 3 and 6 failed, shards 5 and 7 were cancelled, and shard 4 succeeded. The final Merge Readiness aggregate failed. Lint Type Security, PR Automation Tests, Quarantine Policy, frontend, backend, Docker, GameForge and other independent jobs had successful outcomes. Current-head Windows Installer and first-install source qualification also passed as hosted checks, not as a physical target-laptop installation.
+
+### CI-4875-001: unmounted scene evacuation public commands
+
+**Observed:** Domain shard 3, skeleton/testing/test_scene_evacuation_cli.py, expects six command families: scene-evacuation, scene-evacuation-board, scene-evacuation-author, scene-evacuation-accept, scene-evacuation-solve and scene-evacuation-play. Their demo routes return 1 rather than expected 0; public CLI help omits these commands; malformed source returns 1 rather than controlled exit 2. Direct inspection of skeleton/__main__.py at the candidate head found no string occurrence of scene-evacuation, making missing public dispatch a strong and specifically testable hypothesis.
+
+**Smallest repair:** find the actual already-existing domain CLI implementations and register them through the canonical skeleton.__main__ routing/help table rather than generating a new simulation or weakening tests. Verify a bounded JSON success response, exact required result fields and normalized denied-input error without leaked traceback. Preserve current CLI command names and other valid routes. Focused execution: python -m pytest skeleton/testing/test_scene_evacuation_cli.py -q, followed by help/dispatch smoke for all registered commands. CLI success is still below independent Godot game play qualification.
+
+### CI-4875-002: scene-market-party dispatch returns error
+
+**Observed:** Domain shard 0, skeleton/testing/test_scene_market_party_route.py::test_cli_demo_and_main_dispatch, asserts that the scene-market-party-route demo returns 0 but observes 1. The same candidate skeleton/__main__.py contains this command name, so absent registration is **not established** as the root cause.
+
+**Smallest repair:** execute the direct command, capture safe stderr, trace its dispatch function and its imported domain implementation. Determine whether input validation, route wiring, source fixtures or current backend state causes the actual nonzero result. Repair the first canonical contract violation; do not insert a test-only canned response. Retain the invalid session-json negative path and verify successful demo source, terminal witness and proper rejection classification.
+
+### CI-4875-003: story event ancestry changes on CAS resume
+
+**Observed:** Domain shard 3, skeleton/testing/test_harbor_crafting_salvage_story.py::test_story_cas_resume_preserves_previous_events, fails because the first event after resumable story progression differs from the original first acknowledged event. A final correct ending would not excuse rewriting the committed event's digest, tick or sequence.
+
+**Smallest repair:** inspect build_salvage_story, resume_salvage_story and verify_salvage_story. Compare frozen source, request, exact expected_digest and historical events byte-for-byte. If changed schema legitimately changes event identity, migrate through an explicitly reviewed versioned path, not an implicit overwrite. Preserve acknowledged prior events and append newly committed events only. Test stale digest denial, forged event rejection, partial campaign resume, clean replay and crash recovery. Owner: world/narrative BOT-05 with BOT-02 and BOT-12 independent custody review.
+
+### CI-4875-004: native source-only SQLite batch is incorrectly held or test contract stale
+
+**Observed:** Domain shard 1, two skeleton/testing/test_jeeves_native_batch.py tests expect source-only committed batch and cold replay, but CLI returns status held, error_class ContractViolation, exit 2, and explicitly records native_device_qualified=false and release_certified=false.
+
+**Smallest repair:** inspect the active source-only admission policy, exact branch/lease grant and the test fixture's signed source identity. If real source-only work may be committed without hardware certification, admit only that limited operation and retain explicit native/device/release holds. If a newly required grant is genuinely absent, correct the authorized fixture and expected outcome. Never bypass device qualification or falsely set a release flag to appease the test. Prove durable SQLite cold reopen, no repeated work and denied unauthorized operations.
+
+### CI-4875-005: retrieval passage overlap/window contract mismatch
+
+**Observed:** Domain shard 1, skeleton/testing/test_offline_cognition_embedding_search_evidence.py tests test_attribution_not_semantic_claim and test_deterministic_ranking raise CognitionError: overlap must be smaller than passage window.
+
+**Smallest repair:** locate the actual typed overlap/window owner, inspect units and config defaults and determine whether the fixture or cross-layer constructor supplies an impossible window. Maintain the requirement overlap strictly less than passage window. Fix a safe default or adjust a fixture to legal parameters based on current contract; test equality, oversize, zero/negative and normal passage retrieval. Keep exact source offset/evidence provenance and do not confuse deterministic lexical ordering with verified semantic truth.
+
+### CI-4875-006: embedded NUL in canonical world operation path
+
+**Observed:** Domain shard 2, skeleton/testing/test_jeeves_world_canon_operation_custody.py::test_rejects_embedded_nul_and_empty_path, encounters raw ValueError: embedded null byte. A NUL path must remain forbidden, but the intended public denial should be normalized before operating system functions receive it.
+
+**Smallest repair:** validate type, normalization and forbidden bytes before path conversion or descriptor calls. Raise the canonical stable denial and guarantee zero filesystem mutation. Test NUL, empty path, parent traversal, symlink race and non-string input. Do not treat this as permission to open more paths.
+
+### CI-4875-007: scripted demo stdin and forged terminal protection
+
+**Observed:** Domain shard 2, skeleton/testing/test_scene_campaign_script_demo.py::test_scripted_demo_cannot_read_stdin_or_forge_terminal raises SystemExit(2), requiring comparison with the intended public CLI API.
+
+**Smallest repair:** trace parser and demo source, determine whether this is a valid fail-closed denial poorly represented by a wrapper or an actual behavior regression. Keep hostile stdin unconsumed and model-authored fake terminal state unaccepted. Normalize the CLI error contract where required. Prove bounded response, no private input read and zero forged completion.
+
+### CI-4875-008: offline source pin and season duplicate-replay denial
+
+**Observed:** Domain shard 6, skeleton/testing/test_app_offline_mixed_library_epoch_successor.py::test_cli_fails_closed_without_pin fails with SystemExit(2). Separately skeleton/testing/test_harbor_crafting_season.py::test_missing_win_or_duplicate_replay_is_rejected fails the expected rejection regex.
+
+**Smallest repair:** inspect the precise negative path and public exception/exit expectations. Keep missing trusted source pin and duplicate unearned season win as hard denials. Repair only incompatible public wrapping or actual validation errors, never weaken the proof or ignore duplicate rewards. Verify exact unchanged epoch, source identity, event count, reward and replay sequence before/after denial.
+
+## 31.3 Dependency-ordered next validation
+
+1. Freeze PR #4875 latest exact head, compare branch overlap and confirm this run's source identities.
+2. Reproduce all listed failed tests with the exact current source. Capture first failure and localized owner, not just the failed test name.
+3. Fix public CLI command discovery and safe error semantics first. These unblock several independent game-demo and route tests without requiring new runtime services.
+4. Repair immutable story event ancestry and season replay correctness next, treating acknowledged game state as protected user data.
+5. Reconcile native batch/source pin admission and retrieval passage bounds without bypassing guards. Distinguish correct denial from accidental wrapper mismatch.
+6. Run focused positive and hostile-case suites, then all eight canonical domain shards. Cancelled shards are not qualified.
+7. Rerun exact-head Merge Readiness and every required independent workflow affected by the new patch. Verify composite success before even considering merge.
+8. Keep physical Windows 11/WSL2, Docker, actual GGUF guarded chat, real game-engine player input, data recovery, signing and launch acceptance separately held until observed.
+
+The suggested repair owners are BOT-09 for public CLI, BOT-05 for story CAS, BOT-06 for gameplay replay, BOT-03 for native batch/retrieval, BOT-02 for filesystem/epoch authority, BOT-04 for scripted campaign and BOT-12 for independent final-head proof. Source ownership remains determined by the machine authority, not by this suggested human scheduling table.
+
+## 31.4 Preservation of current good evidence
+
+A current-head successful Dragon Atlas backend source test is meaningful and should not be discarded merely because a prior fixture was broken. A current-head failed composite domain test is equally meaningful and should not be hidden by successful installer or secret-scan siblings. No bot may relabel a completed check under an ancestor SHA as current-head success, infer an unexecuted physical target test, waive source rights, modify required CI to skip failing functionality, or merge a deliberately held draft because a plan includes it.
+
+The primary implementation objective remains one safely installable and controllable AI game studio that can create, edit, genuinely play, diagnose, repair and export original games. Operational source-level green checks are necessary but not equivalent to that user-level achievement.
+
+# 32. Source-derived VOL-000 through VOL-420 mapping to 12 bot review lanes
+
+**This is a full indexed cross-reference of existing masterplan volume records, not 421 new gaps.** It is derived from machine/ai_master_plan.json as observed at main e00bfb0809b34573c2df313ea16e17fd10bead38. Titles, machine-declared implementation status and candidate source paths are retained as source metadata. Candidate bot numbers are heuristic *review-routing hints* from each volume's title, not authoritative source owners or proof that the volume is incomplete. When a title is ambiguous, BOT-02 is assigned triage-only; all source mutations still require machine/architecture and named canonical owner confirmation. Do not spawn a new PR just because a volume appears below.
+
+At this snapshot the machine plan declares 421 volumes: **404 implementation_status verified, 7 hardened and 10 implemented**; all 421 enterprise_grade_state fields are **designed**. These are historical plan states, not a live product quality score. In particular “designed for enterprise qualification” is not equivalent to enterprise-qualified, comparator-superior, Windows-installed, gameplay-proven or release-certified. A volume can have an implementation_checkbox and past evidence and still require a fresh final-head game/device or security acceptance. The plan's scope freeze at VOL-420 still applies; new requirements should be nested into existing volumes or undergo an authorized ADR exception.
+
+The following indexed table deliberately avoids making up per-volume acceptance results, because the test logs and code execution for all 421 were not performed in this review. Each row is a **lookup key** for the bot to read the full machine dossier, confirm real paths, reconcile prior evidence and decide whether any new implementation task is justified.
+
+| Volume | Canonical title | Source implementation status | Suggested review lane | Existing code anchor |
+|---|---|---|---|---|
+| VOL-000 | Plan Constitution | verified | BOT-02 (triage) | skeleton/contracts/maturity_reconciliation.py |
+| VOL-001 | Scientific & Historical Foundation | verified | BOT-02 (triage) | skeleton/research/source_lineage.py |
+| VOL-002 | System Architecture | verified | BOT-02 | machine/architecture.json |
+| VOL-003 | Canonical Contract System | verified | BOT-02 | skeleton/contracts/canonical.py |
+| VOL-004 | Kernel & Execution Foundation | verified | BOT-02 (triage) | skeleton/persistence/operation_runtime.py |
+| VOL-005 | Data & Persistence | verified | BOT-02 (triage) | machine/state_topology.json |
+| VOL-006 | Model Development Program | verified | BOT-03 | skeleton/modeling/registry.py |
+| VOL-007 | Inference Engine | verified | BOT-03 | skeleton/provider_runtime.py |
+| VOL-008 | Model Routing | verified | BOT-03 | skeleton/intelligence/admission.py |
+| VOL-009 | Context Engineering | verified | BOT-03 | skeleton/context/compiler.py |
+| VOL-010 | Memory System | verified | BOT-02 (triage) | skeleton/memory/reconciliation.py |
+| VOL-011 | Retrieval System | verified | BOT-02 (triage) | skeleton/retrieval/reranker_contract.py |
+| VOL-012 | Knowledge System | verified | BOT-02 (triage) | skeleton/intelligence/memory_retrieval_quality.py |
+| VOL-013 | Cognitive Core | hardened | BOT-03 | skeleton/intelligence/strategy_registry.py |
+| VOL-014 | Planning Engine | hardened | BOT-04 | skeleton/intelligence/plan_verifier.py |
+| VOL-015 | Tool & Action System | hardened | BOT-02 (triage) | skeleton/skills/privileged_transaction.py |
+| VOL-016 | Agent Runtime | hardened | BOT-04 | skeleton/agents/delegation_qualification.py |
+| VOL-017 | Multi-Agent Orchestration | hardened | BOT-04 | skeleton/agents/delegation_qualification.py |
+| VOL-018 | Long-Horizon Autonomy | verified | BOT-04 | skeleton/agents/autonomy_control.py |
+| VOL-019 | World Models & Simulation | verified | BOT-05 | skeleton/simulation/environment.py |
+| VOL-020 | Multimodal Intelligence | verified | BOT-02 (triage) | skeleton/multimodal/contracts.py |
+| VOL-021 | Code Intelligence | verified | BOT-02 (triage) | skeleton/repo_intelligence/repository_graph.py |
+| VOL-022 | Autonomous Repository Engineering | verified | BOT-04 | skeleton/automation/transactional_workspace.py |
+| VOL-023 | Forge | verified | BOT-04 | skeleton/eval/champion_registry.py |
+| VOL-024 | Learning & Evolution | verified | BOT-02 (triage) | skeleton/eval/failure_knowledge.py |
+| VOL-025 | Safety Architecture | verified | BOT-02 | skeleton/intelligence/verification_runtime.py |
+| VOL-026 | Cybersecurity | verified | BOT-12 | skeleton/security/capability_contracts.py |
+| VOL-027 | Privacy & Data Protection | verified | BOT-02 (triage) | skeleton/vault/deletion_proof.py |
+| VOL-028 | Governance & Authority | verified | BOT-02 | skeleton/vault/governance_audit.py |
+| VOL-029 | Reliability | verified | BOT-12 | skeleton/mesh/capacity_qualification.py |
+| VOL-030 | Distributed Systems | verified | BOT-02 (triage) | skeleton/network/remote_execution.py |
+| VOL-031 | Compute & Hardware | verified | BOT-01 | skeleton/network/model_placement.py |
+| VOL-032 | High-Performance Native Core | verified | BOT-02 (triage) | skeleton/native/isolation.py |
+| VOL-033 | Java / JVM Plane | verified | BOT-02 (triage) | skeleton/native/jvm_protocol.py |
+| VOL-034 | Observability | verified | BOT-12 | skeleton/contracts/canonical.py |
+| VOL-035 | Evaluation Program | verified | BOT-12 | skeleton/contracts/reproducibility.py |
+| VOL-036 | Adversarial Evaluation | verified | BOT-12 | skeleton/contracts/risk_evidence.py |
+| VOL-037 | Verification Plane | verified | BOT-12 | skeleton/intelligence/verification_runtime.py |
+| VOL-038 | Provenance | verified | BOT-02 | skeleton/contracts/canonical.py |
+| VOL-039 | Event Architecture | verified | BOT-02 | skeleton/frontier/operation_stream.py |
+| VOL-040 | Streaming | verified | BOT-02 (triage) | skeleton/frontier/operation_stream.py |
+| VOL-041 | API Architecture | verified | BOT-02 | machine/ai_runtime_schemas.json |
+| VOL-042 | Product Shell | verified | BOT-11 | skeleton/frontier/operation_stream.py |
+| VOL-043 | Desktop Application | verified | BOT-11 | backend |
+| VOL-044 | Web Application | verified | BOT-11 | skeleton/frontier/operation_stream.py |
+| VOL-045 | UX for Long-Running AI | verified | BOT-11 | skeleton/frontier/operation_stream.py |
+| VOL-046 | Multi-Tenancy | verified | BOT-02 (triage) | skeleton/security |
+| VOL-047 | Installer | verified | BOT-01 | skeleton/release/lifecycle.py |
+| VOL-048 | Updater | verified | BOT-01 | skeleton/release/lifecycle.py |
+| VOL-049 | Repair System | verified | BOT-02 (triage) | skeleton/release/lifecycle.py |
+| VOL-050 | Uninstaller | verified | BOT-01 | skeleton/release/lifecycle.py |
+| VOL-051 | Repository Architecture | verified | BOT-02 | skeleton/volumes/wave4/engine.py |
+| VOL-052 | Internal Python Architecture | verified | BOT-02 | skeleton |
+| VOL-053 | Import Architecture | verified | BOT-02 | skeleton/volumes/wave4/engine.py |
+| VOL-054 | Machine Architecture Manifests | verified | BOT-02 | machine/manifest_reference_policy.json |
+| VOL-055 | Architecture Linter | verified | BOT-02 | scripts |
+| VOL-056 | Gap Ledger | verified | BOT-02 (triage) | skeleton/contracts/maturity_reconciliation.py |
+| VOL-057 | Risk Register | verified | BOT-02 (triage) | skeleton/contracts/risk_evidence.py |
+| VOL-058 | ADR Program | verified | BOT-02 (triage) | docs/adr |
+| VOL-059 | CI | verified | BOT-02 (triage) | skeleton/contracts/promotion_gates.py |
+| VOL-060 | Release Engineering | verified | BOT-12 | skeleton/release/qualification.py |
+| VOL-061 | Deployment | verified | BOT-01 | skeleton/release/migration.py |
+| VOL-062 | Environment Management | verified | BOT-02 (triage) | skeleton/release/migration.py |
+| VOL-063 | Configuration | verified | BOT-02 (triage) | skeleton/release/migration.py |
+| VOL-064 | Backup | verified | BOT-02 (triage) | skeleton/release/restore.py |
+| VOL-065 | Disaster Recovery | verified | BOT-01 | skeleton/release/restore.py |
+| VOL-066 | Incident Response | verified | BOT-12 | skeleton/release/disaster_recovery.py |
+| VOL-067 | Performance Program | verified | BOT-02 (triage) | skeleton/mesh/capacity_qualification.py |
+| VOL-068 | Capacity Planning | verified | BOT-02 (triage) | skeleton/mesh/capacity_qualification.py |
+| VOL-069 | Cost Engineering | verified | BOT-02 (triage) | skeleton/observability/budget_accounting.py |
+| VOL-070 | Quality Vector | verified | BOT-12 | skeleton/eval/quality_vector.py |
+| VOL-071 | Specialized Intelligence | verified | BOT-02 (triage) | skeleton/ai/specialization/domain_registry.py |
+| VOL-072 | Jeeves Domain System | verified | BOT-02 (triage) | skeleton/jeeves/evidence_response.py |
+| VOL-073 | Game & Simulation Intelligence | verified | BOT-02 (triage) | skeleton/simulation/environment.py |
+| VOL-074 | Education & Teaching | verified | BOT-02 (triage) | skeleton/learning/instruction_runtime.py |
+| VOL-075 | Artifact System | verified | BOT-08 | skeleton/release/qualification.py |
+| VOL-076 | Content-Addressed Storage | verified | BOT-03 | skeleton/release/qualification.py |
+| VOL-077 | Experiment Platform | verified | BOT-02 (triage) | skeleton/eval/experiment_registry.py |
+| VOL-078 | Reproducibility | verified | BOT-02 (triage) | skeleton/contracts/canonical.py |
+| VOL-079 | Software Quality | verified | BOT-12 | skeleton/contracts/reproducibility.py |
+| VOL-080 | Test Architecture | verified | BOT-02 | skeleton/contracts/maturity_reconciliation.py |
+| VOL-081 | Formal Methods | verified | BOT-02 (triage) | skeleton/contracts/formal_methods.py |
+| VOL-082 | Benchmark Lab | verified | BOT-12 | skeleton/eval/benchmark_registry.py |
+| VOL-083 | Red Team | verified | BOT-12 | skeleton/eval/regression_corpus.py |
+| VOL-084 | Human Control | verified | BOT-02 (triage) | skeleton/agents/human_control.py |
+| VOL-085 | Explainability | verified | BOT-02 (triage) | skeleton/observability/explainability.py |
+| VOL-086 | Accessibility | verified | BOT-11 | frontend/src/accessibility/runtime.ts |
+| VOL-087 | Internationalization | verified | BOT-02 (triage) | skeleton/contracts/localization.py |
+| VOL-088 | Compliance & Legal Engineering | verified | BOT-02 (triage) | skeleton/contracts/compliance.py |
+| VOL-089 | Documentation Engine | verified | BOT-02 (triage) | skeleton/documentation/runtime.py |
+| VOL-090 | Generated Documentation | verified | BOT-02 (triage) | skeleton/documentation/runtime.py |
+| VOL-091 | Operations Manual | verified | BOT-02 (triage) | skeleton/observability/runbooks.py |
+| VOL-092 | Repository Maintenance | verified | BOT-02 (triage) | skeleton/repo_machine/maintenance.py |
+| VOL-093 | Backlog Control | verified | BOT-02 (triage) | skeleton/automation/backlog_control.py |
+| VOL-094 | Priority Engine | verified | BOT-02 (triage) | skeleton/automation/priority_engine.py |
+| VOL-095 | Build Work Packages | verified | BOT-02 (triage) | skeleton/automation/work_packages.py |
+| VOL-096 | VS-000 Foundation Recovery Slice | verified | BOT-02 (triage) | skeleton/persistence/foundation_recovery.py |
+| VOL-097 | VS-001 Functional AI | verified | BOT-02 (triage) | skeleton/ai/functional_transaction.py |
+| VOL-098 | VS-002 Engineering Agent | verified | BOT-04 | skeleton/ai/build/engineering_agent.py |
+| VOL-099 | VS-003 Scientific Researcher | verified | BOT-10 | skeleton/ai/research.py |
+| VOL-100 | VS-004 Multi-Agent Engineering | verified | BOT-04 | skeleton/ai/agents/multi_agent_engineering.py |
+| VOL-101 | VS-005 Self-Improvement | verified | BOT-02 (triage) | skeleton/learning/promotion_control.py |
+| VOL-102 | VS-006 Distributed Execution | verified | BOT-02 (triage) | skeleton/reliability/distributed_execution.py |
+| VOL-103 | VS-007 Desktop Product | verified | BOT-02 (triage) | skeleton/app/installer.py |
+| VOL-104 | Acceptance: Functional AI | verified | BOT-02 (triage) | skeleton/eval/functional_acceptance.py |
+| VOL-105 | Acceptance: Autonomous AI Worker | verified | BOT-04 | skeleton/eval/autonomy_acceptance.py |
+| VOL-106 | Acceptance: Research System | verified | BOT-10 | skeleton/eval/research_acceptance.py |
+| VOL-107 | Acceptance: SOTA Candidate | verified | BOT-02 (triage) | skeleton/eval/sota_qualification.py |
+| VOL-108 | Anti-Patterns | verified | BOT-02 (triage) | skeleton/eval/antipatterns.py |
+| VOL-109 | Build Order | verified | BOT-02 (triage) | skeleton/automation/build_order.py |
+| VOL-110 | Definition of Done | verified | BOT-02 (triage) | skeleton/contracts/definition_of_done.py |
+| VOL-111 | Full Construction Manual Format | verified | BOT-02 (triage) | skeleton/automation/construction_packet.py |
+| VOL-112 | Master Traceability Matrix | verified | BOT-02 (triage) | skeleton/contracts/traceability.py |
+| VOL-113 | Capability Map | verified | BOT-02 (triage) | skeleton/ai/capability_map.py |
+| VOL-114 | Technology Radar | verified | BOT-02 (triage) | skeleton/contracts/technology_radar.py |
+| VOL-115 | Technical Debt Ledger | verified | BOT-02 (triage) | skeleton/contracts/technical_debt.py |
+| VOL-116 | Architecture Fitness Functions | verified | BOT-02 | skeleton/contracts/architecture_fitness.py |
+| VOL-117 | Project Metrics | verified | BOT-02 (triage) | skeleton/contracts/project_metrics.py |
+| VOL-118 | Roadmap Control | verified | BOT-02 (triage) | skeleton/contracts/roadmap_control.py |
+| VOL-119 | Completion Model | verified | BOT-03 | skeleton/automation/completion_model.py |
+| VOL-120 | Final Assembly Test | verified | BOT-02 (triage) | skeleton/app/final_assembly.py |
+| VOL-121 | Master Appendices | verified | BOT-02 (triage) | skeleton/automation/master_appendices.py |
+| VOL-122 | Requirements Engineering | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-123 | Non-Functional Requirements | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-124 | Capability Taxonomy | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-125 | Capability Maturity Model | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-126 | Behavior Specifications | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-127 | State Machine Catalogue | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-128 | Interface Design Standard | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-129 | Schema Registry | verified | BOT-02 | machine |
+| VOL-130 | Compatibility Model | verified | BOT-03 | machine |
+| VOL-131 | Internal Protocols | verified | BOT-02 (triage) | skeleton/ai |
+| VOL-132 | Consistency Model | verified | BOT-02 | machine/state_topology.json |
+| VOL-133 | Distributed Transaction Strategy | verified | BOT-02 | skeleton/storage/cas/__init__.py |
+| VOL-134 | Outbox / Inbox Patterns | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-135 | Cache Architecture | verified | BOT-02 | skeleton/storage/cas/__init__.py |
+| VOL-136 | Content Addressing | verified | BOT-02 (triage) | skeleton/storage/cas/__init__.py |
+| VOL-137 | Data Ingestion Engine | verified | BOT-02 (triage) | skeleton/data/ingestion.py |
+| VOL-138 | Document Intelligence | verified | BOT-02 (triage) | skeleton/data/document_intelligence.py |
+| VOL-139 | Data Lineage | verified | BOT-02 | skeleton/data/lineage_governance.py |
+| VOL-140 | Data Quality Engine | verified | BOT-12 | skeleton/data/quality.py |
+| VOL-141 | Dataset Registry | verified | BOT-02 (triage) | skeleton/data/dataset_registry.py |
+| VOL-142 | Synthetic Data Factory | verified | BOT-02 (triage) | skeleton/data/synthetic.py |
+| VOL-143 | Training Control Plane | verified | BOT-03 | skeleton/training/control_plane.py |
+| VOL-144 | Distributed Training | verified | BOT-03 | skeleton/training/distributed.py |
+| VOL-145 | Training Checkpointing | verified | BOT-03 | skeleton/training/checkpointing.py |
+| VOL-146 | Elastic Training Recovery | verified | BOT-03 | skeleton/training/elastic_recovery.py |
+| VOL-147 | Training Observability | verified | BOT-03 | skeleton/training/observability.py |
+| VOL-148 | Training Evaluation Gates | verified | BOT-03 | skeleton/training/eval_gates.py |
+| VOL-149 | Post-Training Lab | verified | BOT-03 | skeleton/training/post_training.py |
+| VOL-150 | Reinforcement Learning Environments | verified | BOT-02 (triage) | skeleton/training/rl_environment.py |
+| VOL-151 | Curriculum Engine | verified | BOT-02 (triage) | skeleton/training/curriculum.py |
+| VOL-152 | Verifier Model Program | verified | BOT-03 | skeleton/training/verifier_models.py |
+| VOL-153 | Multimodal Ingestion Core | verified | BOT-02 (triage) | skeleton/artifacts/__init__.py |
+| VOL-154 | Vision Pipeline | verified | BOT-02 (triage) | skeleton/vision/pipeline.py |
+| VOL-155 | Document Vision | verified | BOT-02 (triage) | skeleton/document_vision/fusion.py |
+| VOL-156 | Audio Pipeline | verified | BOT-08 | skeleton/audio/pipeline.py |
+| VOL-157 | Live Speech Runtime | verified | BOT-02 (triage) | skeleton/speech/runtime.py |
+| VOL-158 | Video Pipeline | verified | BOT-08 | skeleton/video/pipeline.py |
+| VOL-159 | Multimodal Retrieval | verified | BOT-02 (triage) | skeleton/ai/runtime/extensions/multimodal.py |
+| VOL-160 | Tool SDK | verified | BOT-02 (triage) | skeleton/ai/runtime/extensions/ecosystem.py |
+| VOL-161 | Connector Framework | verified | BOT-02 (triage) | skeleton/connectors/framework.py |
+| VOL-162 | Plugin Ecosystem | verified | BOT-05 | skeleton/plugins/lifecycle.py |
+| VOL-163 | Tool Marketplace Security | verified | BOT-11 | skeleton/ai/runtime/extensions/ecosystem.py |
+| VOL-164 | Sandbox Runtime | verified | BOT-02 (triage) | skeleton/skills/privileged_transaction.py |
+| VOL-165 | Policy Language | verified | BOT-02 (triage) | skeleton/skills/privileged_transaction.py |
+| VOL-166 | Policy Simulation | implemented | BOT-02 (triage) | skeleton/security/policy_simulation.py |
+| VOL-167 | Threat Model | implemented | BOT-03 | skeleton/security/threat_model.py |
+| VOL-168 | AI-Specific Threats | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-169 | Security Boundaries | implemented | BOT-12 | skeleton/security/boundaries.py |
+| VOL-170 | Zero-Trust Internal Model | verified | BOT-03 | skeleton/agents/blast_radius.py |
+| VOL-171 | Network Architecture | verified | BOT-02 | skeleton/network/architecture.py |
+| VOL-172 | Egress Control | implemented | BOT-02 (triage) | skeleton/security/egress_control.py |
+| VOL-173 | Secret Security | implemented | BOT-12 | skeleton/security/secret_handles.py |
+| VOL-174 | Key Management | implemented | BOT-02 (triage) | skeleton/security/key_management.py |
+| VOL-175 | Tenant Isolation | implemented | BOT-02 | skeleton/security/tenant_isolation.py |
+| VOL-176 | Privacy Engine | implemented | BOT-02 (triage) | skeleton/security/privacy_engine.py |
+| VOL-177 | Data Deletion | implemented | BOT-02 (triage) | skeleton/security/data_deletion.py |
+| VOL-178 | Software Bill of Materials | implemented | BOT-08 | skeleton/supply_chain/sbom.py |
+| VOL-179 | Model Bill of Materials | verified | BOT-03 | skeleton/supply_chain/model_bom.py |
+| VOL-180 | Service Level Objectives | verified | BOT-02 (triage) | skeleton/observability/slo.py |
+| VOL-181 | Error Budgets | verified | BOT-02 (triage) | skeleton/observability/error_budget_policy.py |
+| VOL-182 | Observability Cardinality Control | verified | BOT-12 | skeleton/observability/cardinality_control.py |
+| VOL-183 | Trace Model | verified | BOT-03 | skeleton/observability/trace_model.py |
+| VOL-184 | Performance Profiling | verified | BOT-02 (triage) | skeleton/observability/profile_records.py |
+| VOL-185 | Latency Budgeting | verified | BOT-02 (triage) | skeleton/observability/latency_budget.py |
+| VOL-186 | Cost Governor | verified | BOT-02 (triage) | skeleton/observability/cost_governor.py |
+| VOL-187 | Energy / Compute Efficiency | verified | BOT-02 (triage) | skeleton/observability/efficiency_metrics.py |
+| VOL-188 | Chaos Engineering | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-189 | Recovery Drills | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-190 | Release Qualification Matrix | verified | BOT-12 | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-191 | Canary Deployment | verified | BOT-01 | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-192 | Feature Flags | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-193 | Rollback Architecture | verified | BOT-02 | skeleton/ai/runtime/deferred/reliability_release.py |
+| VOL-194 | Developer Experience | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/developer_experience.py |
+| VOL-195 | Local Development | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/local_development.py |
+| VOL-196 | Test Fixture Platform | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/fixture_platform.py |
+| VOL-197 | Simulation Mode | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/simulation_mode.py |
+| VOL-198 | Contract Fuzzing | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/contract_fuzzing.py |
+| VOL-199 | Property-Based Invariant Testing | verified | BOT-12 | skeleton/testing/property_invariants.py |
+| VOL-200 | Formal Verification Candidates | verified | BOT-12 | skeleton/contracts/formal_candidates.py |
+| VOL-201 | Agent Communication Protocol | verified | BOT-04 | skeleton/agents/delegation_qualification.py |
+| VOL-202 | Agent Handoff | verified | BOT-04 | skeleton/agents/delegation_qualification.py |
+| VOL-203 | Agent Performance Evidence | verified | BOT-04 | skeleton/ai/agents/performance_evidence.py |
+| VOL-204 | Agent Economics | verified | BOT-04 | skeleton/ai/agents/economics.py |
+| VOL-205 | Delegation Budgets | verified | BOT-04 | skeleton/agents/delegation_qualification.py |
+| VOL-206 | Consensus & Disagreement | verified | BOT-02 (triage) | skeleton/ai/agents/consensus.py |
+| VOL-207 | Adversarial Reviewer | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-208 | Independent Verifier | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-209 | Artifact Review Workflow | verified | BOT-08 | skeleton/ai/artifact_review.py |
+| VOL-210 | Research Agent Team | verified | BOT-04 | skeleton/volumes/wave4/engine.py |
+| VOL-211 | Literature Watch System | verified | BOT-10 | skeleton/volumes/wave4/engine.py |
+| VOL-212 | Citation Graph Analytics | verified | BOT-10 | skeleton/volumes/wave4/engine.py |
+| VOL-213 | Reproduction Packages | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-214 | Experiment Comparison | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-215 | Statistical Analysis | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-216 | Model Evaluation Harness | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-217 | Agent Evaluation Harness | verified | BOT-04 | skeleton/volumes/wave4/engine.py |
+| VOL-218 | Long-Horizon Benchmarks | verified | BOT-04 | skeleton/volumes/wave4/engine.py |
+| VOL-219 | Contamination Auditor | verified | BOT-12 | skeleton/volumes/wave4/engine.py |
+| VOL-220 | Human Evaluation | verified | BOT-12 | skeleton/volumes/wave4/engine.py |
+| VOL-221 | Model Card System | verified | BOT-03 | skeleton/ai/governance/cards.py |
+| VOL-222 | Dataset Card System | verified | BOT-02 (triage) | skeleton/ai/governance/cards.py |
+| VOL-223 | Tool Card System | verified | BOT-02 (triage) | skeleton/ai/governance/cards.py |
+| VOL-224 | Agent Card System | verified | BOT-04 | skeleton/ai/governance/cards.py |
+| VOL-225 | Component Health Scorecard | verified | BOT-02 (triage) | skeleton/ai/governance/health.py |
+| VOL-226 | Dependency Health | verified | BOT-02 (triage) | skeleton/ai/governance/health.py |
+| VOL-227 | Vendor / Provider Risk | verified | BOT-02 (triage) | skeleton/ai/providers/provider_risk.py |
+| VOL-228 | Provider Failover | verified | BOT-02 (triage) | skeleton/ai/providers/failover.py |
+| VOL-229 | Offline Mode | verified | BOT-02 (triage) | skeleton/ai/providers/offline_mode.py |
+| VOL-230 | Air-Gapped Profile | verified | BOT-02 (triage) | skeleton/security/air_gap.py |
+| VOL-231 | Edge Deployment | verified | BOT-01 | skeleton/ai/runtime/deployment_profiles.py |
+| VOL-232 | Enterprise Deployment | verified | BOT-01 | skeleton/ai/runtime/deployment_profiles.py |
+| VOL-233 | Identity Federation | verified | BOT-02 | skeleton/security/identity_federation.py |
+| VOL-234 | Administration Plane | verified | BOT-02 (triage) | skeleton/ai/governance/administration.py |
+| VOL-235 | Audit UI | verified | BOT-12 | frontend |
+| VOL-236 | Operations Dashboard | verified | BOT-11 | frontend |
+| VOL-237 | Agent Operations Dashboard | verified | BOT-04 | skeleton/ai/agents |
+| VOL-238 | Research Dashboard | verified | BOT-10 | frontend |
+| VOL-239 | Model Operations | verified | BOT-03 | skeleton/ai/providers |
+| VOL-240 | Model Rollback | verified | BOT-03 | skeleton/ai/providers |
+| VOL-241 | Prompt / Instruction Registry | verified | BOT-03 | machine |
+| VOL-242 | Prompt Regression Testing | verified | BOT-03 | skeleton/eval |
+| VOL-243 | Routing Policy Registry | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-244 | Memory Policy Registry | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-245 | Retrieval Policy Registry | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-246 | Knowledge Refresh | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-247 | Temporal Knowledge | verified | BOT-05 | skeleton/ai |
+| VOL-248 | Uncertainty Representation | hardened | BOT-02 (triage) | skeleton/intelligence/strategy_registry.py |
+| VOL-249 | Hypothesis Engine | verified | BOT-02 (triage) | skeleton/ai |
+| VOL-250 | Causal Knowledge | verified | BOT-02 (triage) | skeleton/ai |
+| VOL-251 | Search Strategy Engine | verified | BOT-02 (triage) | skeleton/intelligence/strategy_registry.py |
+| VOL-252 | Value of Information | verified | BOT-02 (triage) | skeleton/intelligence/strategy_registry.py |
+| VOL-253 | Stopping Policies | hardened | BOT-02 (triage) | skeleton/intelligence/strategy_registry.py |
+| VOL-254 | Answer Quality Pipeline | verified | BOT-12 | skeleton/intelligence/output_quality.py |
+| VOL-255 | Artifact Quality Pipeline | verified | BOT-08 | skeleton/intelligence/output_quality.py |
+| VOL-256 | Human-in-the-Loop Gates | verified | BOT-02 (triage) | skeleton/agents/human_control.py |
+| VOL-257 | Reversibility Classification | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-258 | Blast-Radius Model | verified | BOT-03 | skeleton/agents/blast_radius.py |
+| VOL-259 | Changeset Budgeting | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-260 | Migration Engine | verified | BOT-02 (triage) | skeleton/persistence |
+| VOL-261 | Legacy Compatibility | verified | BOT-02 (triage) | skeleton/ai/compat |
+| VOL-262 | Deprecation Process | verified | BOT-02 (triage) | machine |
+| VOL-263 | Architecture Archaeology | verified | BOT-02 | skeleton/ai/build |
+| VOL-264 | Repository Consolidation Engine | verified | BOT-02 (triage) | skeleton/ai/build |
+| VOL-265 | Code Provenance | verified | BOT-02 | skeleton/ai/build |
+| VOL-266 | Duplication Detector | verified | BOT-02 (triage) | skeleton/ai/build |
+| VOL-267 | Module Ownership | verified | BOT-02 (triage) | machine/architecture.json |
+| VOL-268 | CODEOWNERS Generation | verified | BOT-07 | scripts |
+| VOL-269 | Documentation as Code | verified | BOT-02 (triage) | docs |
+| VOL-270 | Diagram as Code | verified | BOT-02 (triage) | docs |
+| VOL-271 | Architecture Snapshots | verified | BOT-02 | machine |
+| VOL-272 | Release Reproducibility | verified | BOT-12 | release |
+| VOL-273 | Build Hermeticity | verified | BOT-02 (triage) | scripts |
+| VOL-274 | Build Cache | verified | BOT-02 (triage) | .github/workflows |
+| VOL-275 | Binary Provenance | verified | BOT-02 | release |
+| VOL-276 | Installer Security | verified | BOT-01 | installer |
+| VOL-277 | Update Security | verified | BOT-12 | updater |
+| VOL-278 | Bootstrap Recovery | verified | BOT-02 (triage) | repair |
+| VOL-279 | Crash Diagnostics | verified | BOT-02 (triage) | skeleton/observability |
+| VOL-280 | Support Bundle | verified | BOT-02 (triage) | repair |
+| VOL-281 | Doctor Command | verified | BOT-02 (triage) | scripts |
+| VOL-282 | Self-Diagnosis | verified | BOT-02 (triage) | skeleton/observability |
+| VOL-283 | Safe Repair | verified | BOT-02 (triage) | repair |
+| VOL-284 | System Digital Twin | verified | BOT-02 (triage) | skeleton/simulation |
+| VOL-285 | Deployment Planner | verified | BOT-01 | deploy |
+| VOL-286 | Resource Scheduler | verified | BOT-02 (triage) | skeleton/runtime |
+| VOL-287 | Fairness / Starvation Control | verified | BOT-02 (triage) | skeleton/runtime |
+| VOL-288 | Backpressure | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-289 | Load Shedding | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-290 | Queue Congestion Control | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-291 | Retry Budgets | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-292 | Circuit Breaker Standard | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-293 | Bulkhead Architecture | verified | BOT-02 | skeleton/reliability |
+| VOL-294 | Dead-Letter Workflow | verified | BOT-02 (triage) | skeleton/reliability |
+| VOL-295 | Operation Replay | verified | BOT-02 (triage) | skeleton/frontier |
+| VOL-296 | Determinism Envelope | verified | BOT-02 (triage) | machine |
+| VOL-297 | Time Architecture | verified | BOT-02 | skeleton/foundation |
+| VOL-298 | Identifier Standard | verified | BOT-02 (triage) | skeleton/foundation |
+| VOL-299 | Logical Clocks / Event Ordering | verified | BOT-02 (triage) | skeleton/foundation |
+| VOL-300 | Final Master Control Plane | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-301 | System Objective Model | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-302 | Objective Normalization | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-303 | Constraint Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-304 | Decision Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-305 | Decision Record Graph | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-306 | Workflow Intermediate Representation | verified | BOT-08 | skeleton/volumes/wave4/engine.py |
+| VOL-307 | Workflow DSL | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-308 | Workflow Compiler | verified | BOT-09 | skeleton/volumes/wave4/engine.py |
+| VOL-309 | Workflow Versioning | verified | BOT-02 | skeleton/volumes/wave4/engine.py |
+| VOL-310 | Workflow Migration | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-311 | Semantic Task Types | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-312 | Task Complexity Estimator | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-313 | Task Decomposition Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-314 | Critical Path Analysis | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-315 | Scheduling Algorithms | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-316 | Scheduling Simulator | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-317 | Control Theory for Autonomy | verified | BOT-04 | skeleton/volumes/wave4/engine.py |
+| VOL-318 | Autonomy Levels | verified | BOT-04 | skeleton/agents/autonomy_control.py |
+| VOL-319 | Autonomy Escalation | verified | BOT-04 | skeleton/volumes/wave4/engine.py |
+| VOL-320 | Autonomy De-Escalation | verified | BOT-04 | skeleton/agents/autonomy_control.py |
+| VOL-321 | Human Override Plane | verified | BOT-02 (triage) | skeleton/agents/human_control.py |
+| VOL-322 | Interrupt Handling | verified | BOT-02 (triage) | skeleton/agents/human_control.py |
+| VOL-323 | Goal Drift Detector | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-324 | Specification Gaming Tests | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-325 | Alignment Between Plan and Execution | verified | BOT-02 (triage) | skeleton/agents/blast_radius.py |
+| VOL-326 | Human Factors | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-327 | Approval Fatigue Control | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-328 | Trust Calibration | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-329 | User Intent Continuity | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-330 | Project Memory | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-331 | Workspace Model | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-332 | Resource Namespace | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-333 | Resource Resolution Service | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-334 | Artifact Dependency Graph | verified | BOT-08 | skeleton/volumes/wave4/engine.py |
+| VOL-335 | Artifact Rebuild Engine | verified | BOT-08 | skeleton/volumes/wave4/engine.py |
+| VOL-336 | Impact Analysis Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-337 | Change Risk Estimator | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-338 | Safe Change Planner | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-339 | System Compiler Concept | verified | BOT-09 | skeleton/volumes/wave4/engine.py |
+| VOL-340 | Code Generation from Contracts | verified | BOT-07 | skeleton/volumes/wave4/engine.py |
+| VOL-341 | API Client SDK Generator | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-342 | Internal SDK | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-343 | Provider SDK | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-344 | Storage SDK | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-345 | Event SDK | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-346 | Evaluation SDK | verified | BOT-12 | skeleton/volumes/wave4/engine.py |
+| VOL-347 | Benchmark Plugin System | verified | BOT-12 | skeleton/volumes/wave4/engine.py |
+| VOL-348 | Data Contracts | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-349 | Data Service SLOs | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-350 | Embedding Lifecycle | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-351 | Vector Index Migration | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-352 | Search Index Lifecycle | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-353 | Retrieval Freshness Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-354 | Source Trust Model | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-355 | Source Diversity Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-356 | Claim Deduplication | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-357 | Claim Scope | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-358 | Claim Expiration | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-359 | Knowledge Reconciliation | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-360 | Knowledge Snapshots | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-361 | Memory Garbage Collection | verified | BOT-02 (triage) | skeleton/memory/reconciliation.py |
+| VOL-362 | Memory Quality Evaluation | verified | BOT-12 | skeleton/memory/reconciliation.py |
+| VOL-363 | Memory Interference Testing | verified | BOT-12 | skeleton/intelligence/memory_retrieval_quality.py |
+| VOL-364 | Memory Versioning | verified | BOT-02 | skeleton/contracts/memory_record.py |
+| VOL-365 | Memory Reconciliation | verified | BOT-02 (triage) | skeleton/memory/reconciliation.py |
+| VOL-366 | Cognitive Strategy Registry | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-367 | Strategy Selection | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-368 | Reasoning Cost Accounting | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-369 | Reasoning Regression Tests | verified | BOT-03 | skeleton/intelligence/output_quality.py |
+| VOL-370 | Plan Verifier | verified | BOT-02 (triage) | skeleton/intelligence/plan_verifier.py |
+| VOL-371 | Plan Static Analyzer | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-372 | Plan Simulation | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-373 | Tool Composition Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-374 | Tool Dependency Graph | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-375 | Tool Health | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-376 | Tool Capability Discovery | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-377 | Tool Result Trust | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-378 | Side-Effect Ledger | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-379 | Compensation Engine | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-380 | Saga Workflows | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-381 | Distributed Inference Control Plane | verified | BOT-03 | skeleton/network/model_placement.py |
+| VOL-382 | Model Placement | verified | BOT-03 | skeleton/network/model_placement.py |
+| VOL-383 | GPU Memory Manager | verified | BOT-01 | skeleton/volumes/wave4/engine.py |
+| VOL-384 | Model Eviction | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-385 | Model Warming | verified | BOT-03 | skeleton/network/model_placement.py |
+| VOL-386 | Continuous Batching Scheduler | verified | BOT-02 (triage) | skeleton/mesh/batching_autoscaling.py |
+| VOL-387 | KV Cache Service | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-388 | Prefix Cache | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-389 | Speculative Inference | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-390 | Inference Autoscaling | verified | BOT-03 | skeleton/mesh/batching_autoscaling.py |
+| VOL-391 | Inference Load Testing | verified | BOT-03 | skeleton/mesh/capacity_qualification.py |
+| VOL-392 | Hardware Topology Model | verified | BOT-01 | skeleton/network/model_placement.py |
+| VOL-393 | NUMA Awareness | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-394 | GPU Interconnect Awareness | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-395 | Storage Tiering | verified | BOT-03 | skeleton/volumes/wave4/engine.py |
+| VOL-396 | Data Locality | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-397 | Network Topology Awareness | verified | BOT-02 (triage) | skeleton/network/model_placement.py |
+| VOL-398 | Remote Execution Protocol | verified | BOT-02 (triage) | skeleton/network/remote_execution.py |
+| VOL-399 | Worker Attestation | verified | BOT-02 (triage) | skeleton/network/remote_execution.py |
+| VOL-400 | Build Farm | verified | BOT-02 (triage) | skeleton/volumes/wave4/engine.py |
+| VOL-401 | Evaluation Farm | verified | BOT-12 | skeleton/volumes/wave4/engine.py |
+| VOL-402 | Research Compute Queue | verified | BOT-10 | skeleton/volumes/wave4/engine.py |
+| VOL-403 | Compute Quotas | verified | BOT-02 (triage) | skeleton/observability/budget_accounting.py |
+| VOL-404 | Budget Accounting Ledger | verified | BOT-11 | skeleton/observability/budget_accounting.py |
+| VOL-405 | Forecasting Engine | verified | BOT-02 (triage) | skeleton/observability/forecasting.py |
+| VOL-406 | Cost Anomaly Detection | verified | BOT-02 (triage) | skeleton/observability/forecasting.py |
+| VOL-407 | License Intelligence | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-408 | Data Usage Rights | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-409 | Attribution Engine | verified | BOT-02 (triage) | skeleton/release/attribution.py |
+| VOL-410 | Research Ethics Review | verified | BOT-10 | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-411 | Model Lifecycle Governance | verified | BOT-02 | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-412 | Model Deprecation | verified | BOT-03 | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-413 | Provider Migration | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-414 | Shadow Traffic | verified | BOT-02 (triage) | skeleton/eval/shadow_traffic.py |
+| VOL-415 | Champion / Challenger Registry | verified | BOT-02 (triage) | skeleton/eval/champion_registry.py |
+| VOL-416 | Experimental Feature Sandbox | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-417 | Research Branching Model | verified | BOT-03 | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-418 | Technique Retirement | verified | BOT-02 (triage) | skeleton/ai/runtime/deferred/lifecycle_governance.py |
+| VOL-419 | Knowledge of Failure | verified | BOT-02 (triage) | skeleton/eval/failure_knowledge.py |
+| VOL-420 | Architecture Scope Freeze | verified | BOT-02 | machine/ai_master_plan.json |
+
+## 32.1 Candidate review load and owner verification
+
+Suggested review row counts: BOT-01: 13; BOT-02: 278; BOT-03: 46; BOT-04: 23; BOT-05: 3; BOT-07: 2; BOT-08: 9; BOT-09: 2; BOT-10: 7; BOT-11: 8; BOT-12: 30. Ambiguous title rows requiring actual owner review: 245. These load counts are **not** engineering completion counts, estimated labor or authority transfers. Because the entire corpus is title-indexed, review lanes will be unbalanced and must be redistributed by true dependency graph and physical capacity. Where a volume lists source files under another bot's code family, the declared machine owner wins over the suggestion. Bot 12 owns independent acceptance for all lanes even when assigned a volume's initial review. A task whose original evidence and implementation remain valid may be closed as “no new work”; a task requiring device, rights, game or operational proof must be linked to its actual acceptance dossier instead of reopened for cosmetic code churn.
+
+### Required per-volume reconciliation checklist
+
+For each VOL-xxx, load exact original title and scope, target/actual maturity, key requirements, declared implementation_paths, current source object hashes, tests, implementation signoff, independent verification and enterprise-grade target. Classify any already verified behavior as retained; cross-reference BOT work orders and actual user journeys; identify only material unimplemented/untested end-user functionality. Preserve canonical architecture and the breadth freeze, avoid reimplementing already valid modules, and make real tests executable when claiming acceptance. Record reason and minimum proof for every requalification or reopening. Prior named evidence that is attached to an ancestor SHA cannot be silently reused as final-head evidence for changed behavior.
+
+
+# 33. Existing 42-task P0 source queue reconciliation
+
+The canonical P0 source queue already has **42 explicit task records** with IDs, gaps, stages, parallel lanes, objectives and status. At the reviewed main source snapshot, all 42 list status **done**. These “done” statuses are material historical construction metadata; the Grokbot-first specification must not restart them as though nothing had been built. Their source closure does not establish full present-day consumer installation or a complete playable studio, especially after later candidate branches touch relevant implementation. The proper next step is **regression/requalification** at the active integration head when relevant, plus implementation of genuinely new game-production functionality under existing canonical owners.
+
+| Existing task ID | Stage | Source gap | Source status | Short original construction objective |
+|---|---|---|---|---|
+| AIQ-S0-STATE-01 | 0 | gap-state-authority-convergence | done | Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories. |
+| AIQ-S0-STATE-02 | 0 | gap-state-authority-convergence | done | Bind production orchestration to the durable OperationEnvelope repository and run the transactional outbox dispatcher. |
+| AIQ-S0-STATE-03 | 0 | gap-state-authority-convergence | done | Prove authoritative restore first and derived index/cache rebuild second. |
+| AIQ-S0-GOV-01 | 0 | gap-governance-registry | done | Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry. |
+| AIQ-S0-GOV-02 | 0 | gap-governance-registry | done | Wire delete/export/retention decisions through real durable-store and projection adapters. |
+| AIQ-S0-GOV-03 | 0 | gap-governance-registry | done | Bind governance receipts and lifecycle actions into canonical observability/audit timelines. |
+| AIQ-S0-COST-01 | 0 | gap-cost-admission | done | Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption. |
+| AIQ-S0-COST-02 | 0 | gap-cost-admission | done | Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget. |
+| AIQ-S0-COST-03 | 0 | gap-cost-admission | done | Add shared cross-process pressure/concurrency coordination and overload shedding. |
+| AIQ-S0-PROV-01 | 0 | gap-provider-surface-convergence | done | Run provider-surface discovery and classify every credential/network model edge. |
+| AIQ-S0-PROV-02 | 0 | gap-provider-surface-convergence | done | Migrate or retire any residual shadow provider SDK/network/credential path while preserving compatibility APIs. |
+| AIQ-S0-PROV-03 | 0 | gap-provider-surface-convergence | done | Produce current-head CI evidence that only declared source-level provider surfaces remain. |
+| AIQ-S1-CONV-01 | 1 | gap-conversation-state-authority | done | Finish canonical thread/message ingress by replacing raw conversation_history authority with thread_id + idempotent new-message append. |
+| AIQ-S1-CONV-02 | 1 | gap-conversation-state-authority | done | Bind assistant messages to canonical operation/execution results and edit/regenerate branch lineage. |
+| AIQ-S1-CONV-03 | 1 | gap-conversation-state-authority | done | Make frontend transcript state rebuildable from server authority and wire delete/export/retention. |
+| AIQ-S1-MEM-01 | 1 | gap-memory-durable-authority | done | Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary. |
+| AIQ-S1-MEM-02 | 1 | gap-memory-durable-authority | done | Implement governed staged memory writeback, dedupe/version conflict handling and provenance policy. |
+| AIQ-S1-MEM-03 | 1 | gap-memory-durable-authority | done | Convert vector/MAG/CAG/process stores to derived projections and prove delete/export/rebuild/degraded behavior. |
+| AIQ-S1-TOOL-01 | 1 | gap-tool-runtime-convergence | done | Freeze ToolManifest, ToolExecutionRequest and ToolExecutionReceipt contracts and canonical registry/runtime. |
+| AIQ-S1-TOOL-02 | 1 | gap-tool-runtime-convergence | done | Adapt database/network/code/build/artifact tools behind scoped repository, egress and sandbox adapters. |
+| AIQ-S1-TOOL-03 | 1 | gap-tool-runtime-convergence | done | Add approval/idempotency reservation, compensation/postconditions and make backend flat registry delegate-only. |
+| AIQ-S2-CTX-01 | 2 | gap-context-compiler-convergence | done | Complete ContextCompiler source adapters for memory, artifacts, tools and skills with deterministic budget/trust selection. |
+| AIQ-S2-CTX-02 | 2 | gap-context-compiler-convergence | done | Converge legacy route/service system prompts onto versioned instruction-policy identities. |
+| AIQ-S2-CTX-03 | 2 | gap-context-compiler-convergence | done | Bind immutable context snapshot/digest to AgentTurn/ProviderRequest and migrate remaining direct feature prompt/history assembly. |
+| AIQ-S2-PROTO-01 | 2 | gap-provider-interaction-protocol | done | Materialize provider-neutral tool definition/call, structured output, usage, finish-reason and delta contracts. |
+| AIQ-S2-PROTO-02 | 2 | gap-provider-interaction-protocol | done | Extend provider_runtime request/response translation and normalize tool calls, usage, finish reasons, deadline/cancellation. |
+| AIQ-S2-PROTO-03 | 2 | gap-provider-interaction-protocol | done | Add optional normalized provider streaming deltas without making provider stream the durable operation stream. |
+| AIQ-S3-VER-01 | 3 | gap-verification-evidence-contract | done | Materialize verification/claim/evidence/postcondition contracts and risk-to-level policy. |
+| AIQ-S3-VER-02 | 3 | gap-verification-evidence-contract | done | Implement deterministic claim grounding, citation integrity and tool postcondition adapters. |
+| AIQ-S3-VER-03 | 3 | gap-verification-evidence-contract | done | Add bounded canonical-provider semantic verifier and repair/qualified/abstain/block finalization semantics. |
+| AIQ-S4-EXEC-01 | 4 | gap-cognitive-execution-loop | done | Materialize AIExecution/AgentTurn/Checkpoint/Result contracts and durable repository interfaces. |
+| AIQ-S4-EXEC-02 | 4 | gap-cognitive-execution-loop | done | Implement the bounded model->tool->model execution loop with wait/resume/cancel/budget/deadline semantics. |
+| AIQ-S4-EXEC-03 | 4 | gap-cognitive-execution-loop | done | Implement crash recovery and atomic/transactional-outbox finalization binding verification, usage, memory, artifacts and terminal stream state. |
+| AIQ-S5-ENG-01 | 5 | gap-engine-application-execution-boundary | done | Implement authenticated engine submit/status/cancel/events endpoints and delegated authority validation. |
+| AIQ-S5-ENG-02 | 5 | gap-engine-application-execution-boundary | done | Implement backend engine client, idempotent retry/query and route canonical conversation AI execution through it. |
+| AIQ-S5-ENG-03 | 5 | gap-engine-application-execution-boundary | done | Move runtime provider credentials to the Skeleton engine process and retire local backend provider execution after parity. |
+| AIQ-S6-STREAM-01 | 6 | gap-streaming-protocol | done | Implement frontend operation reducer with event-id dedupe, sequence checks, provisional content and terminal reconciliation. |
+| AIQ-S6-STREAM-02 | 6 | gap-streaming-protocol | done | Persist reconnect cursor and implement replay-gap authoritative resync plus multi-client compaction semantics. |
+| AIQ-S6-STREAM-03 | 6 | gap-streaming-protocol | done | Prove slow-client backpressure, cancel/complete race and browser/API recovery end to end. |
+| AIQ-S7-E2E-01 | 7 | gap-e2e-golden-journeys | done | Build deterministic full-stack provider/tool/retrieval harness without live provider secrets. |
+| AIQ-S7-E2E-02 | 7 | gap-e2e-golden-journeys | done | Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys. |
+| AIQ-S7-E2E-03 | 7 | gap-e2e-golden-journeys | done | Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle. |
+
+
+## 33.1 No-duplicate mapping of completed P0 work to new product proof
+
+- **Stage 0** already records source authority, governance, quota/cost admission and provider surface convergence. New first-install work must be a real integration/cutover/physical-device qualification, not a second database authority, third provider runtime or duplicate quota ledger.
+- **Stage 1** records canonical conversation and memory state plus tool runtime. New creative assistant behavior should consume those operations and granted tool manifests, not a disconnected LLM agent that silently writes files.
+- **Stage 2** records context compilation and provider interaction. Improve source-grounded game-edit quality and actual model output only through the protected context, tokenizer and receipt interfaces; keep untrusted crawler text inert.
+- **Stage 3** records the verification/evidence contract. Game playtest proof can extend the verified type and postcondition coverage but must not invent an independent release certifier with overlapping authority.
+- **Stage 4** records cognitive execution and durable recovery. Long-running creative campaigns should attach to existing execution checkpoints and idempotency rather than starting unaudited background loops.
+- **Stage 5** records engine-to-app boundary and provider credential custody. Local GGUF and game editor integrations must use that bridge and the current trusted guard, with explicit operation identity.
+- **Stage 6** records stream sequencing and reconnection. User-facing progress for game builds and AI work should use real stream/recovery state, not optimistic UI state.
+- **Stage 7** records source-level golden journeys. Expand into real gameplay, physical device installation, export and operator acceptance without counting already completed source fixture tests twice.
+
+## 33.2 Distinguishing verified construction from a complete game studio
+
+A credible completionist plan asks three separate questions of each volume/task: **(1) Has its canonical source behavior been correctly implemented? (2) Is it integrated into a real user journey at the current exact source head? (3) Is that journey independently certified on an actual supported target?** Source registry status can support question 1; it cannot answer 2 or 3 alone. The actual critical path still includes guarded local inference, reliable first install, native Godot controller-driven gameplay, real media, editing, save/restore and source/provenance-safe release.
+
+This crosswalk is a routing layer and a denominator for review coverage, not an instruction to spawn 421 bots, create 421 new service owners, spend on 421 model training campaigns or duplicate 421 implementation dossiers. The 12-bot federation should work by owner, dependency and user effect, with every canonical plan item either linked to an observed current runtime proof or an explicitly scoped discrepancy and no hidden assumed success.
