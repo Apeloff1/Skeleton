@@ -10,6 +10,7 @@ from .hive import HiveMind, HiveResult, AggregationError
 from .blackboard import Blackboard, BlackboardEntry
 from .handoff import HandoffError, HandoffRegistry, TaskEnvelope, TaskState
 from .mesh_boundary import mesh_boundary
+from .mesh_handoff import MeshHandoffAdapter
 
 __all__ = [
     "AgentRole",
@@ -38,4 +39,5 @@ __all__ = [
     "TaskEnvelope",
     "TaskState",
     "mesh_boundary",
+    "MeshHandoffAdapter",
 ]
