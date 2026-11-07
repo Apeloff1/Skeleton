@@ -97,6 +97,11 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/tsv_documents.py
           python -m py_compile skeleton/ai/webcrawler/technical_documents.py
           python -m py_compile skeleton/ai/webcrawler/html_landmarks.py
+          python -m py_compile skeleton/ai/webcrawler/binary_media_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/zip_inventory.py
+          python -m py_compile skeleton/ai/webcrawler/obj_documents.py
+          python -m py_compile skeleton/ai/webcrawler/gltf_documents.py
+          python -m py_compile skeleton/ai/webcrawler/asset_formats.py
           python -m py_compile skeleton/ai/webcrawler/timed_media.py
           python -m py_compile skeleton/ai/webcrawler/calendar_documents.py
           python -m py_compile skeleton/ai/webcrawler/bibliography_documents.py
@@ -181,6 +186,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_intelligence.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_technical_ingestion.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_rss1_landmarks.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_multimodal_assets.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_http_coding.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_feed_pagination.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_documents.py' -v

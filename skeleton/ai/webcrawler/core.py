@@ -26,7 +26,7 @@ from urllib.robotparser import RobotFileParser
 from .document_formats import (
     ADDITIONAL_TYPES, RESEARCH_ARTIFACT_TYPES,
     HAR_MEDIA_TYPES, PATCH_MEDIA_TYPES, CSL_MEDIA_TYPES,
-    TECHNICAL_MEDIA_TYPES,
+    TECHNICAL_MEDIA_TYPES, ASSET_TEXT_MEDIA_TYPES,
     DocumentFormatError, extract_additional_format,
 )
 from .archive_documents import ARCHIVE_TYPES, extract_archive_document
@@ -37,6 +37,8 @@ from .pdf_documents import PDF_MEDIA_TYPE, extract_pdf_document
 from .discovery_relations import navigational_relation
 from .warc_catalog import WARC_MEDIA_TYPES, extract_warc_catalog
 from .research_projection import ResearchFormatError
+from .binary_media_metadata import BINARY_MEDIA_TYPES, extract_binary_media_metadata
+from .zip_inventory import ZIP_INVENTORY_TYPES, extract_zip_inventory
 
 _TRACKING_PREFIXES = ("utm_",)
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
@@ -177,6 +179,18 @@ class CrawlPolicy:
         "application/vnd.oai.openapi+json",
         "application/schema+json",
         "application/vnd.schema+json",
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/vnd.wave",
+        "model/obj",
+        "text/x-obj",
+        "model/gltf+json",
+        "application/x-gltf+json",
+        "application/zip",
+        "application/x-zip-compressed",
         "text/tab-separated-values",
         "application/tsv",
         "application/toml",
@@ -390,6 +404,20 @@ def extract_document(
     max_text_chars: int = 1_000_000, link_base_url: str | None = None,
 ) -> CrawlDocument | None:
     ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
+    if ctype in BINARY_MEDIA_TYPES | ZIP_INVENTORY_TYPES:
+        try:
+            row = (
+                extract_binary_media_metadata(
+                    response.body, ctype, max_chars=max_text_chars,
+                ) if ctype in BINARY_MEDIA_TYPES else
+                extract_zip_inventory(response.body, max_chars=max_text_chars)
+            )
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return _archive_document_response(
+            response, canonical_url, ctype, row.text, row.title,
+            [], row.truncated,
+        )
     if ctype in WARC_MEDIA_TYPES:
         try:
             row = extract_warc_catalog(response.body, max_chars=max_text_chars)
@@ -423,7 +451,7 @@ def extract_document(
         charset = match.group(1).strip("\"'")
     if ctype in (RESEARCH_ARTIFACT_TYPES | HAR_MEDIA_TYPES
                  | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES
-                 | TECHNICAL_MEDIA_TYPES):
+                 | TECHNICAL_MEDIA_TYPES | ASSET_TEXT_MEDIA_TYPES):
         # Parser-specific syntax and citations must not be silently altered by
         # replacement decoding or unsupported source charset declarations.
         if charset.casefold().replace("_", "-") not in ("utf-8", "utf8"):

@@ -117,6 +117,11 @@ def implementation_digest():
                 "jsonschema_documents.py",
                 "tsv_documents.py",
                 "technical_documents.py",
+                "binary_media_metadata.py",
+                "zip_inventory.py",
+                "obj_documents.py",
+                "gltf_documents.py",
+                "asset_formats.py",
             )
         }
     )

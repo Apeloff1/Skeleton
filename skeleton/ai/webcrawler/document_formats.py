@@ -22,6 +22,7 @@ from .har_documents import HAR_MEDIA_TYPES, extract_har
 from .patch_documents import PATCH_MEDIA_TYPES, extract_unified_patch
 from .csl_documents import CSL_MEDIA_TYPES, extract_csl
 from .technical_documents import TECHNICAL_MEDIA_TYPES, extract_technical_document
+from .asset_formats import ASSET_TEXT_MEDIA_TYPES, extract_asset_text
 
 
 MARKDOWN_TYPES = frozenset({"text/markdown", "text/x-markdown"})
@@ -45,7 +46,7 @@ SOURCE_CODE_TYPES = frozenset({
 ADDITIONAL_TYPES = (
     MARKDOWN_TYPES | CSV_TYPES | JSON_TYPES | NDJSON_TYPES | SOURCE_CODE_TYPES
     | RESEARCH_ARTIFACT_TYPES | HAR_MEDIA_TYPES | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES
-    | TECHNICAL_MEDIA_TYPES
+    | TECHNICAL_MEDIA_TYPES | ASSET_TEXT_MEDIA_TYPES
 )
 
 _MD_LINK = re.compile(
@@ -340,6 +341,18 @@ def extract_additional_format(
     raw: str, media_type: str, *, max_chars: int,
     max_links: int,
 ) -> ExtractedFormat:
+    if media_type in ASSET_TEXT_MEDIA_TYPES:
+        try:
+            row = extract_asset_text(
+                raw, media_type, max_chars=max_chars, max_links=max_links,
+            )
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return ExtractedFormat(
+            text=row.text, title=row.title, links=(),
+            truncated=row.truncated, body_executed=False,
+            reference_trusted=False,
+        )
     if media_type in TECHNICAL_MEDIA_TYPES:
         try:
             row = extract_technical_document(
