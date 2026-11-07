@@ -39,7 +39,14 @@ def _read_reviewed(root: Path, relative: Path) -> str:
             raise ValueError(f"linked CI evidence path: {relative}")
     if not path.is_file():
         raise ValueError(f"missing CI evidence file: {relative}")
-    return path.read_text(encoding="utf-8")
+    # GitHub workflow/registry evidence is text, never a bulk data payload.
+    # Bound reads even when a hostile checkout changes size after stat().
+    limit = 1024 * 1024
+    with path.open("rb") as stream:
+        payload = stream.read(limit + 1)
+    if len(payload) > limit:
+        raise ValueError(f"oversized CI evidence file: {relative}")
+    return payload.decode("utf-8")
 
 
 def events(source: str) -> set[str]:
