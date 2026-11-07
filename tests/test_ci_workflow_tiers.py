@@ -99,6 +99,27 @@ class WorkflowTierTests(unittest.TestCase):
                 source = ROOT / ".github/workflows-archive" / name
                 (root / ".github/workflows-archive" / name).write_text(source.read_text())
             self.assertEqual(audit(root), [])
+            # A linked archive directory must not redirect every specialist
+            # to unreviewed files, even when their contents look legitimate.
+            archive_dir = root / ".github/workflows-archive"
+            moved_archive = root / "external-archive"
+            archive_dir.rename(moved_archive)
+            try:
+                try:
+                    archive_dir.symlink_to(moved_archive, target_is_directory=True)
+                except (OSError, NotImplementedError):
+                    # Some Windows runners prohibit creating directory links.
+                    pass
+                else:
+                    try:
+                        self.assertTrue(any(
+                            "linked CI evidence path" in problem for problem in audit(root)
+                        ))
+                    finally:
+                        archive_dir.unlink()
+            finally:
+                moved_archive.rename(archive_dir)
+            self.assertEqual(audit(root), [])
             # All reviewed evidence must be ordinary checkout files, including
             # archived gates and the registry (not only active YAML files).
             archive_gate = root / ".github/workflows-archive" / registry["specialized_manual_only"][0]
