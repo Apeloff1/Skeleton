@@ -47,6 +47,10 @@ def validate_source_only_handoff(evidence: Mapping[str, object]) -> None:
     """
     if type(evidence) is not dict:
         raise FirstRunHandoffContractError("evidence must be a plain mapping")
+    # Bound untrusted receipt complexity before iterating user-supplied fields.
+    # This guard does not establish provenance or release qualification.
+    if len(evidence) > 64 or any(type(key) is not str or len(key) > 96 for key in evidence):
+        raise FirstRunHandoffContractError("unbounded evidence envelope")
     if evidence.get("schema") != SCHEMA or evidence.get("status") != "source_level_first_run_replayed_release_blocked":
         raise FirstRunHandoffContractError("source-only handoff schema or state invalid")
     for name in REQUIRED_FALSE:
@@ -71,7 +75,8 @@ def validate_source_only_handoff(evidence: Mapping[str, object]) -> None:
     if type(action_count) is not int or not 1 <= action_count <= 64:
         raise FirstRunHandoffContractError("invalid bounded replay action count")
     holds = evidence.get("release_holds")
-    if type(holds) is not list or not holds or any(type(h) is not str or not h for h in holds):
+    if (type(holds) is not list or not holds or len(holds) > 32
+            or any(type(h) is not str or not h or len(h) > 128 for h in holds)):
         raise FirstRunHandoffContractError("release holds must be explicit")
     if not MANDATORY_HOLDS.issubset(holds):
         raise FirstRunHandoffContractError("mandatory release hold missing")
@@ -82,8 +87,10 @@ def validate_source_only_handoff(evidence: Mapping[str, object]) -> None:
             or observation.get("posix_nofollow_available") is not True
             or type(observation.get("operating_system")) is not str
             or not observation["operating_system"]
+            or len(observation["operating_system"]) > 64
             or type(observation.get("machine")) is not str
             or not observation["machine"]
+            or len(observation["machine"]) > 64
             or type(observation.get("python")) is not str
             or re.fullmatch(r"\d+\.\d+\.\d+", observation["python"]) is None):
         raise FirstRunHandoffContractError("source custody observation absent")
