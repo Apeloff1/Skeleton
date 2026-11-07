@@ -368,6 +368,11 @@ class MongoGuardedActivation:
                     or tuple(sorted((user["db"], user["user"]) for user in post_users))
                     != auth_identity or _role_custody(post_epoch_auth) != role_identity):
                 raise ActivationBlocked("Mongo principal changed during final epoch read")
+            # The final Mongo authority observations await I/O. Re-check the
+            # independent verdict trust anchor at the last permit boundary:
+            # a mutable reviewer transport must not rotate its verifier while
+            # the epoch and primary are being revalidated.
+            self._verify_reviewer_binding()
             self._verify_backend()
             return final_epoch, (auth_identity, role_identity)
         except ActivationBlocked:
