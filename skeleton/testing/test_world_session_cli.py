@@ -49,6 +49,30 @@ class SessionCliTests(unittest.TestCase):
         self.assertEqual(out, b"")
         self.assertIn("session_too_large", err)
 
+    def test_rejects_text_stream_without_traceback(self):
+        out, err = io.BytesIO(), io.StringIO()
+        code = run(["--root", self.temp.name, "--world-id", "cli_world", "export"],
+                   input_stream=io.StringIO('["pursue_goal"]'),
+                   output_stream=out, error_stream=err)
+        self.assertEqual(code, 2)
+        self.assertEqual(out.getvalue(), b"")
+        self.assertEqual(json.loads(err.getvalue()), {"error": "invalid_session_payload"})
+
+    def test_rejects_nonbytes_stream_result(self):
+        class InvalidStream:
+            def read(self, limit):
+                self.limit = limit
+                return None
+
+        stream = InvalidStream()
+        out, err = io.BytesIO(), io.StringIO()
+        code = run(["--root", self.temp.name, "--world-id", "cli_world", "restore"],
+                   input_stream=stream, output_stream=out, error_stream=err)
+        self.assertEqual(stream.limit, 65537)
+        self.assertEqual(code, 2)
+        self.assertEqual(out.getvalue(), b"")
+        self.assertEqual(json.loads(err.getvalue()), {"error": "invalid_session_payload"})
+
     def test_rejects_unknown_world(self):
         out, err = io.BytesIO(), io.StringIO()
         code = run(["--root", self.temp.name, "--world-id", "unknown", "export"],
