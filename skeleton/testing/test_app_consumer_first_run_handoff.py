@@ -198,6 +198,30 @@ class FirstRunHandoffTests(unittest.TestCase):
                 with self.assertRaises(FirstRunHandoffContractError):
                     validate_source_only_handoff(evidence)
 
+    def test_unknown_top_level_fields_cannot_smuggle_qualification(self):
+        for name, value in (
+            ("device_qualified", True),
+            ("installer_signed", True),
+            ("release_ready", True),
+            ("secret", "do-not-persist"),
+            ("future_schema_extension", {}),
+        ):
+            with self.subTest(name=name):
+                evidence = valid_evidence()
+                evidence[name] = value
+                with self.assertRaisesRegex(
+                    FirstRunHandoffContractError, "unknown or missing evidence fields"
+                ):
+                    validate_source_only_handoff(evidence)
+
+    def test_missing_required_fields_rejected_before_consumer_use(self):
+        for name in tuple(valid_evidence()):
+            with self.subTest(name=name):
+                evidence = valid_evidence()
+                del evidence[name]
+                with self.assertRaises(FirstRunHandoffContractError):
+                    validate_source_only_handoff(evidence)
+
     def test_read_only_input(self):
         evidence = valid_evidence()
         original = copy.deepcopy(evidence)
