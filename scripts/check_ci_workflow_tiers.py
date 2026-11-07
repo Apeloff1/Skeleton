@@ -100,6 +100,12 @@ def audit(root: Path = ROOT) -> list[str]:
     automatic = 0
     automatic_files: set[str] = set()
     for path in active:
+        # GitHub checks out symlinks as filesystem links. Never let an
+        # admission audit read a workflow outside its reviewed source tree.
+        # A linked workflow is also not a stable, independently reviewed gate.
+        if path.is_symlink():
+            failures.append(f"{path.name}: active workflow must not be a symlink")
+            continue
         try:
             found = events(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, ValueError) as exc:
