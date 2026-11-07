@@ -198,6 +198,30 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             await gate.activate()
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
 
+    async def test_reviewer_anchor_rotation_during_final_mongo_observation_denies(self):
+        # The final Mongo status command is an await boundary after the
+        # reviewer challenge. Even with an unchanged primary and epoch, a
+        # transport trust-anchor swap must not yield an activation permit.
+        original_command = self.database.command
+        status_reads = 0
+
+        async def rotate_on_final_status(command):
+            nonlocal status_reads
+            result = await original_command(command)
+            if command == "connectionStatus":
+                status_reads += 1
+                if status_reads == 3:
+                    self.reviewer._anchor = object()
+            return result
+
+        self.database.command = rotate_on_final_status
+        gate = self.make()
+        with self.assertRaisesRegex(ActivationBlocked, "trust anchor changed"):
+            await gate.activate()
+        self.assertEqual(status_reads, 3)
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+        self.assertIsNone(gate._epoch_at_activation)
+
     async def test_activation_and_rechecks(self):
         gate = self.make()
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
