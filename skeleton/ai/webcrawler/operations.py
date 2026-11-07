@@ -33,6 +33,7 @@ from .structured_discovery import (
     extract_robots_sitemaps,
 )
 from .frontier_scheduler import choose_frontier
+from .host_backpressure import origin_throttle
 from .link_header_discovery import parse_link_headers
 from .document_formats import DocumentFormatError
 from .http import SafeHttpFetcher
@@ -85,6 +86,7 @@ def implementation_digest():
                 "link_header_discovery.py",
                 "content_coding.py",
                 "archive_documents.py",
+                "host_backpressure.py",
             )
         }
     )
@@ -846,6 +848,18 @@ class CrawlRun:
             retry_after = CrawlEngine._retry_after(response.headers, now=now)
             if retry_after is not None and not math.isfinite(retry_after):
                 retry_after = None
+            # 429 and 503 constrain the *origin*, not just this item.
+            # A sibling cannot bypass the server's Retry-After quota signal.
+            throttle = origin_throttle(
+                response.status, response.headers,
+                now=now, attempts=item["attempts"],
+            )
+            if throttle.applies:
+                state["host_ready"][host] = max(
+                    state["host_ready"].get(host, 0),
+                    throttle.origin_ready_at,
+                )
+                retry_after = max(retry_after or 0.0, throttle.retry_seconds)
             retained = self._retry(item, now, retry_after=retry_after)
             return self._event(
                 "retry",
