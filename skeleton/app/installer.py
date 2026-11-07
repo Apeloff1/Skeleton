@@ -293,6 +293,17 @@ def install_application(
             )
             try:
                 recovery_command = compose_command("up", manifest=diagnostic_manifest, hot=hot)
+                # Compose overlays can introduce dependencies even when the
+                # canonical manifest has none. Recovery must never restart
+                # the protected backend or inference stack.
+                if not recovery_command or recovery_command[-1] != "frontend":
+                    raise ValueError("diagnostic recovery must target only frontend")
+                up_index = recovery_command.index("up")
+                recovery_command = (
+                    *recovery_command[:up_index + 1],
+                    "--no-deps",
+                    *recovery_command[up_index + 1:],
+                )
             except ValueError:
                 # Invalid diagnostic topology must not mask the original
                 # protected-stack failure or escape without a receipt.
