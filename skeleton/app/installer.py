@@ -221,8 +221,25 @@ def install_application(
             )
         )
 
-    manifest = load_manifest()
-    runtime_checks = preflight(root, runtime=True, manifest=manifest)
+    # Manifest and host-contract errors are installation failures, not uncaught
+    # exceptions. Do not interpolate exception messages: paths and configuration
+    # values may contain operator credentials or private host details.
+    try:
+        manifest = load_manifest()
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        phases.append(InstallPhase(
+            "manifest", False,
+            f"application manifest could not be loaded: {type(exc).__name__}",
+        ))
+        return InstallReceipt(root=root, phases=tuple(phases))
+    try:
+        runtime_checks = preflight(root, runtime=True, manifest=manifest)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        phases.append(InstallPhase(
+            "runtime-preflight", False,
+            f"runtime preflight could not complete: {type(exc).__name__}",
+        ))
+        return InstallReceipt(root=root, phases=tuple(phases))
     runtime_ok = checks_ok(runtime_checks)
     failed_codes = [check.code for check in runtime_checks if check.required and not check.ok]
     phases.append(
@@ -238,14 +255,29 @@ def install_application(
     )
     if not runtime_ok:
         return InstallReceipt(root=root, phases=tuple(phases))
-    manifest = runtime_manifest(manifest, root=root)
+    try:
+        manifest = runtime_manifest(manifest, root=root)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        phases.append(InstallPhase(
+            "runtime-manifest", False,
+            f"runtime manifest could not be assembled: {type(exc).__name__}",
+        ))
+        return InstallReceipt(root=root, phases=tuple(phases))
 
     # Validate precisely the configuration used for startup. The production
     # frontend uses port 8080, unlike the default development Compose model.
     mode = "production" if production else "development"
     compose_env = {**os.environ, **manifest.mode_env(mode), "COMPOSE_REMOVE_ORPHANS": "0"}
+    try:
+        config_command = compose_command("config", manifest=manifest, full=full, hot=hot)
+    except (ValueError, KeyError, TypeError) as exc:
+        phases.append(InstallPhase(
+            "compose-config", False,
+            f"compose validation command is invalid: {type(exc).__name__}",
+        ))
+        return InstallReceipt(root=root, phases=tuple(phases))
     compose_validate = _run(
-        compose_command("config", manifest=manifest, full=full, hot=hot),
+        config_command,
         root=root,
         runner=runner,
         label="compose-config",
@@ -259,7 +291,7 @@ def install_application(
     try:
         host_urls = public_service_urls(root, manifest=manifest)
     except ValueError as exc:
-        phases.append(InstallPhase("public-endpoints", False, str(exc)))
+        phases.append(InstallPhase("public-endpoints", False, f"invalid public endpoints: {type(exc).__name__}"))
         return InstallReceipt(root=root, phases=tuple(phases))
 
     try:
@@ -271,7 +303,7 @@ def install_application(
             hot=hot,
         )
     except ValueError as exc:
-        phases.append(InstallPhase("start", False, str(exc)))
+        phases.append(InstallPhase("start", False, f"invalid startup command: {type(exc).__name__}"))
         return InstallReceipt(root=root, phases=tuple(phases))
     try:
         completed = runner(
