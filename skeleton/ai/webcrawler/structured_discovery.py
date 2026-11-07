@@ -23,12 +23,15 @@ XML_MEDIA = frozenset({
     "application/xml", "text/xml", "application/rss+xml",
     "application/atom+xml",
     "application/opml+xml", "text/x-opml",
+    "application/rdf+xml",
 })
 GZIP_MEDIA = frozenset({"application/gzip", "application/x-gzip"})
 JSON_MEDIA = frozenset({"application/feed+json", "application/json"})
 SUPPORTED_MEDIA = XML_MEDIA | GZIP_MEDIA | JSON_MEDIA
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 ATOM_NS = "http://www.w3.org/2005/Atom"
+RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+RSS1_NS = "http://purl.org/rss/1.0/"
 MAX_XML_BYTES = 1_048_576
 MAX_XML_ELEMENTS = 16_384
 MAX_XML_DEPTH = 32
@@ -140,6 +143,16 @@ def _entries(root: ET.Element, kind: str):
                     )
                     if alt is not None:
                         yield alt
+    elif kind == "rss1_feed":
+        # RSS 1.0 stores its items as RDF siblings of the channel node;
+        # rdf:Seq resource links and arbitrary RDF predicates are not navigated.
+        for item in root:
+            if _local(item.tag) != (RSS1_NS, "item"):
+                continue
+            for child in item:
+                if _local(child.tag) == (RSS1_NS, "link"):
+                    yield (child.text or "").strip()
+                    break
     elif kind == "rss_feed":
         for channel in root:
             if _local(channel.tag) != ("", "channel"):
@@ -235,6 +248,10 @@ def parse_structured_discovery(
         kind = "sitemap_index"
     elif local == "rss" and namespace == "":
         kind = "rss_feed"
+    elif local == "RDF" and namespace == RDF_NS and any(
+        _local(child.tag) == (RSS1_NS, "channel") for child in root
+    ):
+        kind = "rss1_feed"
     elif local == "feed" and namespace in ("", ATOM_NS):
         kind = "atom_feed"
     elif local == "opml" and namespace == "":

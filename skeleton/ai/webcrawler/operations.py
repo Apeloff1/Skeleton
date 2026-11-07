@@ -94,6 +94,7 @@ def implementation_digest():
                 "xml_documents.py",
                 "capture_rights.py",
                 "html_semantics.py",
+                "html_landmarks.py",
                 "media_probe.py",
                 "pdf_documents.py",
                 "pdf_worker.py",

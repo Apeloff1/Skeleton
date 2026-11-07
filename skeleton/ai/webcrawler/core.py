@@ -32,6 +32,7 @@ from .document_formats import (
 from .archive_documents import ARCHIVE_TYPES, extract_archive_document
 from .xml_documents import GENERIC_XML_TYPES, extract_xml_evidence
 from .html_semantics import HTMLSemanticError, extract_html_semantics
+from .html_landmarks import HTMLLandmarkError, extract_html_landmarks
 from .pdf_documents import PDF_MEDIA_TYPE, extract_pdf_document
 from .discovery_relations import navigational_relation
 from .warc_catalog import WARC_MEDIA_TYPES, extract_warc_catalog
@@ -169,6 +170,7 @@ class CrawlPolicy:
         "text/patch",
         "application/vnd.citationstyles.csl+json",
         "application/x-csl+json",
+        "application/rdf+xml",
         "application/geo+json",
         "application/vnd.geo+json",
         "application/openapi+json",
@@ -456,6 +458,17 @@ def extract_document(
             if semantics.text:
                 text += "\n" + semantics.text
             parser_text_truncated = semantics.truncated
+        try:
+            landmarks = extract_html_landmarks(
+                raw, max_chars=min(max_text_chars, 8192),
+            )
+        except HTMLLandmarkError:
+            # Landmark enrichment is advisory; it cannot grant or veto links.
+            pass
+        else:
+            if landmarks.text:
+                text += "\n" + landmarks.text
+            parser_text_truncated |= landmarks.truncated
     elif ctype == "text/plain":
         text = raw
     elif ctype in GENERIC_XML_TYPES:

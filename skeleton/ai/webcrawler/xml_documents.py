@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 GENERIC_XML_TYPES = frozenset({
     "application/xml", "text/xml", "application/x-xml",
     "application/gpx+xml", "application/vnd.google-earth.kml+xml",
+    "application/rdf+xml",
 })
 _FORBID = re.compile(rb"<!\s*(?:DOCTYPE|ENTITY)\b", re.I)
 _DECL = re.compile(rb"^<\?xml[^?]*\bencoding\s*=\s*['\"]([^'\"]+)['\"]", re.I)
