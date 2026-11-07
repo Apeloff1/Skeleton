@@ -222,6 +222,8 @@ class CrawlPolicy:
         "application/vnd.cyclonedx+json",
         "application/spdx+json",
         "application/vnd.openvex+json",
+        "application/activity+json",
+        "application/vnd.activitystreams+json",
         "image/svg+xml",
         "model/ply",
         "application/x-ply",

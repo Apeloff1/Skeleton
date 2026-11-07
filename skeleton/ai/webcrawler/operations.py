@@ -43,6 +43,7 @@ from .http_freshness import (
 )
 from .media_probe import inspect_download_media
 from .link_header_discovery import parse_link_headers
+from .memento_relations import MementoDiscoveryError, discover_mementos
 from .document_formats import DocumentFormatError
 from .http import SafeHttpFetcher
 from .research import EvidenceObservation
@@ -93,6 +94,8 @@ def implementation_digest():
                 "frontier_scheduler.py",
                 "frontier_coverage.py",
                 "frontier_antichain.py",
+                "federated_activity.py",
+                "memento_relations.py",
                 "link_header_discovery.py",
                 "content_coding.py",
                 "archive_documents.py",
@@ -245,6 +248,7 @@ class CrawlRequest:
     max_total_bytes: int = 8388608
     min_host_delay_seconds: float = 1.0
     discover_sitemaps: bool = False
+    discover_mementos: bool = False
     frontier_strategy: str = "fifo"
 
     def __post_init__(self):
@@ -275,6 +279,8 @@ class CrawlRequest:
         _number(self.min_host_delay_seconds, 0.25, 30, "host delay")
         if type(self.discover_sitemaps) is not bool:
             raise CrawlOperationError("sitemap discovery requires an explicit boolean")
+        if type(self.discover_mementos) is not bool:
+            raise CrawlOperationError("Memento discovery requires an explicit boolean")
         if type(self.frontier_strategy) is not str or self.frontier_strategy not in (
             "fifo", "balanced", "coverage",
         ):
@@ -1100,6 +1106,16 @@ class CrawlRun:
             ).links if rights.follow else ()
         except (ValueError, UnicodeError):
             header_links = ()
+        if rights.follow and self.request.discover_mementos:
+            try:
+                historical = discover_mementos(
+                    response.headers, base_url=url, policy=self.policy,
+                    observed_at=now, max_links=8,
+                )
+            except (MementoDiscoveryError, ValueError, UnicodeError):
+                historical = None
+            if historical is not None:
+                header_links = tuple(dict.fromkeys((*header_links, *historical.links)))
         plaintext_sitemap = (
             ctype == "text/plain"
             and urlsplit(url).path.lower().rsplit("/", 1)[-1] == "sitemap.txt"
