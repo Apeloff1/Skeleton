@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections import Counter
 import re
 from .research_projection import ResearchFormatError, ResearchProjection, check_text, project_lines
+from .unity_hierarchy import inspect_unity_hierarchy
+from .scene_topology import summarize_scene_topology
 
 UNITY_TYPES=frozenset({"application/x-unity-scene","text/x-unity-scene"})
 _OBJECT=re.compile(r"^--- !u!(\d{1,5}) &(-?\d{1,20})$")
@@ -59,4 +61,8 @@ def extract_unity_scene(
         "Example object names: "+(", ".join(names[:16]) or "[none]"),
         "MonoBehaviour scripts, external assets and YAML tags: not loaded",
     ]
+    topology=inspect_unity_hierarchy(raw)
+    if topology is not None:
+        output.extend(summarize_scene_topology(topology.topology))
+        output.append(f"Unresolved local Transform parent anchors: {topology.unresolved_parent_count}")
     return project_lines(output,title="Unity scene inventory",max_chars=max_chars)

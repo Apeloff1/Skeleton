@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections import Counter
 import re
 from .research_projection import ResearchFormatError, ResearchProjection, check_text, project_lines
+from .usda_hierarchy import inspect_usda_hierarchy
+from .scene_topology import summarize_scene_topology
 
 USDA_TYPES=frozenset({"model/vnd.usda","application/x-usda"})
 _PRIM=re.compile(
@@ -39,4 +41,12 @@ def extract_usda(
         "Sample prim names: "+", ".join(names[:16]),
         "USD composition, references, payloads and asset resolution: disabled",
     ]
+    try:
+        topology=inspect_usda_hierarchy(raw)
+    except ResearchFormatError:
+        # A foreign USD composition syntax is not proof of an executable
+        # source. Keep basic unreviewed class counts but omit topology claims.
+        output.append("USD scope topology: unqualified foreign syntax")
+    else:
+        output.extend(summarize_scene_topology(topology))
     return project_lines(output,title="USD scene inventory",max_chars=max_chars)

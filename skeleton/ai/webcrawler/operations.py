@@ -161,6 +161,8 @@ def implementation_digest():
                 "frontier_circuit.py",
                 "scene_topology.py",
                 "godot_hierarchy.py",
+                "unity_hierarchy.py",
+                "usda_hierarchy.py",
             )
         }
     )
