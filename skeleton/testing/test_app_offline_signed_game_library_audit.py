@@ -130,7 +130,7 @@ def test_malformed_and_oversized_signed_entries_rejected(chain_delivery):
 
 def test_repeated_policy_path_and_malformed_epoch_chain_denied(chain_delivery):
     payload = asdict(_entry(chain_delivery))
-    payload["policies"][1] = payload["policies"][0]
+    payload["policies"] = [payload["policies"][0]] * len(payload["policies"])
     with pytest.raises(SignedGameLibraryAuditError, match="duplicate"):
         audit_signed_game_library(
             [parse_signed_game_entry(json.dumps(payload))], authorized=True,
