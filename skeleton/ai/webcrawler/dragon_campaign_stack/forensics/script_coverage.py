@@ -74,7 +74,7 @@ def inspect_script_coverage(
     hosts_with_nonlatin = defaultdict(set)
     counters = defaultdict(Counter)
     for frame in frames.frames:
-        if not set(frame.anchor.objective_ids) <= goals:
+        if not set(frame.anchor.objective_ids) <= set(goals):
             raise PermissionError("unapproved operator objective in selected script evidence")
         tokens = Counter()
         for character in frame.text:
