@@ -46,7 +46,7 @@ def _write_save(path: Path, snapshot: dict) -> None:
     synced before a same-directory hard-link publishes the slot atomically.
     """
     data = (json.dumps(snapshot, sort_keys=True, separators=(",", ":"),
-                       ensure_ascii=False, allow_nan=False) + "\\n").encode("utf-8")
+                       ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
     if len(data) > MAX_READ:
         raise ValueError("save exceeds byte budget")
     fd, temporary = tempfile.mkstemp(prefix=".grid-save-", dir=path.parent)
