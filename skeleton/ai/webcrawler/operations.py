@@ -468,20 +468,28 @@ class CrawlRun:
             for key in ("canonical_url", "fetched_url", "content_hash", "fetched_at", "raw_body_hash"):
                 if provenance.get(key) != source[key]:
                     raise CrawlOperationError("source acquisition identity mismatch")
-            inferred = provenance.get("mime_inferred")
-            declared = provenance.get("declared_content_type")
-            if (type(inferred) is not bool or not isinstance(declared, str)
-                    or len(declared) > 256
-                    or not isinstance(provenance.get("mime_inference_reason"), str)
-                    or (not inferred and declared != source["content_type"])
-                    or (inferred and (
-                        declared not in {
-                            "application/octet-stream", "binary/octet-stream",
-                            "application/zip",
-                        }
-                        or declared == source["content_type"]
-                    ))):
-                raise CrawlOperationError("source MIME inference receipt mismatch")
+            # Older source snapshots and synthetic evidence fixtures predate
+            # the optional media-inference extension. Require all fields when
+            # *any* are supplied, but preserve the exact legacy source schema
+            # without granting new inference or transport authority.
+            mime_fields = (
+                "mime_inferred", "declared_content_type", "mime_inference_reason",
+            )
+            if any(field in provenance for field in mime_fields):
+                inferred = provenance.get("mime_inferred")
+                declared = provenance.get("declared_content_type")
+                if (type(inferred) is not bool or not isinstance(declared, str)
+                        or len(declared) > 256
+                        or not isinstance(provenance.get("mime_inference_reason"), str)
+                        or (not inferred and declared != source["content_type"])
+                        or (inferred and (
+                            declared not in {
+                                "application/octet-stream", "binary/octet-stream",
+                                "application/zip",
+                            }
+                            or declared == source["content_type"]
+                        ))):
+                    raise CrawlOperationError("source MIME inference receipt mismatch")
             if (
                 provenance.get("consent_id") != binding["consent"]["consent_id"]
                 or provenance.get("training_permission") is not False
