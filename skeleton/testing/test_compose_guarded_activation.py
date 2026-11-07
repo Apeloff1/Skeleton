@@ -246,9 +246,11 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         async def rotate(_payload):
             self.database.hello["setVersion"] = 8
         self.reviewer.on_challenge = rotate
+        gate = self.make()
         with self.assertRaisesRegex(ActivationBlocked, "primary changed"):
-            await self.make().activate()
-        self.assertEqual(self.make().phase, ActivationPhase.BLOCKED)
+            await gate.activate()
+        self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
+        self.assertIsNone(gate._epoch_at_activation)
 
     async def test_activation_and_rechecks(self):
         gate = self.make()
