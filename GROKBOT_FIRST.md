@@ -86,6 +86,10 @@
 - 71. Original media foundry with target-native asset custody
 - 72. Unified creator workbench and source-to-play debugging
 - 73. Exact-package consumer release assurance
+- 74. Multifactor game optimization and anti-score-gaming evaluation
+- 75. Jeeves finite campaign production and real tool custody
+- 76. Exact-head qualification conveyor and evidence freshness
+- 77. FRT-081 through FRT-112: executable integration backlog
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -7240,3 +7244,158 @@ An AI worker may prepare a candidate but cannot unilaterally publish it. Exact-h
 ## 73.4 Recovery, rollback and negative tests
 
 Retain a last-known-good package, versioned save compatibility and a rollback plan. A failed update cannot erase player progress, and a rights withdrawal must block ineligible redistribution without deleting unrelated authored source. Inject one changed binary byte, reviewer-role substitution, stale evidence, forged HMAC, missing license notice, no compiler binary, failed controller replay, unsafe path/symlink and unavailable malware scanner. Verify each rejects at the appropriate stage while accurately retaining unrelated valid proof. Publication is allowed only after every required exact-subject gate and an authorized final decision.
+
+# 74. Experimental game optimization without score gaming: multifactor causal improvement
+
+**Engineering packet:** NEXT-74 | **Primary:** BOT-12 scientific QA and BOT-06 gameplay | **Partners:** BOT-03 model learning, BOT-04 campaign execution, BOT-05 world/quests, BOT-08 visual/audio, BOT-11 UI. **Inspected sources:** skeleton/jeeves/game_studio_multifactor.py uses a typed set of legal registered settings, bounded pair/three-way covering, source-replayed ablations, held-out seed separation and optional Q-policy learning; it explicitly does not improve global Jeeves weights. skeleton/jeeves/game_studio_scenario_lab.py executes bounded independent reference environments and is explicit that sales rankings are neither game-mechanic proof nor rights to copy third-party content. skeleton/ai/game_builder/quality_debt.py defines a bounded ratcheting debt ledger across protected axes.
+
+The next product frontier is **genuinely better player experiences generated from evidence**, not a model that makes claims of superiority after producing more words or altering test scores. The system needs a controlled experimental design that can identify causal improvements and reject unsafe regressions. An experiment can be narrow and still valuable if it changes a user-facing behavior on a real target.
+
+## 74.1 Pre-registered factors and observable outcomes
+
+Every optimization campaign defines a source project revision, target engine/binary, real admitted hardware profile, fixed initial saves/seeds, game mechanic, evaluation budget and independent judge. The factor graph contains actual editable settings such as movement acceleration, jump buffer, quest prerequisites, enemy telegraph, loot distribution, encounter rate, camera motion, UI scale, lighting cues, music mixer and generated-world density. A requested but unimplemented factor is **unsupported**, not a pretend synthetic output. The current multifactor tool already supports bounded registered source knobs; expand only through real owner-backed capabilities.
+
+A factor trial records exact baseline values, candidate values, transformation receipt, affected source IDs, expected physical effect, evaluation conditions and outcome. Control confounding: run one-factor ablations where possible; cover selected pairwise interactions when changes couple (e.g., jump height × platform distance, enemy speed × attack warning, lighting × clue contrast). Three-way designs may be necessary for complex affordances but consume more budget; use legal bounded designs rather than factorial explosion. Hold out seeds and project families against adaptive selection.
+
+## 74.2 Quality score is a vector with hard constraints
+
+Candidate metrics include completion, softlock rate, player command success, confusion/backtracking, fair difficulty, narrative branch significance, visible/audible feedback, accessibility, renderer frame pacing, memory, export size, build duration, model inference latency and user review. Not all dimensions can be collapsed to one number. Rights, privacy, authorization, unrecoverable save loss, inability to finish a mandatory goal and broken target support are **noncompensable gates**. A candidate with faster FPS but an invisible required clue must fail even if an aggregate aesthetic score rises.
+
+Separate objective verifiers from subjective review. The player may prefer deliberately difficult games; a designer's intended theme can override a general-purpose "fun" predictor. A model can suggest hypotheses, but the independent tester checks real game behavior. Human playtest participants can report preference with uncertainty and anonymized/consented observations; don't fabricate human judgements from synthetic personas.
+
+## 74.3 Causal inference, variance and repeatability
+
+Run matched baseline and candidate on identical package class, hardware, seeds, tester skill profile and initial state. Randomize order when thermal or hardware carryover could affect results, and report within-arm variance. Use predeclared confidence/abstention policy rather than cherry-picking one impressive run. If a variant differs simultaneously in game engine, shader, quest goals and test controller, the experiment is confounded: classify exploratory, not causal superiority. In counterfactual experiments, changing one input step can reveal response differences, but is not proof of general mechanic mastery.
+
+Negative benchmarks intentionally expose score gaming: removing enemies, hiding a hard quest, changing terminal predicates, shortening play length without preserving experience, weakening accessibility standards or disabling collision tests. The quality-debt ratchet prevents gradual accumulation of small compromises whose total impact would silently degrade the product. Protected-axis debt remains a release hold, not a score weight to trade against speed.
+
+## 74.4 Active experiment selection and stopping
+
+Choose the next trial by estimated value of information, uncertainty reduction, cost and potential user benefit, bounded by real ResourceBudget. Do not spawn unlimited self-play or repeated model turns when the testing setup has not changed. Stop when improvements plateau, required tests regress, critical pressure is observed, comparison is underpowered, source changes invalidate baseline or user approval expires. Preserve last-good version and exact rejected candidates for future diagnosis.
+
+An optimization can be promoted only on an authorized project revision with current dependent proofs. The model should explain causal uncertainty rather than assert certainty from sparse results. Release certification remains a separate independent procedure. The experiment system may recommend a candidate that the artist intentionally rejects; respecting creator agency is not a failed metric.
+
+## 74.5 Acceptance
+
+Run a bounded original platformer and puzzle comparison using factors that actually exist in target code. Show held-out baseline/candidate input traces, game state, frame timing and at least one meaningful improvement under frozen requirements. Corrupt a mandatory path, remove a visual hint and change a saved-game format in candidate trials; the gate must reject these despite any faster execution. Repeat with a fixed source seed and demonstrate actual variance/limits. Model training or toolchain hardware tests are not inferred from reference lab results.
+
+# 75. Jeeves creative campaigns: exactly bounded physical execution and source-level custody
+
+**Engineering packet:** NEXT-75 | **Primary:** BOT-04 | **Partners:** BOT-02 policy/owner, BOT-03 local provider, BOT-05/06 game engines, BOT-08 media, BOT-09 build, BOT-11 UI, BOT-12 independent review. **Inspected sources:** skeleton/ai/game_builder/studio_execution_plane.py contains explicit EXECUTABLE_TOOLS, a bounded MAX_EXECUTION_STEPS=32, typed ExecutedToolReceipts and fail-closed external/research IDs, while studio_campaign_assurance.py is a read-side assurance projection and separately admits operator-only native ROM compilation. These safeguards need to remain stronger than a model's wish to perform an action.
+
+## 75.1 Creator request as a capability-constrained campaign
+
+Compile a game request into a finite work DAG whose nodes specify canonical owner, exact source revision, goal/expected game effect, tool identifier, permitted arguments, read/write footprint, financial/CPU/GPU/disk token budget, external dependencies, policy snapshot and verifiable postconditions. A work node may request another review but cannot spawn an unbounded recursive hierarchy of agents or create its own production permissions. The existing authorized tool fabric decides actual availability; a tool advertised in a model context is not necessarily executable.
+
+The first vertical slice should be authored and verified as one complete game across agents. BOT-05 owns semantic world/quest changes; BOT-06 gameplay/input; BOT-08 media; BOT-09 actual target packaging. The director coordinates receipts and user approvals, not write access over all those owners. The user's intent remains pinned and inspectable; design suggestions are candidate alternatives, not permission to remove required difficulty or content to fit a limited budget.
+
+## 75.2 Workload-aware admission and safe fallbacks
+
+Interactive game rendering/editor actions have protected capacity. Background model reasoning, asset synthesis, crawler research, large compiler runs and experiments consume finite admitted slots. A logical virtual worker is an orchestration lane, not physical inference throughput. When memory/disk/thermal limits are approached, pause or safely cancel lower-priority work, checkpoint where supported and leave committed game state intact. Worker death must be physically reconciled before GPU/CPU reservations are released.
+
+If a valid actual local model is not ready, the user can continue deterministic authoring and source-only export where supported. Jeeves should report model-unavailable rather than simulate tool-calling success or secretly send private prompts to a hosted provider. If a legal native toolchain is absent, preserve source and request a real operator step. If research access is denied, use approved local knowledge or ask for an authorized source; denial does not imply product failure outside that optional scope.
+
+## 75.3 Human steerability and stable revision patches
+
+At checkpoints, a human may inspect plan, generated world graph, art direction, playable preview, source diff and budget. They can reject a variant, lock a character outfit, modify a quest predicate or request a different target. A change becomes an authorized new revision; pending jobs whose preconditions depend on the old source are invalidated or re-planned. Two agents cannot silently overwrite the same project file via separate cached source snapshots. Source-edit gateway policy and high-impact grants remain active even when work originates from a friendly UI button.
+
+Every patch has a compensation or rollback plan. An irreversible external publication/payment operation requires stronger user authority. A model-generated "approval obtained" string is not a valid signed decision. A report of "game packaged" requires exact artifact bytes and verifiable build trace; source-only build logs should not be substituted.
+
+## 75.4 Crash-safe receipts, job status and stage completion
+
+Each tool execution result has exact input/output digests, source/tool identity, predecessor receipt, evidence, status and idempotency. If a tool call times out after a possible external side effect, the state is unknown until the canonical owner reports an outcome. Blind reissue can duplicate game assets, charges or edits. Cancellation signals must propagate to actual running subprocesses and model slots. A successful stage is one whose observed postcondition holds, not one whose model reply ends in "done".
+
+The campaign dashboard should show four dimensions: accepted project changes, target proof level, current physical worker load, and unresolved blockers. It should not claim 100% because every node in a planning DAG has been assigned. The existing studio_execution_history.py is a bounded append-only, source-bound history of qualification reports; it is not an autonomous monitoring engine or store of raw game/model content. Keep operational logs and artifact custody in their proper declared domains.
+
+## 75.5 Multi-bot integration rejection cases
+
+Reject a tool handoff that broadens read roots, expired human approval, stale source parent, duplicate idempotency with changed payload, unavailable native compiler, crawler text that requests privileged code, release worker acting as legal issuer and a cancelled model whose physical process remains alive. Positive campaign: create original two-room game, human edit a quest, generate bound media, play through a native engine, repair a tested bug, save/restart, build clean target and show exact source/evidence. Retain all existing first-install/release holds not proven by that target.
+
+# 76. Qualification conveyor, failure taxonomy and proof freshness under massive repository churn
+
+**Engineering packet:** NEXT-76 | **Primary:** BOT-12 and BOT-02 | **Partners:** all lanes. **Inspected sources:** studio_campaign_assurance.py declares separate source, pixel parity, browser playthrough, Godot headless, canvas capture, emulator, controller, audio, rights, recovery and signoff gates; studio_execution_history.py stores bounded hash-linked E2E run summaries; studio_history_backup.py backs up *only* validated history segments and explicitly does not capture games/media/weights; studio_compiled_psg_parity.py checks real linked ROM music tables but not physical audible hardware output.
+
+## 76.1 Evidence graph over the exact candidate head
+
+Every qualification claim binds source SHA, changed paths, project revision, engine/game package, toolchain, test fixture, reviewer and policy. A source-only success cannot be promoted to live play by writing a newer assurance report. A binary-header or linker symbol match is useful narrow evidence; it does not assert emulator, controller, audio DAC or physical platform behavior. Positive evidence is retained at its real level; superseded or changed dependencies invalidate only the affected downstream proofs.
+
+The CI conveyor must understand architecture/AI mirror parity, dependency quality, security/malware, frontend/backend functionality, genuine game runtime, native install, hardware and release rights as independent gates. One green Secret Scanning result does not erase a failed source graph, and a real Godot headless replay does not certify a customer Windows laptop. Queued, skipped, cancelled, pending, mock-only and ancestor checks must remain separately classified.
+
+## 76.2 Causal blocker taxonomy and minimum repairs
+
+Classify first reproducible blocker by domain: source/AI-tree mismatch; tool schema; parent PR; game IR semantics; model/reviewer/epoch; installation Mongo/Chroma/secrets; target compiler absent; Godot scene/script; bad import; user input; GPU/media; source rights; security; stale CI; hardware device; or release signoff. Identify the first causally upstream failed condition and the exact paths/artifacts. Avoid rerunning every expensive workflow before resolving an obvious deterministic source mismatch; after a real repair, rerun appropriate checks on the exact new head.
+
+Each failure has a red/green reproducer, minimal proposed change, negative regression, affected dependency set, owner, rollback and release-hold impact. An integration change that alters tool boundaries requires architecture/permission review even if game unit tests pass. If a failure cannot be reproduced because hardware or credentials are missing, record BLOCKED/UNVERIFIED rather than a speculative pass.
+
+## 76.3 Immutable history, archives and truth continuity
+
+The execution history is a record of observed assurance reports, not source gameplay footage. A history backup cannot replace a full project backup; separate authoritative source/artifact/save custody persists through upgrades. A hash-linked report chain provides tamper evidence but not real-world truth of an underlying tester's observation. Independent verifier must confirm underlying evidence and issuer role.
+
+Prevent history truncation, duplicate event inflation, ancestor-success reuse and stale stream-terminal summaries. Use finite segment limits and sealed archive transitions. If a run was superseded, retain its historical result but exclude it from the current readiness decision. If current HEAD changes the target game package, expired game playtest or malware proof must be rerun; if only a design note changed without affecting the release package, use a documented dependency analysis instead of blind requalification.
+
+## 76.4 Physical target versus proxy observations
+
+Support a transparent taxonomy: pure source; simulated reference; browser JS executed; Godot headless imported; Godot replay parity; visible canvas/frame captured; real interactive controller; compiled ROM bytes; emulator play; physical hardware; independent legal/rights/accessibility/security; authorized release. Some may be independent parallel dimensions rather than a single ladder. For example compiled PSG table parity can be true while audible sound is untested. Do not conflate an SVG raster source with a captured game frame, or a signed reviewer HMAC with actual human play.
+
+For each target and genre, require only relevant independent evidence; never force a retro 2BPP cartridge to prove PC ray tracing. Conversely a 3D Godot target cannot claim physical rendering solely from a pixel-tile source test. The producer of a proof and its reviewer must have distinct roles where policy requires. A report showing an "unblocked" total without enumerating target qualifications is insufficient for release.
+
+## 76.5 Cross-PR integration and conflict safety
+
+Under heavy autonomous throughput, dozens of drafts may change mirrored AI trees, machine contracts, game planners, CI gates and source encoders. Build an exact-head path/owner/dependency comparison before rebases or merges. Resolve canonical AI-tree parity and any mandatory project source index using existing architecture. Do not combine 250-file quota batches blindly. A merge is allowed only after current-head required checks pass and no unresolved security, provenance, native, install or release hold is waived. Source volume is not a maturity metric.
+
+# 77. Execution-ready frontier integration backlog: FRT-081 through FRT-112
+
+**Owner:** coordinating Grokbot; **release verdict:** BOT-12 and the established protected repository approvals. These tickets extend earlier FRT-001–080 without duplicating the existing 421-volume ecosystem queues. Before starting work, inspect current source and PR heads, map to an existing canonical owner, and disposition the ticket as already implemented, a real integration gap, or blocked by a named dependency. This table is a set of falsifiable engineering work orders, not a statement that code has been completed.
+
+| Ticket | Lead | Concrete implementation increment | Earliest real negative/positive proof |
+|---|---|---|---|
+| FRT-081 | BOT-08 | RenderGraph cross-pass hazard and transient lifetime validation | Write/read and unsafe alias fail before GPU import |
+| FRT-082 | BOT-08 | Actual engine shader/material digest linkage | Wrong shader reflection rejected; correct material visible |
+| FRT-083 | BOT-08 | Real mesh/camera/transform/collision correspondence | Visible but nontraversable bridge rejected |
+| FRT-084 | BOT-03 | Pressure-aware GPU streaming through existing admission owner | Model load cannot evict essential render target |
+| FRT-085 | BOT-08 | Device-loss renderer recovery from committed source | Context-loss restore retains quest/inventory |
+| FRT-086 | BOT-12 | Frame capture and p95/p99 physical render suite | Source-only graph never qualifies physical GPU |
+| FRT-087 | BOT-08 | Source/license/transform lineage of original media | Revoked source invalidates derived export eligibility |
+| FRT-088 | BOT-08 | Sprite atlas/animation engine import and hitbox alignment | Bad UV or missing attack frame fails |
+| FRT-089 | BOT-09 | Cartridge tile-bank integration, source-to-ROM proof | More than six tiles cannot silently truncate |
+| FRT-090 | BOT-08 | Real mesh/rig/skin/material in supported game engine | Broken bind pose or absent collision fails |
+| FRT-091 | BOT-08 | Actual audio/FX gameplay cues and captions | Cue with no bytes remains unqualified |
+| FRT-092 | BOT-12 | Mixed 2D/3D media source-to-target capture suite | Rendered preview alone cannot certify native output |
+| FRT-093 | BOT-11 | One project revision across world/play/media/build/proof | Two panels cannot show conflicting saved state |
+| FRT-094 | BOT-11 | Semantic object graph selection/impact inspector | Door edit reveals genuine dependent tests |
+| FRT-095 | BOT-11 | Real timeline-to-engine keyframe and event binding | Scrub preview cannot commit inventory |
+| FRT-096 | BOT-11 | Debug replay linking input→event→frame→source | First divergence from target evidence inspectable |
+| FRT-097 | BOT-11 | Actual approve/reject/replan campaign UI | Stale auth/project grant cannot mutate source |
+| FRT-098 | BOT-12 | Keyboard, controller and screen-reader creator journey | Unreachable essential control blocks target |
+| FRT-099 | BOT-09 | Exact source/package/evidence dependency graph | Old playtest cannot qualify altered binary |
+| FRT-100 | BOT-02 | Reviewer-role/freshness and HMAC trust validation | Wrong issuer or forged manifest cannot release |
+| FRT-101 | BOT-09 | Independent toolchain build and native binary verification | PE/ELF header alone cannot pass compilation |
+| FRT-102 | BOT-12 | Clean-target controller-to-goal, save/restart evidence | Fake game win marker fails |
+| FRT-103 | BOT-02 | Rights/malware dependency invalidation before publication | Removed attribution blocks commercial package |
+| FRT-104 | BOT-09 | Last-good package/old-save upgrade rollback | Power loss cannot erase prior playable version |
+| FRT-105 | BOT-12 | Multifactor held-out quality and anti-score-gaming | Removing hard objective cannot count as better |
+| FRT-106 | BOT-03 | Actual controlled reviewer candidate shadow comparison | Review score cannot replace critical game QA |
+| FRT-107 | BOT-04 | Source-bound finite game-build DAG and physical capacity | Logical worker count cannot bypass RAM admission |
+| FRT-108 | BOT-02 | Typed tool authorization against exact action/diff | Tool-list entry cannot grant model shell |
+| FRT-109 | BOT-04 | User steering with source CAS and campaign replan | Obsolete agent patch denied after user edit |
+| FRT-110 | BOT-12 | Studio qualification evidence freshness/cause graph | Ancestor check cannot certify current exact head |
+| FRT-111 | BOT-02 | Overlapping PR source-owner/AI-tree conflict classification | Invalid mirror/contract branch blocks promotion |
+| FRT-112 | BOT-12 | Real first-install → AI (if required) → game → native package verdict | All unresolved device/security/release holds explicit |
+
+## 77.1 Twelve-bot execution sequence
+
+First, BOT-02 and BOT-12 reconcile actual source owners, current heads, interface contracts and existing test maturity. Next BOT-08/BOT-06 make one game render, respond to input and produce real audiovisual state; BOT-11 binds it to the editor and its exact source revision. BOT-09 packages it through a real available target toolchain; BOT-12 runs clean-host and adversarial controller/playback checks. BOT-03/04 optimize model/workflow only once they can be evaluated against the same game's actual accepted output. BOT-05/07 then widen world and mechanics without losing parity. BOT-10 remains the source-research custodian, not a generic unrestricted internet worker.
+
+Work must land as real code and tests under the correct owners, with the strongest available exact-head qualification. PR preparation, source edits, CI repairs and merge approvals retain their separate authority. This plan does not waive prior holds, count unbuilt roadmap text as delivered features, or claim consumer launch readiness.
+
+## 77.2 Mandatory independent golden game
+
+The acceptance reference is an original editable puzzle-adventure with a controllable player; visible 2D/3D graphics suitable to target; a real animated character; audible or accessible alternate action cues; two quest approaches; one interacting NPC; an inventory-bound door; failure/retry; save/restart; human/agent authoring; and a clean-target build. The user can change one quest requirement and see proper dependent source, physics, media and test invalidation. A crash mid-build preserves last good project. A real independent controller tape reaches the declared ending; independent tester captures actual engine state and frames/audio where supported.
+
+A missing GGUF may block AI-assisted authoring while leaving deterministic editing possible; an unavailable compiler may permit source export but not a native-ready claim. The evidence packet states precisely which target, engine, model, OS/device, source and policies were actually verified. No unsupported capability is hidden to inflate the score.
+
+## 77.3 Work-packet acceptance contract
+
+For every ticket, record source/branch/head and exact modified files, canonical authority and interface, user-visible effect, expected negative reproducer, completed implementation diff, actual test commands/results, source/game/toolchain digests, target/hardware evidence when required, unresolved security/rights/install/merge/release holds and rollback. If the feature is already implemented, point to its actual source and independent proof rather than generating duplicate wrappers. If blocked, provide the upstream minimal cause and safe next action. If tests cannot run, label them NOT EXECUTED.
+
+The masterplan continues toward one million meaningful words, but progress of the *application* is measured by accepted user journeys and current-head execution evidence, not by this document's word count, catalog cardinality, number of drafts or the number of agents that report themselves complete.
