@@ -21,6 +21,10 @@ ARCHIVE_TYPES = frozenset({
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.oasis.opendocument.text",
     "application/epub+zip",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.oasis.opendocument.spreadsheet",
+    "application/vnd.oasis.opendocument.presentation",
 })
 MAX_MEMBERS = 256
 MAX_UNCOMPRESSED = 8_388_608
@@ -334,6 +338,9 @@ def extract_archive_document(
         raise ArchiveDocumentError("invalid source text capacity")
     archive = BoundedArchive(body)
     try:
+        from .office_suites import OFFICE_SUITE_TYPES, extract_office_suite
+        if media_type in OFFICE_SUITE_TYPES:
+            return extract_office_suite(archive, media_type, max_chars=max_chars)
         if media_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
             return _docx(archive, max_chars)
         if media_type == "application/vnd.oasis.opendocument.text":

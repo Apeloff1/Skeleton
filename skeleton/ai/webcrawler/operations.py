@@ -96,6 +96,7 @@ def implementation_digest():
                 "media_probe.py",
                 "pdf_documents.py",
                 "pdf_worker.py",
+                "office_suites.py",
             )
         }
     )

@@ -15,6 +15,10 @@ _ARCHIVES = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".odt": "application/vnd.oasis.opendocument.text",
     ".epub": "application/epub+zip",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".ods": "application/vnd.oasis.opendocument.spreadsheet",
+    ".odp": "application/vnd.oasis.opendocument.presentation",
 }
 _PDF = {".pdf": "application/pdf"}
 _XML = {
