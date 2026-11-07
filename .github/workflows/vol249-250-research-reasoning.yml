@@ -9,7 +9,6 @@ on:
       - 'skeleton/testing/test_game_design_probes.py'
       - 'skeleton/testing/test_ai_git_knowledge.py'
       - 'skeleton/testing/test_ai_flight_http.py'
-      - 'skeleton/research/**'
       - 'docs/ai/VOL_249_250_RESEARCH_REASONING.md'
       - '.github/workflows/vol249-250-research-reasoning.yml'
   workflow_dispatch:
@@ -42,20 +41,11 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.11.16'
-      - name: Verify canonical mirrored research namespace
-        run: |
-          for file in __init__.py hypothesis_engine.py causal_knowledge.py game_design_probes.py; do
-            cmp "skeleton/research/$file" "skeleton/ai/research/$file"
-          done
       - name: Compile completed research modules and regressions
         run: >-
           python -m py_compile skeleton/ai/research/hypothesis_engine.py
           skeleton/ai/research/causal_knowledge.py
           skeleton/ai/research/game_design_probes.py
-          skeleton/research/hypothesis_engine.py
-          skeleton/research/causal_knowledge.py
-          skeleton/research/game_design_probes.py
-          skeleton/research/__init__.py
           skeleton/ai/research/__init__.py
           skeleton/testing/test_hypothesis_engine.py
           skeleton/testing/test_causal_knowledge.py

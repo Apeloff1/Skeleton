@@ -94,19 +94,17 @@ The Git knowledge fixture now constructs its synthetic secret marker at
 runtime rather than leaving key-shaped bytes in tracked test source; rejection
 behavior remains covered without exempting any secret-hygiene scanner pattern.
 
-## Canonical research mirror and host-portable native CI
+## Canonical AI-only ownership and native fixture portability
 
-The four research namespace files are byte-identical at
-`skeleton/research` and `skeleton/ai/research` as required by the
-canonical AI-tree parity gate. The PR adds a byte comparison in the exact-head
-research workflow. **Existing unrelated AI-tree drift elsewhere in the main
-baseline remains a separate merge blocker**; no AI-tree waiver is inferred.
+New research modules remain only under `skeleton/ai/research`, the established
+canonical AI namespace. The legacy `skeleton/research` remains unchanged
+because a new legacy mirror requires new signed entries in
+`machine/ai_file_tree.json`; this PR cannot silently claim migration
+authority. The existing Jeeves, Forge and audio mirror deficits remain CI
+blockers, not waived or inherited passes.
 
-The flight-HTTP acceptance fixture now uses `tempfile.TemporaryDirectory`
-with the platform-selected secure temporary root rather than hardcoding a
-container-only path. The socket/SQLite acceptance test remains otherwise
-unchanged, and the full native qualification is required before any readiness
-claim. This test-fixture repair does not attest real-device GGUF behavior.
+The flight-HTTP and Git source-custody tests now select the caller's home
+directory as their temporary-file parent instead of a local-only path.
 
 The GGUF/SQLite custody guard traverses all ancestor directories using
 descriptor-based no-follow access and denies group/other-writable ancestors.
