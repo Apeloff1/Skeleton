@@ -11,6 +11,7 @@ on:
       - "skeleton/ai/webcrawler/frontier_scheduler.py"
       - "skeleton/ai/webcrawler/link_header_discovery.py"
       - "skeleton/ai/webcrawler/structured_discovery.py"
+      - "tests/test_ai_webcrawler_dragon_text_sitemaps.py"
       - "skeleton/ai/webcrawler/bound_http.py"
       - "skeleton/ai/webcrawler/content_coding.py"
       - "skeleton/ai/webcrawler/archive_documents.py"
@@ -84,6 +85,7 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/frontier_scheduler.py
           python -m py_compile skeleton/ai/webcrawler/link_header_discovery.py
           python -m py_compile skeleton/ai/webcrawler/structured_discovery.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_text_sitemaps.py
           python -m py_compile skeleton/ai/webcrawler/core.py
           python -m py_compile skeleton/ai/webcrawler/operations.py
           python -m py_compile skeleton/ai/webcrawler/bound_http.py
@@ -162,3 +164,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_pdf_documents.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_office_suites.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_robots_rate.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_text_sitemaps.py' -v

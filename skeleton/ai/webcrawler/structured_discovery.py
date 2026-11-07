@@ -292,6 +292,69 @@ def parse_structured_discovery(
         discarded_entries=rejected, capped=capped,
     )
 
+
+def parse_plaintext_sitemap(
+    body: bytes, *, document_url: str, policy: CrawlPolicy,
+    max_entries: int = 512, max_links: int = 128,
+) -> StructuredDiscovery:
+    """Discover bounded, absolute URLs from an explicit sitemap.txt file.
+
+    Text sitemap entries never become source evidence, and must still pass
+    the canonical worker's robots, DNS, consent, host and byte admission.
+    """
+    if (type(body) is not bytes or not body or len(body) > MAX_XML_BYTES
+            or not isinstance(policy, CrawlPolicy)
+            or type(max_entries) is not int or not 1 <= max_entries <= 1024
+            or type(max_links) is not int or not 1 <= max_links <= MAX_DISCOVERY_LINKS):
+        raise DiscoveryError("invalid text sitemap admission")
+    canonical = canonicalize_url(document_url)
+    if (canonical != document_url or not policy.admits(canonical)
+            or urlsplit(canonical).path.lower().rsplit("/", 1)[-1] != "sitemap.txt"):
+        raise DiscoveryError("text sitemap requires exact committed sitemap.txt URL")
+    try:
+        text = body.decode("utf-8-sig", errors="strict")
+    except UnicodeError as exc:
+        raise DiscoveryError("text sitemap must be strict UTF-8") from exc
+    if "\x00" in text or any(
+        ord(c) < 32 and c not in "\n\r\t" for c in text
+    ):
+        raise DiscoveryError("unsafe control bytes in text sitemap")
+    links: list[str] = []
+    seen: set[str] = set()
+    inspected = rejected = 0
+    capped = False
+    for raw in text.splitlines():
+        if not raw.strip():
+            continue
+        if inspected >= max_entries:
+            capped = True
+            break
+        inspected += 1
+        value = raw.strip()
+        if (len(value.encode("utf-8")) > 4096
+                or any(c.isspace() for c in value)):
+            rejected += 1
+            continue
+        try:
+            p = urlsplit(value)
+            if not p.scheme or not p.netloc:
+                raise ValueError("relative sitemap item")
+            url = canonicalize_url(value)
+            if url == canonical or url in seen or not policy.admits(url):
+                raise ValueError("unadmitted or duplicate text sitemap item")
+        except (ValueError, UnicodeError):
+            rejected += 1
+            continue
+        seen.add(url)
+        if len(links) >= max_links:
+            capped = True
+            break
+        links.append(url)
+    return StructuredDiscovery(
+        kind="plaintext_sitemap", links=tuple(links),
+        examined_entries=inspected, discarded_entries=rejected, capped=capped,
+    )
+
 def extract_robots_sitemaps(
     robots_text: str, *, origin: str, policy: CrawlPolicy,
     max_sitemaps: int = 8,
@@ -326,7 +389,7 @@ def extract_robots_sitemaps(
         p = urlsplit(url)
         if (p.hostname != parsed_origin.hostname
                 or p.scheme != parsed_origin.scheme
-                or not p.path.lower().endswith((".xml", ".xml.gz"))
+                or not p.path.lower().endswith((".xml", ".xml.gz", "/sitemap.txt"))
                 or not policy.admits(url)
                 or url in seen):
             continue

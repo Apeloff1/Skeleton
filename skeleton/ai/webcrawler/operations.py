@@ -30,7 +30,7 @@ from .core import (
 from .dragon_mission_quality import rank_query_passages, scan_untrusted_instructions
 from .structured_discovery import (
     DiscoveryError, UnsupportedDiscoveryRoot, SUPPORTED_MEDIA,
-    parse_structured_discovery,
+    parse_structured_discovery, parse_plaintext_sitemap,
     extract_robots_sitemaps,
 )
 from .frontier_scheduler import choose_frontier
@@ -946,7 +946,11 @@ class CrawlRun:
             ).links if rights.follow else ()
         except (ValueError, UnicodeError):
             header_links = ()
-        structured_type = ctype in SUPPORTED_MEDIA
+        plaintext_sitemap = (
+            ctype == "text/plain"
+            and urlsplit(url).path.lower().rsplit("/", 1)[-1] == "sitemap.txt"
+        )
+        structured_type = ctype in SUPPORTED_MEDIA or plaintext_sitemap
         if (
             ctype == "application/octet-stream"
             and urlsplit(url).path.lower().endswith(".xml.gz")
@@ -964,11 +968,17 @@ class CrawlRun:
                     reason="structured_response_http_status_not_200",
                 )
             try:
-                discovery = parse_structured_discovery(
-                    response.body,
-                    media_type=ctype, document_url=url,
-                    policy=self.policy, max_links=128, max_entries=512,
-                )
+                if plaintext_sitemap:
+                    discovery = parse_plaintext_sitemap(
+                        response.body, document_url=url,
+                        policy=self.policy, max_links=128, max_entries=512,
+                    )
+                else:
+                    discovery = parse_structured_discovery(
+                        response.body,
+                        media_type=ctype, document_url=url,
+                        policy=self.policy, max_links=128, max_entries=512,
+                    )
             except UnsupportedDiscoveryRoot:
                 # A valid, non-feed XML root may be retained as inert,
                 # unreviewed source text; it cannot propose frontier URLs.
