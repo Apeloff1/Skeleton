@@ -256,7 +256,7 @@ test('operator sitemap discovery is explicit, bounded and carried into the creat
   assert.match(source, /discover_sitemaps:\s*discoverSitemaps/);
   assert.match(source, /setDiscoverSitemaps\(false\)/);
   assert.match(source, /value=\{discoverSitemaps\}/);
-  assert.match(source, /XML sitemaps, gzip sitemaps, RSS\/Atom feeds or JSON Feed/);
+  assert.match(source, /Seed XML\/gzip sitemaps, RSS\/Atom or JSON Feed/);
 });
 
 test('gain-of-function crawler formats and balanced dispatch are wired through the operator workspace', () => {
