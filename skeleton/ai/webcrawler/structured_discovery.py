@@ -42,6 +42,10 @@ class DiscoveryError(ValueError):
     """Malformed or oversized untrusted discovery content; fail closed."""
 
 
+class UnsupportedDiscoveryRoot(DiscoveryError):
+    """Well-formed non-sitemap/non-feed XML needs inert evidence parsing."""
+
+
 @dataclass(frozen=True)
 class StructuredDiscovery:
     kind: str
@@ -218,7 +222,7 @@ def parse_structured_discovery(
     elif local == "feed" and namespace in ("", ATOM_NS):
         kind = "atom_feed"
     else:
-        raise DiscoveryError("unsupported XML discovery root")
+        raise UnsupportedDiscoveryRoot("unsupported XML discovery root")
     seen = set()
     links = []
     examined = rejected = 0

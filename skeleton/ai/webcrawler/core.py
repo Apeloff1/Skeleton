@@ -25,6 +25,7 @@ from urllib.robotparser import RobotFileParser
 
 from .document_formats import ADDITIONAL_TYPES, extract_additional_format
 from .archive_documents import ARCHIVE_TYPES, extract_archive_document
+from .xml_documents import GENERIC_XML_TYPES, extract_xml_evidence
 
 _TRACKING_PREFIXES = ("utm_",)
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
@@ -125,6 +126,11 @@ class CrawlPolicy:
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.oasis.opendocument.text",
         "application/epub+zip",
+        "application/xml",
+        "text/xml",
+        "application/x-xml",
+        "application/gpx+xml",
+        "application/vnd.google-earth.kml+xml",
         "application/toml",
         "text/x-toml",
         "text/x-shellscript",
@@ -371,6 +377,13 @@ def extract_document(
         links = parser.links
     elif ctype == "text/plain":
         text = raw
+    elif ctype in GENERIC_XML_TYPES:
+        parsed = extract_xml_evidence(
+            response.body, max_chars=max_text_chars,
+        )
+        text, title = parsed.text, parsed.title
+        links = list(parsed.links)
+        parser_text_truncated = parsed.truncated
     elif ctype in ADDITIONAL_TYPES:
         parsed = extract_additional_format(
             raw, ctype, max_chars=max_text_chars, max_links=max_links,

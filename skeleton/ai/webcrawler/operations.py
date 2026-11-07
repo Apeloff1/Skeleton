@@ -29,7 +29,8 @@ from .core import (
 )
 from .dragon_mission_quality import rank_query_passages, scan_untrusted_instructions
 from .structured_discovery import (
-    DiscoveryError, SUPPORTED_MEDIA, parse_structured_discovery,
+    DiscoveryError, UnsupportedDiscoveryRoot, SUPPORTED_MEDIA,
+    parse_structured_discovery,
     extract_robots_sitemaps,
 )
 from .frontier_scheduler import choose_frontier
@@ -87,6 +88,7 @@ def implementation_digest():
                 "content_coding.py",
                 "archive_documents.py",
                 "host_backpressure.py",
+                "xml_documents.py",
             )
         }
     )
@@ -930,6 +932,10 @@ class CrawlRun:
                     media_type=ctype, document_url=url,
                     policy=self.policy, max_links=128, max_entries=512,
                 )
+            except UnsupportedDiscoveryRoot:
+                # A valid, non-feed XML root may be retained as inert,
+                # unreviewed source text; it cannot propose frontier URLs.
+                structured_type = False
             except (DiscoveryError, ValueError, UnicodeError):
                 if ctype != "application/json":
                     self._finish_item(item)
