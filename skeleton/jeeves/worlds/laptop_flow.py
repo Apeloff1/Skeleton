@@ -202,7 +202,16 @@ class LaptopFlow:
             if exc.code == "not_found":
                 raise CanonError("review_required") from None
             raise
-        self._validate_review(review, world)
+        try:
+            self._validate_review(review, world)
+        except CanonError as exc:
+            # A durable source write can complete before its review write.
+            # A review for an earlier digest is not authorization to compile
+            # the newer world; expose the same fail-closed public contract as
+            # a missing review while retaining malformed-review diagnostics.
+            if exc.code == "review_stale_source":
+                raise CanonError("review_required") from None
+            raise
         return world, review
 
     @staticmethod
