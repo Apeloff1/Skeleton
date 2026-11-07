@@ -100,7 +100,10 @@ class CanonicalTextSitemapTests(unittest.TestCase):
         snap=run.snapshot()
         self.assertIn("https://example.com/sitemap.txt",fetcher.calls)
         self.assertIn("https://example.com/b",fetcher.calls)
-        self.assertEqual(snap["usage"]["documents"],2)
+        # Identical HTML across two URLs is correctly content-deduplicated.
+        self.assertEqual(snap["usage"]["documents"],1)
+        self.assertEqual(snap["usage"]["requests"],4)
+        self.assertTrue(any(e["kind"] == "duplicate" for e in snap["events"]))
         self.assertEqual(CrawlRun.from_snapshot(snap,fetcher=fetcher).snapshot(),snap)
 
     def test_budget_exhaustion_blocks_sitemap_additional_network_fetch(self):
