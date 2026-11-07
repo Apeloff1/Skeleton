@@ -78,6 +78,10 @@
 - 63. Offline-first project custody and save compatibility
 - 64. Bounded production campaign compiler and resource admission
 - 65. Twelve-bot delivery ledger with FRT-049 through FRT-080
+- 66. Universal mechanic capability composition and mixed-genre game semantics
+- 67. Native physics, player control and game-feel parity
+- 68. Granted AI coding and precise host source editing
+- 69. Accessible and localized game compiler constraints
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -6956,3 +6960,155 @@ The user-facing studio report must separate source-present, integrated, engine-t
 The first integration wave begins with FRT-074, FRT-069, FRT-073 and FRT-076: authority, storage, orchestration and truthful evidence. Next implement a minimal shared first playable with FRT-068, FRT-065 and FRT-079, then FRT-053/054/055/056 for persistent world depth. Media and cinematic FRT-057..060 depend on real engine bindings, not just source cue lists. Learning FRT-049..052 is safely asynchronous and cannot gate all editing by default. Multiplayer FRT-061..064 is optional after single-player integrity and export work. Complete targeted device/export/legal evidence FRT-077/078/080 before any broader marketing or release claim.
 
 A work packet is "done" only when code and real tests satisfy its exact acceptance under an independently reviewed source head. This blueprint itself does not implement, test, merge, train, deploy or release the described capabilities.
+
+# 66. Universal game-mechanics assembly and semantic interoperability across genres
+
+**Build packet:** ULTRA-66 | **Primary:** BOT-05 design/IR and BOT-06 engine | **Consumers:** BOT-07 procedural, BOT-08 media, BOT-09 target compilers, BOT-11 editor, BOT-12 validation. **Observed source anchors:** skeleton/ai/game_builder/advanced_gameplay_runtime.py, advanced_engine_bindings.py, system_editors.py, advanced_quest_director_runtime.py, skeleton/forge/game_mechanics_v2/, skeleton/ai/game_builder/quest_director_solver.py and the already populated genre-specific Godot adapters. This is an integration architecture, not a proposal to erase current game-engine implementations.
+
+The goal is to let the user combine meaningful original game mechanics—movement, quests, NPC behavior, economy, traversal, combat, inventory, dialogue, vehicles, time, puzzles, crafting, base building and procedural worlds—without turning incompatible state models into a tangled accumulation of features. Hundreds of standalone modules only become a game-building platform when they can be composed, edited and exported with stable semantics and measured behavior.
+
+## 66.1 Capability registry with actual implementation states
+
+Build a canonical view of supported gameplay capabilities from existing machine/AI and engine bindings. Each **MechanicCapability** includes semantic ID/version, owner module, valid gameplay domain, input/output state types, deterministic transition rules, emitted gameplay event types, resource/CPU budget, target engine adapters, supported platforms, dependent capabilities, failure conditions, save compatibility, human-editable parameters and minimum proof level. "Module importable" is a different property from "real target playable". A mechanic can be declared **reference-only**, **source-exported**, **engine-executed**, **interactive-tested**, or **target-certified** with evidence, but those labels must be mapped to the canonical state system instead of added as competing enums.
+
+Registration should be strict: no undocumented tools, unknown resource types, duplicate ownership, hidden privileged side effects or type-unsafe transitions. The existing advanced_engine_bindings.py table already connects approved editor identities to simulation start/step/replay for a set of reference runtimes. Extend that mapping with tested target-lowering and runtime readback, not by adding an unbounded reflection loader that imports every Python file or trusts a model-supplied class path. A game with a declared "farming" mechanic must expose actual soil, resources, planting, time and harvesting in the target, rather than a title card labelled farming.
+
+## 66.2 Composition laws and common entities
+
+A composite game is a graph of typed mechanics over one project/world authority. Declare which mechanics share state and how they arbitrate it. For example, crafting consumes inventory components, economy owns prices and transactions, quests observe a committed crafting event, NPC reputation reacts only if witnessed, and animation/audio present results without granting items. A vehicle controller may temporarily own player movement input while player inventory and world location remain one canonical identity. Combat and dialogue must not both claim to advance the same tick independently.
+
+Use a common **semantic action envelope** bound to project revision, actor, input phase, tick, gameplay verb, typed target and validation. Type-check state changes and require deterministic conflict rules: if damage and healing occur in the same tick, specify order; if a door opens and region changes simultaneously, transfer cannot bypass inventory preconditions. A tool should not implement a second private wallet or parallel quest flag map to simplify composition. Each game-owned event must be idempotent where replay or network retransmission can occur.
+
+For a hybrid RPG/farming game, the editor should author an actual farming quest: plant authorized seed, advance a world-time period, water under declared rules, harvest produced crop, trade at market, and trigger an NPC dialogue branch using the same causal event. This one scenario validates at least five interacting mechanic families while preventing fake "gameplay completeness" from isolated JSON operations.
+
+## 66.3 Mechanic adapters as explicit morphisms
+
+An adapter translates one semantic rule into target game-engine operations while preserving declared invariants. Define its domain and codomain and the supported subset: e.g., inventory debit/credit in abstract game state → GDScript resource + committed event; fixed-time quest timer → engine timer tied to authoritative tick; 2D tile navigation → Godot collision, nav and actual player movement. The adapter supplies an explicit mapping from source rule IDs to code/scene node identities, executable inputs, target state readback and failure evidence.
+
+No target is required to support every mechanic. On an unsupported transformation, return a typed build error or request an approved semantic downgrade. Do not silently generate empty scripts for a requested fluid dynamic, climbing mechanic or networking protocol and still label the game complete. The user can choose an alternative target with an honest capability tradeoff. A cross-engine adapter that preserves victory state but loses a mandatory accessibility cue is *not* semantically equivalent for the declared game.
+
+## 66.4 Semantic dependency, revision and selective regeneration
+
+Every mechanic records dependencies on geometry, physics settings, assets, input maps, world events, sound cues and save schema. An AI request to change "make jumping less punishing" should produce a revision of controller jump buffer, fall distance and optionally tutorial affordances; it must invalidate related traversal/physics tests and preserve unrelated story/cosmetic authoring. A new weather event affecting grip must invalidate racing movement tests and road accessibility, not regenerate every dialogue line. A rights or policy change invalidates eligible packages even if the logical gameplay schema is unchanged.
+
+Compile changes incrementally with source-digest pins and dependency closure. A stale agent proposal cannot apply to a newer world; a human-approved manual edit is a lockable constraint, not a fragile chat preference. Expose change-impact explanations in the editor: "This jump-height edit changes six routes, two quest feasibility witnesses and one controller test." Actual counts are computed from current project graph; do not hardcode reassuring numbers.
+
+## 66.5 Emergent gameplay without losing author control
+
+Systems can generate interesting consequences when their interactions are intentionally designed. A drought affects crop yield, which increases market prices, which changes NPC needs and the availability of quest supplies; the player can repair a canal, trade from another region or negotiate with a faction. Each effect is a legal typed event and has balance constraints; stochastic variation uses partitioned RNG and does not invent unlimited resources.
+
+Allow author-defined constraints: must remain completable, no permanent death, at least two nonviolent endings, bounded in-game days, no inaccessible timed inputs, explicit save support. Emergence is tested by generated player action traces and property-based worlds, not by claims of "infinite AI possibility". The designer can freeze specific quests or NPC arcs and vary the ambient systems around them.
+
+## 66.6 Cross-genre acceptance sequence
+
+Test a small library of compositional builds, each sharing the canonical engine/IR owner: platformer + collectible quest; farming + crafting + economy; tactics + dialogue + faction memory; racing + weather + pit/repair; narrative puzzle + multiple endings; survival + procedural chunks + save. For each, run source validation, target build, actual controller path, save/restart, independent logic equivalence and relevant audiovisual/rights checks. Inject three negative mutations: remove one required mechanic adapter, corrupt one shared inventory event, and change one input map after approval. The acceptance suite must fail on the correct dependency.
+
+**Exit:** one original mixed-genre game whose cross-system consequences are observed and independently reproduced on a declared target. A 500-operation editor catalog or a 50-trillion-recipe combinatorial count is not a substitute for that proof.
+
+# 67. Physics, collision, controller fidelity and tactile game-feel laboratory
+
+**Build packet:** ULTRA-67 | **Lead:** BOT-06 | **Peers:** BOT-07 level geometry, BOT-08 animation/audio, BOT-09 targets, BOT-11 input, BOT-12 verification. **Source evidence:** skeleton/ai/game_builder/advanced_physics_runtime.py explicitly describes a bounded fixed-point 2D/3D rigid-body *reference*, not continuous collision or an industrial fluid solver; skeleton/jeeves/game_engine_physics.py models numerical/physics compatibility, while game_engine_input.py normalizes historical digital/analog/touch devices and haptic metadata.
+
+The next layer should make physics and controls work in the exported game with predictable user experience across keyboard/gamepad/touch, not multiply abstract simulation types without engine calibration.
+
+## 67.1 Physical invariants and numerical profiles
+
+For each target mechanic, declare spatial units, handedness, up axis, scale, mass/inertia units, gravity, friction, restitution, damping, fixed timestep, collision layers/masks and numeric precision. Different runtimes may use integer/fixed-point or floating-point arithmetic; cross-runtime equality should compare appropriate conserved and gameplay-relevant invariants rather than demand impossible bitwise equality of floating physics. For a rigid body, position and velocity update must be bounded; contacts must not teleport through static obstacles; energy gain needs an explicit actuator; extreme/NaN inputs are rejected.
+
+Reference state is not the same as Godot physics truth. Build a **PhysicsParityCase** which records reference parameters, target scene/node IDs, injected initial conditions, actions, tick sequence, observed collision manifold or acceptable proxy, final state and tolerances. If native physics differs materially, identify whether adapter units, time step, collision geometry or engine behavior is responsible. Validate high-speed collision with continuous detection or substepping only where target supports it; never claim industrial fluid/cloth accuracy from a tiny fixed-point grid.
+
+## 67.2 Interaction latency and player control
+
+Input semantics include press, hold, release, repeat, analog amplitude, action remap, controller focus and disconnection. A user pressing jump while falling before landing may use a bounded jump buffer; coyote time is an authored grace window, not an engine accident. Movement parameters include acceleration/deceleration, slope tolerance, wall jump, sprint, crouch, climb, camera comfort, knockback and animation-root coupling where relevant. Test all with actual target physics and controlled input tapes.
+
+Use an **input-to-action-to-frame** trace with monotonic clocks and source IDs. Separate input sampling delay, backend transport if a remote preview, physics update, animation selection, rendering and display/audio delivery. For interactive local gameplay, neural generation cannot block critical input handling. Accessibility input assists are explicit player options that retain core progression fairness rather than hidden cheat behavior.
+
+Controller mappings require platform-specific validation. The existing device-normalization reference can serve as a compatibility layer for arcade paddles, digital controls, analog sticks, touch, mouse and optional motion/XR. Do not claim XR device support merely because a schema has a value for it. Every target declares supported physical input classes and missing capabilities honestly.
+
+## 67.3 Collision, navigation and generated-level reachability
+
+Nav graph feasibility must incorporate actual collision shapes, character dimensions, jumps, dynamic obstacles, moving platforms, water/gravity zones, portals and hazardous regions. A path through one tile adjacency is not enough if the character body cannot clear a ledge. Verify spawn is not trapped, goals are physically reachable, mandatory doors have conditions that can be satisfied and the platform has enough timing margin for required movement actions. For physics puzzles, model pushable object mass, constraints, friction and goal completion as legal game actions.
+
+A procedural solver should produce both a logical route and a representative physical replay witness. If an entity would cross an unloaded chunk or miss a collision because of asynchronous streaming, the target cannot be certified by the reference proof. Level edits to terrain height, slope or trigger size invalidate the relevant movement and quest proof. Automated region streaming must not switch collision shape while a player is standing on it without a safe reconciliation rule.
+
+## 67.4 Animation/haptics/audio coupling
+
+Character movement has a single authoritative root displacement policy. Either game physics drives locomotion and animation follows, or accepted animation-root movement feeds target collision correctly. Never add both displacements unintentionally. Footfall events correspond to actual contact transitions, audio samples correspond to surface material, camera shake and haptic output have bounded comfort/accessibility settings. Missing haptic hardware is not a reason to make an interaction undiscoverable. When reduced-motion is enabled, gameplay timing should remain valid while presentation is calmer.
+
+Environmental surfaces—ice, sand, mud, metal, low gravity, current, moving machinery—affect game mechanics through explicit, testable coefficients and authored rule types. Visual shaders may signal slipperiness but cannot secretly change friction. A neural asset proposal never directly mutates physics constants without the existing project approval path.
+
+## 67.5 Physics and game-feel laboratory
+
+Build a standardized suite of rooms: flat movement, slopes, corner collision, jump gaps near reachable threshold, moving platform, knockback, one-way door, water drag, platform through portal, variable frame pacing, disconnected controller and full save/resume. Record known-good controller traces and physical frame observations. Test engine/physics upgrades against this suite and compute regression diffs.
+
+Use at least two device/input classes when support is claimed. Calibrate input latency and tolerances on a fixed hardware profile with actual samples. Inject wrong world scaling, swapped collision mask, missing release action, disabled jump buffer and double root motion; all should fail. A reference-game pass must not certify native game feel. Promote only an observed and editable target behavior with retained failure evidence and rollback.
+
+# 68. Authorized AI coding inside the creator IDE: precise mutation, not model-controlled filesystem
+
+**Build packet:** ULTRA-68 | **Lead:** BOT-04 and BOT-02 | **Consumers:** BOT-05/06 game authors, BOT-09 builds, BOT-11 UI, BOT-12 security/testing. **Source anchors:** skeleton/jeeves/source_edit_gateway.py, source_edit_host.py, repository_file_atlas.py, skeleton/forge/repair.py, frontend/src/features/Jeeves/WorkspaceController.ts and the existing ToolExecutor/source-plane authorities.
+
+The inspected source_edit_gateway.py already requires the ToolExecutor HIGH_IMPACT grant, independent per-call host authorization, a trusted host source editor/lease and a committed-output digest matching the proposed bytes. It accepts narrow deterministic file replacements and an exact indexed source snapshot; a model cannot get write power from the atlas or preview. The new functionality must deepen semantic code editing **within those guarantees**, not bypass them to let an LLM "just run shell".
+
+## 68.1 Context-aware edit intent
+
+A user says "repair the door collision and make the left pathway accessible." The AI first retrieves the exact project graph, relevant source files, engine scripts, test traces, tool capability and source revision. It emits a structured **EditIntent** containing goal, affected entity/rule IDs, source file paths, precondition hashes, proposed semantic diff, expected target behavior, test plan, reversible/irreversible flags, required human permission and finite cost. Retrieval and planning can occur without host write authority. A retrieved README or game asset comment that requests a broader command is inert untrusted data.
+
+The EditIntent is checked against declared file owners, project/tenant, max patches/bytes, tool manifest, safe code language and known generated/manual source boundaries. An agent may not edit release gates, secrets or source-rights records just to satisfy a game task. A model cannot invent nonexistent file contents and submit them as a successful patched result.
+
+## 68.2 Patch production and deterministic host custody
+
+Prefer semantic game-document operations where they exist. For source files without a structured editor, generate minimal exact-context patches with old-content digest, expected replacement and bounded affected range. The trusted host applies them using race-resistant filesystem protections and an exclusive source lease; it verifies after-write bytes and publishes a stable new revision. The file atlas is refreshed incrementally after commit, not treated as a second writer. A patch against changed source fails with a genuine conflict and a replan suggestion.
+
+Generated code can introduce unsafe script execution. Apply parser/syntax validation, domain-specific lint, dependency/ABI checks and sandbox policy before running a target. Game scripts should execute under game target permissions, never with the app backend's privileged environment. Shader/plugin/native code requires a stronger declared permission class and review before compilation. A loose string replacement in a generated script is not permission to run arbitrary imported packages or shell commands.
+
+## 68.3 IDE experience and human control
+
+The UI shows requested outcome, exact file/entity diff, before/after gameplay effect, validation plan, cost estimate, rights/security implications and rollback path. The user can approve selected safe edits, reject a subset, refine their intent or lock authored code from regeneration. For unreviewed large changes, group diff by semantic effect rather than dumping hundreds of files with no narrative. A "repair" button must actually dispatch a granted tool call or clearly be suggestion-only.
+
+Jeeves should support multi-step projects with precise checkpoints: inspect, propose, approve, mutate, compile, test, show evidence. A model may suggest a code generation campaign but must not treat its own response as proof that the host wrote bytes. An error message from a real compiler should remain visible even if the model proposes a follow-up. The user owns the game and can edit it without AI.
+
+## 68.4 Executable repair and regression protocol
+
+After a candidate patch, run the parser/type tests for the modified source, the relevant engine import/launch, an actual input trace and the independent regression set. If the fix is a shared emitter/compiler bug, add a source-level regression proving future games get the repair rather than only patching one exported artifact. For a project-only authored rule, preserve engine owner and semantic history. A repair may not delete the scenario, disable the oracle, or turn a real collision into a purely cosmetic door-open animation.
+
+Bound attempts; preserve last-good source. If tests fail, attach exact compiler/engine logs and minimal counterexample. Conflicting changes by another bot/human require source-version fencing. If the host cannot prove safe file custody on the current platform, return BLOCKED rather than doing an unsafe ad-hoc write.
+
+## 68.5 Security and adversarial acceptance
+
+Attack with malicious repository comments, fake tool messages, a stale atlas hash, a symlink-target swap, concurrent modification, source file larger than limits, wrong user project, missing HIGH_IMPACT grant, forged approval receipt and code attempting to read secrets. No privileged write may occur. Then perform one legitimate authorized edit of a real generated Godot project and prove it changes gameplay on the exported target. The result records host source revision and new digest, human approval, test artifacts and all remaining release holds.
+
+# 69. Accessibility and localization as first-class game compilation constraints
+
+**Build packet:** ULTRA-69 | **Lead:** BOT-11 and BOT-08 | **Peers:** BOT-05 narrative, BOT-06 controls, BOT-09 exports, BOT-12 accessible verification. **Observed anchors:** skeleton/ai/game_builder/advanced_accessibility_runtime.py, advanced_localization_runtime.py, frontend/src/features/Jeeves/GamePlayViewport.tsx, menu_accessibility.py and the typed game/editor client contracts.
+
+The reference accessibility runtime actually simulates remapped action dispatch, alternative cues, subtitle text and reduced motion preferences, while explicitly disclaiming real screen-reader hardware/compliance audits. The localization reference actually resolves four declared locales (English, French, Arabic, Japanese), including plurals and RTL/fallback logic, but does not claim unlimited languages or certified translations. These are good bounded starting points. The completion path is **exported-game accessible play and correctly localized interaction**, not a bigger static locale list.
+
+## 69.1 Accessibility requirements flow into design IR
+
+An admitted game brief declares essential actions, expected input devices, readability, sensory alternatives, cognitive-load concerns, timing demands and minimum accessibility target. Each required game action must have at least one reachable input binding under the selected profile; each mandatory cue must have a usable nonexclusive sensory representation; each goal path must be completable using declared accessible controls. These are compilable constraints with proof requirements, not just a collection of settings checkboxes.
+
+Represent adjustable options: remap inputs, hold/toggle behavior, font scaling, contrast palettes, captions/subtitles, reduced motion, flashing intensity limits, camera shake, difficulty/assist options, time extensions and pause state. Default values and constraints must survive project build, save/restart and target export. Do not invent a global WCAG certification for every 3D game; scope checks to applicable application UI standards and actual gameplay accessibility evidence.
+
+## 69.2 Input remapping with conflict resolution
+
+A remap is a transaction over an input action graph. Rebinding jump to confirm must not silently remove the only available confirm or back command. Detect duplicate bindings, inaccessible menu navigation, controller disconnect, focus traps and platform-reserved keys. Provide a reset/recovery route operable with accessible controls. Runtime input maps and editor preview must consume the same mapping revision, and the actual exported target must demonstrate remap behavior. A successful reference ACTIONS simulation does not prove a real controller works.
+
+Assist profiles can enlarge timing windows, simplify simultaneous inputs or offer alternative puzzle interactions when the game's design permits. An action under an assist should still pass through canonical gameplay state, and the game must explicitly label modified scoring/competition behavior where relevant. No accessibility setting should transmit private health information or silently infer a sensitive trait.
+
+## 69.3 Source-owned localization catalog
+
+All player-facing text in quests, dialogue, menus, subtitles, tutorials, achievements and errors has stable string ID, source locale, version, placeholders, plural/gender/select grammar where supported, size/layout budget and context note. A translation candidate retains rights and reviewer origin. Automatically generated translations are not certified until reviewed and tested in their actual UI/scene. Never assume words have the same length or grammar across languages. Typed placeholders cannot become injected scripts or unsafe markup.
+
+For Arabic, demonstrate actual RTL direction, bidi handling, mirrored controls only when semantically appropriate, correct joining and numeric display; for Japanese, verify line breaking and glyph coverage; for French, plural/length. Locale fallback is deterministic and visible when unreviewed or missing. A target without a suitable font must fail its locale qualification or package an appropriately licensed glyph set. Broken localization must not corrupt quest IDs or gameplay logic.
+
+## 69.4 Multimodal accessible gameplay cues
+
+Sound effects must have captions or visual/tactile alternatives when they convey mandatory information; color-coded puzzles need symbols, shapes, patterns or text beyond hue; cinematic dialogue needs subtitles and timing with actual sound; reduced-motion modes avoid excessive camera shake and flashing without invalidating movement or collision. Target engine captures and accessible UI trees are the evidence, not a declarative "supports accessibility" field.
+
+Screen-reader and keyboard-only creator journeys need end-to-end testing: first setup, create project, edit world, approve AI change, play accessible preview, inspect errors, export. Native game UI may have different assistive technology support from the web studio; qualify each separately and retain honest limitations.
+
+## 69.5 Accessibility/localization regression suite
+
+Test a generated puzzle across all currently declared supported locales, with long dialogue, Arabic RTL text, Japanese glyphs, plural forms, dynamic type scaling and fallback. Play the game with remapped controls and no mouse. Disable sound and validate critical cues; enable reduced motion and validate camera/mission progression. Inject missing font, unbound confirm action, color-only essential clue, late voice subtitle and a translated placeholder mismatch; all must fail appropriate gating. Produce an independent report with actual engine views, input sequences and accessible interaction—not just pure translation lookup outputs.
+
+**Exit:** one complete game can be edited and played to a real ending using one alternate accessible control scheme and localized target UI with observed correct gameplay state, source rights and saved settings.
