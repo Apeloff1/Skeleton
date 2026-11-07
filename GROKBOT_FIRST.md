@@ -97,6 +97,8 @@
 - 82. World-save transactions and crash-safe game continuation
 - 83. Semantic compiler diagnostics and creator-guided repair
 - 84. Journey maturity, quality-debt ratchet and finite 12-bot production
+- 85. FRT-113 through FRT-160: frontier construction queue
+- 86. Golden living-world game: end-to-end architecture acceptance
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -7628,3 +7630,114 @@ The first campaign must build **one consistent game**. Its scene, NPCs, inventor
 A ticket can be implemented and qualified, implemented but lacking target proof, blocked with reproducer, or duplicate/already implemented with correct source map. Unknown checks stay unknown. A failing Sealed Context Guard, repository hygiene, malware scan, incomplete device test or missing human release permission is not compensated by dozens of passing source tests. Exact-head CI and independent target evidence determine merger/release eligibility. No draft, checklist or model assertion waives security and legal holds.
 
 Prepare a source-bound readiness dossier for each user journey: source SHA and project revision, executable/toolchain digests, actual controller/input tape, observed world/event/frame/audio state, feature claim, proof layer, current issues, rollback and operator decision. A reader can distinguish what truly works from what the frontier design intends to build. This is the operational contract that every future blueprint volume should strengthen.
+
+# 85. Frontier construction tickets FRT-113 through FRT-160: exact source ownership and proof
+
+**Owner:** coordinating Grokbot for sequencing, independent BOT-12 for qualification. **Disposition:** PROPOSED. The following are 48 additional source-bound implementation tickets mapped to existing canonical owners, not completed source work. They extend FRT-001 through FRT-112 and the previously indexed P0/enterprise volumes. Before creating a PR, inspect the current exact source head and all overlapping work; if the behavior is already implemented, link existing code and independent evidence instead of generating redundant wrappers.
+
+The immediate critical path is not the number of ticket labels. It is an original game that a human can author/edit, that genuinely uses NPC perception and quest consequences, that independently compiles and plays on a declared target, that survives save and upgrade, and that preserves security, original-work rights and device truth. Tickets below specify a minimum observable change and a negative test capable of detecting absence of the feature.
+
+| Ticket | Lead | Required build delta | First falsifiable acceptance |
+|---|---|---|---|
+| FRT-113 | BOT-05 | Unify observed NPC perception with existing world event owner | Unseen theft is absent from NPC belief; witnessed theft yields exact receipt |
+| FRT-114 | BOT-05 | Add source-bound belief/rumor provenance projection | Untrusted rumor cannot overwrite canonical world truth |
+| FRT-115 | BOT-05 | Enforce memory consolidation and finite commitment retention | Memory bound survives 10,000 turns without losing unresolved obligations |
+| FRT-116 | BOT-05 | Integrate NPC needs with physical food, water and trade | No free production under two competing NPC requests |
+| FRT-117 | BOT-05 | Connect households, civic tasks and embodied actors | Care/project progression requires real elapsed time and materials |
+| FRT-118 | BOT-06 | Make active NPC plans produce actual target movement | NPC reaches scene goal through native navigation rather than textual claim |
+| FRT-119 | BOT-07 | Preserve NPC identity across remote/active stream tiers | Region eviction and reload do not clone residents or rewards |
+| FRT-120 | BOT-03 | Admit optional lore-consistent NPC dialogue through real provider | Model outage retains playable authored dialogue |
+| FRT-121 | BOT-08 | Bind authored NPC speech/gesture to real animation and cue | Camera/audio engine capture corresponds to legal spoken event |
+| FRT-122 | BOT-12 | Independently challenge NPC epistemic boundaries | NPC never reveals unwitnessed hidden inventory or secret quest |
+| FRT-123 | BOT-05 | Reconcile quest completability stub with active solver owners | Stub cannot report a successful solve without executable proof |
+| FRT-124 | BOT-05 | Emit bounded quest reachability witnesses and caveats | Unknown/timeout cannot be promoted to SAT |
+| FRT-125 | BOT-05 | Classify intended endings versus accidental softlocks | Impossible key placement fails without deleting user hard constraints |
+| FRT-126 | BOT-05 | Connect quest-pareto alternative methods to source graph | Two routes produce distinct replayed world consequences |
+| FRT-127 | BOT-06 | Validate abstract routes against physical engine movement | Unreachable native jump rejects abstract graph success |
+| FRT-128 | BOT-05 | Bind witness-generated quests to actual observed events | Quest never begins before the witnessing tick |
+| FRT-129 | BOT-06 | Wire quest reward bridge through actual economy authority | Crash/replay cannot double-pay money or items |
+| FRT-130 | BOT-02 | Protect quest-source revisions under concurrent editing | Stale AI patch cannot overwrite a creator's new quest rule |
+| FRT-131 | BOT-12 | Run adversarial quest oracle across native and reference paths | Missing GDScript event fails native target proof |
+| FRT-132 | BOT-11 | Show quest contradictions and repairs in semantic UI | User can inspect failed rule and approve targeted repair |
+| FRT-133 | BOT-02 | Audit current B095/B099 mod authority and granted scopes | Declarative hook cannot invoke arbitrary code or network |
+| FRT-134 | BOT-09 | Add source- and target-versioned mod admission checks | Unsupported engine/mod ABI refuses cleanly |
+| FRT-135 | BOT-02 | Harden mod archive intake, signatures and provenance | Symlink/traversal, zip bomb and altered bytes are blocked |
+| FRT-136 | BOT-05 | Validate combined mod quest/economy semantics | Two mods cannot both grant same unique resource |
+| FRT-137 | BOT-09 | Implement mod dependency/compatibility diff before install | Dependency cycle or missing required provider fails |
+| FRT-138 | BOT-11 | Expose mod provenance, permission and conflict approvals | UI install never bypasses real Host grant |
+| FRT-139 | BOT-06 | Consume safe mod content in real generated Godot scene | Original quest mod visibly changes a playable target |
+| FRT-140 | BOT-02 | Implement revocation dependency graph for installed mods | Rights withdrawal marks dependent exports ineligible |
+| FRT-141 | BOT-06 | Migrate/save gracefully around removed optional mods | Save retains unrelated quest progress after mod removal |
+| FRT-142 | BOT-12 | Falsify mod loader privilege and runtime assumptions | Mod that tries eval/shell/release cannot execute |
+| FRT-143 | BOT-06 | Define explicit supported multiplayer target profiles | Local simulator cannot claim authenticated remote transport |
+| FRT-144 | BOT-06 | Qualify two-controller same-device game state ownership | Players have distinct inputs and exactly-once pickups |
+| FRT-145 | BOT-02 | Review real LAN authority/transport architecture before build | No unapproved public service or raw credential exposure |
+| FRT-146 | BOT-06 | Add sequence, epoch, replay guard to multiplayer intents | Duplicate/reordered packet never mints second reward |
+| FRT-147 | BOT-06 | Test prediction/reconciliation with bounded correction | Client rollback retains canonical economy and quest state |
+| FRT-148 | BOT-07 | Fence remote-active cross-region ownership transitions | Two region workers cannot both commit one NPC action |
+| FRT-149 | BOT-12 | Execute actual two-client network adversarial suite | Real transport verified only on executed client/server target |
+| FRT-150 | BOT-02 | Map authoritative GameSavePlane domains and migrations | One canonical writer for quest, inventory, world cursor |
+| FRT-151 | BOT-06 | Make quest rewards and save transitions idempotent | Kill after reward commit; restart preserves exactly one payout |
+| FRT-152 | BOT-01 | Prove atomic saved-game backup and restore on real disk | Power-loss crash cannot replace last good save with empty state |
+| FRT-153 | BOT-09 | Validate imported target save/asset/mod compatibility | Unknown future save schema is quarantined, not overwritten |
+| FRT-154 | BOT-11 | Show committed versus draft save and recovery status | Unsaved UI draft never appears as durable save |
+| FRT-155 | BOT-11 | Implement source-linked diagnostic and impact inspector | Door edit identifies real nav, quest and target test dependencies |
+| FRT-156 | BOT-04 | Limit AI repair to preconditioned semantic/code mutations | Wrong head, grant or source hash rejects before host write |
+| FRT-157 | BOT-12 | Falsify game maturity evidence hierarchy | Node VM canvas calls cannot certify physical browser pixels |
+| FRT-158 | BOT-04 | Schedule first playable against actual CPU/GPU/tool slots | Mass background asset work cannot starve live player/editor |
+| FRT-159 | BOT-09 | Produce one clean-target source-to-native executable trace | Real independent controller drives goal, save/restart and output |
+| FRT-160 | BOT-12 | Compile independent exact-head game release dossier | Unresolved rights, malware, native and device holds persist |
+
+## 85.1 Source-to-work assignment
+
+BOT-05 owns NPC cognition, causal world/quest authoring and solver integration. BOT-06 owns player movement, native game effects, runtime action semantics and target-specific network play. BOT-07 owns world streaming/geometry and persistence of remotely simulated actors. BOT-08 owns visible/audible character presentation. BOT-09 packages target binaries and mods and validates actual clean-target execution. BOT-02 checks game-source ownership, protected tools, mod grants, data stores and rights. BOT-03 assists through the existing local model provider; it cannot become an unauthorized second inference runtime. BOT-04 coordinates finite admitted actions, source CAS and safe recovery. BOT-01 provides durable first install, backup and host capability. BOT-11 presents real game state and truthful source-to-play diagnostics. BOT-12 tests independently and preserves all unproven release claims. BOT-10 contributes only through approved, citation-bound research transfers, not arbitrary web/file permissions.
+
+The work graph has six admission groups. **A: authority reconciliation** (FRT-123, FRT-133, FRT-145, FRT-150, FRT-154) ensures the relevant live source owners are known before code. **B: causal gameplay** (FRT-113–132) binds NPC memory, quest witnesses and valid native state. **C: safe extensibility** (FRT-133–142) makes controlled user mods real without introducing an untrusted runtime. **D: multiplayer and streaming** (FRT-143–149) proves only the modes actually implemented and authorized. **E: game durability and UI** (FRT-150–156) preserves source, save, approved changes and diagnostics. **F: end-to-end execution and release** (FRT-157–160) measures a shared real player journey and qualifies only its exact target. These grouping names are a scheduling proposal; some ticket prerequisites overlap and require current-head inspection.
+
+## 85.2 The exact minimum work-receipt contract
+
+Every ticket completion receipt includes: ticket and canonical owner; baseline commit; current head and source diff; project/game revision; affected schema and semantic IDs; expected player-visible change; explicit allowed tool/grant and resource budget; actual resulting bytes or event digests; negative reproducer that failed before correction; completed-code focused checks; target-runner identity and observed outcome; affected dependent proofs; rollback; human/independent verifier identity; and any still-active security, hardware, rights, CI or launch holds.
+
+A missing physical test is reported NOT EXECUTED, not PASS. A successful source import does not prove a player-facing game. A sealed source receipt does not substitute for a network operation or model-weight training. A valid duplicate decision maps to an already-existing owner and proof instead of increasing file count artificially. A valid blocker shows the first reproducible upstream failure and the smallest safe repair; it does not weaken the test to claim progress.
+
+# 86. Golden reference game: a single living-world build that exercises the whole architecture
+
+**System integrator:** BOT-04 under existing authority, with BOT-12 independent final observation. **Game:** a wholly original, editable two-region village-and-floodgate adventure provisionally called **The Broken Causeway**. The name is an example design seed, not a required product branding choice. This scenario deliberately couples live NPC perception, economy, quest solvability, input/physics, media, save/restore, safe mod extension and native export into one game identity. It avoids constructing a different toy for each bot and then falsely claiming the products are integrated.
+
+## 86.1 Authored player experience
+
+The player arrives at a settlement after storms have damaged the causeway. They can inspect physical damage, speak to a builder, trade for timber, recover stock from a flooded cellar, seek a legal passage alternative, or negotiate with the harbor faction. An NPC witnesses at least one meaningful player action and forms a belief based on its own location and perception, not a model's omniscient prompt. Two legal endings exist: repair the causeway using accountable materials and gain builder trust, or negotiate a temporary ferry route while preserving the town's scarce wood for winter. Each ending changes real world state, faction relationships and a visible environmental feature.
+
+The original game must include a controllable character, bounded movement and collision, 2D/3D presentation appropriate to chosen engine, an animated NPC, an inventory resource, a quest choice, audible/accessible feedback, one failure/retry route, manual editability and working save/restart. A designer can change a requirement such as the number of timbers needed without invalidating the world identity. This reference game uses lawful source-created visuals/sound; no copyrighted commercial game content is imported by default.
+
+## 86.2 The shared source-to-target spine
+
+**S0: authorize and snapshot.** Identify actor/project, source branch, approved target and real local capabilities. Record initial source, rights, tool versions and stable game seed. Keep no hidden privileged game code execution.
+
+**S1: compile semantic design.** Author world, entities, resources, quests, alternatives, NPC roles and fail states through established schemas. Validate no contradictory mandatory prerequisites, explicit starting resources, legal commands, story causality and accessible input. Make a witness route for each ending; expose unknown physical assumptions.
+
+**S2: build world and NPC consequences.** BOT-05 defines physical timber stocks, witness event, town resource impacts and faction state. BOT-07 supplies two streaming regions and navigation/collision. The NPC cannot observe the player if out of sight, cannot spend stock twice, and must physically move or take a valid abstract path to perform repair work.
+
+**S3: compile into a real engine.** Use the existing admitted Godot exporter/target or another expressly supported target. Validate scene node identities, scripts, input maps, sprites/rigs, source art, sound cues, colliders, quest signals and save adaptor. A reference-only game plan does not satisfy this stage.
+
+**S4: demonstrate independent player actions.** Run actual input tape: spawn, walk, talk, collect/trade, trigger witness, select one alternate strategy, resolve floodgate/causeway, observe actual ending, save, terminate and reload. Capture source-bound event state and engine frames; where audio is claimed, show decodable buffer or physical output as appropriate. The tester must be independent of generated game code.
+
+**S5: exercise source edit and rebuild.** A human changes a door/bridge resource requirement. The editor shows affected rules, routes, NPC plans, localization, target scripts and tests. The agent proposes a bounded patch with source preconditions; human approval commits a new revision. Old proof is invalidated only for real affected dependencies. Recompile and independently replay; preserve unrelated art.
+
+**S6: introduce a safe mod.** Add one original decorative sprite variant and one bounded quest option through current declarative mod API. Verify load order, source rights, permission scopes, semantic conflict, game import and save compatibility. Attempt an unauthorized hook action and prove no privileged effect.
+
+**S7: crash and recover.** Kill a process after one committed reward but before frontend acknowledgement; restart and reconcile exactly one currency/item outcome. Kill during a compiled asset publication and retain last-good playable game. Restore a saved game after remote NPC tier change; check resident identity, history and resources.
+
+**S8: package and classify.** Build actual target if toolchain exists, run from clean directory, capture final package digest and input-driven play, then request independent security/rights/install/hardware signoff only where supporting evidence exists. Mark unexecuted device or model tests as unknown. Do not reinterpret a signed source manifest, ROM header or Node canvas recorder as full real-world target certification.
+
+## 86.3 Falsification grid
+
+A strong game-builder can refuse unsafe builds. Define deliberate mutations: place mandatory resource behind locked gate; remove NPC's perception event; replace real timbers with invented free stock; duplicate quest reward; change a mod's declared hash; introduce a cycle; remove the controller action mapping; corrupt a save cursor; swap a target binary after playtesting; revoke a source license; simulate a remote network result without actual transport; and remove visible/accessibility cue for an essential switch. Every mutation must fail the gate associated with its actual effect. A suite that still reports complete after severing native controller input is invalid.
+
+Compare behavior before and after a legitimate fix using source/project/engine identities and held-out test seeds. A score improvement cannot be accepted if the model removed the story requirement or disabled a failing test. A game that boots but is unsolvable remains unqualified. The only acceptable full product conclusion is one with source editability, observed gameplay, persistent player state, proper rights and exact target evidence.
+
+## 86.4 Scale-up rule after the golden game
+
+Only after the shared golden game reaches an independently verified target rung should the production graph expand to a richer region, deeper NPC households, more gameplay genres, higher-fidelity rig/media and additional target platforms. Expand one semantic dimension at a time and preserve regression gates: every new mechanic has real source owner and native action mapping; every new genre has actual player journey; every new target has own compiler/device proof; every new asset model has rights and actual pixel/audio output; every new agent has physical admission and tool grants.
+
+The million-word blueprint is an indexed implementation constitution, not an excuse for generating a million lines of inactive code. The next batch must continue with novel, source-grounded integration depth and route the plan into real code-producing tickets. Existing security, native, merge, release and first-install holds remain in force until the true qualified owners lift them on exact evidence.
