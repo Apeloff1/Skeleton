@@ -121,6 +121,20 @@ def _setup_phase(result: SetupResult) -> InstallPhase:
     return InstallPhase("setup-runtime", True, detail)
 
 
+
+def _isolated_setup_recovery_command(manifest: object, *, hot: bool) -> tuple[str, ...]:
+    """Start only the independent setup frontend, regardless of Compose overlays.
+
+    A successful UI recovery is diagnostic only and cannot establish backend or
+    local-inference readiness. The command must remain shell-free.
+    """
+    command = compose_command("up", manifest=manifest, hot=hot)
+    if not command or command[-1] != "frontend" or command.count("up") != 1:
+        raise ValueError("diagnostic recovery must target only frontend")
+    up_index = command.index("up")
+    return (*command[:up_index + 1], "--no-deps", *command[up_index + 1:])
+
+
 def install_application(
     root: Path | None = None,
     *,
@@ -292,18 +306,7 @@ def install_application(
                 full_services=("frontend",),
             )
             try:
-                recovery_command = compose_command("up", manifest=diagnostic_manifest, hot=hot)
-                # Compose overlays can introduce dependencies even when the
-                # canonical manifest has none. Recovery must never restart
-                # the protected backend or inference stack.
-                if not recovery_command or recovery_command[-1] != "frontend":
-                    raise ValueError("diagnostic recovery must target only frontend")
-                up_index = recovery_command.index("up")
-                recovery_command = (
-                    *recovery_command[:up_index + 1],
-                    "--no-deps",
-                    *recovery_command[up_index + 1:],
-                )
+                recovery_command = _isolated_setup_recovery_command(diagnostic_manifest, hot=hot)
             except ValueError:
                 # Invalid diagnostic topology must not mask the original
                 # protected-stack failure or escape without a receipt.
