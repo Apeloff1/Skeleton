@@ -74,7 +74,7 @@ def _hazard(url:str)->str|None:
         return "unapproved_or_oversized_url"
     segments=[unquote(x).casefold() for x in parsed.path.split("/") if x]
     repeats=Counter(segments)
-    if any(repeats[x]>_REPEATED_SEGMENT_LIMIT and len(x)>1 for x in repeats):
+    if any(repeats[x]>_REPEATED_SEGMENT_LIMIT for x in repeats):
         return "repeated_path_segment_trap"
     try:
         pairs=parse_qsl(parsed.query,keep_blank_values=True,max_num_fields=_MAX_QUERY_PAIRS)
@@ -106,13 +106,13 @@ def evaluate_frontier_candidate(
             or type(max_variants) is not int
             or not 1<=max_variants<=_MAX_FAMILY_VARIANTS):
         raise ValueError("invalid crawl-trap circuit source inputs")
-    family=_family(candidate)
-    identity=_fingerprint(family)
     hazard=_hazard(candidate)
     if hazard:
         return FrontierCircuitDecision(
-            False,hazard,identity,0,max_variants,
+            False,hazard,_fingerprint((candidate[:4096],())),0,max_variants,
         )
+    family=_family(candidate)
+    identity=_fingerprint(family)
     # The snapshot owns every existing identity. Only the canonical URL
     # family is counted; text, page instructions and arbitrary model scores
     # have no effect on permission, identity or request billing.
