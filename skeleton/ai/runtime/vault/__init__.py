@@ -9,6 +9,9 @@ Exports:
 - Predefined roles: ROLE_GUEST, ROLE_USER, ROLE_OPERATOR, ROLE_ADMIN
 - AuditLog / WORM refuse-on-boot helpers (AuditChainBroken, verify_chain_or_refuse)
 - ShamirSeal: secret sharing seal
+- SealedStore / RecoveryManager: slot-bound AEAD store + sealed snapshots
+- QuorumGate: N-of-M dual control
+- VaultSeal: initialize / unseal ceremony / seal / quorum re-key lifecycle
 """
 
 from skeleton.vault.access import (
@@ -29,6 +32,10 @@ from skeleton.vault.audit import (
     verify_chain_or_refuse,
 )
 from skeleton.vault.shamir import ShamirSeal
+from skeleton.vault.store import IntegrityError, SealedStore
+from skeleton.vault.recovery import RecoveryError, RecoveryManager, RecoverySnapshot
+from skeleton.vault.quorum import QuorumError, QuorumGate
+from skeleton.vault.unseal import SealKeys, SealState, SealStatus, UnsealError, VaultSeal
 from skeleton.vault.data_lifecycle import (
     DataLifecycleRegistry,
     DeletionAction,
@@ -84,6 +91,18 @@ __all__ = [
     "AuditLog",
     "verify_chain_or_refuse",
     "ShamirSeal",
+    "IntegrityError",
+    "SealedStore",
+    "RecoveryError",
+    "RecoveryManager",
+    "RecoverySnapshot",
+    "QuorumError",
+    "QuorumGate",
+    "SealKeys",
+    "SealState",
+    "SealStatus",
+    "UnsealError",
+    "VaultSeal",
     "DataClass",
     "DataGovernanceDenied",
     "DataGovernanceError",
