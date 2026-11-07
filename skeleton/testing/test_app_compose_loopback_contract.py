@@ -1,7 +1,6 @@
 """Regression contract for first-install host exposure (no Docker required)."""
 
 from pathlib import Path
-import re
 import unittest
 
 
@@ -18,14 +17,11 @@ class ConsumerLoopbackComposeTests(unittest.TestCase):
             ("frontend", "FRONTEND_PORT"),
         ):
             with self.subTest(service=service):
-                section = re.search(
-                    rf"(?ms)^  {service}:\\n(.*?)(?=^  [a-z][a-z0-9_-]*:|^networks:|\\Z)",
-                    text,
-                )
-                self.assertIsNotNone(section)
-                self.assertRegex(
-                    section.group(1),
-                    rf'(?m)^      - "127\\.0\\.0\\.1:\\$\\{{{port}:-[0-9]+\\}}:',
+                section = text.split("\\n  " + service + ":\\n", 1)[1]
+                section = section.split("\\n  ", 1)[0]
+                self.assertIn(
+                    '      - "127.0.0.1:${' + port + ':-',
+                    section,
                 )
 
     def test_mongo_and_chroma_remain_loopback(self):
