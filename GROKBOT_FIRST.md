@@ -82,6 +82,10 @@
 - 67. Native physics, player control and game-feel parity
 - 68. Granted AI coding and precise host source editing
 - 69. Accessible and localized game compiler constraints
+- 70. Physical GPU rendering and proof-carrying frame graphs
+- 71. Original media foundry with target-native asset custody
+- 72. Unified creator workbench and source-to-play debugging
+- 73. Exact-package consumer release assurance
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -7112,3 +7116,127 @@ Screen-reader and keyboard-only creator journeys need end-to-end testing: first 
 Test a generated puzzle across all currently declared supported locales, with long dialogue, Arabic RTL text, Japanese glyphs, plural forms, dynamic type scaling and fallback. Play the game with remapped controls and no mouse. Disable sound and validate critical cues; enable reduced motion and validate camera/mission progression. Inject missing font, unbound confirm action, color-only essential clue, late voice subtitle and a translated placeholder mismatch; all must fail appropriate gating. Produce an independent report with actual engine views, input sequences and accessible interaction—not just pure translation lookup outputs.
 
 **Exit:** one complete game can be edited and played to a real ending using one alternate accessible control scheme and localized target UI with observed correct gameplay state, source rights and saved settings.
+
+# 70. Real GPU rendering and proof-carrying frame graphs
+
+**Packet:** NEXT-70 | **Lead:** BOT-08 | **Partners:** BOT-05 world, BOT-06 gameplay, BOT-09 export, BOT-11 editor, BOT-12 independent verification. **Inspected source:** skeleton/game/render/flgb_render_runtime.py owns immutable RenderPass/RenderGraph, MaterialNode/MaterialGraph, ShaderCompileRequest/Receipt, TextureRequest, MeshArtifact, Light, ShadowRequest, CameraRig, RenderCheckpoint and RenderRecoveryDecision. The render_graph.py and render_recovery.py files re-export these types. This packet is integration on these actual owners, not another GPU execution authority.
+
+A graph of passes, materials and light requests is a useful structural description; it is not evidence that a real target generated pixels. The next engineering frontier is taking one committed project revision and camera, importing/binding the corresponding geometry/materials, running an admitted actual engine or GPU backend, observing its output frames and comparing those to gameplay events. Renderer completion requires both a correct graph and an observed, playable scene.
+
+## 70.1 Cross-pass hazards, memory lifetimes and backend admission
+
+RenderGraph currently topologically orders declared dependencies and rejects cycles. RenderPass disallows reading and writing a logical resource within the same pass. Extend the validated projection to include *cross-pass* hazards: read before a valid producer, two overlapping writes, lost synchronization, incompatible resource format, invalid depth/stencil access, unsupported compute stage, stale shader reflection and aliased memory still in use. A directed acyclic graph alone cannot establish these GPU safety properties.
+
+Model resource lifetime and usage through existing render authority. Each transient image/buffer identifies its producer, consumers, format, dimensions, physical allocation compatibility, GPU access stage and release fence. An allocator may alias memory only after it can show that all prior reads/writes have completed. Do not let a model reorder graphics passes to claim speed without proving matching final frames. Target-specific import/barriers are typed operations, not arbitrary user-selected shader callbacks that execute in the privileged backend.
+
+Admit real target capability first: engine/version, graphics API, texture formats, shader stages, memory and draw budgets, frame capture support and dependency versions. If a requested compute or mesh shader is unsupported, return a truthful unsupported feature with optional reviewed fallback, rather than an empty render pass. Keep source-only graph checks separate from real target execution.
+
+## 70.2 Shader and material semantics
+
+The existing ShaderCompileRequest contains source digest, stage, target and defines; ShaderCompileReceipt binds compiler/binary/reflection/warning digests. Require the actual compiler process and imported shader bytes before making a runtime claim. Validate stage interfaces, vertex layout, descriptor/binding types, uniform alignment, texture colorspaces, sampler limits, shader feature flags, deterministic build identity and runtime compile errors. A digest over invented compiler output is invalid evidence.
+
+Materials need explicit physically based conventions: linear-versus-sRGB channels; roughness/metallic/normal/occlusion semantics; opacity ordering; tangent normal conventions; alpha premultiplication; emission and shadow participation. Editor-visible material parameters must map to real engine shader uniforms or declare unsupported. Original authored textures retain provenance, rights and reversible transforms. A complex neural-looking surface preview is not a native material until a real target renders it from licensed bytes.
+
+Advanced candidates—clustered lights, virtualized mesh/texture streaming, GPU-driven culling, temporal upscaling, volumetric fog, global illumination and neural denoising—are *optional experiments*. Each must beat a pinned baseline in actual frame quality and frame-time budget without weakening device, safety or user-perception requirements.
+
+## 70.3 Geometry, collision and visual affordances
+
+MeshArtifact declares topology, vertex/index counts and bounds digest, but this does not prove that a GPU buffer or skinned scene exists. For any produced prop/character, bind source mesh bytes, target import ID, material, transform, camera visibility, collision source and player interaction. Test winding, UVs/tangents, normals, scale/up-axis, degenerate triangles, shader availability and target draw limits. Link visible and physical identities so a bridge shown to the player is traversable according to its actual collider.
+
+CameraRig source coordinates/FOV must lower to a real target camera. Verify frame composition, aspect ratios, depth/clipping, character visibility, required quest clues, subtitle safe zones and reduced-motion constraints. A formally valid camera looking at a wall is not a gameplay-qualified view. Source-to-render-to-collision association is mandatory for interactive scenes; losing any link invalidates target proof.
+
+## 70.4 Texture streaming, lights and device pressure
+
+The existing plan_texture_streaming and plan_shadows choose admissible requests under byte/texel caps. Extend decisions into *observed physical resource residency* through current capacity managers, never a second GPU ledger. Use camera proximity, velocity, scene semantics, required quest cues, active UI, true VRAM consumption, upload fences, shader warmup and thermal/swap pressure. Evict cosmetic mip levels before mission-critical sprites or HUD. Do not reclaim capacity until the worker/driver confirms release.
+
+Use bounded fallbacks: lower texture mips, simpler shadows, reduced particles, cheaper material, controlled draw distances. Never hide a mandatory collectible merely to meet FPS, or advertise active collision before geometry is ready. Track p95/p99 frame time, shader stalls, resource peaks and screenshot-level visual defects. Different target hardware tiers receive different admitted caps and evidence.
+
+## 70.5 Renderer recovery and proof
+
+On device loss, discard invalid GPU handles, rebuild derived resources from approved source, rebind the last committed project scene/camera and preserve game event/save history. Render recovery cannot mint inventory or overwrite a human project. Unsupported/failed shaders must not enter endless reload loops. Capture actual engine frames on a declared supported target while player input moves through a scene with lighting, one rigged actor, texture LOD, a quest item, UI and collision. Induce missing shader, malformed mesh, GPU pressure and context loss. Verify real visible fallbacks or precise holds, not a metadata-only "rendered" flag. Retain graph/source/asset/target/frame identities in every acceptance receipt.
+
+# 71. Full original media foundry with target-native asset custody
+
+**Packet:** NEXT-71 | **Lead:** BOT-08 | **Partners:** BOT-02 rights, BOT-03 approved generation, BOT-05 design, BOT-06 engine, BOT-09 packaging, BOT-12 QA. **Inspected source:** skeleton/ai/game_builder/studio_asset_pipeline.py creates original pixel tile bytes, PNG previews and portable media; studio_sprite_authoring.py accepts exact six semantic 8×8 indexed sprites or its specifically bounded artist PNG. Selected GB/CGB/NES/SMS/Game Gear emitters consume generated tiles, while other listed targets may support previews only. Do not confuse a portable preview with a native embedded game asset.
+
+## 71.1 Source asset ledger and transform graph
+
+An asset has canonical content digest, tenant/project owner, origin, author/consent/rights, medium and format, exact dimensions/bounds, semantic role, transformations, version/seed/model settings if generated, allowed targets, source references, revocation state and dependent outputs. Its bytes are admitted through existing artifact custody, not by an arbitrary model-named path. Each transform—decode, crop, quantize, atlas, rig, bake, resample, compress, import, export—is reproducible or explicitly records nondeterministic physical output and its digest.
+
+A text description of artwork cannot be counted as pixels. A PNG preview does not prove a cartridge program consumes the tile bytes. A sprite atlas is not an animated engine character until actual input drives frame/state changes. Rights clearance to study an image or video is not permission to redistribute it or train on it. Source withdrawal invalidates dependent media/export lineage without deleting independent user-owned work.
+
+## 71.2 2D sprite, palette and font production
+
+Support actual sprite drawing/import, layers, alpha, pivots, collision/hit boxes, animation frames, tilemaps, texture atlases, palette controls, UI states and accessible variants. Every import validates decompressed size, dimensions, colorspace and pixel data under bounded decoder resources. Tile codecs must round-trip tested input to output bytes; renderer check compares actual target import and UV/sample alignment. Quantization/dithering records palette and algorithm, and does not silently discard artist-approved detail.
+
+Cartridge targets have real palette/bank/VRAM/tile memory constraints. The current six-tile structure must not silently accept a larger atlas by truncation. More tiles require actual banked scene handling and relevant source/game assembly changes, then emulator and where possible hardware proof. Modern game projects can offer richer animation and resolution while retaining source pixel identity, consistent character silhouette and registered target features.
+
+Text is an asset too: font rights, glyph range, locale shaping, scaling, contrast and subtitle layout should be tested in the actual game, not merely in a source catalog. An unsupported script such as Arabic RTL without correct shaping or Japanese glyph fallback must be reported honestly.
+
+## 71.3 3D model, rig and material pathway
+
+Admit authorized procedural geometry, user-authored mesh, modular building blocks or model-generated candidates. Validate scale/up-axis, mesh topology, UV, tangent/normal, bounds, material channels, skin weights and skeleton parent graph before engine import. Derived LOD, normal maps, baked textures or mesh simplifications retain original source rights and reversible editing metadata. Physically visible behavior and collider navigation are separate acceptance dimensions.
+
+For character production, retain a stable identity/canon definition and actual animation tree mapping. An idle/walk/run/attack proposal passes only when the target renderer displays the motion and gameplay root/collision state agrees. Optional neural reconstruction, Gaussian visual fields or generative retopology are research features until editable engine-supported output is actually proven. A gorgeous render cannot substitute for a controllable original character.
+
+## 71.4 Audio, voice, VFX and cross-media sync
+
+Audio cues need real decodable samples or authorized synthesis, mixer bus, timing, loudness, spatial attributes, captions and rights. The logical audio scheduler cannot itself attest physical playback. VFX need actual engine emitter, GPU/CPU particle budget, responsive gameplay cue and accessible alternative. Cinematics bind source dialogue, shot, actor expression/pose, audio sample and subtitle cue on a versioned timeline. Skipping, pausing, localizing or restoring the scene cannot double-commit rewards.
+
+AI media must be permissioned and bounded by user privacy and commercial rights. Real-person voice/likeness sources require appropriate consent; do not train on private media by default. Content from a crawler remains research evidence until approved for use and transformation. Any unavailable provider leaves the user with a clear manual/procedural asset path, not a fabricated generated file.
+
+## 71.5 Usage-based asset acceptance
+
+An asset is **produced**, **decoded**, **engine-imported**, **bound to scene/gameplay**, **observed in real play**, **retained through rebuild/save**, and **eligible for release** as separate milestones. The user cockpit should show actual usage and orphan dependencies. A large unused library can be valuable but cannot be counted as a more complete playable game. Test missing clip/texture, PNG bomb, incorrect tile count, invalid rig, revoked rights and stale shader asset. One original small game should visibly and audibly consume the same accepted assets in a clean-target executable, with exact digests and independent evidence.
+
+# 72. Creator workbench: unified game digital twin and source-to-play debugging
+
+**Packet:** NEXT-72 | **Lead:** BOT-11 | **Partners:** BOT-02 identity, BOT-04 Jeeves, BOT-05 world, BOT-06 input, BOT-08 media, BOT-09 build, BOT-12 usability. **Observed surfaces:** GameSceneTimeline.tsx provides an editable SVG-based timeline; GameBuildWorkflowPanel.tsx manages build plans, previews, auth scope and cancellable requests; GamePlayViewport.tsx connects to game play; Forge panels expose detailed source authoring. The goal is not more separate panels but one coherent, inspectable product.
+
+## 72.1 One canonical project, many synchronized views
+
+Show world scene/hierarchy, mechanics/events, assets, character rigs, production timeline, actual play, builds, QA/evidence and Jeeves suggestions as views of one project revision. A selection of one door links source entity, quest predicate, collider, mesh, trigger event, animation and native playtest. If any link is missing, display the integration gap rather than invent it. UI state such as zoom or drag is ephemeral; project revisions and tool receipts belong to the existing authoritative backend/engine.
+
+A human project edit is source-CAS guarded. Another collaborator or AI working from an old revision must see a conflict and replan instead of overwriting the user's latest change. A browser offline draft is clearly not a committed project. Switching auth account/project fences old requests and private cached views.
+
+## 72.2 Spatial and timeline editing
+
+Spatial tools need scene hierarchy, layers, camera, tile/terrain brush, prefab/actor placement, collision and nav affordances, event triggers, lighting/material controls and asset previews where target-supported. Unavailable features should be explicit. Large worlds require virtualized trees and lazy thumbnails; never load all future chapters or all hypothetical chunks into the device. Use source IDs for selections, not names guessed by an LLM.
+
+Timeline editing binds keyframe, actor, camera, audio, caption, interpolation, logical time and optional gameplay consequence. Scrubbing presentation must not mutate authoritative quest/inventory. A moved dialog cue updates dependent subtitle and camera timing with clear changed-node diff. A target that cannot lower the requested animation returns an actionable build error rather than an empty clip.
+
+## 72.3 Actual playable comparison and repair
+
+Provide design preview beside last verified engine capture when useful. Label source-only, reference simulator, headless replay, live interactive engine and physical target proof separately. A tool-generated image in the viewport cannot be labelled a current playable native screenshot. An input recording maps player action → game tick → world event → scene transform → frame/audio output. A bug report can jump to the first divergence, its source rule and a minimal reproducer.
+
+Jeeves can propose a patch with exact file/semantic IDs, parent revision, expected effects, budget and testing. The user can approve or reject. Tool execution needs the real current permissions; a chat statement never becomes a host source write or release grant. Preserve manual art/canon locks across regeneration.
+
+## 72.4 User-journey and accessibility acceptance
+
+A novice should be able to create a small original world, place player and door, request a quest, edit a rule, observe a real engine play, save/restart, compare result, approve one AI repair and export a source/target with truthful proof labels. An expert should inspect typed graphs, build dependencies, raw source, rights, test logs and performance. Run keyboard-only, gamepad/touch where claimed, reduced-motion, large text and screen-reader journeys. Buttons must be real operations or unambiguously read-only; a progress spinner alone is not evidence of a running worker.
+
+# 73. Exact-package release assurance and trustworthy consumer delivery
+
+**Packet:** NEXT-73 | **Lead:** BOT-09 | **Independent owners:** BOT-02 rights/security and BOT-12 QA. **Observed source:** consumer_release_assurance.py validates role-separated HMAC evidence kinds RIGHTS, PLAYTEST, HARDWARE, ACCESSIBILITY, LOCALIZATION, MALWARE, CODESIGN, PLATFORM_PERMISSION and PUBLICATION against one exact source manifest. It explicitly notes HMAC proves configured-key custody, not legal correctness. native_release_intake.py byte-verifies bounded local artifacts through no-follow descriptor-anchored paths, while deliberately refusing to claim compiler execution, native play, legal review or release. studio_godot_qualification.py performs headless GDScript replay parity and expressly does not claim visible framebuffer, native binary export, hardware controller or release approval.
+
+## 73.1 Evidence DAG and scope
+
+A candidate package binds project/source revision, build/toolchain digests, executable bytes, bundled asset/rights inventory, target OS/architecture, save schema, supported input, localization/accessibility, independent QA, malware/security scan, signing and human distribution decision. Each evidence node has issuer role, exact subject, produced timestamp, dependency identities, tool/runner, policy version and freshness. A proof for an old package cannot qualify a new binary merely because both came from the same project name.
+
+Classify separately: source valid; bytes exact; compiler actually executed; game behavior observed; clean target device compatible; security/rights approved; publication authorized. If the binary changes, dependent malware and gameplay proof must be rechecked. If rights change, the affected export eligibility is re-evaluated even if bytes remain unchanged. Preserve independent evidence that is still current.
+
+## 73.2 Build and game acceptance cannot be inferred
+
+A successful source-to-C11 or GDScript emitter is a source artifact, not a Windows executable. A file starting with MZ or ELF is not proof of successful toolchain or runtime execution. A headless engine script replay proving end state does not demonstrate pixels, audio, real player input or clean device install. The user-facing release view must show these as separate explicit states.
+
+For each claimed target, require real toolchain invocation, isolated build, binary/asset import, clean-host launch, controller-to-game goal completion, save/restart and relevant physical audio/graphics tests. Unsupported targets remain source-only or unavailable. A platform SDK absent from the host is not a reason to fabricate executable bytes.
+
+## 73.3 Security, rights and signoff
+
+Keep code-signing keys and trusted HMAC keys out of game manifests. Independently signed role evidence cannot be self-issued by the model or inferred from a favourable QA summary. A rights review verifies original and imported material under the actual intended use; passing a structural credits check is insufficient for legal clearance. Malware/active-content scanning applies to the final package, and scanner unavailable is not scanner clean. Public storefront or paid distribution additionally needs entitlement/payment and platform approval, separately from offline self-export.
+
+An AI worker may prepare a candidate but cannot unilaterally publish it. Exact-head CI, architecture/source parity, security checks, physical target and human approvals remain independent noncompensable gates. A draft PR is not release authority.
+
+## 73.4 Recovery, rollback and negative tests
+
+Retain a last-known-good package, versioned save compatibility and a rollback plan. A failed update cannot erase player progress, and a rights withdrawal must block ineligible redistribution without deleting unrelated authored source. Inject one changed binary byte, reviewer-role substitution, stale evidence, forged HMAC, missing license notice, no compiler binary, failed controller replay, unsafe path/symlink and unavailable malware scanner. Verify each rejects at the appropriate stage while accurately retaining unrelated valid proof. Publication is allowed only after every required exact-subject gate and an authorized final decision.
