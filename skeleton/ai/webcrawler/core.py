@@ -25,6 +25,7 @@ from urllib.robotparser import RobotFileParser
 
 from .document_formats import (
     ADDITIONAL_TYPES, RESEARCH_ARTIFACT_TYPES,
+    HAR_MEDIA_TYPES, PATCH_MEDIA_TYPES, CSL_MEDIA_TYPES,
     DocumentFormatError, extract_additional_format,
 )
 from .archive_documents import ARCHIVE_TYPES, extract_archive_document
@@ -32,6 +33,8 @@ from .xml_documents import GENERIC_XML_TYPES, extract_xml_evidence
 from .html_semantics import HTMLSemanticError, extract_html_semantics
 from .pdf_documents import PDF_MEDIA_TYPE, extract_pdf_document
 from .discovery_relations import navigational_relation
+from .warc_catalog import WARC_MEDIA_TYPES, extract_warc_catalog
+from .research_projection import ResearchFormatError
 
 _TRACKING_PREFIXES = ("utm_",)
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
@@ -155,6 +158,16 @@ class CrawlPolicy:
         "application/vnd.jupyter",
         "application/n-triples",
         "application/n-quads",
+        "application/warc",
+        "application/x-warc",
+        "application/har+json",
+        "application/x-har+json",
+        "text/x-diff",
+        "text/x-patch",
+        "application/x-diff",
+        "text/patch",
+        "application/vnd.citationstyles.csl+json",
+        "application/x-csl+json",
         "application/toml",
         "text/x-toml",
         "text/x-shellscript",
@@ -366,6 +379,15 @@ def extract_document(
     max_text_chars: int = 1_000_000, link_base_url: str | None = None,
 ) -> CrawlDocument | None:
     ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
+    if ctype in WARC_MEDIA_TYPES:
+        try:
+            row = extract_warc_catalog(response.body, max_chars=max_text_chars)
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return _archive_document_response(
+            response, canonical_url, ctype, row.text, row.title,
+            [], row.truncated,
+        )
     if ctype == PDF_MEDIA_TYPE:
         pdf = extract_pdf_document(response.body, max_chars=max(512, max_text_chars))
         return _archive_document_response(
@@ -388,7 +410,8 @@ def extract_document(
     match = re.search(r"charset=([^;\s]+)", response.headers.get("content-type", ""), re.IGNORECASE)
     if match:
         charset = match.group(1).strip("\"'")
-    if ctype in RESEARCH_ARTIFACT_TYPES:
+    if ctype in (RESEARCH_ARTIFACT_TYPES | HAR_MEDIA_TYPES
+                 | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES):
         # Parser-specific syntax and citations must not be silently altered by
         # replacement decoding or unsupported source charset declarations.
         if charset.casefold().replace("_", "-") not in ("utf-8", "utf8"):

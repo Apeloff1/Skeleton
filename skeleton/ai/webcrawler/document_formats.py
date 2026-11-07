@@ -18,6 +18,9 @@ from typing import Any
 
 from .research_artifacts import RESEARCH_ARTIFACT_TYPES, extract_research_artifact
 from .research_projection import ResearchFormatError
+from .har_documents import HAR_MEDIA_TYPES, extract_har
+from .patch_documents import PATCH_MEDIA_TYPES, extract_unified_patch
+from .csl_documents import CSL_MEDIA_TYPES, extract_csl
 
 
 MARKDOWN_TYPES = frozenset({"text/markdown", "text/x-markdown"})
@@ -39,7 +42,8 @@ SOURCE_CODE_TYPES = frozenset({
     "text/x-shellscript", "application/x-sh",
 })
 ADDITIONAL_TYPES = (
-    MARKDOWN_TYPES | CSV_TYPES | JSON_TYPES | NDJSON_TYPES | SOURCE_CODE_TYPES | RESEARCH_ARTIFACT_TYPES
+    MARKDOWN_TYPES | CSV_TYPES | JSON_TYPES | NDJSON_TYPES | SOURCE_CODE_TYPES
+    | RESEARCH_ARTIFACT_TYPES | HAR_MEDIA_TYPES | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES
 )
 
 _MD_LINK = re.compile(
@@ -334,6 +338,19 @@ def extract_additional_format(
     raw: str, media_type: str, *, max_chars: int,
     max_links: int,
 ) -> ExtractedFormat:
+    if media_type in (HAR_MEDIA_TYPES | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES):
+        try:
+            parser = (extract_har if media_type in HAR_MEDIA_TYPES
+                      else extract_unified_patch if media_type in PATCH_MEDIA_TYPES
+                      else extract_csl)
+            row = parser(raw, max_chars=max_chars, max_links=max_links)
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return ExtractedFormat(
+            text=row.text, title=row.title, links=(),
+            truncated=row.truncated, body_executed=False,
+            reference_trusted=False,
+        )
     if media_type in RESEARCH_ARTIFACT_TYPES:
         try:
             row = extract_research_artifact(

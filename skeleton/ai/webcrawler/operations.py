@@ -107,6 +107,10 @@ def implementation_digest():
                 "notebook_documents.py",
                 "rdf_documents.py",
                 "discovery_relations.py",
+                "warc_catalog.py",
+                "har_documents.py",
+                "patch_documents.py",
+                "csl_documents.py",
             )
         }
     )
