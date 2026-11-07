@@ -12,7 +12,7 @@ _FEEDS = frozenset({
 
 
 def admissible_language(value: object) -> bool:
-    return isinstance(value, str) and len(value) <= 35 and bool(_LANG.fullmatch(value))
+    return isinstance(value, str) and len(value) <= 35 and bool(_LANGUAGE.fullmatch(value))
 
 
 def navigational_relation(

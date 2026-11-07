@@ -52,7 +52,10 @@ def _meta(data: bytes) -> WarcHeader:
         if len(value) > 4096:
             raise ResearchFormatError("WARC field exceeds length bound")
         fields[key] = value
-    length = fields.get("content-length", "").encode("ascii", errors="ignore")
+    try:
+        length = fields.get("content-length", "").encode("ascii", errors="strict")
+    except UnicodeEncodeError as exc:
+        raise ResearchFormatError("non-ASCII WARC Content-Length") from exc
     if not _SIZE.fullmatch(length):
         raise ResearchFormatError("missing or invalid WARC Content-Length")
     kind = fields.get("warc-type", "").lower()

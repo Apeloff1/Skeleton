@@ -77,7 +77,7 @@ def _walk_geometry(value: Any, bounds: _ShapeBounds, depth: int = 0) -> str:
     if not isinstance(value, dict) or depth > 8:
         raise ResearchFormatError("invalid or overdeep GeoJSON geometry")
     kind = value.get("type")
-    if kind not in _TYPES:
+    if not isinstance(kind, str) or kind not in _TYPES:
         raise ResearchFormatError("unsupported GeoJSON geometry kind")
     if kind == "GeometryCollection":
         geometries = value.get("geometries")

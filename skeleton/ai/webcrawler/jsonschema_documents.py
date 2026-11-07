@@ -60,7 +60,7 @@ def extract_jsonschema(
             raise ResearchFormatError("schema property must be object")
         typ = val.get("type")
         if isinstance(typ, list):
-            if not typ or len(typ) > 7 or any(x not in _ALLOWED for x in typ):
+            if not typ or len(typ) > 7 or any(type(x) is not str or x not in _ALLOWED for x in typ):
                 raise ResearchFormatError("invalid property type alternatives")
             typ = "|".join(sorted(set(typ)))
         if not isinstance(typ, str) or (
