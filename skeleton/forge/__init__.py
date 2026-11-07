@@ -15,6 +15,13 @@ from skeleton.forge.diagram import to_dot
 from skeleton.forge.materialisers import Materialiser, MaterialisationRegistry
 from skeleton.forge.repair import latest_repair_plan, candidate_failures, attempt_repair
 from skeleton.forge.universal import Blueprint, Component, Forge, Port, Wire
+from skeleton.forge.outbox import (
+    MaterialiseIntent,
+    MaterialiseOutbox,
+    MemorySink,
+    OutboxFull,
+    bind_materialise_outbox,
+)
 from skeleton.forge.validator import (
     CompositeValidator,
     Severity,
@@ -70,6 +77,11 @@ __all__ = [
     "ValidationReport",
     "ValidationRule",
     "default_validator",
+    "MaterialiseIntent",
+    "MaterialiseOutbox",
+    "MemorySink",
+    "OutboxFull",
+    "bind_materialise_outbox",
 ]
 
 
