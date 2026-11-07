@@ -25,6 +25,7 @@ from skeleton.client.projects import (
     ProjectBrief,
     ProjectBuild,
     ProjectBuildLink,
+    ProjectBuildPage,
     ProjectPage,
     ProjectsClient,
 )
@@ -45,6 +46,7 @@ __all__ = [
     "ProjectBrief",
     "ProjectBuild",
     "ProjectBuildLink",
+    "ProjectBuildPage",
     "ProjectPage",
     "ProjectsClient",
     "RequestSealer",

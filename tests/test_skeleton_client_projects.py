@@ -16,6 +16,7 @@ from skeleton.client import (
     ProjectBrief,
     ProjectBuild,
     ProjectBuildLink,
+    ProjectBuildPage,
     ProjectsClient,
     RequestSealer,
     RetryPolicy,
@@ -63,7 +64,8 @@ def test_constants_and_base_path_override():
     assert PROJECTS_BASE_PATH == "/api/v1/projects"
     assert projects_mod.PROJECT_ERROR_STATUS == {
         "PROJECT.INVALID": 400, "PROJECT.UNAUTHENTICATED": 401, "PROJECT.NOT_FOUND": 404,
-        "PROJECT.BUILD_CONFLICT": 409, "PROJECT.NAME_CONFLICT": 409, "PROJECT.UNAVAILABLE": 503}
+        "PROJECT.BUILD_CONFLICT": 409, "PROJECT.NAME_CONFLICT": 409, "PROJECT.UNAVAILABLE": 503,
+        "PROJECT.IDEMPOTENCY_MISMATCH": 409}
     assert projects_mod.TERMINAL_BUILD_STATUSES == {"succeeded", "failed", "cancelled"}
     paths = []
 
@@ -114,9 +116,11 @@ def test_create_rejects_name_and_settings_and_bad_briefs():
         pc.create("b", name="n")
     with pytest.raises(ValueError):
         pc.create("b", settings={})
-    for bad in ("", "   ", "x" * 20001):
+    for bad in ("", "   "):
         with pytest.raises(ValueError):
             pc.create(bad)
+    with pytest.raises(TypeError):
+        pc.create(123)
     for bad in (
         {"title": ""}, {"title": "t" * 201}, {"title": "t", "summary": "s" * 8001},
         {"title": "t", "genre": "g" * 81}, {"title": "t", "constraints": ["c"] * 33},
@@ -354,3 +358,76 @@ def test_projects_routes_exist_in_backend_router():
     }
     for method, path in projects_mod.SDK_ROUTES:
         assert (method, re.sub(r"\{[^}]+\}", "{}", path)) in backend, f"{method} {path}"
+
+
+def test_list_builds_paging_and_compat():
+    seen = []
+
+    def handler(req):
+        seen.append(dict(req.url.params))
+        if req.url.params.get("cursor") == "c2":
+            return httpx.Response(200, json={"schema_version": "1.0.0", "items": [_build("failed")],
+                                             "next_cursor": None})
+        return httpx.Response(200, json={"schema_version": "1.0.0",
+                                         "items": [_build("running"), _build()], "next_cursor": "c2"})
+
+    pc = _client(handler)
+    page = pc.list_builds("p1", limit=2)
+    assert isinstance(page, ProjectBuildPage)
+    assert page.next_cursor == "c2" and len(page) == 2 and page[0].status == "running"
+    assert [b.status for b in page] == ["running", "queued"]
+    last = pc.list_builds("p1", cursor="c2")
+    assert last.next_cursor is None and [b.status for b in last] == ["failed"]
+    assert seen == [{"limit": "2"}, {"cursor": "c2"}]
+    for bad in (0, 101, True, "5"):
+        with pytest.raises(ValueError):
+            pc.list_builds("p1", limit=bad)
+    with pytest.raises(ValueError):
+        pc.list_builds("p1", cursor="")
+
+
+def test_list_builds_invalid_limit_server_error():
+    pc = _client(lambda req: _env("PROJECT.INVALID", "limit must be from 1 to 100"))
+    with pytest.raises(SkeletonHTTPError) as ei:
+        pc.list_builds("p1")
+    assert ei.value.status_code == 400 and ei.value.code == projects_mod.PROJECT_ERROR_INVALID
+
+
+@pytest.mark.parametrize("call", ["create", "start_build"])
+def test_idempotency_mismatch_409_not_retried(call):
+    hits = []
+
+    def handler(req):
+        hits.append(req.url.path)
+        return _env("PROJECT.IDEMPOTENCY_MISMATCH", "idempotency key reused with a different body", 409)
+
+    pc = _client(handler)
+    with pytest.raises(SkeletonHTTPError) as ei:
+        if call == "create":
+            pc.create("other brief", idempotency_key="k1")
+        else:
+            pc.start_build("p1", target="other", idempotency_key="k1")
+    assert ei.value.status_code == 409
+    assert ei.value.code == projects_mod.PROJECT_ERROR_IDEMPOTENCY_MISMATCH
+    assert projects_mod.PROJECT_ERROR_STATUS[ei.value.code] == 409
+    assert len(hits) == 1
+
+
+def test_long_text_brief_has_no_client_cap_and_cursor_is_opaque():
+    bodies, params = [], []
+
+    def handler(req):
+        if req.method == "POST":
+            bodies.append(json.loads(req.content))
+            return httpx.Response(201, json=PROJECT)
+        params.append(dict(req.url.params))
+        return httpx.Response(200, json={"schema_version": "1.0.0", "items": [], "next_cursor": "r:42"})
+
+    pc = _client(handler)
+    pc.create("x" * 30000)  # schema BriefInput has no maxLength
+    assert len(bodies[0]["brief"]) == 30000
+    page = pc.list()
+    assert page.next_cursor == "r:42"
+    pc.list(cursor=page.next_cursor)
+    pc.list_builds("p1", cursor="opaque/any:thing")
+    assert params[1] == {"cursor": "r:42"} and params[2] == {"cursor": "opaque/any:thing"}
