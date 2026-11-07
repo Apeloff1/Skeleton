@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
 from .core import FetchResponse
+from .content_coding import BoundedHTTPBody, normalize_content_coding
 from .dns_binding import (
     ResolvedTarget,
     peer_is_planned,
@@ -127,7 +128,7 @@ class SocketBoundFetcher:
             "Host": host_header,
             "User-Agent": user_agent,
             "Accept": "text/html,text/plain,application/xhtml+xml;q=0.9",
-            "Accept-Encoding": "identity",
+            "Accept-Encoding": "gzip, deflate, identity",
             "Connection": "close",
         }
         for key, value in (extra_headers or {}).items():
@@ -207,15 +208,17 @@ class SocketBoundFetcher:
                 raise ValueError("response header bound exceeded")
             if sum(key.lower() == "content-length" for key, _ in response_headers) > 1:
                 raise ValueError("ambiguous Content-Length headers")
+            if sum(key.lower() == "content-encoding" for key, _ in response_headers) > 1:
+                raise ValueError("ambiguous Content-Encoding headers")
             out_headers = {key.lower(): value for key, value in response_headers}
             _coalesce_bounded_link_headers(response_headers, out_headers)
             if "content-length" in out_headers and "transfer-encoding" in out_headers:
                 raise ValueError("ambiguous response framing")
             if response.status in {301, 302, 303, 307, 308}:
                 body = b""
+                wire_bytes, wire_hash, coding = None, None, "identity"
             else:
-                if out_headers.get("content-encoding", "identity").lower() not in {"identity", ""}:
-                    raise ValueError("encoded crawler response is not admitted")
+                coding = normalize_content_coding(out_headers.get("content-encoding"))
                 length = out_headers.get("content-length")
                 if length is not None:
                     try:
@@ -224,8 +227,7 @@ class SocketBoundFetcher:
                         raise ValueError("invalid Content-Length") from exc
                     if not 0 <= size <= max_bytes:
                         raise ValueError("response exceeds configured byte limit")
-                chunks = []
-                count = 0
+                reader = BoundedHTTPBody(coding, max_bytes=max_bytes)
                 while True:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
@@ -234,19 +236,20 @@ class SocketBoundFetcher:
                     sock = getattr(raw, "_sock", None)
                     if sock is not None:
                         sock.settimeout(remaining)
-                    chunk = response.read1(min(65536, max_bytes + 1 - count))
+                    chunk = response.read1(min(65536, reader.remaining_wire + 1))
                     if not chunk:
                         break
-                    chunks.append(chunk)
-                    count += len(chunk)
-                    if count > max_bytes:
-                        raise ValueError("response exceeds configured byte limit")
-                body = b"".join(chunks)
+                    reader.feed(chunk)
                 if response.length not in {None, 0}:
                     raise ValueError("incomplete response body")
+                body = reader.finish()
+                wire_bytes, wire_hash = reader.wire_bytes, reader.wire_hash
             if time.monotonic() >= deadline:
                 raise TimeoutError("crawler response deadline exceeded")
-            return FetchResponse(target.url, int(response.status), out_headers, body, time.time())
+            return FetchResponse(
+                target.url, int(response.status), out_headers, body, time.time(),
+                wire_bytes=wire_bytes, wire_hash=wire_hash, content_encoding=coding,
+            )
         finally:
             watchdog.cancel()
             watchdog.join()

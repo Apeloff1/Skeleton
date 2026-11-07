@@ -83,6 +83,7 @@ def implementation_digest():
                 "document_formats.py",
                 "frontier_scheduler.py",
                 "link_header_discovery.py",
+                "content_coding.py",
             )
         }
     )
@@ -738,8 +739,20 @@ class CrawlRun:
             or len(response.body) > limit
         ):
             raise CrawlOperationError("transport response violates admitted request")
+        wire_bytes = len(response.body) if response.wire_bytes is None else response.wire_bytes
+        if (type(wire_bytes) is not int or not 0 <= wire_bytes <= limit
+                or response.content_encoding not in {"identity", "gzip", "deflate"}
+                or (response.wire_hash is not None and not re.fullmatch(
+                    r"[0-9a-f]{64}", response.wire_hash))
+                or (response.content_encoding != "identity" and (
+                    response.wire_hash is None
+                    or response.wire_bytes is None
+                    or response.headers.get("content-encoding", "").lower() != response.content_encoding
+                ))):
+            raise CrawlOperationError("transport compression receipt violates byte admission")
         _number(response.fetched_at, started - 300, time.time() + 300, "response timestamp")
-        self._state["usage"]["bytes"] += len(response.body)
+        # Charge the larger encoded/decoded entity within the same reservation.
+        self._state["usage"]["bytes"] += max(len(response.body), wire_bytes)
         self._state["usage"]["reserved_bytes"] -= limit
         self._state["pending_dispatch"] = None
         return response

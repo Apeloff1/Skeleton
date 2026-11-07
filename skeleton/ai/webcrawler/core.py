@@ -189,6 +189,9 @@ class FetchResponse:
     headers: Mapping[str, str]
     body: bytes
     fetched_at: float
+    wire_bytes: int | None = None
+    wire_hash: str | None = None
+    content_encoding: str = "identity"
 
 
 class Fetcher(Protocol):
@@ -341,7 +344,10 @@ def extract_document(
         "fetched_at": response.fetched_at,
         "status": response.status,
         "content_hash": digest,
-        "raw_body_hash": hashlib.sha256(response.body).hexdigest(),
+        "raw_body_hash": response.wire_hash or hashlib.sha256(response.body).hexdigest(),
+        "decoded_body_hash": hashlib.sha256(response.body).hexdigest(),
+        "wire_bytes": response.wire_bytes if response.wire_bytes is not None else len(response.body),
+        "content_encoding": response.content_encoding,
         "parser_text_truncated": parser_text_truncated,
     }
     return CrawlDocument(
