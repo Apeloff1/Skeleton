@@ -22,6 +22,13 @@ SCHEMA = "skeleton.app.consumer_first_run_evidence.v1"
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 HOLD_TOKEN = re.compile(r"[A-Z][A-Z0-9_]{0,127}\Z")
 OBSERVATION_KEYS = frozenset({"posix_nofollow_available", "operating_system", "machine", "python"})
+# Unknown fields are forbidden: a consumer must not mistake injected claims for
+# authenticated device, installer, signing or release evidence.
+DIGEST_KEYS = frozenset({
+    "manifest_sha256", "archive_sha256", "save_sha256", "receipt_sha256",
+    "world_digest", "replay_digest", "installed_tree_snapshot_sha256",
+})
+
 REQUIRED_FALSE = (
     "native_device_qualified", "native_godot_executed",
     "windows_laptop_qualified", "installer_qualified",
@@ -53,6 +60,12 @@ def validate_source_only_handoff(evidence: Mapping[str, object]) -> None:
     # This guard does not establish provenance or release qualification.
     if len(evidence) > 64 or any(type(key) is not str or len(key) > 96 for key in evidence):
         raise FirstRunHandoffContractError("unbounded evidence envelope")
+    allowed = (frozenset({"schema", "status", "project_id", "action_count",
+                         "release_holds", "runtime_observation", "files_published",
+                         "source_level_replay_passes"}) | DIGEST_KEYS |
+               frozenset(REQUIRED_FALSE) | frozenset(REQUIRED_TRUE))
+    if set(evidence) != allowed:
+        raise FirstRunHandoffContractError("unknown or missing evidence fields")
     if evidence.get("schema") != SCHEMA or evidence.get("status") != "source_level_first_run_replayed_release_blocked":
         raise FirstRunHandoffContractError("source-only handoff schema or state invalid")
     for name in REQUIRED_FALSE:
