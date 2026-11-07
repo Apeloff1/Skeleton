@@ -27,6 +27,9 @@ from .provenance_posture import ProvenancePosture, audit_capture_provenance
 from .objective_grounding import ObjectiveGroundingReport, inspect_objective_grounding
 from .reference_concentration import CitationConcentrationReport, inspect_reference_concentration
 from .consent_horizon import ConsentHorizon, inspect_consent_horizon
+from .source_usage_map import SourceUsageMap, compile_source_usage_map
+from .research_gap_matrix import ResearchGapMatrix, synthesize_research_gaps
+from .context_budget_audit import ContextBudgetAudit, audit_context_budget
 from .trace import ForensicStage, ORDER, chain_forensic_receipts, verify_forensic_stage_chain
 
 
@@ -56,6 +59,9 @@ class AtlasForensics:
     grounding: ObjectiveGroundingReport
     reference_concentration: CitationConcentrationReport
     consent: ConsentHorizon
+    usage: SourceUsageMap
+    gaps: ResearchGapMatrix
+    context_budget: ContextBudgetAudit
     reviews: ForensicReviewQueue
     stages: tuple[ForensicStage, ...]
     report_digest: str
@@ -87,6 +93,9 @@ def _receipts(report: AtlasForensics) -> tuple[tuple[str, str], ...]:
         report.grounding.report_digest,
         report.reference_concentration.report_digest,
         report.consent.report_digest,
+        report.usage.map_digest,
+        report.gaps.matrix_digest,
+        report.context_budget.audit_digest,
         report.reviews.queue_digest,
     )))
 
@@ -95,7 +104,7 @@ def compose_atlas_forensics(
     mandate: CampaignMandate, snapshot: dict[str, object],
     atlas: DragonAtlas, *, now: float, authorized: bool,
 ) -> AtlasForensics:
-    """Build seventeen bounded, deterministic source-fenced review projections."""
+    """Build twenty bounded, deterministic source-fenced review projections."""
     verify_dragon_atlas_trace(
         mandate, snapshot, atlas, now=now, authorized=authorized,
     )
@@ -129,12 +138,21 @@ def compose_atlas_forensics(
     consent = inspect_consent_horizon(
         mandate, frames, now=now, authorized=authorized,
     )
+    usage = compile_source_usage_map(
+        frames, atlas.workbench.objectives,
+    )
+    gaps = synthesize_research_gaps(
+        frames, atlas.workbench.objectives, grounding, resilience,
+        exposure, provenance, usage,
+    )
+    context_budget = audit_context_budget(mandate, frames)
     reviews = compile_forensic_review_queue(
         frames, security, geometry, reuse, resilience, boilerplate, age,
         echoes=echoes, active=active, privacy=privacy,
         exposure=exposure, polarity=polarity,
         provenance=provenance, grounding=grounding,
         concentration=concentration, consent=consent,
+        usage=usage, gaps=gaps, context_budget=context_budget,
     )
     root = AtlasForensics(
         mandate.fingerprint, atlas.run_id, atlas.source_snapshot_digest,
@@ -143,7 +161,7 @@ def compose_atlas_forensics(
         len(frames.frames), len(reuse.selected_sources), security, geometry,
         reuse, resilience, boilerplate, age, echoes, active, privacy,
         exposure, polarity, provenance, grounding, concentration, consent,
-        reviews, (), "",
+        usage, gaps, context_budget, reviews, (), "",
     )
     stages = chain_forensic_receipts(
         root.mandate_digest, root.source_snapshot_digest,

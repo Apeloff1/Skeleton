@@ -259,12 +259,15 @@ class DragonCustodyWave3Tests(unittest.TestCase):
 
     def test_seventeen_stage_source_replay_and_chain_verification(self):
         atlas, frames, report = self.forensics(self.single)
-        self.assertEqual(len(report.stages), 17)
+        self.assertEqual(len(report.stages), 20)
         self.assertEqual(report.stages[12].name,
                          "canonical_capture_provenance_posture")
         self.assertEqual(report.stages[13].name, "operator_objective_grounding")
         self.assertEqual(report.stages[14].name, "selected_reference_concentration")
         self.assertEqual(report.stages[15].name, "mandate_consent_horizon")
+        self.assertEqual(report.stages[16].name, "reverse_source_objective_usage")
+        self.assertEqual(report.stages[17].name, "policy_bound_research_deficit_matrix")
+        self.assertEqual(report.stages[18].name, "untrusted_context_resource_budget")
         self.assertEqual(report.stages[-1].name, "review_only_forensic_queue")
         verify_atlas_forensics(
             self.f.mandate, self.single, atlas, report,

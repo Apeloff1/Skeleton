@@ -27,6 +27,9 @@ ORDER = (
     "operator_objective_grounding",
     "selected_reference_concentration",
     "mandate_consent_horizon",
+    "reverse_source_objective_usage",
+    "policy_bound_research_deficit_matrix",
+    "untrusted_context_resource_budget",
     "review_only_forensic_queue",
 )
 

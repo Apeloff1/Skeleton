@@ -25,6 +25,9 @@ from .provenance_posture import ProvenancePosture
 from .objective_grounding import ObjectiveGroundingReport
 from .reference_concentration import CitationConcentrationReport
 from .consent_horizon import ConsentHorizon
+from .source_usage_map import SourceUsageMap
+from .research_gap_matrix import ResearchGapMatrix
+from .context_budget_audit import ContextBudgetAudit
 
 
 @dataclass(frozen=True)
@@ -66,6 +69,9 @@ def compile_forensic_review_queue(
     grounding: ObjectiveGroundingReport | None = None,
     concentration: CitationConcentrationReport | None = None,
     consent: ConsentHorizon | None = None,
+    usage: SourceUsageMap | None = None,
+    gaps: ResearchGapMatrix | None = None,
+    context_budget: ContextBudgetAudit | None = None,
     max_tasks: int = 256,
 ) -> ForensicReviewQueue:
     from ..contracts import integer
@@ -153,6 +159,25 @@ def compile_forensic_review_queue(
                 concentration.held_source_ids)
     if consent and consent.warning == "renewal_review_due":
         add("high", "mandate_consent_expiry_near")
+    for item in (usage, gaps, context_budget):
+        if item is not None and item.frame_set_digest != frames.frame_set_digest:
+            raise PermissionError("fourth-wave source review receipt is foreign")
+    if usage:
+        for source_id in usage.cross_objective_reuse_sources:
+            add("medium", "source_reused_across_objectives", (source_id,))
+    if gaps:
+        for row in gaps.gaps:
+            for code in row.review_deficit_codes:
+                add("high" if row.urgency_tier == "urgent_human_research"
+                    else "medium", "research_gap:" + code, (), (row.objective_id,))
+    if context_budget:
+        if context_budget.over_campaign_evidence_char_limit:
+            add("high", "untrusted_evidence_character_budget_exceeded")
+        if context_budget.over_explicit_context_byte_limit:
+            add("high", "untrusted_context_byte_budget_exceeded")
+        if context_budget.source_concentration_review:
+            add("medium", "context_dominated_by_single_source",
+                (context_budget.hottest_source_id,) if context_budget.hottest_source_id else ())
     ordering = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     ranked = sorted(signals, key=lambda row: (ordering[row[0]], row[1], row[2], row[3]))
     if len(ranked) > max_tasks:

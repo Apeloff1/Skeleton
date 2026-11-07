@@ -19,6 +19,10 @@ from .provenance_posture import ProvenanceFinding, ProvenancePosture, audit_capt
 from .objective_grounding import ObjectiveGrounding, ObjectiveGroundingReport, inspect_objective_grounding
 from .reference_concentration import CitationConcentration, CitationConcentrationReport, inspect_reference_concentration
 from .consent_horizon import ConsentHorizon, inspect_consent_horizon
+from .source_usage_map import SourceObjectiveUse, SourceUsageMap, compile_source_usage_map
+from .research_gap_matrix import ResearchGap, ResearchGapMatrix, synthesize_research_gaps
+from .context_budget_audit import ContextSourceBudget, ContextBudgetAudit, audit_context_budget
+from .review_workload import HypotheticalReviewerSlot, ReviewCapacityPlan, plan_review_capacity
 from .trace import ForensicStage, chain_forensic_receipts, verify_forensic_stage_chain
 from .assembly import AtlasForensics, compose_atlas_forensics, verify_atlas_forensics
 

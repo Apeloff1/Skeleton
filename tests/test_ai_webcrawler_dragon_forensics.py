@@ -58,7 +58,7 @@ class ForensicSourceTests(unittest.TestCase):
     def test_empty_campaign_keeps_human_review_and_no_false_truth_claim(self):
         atlas = self.atlas()
         result = self.report(self.fixture.empty, atlas)
-        self.assertEqual(len(result.stages), 17)
+        self.assertEqual(len(result.stages), 20)
         self.assertEqual(result.selected_anchor_count, 0)
         self.assertEqual(result.reviews.tasks[0].reason, "no_selected_evidence")
         self.assertEqual(result.resilience.objectives[0].selected_sources, 0)
@@ -307,6 +307,9 @@ class ForensicSourceTests(unittest.TestCase):
             ("operator_objective_grounding", report.grounding.report_digest),
             ("selected_reference_concentration", report.reference_concentration.report_digest),
             ("mandate_consent_horizon", report.consent.report_digest),
+            ("reverse_source_objective_usage", report.usage.map_digest),
+            ("policy_bound_research_deficit_matrix", report.gaps.matrix_digest),
+            ("untrusted_context_resource_budget", report.context_budget.audit_digest),
             ("review_only_forensic_queue", report.reviews.queue_digest),
         )
         verify_forensic_stage_chain(
