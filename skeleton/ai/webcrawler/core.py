@@ -40,6 +40,9 @@ from .research_projection import ResearchFormatError
 from .binary_media_metadata import BINARY_MEDIA_TYPES, extract_binary_media_metadata
 from .zip_inventory import ZIP_INVENTORY_TYPES, extract_zip_inventory
 from .extended_media import EXTENDED_MEDIA_TYPES, extract_extended_media
+from .source_structure import (
+    SOURCE_STRUCTURE_TYPES, SourceSignatureError, analyze_source_structure,
+)
 
 _TRACKING_PREFIXES = ("utm_",)
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
@@ -544,6 +547,20 @@ def extract_document(
         text, title = parsed.text, parsed.title
         links = list(parsed.links)
         parser_text_truncated = parsed.truncated
+        if ctype in SOURCE_STRUCTURE_TYPES:
+            # Structurally inspect only the already-acquired, bounded source.
+            # Syntax errors are never permission to discard ordinary text.
+            try:
+                structs = analyze_source_structure(
+                    raw, ctype, max_chars=min(8192, max_text_chars),
+                )
+            except SourceSignatureError:
+                pass
+            else:
+                annotation = "\n" + structs.text
+                remaining = max(0, max_text_chars-len(text))
+                text += annotation[:remaining]
+                parser_text_truncated |= structs.truncated or len(annotation)>remaining
     else:
         return None
     text = html.unescape(" ".join(text.split())).strip()

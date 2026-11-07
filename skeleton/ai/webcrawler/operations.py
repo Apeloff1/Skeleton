@@ -138,6 +138,10 @@ def implementation_digest():
                 "spdx_documents.py",
                 "vex_documents.py",
                 "supply_chain_artifacts.py",
+                "source_signatures.py",
+                "python_signatures.py",
+                "lexical_signatures.py",
+                "source_structure.py",
             )
         }
     )
