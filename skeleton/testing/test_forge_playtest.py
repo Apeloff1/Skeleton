@@ -6,6 +6,8 @@ project in a real headless Godot 4 and are skipped when no binary resolves
 """
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from skeleton.context.pipeline import GameForgeRun
@@ -15,8 +17,12 @@ from skeleton.forge.eras import ERA_IDS, compile_era
 from skeleton.forge.godot_emit import emit_godot
 from skeleton.forge.verify_loop import forge_verify_until_green
 
-_BIN, _SOURCE, _ = pt.resolve_binary()
-needs_godot = pytest.mark.skipif(_BIN is None, reason="no Godot binary (set SKELETON_GODOT_BIN)")
+_BIN, _SOURCE, _VERIFIED = pt.resolve_binary()
+# CI sets SKELETON_REQUIRE_GODOT=1 (.github/workflows/godot-playtest.yml): the
+# real-boot tests then run (and fail) instead of skipping when Godot is absent.
+_REQUIRED = bool(os.environ.get("SKELETON_REQUIRE_GODOT"))
+needs_godot = pytest.mark.skipif(_BIN is None and not _REQUIRED,
+                                 reason="no Godot binary (set SKELETON_GODOT_BIN)")
 
 ANSWERS = {b["id"]: next(iter(b["options"])) for b in BEATS if b["id"] != "era_explicit"}
 
@@ -136,6 +142,12 @@ def test_execute_repair_mode_reaches_verify_loop():
 
 
 # ------------------------------------------------------- real headless boot
+
+
+@pytest.mark.skipif(not _REQUIRED, reason="SKELETON_REQUIRE_GODOT not set")
+def test_required_godot_is_the_pinned_verified_engine():
+    assert _BIN is not None, "SKELETON_REQUIRE_GODOT=1 but no Godot binary resolved"
+    assert _VERIFIED is True, f"Godot at {_BIN} ({_SOURCE}) does not match backend/godot.artifact.json"
 
 
 @needs_godot

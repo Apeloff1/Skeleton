@@ -3,11 +3,32 @@
   "kind": "engine-binary",
   "law": "GB-9",
   "platform": "linux-x86_64",
-  "bytes": 103604344,
-  "sha256": null,
-  "source": "https://github.com/godotengine/godot/releases",
+  "bytes": 111880592,
+  "sha256": "6e100966e49c69a2d4c163673f606eec1bafe54b4c6170eec5a6a2ee50756ddd",
+  "source": "https://github.com/godotengine/godot/releases/tag/4.3-stable",
   "acquire": "env:SKELETON_GODOT_BIN|env:GODOT_BINARY|path:godot|local:backend/godot",
-  "hint": "pointer:https://github.com/godotengine/godot/releases",
+  "hint": "pointer:https://github.com/godotengine/godot/releases/tag/4.3-stable",
   "local_path": "backend/godot",
-  "stored_prose": 0
+  "stored_prose": 0,
+  "version": "4.3-stable",
+  "archive": {
+    "url": "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip",
+    "sha256": "7de56444b130b10af84d19c7e0cf63cf9e9937ee4ba94364c3b7dd114253ca21",
+    "sha512": "fd52bb4ba8acc30ca5accd1c566d470ad7282f891ccc0995dfafabcf92bcf76280ce182bf9d80ebd885f3ed2165d01e1fc3f2928436b15498dfbd98656c2a45a",
+    "member": "Godot_v4.3-stable_linux.x86_64"
+  },
+  "export_templates": {
+    "url": "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz",
+    "sha512": "476366caf0fd45a8f24136cf9cf1dc0bc2b96f7c82d53e5f82200b55aefd07b286d283fd6f1ce29e0de70648c5a51d3b12f96c6d4fafd4e8c4878ecda6406d6a",
+    "bytes": 1073228327,
+    "install_dir": "~/.local/share/godot/export_templates/4.3.stable",
+    "members": [
+      "templates/version.txt",
+      "templates/linux_debug.x86_64",
+      "templates/linux_release.x86_64",
+      "templates/web_nothreads_debug.zip",
+      "templates/web_nothreads_release.zip"
+    ]
+  },
+  "checksum_source": "https://github.com/godotengine/godot/releases/download/4.3-stable/SHA512-SUMS.txt"
 }
