@@ -6,6 +6,16 @@ qualification without independent device and provenance evidence.
 from __future__ import annotations
 
 import re
+
+PROJECT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\\Z")
+MANDATORY_HOLDS = frozenset({
+    "NATIVE_DEVICE_QUALIFICATION_ABSENT",
+    "INSTALLER_DEVICE_LIFECYCLE_UNQUALIFIED",
+    "SIGNED_PACKAGE_CHAIN_UNATTESTED",
+    "ORIGINAL_CONTENT_RIGHTS_UNCERTIFIED",
+    "GUARDED_LOCAL_AI_END_TO_END_UNQUALIFIED",
+    "PERSISTENT_NESTED_ASSET_CUSTODY_UNQUALIFIED",
+})
 from collections.abc import Mapping
 
 SCHEMA = "skeleton.app.consumer_first_run_evidence.v1"
@@ -54,11 +64,26 @@ def validate_source_only_handoff(evidence: Mapping[str, object]) -> None:
                  "installed_tree_snapshot_sha256"):
         if type(evidence.get(name)) is not str or SHA.fullmatch(evidence[name]) is None:
             raise FirstRunHandoffContractError(f"invalid digest: {name}")
+    project_id = evidence.get("project_id")
+    if type(project_id) is not str or PROJECT_ID.fullmatch(project_id) is None:
+        raise FirstRunHandoffContractError("invalid canonical project identifier")
+    action_count = evidence.get("action_count")
+    if type(action_count) is not int or not 1 <= action_count <= 64:
+        raise FirstRunHandoffContractError("invalid bounded replay action count")
     holds = evidence.get("release_holds")
     if type(holds) is not list or not holds or any(type(h) is not str or not h for h in holds):
         raise FirstRunHandoffContractError("release holds must be explicit")
+    if not MANDATORY_HOLDS.issubset(holds):
+        raise FirstRunHandoffContractError("mandatory release hold missing")
     if len(set(holds)) != len(holds):
         raise FirstRunHandoffContractError("duplicate release hold")
     observation = evidence.get("runtime_observation")
-    if type(observation) is not dict or observation.get("posix_nofollow_available") is not True:
+    if (type(observation) is not dict
+            or observation.get("posix_nofollow_available") is not True
+            or type(observation.get("operating_system")) is not str
+            or not observation["operating_system"]
+            or type(observation.get("machine")) is not str
+            or not observation["machine"]
+            or type(observation.get("python")) is not str
+            or re.fullmatch(r"\\d+\\.\\d+\\.\\d+", observation["python"]) is None):
         raise FirstRunHandoffContractError("source custody observation absent")
