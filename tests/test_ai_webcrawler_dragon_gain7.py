@@ -17,7 +17,7 @@ from skeleton.ai.webcrawler.core import (
 )
 from skeleton.ai.webcrawler.document_formats import (
     DocumentFormatError, extract_markdown, extract_csv,
-    extract_json, extract_additional_format,
+    extract_json, extract_additional_format, extract_source_code, extract_ndjson,
 )
 from skeleton.ai.webcrawler.frontier_scheduler import choose_frontier
 from skeleton.ai.webcrawler.link_header_discovery import parse_link_headers
@@ -52,6 +52,8 @@ JSON = json.dumps({
     "access_token": "THIS_SHOULD_NEVER_BE_IN_EVIDENCE",
     "url": "https://outside.example.net/forbidden",
 }).encode()
+SOURCE_CODE = b"def simulate_flight(speed):\\n    return speed * 2  # archive velocity rules\\n"
+NDJSON = b'{"id":1,"topic":"archive capture"}\\n{"id":2,"topic":"flight dynamics"}\\n'
 HTML = b"<html><title>Next chapter</title><body>Archive capture and moving aircraft are described here.</body></html>"
 PAGE = b"<html><head><title>Index</title></head><body>Introduction and archive capture.</body></html>"
 GOOD_ROBOTS = b"User-agent: *\nAllow: /\n"
@@ -233,6 +235,89 @@ class Gain7ParserTest(unittest.TestCase):
         self.assertEqual(a.content_hash, b.content_hash)
         self.assertEqual(a.provenance["raw_body_hash"], b.provenance["raw_body_hash"])
 
+
+    def test_python_code_is_retained_without_executing_it(self):
+        result = self.document(SOURCE_CODE, "text/x-python")
+        self.assertEqual(result.content_type, "text/x-python")
+        self.assertIn("simulate_flight", result.text)
+        self.assertEqual(result.links, ())
+
+    def test_typescript_source_is_inert_retrievable_text(self):
+        source = b"const original = { movement: true, velocity: 3 };"
+        result = self.document(source, "text/x-typescript")
+        self.assertIn("movement", result.text)
+        self.assertEqual(result.links, ())
+
+    def test_javascript_code_urls_are_not_followed(self):
+        source = 'fetch("https://outside.example.net/private");'
+        result = extract_source_code(source, max_chars=1000, max_links=32)
+        self.assertIn("outside.example.net", result.text)
+        self.assertEqual(result.links, ())
+        self.assertFalse(result.body_executed)
+
+    def test_source_code_rejects_binary_nul(self):
+        with self.assertRaises(DocumentFormatError):
+            extract_source_code("class A:\\x00bad", max_chars=1024, max_links=1)
+
+    def test_source_code_rejects_terminal_escape(self):
+        with self.assertRaises(DocumentFormatError):
+            extract_source_code("code\\x1b[31m", max_chars=1024, max_links=1)
+
+    def test_source_code_rejects_invalid_decoder_replacement_density(self):
+        with self.assertRaises(DocumentFormatError):
+            extract_source_code("\\ufffd" * 20, max_chars=1024, max_links=1)
+
+    def test_yaml_config_preserves_content_without_interpreting_tags(self):
+        source = "handler: !!python/object/apply:os.system [false]\\nmode: research"
+        result = self.document(source.encode(), "application/yaml")
+        self.assertIn("!!python/object/apply", result.text)
+        self.assertFalse(result.provenance["parser_text_truncated"])
+        self.assertEqual(result.links, ())
+
+    def test_toml_config_retains_inert_settings(self):
+        result = self.document(b"[ai]\\nmode = 'offline'\\n", "application/toml")
+        self.assertIn("offline", result.text)
+        self.assertEqual(result.links, ())
+
+    def test_rst_reference_docs_are_captured_as_plain_source(self):
+        result = self.document(b"Original Heading\\n===============\\n", "text/x-rst")
+        self.assertIn("Original Heading", result.text)
+
+    def test_json_lines_extracts_multiple_records(self):
+        result = self.document(NDJSON, "application/x-ndjson")
+        self.assertIn("Record 1:", result.text)
+        self.assertIn("topic: archive capture", result.text)
+        self.assertIn("Record 2:", result.text)
+        self.assertEqual(result.links, ())
+
+    def test_json_lines_rejects_malformed_line(self):
+        with self.assertRaises(DocumentFormatError):
+            extract_ndjson('{"ok":true}\\n{broken',
+                           max_chars=1024, max_links=0)
+
+    def test_json_lines_rejects_unbounded_record_count(self):
+        with self.assertRaises(DocumentFormatError):
+            extract_ndjson('{"item":1}\\n'*6,
+                           max_chars=1024, max_links=0, max_records=5)
+
+    def test_json_lines_does_not_enqueue_url_fields(self):
+        result = extract_ndjson(
+            '{"url":"https://outside.example.net/private"}',
+            max_chars=4096, max_links=0,
+        )
+        self.assertEqual(result.links, ())
+        self.assertIn("outside.example.net", result.text)
+
+    def test_source_code_projection_truncation_is_explicit(self):
+        source = "safe code content " * 100
+        parsed = extract_source_code(source, max_chars=200, max_links=0)
+        self.assertTrue(parsed.truncated)
+        self.assertEqual(len(parsed.text), 200)
+
+    def test_ndjson_with_duplicate_object_fields_is_rejected(self):
+        with self.assertRaises(DocumentFormatError):
+            extract_ndjson('{"id":1,"id":2}',
+                           max_chars=1024, max_links=0)
 
 class LinkHeaderTest(unittest.TestCase):
     def setUp(self):
@@ -433,6 +518,8 @@ class CanonicalGain7Test(unittest.TestCase):
             "https://example.com/doc.md": reply("text/markdown", MD),
             "https://example.com/table.csv": reply("text/csv", CSV),
             "https://example.com/data.json": reply("application/json", JSON),
+            "https://example.com/code.py": reply("text/x-python", SOURCE_CODE),
+            "https://example.com/log.jsonl": reply("application/x-ndjson", NDJSON),
             "https://example.com/pagination": reply(
                 "text/html", PAGE,
                 link='</page-two>; rel="next", </feed.json>; rel="alternate"; type="application/feed+json"',
@@ -470,6 +557,52 @@ class CanonicalGain7Test(unittest.TestCase):
                 cancelled=lambda: False,
                 on_checkpoint=lambda snapshot, event: None,
             )
+
+    def test_live_python_code_is_captured_but_not_executed(self):
+        run = self.make_run("https://example.com/code.py")
+        self.tick(run, 1)
+        self.tick(run, 3)
+        snap = run.snapshot()
+        self.assertEqual(snap["usage"]["documents"], 1)
+        source = next(iter(snap["sources"].values()))
+        self.assertEqual(source["content_type"], "text/x-python")
+        self.assertIn("simulate_flight", source["text"])
+        self.assertEqual(snap["frontier"], [])
+        self.assertFalse(source["provenance"]["training_permission"])
+
+    def test_live_ndjson_is_captured_and_searchable(self):
+        run = self.make_run("https://example.com/log.jsonl")
+        self.tick(run, 1)
+        self.tick(run, 3)
+        snap = run.snapshot()
+        self.assertEqual(snap["usage"]["documents"], 1)
+        self.assertIn("Record 2", next(iter(snap["sources"].values()))["text"])
+        self.assertTrue(run.search("archive")["hits"])
+
+    def test_prestorage_truncation_is_bound_into_source_metadata(self):
+        big = b'{"title":"large","records":["' + b"R" * 14000 + b'"]}'
+        self.transport.replies["https://example.com/data.json"] = reply(
+            "application/json", big,
+        )
+        req = CrawlRequest(
+            seed_urls=("https://example.com/data.json",),
+            allowed_hosts=("example.com",), query="records",
+            max_response_bytes=24000, max_total_bytes=60000,
+        )
+        run = CrawlRun.create(req, scope={
+            "tenant_id":"tenant", "owner_id":"account",
+        }, consent={
+            "consent_id":"c", "capture_acknowledged":True,
+            "source_rights_acknowledged":True,
+            "expires_at":self.now+3600,
+        }, now=self.now, fetcher=self.transport)
+        self.tick(run, 1)
+        self.tick(run, 3)
+        source = next(iter(run.snapshot()["sources"].values()))
+        self.assertTrue(source["provenance"]["parser_text_truncated"]
+                        or source["text_truncated"])
+        self.assertEqual(source["review_state"], "unreviewed")
+        CrawlRun.from_snapshot(run.snapshot(), fetcher=self.transport)
 
     def test_live_markdown_doc_is_captured_as_unreviewed_evidence(self):
         run = self.make_run("https://example.com/doc.md")

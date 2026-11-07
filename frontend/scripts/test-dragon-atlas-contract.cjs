@@ -265,7 +265,7 @@ test('gain-of-function crawler formats and balanced dispatch are wired through t
   assert.match(view, /frontier_strategy:\s*balancedFrontier\s*\?\s*'balanced'\s*:\s*'fifo'/);
   assert.match(view, /value=\{balancedFrontier\}/);
   assert.match(view, /setBalancedFrontier\(false\)/);
-  assert.match(view, /capture Markdown, CSV and JSON API documents/);
+  assert.match(view, /capture Markdown, CSV, JSON\/NDJSON and inert code or configuration documents/);
   assert.match(view, /HTML\/HTTP pagination links/);
   assert.match(client, /frontier_strategy\?:\s*'fifo'\s*\|\s*'balanced'/);
   assert.match(client, /canonical bounded frontier scheduling strategy/);
