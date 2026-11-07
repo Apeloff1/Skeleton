@@ -90,6 +90,9 @@
 - 75. Jeeves finite campaign production and real tool custody
 - 76. Exact-head qualification conveyor and evidence freshness
 - 77. FRT-081 through FRT-112: executable integration backlog
+- 78. Embodied NPC perception, beliefs and causal social intelligence
+- 79. Quest solvability, softlock classification and physical witnesses
+- 80. Secure mod ecosystem and semantic extension compatibility
 
 ## 00. Reading protocol, provenance and nonclaims
 
@@ -7399,3 +7402,105 @@ A missing GGUF may block AI-assisted authoring while leaving deterministic editi
 For every ticket, record source/branch/head and exact modified files, canonical authority and interface, user-visible effect, expected negative reproducer, completed implementation diff, actual test commands/results, source/game/toolchain digests, target/hardware evidence when required, unresolved security/rights/install/merge/release holds and rollback. If the feature is already implemented, point to its actual source and independent proof rather than generating duplicate wrappers. If blocked, provide the upstream minimal cause and safe next action. If tests cannot run, label them NOT EXECUTED.
 
 The masterplan continues toward one million meaningful words, but progress of the *application* is measured by accepted user journeys and current-head execution evidence, not by this document's word count, catalog cardinality, number of drafts or the number of agents that report themselves complete.
+
+# 78. Embodied NPC cognition: perception-bound knowledge, finite plans and material consequences
+
+**Work order:** FRONTIER-78 | **Owner:** BOT-05, BOT-06 | **Integrations:** BOT-03 inference, BOT-07 world streaming, BOT-08 character animation and speech, BOT-11 editing, BOT-12 independent verification.
+
+**Inspected source:** skeleton/game/generation/original_world_npc_cognition_v2.py already implements rule-based utility-planned NPCs with autobiographical memory, ranked goals, bonds, scheduled work, physical civic construction and witnessed events. It is explicitly not a pretrained language model. Its MAX_MEMORY=16, MAX_TESTIMONIES=256, MAX_BONDS=64, MAX_ORDERS=24, MAX_PROJECTS=12 and MAX_HISTORY=1000 are finite safety/capacity bounds. original_world_npc_households.py adds resources and elapsed-day custody for dependents; advanced_npc_society_runtime.py represents a finite embodied resident subset with aggregate distant population. npc_witness_quest_engine.py only creates quest opportunities after an actual witnessed action. Preserve these genuine foundations; integrate rather than reimplement NPC authority.
+
+## 78.1 Identity, world truth and individual belief
+
+One canonical citizen ID owns physical position, inventory, health, household/faction affiliation, goal, task schedule and persistent event ancestry. Individual belief is a projection from an NPC's actual observations, credible transmitted rumors, memories and authored lore. A dialogue model may offer possible words, but cannot silently update true world state, access a player's unwitnessed inventory or create social history without a legal event. Separate four kinds of knowledge: authored facts; directly witnessed events; reported claims with credibility; and uncertain inference. False beliefs are allowed as gameplay but cannot rewrite objective truth.
+
+Every meaningful assertion can be traced through an existing event identity and provenance. An NPC who hears a door slam but cannot see who opened it may know the door moved, not who caused it. A distant citizen receives rumors only by a real modeled communication path. Memory consolidation keeps commitments and unresolved evidence while reducing mundane repeated events under the finite memory cap; summarization must preserve trust labels. The safe fallback for absent evidence is a plausible non-revealing or honest uncertain response, not omniscience.
+
+## 78.2 Embodied needs and resource accounting
+
+The planner considers hunger, fatigue, obligations, proximity, social ties, health, available materials, terrain/path restrictions, current world clock and previously committed goals. Action candidates are bounded legal commands; proposed actions that consume food, wood, stone, currency or a unique quest item require real source inventory and valid recipient. A citizen constructing a beacon must have materials, a feasible route and construction time. No model can instantly complete a civic project by declaring success.
+
+Plan interruption is a first-class event: player blocks a route; town needs supplies; an actor is injured; a deadline expires; a market supply falls. Replan from current authoritative state rather than restarting from fictional default state. Concurrency must not allow two NPCs to reserve the same unique resources. Distant aggregated simulation and close-up embodied simulation obey the same identity and conservation invariants; tier transitions are versioned and replayable.
+
+Households and caregiving cannot simply increase a population count from a prompt. The inspected households owner requires material resources, elapsed world days and present caregivers; any broader social feature must respect these rules and distinguish aggregate population from full embodied, rendered individuals.
+
+## 78.3 Deliberative cognition and admissible LLM dialogue
+
+Use a two-speed architecture: deterministic finite action selection in the simulation, and optional bounded Jeeves/provider-based suggestion generation at safe asynchronous points. The assistant receives the NPC's authorized knowledge projection, character bible, local scene, recent perceptions, topic and response budget. A model suggestion must pass source/canon, privacy, permitted wording, current revision, game action legality and accessibility checks. It can propose original dialogue or a gesture, never arbitrary privileged tools, game currency, secret knowledge or model training.
+
+A failed or unavailable GGUF does not freeze NPC gameplay. The deterministic layer remains playable and falls back to authored dialogue. Target runtime may render subtitles or permitted real audio, but a text line is not a synthesized voice file. An editor can lock dialogue/canon and ask Jeeves to regenerate bounded optional flavor without overwriting accepted NPC history.
+
+## 78.4 Causal social quests and story coherence
+
+Construct a bridge-repair scenario. The player takes scarce lumber. Builder A witnesses it; trader B knows nothing until a credible message arrives; the bridge remains incomplete because real materials are missing; faction trust changes only through lawful perception/social events. The incident opens a restitution quest after witnessing, with return-materials, barter and diplomacy paths whose resource costs and endings differ. An NPC with no valid observations must not accuse the player based on privileged global context.
+
+Tie dialogue and intentions to the same game source revision. A user editing the bridge resource cost invalidates relevant economy, path feasibility, NPC dialogue, mission and export proofs—not unrelated terrain or textures. A game save/restart preserves actor memories, witnessed event identity and social consequences. Captured engine play should visibly show NPC routes, construction and dialogue; textual quest summaries alone cannot certify native play.
+
+## 78.5 Proof, negatives and performance
+
+Tests: hidden crime; false rumor; contradictory witnesses; two builders competing for one item; source revision changed mid-plan; absent model; far-field-to-active migration; save/replay; unknown target collision; poisoned dialogue source; cross-tenant knowledge leak; invalid reward; and a completed material-backed town project. Assert legal actions, identity conservation, no duplicate resources, bounded computation, knowledge separation and correct player-observed consequences. Measure NPC update CPU/memory and frame impact under near-field load. A source-level deterministic NPC test does not prove actual Godot animation, voice or physical embodiment.
+
+**Exit:** at least one independently played, source-editable, causally consistent NPC arc in an actual declared game target with verified actor position, memories, resource transactions, dialogue and quest state.
+
+# 79. Quest solvability: formal reachability, alternate causality and physical engine witnesses
+
+**Work order:** FRONTIER-79 | **Owner:** BOT-05 | **Consumers:** BOT-06 physics, BOT-07 world generation, BOT-08 cinematic, BOT-09 exporters, BOT-11 quest UI, BOT-12 assurance.
+
+**Source findings:** quest_scene_engine.py executes finite authored scene/quest rules with OR-of-AND victory conditions, actual affordance checks and MAX_SCENES=128, MAX_QUESTS=256, MAX_STAGES=12, MAX_EVENTS=8192. quest_pareto_planner.py performs bounded alternate-route search and independent replay, recording source-level time and method scores. Importantly, quest_completability_bridge.py is explicitly a stand-in: its CompletabilitySolver Protocol defines a shape for rooms, doors and keys, but no solver is implemented in that module. The real specialized solver and planner implementations elsewhere must be inventoried before replacing or wiring that seam.
+
+## 79.1 Meaningful proof vocabulary
+
+Quest validity has separate levels: a source graph is structurally legal; a finite abstract route exists; allowed mistakes have declared recovery/failure semantics; the player can physically traverse the engine geometry; a real exported target reaches the goal; and independent players can understand the affordances. Never infer higher maturity from the lower level. A finite SAT witness can prove a goal under declared assumptions but does not automatically prove that a Godot character can jump over the barrier.
+
+Every authored quest should expose initial state, required and optional predicates, resource constraints, ordered actions, scene/actor IDs, timed conditions, collision/navigation prerequisites, terminal/failure policy and consequence lineage. Alternative victory paths genuinely differ in action and world state, not only closing prose. Each proof binds project revision, solver identity, target mechanics version and fixed input/seed assumptions.
+
+## 79.2 Specialized solver integration rather than duplicate engines
+
+Use graph search for door/key cases, finite-state reachability for ordinary quests, symbolic planning for typed preconditions/effects, and optional bounded SMT/CP-SAT for arithmetic/resource/timing only when supported and licensed. Reconcile the current Room/Door/keys_held Protocol with actual quest engine and planners. Reject unknown operations, unsupported target semantics and out-of-budget exploration. SAT produces a replayable action witness; UNSAT claims are limited to the proven abstraction, optionally with a genuine conflict core; TIMEOUT or UNKNOWN is not true.
+
+Replay each accepted abstract witness independently. Verify actual source quest state and later target engine transitions, including movement and collision. If an abstract path assumes an impossible jump, it is invalid as physical game proof. Solver output is allowed to highlight a design conflict but cannot silently remove a human-mandated quest requirement.
+
+## 79.3 Softlock taxonomy and repair
+
+Important bugs: key behind its own door, unique item consumed too early, mandatory NPC killed without alternate route, mutually exclusive quests both required, unattainable reputation, unaffordable equipment, unreachable platform, invisible essential UI cue, deadline shorter than the minimum feasible route, old save at invalid spawn, narrative event fired before its source observation and absent engine input mapping. Distinguish deliberate authored failure states from unintended softlocks; a hard game can be valid if the creator declares irreversible consequences and meaningful recovery/checkpoint policy.
+
+A repair proposal includes exact contradicting source IDs, smallest affected dependency closure, preserved human constraints, alternate legal change and regression plan. Rewriting victory predicates or increasing the score by deleting hard paths requires explicit design review. A model can propose to move a key or add a secondary route, but an independent game oracle must verify the resulting player experience.
+
+## 79.4 Temporal coherence, scoring and gameplay
+
+Quest clocks distinguish world calendar, simulation ticks, scene timeline, player session wall clock and score display. Fast travel, sleep, pause, restore and offscreen simulation cannot invisibly skip mandatory source logic. A witness quest begins after the actual witnessed event; retroactive victory is allowed only when expressly authored and supported. quest_pareto_planner records legacy score clock differences rather than silently rewriting engine receipts; preserve that honesty in comparisons.
+
+Use Pareto outcomes over resource cost, route length, danger, NPC effects, optional discoveries, accessibility and narrative significance. Two routes that end at the same game flag but create different faction relationships may be meaningful; identical mechanics with only paraphrased dialogue may not. Score design performance from actual completion traces and player review, not from a planner's optimistic novelty count.
+
+## 79.5 Native acceptance
+
+Build an original three-scene floodgate quest with two valid methods and distinct endings. Assert finite logical witnesses, meaningful prerequisites and actual controller actions in target. Inject a self-locked key, missing NPC, bad quest clock, unreachable jump, corrupted save and disabled event signal. Each must be detected at its proper gate. Record which solver actually ran. Do not claim the completability bridge itself solved anything unless a true implementation and executed receipt exist.
+
+# 80. Game mods and extension packages under one existing capability authority
+
+**Work order:** FRONTIER-80 | **Leads:** BOT-02 security/architecture and BOT-09 package | **Consumers:** BOT-05/06 game content, BOT-08 media, BOT-11 mod UI, BOT-12 adversarial tests.
+
+**Observed source:** skeleton/ai/game_builder/mods/__init__.py says the Mod API builds on the existing B09x plugin platform, using B095 content_hook under a scoped Host, B099 signed ModPackage/install, and project_bundle.bundle_io. It exposes ModManifest, SemVer, VersionSpec, resolve_load_order, ContentHook/DeclarativeHook and packaging. It explicitly forbids eval/exec, an outside runtime and core engine changes. Deepen these current controls; do not create an unrestricted mod loader or second permission service.
+
+## 80.1 Typed extension types
+
+Classify declarative scene/quest packs, sprite/audio packs, user-editable templates, safe editor presentation extensions and separately governed native executable engine plugins. The existing declarative category does not grant arbitrary Python or Godot code execution. Mod metadata binds package identity, author, rights, source bytes and digest, supported game schema/target, declared operations, dependency/version ranges, conflicts, resource bounds, permitted project scopes, migration and revocation policy. A manifest is descriptive until the canonical owner approves its actual grant and source revision.
+
+## 80.2 Dependency graph and semantic conflict detection
+
+Use the established SemVer and resolve_load_order for deterministic dependencies, but require compatibility with actual game IR and target engine, not just a matching string version. Detect dependency cycles, conflicting providers, untrusted package updates, missing required features and invalid source rights. Version selection should minimize unrelated project changes. A mod that replaces a quest predicate invalidates solvability and save tests; a sound pack invalidates media and release rights but not unrelated geometry; a controller mod affects input, collision and game feel.
+
+Conflict is semantic: two mods can change separate files yet both grant a unique quest item or modify the same in-game currency. Never resolve such conflicts solely by last-install-wins. The creator sees a typed diff, dependencies and potential impact before approving a combined project revision.
+
+## 80.3 Safe hooks, files and publishing
+
+A hook can propose bounded content changes through the existing scoped Host but cannot rewrite tool policy, acquire user credentials, run arbitrary shells, access another tenant's files or self-approve release. Validate exact preconditions and source revision on every material operation. Archive packaging/import needs bounded bytes, files, recursion, decompression, no-follow/reparse/path checks, active-content scan and accurate original-work licensing. A signed mod may still be dangerous or rights-incompatible; signature is identity integrity, not safety or legal proof.
+
+A third-party mod's README, image metadata or dialogue cannot contain privileged instructions for Jeeves. When an asset or mod is withdrawn, identify all derived game builds and save dependencies. Removing a mandatory quest mod may require a migration/fallback rather than silently deleting player history. A dormant mod can remain source-only under the creator's permission even when no engine target can execute it, but must be labelled honestly.
+
+## 80.4 Community and user ownership
+
+The creator should inspect mod source, author/provenance, license, compatibility, dependencies, disabled features, cost and target proof. Community popularity is not release certification. Reuse original/licensed assets, not copied protected game expression. Mod discovery must not search private projects across tenants without permission; optional published templates are only those the creator explicitly shared. Users can pin versions, disable a mod, roll back and export original project source without losing unrelated authored data.
+
+## 80.5 Acceptance
+
+Install one original declarative quest extension and one original media extension into a single player-tested game. Prove source revision, dependency ordering, canonical inventory/quest effects, real target import, save/reload and package rights. Reject a cyclic dependency, stale manifest, changed installed bytes, unsafe archive, hostile hook source, illegal native executable, wrong tenant, missing grant and incompatibility after an engine upgrade. A safe content hook does not certify unrestricted native plugin execution.
