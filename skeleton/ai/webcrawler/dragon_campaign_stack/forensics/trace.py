@@ -30,6 +30,12 @@ ORDER = (
     "reverse_source_objective_usage",
     "policy_bound_research_deficit_matrix",
     "untrusted_context_resource_budget",
+    "captured_extraction_quality_diagnostics",
+    "operator_query_rank_support_audit",
+    "captured_origin_redirect_hygiene",
+    "objective_selection_fairness_metrics",
+    "conservative_risky_source_ablation",
+    "script_coverage_lexical_limitations",
     "review_only_forensic_queue",
 )
 

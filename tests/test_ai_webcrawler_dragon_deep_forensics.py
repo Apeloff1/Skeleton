@@ -41,7 +41,7 @@ class DeepForensicTests(unittest.TestCase):
         report = compose_atlas_forensics(
             self.f.mandate, self.single, atlas, now=self.now, authorized=True,
         )
-        self.assertEqual(len(report.stages), 20)
+        self.assertEqual(len(report.stages), 26)
         self.assertEqual(report.stages[-1].name, "review_only_forensic_queue")
         self.assertFalse(report.web_or_model_invoked)
         self.assertFalse(report.source_text_exported)

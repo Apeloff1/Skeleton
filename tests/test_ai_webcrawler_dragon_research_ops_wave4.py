@@ -234,12 +234,14 @@ class DragonResearchOpsWave4Tests(unittest.TestCase):
 
     def test_full_20_stage_trace_replays_on_current_canonical_source(self):
         atlas, _, report = self.compose(self.single)
-        self.assertEqual(len(report.stages), 20)
+        self.assertEqual(len(report.stages), 26)
         self.assertEqual(report.stages[16].name, "reverse_source_objective_usage")
         self.assertEqual(report.stages[17].name,
                          "policy_bound_research_deficit_matrix")
         self.assertEqual(report.stages[18].name,
                          "untrusted_context_resource_budget")
+        self.assertEqual(report.stages[19].name, "captured_extraction_quality_diagnostics")
+        self.assertEqual(report.stages[24].name, "script_coverage_lexical_limitations")
         self.assertEqual(report.stages[-1].name, "review_only_forensic_queue")
         verify_atlas_forensics(
             self.f.mandate, self.single, atlas, report,

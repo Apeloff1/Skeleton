@@ -259,7 +259,7 @@ class DragonCustodyWave3Tests(unittest.TestCase):
 
     def test_seventeen_stage_source_replay_and_chain_verification(self):
         atlas, frames, report = self.forensics(self.single)
-        self.assertEqual(len(report.stages), 20)
+        self.assertEqual(len(report.stages), 26)
         self.assertEqual(report.stages[12].name,
                          "canonical_capture_provenance_posture")
         self.assertEqual(report.stages[13].name, "operator_objective_grounding")

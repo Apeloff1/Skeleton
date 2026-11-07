@@ -30,6 +30,12 @@ from .consent_horizon import ConsentHorizon, inspect_consent_horizon
 from .source_usage_map import SourceUsageMap, compile_source_usage_map
 from .research_gap_matrix import ResearchGapMatrix, synthesize_research_gaps
 from .context_budget_audit import ContextBudgetAudit, audit_context_budget
+from .extraction_quality import ExtractionQualityReport, inspect_extraction_quality
+from .query_support_audit import QuerySupportAudit, audit_query_support
+from .source_origin_audit import SourceOriginAudit, audit_selected_origins
+from .selection_fairness import SelectionFairnessAudit, measure_selection_fairness
+from .risk_ablation import RiskAblationReport, simulate_risk_ablations
+from .script_coverage import ScriptCoverageReport, inspect_script_coverage
 from .trace import ForensicStage, ORDER, chain_forensic_receipts, verify_forensic_stage_chain
 
 
@@ -62,6 +68,12 @@ class AtlasForensics:
     usage: SourceUsageMap
     gaps: ResearchGapMatrix
     context_budget: ContextBudgetAudit
+    extraction: ExtractionQualityReport
+    query_support: QuerySupportAudit
+    origins: SourceOriginAudit
+    selection_fairness: SelectionFairnessAudit
+    risk_ablation: RiskAblationReport
+    script_coverage: ScriptCoverageReport
     reviews: ForensicReviewQueue
     stages: tuple[ForensicStage, ...]
     report_digest: str
@@ -96,6 +108,12 @@ def _receipts(report: AtlasForensics) -> tuple[tuple[str, str], ...]:
         report.usage.map_digest,
         report.gaps.matrix_digest,
         report.context_budget.audit_digest,
+        report.extraction.report_digest,
+        report.query_support.audit_digest,
+        report.origins.audit_digest,
+        report.selection_fairness.audit_digest,
+        report.risk_ablation.report_digest,
+        report.script_coverage.report_digest,
         report.reviews.queue_digest,
     )))
 
@@ -104,7 +122,7 @@ def compose_atlas_forensics(
     mandate: CampaignMandate, snapshot: dict[str, object],
     atlas: DragonAtlas, *, now: float, authorized: bool,
 ) -> AtlasForensics:
-    """Build twenty bounded, deterministic source-fenced review projections."""
+    """Build twenty-six bounded, deterministic source-fenced review projections."""
     verify_dragon_atlas_trace(
         mandate, snapshot, atlas, now=now, authorized=authorized,
     )
@@ -146,6 +164,23 @@ def compose_atlas_forensics(
         exposure, provenance, usage,
     )
     context_budget = audit_context_budget(mandate, frames)
+    extraction = inspect_extraction_quality(frames)
+    query_support = audit_query_support(
+        frames, atlas.lattice, atlas.retrieval,
+    )
+    origins = audit_selected_origins(
+        mandate, snapshot, frames, now=now, authorized=authorized,
+    )
+    selection_fairness = measure_selection_fairness(
+        frames, atlas.workbench.objectives,
+    )
+    risk_ablation = simulate_risk_ablations(
+        frames, atlas.workbench.objectives,
+        security, privacy, active, extraction, origins,
+    )
+    script_coverage = inspect_script_coverage(
+        frames, atlas.workbench.objectives,
+    )
     reviews = compile_forensic_review_queue(
         frames, security, geometry, reuse, resilience, boilerplate, age,
         echoes=echoes, active=active, privacy=privacy,
@@ -153,6 +188,9 @@ def compose_atlas_forensics(
         provenance=provenance, grounding=grounding,
         concentration=concentration, consent=consent,
         usage=usage, gaps=gaps, context_budget=context_budget,
+        extraction=extraction, query_support=query_support,
+        origins=origins, selection_fairness=selection_fairness,
+        risk_ablation=risk_ablation, script_coverage=script_coverage,
     )
     root = AtlasForensics(
         mandate.fingerprint, atlas.run_id, atlas.source_snapshot_digest,
@@ -161,7 +199,9 @@ def compose_atlas_forensics(
         len(frames.frames), len(reuse.selected_sources), security, geometry,
         reuse, resilience, boilerplate, age, echoes, active, privacy,
         exposure, polarity, provenance, grounding, concentration, consent,
-        usage, gaps, context_budget, reviews, (), "",
+        usage, gaps, context_budget, extraction, query_support,
+        origins, selection_fairness, risk_ablation, script_coverage,
+        reviews, (), "",
     )
     stages = chain_forensic_receipts(
         root.mandate_digest, root.source_snapshot_digest,

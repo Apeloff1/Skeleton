@@ -28,6 +28,12 @@ from .consent_horizon import ConsentHorizon
 from .source_usage_map import SourceUsageMap
 from .research_gap_matrix import ResearchGapMatrix
 from .context_budget_audit import ContextBudgetAudit
+from .extraction_quality import ExtractionQualityReport
+from .query_support_audit import QuerySupportAudit
+from .source_origin_audit import SourceOriginAudit
+from .selection_fairness import SelectionFairnessAudit
+from .risk_ablation import RiskAblationReport
+from .script_coverage import ScriptCoverageReport
 
 
 @dataclass(frozen=True)
@@ -72,6 +78,12 @@ def compile_forensic_review_queue(
     usage: SourceUsageMap | None = None,
     gaps: ResearchGapMatrix | None = None,
     context_budget: ContextBudgetAudit | None = None,
+    extraction: ExtractionQualityReport | None = None,
+    query_support: QuerySupportAudit | None = None,
+    origins: SourceOriginAudit | None = None,
+    selection_fairness: SelectionFairnessAudit | None = None,
+    risk_ablation: RiskAblationReport | None = None,
+    script_coverage: ScriptCoverageReport | None = None,
     max_tasks: int = 256,
 ) -> ForensicReviewQueue:
     from ..contracts import integer
@@ -178,6 +190,51 @@ def compile_forensic_review_queue(
         if context_budget.source_concentration_review:
             add("medium", "context_dominated_by_single_source",
                 (context_budget.hottest_source_id,) if context_budget.hottest_source_id else ())
+    for item in (extraction, query_support, origins, selection_fairness,
+                 risk_ablation, script_coverage):
+        if item is not None and item.frame_set_digest != frames.frame_set_digest:
+            raise PermissionError("fifth-wave source review receipt is foreign")
+    if extraction:
+        for finding in extraction.findings:
+            for code in finding.review_codes:
+                add("high" if code in ("nonprintable_extraction_characters",
+                                      "repeated_character_payload") else "medium",
+                    "extraction_quality:" + code, (finding.source_id,))
+    if query_support:
+        for finding in query_support.findings:
+            if finding.no_selected_evidence:
+                add("high", "query_support:no_selected_evidence", (),
+                    (finding.objective_id,))
+            elif finding.only_one_query_variant:
+                add("medium", "query_support:single_variant", (),
+                    (finding.objective_id,))
+    if origins:
+        for finding in origins.findings:
+            for code in finding.flags:
+                add("high" if code in ("possible_sensitive_query_parameter_name",
+                                       "observed_origin_host_handoff") else "medium",
+                    "source_origin:" + code, (finding.source_id,))
+    if selection_fairness:
+        for finding in selection_fairness.findings:
+            if finding.source_dominance_review:
+                add("medium", "selection:source_character_dominance", (),
+                    (finding.objective_id,))
+            if finding.host_dominance_review:
+                add("medium", "selection:host_character_dominance", (),
+                    (finding.objective_id,))
+    if risk_ablation:
+        for finding in risk_ablation.findings:
+            if finding.no_usable_selected_evidence_in_scenario:
+                add("high", "risk_ablation:no_selected_evidence", (),
+                    (finding.objective_id,))
+            elif finding.hypothetical_passage_shortfall:
+                add("medium", "risk_ablation:insufficient_passages", (),
+                    (finding.objective_id,))
+    if script_coverage:
+        for finding in script_coverage.findings:
+            if finding.lexical_coverage_review:
+                add("medium", "script_coverage:operator_term_bias", (),
+                    (finding.objective_id,))
     ordering = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     ranked = sorted(signals, key=lambda row: (ordering[row[0]], row[1], row[2], row[3]))
     if len(ranked) > max_tasks:
