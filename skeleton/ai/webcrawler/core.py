@@ -349,7 +349,8 @@ def _archive_document_response(
 
 
 def extract_document(
-    response: FetchResponse, canonical_url: str, *, max_links: int = 500, max_text_chars: int = 1_000_000
+    response: FetchResponse, canonical_url: str, *, max_links: int = 500,
+    max_text_chars: int = 1_000_000, link_base_url: str | None = None,
 ) -> CrawlDocument | None:
     ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
     if ctype == PDF_MEDIA_TYPE:
@@ -424,7 +425,7 @@ def extract_document(
     normalized_links: list[str] = []
     for link in links:
         try:
-            normalized_links.append(canonicalize_url(link, base=canonical_url))
+            normalized_links.append(canonicalize_url(link, base=link_base_url or canonical_url))
         except (ValueError, UnicodeError):
             continue
     provenance = {

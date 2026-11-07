@@ -943,6 +943,17 @@ class CrawlRun:
                     # bypass depth, robots or network byte reservations.
                     self._enqueue(sitemap_url, depth=0, parent_url=None)
             return self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
+        # A partial response cannot be promoted as a complete source even
+        # if a proxy falsely labels it HTTP 200 with Content-Range.
+        if response.status == 206 or any(
+            isinstance(key, str) and key.casefold() == "content-range"
+            for key in response.headers
+        ):
+            self._finish_item(item)
+            return self._event(
+                "rejected", now=now, url=url,
+                reason="partial_content_not_authoritative",
+            )
         ctype = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
         declared_content_type = ctype
         media = inspect_download_media(
@@ -1043,6 +1054,7 @@ class CrawlRun:
             doc = extract_document(
                 response, item["original_url"],
                 max_links=128, max_text_chars=self.request.max_response_bytes,
+                link_base_url=url,
             )
         except (DocumentFormatError, UnicodeError, ValueError):
             doc = None
