@@ -13,7 +13,7 @@ import json
 import math
 import re
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -36,6 +36,7 @@ from .structured_discovery import (
 from .frontier_scheduler import choose_frontier
 from .host_backpressure import origin_throttle
 from .capture_rights import source_capture_rights
+from .media_probe import inspect_download_media
 from .link_header_discovery import parse_link_headers
 from .document_formats import DocumentFormatError
 from .http import SafeHttpFetcher
@@ -92,6 +93,7 @@ def implementation_digest():
                 "xml_documents.py",
                 "capture_rights.py",
                 "html_semantics.py",
+                "media_probe.py",
             )
         }
     )
@@ -903,6 +905,14 @@ class CrawlRun:
                     self._enqueue(sitemap_url, depth=0, parent_url=None)
             return self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
         ctype = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        media = inspect_download_media(url, ctype, response.body)
+        if media.inferred:
+            # Only the effective parser type changes. Original raw bytes,
+            # requested URL, wire digest and source policy remain unchanged.
+            response = replace(response, headers={
+                **response.headers, "content-type": media.effective_type,
+            })
+        ctype = media.effective_type
         rights = source_capture_rights(
             response.headers, response.body, media_type=ctype,
             user_agent=self.policy.user_agent,
