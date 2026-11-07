@@ -126,5 +126,64 @@ class AtomicReviewTests(unittest.TestCase):
                          self.initial)
 
 
+    def test_interrupted_rereview_revokes_previously_compiled_handoff(self):
+        """A stale approval cannot preserve an already published playable."""
+        first = self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
+        before = self.flow.compile(BRIEF["id"], first["source_digest"])
+        self.assertEqual(self.flow.verify(BRIEF["id"]), before)
+
+        second = {
+            "action": "replace_scene",
+            "value": {
+                "id": "opening",
+                "title": "Storm changes the crossing",
+                "narrative": "The original route has been submerged.",
+            },
+        }
+        original_write = self.flow.worlds._write
+        writes = 0
+
+        def interrupt_second_publication(fd, name, data):
+            nonlocal writes
+            writes += 1
+            if writes == 2:
+                raise OSError("injected review custody interruption")
+            return original_write(fd, name, data)
+
+        with patch.object(self.flow.worlds, "_write",
+                          side_effect=interrupt_second_publication):
+            with self.assertRaises(OSError):
+                self.flow.review(
+                    BRIEF["id"], first["source_digest"], second, NOTE)
+
+        current = self.flow.inspect(BRIEF["id"])
+        self.assertFalse(current["reviewed"])
+        self.assertNotEqual(current["source_digest"], first["source_digest"])
+        for operation in (
+            lambda: self.flow.compile(BRIEF["id"], current["source_digest"]),
+            lambda: self.flow.verify(BRIEF["id"]),
+            lambda: self.flow.acceptance(BRIEF["id"]),
+        ):
+            with self.subTest(operation=operation), self.assertRaises(CanonError) as raised:
+                operation()
+            self.assertEqual(raised.exception.code, "review_required")
+
+        # A stale manual approval must never revive an old digest.
+        with self.assertRaises(CanonError) as raised:
+            self.flow.approve_current(BRIEF["id"], first["source_digest"], NOTE)
+        self.assertEqual(raised.exception.code, "stale_source")
+        self.assertFalse(self.flow.inspect(BRIEF["id"])["reviewed"])
+
+        # Explicit current-source approval still does not validate old output.
+        self.flow.approve_current(BRIEF["id"], current["source_digest"], NOTE)
+        with self.assertRaises(CanonError) as raised:
+            self.flow.verify(BRIEF["id"])
+        self.assertEqual(raised.exception.code, "laptop_receipt_mismatch")
+        after = self.flow.compile(BRIEF["id"], current["source_digest"])
+        self.assertEqual(self.flow.verify(BRIEF["id"]), after)
+        self.assertNotEqual(after["source_digest"], before["source_digest"])
+
+
+
 if __name__ == "__main__":
     unittest.main()
