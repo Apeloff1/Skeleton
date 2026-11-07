@@ -94,6 +94,7 @@ Commands:
     combat-inspect  Inspect combat session evidence
     scene-author  Atomically edit playable scene worlds and preview routes
     scene-circuit  Play switch puzzles and conditional gates
+    scene-circuit-accept  Audit source-authored switch puzzle play, replay and export
     scene-circuit-solve  Solve replayable circuit routes with bounded search
     scene-circuit-author  Atomically edit and preview playable circuit sources
     scene-patrol-solve  Find bounded legal routes through timed guards
@@ -1050,6 +1051,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-circuit":
         from skeleton.game.gameplay.scene_circuit import cli as circuit_cli
         return circuit_cli(rest)
+    if cmd == "scene-circuit-accept":
+        from skeleton.game.gameplay.scene_circuit_accept import cli as handler_cli
+        return handler_cli(rest)
     if cmd == "scene-patrol-solve":
         from skeleton.game.gameplay.scene_guard_patrol_solver import cli as patrol_solver_cli
         return patrol_solver_cli(rest)

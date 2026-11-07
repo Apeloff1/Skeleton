@@ -104,6 +104,7 @@ _COMMANDS = [
     "combat-inspect",
     "scene-author",
     "scene-circuit",
+    "scene-circuit-accept",
     "scene-circuit-solve",
     "scene-circuit-author",
     "scene-patrol-solve",
