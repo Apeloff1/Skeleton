@@ -41,6 +41,33 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertIn("skeleton/testing --tb=short", readiness)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
+    def test_registry_rejects_duplicate_keys_and_unhashable_trigger_profiles(self):
+        """Malformed registry inputs must fail closed with diagnostics, not exceptions."""
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "machine").mkdir()
+            source = (ROOT / "machine/ci_workflow_tiers.json").read_text(encoding="utf-8")
+            registry_path = root / "machine/ci_workflow_tiers.json"
+            # Duplicate top-level keys previously allowed the final inventory to
+            # silently replace the reviewed one.
+            registry_path.write_text(
+                source.replace(
+                    '"schema": "skeleton.ci.workflow_tiers.v1",',
+                    '"schema": "skeleton.ci.workflow_tiers.v1",\n'
+                    '  "schema": "skeleton.ci.workflow_tiers.v1",',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            self.assertTrue(any("duplicate CI registry key" in p for p in audit(root)))
+            registry = json.loads(source)
+            profile_name = next(iter(registry["automatic_event_triggers"]))
+            for malformed in ([{"push": True}], [["push"]], [None], [42]):
+                with self.subTest(malformed=malformed):
+                    registry["automatic_event_triggers"][profile_name] = malformed
+                    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+                    self.assertIn("invalid explicit automatic event trigger profiles", audit(root))
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
