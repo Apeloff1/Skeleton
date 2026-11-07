@@ -38,6 +38,9 @@ from .frontier_circuit import evaluate_frontier_candidate
 from .host_backpressure import origin_throttle
 from .robots_rate import combine_robots_pacing
 from .capture_rights import source_capture_rights
+from .http_freshness import (
+    FreshnessError,observe_http_freshness,verify_freshness_receipt,
+)
 from .media_probe import inspect_download_media
 from .link_header_discovery import parse_link_headers
 from .document_formats import DocumentFormatError
@@ -164,6 +167,7 @@ def implementation_digest():
                 "unity_hierarchy.py",
                 "usda_hierarchy.py",
                 "openapi_graph.py",
+                "http_freshness.py",
             )
         }
     )
@@ -523,6 +527,10 @@ class CrawlRun:
             _text(source.get("title"), 4000, "source title", empty=True)
             _number(source.get("fetched_at"), 0, 1e12, "source timestamp")
             provenance = source["provenance"]
+            if "http_freshness" in provenance and not verify_freshness_receipt(
+                provenance["http_freshness"], observed_at=source["fetched_at"],
+            ):
+                raise CrawlOperationError("malformed HTTP freshness source receipt")
             if (
                 source.get("content_type") not in run.policy.allowed_content_types
                 or provenance.get("schema") != "skeleton.ai.crawl.provenance.v1"
@@ -1045,6 +1053,20 @@ class CrawlRun:
             response.headers, response.body, media_type=ctype,
             user_agent=self.policy.user_agent,
         )
+        try:
+            freshness=observe_http_freshness(
+                response.headers,observed_at=response.fetched_at,
+            )
+        except FreshnessError:
+            freshness=None
+        if freshness is not None and freshness.no_store:
+            # Site no-store narrows captured retention, never relaxes
+            # normal source robots, follow rules or URL admission.
+            rights=replace(
+                rights,retain=False,
+                directives=tuple(sorted(set((*rights.directives,"no-store")))),
+                source=tuple(sorted(set((*rights.source,"http_cache_control")))),
+            )
         # HTTP Link pagination/feeds use the same exact, metered
         # canonical worker as HTML links; malformed headers are inert.
         try:
@@ -1166,6 +1188,8 @@ class CrawlRun:
             "redirect_chain": list(item["redirects"]),
             "parent_url": item["parent_url"],
         }
+        if freshness is not None:
+            provenance["http_freshness"]=asdict(freshness)
         state["sources"][source_id] = {
             "source_id": source_id,
             "canonical_url": doc.canonical_url,
