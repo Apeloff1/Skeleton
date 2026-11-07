@@ -150,6 +150,11 @@ def implementation_digest():
                 "usda_scene.py",
                 "ldraw_scene.py",
                 "scene_asset_formats.py",
+                "npm_lock_documents.py",
+                "cargo_lock_documents.py",
+                "go_mod_documents.py",
+                "pylock_documents.py",
+                "package_lock_artifacts.py",
             )
         }
     )
