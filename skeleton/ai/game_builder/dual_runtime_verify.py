@@ -22,6 +22,9 @@ from .playable_world import (
 SCHEMA = "skeleton.game_builder.dual_runtime_verification.v1"
 _MAX_FILES = 128
 _MAX_BYTES = 2_100_000
+# Studio authoring permits up to 16 MB of source assets; verification must
+# preserve that finite producer budget without relaxing base package limits.
+_MAX_STUDIO_BYTES = 16_100_000
 _MAX_MANIFEST = 65_536
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
 _COMPONENT = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\Z")
@@ -328,6 +331,11 @@ def verify_exported_package(
                 or manifest.get("godot_hardware_tested") is not False
                 or manifest.get("proof_status") != "python-simulated-winning-actions"):
             raise DualRuntimeVerificationError("unsupported release authority claim")
+        byte_budget = (
+            _MAX_STUDIO_BYTES
+            if release_schema == "skeleton.game_builder.studio_package.v1"
+            else _MAX_BYTES
+        )
         declared = manifest.get("files")
         if type(declared) is not dict or not 1 <= len(declared) <= _MAX_FILES:
             raise DualRuntimeVerificationError("invalid file manifest")
@@ -360,7 +368,9 @@ def verify_exported_package(
         files: dict[str, bytes] = {}
         total = len(release)
         for path, expected_digest in sorted(declared.items()):
-            payload = _read(fd, path, _MAX_BYTES - total)
+            if total >= byte_budget:
+                raise DualRuntimeVerificationError("package source byte budget exceeded")
+            payload = _read(fd, path, byte_budget - total)
             total += len(payload)
             if sha256(payload).hexdigest() != expected_digest:
                 raise DualRuntimeVerificationError("package file digest mismatch")
@@ -399,7 +409,7 @@ def verify_exported_package(
         # replaced after the first digest pass. This is a bounded second
         # read of at most _MAX_BYTES across the same pinned directory tree.
         for path, expected_digest in sorted(declared.items()):
-            if sha256(_read(fd, path, _MAX_BYTES)).hexdigest() != expected_digest:
+            if sha256(_read(fd, path, byte_budget)).hexdigest() != expected_digest:
                 raise DualRuntimeVerificationError("package source changed during replay")
         if _inventory(fd) != expected:
             raise DualRuntimeVerificationError("package entries changed during replay")
