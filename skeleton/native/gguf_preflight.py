@@ -79,6 +79,43 @@ def _open_beneath_trusted_parent(path: str | Path) -> tuple[int, int, str]:
         raise GGUFPreflightError("model file or parent unavailable or unsafe") from exc
 
 
+
+def _verify_parent_custody(path: str | Path, original: os.stat_result) -> None:
+    """Rewalk the source name after hashing and compare its trusted parent.
+
+    A file descriptor alone can remain valid after its parent directory is
+    renamed or replaced. A second no-follow walk refuses a substituted source
+    path, including when the replacement holds a byte-identical model.
+    This is a post-read check, not an authority to load or publish the model.
+    """
+    raw = os.fspath(path)
+    absolute = raw if os.path.isabs(raw) else os.path.join(os.getcwd(), raw)
+    parts = [part for part in absolute.split("/") if part]
+    flags = (os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+             | getattr(os, "O_CLOEXEC", 0))
+    try:
+        current = os.open("/", flags)
+        try:
+            info = os.fstat(current)
+            if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
+                raise GGUFPreflightError("model root changed or writable")
+            for part in parts[:-1]:
+                child = os.open(part, flags, dir_fd=current)
+                os.close(current)
+                current = child
+                info = os.fstat(current)
+                if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
+                    raise GGUFPreflightError("model parent became writable")
+            if _identity(os.fstat(current)) != _identity(original):
+                raise GGUFPreflightError("model parent path changed during inspection")
+        finally:
+            os.close(current)
+    except GGUFPreflightError:
+        raise
+    except OSError as exc:
+        raise GGUFPreflightError("model parent path changed during inspection") from exc
+
+
 def inspect_gguf(
     path: str | Path,
     *,
@@ -100,6 +137,7 @@ def inspect_gguf(
 
     parent_fd, file_fd, name = _open_beneath_trusted_parent(path)
     try:
+        parent_before = os.fstat(parent_fd)
         before = os.fstat(file_fd)
         if (not stat.S_ISREG(before.st_mode)
                 or before.st_size < 24 or before.st_size > max_bytes):
@@ -138,6 +176,9 @@ def inspect_gguf(
                 or not stat.S_ISREG(after_path.st_mode)
                 or total != before.st_size):
             raise GGUFPreflightError("model source changed during inspection")
+        if _identity(os.fstat(parent_fd)) != _identity(parent_before):
+            raise GGUFPreflightError("model parent changed during inspection")
+        _verify_parent_custody(path, parent_before)
         actual = digest.hexdigest()
         if not hmac.compare_digest(actual, expected_sha256):
             raise GGUFPreflightError("model SHA-256 mismatch")

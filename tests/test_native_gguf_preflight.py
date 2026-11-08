@@ -114,5 +114,78 @@ class GGUFPreflightTests(unittest.TestCase):
         self.assertTrue(swapped)
 
 
+    def test_replaced_parent_denied_even_with_identical_bytes(self):
+        parent = Path(self.temp.name) / "active"
+        parent.mkdir(mode=0o700)
+        model = parent / "model.gguf"
+        model.write_bytes(self.data)
+        model.chmod(0o600)
+        old_parent = Path(self.temp.name) / "old-parent"
+        original_read = os.read
+        moved = False
+
+        def swap_parent(fd, amount):
+            nonlocal moved
+            data = original_read(fd, amount)
+            if not moved:
+                moved = True
+                os.rename(parent, old_parent)
+                parent.mkdir(mode=0o700)
+                replacement = parent / "model.gguf"
+                replacement.write_bytes(self.data)
+                replacement.chmod(0o600)
+            return data
+
+        with patch("skeleton.native.gguf_preflight.os.read", side_effect=swap_parent):
+            with self.assertRaisesRegex(GGUFPreflightError, "parent"):
+                inspect_gguf(model, expected_sha256=self.digest)
+        self.assertTrue(moved)
+
+    def test_parent_permissions_changed_mid_read_denied(self):
+        parent = Path(self.temp.name) / "mutable"
+        parent.mkdir(mode=0o700)
+        model = parent / "model.gguf"
+        model.write_bytes(self.data)
+        model.chmod(0o600)
+        original_read = os.read
+        changed = False
+
+        def open_writes_mid_read(fd, amount):
+            nonlocal changed
+            data = original_read(fd, amount)
+            if not changed:
+                changed = True
+                parent.chmod(0o777)
+            return data
+
+        with patch("skeleton.native.gguf_preflight.os.read",
+                   side_effect=open_writes_mid_read):
+            with self.assertRaises(GGUFPreflightError):
+                inspect_gguf(model, expected_sha256=self.digest)
+        self.assertTrue(changed)
+
+    def test_model_replacement_with_same_digest_denied(self):
+        new_path = Path(self.temp.name) / "same-digest.gguf"
+        new_path.write_bytes(self.data)
+        new_path.chmod(0o600)
+        original_read = os.read
+        changed = False
+
+        def replace_identical_file(fd, amount):
+            nonlocal changed
+            data = original_read(fd, amount)
+            if not changed:
+                changed = True
+                os.replace(new_path, self.path)
+            return data
+
+        with patch("skeleton.native.gguf_preflight.os.read",
+                   side_effect=replace_identical_file):
+            with self.assertRaisesRegex(GGUFPreflightError, "changed"):
+                inspect_gguf(self.path, expected_sha256=self.digest)
+        self.assertTrue(changed)
+
+
+
 if __name__ == "__main__":
     unittest.main()
