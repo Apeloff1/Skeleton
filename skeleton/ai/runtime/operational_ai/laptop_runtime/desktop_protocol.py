@@ -15,6 +15,8 @@ MAX_INBOUND = 65536
 MAX_OUTBOUND = 262144
 MAX_PROMPT = 32768
 MAX_HISTORY = 128
+MAX_FRAME_DEPTH = 96
+MAX_FRAME_NODES = 65536
 
 
 class DesktopProtocolHold(ValueError):
@@ -34,6 +36,45 @@ def _bad_constant(_: str) -> None:
     raise DesktopProtocolHold("nonfinite framed JSON denied")
 
 
+def _finite_float(token: str) -> float:
+    result = float(token)
+    if not math.isfinite(result):
+        raise DesktopProtocolHold("nonfinite framed JSON number denied")
+    return result
+
+
+def _validate_frame_tree(value: object) -> None:
+    """Bound nesting, aggregate nodes and Unicode after strict UTF-8 decode.
+
+    JSON decoders can generate lone surrogate code points from escape
+    sequences even when the input is valid UTF-8. Such strings cannot be
+    safely published to SQLite, the GUI or a sibling IPC frame.
+    """
+    queue: list[tuple[object, int]] = [(value, 0)]
+    nodes = 0
+    while queue:
+        current, depth = queue.pop()
+        nodes += 1
+        if depth > MAX_FRAME_DEPTH or nodes > MAX_FRAME_NODES:
+            raise DesktopProtocolHold("private frame exceeds structural budget")
+        if isinstance(current, str):
+            if any(0xD800 <= ord(character) <= 0xDFFF for character in current):
+                raise DesktopProtocolHold("private frame contains invalid Unicode")
+        elif type(current) is float:
+            if not math.isfinite(current):
+                raise DesktopProtocolHold("nonfinite private frame value")
+        elif isinstance(current, list):
+            if nodes + len(queue) + len(current) > MAX_FRAME_NODES:
+                raise DesktopProtocolHold("private frame exceeds structural budget")
+            queue.extend((item, depth + 1) for item in current)
+        elif isinstance(current, dict):
+            if nodes + len(queue) + 2 * len(current) > MAX_FRAME_NODES:
+                raise DesktopProtocolHold("private frame exceeds structural budget")
+            for key, item in current.items():
+                queue.append((key, depth + 1))
+                queue.append((item, depth + 1))
+
+
 def encoded(value: object, *, limit: int) -> bytes:
     if type(limit) is not int or not 16 <= limit <= MAX_OUTBOUND:
         raise DesktopProtocolHold("invalid transport frame ceiling")
@@ -42,7 +83,7 @@ def encoded(value: object, *, limit: int) -> bytes:
             value, sort_keys=True, ensure_ascii=False, allow_nan=False,
             separators=(",", ":"),
         ).encode("utf-8", "strict")
-    except (TypeError, ValueError, UnicodeError, OverflowError) as exc:
+    except (TypeError, ValueError, UnicodeError, OverflowError, RecursionError) as exc:
         raise DesktopProtocolHold("unserializable private frame") from exc
     if not 2 <= len(payload) <= limit:
         raise DesktopProtocolHold("private frame outside byte ceiling")
@@ -53,11 +94,13 @@ def decoded(payload: bytes, *, limit: int) -> object:
     if type(payload) is not bytes or not 2 <= len(payload) <= limit:
         raise DesktopProtocolHold("frame payload outside declared byte ceiling")
     try:
-        return json.loads(
+        value = json.loads(
             payload.decode("utf-8", "strict"), object_pairs_hook=_unique,
-            parse_constant=_bad_constant,
+            parse_constant=_bad_constant, parse_float=_finite_float,
         )
-    except (ValueError, UnicodeError, TypeError, OverflowError) as exc:
+        _validate_frame_tree(value)
+        return value
+    except (ValueError, UnicodeError, TypeError, OverflowError, RecursionError) as exc:
         raise DesktopProtocolHold("invalid strict private JSON frame") from exc
 
 
@@ -210,7 +253,7 @@ def require_command(value: object) -> dict[str, object]:
 
 
 def response(status: str, **fields: object) -> dict[str, object]:
-    if type(status) is not str or not status.isascii() or not status:
+    if type(status) is not str or not status.isascii() or not 1 <= len(status) <= 64:
         raise DesktopProtocolHold("invalid desktop response status")
     item = {"schema": SCHEMA_RESPONSE, "status": status, "release_certified": False}
     item.update(fields)
