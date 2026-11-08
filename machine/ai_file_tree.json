@@ -7374,11 +7374,6 @@
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
     },
     {
-      "path": "skeleton/provider_environment.py",
-      "owner": "environment replay and holdout simulation",
-      "reason": "Provider environment simulation and holdout-replay compatibility retain their existing source, evidence and security owner; no AI-runtime cutover without independent approval."
-    },
-    {
       "path": "skeleton/providers",
       "owner": "integration contract owner",
       "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
@@ -7787,7 +7782,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 163,
+    "retained_outside_ai_tree_count": 162,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
