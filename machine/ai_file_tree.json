@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "f01baeff29b1d7dd96fffad3127adf09d8515969",
+      "source_git_object_sha": "c5a33e6415c18d94618d10f7a467232607fd6ac8",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -7339,6 +7339,11 @@
       "reason": "Hardware and runtime profiling remain independent observability surfaces pending measured authority and safety cutover"
     },
     {
+      "path": "skeleton/perfgate",
+      "owner": "source-bound performance gate compatibility owner",
+      "reason": "Source/AI mirrored bounded performance and soak gate remains an advisory review-only qualification surface, not hardware-attested, AI-owner-cutover approved or release certified."
+    },
+    {
       "path": "skeleton/persist",
       "owner": "persistence compatibility boundary",
       "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
@@ -7374,9 +7379,19 @@
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
     },
     {
+      "path": "skeleton/provider_environment.py",
+      "owner": "offline provider environment replay compatibility owner",
+      "reason": "Environment and holdout replay is source-only, with no provider credential, model execution or runtime activation authority; independent review and explicit import/owner cutover remain required."
+    },
+    {
       "path": "skeleton/providers",
       "owner": "integration contract owner",
       "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
+    },
+    {
+      "path": "skeleton/qualification",
+      "owner": "GF-M isolated performance qualification owner",
+      "reason": "GF-M source-only advisory evidence/measurement harness is not installed as authoritative AI runtime or approved for device hardware/release certification."
     },
     {
       "path": "skeleton/quality/scatter10240",
