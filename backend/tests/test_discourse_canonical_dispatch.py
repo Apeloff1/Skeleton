@@ -225,7 +225,10 @@ def test_unavailable_catalog_never_contacts_provider_or_database(monkeypatch):
         "creative", "Create an original game", identity=ALICE,
     ))
     assert result["error"] == "model_panel_unavailable"
-    assert result["reason"] == "no_executable_models"
+    # Catalog exceptions may carry tenant/provider internals. Public HTTP
+    # envelopes expose a stable opaque reason, never the exception text.
+    assert result["reason"] == "model_panel_unavailable"
+    assert "no_executable_models" not in str(result)
 
 
 def test_no_ready_models_does_not_admit_async_job(monkeypatch):
