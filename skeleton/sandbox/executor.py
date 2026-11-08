@@ -314,6 +314,10 @@ class GuardedExecutor:
         stdin = bytes(request.stdin) if request.stdin is not None else None
         env = dict(request.env) if request.env is not None else None
         cwd = request.cwd
+        # Bind the audit to the exact bytes actually scanned and launched.
+        # A caller may mutate its bytearray after the snapshot or while the
+        # subprocess runs; the retained receipt must not describe new bytes.
+        request = replace(request, stdin=stdin, env=env, cwd=cwd)
 
         denied = self._authorize(spec, args)
         if denied is not None:

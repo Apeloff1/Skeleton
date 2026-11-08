@@ -471,3 +471,5 @@ def test_quarantine_mutable_stdin_is_snapshotted_once(tmp_path: Path) -> None:
         out = ex.execute(ToolRequest("echo", ("ok",), stdin=original))
     assert out.ok
     assert observed == [b"before"]
+    import hashlib
+    assert ex.audit.entries()[-1]["event"]["stdin_sha256"] == hashlib.sha256(b"before").hexdigest()
