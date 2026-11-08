@@ -17,6 +17,16 @@ WORKFLOWS = Path(".github/workflows")
 ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
 
+# These are independent *controller* admissions, not application CI jobs.
+# Keep all three exact event contracts and never quietly exempt arbitrary
+# scheduled/privileged workflows from the 20 automatic-check admission cap.
+CONTROL_ONLY_EVENTS = {
+    "automerge-control-plane.yml": frozenset({"workflow_run"}),
+    "automation-traffic-manager.yml": frozenset({"schedule"}),
+    "owner-historical-actions-cleanup.yml": frozenset({"issue_comment"}),
+}
+MANUAL_EVENTS = frozenset({"workflow_dispatch", "workflow_call"})
+
 
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
@@ -70,9 +80,15 @@ def audit(root: Path = ROOT) -> list[str]:
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
     if not active:
         failures.append("unexpected active workflow count: 0")
-    # Signed evidence workflows may sit beside the compact PR set when they
-    # cannot run automatically. Only non-manual triggers consume the cap.
+    # The budget is for independently triggered CI/validation jobs, not for
+    # three separate, security-reviewed owner/control admission channels.
+    # Each controller must retain its exact limited event family: a new push,
+    # PR, schedule or workflow_run event cannot inherit an exemption.
     automatic = 0
+    active_names = {path.name for path in active}
+    for name in CONTROL_ONLY_EVENTS:
+        if name not in active_names:
+            failures.append(f"required owner-scoped controller missing: {name}")
     for path in active:
         try:
             found = events(path.read_text(encoding="utf-8"))
@@ -80,6 +96,15 @@ def audit(root: Path = ROOT) -> list[str]:
             failures.append(
                 f"{path.name}: cannot inspect active workflow ({exc})"
             )
+            continue
+        controller_events = CONTROL_ONLY_EVENTS.get(path.name)
+        if controller_events is not None:
+            actual = found - MANUAL_EVENTS
+            if actual != controller_events:
+                failures.append(
+                    f"{path.name}: owner-scoped controller event contract drift: "
+                    f"expected {sorted(controller_events)}, got {sorted(actual)}"
+                )
             continue
         if independently_triggered(found):
             automatic += 1

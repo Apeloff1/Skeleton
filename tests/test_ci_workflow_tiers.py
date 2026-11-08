@@ -41,6 +41,41 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertIn("skeleton/testing --tb=short", readiness)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
+    def test_owner_control_admissions_are_explicit_and_non_ci(self):
+        from scripts.check_ci_workflow_tiers import CONTROL_ONLY_EVENTS, MANUAL_EVENTS
+        workflow_dir = ROOT / ".github/workflows"
+        self.assertEqual(len(CONTROL_ONLY_EVENTS), 3)
+        for name, expected in CONTROL_ONLY_EVENTS.items():
+            with self.subTest(name=name):
+                actual = events((workflow_dir / name).read_text(encoding="utf-8"))
+                self.assertEqual(actual - MANUAL_EVENTS, expected)
+                self.assertNotIn("pull_request", actual)
+                self.assertNotIn("push", actual)
+
+    def test_controller_unrelated_trigger_is_denied_not_exempt(self):
+        from scripts.check_ci_workflow_tiers import CONTROL_ONLY_EVENTS
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / ".github/workflows").mkdir(parents=True)
+            (root / ".github/workflows-archive").mkdir()
+            (root / "machine").mkdir()
+            registry = (ROOT / "machine/ci_workflow_tiers.json").read_text(encoding="utf-8")
+            (root / "machine/ci_workflow_tiers.json").write_text(registry, encoding="utf-8")
+            for source in (ROOT / ".github/workflows").glob("*.yml"):
+                (root / ".github/workflows" / source.name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+            for name in json.loads(registry)["specialized_manual_only"] + json.loads(registry)["required_reusable_workflows"]:
+                (root / ".github/workflows-archive" / name).write_text((ROOT / ".github/workflows-archive" / name).read_text(encoding="utf-8"), encoding="utf-8")
+            self.assertEqual(audit(root), [])
+            for name in CONTROL_ONLY_EVENTS:
+                control = root / ".github/workflows" / name
+                original = control.read_text(encoding="utf-8")
+                control.write_text(original.replace("on:\\n", "on:\\n  pull_request:\\n", 1), encoding="utf-8")
+                self.assertTrue(any("owner-scoped controller event contract drift" in reason for reason in audit(root)), name)
+                control.write_text(original, encoding="utf-8")
+            extra = root / ".github/workflows" / "unreviewed-schedule-controller.yml"
+            extra.write_text("name: Unreviewed\\non:\\n  schedule:\\n    - cron: '0 * * * *'\\njobs:\\n  x:\\n    runs-on: ubuntu-latest\\n    steps:\\n      - run: true\\n", encoding="utf-8")
+            self.assertTrue(any("unexpected active workflow count" in reason for reason in audit(root)))
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
