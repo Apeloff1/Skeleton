@@ -49,4 +49,4 @@ def test_independent_budgets_keep_existing_caps():
 def test_duplicate_event_map_is_not_silently_accepted():
     import pytest
     with pytest.raises(ValueError, match="exactly one"):
-        events("name: duplicate\\non:\\n  workflow_dispatch:\\non:\\n  pull_request:\\n")
+        events("name: duplicate\non:\n  workflow_dispatch:\non:\n  pull_request:\n")

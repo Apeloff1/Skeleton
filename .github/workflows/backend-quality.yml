@@ -119,6 +119,8 @@ jobs:
           python scripts/check_ci_workflow_tiers.py
           python -m pytest -q --maxfail=1 \
             tests/test_ci_workflow_admission_budgets_20261108.py \
+            tests/test_ci_workflow_tiers.py \
+            tests/test_ci_workflow_tiers_self_only.py \
             tests/api_v1_edge tests/api_v1_quota_store \
             tests/test_ai_tree_quarantined_api_mirror_20261108.py
           python -m compileall -q skeleton/api/v1_edge skeleton/ai/runtime/api/v1_edge
