@@ -26,12 +26,15 @@ class EventStreamSOTA:
                  *, policy: StreamPolicy | None = None):
         try:
             actual_principal = ledger.identity.key()
-        except (AttributeError, TypeError, ValueError) as exc:
+            if (type(principal) is not str or type(actual_principal) is not str
+                    or not 1 <= len(principal) <= 256
+                    or not 1 <= len(actual_principal) <= 256
+                    or not hmac.compare_digest(
+                        principal.encode("utf-8"), actual_principal.encode("utf-8")
+                    )):
+                raise StreamError("event stream principal does not own ledger")
+        except (AttributeError, TypeError, ValueError, UnicodeError) as exc:
             raise StreamError("authoritative ledger principal required") from exc
-        if (type(principal) is not str or not principal
-                or type(actual_principal) is not str
-                or not hmac.compare_digest(principal, actual_principal)):
-            raise StreamError("event stream principal does not own ledger")
         self._stream = EventStream(ledger, bearer, policy=policy)
         self.policy = self._stream.policy
         self.reader = self._stream.reader
