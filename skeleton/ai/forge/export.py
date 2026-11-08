@@ -96,6 +96,22 @@ def _artifact_digest(path: Path) -> str:
             hasher.update(chunk)
         if size != st.st_size:
             raise ValueError("artifact changed while hashing")
+        # A same-byte-count rewrite can otherwise produce a plausible but
+        # unowned digest. Refuse changes to the opened inode during streaming
+        # and refuse path replacement between open and receipt publication.
+        after = os.fstat(fd)
+        fields = ("st_dev", "st_ino", "st_mode", "st_nlink", "st_size",
+                  "st_mtime_ns", "st_ctime_ns")
+        if any(getattr(after, name) != getattr(st, name) for name in fields):
+            raise ValueError("artifact changed during hashing")
+        try:
+            linked = path.lstat()
+        except OSError as exc:
+            raise ValueError("artifact disappeared during hashing") from exc
+        if (not stat.S_ISREG(linked.st_mode) or linked.st_nlink != 1
+                or any(getattr(linked, name) != getattr(after, name)
+                       for name in fields)):
+            raise ValueError("artifact path replaced during hashing")
         return hasher.hexdigest()
     finally:
         os.close(fd)
@@ -134,6 +150,8 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
         raise ValueError("bounded Godot export boot frames and timeout required")
     if not isinstance(presets, (tuple, list)) or len(presets) > len(PRESET_OUTPUTS):
         raise ValueError("bounded native export preset inventory required")
+    if any(type(p) is not str for p in presets) or len(set(presets)) != len(presets):
+        raise ValueError("native export presets must be distinct known strings")
     unknown = [p for p in presets if p not in PRESET_OUTPUTS]
     if unknown or not presets:
         raise ValueError(f"presets must be a non-empty subset of {sorted(PRESET_OUTPUTS)}; got {list(presets)}")

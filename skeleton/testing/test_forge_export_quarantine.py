@@ -51,3 +51,59 @@ def test_fake_symlinked_native_artifact_never_passes(tmp_path):
     assert not ex._regular_output(linked)
     with pytest.raises(ValueError):
         ex._artifact_digest(linked)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX no-follow output boundary")
+def test_digest_denies_same_size_rewrite_during_stream(tmp_path, monkeypatch):
+    target = tmp_path / "artifact.pck"
+    target.write_bytes(b"a" * 8192)
+    original_read = os.read
+    modified = [False]
+
+    def rewriting_read(fd, count):
+        chunk = original_read(fd, count)
+        if chunk and not modified[0]:
+            modified[0] = True
+            with target.open("r+b") as out:
+                out.seek(0)
+                out.write(b"b" * 8192)
+            before = target.stat()
+            os.utime(target, ns=(before.st_atime_ns, before.st_mtime_ns + 2_000_000_000))
+        return chunk
+
+    with monkeypatch.context() as scope:
+        scope.setattr(ex.os, "read", rewriting_read)
+        with pytest.raises(ValueError, match="changed"):
+            ex._artifact_digest(target)
+    assert modified[0] is True
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX no-follow output boundary")
+def test_digest_denies_path_replacement_after_open(tmp_path, monkeypatch):
+    target = tmp_path / "artifact.pck"
+    removed = tmp_path / "old.pck"
+    replacement = tmp_path / "new.pck"
+    target.write_bytes(b"a" * 8192)
+    replacement.write_bytes(b"b" * 8192)
+    original_read = os.read
+    replaced = [False]
+
+    def replacing_read(fd, count):
+        chunk = original_read(fd, count)
+        if chunk and not replaced[0]:
+            replaced[0] = True
+            os.replace(target, removed)
+            os.replace(replacement, target)
+        return chunk
+
+    with monkeypatch.context() as scope:
+        scope.setattr(ex.os, "read", replacing_read)
+        with pytest.raises(ValueError, match="replaced"):
+            ex._artifact_digest(target)
+    assert replaced[0] is True
+
+
+def test_duplicate_and_nonstring_presets_fail_before_binary_lookup(tmp_path):
+    for presets in (("Linux", "Linux"), (None,), (0,), (["Linux"],)):
+        with pytest.raises(ValueError, match="presets"):
+            ex.export_build(emitted(), tmp_path, presets=presets)
