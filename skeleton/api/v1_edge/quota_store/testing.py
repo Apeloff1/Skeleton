@@ -29,13 +29,19 @@ class FakeRemoteClient:
         self._hash: Dict[str, Tuple[float, float]] = {}
         self._expires_ms: Dict[str, float] = {}
         self._clock = clock
+        self._server_now_ms = float("-inf")
         self.down = False
         self.timeout = False
         self.corrupt = False
         self.calls: List[str] = []
 
     def _now_ms(self, fallback_s: float) -> float:
-        return (self._clock() if self._clock else fallback_s) * 1000.0
+        # Redis PEXPIRE uses the server clock, not the caller's potentially
+        # regressed refill timestamp. Test clocks must preserve monotone TTL
+        # progression or a rollback could erase quota custody in the fixture.
+        observed = (self._clock() if self._clock else fallback_s) * 1000.0
+        self._server_now_ms = max(self._server_now_ms, observed)
+        return self._server_now_ms
 
     def _check(self, op: str) -> None:
         self.calls.append(op)

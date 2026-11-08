@@ -161,3 +161,18 @@ def test_remote_clock_rollback_preserves_refill_high_watermark():
     now[0] = 1001.0
     assert s.take("hot", spec).allowed
     assert "effective_now" in TAKE_SCRIPT
+
+
+def test_remote_ttl_not_reset_by_regressed_client_timestamp():
+    now = [1000.0]
+    client = FakeRemoteClient(clock=lambda: now[0])
+    store = RemoteCounterStore(client, clock=lambda: now[0])
+    spec = BucketSpec(2, 1.0)
+    assert store.take("hot", spec, 2).allowed
+    now[0] = 0.0
+    assert not store.take("hot", spec).allowed
+    assert client.get_bucket("skq:hot") is not None
+    now[0] = 1000.0
+    assert not store.take("hot", spec).allowed
+    now[0] = 1001.0
+    assert store.take("hot", spec).allowed
