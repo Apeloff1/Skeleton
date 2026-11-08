@@ -69,6 +69,10 @@ def decode_scene_bytes(payload: bytes) -> dict[str, Any]:
                 PortableGameError("nonfinite portable gameplay number")
             ),
         )
+    except PortableGameError:
+        # Preserve fail-closed parser diagnostics from duplicate-key, NaN and
+        # overflow admission instead of masking them as generic JSON failure.
+        raise
     except (UnicodeError, ValueError, RecursionError) as exc:
         raise PortableGameError("invalid portable gameplay JSON bytes") from exc
     return import_scene_bundle(value)
