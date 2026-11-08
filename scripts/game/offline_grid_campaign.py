@@ -125,9 +125,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.out_save is not None:
                 _write_new_save(args.out_save, session.snapshot())
             print()
-            if args.out_save is not None:
-            _write_new_save(args.out_save, session.snapshot())
-        print(json.dumps({"save": session.snapshot(), "map": session.render(),
+            print(json.dumps({"save": session.snapshot(), "map": session.render(),
                               "viewport": viewport(session, args.view_width, args.view_height).record()},
                              sort_keys=True))
             return 0
@@ -141,6 +139,8 @@ def main(argv: list[str] | None = None) -> int:
             if not isinstance(item, dict) or set(item) - {"command_id", "kind", "target"}:
                 raise ValueError("invalid command fields")
             session = session.step(Command(**item))
+        if args.out_save is not None:
+            _write_new_save(args.out_save, session.snapshot())
         print(json.dumps({"save": session.snapshot(), "map": session.render(),
                           "viewport": viewport(session, args.view_width, args.view_height).record()},
                          sort_keys=True))
