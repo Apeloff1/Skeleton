@@ -11,6 +11,7 @@ This module does not sign work off and does not claim a completion checkbox.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Any, Callable
 
 
@@ -27,10 +28,21 @@ class AccelerationProfile:
     abi_version: int
     protocol: str
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name.strip() or self.name != self.name.strip():
+            raise ProfileGateError("name must be canonical non-empty text")
+        if not isinstance(self.protocol, str) or not self.protocol.strip() or self.protocol != self.protocol.strip():
+            raise ProfileGateError("protocol must be canonical non-empty text")
+        for field_name in ("samples", "baseline_ns", "candidate_ns", "abi_version"):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ProfileGateError(f"{field_name} must be a positive integer")
+
     def speedup(self) -> float:
-        if self.candidate_ns <= 0:
-            raise ProfileGateError("candidate_ns must be positive")
-        return self.baseline_ns / self.candidate_ns
+        ratio = self.baseline_ns / self.candidate_ns
+        if not math.isfinite(ratio):
+            raise ProfileGateError("profile speedup must be finite")
+        return ratio
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,8 +92,8 @@ class ProfileGate:
             raise ProfileGateError("min_samples must be an integer >= 8")
         if not isinstance(min_speedup, (int, float)) or isinstance(min_speedup, bool):
             raise ProfileGateError("min_speedup must be numeric")
-        if float(min_speedup) < 1.0:
-            raise ProfileGateError("min_speedup must be at least 1")
+        if not math.isfinite(float(min_speedup)) or float(min_speedup) < 1.0:
+            raise ProfileGateError("min_speedup must be finite and at least 1")
         self.expected_abi = expected_abi
         self.protocol = protocol
         self.min_samples = min_samples
