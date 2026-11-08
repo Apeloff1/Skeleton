@@ -1,20 +1,7 @@
 name: Reconciliation exact-head policy and evidence custody
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "scripts/check_reconciliation_exact_head.py"
-      - "tests/test_reconciliation_exact_head.py"
-      - "scripts/check_backlog19_actions.py"
-      - "machine/backlog19_actions_20261108.json"
-      - "scripts/check_draft19_reconciliation.py"
-      - "machine/draft19_reconciliation.json"
-      - "tests/test_backlog19_actions.py"
-      - "tests/test_draft19_reconciliation.py"
-      - "tests/test_reconciliation_source_convergence.py"
-      - "docs/qa/RECONCILIATION_EXACT_HEAD_2026-11-08.md"
-      - ".github/workflows/reconciliation-exact-head-policy.yml"
+  workflow_call:
   workflow_dispatch:
 
 permissions:
