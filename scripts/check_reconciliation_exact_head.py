@@ -28,6 +28,12 @@ REQUIRED_MERGE_JOBS = frozenset(
     | {"PR Automation Tests", "Lint Type Security",
        "Quarantine Policy", "Integration Smoke"}
 )
+MANDATORY_GATES = frozenset({
+    "Merge Readiness", "Backend Quality", "App Foundation E2E",
+    "Malware Gate", "Artifact Policy", "Repository Hygiene Gate",
+    "Secret scanning", "Dependency Review", "Workflow Input Security",
+    "Sealed Context Guard",
+})
 EXTRA_WORKFLOWS = frozenset({
     "Jeeves integrated mirror and local-AI CI qualification",
     "Jeeves native SQLite source qualification",
@@ -88,13 +94,10 @@ def read_required_workflows(path: Path = POLICY) -> frozenset[str]:
             "gate policy is not a held source-review policy")
     names = data.get("required_gates")
     require(type(names) is list and len(names) >= 10
-            and len(names) == len(set(names))
             and all(type(name) is str and name.strip() == name and name
-                    for name in names), "invalid required gate inventory")
-    require({"Merge Readiness", "Backend Quality", "App Foundation E2E",
-             "Malware Gate", "Secret scanning", "Dependency Review",
-             "Workflow Input Security", "Sealed Context Guard",
-             "Artifact Policy", "Repository Hygiene Gate"}.issubset(names),
+                    for name in names)
+            and len(names) == len(set(names)), "invalid required gate inventory")
+    require(MANDATORY_GATES.issubset(names),
             "mandatory gate omitted from policy")
     return frozenset(names)
 
@@ -167,7 +170,8 @@ def validate(data: Any, required: frozenset[str] | None = None) -> dict[str, Any
     require(type(rows) is list and len(rows) == len(CHAIN),
             "complete three-PR dependency chain required")
     required = read_required_workflows() if required is None else required
-    require(type(required) is frozenset and len(required) >= 10,
+    require(type(required) is frozenset and len(required) >= 10
+            and MANDATORY_GATES.issubset(required),
             "untrusted gate policy")
     seen_heads: set[str] = set()
     previous: str | None = None
