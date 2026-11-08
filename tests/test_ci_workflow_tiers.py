@@ -30,7 +30,7 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertEqual(missing, [], "masterplan references missing workflows")
 
     def test_auxiliary_admissions_are_manual_only(self):
-        """Keep the 20-trigger cap without dropping required security gates."""
+        """Keep the 26 named independent triggers and every required security gate."""
         for name in ("historical-zero-job-canary.yml", "local-ai-boilerplate.yml"):
             source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
             self.assertEqual(events(source), {"workflow_dispatch"}, name)
@@ -44,6 +44,8 @@ class WorkflowTierTests(unittest.TestCase):
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
+        with self.assertRaises(ValueError):
+            events("on:\n  pull_request:\n  pull_request:\njobs:\n")
 
     def test_specialists_are_archived_and_active_core_remains_required(self):
         with TemporaryDirectory() as temp:
@@ -101,6 +103,15 @@ class WorkflowTierTests(unittest.TestCase):
             )
             for index in range(10):
                 (root / ".github/workflows" / f"automatic-extra-{index}.yml").unlink()
+            extra = root / ".github/workflows" / "unexpected-auto.yml"
+            extra.write_text("name: Unauthorized\non:\n  pull_request:\njobs:\n")
+            self.assertTrue(any("unregistered automatic workflows" in p for p in audit(root)))
+            extra.unlink()
+            mandatory = root / ".github/workflows" / registry["automatic_event_workflows"][0]
+            mandatory_original = mandatory.read_text()
+            mandatory.write_text("name: Disabled\non:\n  workflow_dispatch:\njobs:\n")
+            self.assertTrue(any("expected automatic workflows not triggered" in p for p in audit(root)))
+            mandatory.write_text(mandatory_original)
             name = registry["specialized_manual_only"][0]
             spec = root / ".github/workflows-archive" / name
             original = spec.read_text()
