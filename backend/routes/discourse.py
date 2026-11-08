@@ -221,16 +221,18 @@ async def deliberate(task: str, prompt: str, system: str = "",
     """Run a bounded, authenticated deliberation with owner-bound receipts."""
     try:
         panel, judge_model = _admit(task, prompt, system, panel, judge_model, do_discord, rounds)
-    except ValueError as exc:
-        return {"error": str(exc)}
+    except ValueError:
+        # Validation details may contain the submitted private prompt or model key.
+        return {"error": "invalid_deliberation_request"}
     scope = _private_scope(identity)
     try:
         declared = await tenant_panel(
             tenant_id=scope["tenant_id"], actor_id=scope["owner_id"],
             selected=panel or None, judge_key=judge_model or None, maximum=MAX_PANEL,
         )
-    except PanelUnavailable as exc:
-        return {"error": "model_panel_unavailable", "reason": str(exc)}
+    except PanelUnavailable:
+        # Provider/catalog exceptions are not safe client-facing diagnostics.
+        return {"error": "model_panel_unavailable", "reason": "model_panel_unavailable"}
 
     panel = [model.key for model in declared.models]
     judge_model = declared.judge.key
@@ -400,10 +402,10 @@ async def get_panel(identity: dict = Depends(require_authenticated_identity)):
         panel = await tenant_panel(
             tenant_id=scope["tenant_id"], actor_id=scope["owner_id"], maximum=MAX_PANEL,
         )
-    except PanelUnavailable as exc:
+    except PanelUnavailable:
         return {
             "default_panel": [], "default_judge": None, "max_panel": MAX_PANEL,
-            "available_models": [], "available": False, "readiness": str(exc),
+            "available_models": [], "available": False, "readiness": "model_panel_unavailable",
             "selection_source": "tenant_model_inventory",
         }
     return {
@@ -568,8 +570,9 @@ async def deliberate_async(
             body.task, body.prompt, body.system, body.panel or None,
             body.judge_model, body.discord, body.rounds,
         )
-    except ValueError as exc:
-        return {"error": str(exc)}
+    except ValueError:
+        # Validation details may contain the submitted private prompt or model key.
+        return {"error": "invalid_deliberation_request"}
     scope = _private_scope(identity)
     try:
         await tenant_panel(
@@ -577,8 +580,9 @@ async def deliberate_async(
             selected=body.panel or None, judge_key=body.judge_model or None,
             maximum=MAX_PANEL,
         )
-    except PanelUnavailable as exc:
-        return {"error": "model_panel_unavailable", "reason": str(exc)}
+    except PanelUnavailable:
+        # Provider/catalog exceptions are not safe client-facing diagnostics.
+        return {"error": "model_panel_unavailable", "reason": "model_panel_unavailable"}
 
     with _ACTIVE_LOCK:
         if len(_ACTIVE_DELIBERATIONS) >= MAX_ASYNC_DELIBERATIONS:
