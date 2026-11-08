@@ -6,6 +6,8 @@ on:
     paths:
       - "skeleton/local_ai/model_loader.py"
       - "backend/core/lazy_registry.py"
+      - "skeleton/app/offline_delivery_archive.py"
+      - "skeleton/testing/test_app_offline_delivery_archive.py"
       - "skeleton/testing/test_local_ai_gguf_custody.py"
       - "machine/draft19_reconciliation.json"
       - "scripts/check_draft19_reconciliation.py"
@@ -42,6 +44,7 @@ jobs:
         run: |
           python -m py_compile skeleton/local_ai/model_loader.py skeleton/testing/test_local_ai_gguf_custody.py
           python -m py_compile backend/core/lazy_registry.py
+          python -m py_compile skeleton/app/offline_delivery_archive.py skeleton/testing/test_app_offline_delivery_archive.py
           python -m py_compile scripts/check_draft19_reconciliation.py tests/test_draft19_reconciliation.py
       - name: Verify complete held-source registry
         run: python scripts/check_draft19_reconciliation.py
@@ -66,3 +69,12 @@ jobs:
         # server (including bcrypt/JWT provider dependencies), obscuring the
         # actual lazy-registry assertions. Full backend CI is still mandatory.
         run: python -m pytest -q --noconftest backend/tests/test_storage_lazy_registry.py
+      - name: Qualify Studio ZIP custody, deterministic inspection and preflight
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_app_offline_delivery_archive.py::test_deterministic_game_archive_and_independent_read_only_inspection
+          skeleton/testing/test_app_offline_delivery_archive.py::test_studio_archive_rejects_missing_or_forged_custody_source
+          skeleton/testing/test_app_offline_install_preflight.py::test_preflight_does_not_reserve_and_installer_rechecks
