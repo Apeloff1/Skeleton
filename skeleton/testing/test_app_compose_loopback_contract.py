@@ -28,6 +28,13 @@ class ConsumerLoopbackComposeTests(unittest.TestCase):
                     section,
                 )
 
+    def test_assembly_audit_preserves_loopback_and_selectable_container_port(self):
+        checker = (ROOT / "scripts/check_app_assembly.py").read_text(encoding="utf-8")
+        expected = '"127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"'
+        self.assertIn(expected, COMPOSE.read_text(encoding="utf-8"))
+        self.assertIn(expected + "' in base", checker)
+        self.assertNotIn('"' + "${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}" + '"' + "' in base", checker)
+
     def test_mongo_and_chroma_remain_loopback(self):
         text = COMPOSE.read_text(encoding="utf-8")
         for port in ("MONGO_PORT", "CHROMA_PORT"):
