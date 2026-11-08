@@ -42,7 +42,8 @@ class FixtureBackend:
 
 class FlightHttpAcceptance(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(prefix='ai-flight-http-',dir='/home/oai')
+        # Use the runner's secure temporary directory, not an image-specific home.
+        self.temp=tempfile.TemporaryDirectory(prefix='ai-flight-http-')
         self.root=Path(self.temp.name)
         self.state=self.root/'private';self.state.mkdir(mode=0o700)
         establish_binding(self.state,PrincipalBinding('tenant','operator',M,T))

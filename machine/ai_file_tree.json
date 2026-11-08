@@ -7239,6 +7239,11 @@
       "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
     },
     {
+      "path": "skeleton/mass_build",
+      "owner": "delivery-plane: deterministic mass-build source and artifact custody",
+      "reason": "Existing mass-build production tooling remains with the delivery-plane build owner; no AI mirror import, authority cutover, or readiness claim is authorized."
+    },
+    {
       "path": "skeleton/masterplan",
       "owner": "masterplan volume authority",
       "reason": "executable masterplan/volume evidence surface; authority is machine/ai_master_plan.json, not an AI runtime mirror."
@@ -7327,6 +7332,11 @@
       "path": "skeleton/parse",
       "owner": "package/parsing compatibility boundary",
       "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
+    },
+    {
+      "path": "skeleton/perf_profiler",
+      "owner": "platform-runtime observability and performance profiling",
+      "reason": "Native performance profiling and measurement are retained in the platform observability owner; AI-tree migration remains subject to a separate source and runtime review."
     },
     {
       "path": "skeleton/persist",
