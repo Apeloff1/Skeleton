@@ -44,7 +44,9 @@ class WirePayloadCustodyTests(unittest.TestCase):
         nested = {"leaf": True}
         for _ in range(18):
             nested = {"next": nested}
-        for payload in (nested, {"text": "x" * 1_048_577}):
+        huge_integer = 1 << (1_048_576 * 4 + 1)
+        for payload in (nested, {"text": "x" * 1_048_577},
+                        {"integer": huge_integer}):
             with self.assertRaises(AcceleratorProtocolError):
                 envelope(payload)
 
