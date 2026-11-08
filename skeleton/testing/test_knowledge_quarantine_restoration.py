@@ -126,17 +126,25 @@ class QuarantinedKnowledgeRestoration(unittest.TestCase):
                 "SELECT active, deleted FROM ai_kb_documents"
             ).fetchone(), (0, 1))
 
-    def test_wrong_or_unbound_tenant_cannot_write_into_existing_scope(self):
+    def test_same_document_id_remains_separate_across_tenant_principals(self):
+        original = self.admit(b"tenant one original text")
         other = Identity("another-tenant", "researcher", "a" * 64, "b" * 64)
-        with self.assertRaises(Exception):
-            KnowledgePlane(self.db, other, initialize=False).admit_bytes_for_tests(
-                b"out-of-tenant source", doc_id="original",
-                title="Wrong tenant", approved=True,
-            )
+        second = KnowledgePlane(self.db, other, initialize=False).admit_bytes_for_tests(
+            b"tenant two isolated text", doc_id="original",
+            title="Independent source", approved=True,
+        )
+        self.assertEqual(original["revision"], 1)
+        self.assertEqual(second["revision"], 1)
         with self.db.snapshot() as conn:
-            self.assertEqual(conn.execute(
-                "SELECT COUNT(*) FROM ai_kb_documents"
-            ).fetchone()[0], 0)
+            rows = conn.execute(
+                "SELECT principal, doc_id, revision FROM ai_kb_documents ORDER BY principal"
+            ).fetchall()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual({row[0] for row in rows},
+                         {self.identity.key(), other.key()})
+        self.assertTrue(all(row[1:] == ("original", 1) for row in rows))
+        self.assertTrue(self.knowledge.search("tenant one", include_text=True))
+        self.assertFalse(self.knowledge.search("tenant two", include_text=True))
 
 
 if __name__ == "__main__":
