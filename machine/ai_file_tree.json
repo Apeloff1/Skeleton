@@ -7241,7 +7241,7 @@
     {
       "path": "skeleton/mass_build",
       "owner": "Mass-build orchestration and artifact assembly",
-      "reason": "Canonical bulk construction stays in the independently governed build pipeline until explicit AI ownership and safety cutover"
+      "reason": "Canonical bulk construction stays in the independently governed build pipeline; no AI-runtime cutover before independently verified explicit ownership, security and safety approval"
     },
     {
       "path": "skeleton/masterplan",
@@ -7797,7 +7797,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 157,
+    "retained_outside_ai_tree_count": 165,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
