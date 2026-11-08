@@ -169,6 +169,10 @@ def first_install_report(
             and isinstance(status.get("providers"), list)
             and type(status.get("llm_available")) is bool
             and status.get("availability_observed") is True
+            # A healthy *different* provider must never certify the selected
+            # provider. The active provider is an exact canonical identity.
+            and status.get("active") == provider
+            and configured
         ):
             ai.update(
                 available=status["llm_available"],

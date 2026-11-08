@@ -53,6 +53,22 @@ class Fixture(unittest.TestCase):
     def snap(self,cursor=None,limit=32):
         return self.svc.reader.read('job1',cursor,limit=limit)
 
+
+    def test_hand_constructed_query_cannot_bypass_route_shape_checks(self):
+        for q in (
+            StreamQuery('job1',None,True,0),
+            StreamQuery('job1',None,'32',0),
+            StreamQuery('job1',None,65,0),
+            StreamQuery('job1',None,32,True),
+            StreamQuery('job1',None,32,-1),
+            StreamQuery('job1',None,32,2001),
+            StreamQuery('job1','',32,0),
+            StreamQuery('job1',False,32,0),
+            StreamQuery('../other',None,32,0),
+        ):
+            with self.subTest(query=q), self.assertRaises(StreamError):
+                self.svc.read(q)
+
     def test_first_event_is_verified_submission(self):
         one=self.snap()
         self.assertEqual(one.state,'queued')

@@ -1,0 +1,11 @@
+{
+  "id": "GFM-RPL-01",
+  "gate": "replay",
+  "title": "Snapshot restore fidelity",
+  "todo_ref": "P3: Game completion acceptance and replay/restore fidelity",
+  "severity": "sev1",
+  "params": {
+    "min_ticks": 600
+  },
+  "requires_hardware": false
+}

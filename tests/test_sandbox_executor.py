@@ -427,3 +427,49 @@ def test_audit_callback_cannot_mutate_nested_retained_chain_data() -> None:
     assert audit.entries()[0]["event"]["findings"] == [{"rule": "original"}]
     assert audit.head == digest
     assert audit.verify()
+
+def test_quarantine_stdin_size_budget_fails_before_scan_or_launch(tmp_path: Path) -> None:
+    ex = _executor(tmp_path)
+    with patch("skeleton.sandbox.executor.run_isolated") as launched:
+        out = ex.execute(ToolRequest("echo", ("ok",), stdin=b"x" * (1024 * 1024 + 1)))
+    assert out.status == "denied" and "stdin byte budget" in out.reason
+    assert out.audit_hash == ex.audit.head
+    assert ex.audit.entries()[-1]["event"]["stdin_sha256"] is None
+    launched.assert_not_called()
+
+
+def test_quarantine_environment_budget_and_type_are_fail_closed(tmp_path: Path) -> None:
+    ex = _executor(tmp_path)
+    for env in ({"N" + str(i): "v" for i in range(65)}, {"OK": "x" * 4097},
+                {"OK": b"x"}, {"BAD\\x00": "v"}):
+        with patch("skeleton.sandbox.executor.run_isolated") as launched:
+            out = ex.execute(ToolRequest("echo", ("ok",), env=env))
+        assert out.status == "denied" and out.audit_hash == ex.audit.head
+        launched.assert_not_called()
+
+
+def test_quarantine_invalid_policy_or_audit_object_rejected(tmp_path: Path) -> None:
+    jail = FsJail(tmp_path / "jail")
+    with pytest.raises(ExecutorConfigError, match="policy"):
+        GuardedExecutor(_mediator(tmp_path), jail, [], policy=object())
+    with pytest.raises(ExecutorConfigError, match="audit"):
+        GuardedExecutor(_mediator(tmp_path), jail, [], audit=object())
+
+
+def test_quarantine_mutable_stdin_is_snapshotted_once(tmp_path: Path) -> None:
+    ex = _executor(tmp_path)
+    original = bytearray(b"before")
+    observed = []
+
+    def fake_run(args, **kw):
+        observed.append(kw["stdin"])
+        original[:] = b"after!"
+        from skeleton.sandbox.process import ProcessResult
+        return ProcessResult(tuple(args), 0, b"ok", b"", False, False, 0.0)
+
+    with patch("skeleton.sandbox.executor.run_isolated", side_effect=fake_run):
+        out = ex.execute(ToolRequest("echo", ("ok",), stdin=original))
+    assert out.ok
+    assert observed == [b"before"]
+    import hashlib
+    assert ex.audit.entries()[-1]["event"]["stdin_sha256"] == hashlib.sha256(b"before").hexdigest()

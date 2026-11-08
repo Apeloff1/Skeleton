@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "4256c9b1e2b57a6435d668933c2f19f3c8d4e180",
+      "source_git_object_sha": "48b29b39beb5a3e184c6ca0b31eb3ce1488fad4f",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -5654,7 +5654,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_execution_sandbox_tree_exactly_mirrored",
-      "source_git_object_sha": "a19734e6dc90b85d3c26c3a322105fbc88d44f04"
+      "source_git_object_sha": "479c7161d13fb676e98d666f46dd13a617879819"
     },
     {
       "id": "AIFT-STORAGE",
