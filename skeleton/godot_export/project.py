@@ -21,7 +21,7 @@ def res_to_path(root: Path, res: str) -> Path:
     if not isinstance(res, str) or not res.startswith("res://"):
         raise ValueError("expected a res:// resource identifier")
     rel = res[len("res://"):]
-    if (not rel or "\\x00" in rel or "\\\\" in rel or ":" in rel
+    if (not rel or "\x00" in rel or "\\" in rel or ":" in rel
             or rel.startswith("/")):
         raise ValueError("invalid Godot resource identifier")
     parts = rel.split("/")
@@ -105,11 +105,18 @@ class GodotProject:
             return False
 
     def iter_files(self, suffixes: tuple[str, ...]) -> list[Path]:
+        # Directory enumeration must not accept symlinked files/ancestors as
+        # ordinary in-project source. This is a source discovery filter, not
+        # an authorization for later I/O after a possible filesystem swap.
+        base = self.root.resolve(strict=True)
         out = []
         for p in sorted(self.root.rglob("*")):
-            if not p.is_file() or p.suffix not in suffixes:
+            rel = p.relative_to(self.root)
+            if any(part in IGNORED_DIRS for part in rel.parts):
                 continue
-            if any(part in IGNORED_DIRS for part in p.relative_to(self.root).parts):
+            if p.is_symlink() or p.resolve(strict=False) != base / rel:
+                continue
+            if not p.is_file() or p.suffix not in suffixes:
                 continue
             out.append(p)
         return out

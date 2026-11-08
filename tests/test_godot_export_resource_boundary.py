@@ -22,7 +22,7 @@ class GodotResourceBoundaryTests(unittest.TestCase):
             for value in ("res://../outside", "res://a/../b", "res:///etc/passwd",
                           "res://a//b", "res://./b", "res://",
                           "res://C:/windows", "res://a\\\\..\\\\secret",
-                          "res://a\\\\b", "file:///tmp/x", "res://a\\x00b"):
+                          "res://a\\\\b", "file:///tmp/x", "res://a" + chr(0) + "b", "res://a" + chr(92) + "b"):
                 with self.subTest(value=value), self.assertRaises(ValueError):
                     res_to_path(root, value)
 
@@ -43,6 +43,22 @@ class GodotResourceBoundaryTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     path_to_res(root, link)
             self.assertFalse(GodotProject(root, None).exists("res://linked.tscn"))
+            # External source aliases must not enter project file inventory.
+            project = GodotProject(root, None)
+            self.assertNotIn(root / "linked.tscn", project.scenes())
+            self.assertNotIn(root / "linked_dir" / "private.tscn", project.scenes())
+
+    def test_internal_symlink_alias_is_not_a_second_source_identity(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            original = root / "original.gd"
+            original.write_text("extends Node", encoding="utf-8")
+            alias = root / "duplicate.gd"
+            try:
+                alias.symlink_to(original)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks unavailable on host")
+            self.assertEqual(GodotProject(root, None).scripts(), [original])
 
     def test_missing_resource_stays_within_project(self):
         with tempfile.TemporaryDirectory() as d:
