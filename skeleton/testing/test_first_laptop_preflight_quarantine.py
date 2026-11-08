@@ -135,6 +135,20 @@ class FirstLaptopPreflightQuarantine(unittest.TestCase):
         self.assertEqual(outcome["reason"], "invalid-bounded-evidence")
         self.assertIsNone(self.preflight.provenance)
 
+    def test_verifier_mutation_cannot_rewrite_sealed_receipt(self):
+        pristine = self.run_preflight(verifier=lambda *_: True)
+        self.assertTrue(pristine["passed"])
+        def mutating_verifier(source, rights, epoch):
+            source["model_sha256"] = "0" * 64
+            rights["approved"] = False
+            source["nested"] = {"bad": float("nan")}
+            return True
+        mutated = self.run_preflight(verifier=mutating_verifier)
+        self.assertTrue(mutated["passed"])
+        self.assertEqual(mutated["provenance"], pristine["provenance"])
+        self.assertEqual(mutated["stages"], 6)
+        self.assertEqual(self.preflight.results[-1].evidence_sha, pristine["provenance"])
+
     def test_overlapping_runs_are_denied_without_mutation(self):
         self.preflight._run_lock.acquire()
         try:
