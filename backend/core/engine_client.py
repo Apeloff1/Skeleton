@@ -350,21 +350,22 @@ class EngineClientConfig:
     @classmethod
     def from_env(cls) -> "EngineClientConfig | None":
         raw_url = os.getenv("SKELETON_INTERNAL_URL")
-        if raw_url is None or not raw_url.strip():
+        if raw_url is None or raw_url == "":
             return None
+        if not raw_url.strip():
+            raise EngineProtocolError("engine base_url must be normalized")
         raw_token = os.getenv("SKL_ENGINE_SERVICE_TOKEN")
         if raw_token is None or not raw_token.strip():
             raise EngineProtocolError("engine service token is required when engine URL is configured")
         try:
             return cls(
-                base_url=raw_url.strip(),
-                service_token=raw_token.strip(),
-                service_principal=(
-                    os.getenv(
-                        "SKL_ENGINE_SERVICE_PRINCIPAL",
-                        "codedock-backend",
-                    ).strip()
-                    or "codedock-backend"
+                # Never trim or repair operator-provided bearer authority.
+                # The typed constructor rejects ambiguity before HTTPX startup.
+                base_url=raw_url,
+                service_token=raw_token,
+                service_principal=os.getenv(
+                    "SKL_ENGINE_SERVICE_PRINCIPAL",
+                    "codedock-backend",
                 ),
                 request_timeout_s=float(os.getenv("SKELETON_ENGINE_REQUEST_TIMEOUT_S", "15")),
                 poll_interval_s=float(os.getenv("SKELETON_ENGINE_POLL_INTERVAL_S", "0.05")),
