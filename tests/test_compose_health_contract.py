@@ -30,3 +30,21 @@ def test_skeleton_healthcheck_stays_loopback_only() -> None:
     skeleton = _compose_service_block("skeleton", "backend")
 
     assert "http://127.0.0.1:8001/api/v1/health/live" in skeleton
+
+
+def test_first_install_application_ports_default_to_loopback() -> None:
+    """A clean install must not publish app APIs to the LAN by default."""
+    skeleton = _compose_service_block("skeleton", "backend")
+    backend = _compose_service_block("backend", "frontend")
+    frontend = _compose_service_block("frontend", "mongo")
+
+    assert '"${SKELETON_BIND_HOST:-127.0.0.1}:${SKELETON_PORT:-8010}:8001"' in skeleton
+    assert '"${BACKEND_BIND_HOST:-127.0.0.1}:${BACKEND_PORT:-8001}:8001"' in backend
+    assert '"${FRONTEND_BIND_HOST:-127.0.0.1}:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in frontend
+
+
+def test_first_install_ui_does_not_wait_for_backend_or_database() -> None:
+    """Setup remains reachable when backend, engine, or MongoDB is unhealthy."""
+    frontend = _compose_service_block("frontend", "mongo")
+    assert "depends_on:" not in frontend
+    assert "EXPO_PUBLIC_BACKEND_URL" in frontend
