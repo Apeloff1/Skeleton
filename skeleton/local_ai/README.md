@@ -1,18 +1,11 @@
-# Local AI Boilerplate
+# Local AI compatibility seams
 
-Complete SOTA seams for local Cortex / Jeeves / GameForge workloads.
+This package is a legacy adapter inventory, **not** the authoritative inference
+runtime. Creating `LocalAIComplete` does not load a GGUF model or establish a
+reviewer, tokenizer, shared guard epoch or writer fence.
 
-## Usage
-
-```python
-from skeleton.local_ai import get_complete
-
-ai = get_complete()
-print(ai.status())
-```
-
-## Seams
-
-See docs/LOCAL_AI_SEAMS_INDEX.md for the full catalog.
-
-All extend-only. No stubs. Perfect internals.
+Run `python -m skeleton.local_ai.bootstrap_cli --status` for a conservative
+diagnostic. It exits 2 with `LOCAL_INFERENCE_NOT_BOUND` until the legacy
+facade is replaced by a verified binding. Use the canonical
+`skeleton/provider_runtime.py` path for model dispatch; never treat a
+synthetic bridge string as model output.

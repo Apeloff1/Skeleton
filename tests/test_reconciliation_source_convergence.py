@@ -18,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "machine" / "ai_file_tree.json"
 EXPECTED_MAPPINGS = {
     "AIFT-FORGE": ("skeleton/forge", "skeleton/ai/forge"),
+    "AIFT-CONTEXT": ("skeleton/context", "skeleton/ai/runtime/context"),
+    "AIFT-ECS-ADAPTER": ("skeleton/ecs", "skeleton/ai/runtime/ecs"),
     "AIFT-EXEC-SANDBOX": ("skeleton/sandbox", "skeleton/ai/runtime/sandbox"),
     "AIFT-JEEVES": ("skeleton/jeeves", "skeleton/ai/agents/jeeves"),
     "AIFT-SIMULATION": ("skeleton/simulation", "skeleton/ai/simulation"),
@@ -43,6 +45,13 @@ MIRRORS = (
      "skeleton/ai/runtime/api/v1_edge/edge.py"),
     ("skeleton/api/v1_edge/quota_store/remote.py",
      "skeleton/ai/runtime/api/v1_edge/quota_store/remote.py"),
+    ("skeleton/simulation/physics/vehicle.py", "skeleton/ai/simulation/physics/vehicle.py"),
+    ("skeleton/ecs/ai.py", "skeleton/ai/runtime/ecs/ai.py"),
+    ("skeleton/forge/archetype_content.py", "skeleton/ai/forge/archetype_content.py"),
+    ("skeleton/forge/export.py", "skeleton/ai/forge/export.py"),
+    ("skeleton/jeeves/worlds/world_canon.py", "skeleton/ai/agents/jeeves/worlds/world_canon.py"),
+    ("skeleton/jeeves/local_inference_bridge.py", "skeleton/ai/agents/jeeves/local_inference_bridge.py"),
+    ("skeleton/context/pipeline.py", "skeleton/ai/runtime/context/pipeline.py"),
     ("skeleton/perfgate/cli.py", "skeleton/ai/perfgate/cli.py"),
 )
 EXPLICIT_RETAINS = {

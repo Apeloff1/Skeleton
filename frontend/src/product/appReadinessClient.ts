@@ -33,6 +33,14 @@ function localGuardIssue(data: Record<string, unknown> | null): { message: strin
   return null;
 }
 
+/** A missing observation is never a positive readiness verdict. A failed observed
+ * probe is blocked, while an absent private-service probe remains unknown. */
+export function serviceReadinessStatus(item: { ok: boolean; detail: string } | undefined): ReadinessCheck['status'] {
+  if (!item) return 'unknown';
+  if (item.ok) return 'ready';
+  return item.detail.startsWith('observation pending') ? 'unknown' : 'blocked';
+}
+
 /** Each verdict belongs to its observed owner; service health never implies AI readiness. */
 export async function readAppReadiness(signal?: AbortSignal): Promise<AppReadiness> {
   const healthPromise = probeAppHealth(2500, signal).catch(() => null);
@@ -62,8 +70,8 @@ export async function readAppReadiness(signal?: AbortSignal): Promise<AppReadine
   for (const name of ['backend', 'skeleton', 'mongo'] as const) {
     const item = health?.services.find(row => row.name === name);
     checks.push({ id: name, label: name === 'backend' ? 'Application service' : name === 'mongo' ? 'Database service' : 'AI engine service',
-      status: item?.ok ? 'ready' : item?.detail.startsWith('observation pending') ? 'unknown' : item ? 'blocked' : 'unknown',
-      message: item?.ok ? 'The service responded to its health check.' : name === 'mongo' && item ? 'The application database could not be observed as healthy. Account sign-in and durable work need this service; inspect it before retrying.' : 'The service could not be reached. Start the installed application and check its status.',
+      status: serviceReadinessStatus(item),
+      message: item?.ok ? 'The service responded to its health check.' : name === 'mongo' && item ? 'The application database could not be observed as healthy. Account sign-in and durable work need this service; inspect it before retrying.' : item?.detail.startsWith('observation pending') ? 'This service was not independently observed. No readiness claim is available.' : item ? 'SERVICE_UNAVAILABLE: The service health probe failed. Inspect host diagnostics before retrying.' : 'SERVICE_UNOBSERVED: The service could not be checked. Start the installed application and check its status.',
       action: 'python -m skeleton app status --live' });
   }
   const authData = account.observed !== false ? account : null;
