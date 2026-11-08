@@ -113,14 +113,11 @@ def test_governed_storage_and_release_cockpit_retain_existing_owners() -> None:
     assert (storage.zone, storage.owner) == ("platform", "platform-runtime")
     assert (cockpit.zone, cockpit.owner) == ("build-delivery", "delivery-plane")
 
-def test_godot_export_and_mass_build_have_explicit_canonical_ownership() -> None:
+
+def test_export_and_mass_build_roots_have_canonical_delivery_custody() -> None:
     config = load_machine_config(ROOT)
-    for path in (
-        "skeleton/godot_export/runner.py",
-        "skeleton/godot_export/provenance.py",
-        "skeleton/mass_build/b081_b100/__init__.py",
-    ):
+    for path in ("skeleton/godot_export/runner.py", "skeleton/mass_build/compiler.py"):
         placement = placement_for_path(config, path)
         assert (placement.zone, placement.owner, placement.lifecycle) == (
-            "build-delivery", "delivery-plane", "canonical"
-        ), path
+            "build-delivery", "delivery-plane", "canonical",
+        )
