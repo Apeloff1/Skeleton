@@ -28,7 +28,8 @@ class ProbeBackend:
 
 class QualificationTests(unittest.TestCase):
     def setUp(self):
-        self.tmp=tempfile.TemporaryDirectory(dir='/home/oai/.cache')
+        # CI and operator hosts choose their own private, OS-approved temp root.
+        self.tmp=tempfile.TemporaryDirectory()
         self.state=Path(self.tmp.name)/'private'
         self.state.mkdir(mode=0o700)
         self.out=Path(self.tmp.name)/'reports';self.out.mkdir(mode=0o700)
