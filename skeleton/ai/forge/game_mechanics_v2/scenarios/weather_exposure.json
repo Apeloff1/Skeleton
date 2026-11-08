@@ -1,0 +1,55 @@
+{
+  "schema": "skeleton.game_mechanic_scenario.v1",
+  "name": "weather_exposure",
+  "domain": "world",
+  "initial": 54,
+  "capacity": 120,
+  "events": [
+    {
+      "id": "weather_exposure:gain:1",
+      "action": "gain",
+      "amount": 10,
+      "tick": 1
+    },
+    {
+      "id": "weather_exposure:spend:2",
+      "action": "spend",
+      "amount": 8,
+      "tick": 2
+    },
+    {
+      "id": "weather_exposure:recover:3",
+      "action": "recover",
+      "amount": 2,
+      "tick": 3
+    },
+    {
+      "id": "weather_exposure:observe:4",
+      "action": "observe",
+      "amount": 0,
+      "tick": 4
+    },
+    {
+      "id": "weather_exposure:decay:5",
+      "action": "decay",
+      "amount": 2,
+      "tick": 5
+    }
+  ],
+  "assertions": {
+    "bounds": [
+      0,
+      120
+    ],
+    "accepted_receipts": 5,
+    "duplicate_receipts_change_state": false,
+    "stable_ordering": true,
+    "no_authorization_side_effects": true
+  },
+  "notes": [
+    "Designed for world simulation with bounded intensity units.",
+    "Event IDs carry replay identity within a world instance.",
+    "Timestamps are logical ticks, not wall-clock time.",
+    "This fixture is synthetic and does not claim gameplay/device qualification."
+  ]
+}
