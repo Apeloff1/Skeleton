@@ -7,6 +7,7 @@ from __future__ import annotations
 from hashlib import sha256
 import time
 from .contracts import BurnInPolicy,QualificationHeld
+from skeleton.ai.runtime.operational_ai.authority.canonical import ContractViolation
 from .latency import summarize
 from .records import trial_record
 
@@ -40,6 +41,11 @@ def measure(backend, policy:BurnInPolicy,*,clock=time.monotonic_ns) -> dict:
         try:
             receipt=backend.generate(inputs,max_output_tokens=policy.max_output_tokens,
                                      seed=42+index,temperature=0.5)
+        except ContractViolation:
+            # A malformed model receipt is a qualification hold, never a pass.
+            # Do not stringify provider-controlled exception content, retry
+            # an already-started native call, or manufacture an output.
+            raise QualificationHeld('native generated receipt rejected') from None
         except BaseException:
             # No retry. The isolated model child must be shutdown by its
             # enclosing context manager; the request is not considered good.
