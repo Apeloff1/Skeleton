@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "33104d999f7517a1702048be1f1075f56f8f7979",
+      "source_git_object_sha": "63be51cf2446449cedbfde7e9380f617e1450695",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
