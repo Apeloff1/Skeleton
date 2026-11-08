@@ -21,6 +21,10 @@ on:
       - 'scripts/game/offline_grid_campaign.py'
       - 'tests/test_offline_grid_save_slot.py'
       - 'skeleton/simulation/game/golden_grid.py'
+      - 'skeleton/game/flgb_editor_runtime.py'
+      - 'tests/test_jeeves_deep_authoring_graph.py'
+      - 'skeleton/godot_export/artifact_custody.py'
+      - 'skeleton/testing/test_godot_export_artifact_custody.py'
       - 'tests/test_golden_grid_v6.py'
       - 'skeleton/jeeves/worlds/laptop_flow.py'
       - 'skeleton/jeeves/worlds/world_canon.py'
@@ -173,6 +177,7 @@ jobs:
         run: |
           python -m compileall -q skeleton/install/loopback_readiness.py skeleton/game/gameplay/offline_grid_save_slot.py skeleton/simulation/game/golden_grid.py skeleton/jeeves/worlds/laptop_flow.py skeleton/jeeves/worlds/world_canon.py skeleton/ai/research/causal_knowledge.py skeleton/ai/research/hypothesis_engine.py skeleton/ai/research/game_design_probes.py skeleton/ai/webcrawler/dragon_campaign_stack
           python -m compileall -q tests/test_offline_grid_save_slot.py tests/test_golden_grid_v6.py tests/test_ai_webcrawler_dragon_archive_catalogs.py tests/test_ai_webcrawler_dragon_campaign_stack.py tests/test_ai_webcrawler_dragon_atlas.py skeleton/testing/test_loopback_readiness.py skeleton/testing/test_jeeves_laptop_atomic_review.py skeleton/testing/test_jeeves_browser_save.py skeleton/testing/test_jeeves_standalone_keyboard.py skeleton/testing/test_jeeves_world_source_custody.py skeleton/testing/test_causal_knowledge.py skeleton/testing/test_hypothesis_engine.py skeleton/testing/test_game_design_probes.py
+          python -m compileall -q skeleton/game/flgb_editor_runtime.py skeleton/godot_export/artifact_custody.py tests/test_jeeves_deep_authoring_graph.py skeleton/testing/test_godot_export_artifact_custody.py
       - name: Exercise committed features against real source and filesystem fixtures
         run: |
           python -m pytest -q --maxfail=1 --noconftest \
@@ -188,4 +193,6 @@ jobs:
             skeleton/testing/test_game_design_probes.py \
             tests/test_ai_webcrawler_dragon_archive_catalogs.py \
             tests/test_ai_webcrawler_dragon_campaign_stack.py \
-            tests/test_ai_webcrawler_dragon_atlas.py
+            tests/test_ai_webcrawler_dragon_atlas.py \
+            tests/test_jeeves_deep_authoring_graph.py \
+            skeleton/testing/test_godot_export_artifact_custody.py
