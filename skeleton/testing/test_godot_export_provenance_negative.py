@@ -62,3 +62,23 @@ def test_no_follow_on_parent_and_source_tree(tmp_path):
         provenance.tree_digest(root)
     with pytest.raises(OSError):
         provenance._digest_beneath(root, "leak/secret.txt")
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX no-follow export directory custody")
+def test_export_target_cannot_overwrite_or_follow_directory_symlinks(tmp_path):
+    from skeleton.godot_export.export_cert import _export_target
+    root = tmp_path / "out"
+    target = _export_target(root, "build/linux/game.x86_64")
+    assert target == root / "build/linux/game.x86_64"
+    target.write_bytes(b"old")
+    with pytest.raises(FileExistsError):
+        _export_target(root, "build/linux/game.x86_64")
+    target.unlink()
+    redirected = tmp_path / "redirected"
+    redirected.mkdir()
+    (root / "build" / "linked").symlink_to(redirected, target_is_directory=True)
+    with pytest.raises(OSError):
+        _export_target(root, "build/linked/other.x86_64")
+    with pytest.raises(ValueError):
+        _export_target(root, "../escape")
+    with pytest.raises(ValueError):
+        _export_target(root, "/etc/shadow")
