@@ -280,8 +280,13 @@ def _load_json_object(raw: str | bytes, *, label: str) -> dict[str, object]:
         _fail(f"{label} must be text or UTF-8 bytes", reason="malformed")
     if not text or len(text.encode("utf-8")) > MAX_COMMAND_BYTES:
         _fail(f"{label} byte size is invalid", reason="bound")
+    def reject_nonfinite(token: str) -> NoReturn:
+        _fail(f"{label} contains non-finite JSON number", reason="json_type", token=token)
+
     try:
-        value = json.loads(text, object_pairs_hook=_unique_object)
+        value = json.loads(
+            text, object_pairs_hook=_unique_object, parse_constant=reject_nonfinite
+        )
     except CreatorCommandError:
         raise
     except json.JSONDecodeError:
