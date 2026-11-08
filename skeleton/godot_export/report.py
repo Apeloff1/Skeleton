@@ -53,7 +53,7 @@ class CertificationReport:
 
     @property
     def ship(self) -> bool:
-        return not self.blocking
+        return bool(self.results) and not self.blocking
 
     def exit_code(self) -> int:
         return 0 if self.ship else 1
