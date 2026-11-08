@@ -6739,6 +6739,16 @@
   },
   "retained_outside_ai_tree": [
     {
+      "path": "skeleton/mass_build",
+      "owner": "legacy game mass-build batch source",
+      "reason": "Tracked batch-range implementation slices remain a legacy game-build source, not a canonical AI/provider runtime. Retain source and provenance without granting move, cutover, completion, or release authority."
+    },
+    {
+      "path": "skeleton/perf_profiler",
+      "owner": "product/game runtime performance instrumentation",
+      "reason": "Stdlib-only allocation, frame and load timing CLI is a product performance instrument that delegates percentile statistics to canonical AI observability. Retain instrumentation ownership outside AI engine move scope; local-callable execution remains explicitly gated."
+    },
+    {
       "path": "skeleton/__main__.py",
       "owner": "package CLI shell",
       "reason": "top-level CLI dispatch remains a shell/compatibility entrypoint around canonical subsystems"
@@ -7772,7 +7782,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 160,
+    "retained_outside_ai_tree_count": 162,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
