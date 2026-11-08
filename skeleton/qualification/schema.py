@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -8,7 +7,7 @@ from typing import Any
 
 from .errors import SchemaError
 
-CASE_ID_RE = re.compile(r"^GFM-[A-Z]{2,8}-\d{2,3}$")
+CASE_ID_RE = re.compile(r"GFM-[A-Z]{2,8}-[0-9]{2,3}\Z")
 KNOWN_GATES = ("fps", "perf", "soak", "retention", "replay", "promotion")
 SEVERITIES = ("sev1", "sev2", "sev3")
 
@@ -41,7 +40,7 @@ def parse_case(doc: Any, where: str = "<case>") -> QualCase:
     if extra:
         raise SchemaError(where, f"unknown fields {sorted(extra)}")
     cid = _req(doc, "id", str, where)
-    if not CASE_ID_RE.match(cid):
+    if not CASE_ID_RE.fullmatch(cid):
         raise SchemaError(where, f"id '{cid}' must match {CASE_ID_RE.pattern}")
     gate = _req(doc, "gate", str, where)
     if gate not in KNOWN_GATES:
@@ -64,17 +63,25 @@ def parse_case(doc: Any, where: str = "<case>") -> QualCase:
     return QualCase(cid, gate, title, todo_ref, sev, params, hw)
 
 
+MAX_CASE_FILES = 256
+MAX_CASE_BYTES = 65_536
+MAX_CASE_TOTAL_BYTES = 2 * 1024 * 1024
+
+
 def load_case(path: str | Path) -> QualCase:
-    p = Path(path)
-    try:
-        doc = json.loads(p.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise SchemaError(str(p), f"invalid JSON: {exc.msg}") from exc
-    return parse_case(doc, str(p))
+    from .secure_fs import decode, read_one
+    return parse_case(decode(read_one(path, limit=MAX_CASE_BYTES), str(path)), str(path))
 
 
 def load_cases(directory: str | Path) -> list[QualCase]:
-    cases = [load_case(p) for p in sorted(Path(directory).glob("*.json"))]
+    from .secure_fs import decode, read_inventory
+    cases = [
+        parse_case(decode(raw, str(where)), str(where))
+        for where, raw in read_inventory(
+            directory, max_files=MAX_CASE_FILES, max_bytes=MAX_CASE_BYTES,
+            max_total=MAX_CASE_TOTAL_BYTES,
+        )
+    ]
     seen: set[str] = set()
     for c in cases:
         if c.id in seen:

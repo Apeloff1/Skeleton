@@ -63,33 +63,15 @@ def parse_evidence(doc: Any, where: str = "<evidence>") -> Evidence:
 
 
 def load_evidence(directory: str | Path) -> dict[str, Evidence]:
-    out: dict[str, Evidence] = {}
-    d = Path(directory)
-    if not d.exists():
-        return out
-    entries = sorted(d.glob("*.json"))
-    if len(entries) > MAX_EVIDENCE_FILES:
-        raise SchemaError(str(d), "evidence inventory exceeds bounded limit")
-    def reject_duplicates(pairs):
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError("duplicate evidence JSON key")
-            result[key] = value
-        return result
-    for p in entries:
-        if p.is_symlink() or not p.is_file() or p.stat().st_nlink != 1:
-            raise SchemaError(str(p), "unsafe evidence file identity")
-        if p.stat().st_size > MAX_EVIDENCE_BYTES:
-            raise SchemaError(str(p), "evidence file byte budget exceeded")
-        try:
-            raw = p.read_bytes()
-            doc = json.loads(raw, object_pairs_hook=reject_duplicates,
-                parse_constant=lambda value: (_ for _ in ()).throw(ValueError("nonfinite JSON")))
-        except (ValueError, UnicodeError, OSError) as exc:
-            raise SchemaError(str(p), "malformed evidence JSON") from exc
-        ev = parse_evidence(doc, str(p))
-        if ev.case_id in out:
-            raise SchemaError(str(p), f"duplicate evidence for {ev.case_id}")
-        out[ev.case_id] = ev
-    return out
+    """A stable, owner-controlled and finite source snapshot; never device proof."""
+    from .secure_fs import decode, read_inventory
+    result: dict[str, Evidence] = {}
+    for where, raw in read_inventory(
+        directory, max_files=MAX_EVIDENCE_FILES, max_bytes=MAX_EVIDENCE_BYTES,
+        max_total=8 * 1024 * 1024,
+    ):
+        ev = parse_evidence(decode(raw, str(where)), str(where))
+        if ev.case_id in result:
+            raise SchemaError(str(where), f"duplicate evidence for {ev.case_id}")
+        result[ev.case_id] = ev
+    return result
