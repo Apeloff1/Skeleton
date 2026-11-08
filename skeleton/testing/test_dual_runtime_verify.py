@@ -69,13 +69,13 @@ def _source_bound_studio_fixture(package):
     }
     for name, document in documents.items():
         raw = (json.dumps(document, sort_keys=True, ensure_ascii=True,
-                          separators=(",", ":"), allow_nan=False) + "\\n").encode()
+                          separators=(",", ":"), allow_nan=False) + "\n").encode()
         (studio / name).write_bytes(raw)
         manifest["files"]["studio/" + name] = sha256(raw).hexdigest()
     manifest.pop("manifest_digest")
     manifest["manifest_digest"] = canonical_digest(manifest)
     release.write_bytes((json.dumps(manifest, sort_keys=True, ensure_ascii=True,
-                                     separators=(",", ":"), allow_nan=False) + "\\n").encode())
+                                     separators=(",", ":"), allow_nan=False) + "\n").encode())
     return root, sha256(release.read_bytes()).hexdigest()
 
 
@@ -104,13 +104,13 @@ def test_studio_package_fails_closed_on_missing_or_forged_source_custody(package
         else:
             doc["project_id"] = "foreign-tenant-game"
         raw = (json.dumps(doc, sort_keys=True, ensure_ascii=True,
-                          separators=(",", ":"), allow_nan=False) + "\\n").encode()
+                          separators=(",", ":"), allow_nan=False) + "\n").encode()
         name.write_bytes(raw)
         manifest["files"]["studio/pipeline.json"] = sha256(raw).hexdigest()
     manifest.pop("manifest_digest")
     manifest["manifest_digest"] = canonical_digest(manifest)
     release.write_bytes((json.dumps(manifest, sort_keys=True, ensure_ascii=True,
-                                     separators=(",", ":"), allow_nan=False) + "\\n").encode())
+                                     separators=(",", ":"), allow_nan=False) + "\n").encode())
     pin = sha256(release.read_bytes()).hexdigest()
     with pytest.raises(DualRuntimeVerificationError):
         verify_exported_package(root, expected_manifest_sha256=pin, authorized=True)
