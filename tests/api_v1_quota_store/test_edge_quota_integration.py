@@ -30,8 +30,8 @@ def make_app(store, legacy=None, tel=None):
     reg.register(RouteSpec("GET", "/items/{iid}"))
     reg.register(RouteSpec("POST", "/items", quota_class="writes"))
     keys = ApiKeyStore()
-    tok1 = keys.add("k1", "test-only-key-1", subject="svc", tenant="t1", scopes=set())
-    tok2 = keys.add("k2", "test-only-key-2", subject="svc", tenant="t2", scopes=set())
+    tok1 = keys.add("k1", "test-only-key-material-0000000001", subject="svc", tenant="t1", scopes=set())
+    tok2 = keys.add("k2", "test-only-key-material-0000000002", subject="svc", tenant="t2", scopes=set())
     plan = QuotaPlan({"default": Limit(1, 3), "writes": Limit(1, 2)},
                      tenant_route_limits={"GET /items/{iid}": Limit(1, 2)})
     tel = tel or QuotaTelemetry()
