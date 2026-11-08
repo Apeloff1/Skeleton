@@ -14,6 +14,9 @@ from dataclasses import dataclass
 import math
 from typing import Any, Callable
 
+# Keep native telemetry representable and bounded before any speedup division.
+MAX_EVIDENCE_INTEGER = (1 << 63) - 1
+
 
 class ProfileGateError(RuntimeError):
     """Profile input cannot be interpreted. Not a maturity signal."""
@@ -37,6 +40,8 @@ class AccelerationProfile:
             value = getattr(self, field_name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise ProfileGateError(f"{field_name} must be a positive integer")
+            if value > MAX_EVIDENCE_INTEGER:
+                raise ProfileGateError(f"{field_name} exceeds native evidence bounds")
 
     def speedup(self) -> float:
         ratio = self.baseline_ns / self.candidate_ns
@@ -84,26 +89,43 @@ class ProfileGate:
     ) -> None:
         if isinstance(expected_abi, bool) or not isinstance(expected_abi, int):
             raise ProfileGateError("expected_abi must be an integer")
-        if expected_abi < 1:
-            raise ProfileGateError("expected_abi must be positive")
+        if not 0 < expected_abi <= MAX_EVIDENCE_INTEGER:
+            raise ProfileGateError("expected_abi must be positive and bounded")
         if not isinstance(protocol, str) or not protocol.strip() or protocol != protocol.strip():
             raise ProfileGateError("protocol must be canonical text")
-        if isinstance(min_samples, bool) or not isinstance(min_samples, int) or min_samples < 8:
-            raise ProfileGateError("min_samples must be an integer >= 8")
+        if (isinstance(min_samples, bool) or not isinstance(min_samples, int)
+                or not 8 <= min_samples <= MAX_EVIDENCE_INTEGER):
+            raise ProfileGateError("min_samples must be an integer between 8 and native evidence bounds")
         if not isinstance(min_speedup, (int, float)) or isinstance(min_speedup, bool):
             raise ProfileGateError("min_speedup must be numeric")
-        if not math.isfinite(float(min_speedup)) or float(min_speedup) < 1.0:
+        try:
+            speedup = float(min_speedup)
+        except (OverflowError, ValueError) as exc:
+            raise ProfileGateError("min_speedup must be finite") from exc
+        if not math.isfinite(speedup) or speedup < 1.0:
             raise ProfileGateError("min_speedup must be finite and at least 1")
         self.expected_abi = expected_abi
         self.protocol = protocol
         self.min_samples = min_samples
-        self.min_speedup = float(min_speedup)
+        self.min_speedup = speedup
 
     def decide(self, profile: AccelerationProfile | None) -> GateDecision:
         if profile is None:
             return GateDecision("scalar", "profile-missing")
         if not isinstance(profile, AccelerationProfile):
             raise ProfileGateError("profile must be an AccelerationProfile")
+        # A frozen dataclass can still be modified by low-level test or native
+        # deserialization tricks: revalidate before any privileged dispatch.
+        if (not isinstance(profile.name, str) or not profile.name.strip()
+                or profile.name != profile.name.strip()
+                or not isinstance(profile.protocol, str) or not profile.protocol.strip()
+                or profile.protocol != profile.protocol.strip()):
+            return GateDecision("scalar", "profile-identity-invalid")
+        numeric = (profile.abi_version, profile.samples,
+                   profile.baseline_ns, profile.candidate_ns)
+        if any(type(value) is not int or not 0 < value <= MAX_EVIDENCE_INTEGER
+               for value in numeric):
+            return GateDecision("scalar", "profile-numeric-invalid")
         if profile.protocol != self.protocol:
             return GateDecision("scalar", "protocol-mismatch")
         if profile.abi_version != self.expected_abi:
