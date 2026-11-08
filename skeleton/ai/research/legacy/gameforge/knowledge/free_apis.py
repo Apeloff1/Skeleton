@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import json
 import re
+import ipaddress
+import socket
 from typing import Any, Optional
 from urllib.parse import quote, urlencode, urlsplit
 
@@ -101,6 +103,10 @@ def _validate_catalog_url(api: dict, url: str) -> None:
         raise ValueError("API URL host is not part of the trusted catalog")
     if actual.username or actual.password:
         raise ValueError("API URL credentials are not allowed")
+    if configured.port not in (None, 443) or actual.port not in (None, 443):
+        raise ValueError("public catalog endpoints require HTTPS port 443")
+    if actual.fragment:
+        raise ValueError("API URL fragments are not allowed")
 
 
 def _catalog_request_parts(api: dict, url: str) -> tuple[str, str]:
@@ -116,6 +122,31 @@ def _catalog_request_parts(api: dict, url: str) -> tuple[str, str]:
     path = "/" + (actual.path or "").lstrip("/")
     target = path + (f"?{actual.query}" if actual.query else "")
     return origin, target
+
+
+def _pin_catalog_host(hostname: str) -> str:
+    """Check every DNS answer and return one public IP as the actual HTTP target."""
+    try:
+        answers = socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise ValueError("catalog DNS resolution failed") from exc
+    if not answers:
+        raise ValueError("catalog DNS returned no addresses")
+    public = set()
+    for record in answers:
+        try:
+            ip = ipaddress.ip_address(record[4][0])
+        except (IndexError, TypeError, ValueError) as exc:
+            raise ValueError("catalog DNS returned an invalid address") from exc
+        if not ip.is_global:
+            raise ValueError("catalog DNS returned a non-public address")
+        public.add(ip.compressed)
+    return sorted(public, key=lambda value: (ipaddress.ip_address(value).version, value))[0]
+
+
+def _pinned_origin(ip: str) -> str:
+    address = ipaddress.ip_address(ip)
+    return f"https://[{address.compressed}]" if address.version == 6 else f"https://{address.compressed}"
 
 
 async def _read_bounded_body(response) -> bytes:
@@ -144,14 +175,24 @@ async def fetch(api_key: str, params: dict) -> dict:
     url = _build_url(api, params or {})
     try:
         base_url, request_target = _catalog_request_parts(api, url)
+        hostname = urlsplit(base_url).hostname
+        if not hostname:
+            raise ValueError("catalog HTTPS hostname is missing")
+        # Bind the transport to this reviewed public IP, rather than allowing
+        # HTTPX to re-resolve the hostname after validation. SNI and Host
+        # remain fixed to the trusted catalog entry for certificate checks.
+        address = _pin_catalog_host(hostname)
         import httpx
         async with httpx.AsyncClient(
-            base_url=base_url,
+            base_url=_pinned_origin(address),
             timeout=10,
             follow_redirects=False,
-            headers=_HEADERS,
+            headers={**_HEADERS, "Host": hostname},
+            trust_env=False,
         ) as c:
-            async with c.stream("GET", request_target) as r:
+            async with c.stream(
+                "GET", request_target, extensions={"sni_hostname": hostname},
+            ) as r:
                 raw = await _read_bounded_body(r)
                 ct = r.headers.get("content-type", "")
                 status = r.status_code
