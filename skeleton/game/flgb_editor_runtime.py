@@ -153,16 +153,20 @@ class SceneGraph:
         if len(roots)!=1: raise GameProjectError("scene graph requires exactly one root")
         for node in nodes:
             if node.parent_id is not None and node.parent_id not in by_id: raise GameProjectError("orphan scene node")
+        # Iterative parent traversal: valid user-authored worlds may exceed
+        # Python's recursion limit. A cycle must remain a contract error.
         state={}
-        def visit(node_id:str)->None:
-            mark=state.get(node_id,0)
-            if mark==1: raise GameProjectError("scene graph cycle")
-            if mark==2: return
-            state[node_id]=1
-            parent=by_id[node_id].parent_id
-            if parent is not None: visit(parent)
-            state[node_id]=2
-        for node_id in by_id: visit(node_id)
+        for node_id in by_id:
+            chain=[]
+            current=node_id
+            while current is not None and state.get(current,0)!=2:
+                if state.get(current,0)==1:
+                    raise GameProjectError("scene graph cycle")
+                state[current]=1
+                chain.append(current)
+                current=by_id[current].parent_id
+            for visited in chain:
+                state[visited]=2
         entity_ids=[n.entity_id for n in nodes if n.entity_id is not None]
         if len(set(entity_ids))!=len(entity_ids): raise GameProjectError("entity attached to multiple scene nodes")
         self.nodes=tuple(sorted(nodes,key=lambda n:(n.order,n.node_id)))
@@ -232,17 +236,20 @@ def validate_prefabs(prefabs:Sequence[PrefabSpec])->tuple[PrefabSpec,...]:
     by_id={p.prefab_id:p for p in prefabs}
     if len(by_id)!=len(prefabs): raise GameProjectError("duplicate prefab identity")
     state={}
-    def visit(pid:str)->None:
-        mark=state.get(pid,0)
-        if mark==1: raise GameProjectError("prefab inheritance cycle")
-        if mark==2:return
-        state[pid]=1
-        parent=by_id[pid].parent_prefab_id
-        if parent is not None:
-            if parent not in by_id: raise GameProjectError("unknown prefab parent")
-            visit(parent)
-        state[pid]=2
-    for pid in by_id: visit(pid)
+    for pid in by_id:
+        chain=[]
+        current=pid
+        while current is not None and state.get(current,0)!=2:
+            if state.get(current,0)==1:
+                raise GameProjectError("prefab inheritance cycle")
+            state[current]=1
+            chain.append(current)
+            parent=by_id[current].parent_prefab_id
+            if parent is not None and parent not in by_id:
+                raise GameProjectError("unknown prefab parent")
+            current=parent
+        for visited in chain:
+            state[visited]=2
     return tuple(sorted(prefabs,key=lambda p:p.prefab_id))
 
 @dataclass(frozen=True)
