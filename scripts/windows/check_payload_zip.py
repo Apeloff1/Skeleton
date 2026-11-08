@@ -120,8 +120,19 @@ def archive_errors(
         errors.extend(f"{name!r}: {problem}" for problem in problems)
         if entry.flag_bits & 1:
             errors.append(f"{name!r}: encrypted ZIP entry not supported")
-        if stat.S_IFMT(entry.external_attr >> 16) == stat.S_IFLNK:
+        # Windows extraction only admits regular files and directories.
+        # ZIP Unix attributes can also encode devices, FIFOs and sockets.
+        unix_type = stat.S_IFMT(entry.external_attr >> 16) if entry.create_system == 3 else 0
+        if unix_type == stat.S_IFLNK:
             errors.append(f"{name!r}: symbolic link not supported in Windows payload")
+        elif unix_type not in (0, stat.S_IFREG, stat.S_IFDIR):
+            errors.append(f"{name!r}: nonregular Unix file type not supported")
+        if unix_type == stat.S_IFDIR and not name.endswith("/"):
+            errors.append(f"{name!r}: directory metadata without directory path")
+        if unix_type == stat.S_IFREG and name.endswith("/"):
+            errors.append(f"{name!r}: file metadata with directory path")
+        if entry.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+            errors.append(f"{name!r}: unsupported ZIP compression method")
         if entry.file_size > MAX_SINGLE_FILE_BYTES:
             errors.append(f"{name!r}: single file exceeds {MAX_SINGLE_FILE_BYTES} bytes")
         total_bytes += entry.file_size
