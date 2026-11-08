@@ -1321,7 +1321,13 @@ def _ratio_to_mille(value: Any) -> int:
             "ratio must be numeric",
             context={"reason": "malformed_spec"},
         )
-    number = float(value)
+    try:
+        number = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise GameReplayError(
+            "ratio must be a finite non-negative number",
+            context={"reason": "malformed_spec"},
+        ) from exc
     if not math.isfinite(number) or number < 0:
         raise GameReplayError(
             "ratio must be a finite non-negative number",
