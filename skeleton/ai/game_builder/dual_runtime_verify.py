@@ -313,7 +313,10 @@ def verify_exported_package(
         manifest = _json(release, _MAX_MANIFEST)
         if release != _canonical_bytes(manifest):
             raise DualRuntimeVerificationError("noncanonical release JSON")
-        if manifest.get("schema") != "skeleton.game_builder.dual_runtime_package.v1":
+        if manifest.get("schema") not in {
+            "skeleton.game_builder.dual_runtime_package.v1",
+            "skeleton.game_builder.studio_package.v1",
+        }:
             raise DualRuntimeVerificationError("unsupported release schema")
         digest = manifest.get("manifest_digest")
         body = {key: value for key, value in manifest.items()
