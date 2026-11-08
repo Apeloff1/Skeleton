@@ -85,7 +85,7 @@ class PayloadZipPreflightTests(unittest.TestCase):
         info = ZipInfo("link")
         info.create_system = 3
         info.external_attr = (stat.S_IFLNK | 0o777) << 16
-        self.assertTrue(any("symbolic link" in issue for issue in archive_errors([info])))
+        self.assertTrue(any("unsupported Unix special file type" in issue for issue in archive_errors([info])))
 
     def test_unix_special_inode_types_fail_closed(self) -> None:
         for inode in (stat.S_IFIFO, stat.S_IFSOCK, stat.S_IFCHR, stat.S_IFBLK, stat.S_IFLNK):
