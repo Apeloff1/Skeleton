@@ -28,6 +28,8 @@ on:
       - ".github/workflows/draft19-gguf-source-qualification.yml"
       - "scripts/check_reconciliation_exact_head.py"
       - "tests/test_reconciliation_exact_head.py"
+      - "tests/test_reconciliation_workflow_admission_20261108.py"
+      - "machine/ci_workflow_tiers.json"
       - ".github/workflows/reconciliation-exact-head-policy.yml"
 
 permissions:
