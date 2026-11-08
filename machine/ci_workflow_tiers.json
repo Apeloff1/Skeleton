@@ -38,6 +38,7 @@
     "automerge-control-plane.yml",
     "backend-quality.yml",
     "dependency-review.yml",
+    "draft19-gguf-source-qualification.yml",
     "dragon-atlas-backend-bridge.yml",
     "dragon-campaign-frontend-checks.yml",
     "dragon-campaign-source-tests.yml",
@@ -47,11 +48,8 @@
     "jeeves-native-sqlite-source-qualification.yml",
     "malware-gate.yml",
     "merge-readiness.yml",
-    "owner-historical-actions-cleanup.yml",
     "queue-drain.yml",
-    "release-images.yml",
     "repository-hygiene-gate.yml",
-    "reproducible-release.yml",
     "sealed-context-guard.yml",
     "secret-scanning.yml",
     "security-alert-inventory.yml",
@@ -89,6 +87,9 @@
     "dependency-review.yml": [
       "pull_request"
     ],
+    "draft19-gguf-source-qualification.yml": [
+      "pull_request"
+    ],
     "dragon-atlas-backend-bridge.yml": [
       "pull_request"
     ],
@@ -122,26 +123,14 @@
       "pull_request",
       "push"
     ],
-    "owner-historical-actions-cleanup.yml": [
-      "issue_comment",
-      "workflow_dispatch"
-    ],
     "queue-drain.yml": [
       "workflow_dispatch",
       "schedule",
       "push"
     ],
-    "release-images.yml": [
-      "push",
-      "workflow_dispatch"
-    ],
     "repository-hygiene-gate.yml": [
       "pull_request",
       "push"
-    ],
-    "reproducible-release.yml": [
-      "push",
-      "workflow_dispatch"
     ],
     "sealed-context-guard.yml": [
       "pull_request",

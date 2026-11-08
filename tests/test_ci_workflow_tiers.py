@@ -30,7 +30,7 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertEqual(missing, [], "masterplan references missing workflows")
 
     def test_auxiliary_admissions_are_manual_only(self):
-        """Keep the 26 named independent triggers and every required security gate."""
+        """Keep the 24 named independent triggers and every required security gate."""
         for name in ("historical-zero-job-canary.yml", "local-ai-boilerplate.yml"):
             source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
             self.assertEqual(events(source), {"workflow_dispatch"}, name)
@@ -38,7 +38,8 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertIn("os.environ.get('GH_ACTOR') != 'Apeloff1'", canary)
         self.assertIn("os.environ.get('GH_EVENT') != 'workflow_dispatch'", canary)
         readiness = (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
-        self.assertIn("skeleton/testing --tb=short", readiness)
+        self.assertIn("python scripts/run_domain_suite_shard.py --index", readiness)
+        self.assertIn("shard: [0, 1, 2, 3, 4, 5, 6, 7]", readiness)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
     def test_event_parser(self):

@@ -17,30 +17,33 @@ WORKFLOWS = Path(".github/workflows")
 ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
 # Explicit event-subscriber inventory: no extra independent Actions admission.
-MAX_INDEPENDENT_WORKFLOWS = 26
+MAX_INDEPENDENT_WORKFLOWS = 24
 
 
 def events(source: str) -> set[str]:
-    """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
+    """Parse exactly one YAML event map without undercounting unsafe triggers."""
     lines = source.splitlines()
-    starts = [i for i, line in enumerate(lines) if line == "on:"]
-    if len(starts) != 1:
-        raise ValueError("workflow requires exactly one literal multiline 'on:' trigger")
+    positions = [i for i, line in enumerate(lines) if line == "on:"]
+    if len(positions) != 1:
+        raise ValueError("workflow requires exactly one multiline on: event map")
     found: set[str] = set()
-    for line in lines[starts[0] + 1:]:
-        if line and not line[0].isspace() and not line.startswith("#"):
+    for line in lines[positions[0] + 1:]:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line[0].isspace():
             break
-        match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
-        if match:
-            event = match.group(1)
-            if event in found:
-                raise ValueError("duplicate workflow trigger event")
-            found.add(event)
-        elif re.match(r"^  \S", line) and not line.lstrip().startswith("#"):
-            # Do not silently miss inline, aliased, or quoted triggers.
-            raise ValueError("unsupported workflow trigger event declaration")
+        if line.startswith("  ") and not line.startswith("   "):
+            match = re.fullmatch(r"  ([a-z_][a-z0-9_]*):\s*(?:#.*)?", line)
+            if match is None:
+                raise ValueError("inline or unclassified workflow admission")
+            name = match.group(1)
+            if name in found:
+                raise ValueError("duplicate workflow event")
+            found.add(name)
+        elif not found:
+            raise ValueError("nested workflow event before event declaration")
     if not found:
-        raise ValueError("workflow has no explicit trigger events")
+        raise ValueError("no classifiable workflow admissions")
     return found
 
 
