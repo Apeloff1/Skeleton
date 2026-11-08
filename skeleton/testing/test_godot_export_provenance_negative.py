@@ -82,3 +82,79 @@ def test_export_target_cannot_overwrite_or_follow_directory_symlinks(tmp_path):
         _export_target(root, "../escape")
     with pytest.raises(ValueError):
         _export_target(root, "/etc/shadow")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor-backed custody")
+def test_digest_rejects_swapped_artifact_path_during_hash(tmp_path, monkeypatch):
+    root = tmp_path / "output"
+    root.mkdir()
+    target = root / "game.bin"
+    old = root / "old.bin"
+    replacement = root / "replacement.bin"
+    target.write_bytes(b"a" * 8192)
+    replacement.write_bytes(b"b" * 8192)
+    original_read = os.read
+    swapped = [False]
+
+    def read_and_swap(fd, count):
+        chunk = original_read(fd, count)
+        if chunk and not swapped[0]:
+            swapped[0] = True
+            os.replace(target, old)
+            os.replace(replacement, target)
+        return chunk
+
+    with monkeypatch.context() as scope:
+        scope.setattr(provenance.os, "read", read_and_swap)
+        with pytest.raises(ValueError, match="replaced"):
+            provenance._digest_beneath(root, "game.bin")
+    assert swapped[0] is True
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor-backed custody")
+def test_digest_rejects_same_size_rewrite_during_hash(tmp_path, monkeypatch):
+    root = tmp_path / "output"
+    root.mkdir()
+    target = root / "game.bin"
+    target.write_bytes(b"a" * 8192)
+    original_read = os.read
+    modified = [False]
+
+    def read_and_rewrite(fd, count):
+        chunk = original_read(fd, count)
+        if chunk and not modified[0]:
+            modified[0] = True
+            with target.open("r+b") as stream:
+                stream.write(b"b" * 8192)
+            info = target.stat()
+            os.utime(target, ns=(info.st_atime_ns, info.st_mtime_ns + 2_000_000_000))
+        return chunk
+
+    with monkeypatch.context() as scope:
+        scope.setattr(provenance.os, "read", read_and_rewrite)
+        with pytest.raises(ValueError, match="changed"):
+            provenance._digest_beneath(root, "game.bin")
+    assert modified[0] is True
+
+
+@pytest.mark.skipif(os.name != "posix" or not hasattr(os, "mkfifo"),
+                    reason="POSIX nonblocking special-file inspection")
+def test_fifo_export_does_not_block_hashing(tmp_path):
+    root = tmp_path / "output"
+    root.mkdir()
+    os.mkfifo(root / "pipe")
+    with pytest.raises(ValueError, match="bounded regular file"):
+        provenance._digest_beneath(root, "pipe")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor-backed custody")
+def test_anchored_hash_allows_unchanged_private_regular_file(tmp_path):
+    root = tmp_path / "output"
+    root.mkdir()
+    target = root / "game.bin"
+    content = b"original-godot-fixture" * 20
+    target.write_bytes(content)
+    import hashlib
+    digest, size = provenance._digest_beneath(root, "game.bin")
+    assert digest == hashlib.sha256(content).hexdigest()
+    assert size == len(content)

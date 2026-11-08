@@ -38,12 +38,19 @@ def _relative(path: str) -> tuple[str, ...]:
 
 
 def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
-    """Descriptor-relative, no-follow read; never dereference a manifest symlink."""
+    """Read a bounded artifact via anchored descriptors, detecting path swaps.
+
+    The parent directory descriptor remains open until digest publication so
+    a same-size replacement at the file name cannot inherit the old digest.
+    The trusted source root itself requires separate operator custody.
+    """
     parts = _relative(relative)
     if not all(hasattr(os, k) for k in ("O_NOFOLLOW", "O_DIRECTORY")) or os.name != "posix":
         raise ValueError("secure artifact verification unavailable on this host")
     dflags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-    fflags = os.O_RDONLY | os.O_NOFOLLOW
+    # O_NONBLOCK prevents a malicious named pipe from hanging before fstat()
+    # rejects it as non-regular. No symlink or hardlink is admitted.
+    fflags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
     fd = os.open(root, dflags)
     try:
         for part in parts[:-1]:
@@ -51,30 +58,37 @@ def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
             os.close(fd)
             fd = nxt
         file_fd = os.open(parts[-1], fflags, dir_fd=fd)
+        try:
+            before = os.fstat(file_fd)
+            if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                    or before.st_size > MAX_ARTIFACT_BYTES):
+                raise ValueError("artifact is not an allowed bounded regular file")
+            digest = hashlib.sha256()
+            size = 0
+            while True:
+                data = os.read(file_fd, min(1024 * 1024, MAX_ARTIFACT_BYTES + 1 - size))
+                if not data:
+                    break
+                size += len(data)
+                if size > MAX_ARTIFACT_BYTES:
+                    raise ValueError("artifact exceeds bound")
+                digest.update(data)
+            after = os.fstat(file_fd)
+            # Check both the opened inode and its original directory entry.
+            # A digest from an unlinked old inode is not current path evidence.
+            linked = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False)
+            fields = ("st_dev", "st_ino", "st_mode", "st_nlink",
+                      "st_size", "st_mtime_ns", "st_ctime_ns")
+            identity = lambda s: tuple(getattr(s, name) for name in fields)
+            if (size != before.st_size or identity(before) != identity(after)
+                    or identity(after) != identity(linked)
+                    or not stat.S_ISREG(linked.st_mode) or linked.st_nlink != 1):
+                raise ValueError("artifact changed or path replaced during digest")
+            return digest.hexdigest(), size
+        finally:
+            os.close(file_fd)
     finally:
         os.close(fd)
-    try:
-        before = os.fstat(file_fd)
-        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
-                or before.st_size > MAX_ARTIFACT_BYTES):
-            raise ValueError("artifact is not an allowed bounded regular file")
-        digest = hashlib.sha256()
-        size = 0
-        while True:
-            data = os.read(file_fd, min(1024 * 1024, MAX_ARTIFACT_BYTES + 1 - size))
-            if not data:
-                break
-            size += len(data)
-            if size > MAX_ARTIFACT_BYTES:
-                raise ValueError("artifact exceeds bound")
-            digest.update(data)
-        after = os.fstat(file_fd)
-        identity = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
-        if identity(before) != identity(after) or size != before.st_size:
-            raise ValueError("artifact changed during digest")
-        return digest.hexdigest(), size
-    finally:
-        os.close(file_fd)
 
 
 def tree_digest(root: Path) -> str:
