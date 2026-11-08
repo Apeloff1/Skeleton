@@ -491,13 +491,13 @@ def main() -> int:
         ci.count("actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0") == 1
         and ci.count("actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0") == 8
         and ci.count("actions/setup-python@") == 8
-        and ci.count("astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2") == 3
+        and ci.count("astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3") == 3
         and ci.count("astral-sh/setup-uv@") == 3,
         "CI Node/uv action SHA identities must match verified upstream release pins",
         failures,
     )
     require(
-        pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.2") == 3,
+        pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.3") == 3,
         "CI must use exactly three immutable setup-uv v10.3.2 sites backed by the repository uv pin",
         failures,
     )
