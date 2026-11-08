@@ -20,12 +20,22 @@ from zipfile import ZipFile, ZipInfo, ZIP_STORED, BadZipFile, LargeZipFile
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.dual_runtime_verify import (
     DualRuntimeVerificationError, _MAX_BYTES, _MAX_FILES, _MAX_MANIFEST,
-    _REQUIRED, _assert_original_root, _json, _parts, _read, _root_fd,
+    _REQUIRED, _assert_original_root, _canonical_bytes, _json, _parts, _read, _root_fd,
     verify_exported_package,
 )
 
 SCHEMA = "skeleton.app.offline_game_source_archive.v1"
 INSPECTION_SCHEMA = "skeleton.app.offline_game_source_archive_inspection.v1"
+_DUAL_SCHEMA = "skeleton.game_builder.dual_runtime_package.v1"
+_STUDIO_SCHEMA = "skeleton.game_builder.studio_package.v1"
+# Keep the versioned Studio intake contract aligned with dual_runtime_verify.
+# Studio source files are never treated as native or device-qualified artifacts.
+_STUDIO_REQUIRED = frozenset({
+    "studio/pipeline.json", "studio/jeeves_dragon_tools.json",
+    "studio/executed_tool_receipts.json", "studio/mirror_room.json",
+    "studio/consumer_gate.json", "studio/companion_mirror_room.json",
+    "studio/companion_almanac.json", "studio/companion_practice.json",
+})
 _ARCHIVE_MAX_BYTES = 2_500_000
 _NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,126}\.zip\Z")
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
@@ -317,10 +327,16 @@ def inspect_offline_game_archive(
             if sha256(release).hexdigest() != expected_manifest_sha256:
                 raise OfflineGameArchiveError("archive release differs from independent pin")
             manifest = _json(release, _MAX_MANIFEST)
+            if release != _canonical_bytes(manifest):
+                raise OfflineGameArchiveError("noncanonical archived release manifest")
+            schema = manifest.get("schema")
             digest = manifest.get("manifest_digest")
             body = {key: value for key, value in manifest.items()
                     if key != "manifest_digest"}
-            if (manifest.get("schema") != "skeleton.game_builder.dual_runtime_package.v1"
+            # The producer's independent verifier accepts both versioned source
+            # formats. The archive inspector must enforce the same authority
+            # contract instead of rejecting valid Studio archives by schema.
+            if (schema not in (_DUAL_SCHEMA, _STUDIO_SCHEMA)
                     or type(digest) is not str or digest != canonical_digest(body)
                     or manifest.get("automatic_publication") is not False
                     or manifest.get("godot_hardware_tested") is not False):
@@ -336,6 +352,15 @@ def inspect_offline_game_archive(
                 if (type(expected_digest) is not str or not _HEX.fullmatch(expected_digest)
                         or sha256(files[name]).hexdigest() != expected_digest):
                     raise OfflineGameArchiveError("archived source digest mismatch")
+            if schema == _STUDIO_SCHEMA:
+                if not _STUDIO_REQUIRED <= set(declared):
+                    raise OfflineGameArchiveError("missing mandatory Studio provenance")
+                studio = _json(files["studio/pipeline.json"], _MAX_MANIFEST)
+                if (studio.get("schema") != "skeleton.game_builder.studio_pipeline.v1"
+                        or studio.get("not_automatically_published") is not True
+                        or studio.get("original_game_claim") != "generated-or-user-authored-geometry"
+                        or studio.get("project_id") != manifest.get("project_id")):
+                    raise OfflineGameArchiveError("invalid archived Studio provenance")
         if not hmac.compare_digest(_canonical_zip(files), raw):
             raise OfflineGameArchiveError("noncanonical or ambiguous source archive")
     except (OSError, BadZipFile, LargeZipFile, KeyError, TypeError,
