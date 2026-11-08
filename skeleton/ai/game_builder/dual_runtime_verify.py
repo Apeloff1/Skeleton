@@ -313,7 +313,11 @@ def verify_exported_package(
         manifest = _json(release, _MAX_MANIFEST)
         if release != _canonical_bytes(manifest):
             raise DualRuntimeVerificationError("noncanonical release JSON")
-        if manifest.get("schema") != "skeleton.game_builder.dual_runtime_package.v1":
+        release_schema = manifest.get("schema")
+        if release_schema not in {
+            "skeleton.game_builder.dual_runtime_package.v1",
+            "skeleton.game_builder.studio_package.v1",
+        }:
             raise DualRuntimeVerificationError("unsupported release schema")
         digest = manifest.get("manifest_digest")
         body = {key: value for key, value in manifest.items()
@@ -330,6 +334,23 @@ def verify_exported_package(
         expected = set(declared) | {"release.json"}
         if not _REQUIRED <= expected or "release.json" in declared:
             raise DualRuntimeVerificationError("missing required game source")
+        if release_schema == "skeleton.game_builder.studio_package.v1":
+            # Studio exports are an explicitly versioned *superset* of the
+            # dual-runtime source package. Do not treat the schema string as
+            # equivalent to evidence: require the exact studio custody paths
+            # before reading or re-executing a single source asset.
+            studio_required = {
+                "studio/pipeline.json",
+                "studio/jeeves_dragon_tools.json",
+                "studio/executed_tool_receipts.json",
+                "studio/mirror_room.json",
+                "studio/consumer_gate.json",
+                "studio/companion_mirror_room.json",
+                "studio/companion_almanac.json",
+                "studio/companion_practice.json",
+            }
+            if not studio_required <= expected:
+                raise DualRuntimeVerificationError("missing required studio source")
         for path, digest in declared.items():
             _parts(path)
             if type(digest) is not str or not _HEX.fullmatch(digest):
@@ -346,6 +367,13 @@ def verify_exported_package(
             files[path] = payload
         if _inventory(fd) != expected:
             raise DualRuntimeVerificationError("package changed during verification")
+        if release_schema == "skeleton.game_builder.studio_package.v1":
+            studio = _json(files["studio/pipeline.json"], _MAX_MANIFEST)
+            if (studio.get("schema") != "skeleton.game_builder.studio_pipeline.v1"
+                    or studio.get("not_automatically_published") is not True
+                    or studio.get("original_game_claim") != "generated-or-user-authored-geometry"
+                    or studio.get("project_id") != manifest.get("project_id")):
+                raise DualRuntimeVerificationError("invalid studio source custody")
         if files["godot/proof.json"] != files["proof/verified_solution.json"]:
             raise DualRuntimeVerificationError("browser and Godot proofs differ")
         native = _json(files["godot/world.json"], _MAX_BYTES)
