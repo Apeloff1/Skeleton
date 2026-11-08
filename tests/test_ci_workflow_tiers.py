@@ -80,6 +80,35 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
 
+    def test_event_parser_never_undercounts_inline_or_duplicate_events(self):
+        cases = (
+            "on:\n  push: [main]\njobs:\n",
+            "on:\n  pull_request: {}\njobs:\n",
+            "on:\n  workflow_dispatch:\n  pull_request: [opened]\njobs:\n",
+            "on:\n  push:\n  push:\njobs:\n",
+            "on:\n  # no event\njobs:\n",
+            "on:\n  workflow_dispatch:\non:\n  push:\njobs:\n",
+        )
+        for source in cases:
+            with self.subTest(source=source):
+                with self.assertRaises(ValueError):
+                    events(source)
+        self.assertEqual(
+            events("on:\n  pull_request: # exact PR gate\n"
+                   "  workflow_dispatch:\n  schedule:\njobs:\n"),
+            {"pull_request", "workflow_dispatch", "schedule"},
+        )
+
+    def test_controller_exemption_rejects_inline_privilege_escalation(self):
+        from scripts.check_ci_workflow_tiers import CONTROL_ONLY_EVENTS
+        for event in ("push: [main]", "pull_request: [opened]",
+                      "workflow_run: [completed]"):
+            with self.subTest(event=event):
+                source = "on:\n  workflow_dispatch:\n  " + event + "\njobs:\n"
+                with self.assertRaises(ValueError):
+                    events(source)
+        self.assertEqual(len(CONTROL_ONLY_EVENTS), 3)
+
     def test_specialists_are_archived_and_active_core_remains_required(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)

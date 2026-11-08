@@ -29,19 +29,34 @@ MANUAL_EVENTS = frozenset({"workflow_dispatch", "workflow_call"})
 
 
 def events(source: str) -> set[str]:
-    """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
+    """Classify a single explicit YAML on: map; deny ambiguous subscriptions.
+
+    Never count an inline/duplicate event as a manual-only admission. The
+    repository policy supports multiline triggers only, so future syntaxes
+    require a reviewed parser change before they may run.
+    """
     lines = source.splitlines()
-    try:
-        start = next(i for i, line in enumerate(lines) if line == "on:")
-    except StopIteration as exc:
-        raise ValueError("workflow missing multiline 'on:' trigger") from exc
+    positions = [i for i, line in enumerate(lines) if line == "on:"]
+    if len(positions) != 1:
+        raise ValueError("workflow requires exactly one multiline 'on:' trigger")
     found: set[str] = set()
-    for line in lines[start + 1:]:
-        if line and not line[0].isspace() and not line.startswith("#"):
+    for line in lines[positions[0] + 1:]:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line[0].isspace():
             break
-        match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
-        if match:
-            found.add(match.group(1))
+        if line.startswith("  ") and not line.startswith("   "):
+            match = re.fullmatch(r"  ([a-z_][a-z0-9_]*):\s*(?:#.*)?", line)
+            if match is None:
+                raise ValueError("workflow has inline or unclassified event")
+            event = match.group(1)
+            if event in found:
+                raise ValueError("duplicate independent workflow event")
+            found.add(event)
+        elif not found:
+            raise ValueError("workflow has nested event body without event name")
+    if not found:
+        raise ValueError("workflow has no classifiable triggers")
     return found
 
 
