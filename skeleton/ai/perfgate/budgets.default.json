@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "workloads": {
+    "forge_walk:soulslike": {"p95_ms": 2000, "max_ms": 5000, "error_rate": 0.0, "drift_ratio": 2.0},
+    "noop": {"p95_ms": 5, "error_rate": 0.0}
+  }
+}
