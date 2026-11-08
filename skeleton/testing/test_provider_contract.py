@@ -9,7 +9,7 @@ from urllib.error import URLError
 
 import pytest
 
-from skeleton.automation.free_model import FreeModelClient, ModelError, redact_secrets
+from skeleton.automation.free_model import FreeModelClient, ModelError, _RejectRedirects, redact_secrets
 from skeleton.jeeves.providers import AnthropicProvider, OpenAIProvider
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
@@ -111,6 +111,16 @@ def test_automation_model_status_exposes_receipt_without_secret(monkeypatch) -> 
     assert "test-automation-key" not in json.dumps(status)
 
 
+def _mock_automation_opener(monkeypatch, opener):
+    """Replace the guarded opener, not urllib.urlopen (which is not used)."""
+
+    def fake_build_opener(*handlers):
+        assert any(isinstance(handler, _RejectRedirects) for handler in handlers)
+        return SimpleNamespace(open=opener)
+
+    monkeypatch.setattr("urllib.request.build_opener", fake_build_opener)
+
+
 def test_automation_model_redacts_prompt_secrets_before_network(monkeypatch) -> None:
     _automation_env(monkeypatch)
     captured = {}
@@ -124,7 +134,7 @@ def test_automation_model_redacts_prompt_secrets_before_network(monkeypatch) -> 
             ).encode("utf-8")
         )
 
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    _mock_automation_opener(monkeypatch, fake_urlopen)
     client = FreeModelClient()
 
     result = client.chat("system sk-1234567890abcdefghijkl", "token=supersecretvalue")
@@ -142,7 +152,7 @@ def test_automation_model_sanitizes_network_failure(monkeypatch) -> None:
     def fail(*_args, **_kwargs):
         raise URLError("Bearer abcdefghijklmnopqrstuvwxyz")
 
-    monkeypatch.setattr("urllib.request.urlopen", fail)
+    _mock_automation_opener(monkeypatch, fail)
     client = FreeModelClient()
 
     with pytest.raises(ModelError) as exc:
