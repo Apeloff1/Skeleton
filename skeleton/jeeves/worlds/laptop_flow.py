@@ -134,6 +134,7 @@ class LaptopFlow:
                     "world_id": world_id,
                     "source_digest": expected_digest,
                     "candidate_digest": candidate_digest,
+                    "operation_digest": digest(operation),
                     "changes": changes,
                     "proof": prove(candidate).as_dict(),
                     "reviewed": False,
@@ -145,7 +146,8 @@ class LaptopFlow:
             os.close(fd)
 
     def review(self, world_id: str, expected_digest: str, operation: Any,
-               review_note: str, *, expected_candidate_digest: str | None = None) -> dict[str, Any]:
+               review_note: str, *, expected_candidate_digest: str | None = None,
+               expected_operation_digest: str | None = None) -> dict[str, Any]:
         """Publish an explicitly reviewed edit under one canonical writer lease.
 
         Source CAS, proof, and review custody share a single lock. A concurrent
@@ -163,6 +165,11 @@ class LaptopFlow:
                 current = self._world(fd, world_id)
                 if digest(current) != expected_digest:
                     raise CanonError("stale_source")
+                if expected_operation_digest is not None:
+                    if (not isinstance(expected_operation_digest, str) or
+                            len(expected_operation_digest) != 64 or
+                            expected_operation_digest != digest(operation)):
+                        raise CanonError("review_operation_mismatch")
                 revised = edit(current, operation)
                 new_digest = digest(revised)
                 if expected_candidate_digest is not None:
