@@ -37,8 +37,8 @@ class ConsumerComposeBindingTests(unittest.TestCase):
 
     def test_frontend_setup_remains_visible_during_backend_outage(self):
         source = COMPOSE.read_text(encoding="utf-8")
-        section = source.split("\\n  frontend:\\n", 1)[1].split("\\n  mongo:\\n", 1)[0]
-        self.assertNotRegex(section, r"(?m)^\\s+depends_on:")
+        section = source.split("\n  frontend:\n", 1)[1].split("\n  mongo:\n", 1)[0]
+        self.assertNotRegex(section, r"(?m)^\s+depends_on:")
         self.assertIn("EXPO_PUBLIC_BACKEND_URL", section)
 
     def test_service_specific_opt_in_never_changes_private_data_ports(self):
@@ -48,6 +48,26 @@ class ConsumerComposeBindingTests(unittest.TestCase):
         for service, port in (("MONGO", "27017"), ("CHROMA", "8000")):
             self.assertIn('127.0.0.1:${' + service + '_PORT:-' + port + '}', source)
             self.assertNotIn("${" + service + "_BIND_HOST:-", source)
+
+
+    def test_no_hidden_second_public_port_on_first_install(self):
+        source = COMPOSE.read_text(encoding="utf-8")
+        blocks = dict(re.findall(
+            r"(?ms)^  ([a-z][a-z0-9_-]*):\n(.*?)(?=^  [a-z][a-z0-9_-]*:\n|\Z)",
+            source,
+        ))
+        for service in ("skeleton", "backend", "frontend"):
+            with self.subTest(service=service):
+                self.assertIn(service, blocks)
+                ports = re.search(r"(?m)^    ports:\n((?:      - [^\n]*\n)+)", blocks[service])
+                self.assertIsNotNone(ports)
+                published = re.findall(r'(?m)^      - "([^"\n]+)"
+    unittest.main()
+, ports.group(1))
+                self.assertEqual(len(published), 1)
+                self.assertTrue(
+                    published[0].startswith("$" + "{" + service.upper() + "_BIND_HOST:-127.0.0.1}:")
+                )
 
 
 if __name__ == "__main__":
