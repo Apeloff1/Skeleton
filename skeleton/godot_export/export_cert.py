@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from . import configfile, pck, presets as presets_mod
-from .provenance import _relative, _digest_beneath, MAX_ARTIFACT_BYTES
+from .provenance import _relative, _digest_beneath
 from .platforms import registry
 from .report import CertificationReport
 from .runner import GodotRunner
