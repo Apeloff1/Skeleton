@@ -312,8 +312,20 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                         relative = location.relative_to(root)
                     except ValueError:
                         return trace_source_exception
+                    innermost = value[2]
+                    while innermost is not None and innermost.tb_next is not None:
+                        innermost = innermost.tb_next
+                    if innermost is not None:
+                        origin = innermost.tb_frame
+                        origin_label = (
+                            f"{Path(origin.f_code.co_filename).name}:"
+                            f"{innermost.tb_lineno}:{origin.f_code.co_name}"
+                        )
+                    else:
+                        origin_label = "unavailable"
                     source_exceptions.append(
                         f"{relative}:{frame.f_lineno}:{frame.f_code.co_name}"
+                        f" [origin={origin_label}]"
                     )
                 return trace_source_exception
             previous_trace = sys.gettrace()
