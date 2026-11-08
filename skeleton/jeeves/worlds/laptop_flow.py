@@ -172,8 +172,15 @@ class LaptopFlow:
                     "schema": REVIEW_SCHEMA, "world_id": world_id,
                     "source_digest": new_digest, "review_note": review_note,
                 }
-                # A previously approved digest is invalid after the source
-                # publication. Review is committed only after canonical bytes.
+                # Revoke earlier approvals before changing source bytes.
+                # Otherwise an A -> B -> A retry could borrow a previously
+                # valid review if the next source/review pair is interrupted.
+                try:
+                    os.unlink(self._names(world_id)[0], dir_fd=fd)
+                except FileNotFoundError:
+                    pass
+                else:
+                    os.fsync(fd)
                 self.worlds._write(fd, world_id + ".json", canonical(revised))
                 self.worlds._write(fd, self._names(world_id)[0], canonical(review))
                 return {
@@ -249,7 +256,14 @@ class LaptopFlow:
             if exc.code == "not_found":
                 raise CanonError("review_required") from None
             raise
-        self._validate_review(review, world)
+        try:
+            self._validate_review(review, world)
+        except CanonError as exc:
+            # A successfully written world with an interrupted review write
+            # has no approval, even if an old review remains on disk.
+            if exc.code == "review_stale_source":
+                raise CanonError("review_required") from None
+            raise
         return world, review
 
     @staticmethod
