@@ -5,8 +5,9 @@ machine_root = ".machine"
 default_owner = "automation-supervisor"
 # Full working-tree machine/code-search coverage must include current tracked growth.
 # Retain a finite scan budget; scanner and CI still fail closed on truncation.
-# The previous 80,000-file ceiling truncated the 2026-10-29 exact-head inventory.
-max_files = 100000
+# The prior 100,000-file ceiling truncated the 2026-11-08 102,945-file inventory.
+# Retain a finite, fail-closed budget: future growth beyond this bound must be reviewed.
+max_files = 150000
 max_file_bytes = 2000000
 max_context_bytes = 30000
 
