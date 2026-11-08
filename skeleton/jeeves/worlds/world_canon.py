@@ -383,22 +383,48 @@ class WorldStore:
     than quietly falling back to symlink-following path operations.
     """
     def __init__(self, root: str | os.PathLike[str]) -> None:
-        if not hasattr(os, "O_NOFOLLOW") or os.open not in os.supports_dir_fd:
+        if (not all(hasattr(os, attr) for attr in ("O_NOFOLLOW", "O_DIRECTORY"))
+                or os.open not in os.supports_dir_fd
+                or os.mkdir not in os.supports_dir_fd):
             raise CanonError("platform_not_supported")
-        path = Path(root)
-        if path.is_symlink():
-            raise CanonError("symlink_root")
-        path.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if path.is_symlink():
-            raise CanonError("symlink_root")
-        self.root = path
+        self.root = Path(os.path.abspath(root))
+        # Create the requested root one directory descriptor at a time.
+        # Calling Path.mkdir(parents=True) first could follow a symlinked
+        # ancestor and create private world material outside the intended root.
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        fd = os.open("/", flags)
+        try:
+            for part in self.root.parts[1:]:
+                try:
+                    os.mkdir(part, mode=0o700, dir_fd=fd)
+                except FileExistsError:
+                    pass
+                child = os.open(part, flags, dir_fd=fd)
+                os.close(fd)
+                fd = child
+            if not stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise CanonError("not_directory")
+        except OSError as exc:
+            raise CanonError("symlink_or_untrusted_root") from exc
+        finally:
+            os.close(fd)
 
     def _directory(self) -> int:
-        fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-        if not stat.S_ISDIR(os.fstat(fd).st_mode):
+        # Every reopen traverses descriptor-anchored, no-follow components;
+        # a later ancestor replacement cannot redirect a read or publication.
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        fd = os.open("/", flags)
+        try:
+            for part in self.root.parts[1:]:
+                child = os.open(part, flags, dir_fd=fd)
+                os.close(fd)
+                fd = child
+            if not stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise CanonError("not_directory")
+            return fd
+        except BaseException:
             os.close(fd)
-            raise CanonError("not_directory")
-        return fd
+            raise
 
     @staticmethod
     def _read(fd: int, name: str) -> bytes:
@@ -424,10 +450,13 @@ class WorldStore:
             except OSError as exc:
                 raise CanonError("source_replaced_during_read", name) from exc
             after = os.fstat(handle)
-            if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1 or
-                    (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino) or
-                    (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) !=
-                    (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)):
+            fields = ("st_dev", "st_ino", "st_mode", "st_nlink",
+                      "st_size", "st_mtime_ns", "st_ctime_ns")
+            identity = lambda s: tuple(getattr(s, field) for field in fields)
+            if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1
+                    or len(data) != info.st_size
+                    or identity(info) != identity(after)
+                    or identity(after) != identity(current)):
                 raise CanonError("source_replaced_during_read", name)
             return data
         finally:
