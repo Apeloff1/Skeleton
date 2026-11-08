@@ -490,8 +490,11 @@ def test_consumer_first_run_rejects_forged_upstream_evidence(
     # replay. Its upstream inspection and inode snapshot are deliberately
     # synthetic; explicitly replace the tree scan too so no fake /game path
     # reaches the real descriptor-anchored filesystem reader.
+    # Forged-claim regression uses a structurally valid immutable inode
+    # inventory without bypassing the actual source inventory hash validator.
+    fixed_inventory = (("", (1, 2, 3, 4, 1, 0, 0, 0)),)
     monkeypatch.setattr(module, "snapshot_installed_tree",
-                        lambda *_args: {"fixture": "fixed-source-tree"})
+                        lambda *_args: fixed_inventory)
     def inspect(**overrides):
         monkeypatch.setattr(
             module, "inspect_first_playable_delivery",
