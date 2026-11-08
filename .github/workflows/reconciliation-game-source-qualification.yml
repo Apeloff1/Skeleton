@@ -25,6 +25,9 @@ on:
       - "tests/test_backend_docker_python_pin.py"
       - ".github/workflows/reconciliation-game-source-qualification.yml"
   workflow_dispatch:
+      - "skeleton/ai/research/**"
+      - "docs/ai/VOL_249_250_RESEARCH_REASONING.md"
+      - ".github/workflows/vol249-250-research-reasoning.yml"
 
 permissions:
   contents: read
@@ -114,3 +117,9 @@ jobs:
         run: yarn --cwd frontend typecheck
       - name: Execute app readiness and first-install source contracts
         run: yarn --cwd frontend test:app-foundation
+
+  research_reasoning_qualification:
+    name: Source-qualified hypothesis and causal research regression
+    uses: ./.github/workflows/vol249-250-research-reasoning.yml
+    permissions:
+      contents: read
