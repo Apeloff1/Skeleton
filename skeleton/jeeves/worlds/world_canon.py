@@ -86,6 +86,10 @@ def _keys(value: Any, required: set[str], optional: set[str] = frozenset()) -> d
 def _text(value: Any, field: str, limit: int = 400) -> str:
     if type(value) is not str or not value or len(value) > limit:
         raise CanonError("invalid_text", field)
+    # Lone UTF-16 surrogates are valid Python str values but cannot be
+    # serialized as UTF-8. Reject at the typed boundary, not during publish.
+    if any(0xD800 <= ord(ch) <= 0xDFFF for ch in value):
+        raise CanonError("invalid_unicode_scalar", field)
     if unicodedata.normalize("NFC", value) != value:
         raise CanonError("noncanonical_unicode", field)
     if any(ord(ch) < 32 and ch not in "\n\t" for ch in value):
