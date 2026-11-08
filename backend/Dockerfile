@@ -7,14 +7,15 @@
 
 # Stage 1: dependency builder. Alpine keeps the builder/runtime ABI aligned
 # so compiled wheels and native extensions do not cross a glibc/musl boundary.
-FROM python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211 AS builder
+FROM python:3.14.10-alpine3.24@sha256:04357e8d728ac6a88a12b808f9b377762f937271ecaf5b99feb242c04de1ffc1 AS builder
 
 WORKDIR /app
 
 # Fail closed before dependency installation if this build stage is advanced
 # beyond the last verified Python version. LiteLLM excludes Python >=3.15,
 # while its FastUUID dependency lacks CPython 3.15/musllinux wheels.
-# Remove this bound only after an exact Python 3.15 install/import/e2e proof.
+# Keep all stages pinned to the same supported multi-architecture Python 3.14
+# digest until an exact Python 3.15 install/import/e2e proof exists.
 RUN python -c 'import sys; assert (3, 10) <= sys.version_info[:2] < (3, 15), "backend dependencies require supported Python <3.15"'
 
 # Copy dependency metadata before installing the build toolchain. Keeping the
@@ -38,7 +39,7 @@ RUN --mount=type=secret,id=proxy_ca \
 
 # Prepare the existing flat backend layout in a source-only stage. The
 # Dockerfile-specific context allowlist excludes secrets and runtime data.
-FROM python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211 AS runtime-source
+FROM python:3.14.10-alpine3.24@sha256:04357e8d728ac6a88a12b808f9b377762f937271ecaf5b99feb242c04de1ffc1 AS runtime-source
 WORKDIR /source
 COPY . .
 RUN mv backend /runtime \
@@ -48,7 +49,7 @@ RUN mv backend /runtime \
     && cp scripts/check_jeeves_training_modules.py /runtime/scripts/check_jeeves_training_modules.py
 
 # Stage 2: Production
-FROM python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211 AS production
+FROM python:3.14.10-alpine3.24@sha256:04357e8d728ac6a88a12b808f9b377762f937271ecaf5b99feb242c04de1ffc1 AS production
 
 # Apply the current Alpine security repository updates to the runtime layer.
 # The pinned base remains reproducible while util-linux and other OS packages

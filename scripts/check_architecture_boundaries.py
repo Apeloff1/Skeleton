@@ -89,12 +89,23 @@ def _imports_forbidden_kernel_dependency(module: str) -> bool:
     return root in _KERNEL_FORBIDDEN_ROOTS or module == "skeleton.api" or module.startswith("skeleton.api.")
 
 
-def _imports_api(module: str, level: int = 0) -> bool:
-    if module == "skeleton.api" or module.startswith("skeleton.api."):
-        return True
-    # Relative imports such as ``from ..api import routes`` should not bypass
-    # the same boundary merely because they omit the absolute package prefix.
-    return level > 0 and (module == "api" or module.startswith("api."))
+def _imports_api(module: str, level: int = 0, *, source: str = "") -> bool:
+    """Resolve relative imports against their actual source package.
+
+    A local ``from .api import LocalAPI`` is not a dependency on
+    ``skeleton.api``. Only imports resolving to that exact namespace
+    violate the upward dependency rule.
+    """
+    if level == 0:
+        return _matches_module(module, "skeleton.api")
+    if not source:
+        return False
+    package_parts = Path(source).parent.parts
+    if level > len(package_parts):
+        return False
+    prefix = package_parts[:len(package_parts) - level + 1]
+    target = ".".join((*prefix, *(module.split(".") if module else ())))
+    return _matches_module(target, "skeleton.api")
 
 
 def _matches_module(module: str, forbidden: str) -> bool:
@@ -217,7 +228,7 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                         and not production_exempt
                         and not api_composition_root
                         and not _is_staged_api_mirror(rel, repo_root)
-                        and _imports_api(module, level)
+                        and _imports_api(module, level, source=rel)
                     ):
                         violations.append(
                             Violation(
