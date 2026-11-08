@@ -76,6 +76,9 @@ def audit(root: Path = ROOT) -> list[str]:
             or set(recovery) != SCHEDULED_RECOVERY):
         failures.append("operational recovery registry must be the exact three scheduled lanes")
         recovery = []
+    for name in SCHEDULED_RECOVERY:
+        if not (root / WORKFLOWS / name).is_file():
+            failures.append(f"{name}: required scheduled recovery workflow missing")
     names = specialised + core + reusable + recovery
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
