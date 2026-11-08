@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from hashlib import sha256
-from io import BytesIO, StringIO, TextIOWrapper
+from io import BytesIO, TextIOWrapper
 import json
 import os
 from pathlib import Path
@@ -274,7 +274,11 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                       for t in tasks(2)],
         }).encode())
         stdin = TextIOWrapper(BytesIO(raw), encoding="utf-8")
-        stdout, stderr = StringIO(), StringIO()
+        # Real terminal text streams expose a binary buffer; StringIO does
+        # not, and can trigger a fixture-only AttributeError on CLI paths.
+        # Preserve an in-memory sink without changing production publication.
+        stdout = TextIOWrapper(BytesIO(), encoding="utf-8", write_through=True)
+        stderr = TextIOWrapper(BytesIO(), encoding="utf-8", write_through=True)
         with (
             mock.patch("sys.stdin", stdin),
             mock.patch("sys.stdout", stdout),
@@ -296,7 +300,14 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
             if approve:
                 arguments.append("--approve-native")
             status = batch_cli(arguments)
-        return status, stdout.getvalue(), stderr.getvalue(), active.call_count
+        stdout.flush()
+        stderr.flush()
+        return (
+            status,
+            stdout.buffer.getvalue().decode("utf-8", "strict"),
+            stderr.buffer.getvalue().decode("utf-8", "strict"),
+            active.call_count,
+        )
 
     def test_synthetic_worker_cannot_forge_installed_native_source(self):
         with self.assertRaises(ContractViolation):
