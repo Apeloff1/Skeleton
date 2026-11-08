@@ -42,8 +42,11 @@ def parse_evidence(doc: Any, where: str = "<evidence>") -> Evidence:
     if not isinstance(doc, dict):
         raise SchemaError(where, "evidence must be an object")
     required = {"case_id", "head_sha", "source", "data"}
-    if not required.issubset(doc) or set(doc) - (required | {"digest"}):
-        raise SchemaError(where, "missing or unknown evidence fields")
+    missing = required - set(doc)
+    if missing:
+        raise SchemaError(where, f"missing evidence fields: {', '.join(sorted(missing))}")
+    if set(doc) - (required | {"digest"}):
+        raise SchemaError(where, "unknown evidence fields")
     if type(doc["case_id"]) is not str or CASE_RE.fullmatch(doc["case_id"]) is None:
         raise SchemaError(where, "invalid qualification case identifier")
     if type(doc["head_sha"]) is not str or SHA_RE.fullmatch(doc["head_sha"]) is None:
