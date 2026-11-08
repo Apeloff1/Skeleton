@@ -16,7 +16,7 @@ from threading import Lock
 from time import monotonic_ns
 from typing import Any, Callable
 
-from ...authority.canonical import canonical
+from ...authority.canonical import canonical_bytes as canonical
 
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _MAX_EVIDENCE_BYTES = 32 * 1024
