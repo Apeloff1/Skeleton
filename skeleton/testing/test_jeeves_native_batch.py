@@ -12,6 +12,7 @@ from io import BytesIO, TextIOWrapper
 import json
 import os
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 import tempfile
 import unittest
@@ -299,13 +300,37 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
             ]
             if approve:
                 arguments.append("--approve-native")
-            status = batch_cli(arguments)
+            # Test-only tracing records *source locations*, never exception
+            # messages, private prompts, model bytes or arbitrary locals.
+            # Production intentionally redacts native failure details.
+            source_exceptions = []
+            root = Path(__file__).resolve().parents[2]
+            def trace_source_exception(frame, event, value):
+                if event == "exception" and isinstance(value[1], AttributeError):
+                    location = Path(frame.f_code.co_filename)
+                    try:
+                        relative = location.relative_to(root)
+                    except ValueError:
+                        return trace_source_exception
+                    source_exceptions.append(
+                        f"{relative}:{frame.f_lineno}:{frame.f_code.co_name}"
+                    )
+                return trace_source_exception
+            previous_trace = sys.gettrace()
+            sys.settrace(trace_source_exception)
+            try:
+                status = batch_cli(arguments)
+            finally:
+                sys.settrace(previous_trace)
         stdout.flush()
         stderr.flush()
         return (
             status,
             stdout.buffer.getvalue().decode("utf-8", "strict"),
-            stderr.buffer.getvalue().decode("utf-8", "strict"),
+            stderr.buffer.getvalue().decode("utf-8", "strict")
+            + ((" [test-only AttributeError source locations: "
+                + ", ".join(source_exceptions[-5:]) + "]")
+               if status != 0 and approve and source_exceptions else ""),
             active.call_count,
         )
 
