@@ -104,12 +104,12 @@ class WorkflowTierTests(unittest.TestCase):
             for index in range(10):
                 (root / ".github/workflows" / f"automatic-extra-{index}.yml").unlink()
             extra = root / ".github/workflows" / "unexpected-auto.yml"
-            extra.write_text("name: Unauthorized\\non:\\n  pull_request:\\njobs:\\n")
+            extra.write_text("name: Unauthorized\non:\n  pull_request:\njobs:\n")
             self.assertTrue(any("unregistered automatic workflows" in p for p in audit(root)))
             extra.unlink()
             mandatory = root / ".github/workflows" / registry["automatic_event_workflows"][0]
             mandatory_original = mandatory.read_text()
-            mandatory.write_text("name: Disabled\\non:\\n  workflow_dispatch:\\njobs:\\n")
+            mandatory.write_text("name: Disabled\non:\n  workflow_dispatch:\njobs:\n")
             self.assertTrue(any("expected automatic workflows not triggered" in p for p in audit(root)))
             mandatory.write_text(mandatory_original)
             name = registry["specialized_manual_only"][0]
