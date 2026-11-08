@@ -24,6 +24,27 @@ def test_invalid_vehicle_snapshot_does_not_mutate_existing_state():
         assert vehicle.capture_state() == before
 
 
+def test_massive_integral_vehicle_inputs_fail_with_domain_error():
+    # int -> float overflows for 10**1000; do not leak OverflowError
+    # outside the validated physics admission contract.
+    for constructor in (
+        lambda: VehicleControl(throttle=10**1000),
+        lambda: WheelSettings("wheel", Vec3(), radius=10**1000),
+        lambda: VehicleSettings((WheelSettings("wheel", Vec3()),),
+                                max_drive_force=10**1000),
+    ):
+        with pytest.raises(PhysicsValidationError, match="finite"):
+            constructor()
+
+
+def test_custom_numeric_protocol_cannot_run_untrusted_float_hook():
+    class HostileFloat(float):
+        def __float__(self):
+            raise AssertionError("untrusted __float__ must not run")
+    with pytest.raises(PhysicsValidationError, match="numeric"):
+        VehicleControl(steer=HostileFloat(0.5))
+
+
 def test_large_tick_batch_rejected_before_world_advance():
     world, vehicle, _ = _scene()
     before = world.tick

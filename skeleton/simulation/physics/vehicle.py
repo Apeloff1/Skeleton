@@ -44,12 +44,15 @@ _LOCAL_UP = Vec3(0.0, 1.0, 0.0)
 
 
 def _finite(value: float, *, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if type(value) not in (int, float):
         raise PhysicsValidationError(f"{name} must be numeric")
-    value = float(value)
-    if not math.isfinite(value):
+    try:
+        converted = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise PhysicsValidationError(f"{name} must be finite") from exc
+    if not math.isfinite(converted):
         raise PhysicsValidationError(f"{name} must be finite")
-    return value
+    return converted
 
 
 def _positive(value: float, *, name: str) -> float:
