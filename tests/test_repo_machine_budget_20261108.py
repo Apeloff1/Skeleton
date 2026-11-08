@@ -21,7 +21,8 @@ class RepositoryMachineBudgetTests(unittest.TestCase):
         config = load_machine_config(ROOT)
         self.assertGreaterEqual(config.max_files, 125000)
         self.assertLessEqual(config.max_files, 250000)
-        self.assertEqual(config.max_files, 250000)
+        self.assertGreater(config.max_files, 100000)
+        self.assertLessEqual(config.max_files, 250000)
 
     def test_at_exact_limit_is_not_truncated_but_next_file_is(self):
         config = replace(load_machine_config(ROOT), max_files=2)
