@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "heating_fuel exchange command",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "side",
+    "quantity",
+    "expected_version",
+    "tick"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "side": {
+      "type": "string",
+      "enum": [
+        "buy",
+        "sell"
+      ]
+    },
+    "quantity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 32
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "$comment": "Market settlement_heating_fuel; unit base 101; integer pricing, no external currencies or network settlement."
+}

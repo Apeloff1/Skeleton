@@ -13,7 +13,7 @@ reasoning explicitly retrieves and cites by record id.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone; UTC = timezone.utc
+from datetime import UTC, datetime
 import hashlib
 import hmac
 import json

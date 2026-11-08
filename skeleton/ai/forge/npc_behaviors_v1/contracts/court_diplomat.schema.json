@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "court diplomat NPC event",
+  "description": "Validated deterministic command for diplomat; host must independently authenticate world event and witness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "action",
+    "effort",
+    "tick",
+    "expected_version",
+    "destination",
+    "witness"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "observe",
+        "work",
+        "rest",
+        "socialize",
+        "travel",
+        "retreat",
+        "negotiate",
+        "guard"
+      ]
+    },
+    "effort": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 12
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "destination": {
+      "type": "string",
+      "enum": [
+        "home",
+        "market",
+        "outpost",
+        "sanctuary",
+        "camp",
+        "hall"
+      ]
+    },
+    "witness": {
+      "type": "string",
+      "maxLength": 128
+    }
+  },
+  "$comment": "Policy court_diplomat: work 6, rest 13, social 6, initial energy 70; version and timestamp fences enforced by engine."
+}
