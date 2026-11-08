@@ -1,16 +1,7 @@
 name: VOL-249/250 Research Reasoning Qualification
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/research/**'
-      - 'skeleton/testing/test_hypothesis_engine.py'
-      - 'skeleton/testing/test_causal_knowledge.py'
-      - 'skeleton/testing/test_game_design_probes.py'
-      - 'skeleton/testing/test_ai_git_knowledge.py'
-      - 'skeleton/testing/test_ai_flight_http.py'
-      - 'docs/ai/VOL_249_250_RESEARCH_REASONING.md'
-      - '.github/workflows/vol249-250-research-reasoning.yml'
+  workflow_call:
   workflow_dispatch:
 
 permissions:
