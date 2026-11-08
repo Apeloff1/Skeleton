@@ -119,12 +119,5 @@ jobs:
         env:
           PYTHONPATH: ".:backend:tests"
         run: python -m pytest -q --noconftest skeleton/testing/test_repo_machine_inventory_budget.py
-      - name: Qualify source-bound forged Studio ZIP and scan-overflow suites
-        env:
-          PYTHONPATH: ".:backend:tests"
-        run: >-
-          python -m pytest -q --noconftest
-          skeleton/testing/test_app_offline_archive_schema_parity.py
-          skeleton/testing/test_repo_machine_inventory_budget.py
       - name: Verify complete repository scan without truncation
         run: python scripts/check_repo_machine.py
