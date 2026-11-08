@@ -28,10 +28,10 @@ PR_EVENTS = frozenset({"pull_request", "pull_request_target", "merge_group"})
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
     lines = source.splitlines()
-    try:
-        start = next(i for i, line in enumerate(lines) if line == "on:")
-    except StopIteration as exc:
-        raise ValueError("workflow missing multiline 'on:' trigger") from exc
+    positions = [i for i, line in enumerate(lines) if line == "on:"]
+    if len(positions) != 1:
+        raise ValueError("workflow requires exactly one multiline 'on:' trigger")
+    start = positions[0]
     found: set[str] = set()
     for line in lines[start + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
@@ -105,9 +105,9 @@ def audit(root: Path = ROOT) -> list[str]:
         if group is not None:
             counts[group] += 1
     if counts["pr"] > MAX_PR_ADMISSIONS:
-        failures.append(f"unexpected PR workflow count: {counts['pr']} > {MAX_PR_ADMISSIONS}")
+        failures.append(f"unexpected active PR workflow count: {counts['pr']} > {MAX_PR_ADMISSIONS}")
     if counts["other"] > MAX_OTHER_ADMISSIONS:
-        failures.append(f"unexpected non-PR workflow count: {counts['other']} > {MAX_OTHER_ADMISSIONS}")
+        failures.append(f"unexpected active non-PR workflow count: {counts['other']} > {MAX_OTHER_ADMISSIONS}")
     for name in specialised:
         path = root / ARCHIVE / name
         if (root / WORKFLOWS / name).exists():

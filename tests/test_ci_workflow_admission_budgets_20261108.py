@@ -44,3 +44,9 @@ def test_independent_budgets_keep_existing_caps():
     assert events("name: test\non:\n  workflow_dispatch:\n  pull_request:\n") == {
         "workflow_dispatch", "pull_request"
     }
+
+
+def test_duplicate_event_map_is_not_silently_accepted():
+    import pytest
+    with pytest.raises(ValueError, match="exactly one"):
+        events("name: duplicate\\non:\\n  workflow_dispatch:\\non:\\n  pull_request:\\n")

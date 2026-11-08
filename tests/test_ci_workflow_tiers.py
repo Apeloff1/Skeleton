@@ -97,7 +97,7 @@ class WorkflowTierTests(unittest.TestCase):
                     encoding="utf-8",
                 )
             self.assertTrue(
-                any("unexpected active workflow count" in item for item in audit(root))
+                any("unexpected active PR workflow count" in item for item in audit(root))
             )
             for index in range(10):
                 (root / ".github/workflows" / f"automatic-extra-{index}.yml").unlink()
