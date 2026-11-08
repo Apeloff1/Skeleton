@@ -14,9 +14,10 @@ class GoldenGridTests(unittest.TestCase):
         # Reach the NPC from the top, start quest, fetch key via lower corridor,
         # return to NPC, then travel around the right edge to the exit.
         to_npc = ["right"] * 4 + ["down", "interact"]
-        to_key = ["left"] * 3 + ["down"] * 2
-        back_to_npc = ["up"] * 2 + ["right"] * 3 + ["interact"]
-        to_exit = ["right", "down"] * 3 + ["interact"]
+        # The central wall blocks (2, 1..3). Traverse the upper corridor.
+        to_key = ["up"] + ["left"] * 3 + ["down"] * 3
+        back_to_npc = ["up"] * 3 + ["right"] * 3 + ["down", "interact"]
+        to_exit = ["right"] + ["down"] * 3 + ["interact"]
         actions = to_npc + to_key + back_to_npc + to_exit
         final = play(actions)
         self.assertTrue(final.ending)
