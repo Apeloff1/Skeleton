@@ -71,8 +71,11 @@ class TenantQuotas:
                     raise EdgeError(503, "EDGE.QUOTA.CAPACITY", "quota admission capacity exhausted")
                 b = _Bucket(float(pol.burst), now, now)
                 self._buckets[key] = b
-            b.tokens = min(float(pol.burst), b.tokens + max(0.0, now - b.updated) * pol.rate_per_s)
-            b.updated = now
+            # Never regress the persisted refill watermark on clock rollback.
+            # Otherwise time returning to its prior value mints free tokens.
+            effective_now = max(now, b.updated)
+            b.tokens = min(float(pol.burst), b.tokens + (effective_now - b.updated) * pol.rate_per_s)
+            b.updated = effective_now
             if now - b.window_start >= pol.window_s:
                 b.window_start, b.window_used = now, 0
             if pol.window_limit is not None and b.window_used >= pol.window_limit:

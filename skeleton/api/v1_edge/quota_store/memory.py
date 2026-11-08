@@ -58,8 +58,10 @@ class InMemoryCounterStore:
         with self._lock:
             t = self._clock() if now is None else now
             tokens, updated = self._load(key, t)
-            result, level = compute_take(tokens, updated, spec, cost, t)
-            self._store(key, level, t, spec)
+            # Record the high-water clock value, not a backwards sample.
+            effective_now = max(t, updated) if updated is not None else t
+            result, level = compute_take(tokens, updated, spec, cost, effective_now)
+            self._store(key, level, effective_now, spec)
             return result
 
     def peek(self, key: str, spec: BucketSpec, now: Optional[float] = None) -> TakeResult:

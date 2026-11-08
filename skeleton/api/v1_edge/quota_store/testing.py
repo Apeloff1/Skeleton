@@ -58,8 +58,10 @@ class FakeRemoteClient:
             self._expire(key, now_ms)
             row = self._hash.get(key)
             tokens, updated = row if row else (None, None)
-            res, level = compute_take(tokens, updated, BucketSpec(capacity, rate), cost, now)
-            self._hash[key] = (level, now)
+            # Match Redis Lua high-water timestamp behavior under skew.
+            effective_now = max(now, updated) if updated is not None else now
+            res, level = compute_take(tokens, updated, BucketSpec(capacity, rate), cost, effective_now)
+            self._hash[key] = (level, effective_now)
             self._expires_ms[key] = now_ms + ttl_ms
         if self.corrupt:
             return (7, "nan")

@@ -110,3 +110,16 @@ def test_memory_is_atomic_under_threads():
     for t in ts:
         t.join()
     assert len(allowed) == 100
+
+
+def test_memory_clock_rollback_preserves_refill_high_watermark():
+    now = [1000.0]
+    s = InMemoryCounterStore(clock=lambda: now[0])
+    spec = BucketSpec(2, 1.0)
+    assert s.take("hot", spec, 2).allowed
+    now[0] = 0.0
+    assert not s.take("hot", spec).allowed
+    now[0] = 1000.0
+    assert not s.take("hot", spec).allowed
+    now[0] = 1001.0
+    assert s.take("hot", spec).allowed

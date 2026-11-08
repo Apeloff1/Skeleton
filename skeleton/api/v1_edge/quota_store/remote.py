@@ -42,14 +42,15 @@ if tokens == nil or updated == nil then
   tokens = capacity
   updated = now
 end
-local elapsed = math.max(0, now - updated)
+local effective_now = math.max(now, updated)
+local elapsed = effective_now - updated
 local level = math.min(capacity, tokens + elapsed * rate)
 local allowed = 0
 if cost <= capacity and level + 1e-9 >= cost then
   level = level - cost
   allowed = 1
 end
-redis.call('HSET', key, 'tokens', tostring(level), 'updated', tostring(now))
+redis.call('HSET', key, 'tokens', tostring(level), 'updated', tostring(effective_now))
 redis.call('PEXPIRE', key, ttl_ms)
 return {allowed, tostring(level)}
 """

@@ -88,3 +88,18 @@ def test_legacy_quota_concurrent_requests_have_single_budget():
     with ThreadPoolExecutor(max_workers=20) as pool:
         result = list(pool.map(take, range(200)))
     assert sum(result) == 5
+
+
+def test_legacy_quota_clock_rollback_does_not_mint_tokens():
+    now = [1000.0]
+    q = TenantQuotas({"default": QuotaPolicy(1.0, 2)}, clock=lambda: now[0])
+    q.check("a", "default")
+    q.check("a", "default")
+    now[0] = 0.0
+    with pytest.raises(EdgeError):
+        q.check("a", "default")
+    now[0] = 1000.0
+    with pytest.raises(EdgeError):
+        q.check("a", "default")
+    now[0] = 1001.0
+    assert q.check("a", "default")["ratelimit-remaining"] == "0"
