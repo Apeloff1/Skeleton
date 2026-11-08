@@ -3,10 +3,12 @@ schema_version = 1
 name = "Skeleton"
 machine_root = ".machine"
 default_owner = "automation-supervisor"
-# Full working-tree machine/code-search coverage must include current tracked growth.
-# Retain a finite scan budget; scanner and CI still fail closed on truncation.
-# The previous 80,000-file ceiling truncated the 2026-10-29 exact-head inventory.
-max_files = 100000
+# Full working-tree machine/code-search coverage must include tracked growth.
+# A 100,000-file budget truncated #5074 at the exact CI head on 2026-11-08.
+# Increase the finite intake bound; the scanner still stops at max_files + 1,
+# reports truncated=true and makes CI fail closed for larger inventories.
+# This is a capacity change, not an exclusion, scanner bypass or certification.
+max_files = 250000
 max_file_bytes = 2000000
 max_context_bytes = 30000
 
