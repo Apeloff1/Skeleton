@@ -75,6 +75,30 @@ def events(source: str) -> set[str]:
     return found
 
 
+
+def event_block(source: str, event: str) -> str:
+    """Return one complete top-level event block, including all nested filters."""
+    lines = source.splitlines()
+    positions = [i for i, line in enumerate(lines) if line == "on:"]
+    if len(positions) != 1:
+        raise ValueError("workflow requires exactly one multiline on: event map")
+    start = positions[0] + 1
+    event_line = f"  {event}:"
+    matches = [i for i in range(start, len(lines)) if lines[i] == event_line]
+    if len(matches) != 1:
+        raise ValueError(f"workflow requires exactly one {event} event block")
+    first = matches[0]
+    end = len(lines)
+    for index in range(first + 1, len(lines)):
+        line = lines[index]
+        if line and not line[0].isspace():
+            end = index
+            break
+        if line.startswith("  ") and not line.startswith("   "):
+            end = index
+            break
+    return "\n".join(lines[first:end]).rstrip()
+
 def independently_triggered(found: set[str]) -> bool:
     """Count only independent Actions admissions, not manually dispatched or called jobs.
 
@@ -138,7 +162,7 @@ def audit(root: Path = ROOT) -> list[str]:
             # default branch, explicit path filter, or root permission ceiling.
             source = path.read_text(encoding="utf-8")
             if (found != {"workflow_dispatch", "schedule", "push"}
-                    or RECOVERY_PUSH_CONTRACTS[path.name] not in source
+                    or event_block(source, "push") != RECOVERY_PUSH_CONTRACTS[path.name]
                     or not re.search(r"(?m)^permissions: \{\}$", source)):
                 failures.append(f"{path.name}: operational-only trigger or permission drift")
             continue
