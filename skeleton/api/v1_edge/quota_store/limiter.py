@@ -42,7 +42,7 @@ class DistributedQuotas:
                  telemetry: Optional[QuotaTelemetry] = None,
                  timer: Callable[[], float] = time.perf_counter):
         self.plan = plan
-        self.store: CounterStore = store or InMemoryCounterStore()
+        self.store: CounterStore = store if store is not None else InMemoryCounterStore()
         self.legacy = legacy
         self.telemetry = telemetry or QuotaTelemetry()
         self._timer = timer

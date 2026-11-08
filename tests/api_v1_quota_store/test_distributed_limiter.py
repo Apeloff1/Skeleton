@@ -22,6 +22,24 @@ def build(now, **kw):
     return DistributedQuotas(plan, store=store, **kw)
 
 
+def test_empty_injected_counter_store_is_not_replaced():
+    # An empty store defines __len__ and is falsy. Caller-supplied counters
+    # must retain their clock, identity, and process-local quota custody.
+    now = [0.0]
+    store = InMemoryCounterStore(clock=lambda: now[0])
+    q = build(now, store=store)
+    assert q.store is store
+    assert len(store) == 0
+    assert q.check_request("t1", GET, "GET")["ratelimit-remaining"] == "1"
+    assert len(store) == 2
+    q.check_request("t1", GET, "GET")
+    with pytest.raises(EdgeError) as denied:
+        q.check_request("t1", GET, "GET")
+    assert denied.value.code == CODE_RATE_LIMITED
+    now[0] = 1.0
+    assert q.check_request("t1", GET, "GET")["ratelimit-remaining"] == "0"
+
+
 def test_tenant_bucket_and_headers():
     now = [0.0]
     q = build(now)
