@@ -7239,6 +7239,11 @@
       "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
     },
     {
+      "path": "skeleton/mass_build",
+      "owner": "build-pipeline source owner",
+      "reason": "Original repository-owned mass-build orchestration remains in the independent build pipeline; this classification does not admit generated artifacts, AI authority or source migration."
+    },
+    {
       "path": "skeleton/masterplan",
       "owner": "masterplan volume authority",
       "reason": "executable masterplan/volume evidence surface; authority is machine/ai_master_plan.json, not an AI runtime mirror."
@@ -7329,6 +7334,11 @@
       "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
     },
     {
+      "path": "skeleton/perf_profiler",
+      "owner": "performance testing and observability",
+      "reason": "Runtime profiler is a bounded performance-measurement helper and not an AI model or canonical inference owner; existing regression and latency gate ownership remain separate."
+    },
+    {
       "path": "skeleton/persist",
       "owner": "persistence compatibility boundary",
       "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
@@ -7362,6 +7372,11 @@
       "path": "skeleton/provider_contract.py",
       "owner": "provider compatibility boundary",
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
+    },
+    {
+      "path": "skeleton/provider_environment.py",
+      "owner": "provider environment simulation and holdout boundary",
+      "reason": "Exact environment adapter and holdout-isolation compatibility implementation remains source-owned outside the AI runtime tree until independently approved migration and test/evidence signoff."
     },
     {
       "path": "skeleton/providers",
@@ -7772,7 +7787,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 160,
+    "retained_outside_ai_tree_count": 163,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
