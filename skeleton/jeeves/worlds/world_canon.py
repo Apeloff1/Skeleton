@@ -479,12 +479,26 @@ class WorldStore:
             raise CanonError("not_found", name) from None
         try:
             info = os.fstat(handle)
-            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_SOURCE_BYTES:
+            if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
+                    info.st_size > MAX_SOURCE_BYTES):
                 raise CanonError("unsafe_source_file", name)
             with os.fdopen(os.dup(handle), "rb") as stream:
                 data = stream.read(MAX_SOURCE_BYTES + 1)
             if len(data) > MAX_SOURCE_BYTES:
                 raise CanonError("source_too_large")
+            # The opened descriptor must still be the directory's current
+            # source. Reject rename/replacement races instead of accepting
+            # bytes from an unlinked or superseded source inode.
+            try:
+                current = os.stat(name, dir_fd=fd, follow_symlinks=False)
+            except OSError as exc:
+                raise CanonError("source_replaced_during_read", name) from exc
+            after = os.fstat(handle)
+            if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1 or
+                    (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino) or
+                    (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) !=
+                    (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)):
+                raise CanonError("source_replaced_during_read", name)
             return data
         finally:
             os.close(handle)
