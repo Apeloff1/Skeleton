@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,16 +19,9 @@ MANUAL = (
 
 
 def trigger_events(text: str) -> set[str]:
-    lines = text.splitlines()
-    start = lines.index("on:")
-    events: set[str] = set()
-    for line in lines[start + 1:]:
-        if line and not line[0].isspace() and not line.startswith("#"):
-            break
-        match = re.match(r"^  ([a-z_]+):(?:\\s*(?:#.*)?)?$", line)
-        if match:
-            events.add(match.group(1))
-    return events
+    """Use the strict production parser; never ignore a malformed event."""
+    from scripts.check_ci_workflow_tiers import events
+    return events(text)
 
 
 class ManualPrivilegedWorkflowAdmission(unittest.TestCase):
@@ -38,6 +30,16 @@ class ManualPrivilegedWorkflowAdmission(unittest.TestCase):
             with self.subTest(name=name):
                 source = (WORKFLOWS / name).read_text(encoding="utf-8")
                 self.assertEqual(trigger_events(source), {"workflow_dispatch"})
+
+    def test_malformed_or_duplicate_manual_triggers_fail_closed(self) -> None:
+        for untrusted in (
+            "on:\n  workflow_dispatch:\n  'pull_request':\n",
+            "on:\n  workflow_dispatch:\n  workflow_dispatch:\n",
+            "on:\n  workflow_dispatch:\n  workflow_dispatch: {}\n",
+        ):
+            with self.subTest(untrusted=untrusted):
+                with self.assertRaises(ValueError):
+                    trigger_events(untrusted)
 
     def test_image_publication_is_opt_in_on_version_tag_with_governance(self) -> None:
         source = (WORKFLOWS / "release-images.yml").read_text(encoding="utf-8")
