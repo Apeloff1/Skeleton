@@ -16,7 +16,7 @@ import type { FrontierEventAction } from './GameFrontierApprovalState';
 export type FrontierEditor = Readonly<{ id: string; title: string; summary: string }>;
 
 /** RPG-style editors shipped by the Game Frontier lanes. */
-export const FRONTIER_EDITORS: ReadonlyArray<FrontierEditor> = [
+export const FRONTIER_EDITORS: readonly FrontierEditor[] = [
   { id: 'authoring', title: 'World & quest authoring', summary: 'Layers, actors, prefabs and quests' },
   { id: 'curriculum', title: 'Curriculum', summary: 'Learning progression for the authored game' },
   { id: 'epic-route', title: 'Epic route', summary: 'Campaign / chronicle / saga route planning' },
@@ -37,7 +37,7 @@ export function forgeRuntimeRunner(projectId: string): RuntimeRunner {
 
 export default function GameFrontierCockpitPanel({ projectId, actions = [], runAction, disabled = false }: {
   projectId?: string;
-  actions?: ReadonlyArray<FrontierEventAction>;
+  actions?: readonly FrontierEventAction[];
   runAction?: RuntimeRunner;
   disabled?: boolean;
 }) {
