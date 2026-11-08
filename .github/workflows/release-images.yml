@@ -1,14 +1,20 @@
 name: Release Images
 
-# Tag-triggered release: verifies the tag matches the canonical version
+# Operator-triggered release: verifies the tag matches the canonical version
 # ([project].version in the root pyproject.toml), generates the
 # changelog section, then builds and pushes backend + frontend images to GHCR.
 # Auth is the built-in GITHUB_TOKEN only (packages: write); nothing else is required.
-# workflow_dispatch builds both images without pushing (dry run).
+# workflow_dispatch defaults to non-publishing dry run; explicit publish requires a v* tag.
 on:
-  push:
-    tags: ["v*"]
+  # Publishing requires an explicit operator decision on the exact signed-off tag.
+  # Creating a tag alone never publishes an image.
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish images only from a qualified v* tag (otherwise dry run)"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,7 +37,7 @@ jobs:
       REGISTRY: ghcr.io
       BACKEND_IMAGE: ghcr.io/apeloff1/skeleton-backend
       FRONTEND_IMAGE: ghcr.io/apeloff1/skeleton-frontend
-      PUSH: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+      PUSH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && startsWith(github.ref, 'refs/tags/v') }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,6 +49,13 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
+
+      - name: Deny publication intent outside a qualified version tag
+        if: inputs.publish == true && !startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          echo "Explicit image publication requires selecting a v* Git tag" >&2
+          exit 2
 
       - name: Resolve version and verify no drift
         id: version
