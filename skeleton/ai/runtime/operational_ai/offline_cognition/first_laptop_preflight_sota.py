@@ -6,6 +6,7 @@ No verifier means a hold, never synthetic readiness.
 """
 from __future__ import annotations
 
+import copy
 import json
 import math
 import re
@@ -182,14 +183,18 @@ class FirstLaptopPreflightSOTA:
 
         # A source-provided boolean is NOT proof; require an independently wired
         # trusted verifier to inspect precisely the bounded snapshots for this epoch.
+        # Seal identity before invoking an external verifier. Its arguments are
+        # isolated copies so mutation cannot change the receipt or escape guards.
+        receipt = sha256(canonical({"epoch": epoch, "source": source_data,
+                                    "rights": rights_data})).hexdigest()
         provenance_ok = False
         if callable(verifier):
             try:
-                provenance_ok = verifier(source_data, rights_data, epoch) is True
+                provenance_ok = verifier(
+                    copy.deepcopy(source_data), copy.deepcopy(rights_data), epoch
+                ) is True
             except Exception:
                 provenance_ok = False
-        receipt = sha256(canonical({"epoch": epoch, "source": source_data,
-                                    "rights": rights_data})).hexdigest()
         results.append(StageResult("provenance", provenance_ok,
                                    float(provenance_ok), receipt, epoch))
         if not provenance_ok:
