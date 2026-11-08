@@ -9,7 +9,9 @@ from .contracts import StreamError,StreamPolicy,identifier,bounded
 
 class EventStream:
     def __init__(self,ledger,bearer:str,*,policy:StreamPolicy|None=None):
-        self.policy=policy or StreamPolicy()
+        if policy is not None and type(policy) is not StreamPolicy:
+            raise StreamError('explicit typed event-stream policy required')
+        self.policy=StreamPolicy() if policy is None else policy
         principal=ledger.identity.key()
         self.reader=EventReader(ledger,CursorAuthority(bearer,principal))
     def read(self,query:StreamQuery)->tuple[bytes,dict]:

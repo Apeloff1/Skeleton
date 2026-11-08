@@ -216,6 +216,14 @@ class Fixture(unittest.TestCase):
         for token in ('tiny','a'*513,'a'*40+'\n'):
             with self.subTest(token=token[:5]),self.assertRaises(InvalidCursor):CursorAuthority(token,self.id.key())
 
+    def test_invalid_falsy_policy_cannot_silently_use_defaults(self):
+        # Falsy 0, False, {}, [] used to evade typed policy admission.
+        for policy in (0, False, "", {}, [], object()):
+            with self.subTest(policy=type(policy).__name__), self.assertRaises(StreamError):
+                EventStream(self.ledger, BEARER, policy=policy)
+        accepted=EventStream(self.ledger, BEARER, policy=StreamPolicy(max_events=1))
+        self.assertEqual(accepted.policy.max_events,1)
+
     def test_read_only_no_model_generation(self):
         before=self.ledger.state_count()
         self.svc.read(StreamQuery('job1',None,32,0))
