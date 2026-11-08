@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from scripts.check_ci_workflow_tiers import ROOT, SCHEDULED_RECOVERY, audit, events
+from scripts.check_ci_workflow_tiers import ROOT, SCHEDULED_RECOVERY, audit, event_block, events
 
 
 class WorkflowTierTests(unittest.TestCase):
@@ -78,7 +78,9 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertEqual(len(RECOVERY_PUSH_CONTRACTS), 3)
         for workflow, expected in RECOVERY_PUSH_CONTRACTS.items():
             body = (ROOT / ".github/workflows" / workflow).read_text(encoding="utf-8")
-            self.assertIn(expected, body)
+            self.assertEqual(event_block(body, "push"), expected)
+            widened = body.replace(expected, expected + "\n      - '**'")
+            self.assertNotEqual(event_block(widened, "push"), expected)
 
     def test_specialists_are_archived_and_active_core_remains_required(self):
         with TemporaryDirectory() as temp:
