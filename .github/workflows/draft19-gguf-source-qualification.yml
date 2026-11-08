@@ -88,8 +88,6 @@ jobs:
           skeleton/testing/test_app_offline_install_preflight.py::test_preflight_does_not_reserve_and_installer_rechecks
       - name: Qualify repository scanner finite-budget semantics
         run: python -m unittest discover -s tests -p 'test_repo_machine_budget_20261108.py' -v
-      - name: Verify complete repository scan without truncation
-        run: python scripts/check_repo_machine.py
       - name: Qualify strict native generation receipt and circuit denial
         run: python -m unittest skeleton.testing.test_ai_next_model -v
       - name: Qualify collided quest/dialogue pytest module identities
@@ -107,3 +105,5 @@ jobs:
           skeleton/testing/test_app_offline_archive_signature.py::test_valid_detached_signature_is_not_consumer_release
           skeleton/testing/test_app_consumer_first_run_readiness.py::test_real_installed_game_and_private_save_replayed_without_release_claim
           skeleton/testing/test_app_offline_mixed_game_library_continuity.py::test_real_signed_unsigned_progress_continuity_and_cli
+      - name: Verify complete repository scan without truncation
+        run: python scripts/check_repo_machine.py
