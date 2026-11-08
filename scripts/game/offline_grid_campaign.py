@@ -105,9 +105,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.out_save is not None:
                 publish_save(args.out_save, session)
             print()
-            if args.out_save is not None:
-            publish_save(args.out_save, session)
-        print(json.dumps({"save": session.snapshot(), "map": session.render(),
+            print(json.dumps({"save": session.snapshot(), "map": session.render(),
                               "viewport": viewport(session, args.view_width, args.view_height).record()},
                              sort_keys=True))
             return 0
@@ -116,11 +114,13 @@ def main(argv: list[str] | None = None) -> int:
         raw_commands = _read(args.commands)
         if not isinstance(raw_commands, list) or len(raw_commands) > 4096:
             raise ValueError("invalid command batch")
-        session = Session.restore(campaign, _read(args.resume)) if args.resume else Session.new(campaign)
+        session = read_save(args.resume, campaign) if args.resume else Session.new(campaign)
         for item in raw_commands:
             if not isinstance(item, dict) or set(item) - {"command_id", "kind", "target"}:
                 raise ValueError("invalid command fields")
             session = session.step(Command(**item))
+        if args.out_save is not None:
+            publish_save(args.out_save, session)
         print(json.dumps({"save": session.snapshot(), "map": session.render(),
                           "viewport": viewport(session, args.view_width, args.view_height).record()},
                          sort_keys=True))
