@@ -163,7 +163,9 @@ def _positive_float(value: object, field: str, *, maximum: float) -> float:
         raise EngineProtocolError(f"{field} must be numeric")
     try:
         result = float(value)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
+        # A hostile bignum may overflow float conversion before range checks.
+        # Reject it as a typed protocol refusal without entering HTTPX.
         raise EngineProtocolError(f"{field} must be numeric") from exc
     if result <= 0 or result > maximum or result != result:
         raise EngineProtocolError(f"{field} is outside allowed range")
