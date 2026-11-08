@@ -2,7 +2,7 @@
 from pathlib import Path
 import unittest
 
-from scripts.check_ci_workflow_tiers import admission_group, events
+from scripts.check_ci_workflow_tiers import events, independently_triggered
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,11 +19,11 @@ class SelfOnlyMaintenanceAdmissionTests(unittest.TestCase):
             with self.subTest(name=name):
                 source = (WORKFLOWS / name).read_text(encoding="utf-8")
                 self.assertEqual(events(source), {"workflow_dispatch"})
-                self.assertIsNone(admission_group(events(source)))
+                self.assertFalse(independently_triggered(events(source)))
                 for new_event in ("pull_request", "schedule", "push", "workflow_run"):
                     modified = source.replace("on:\n", f"on:\n  {new_event}:\n", 1)
                     self.assertIn(new_event, events(modified))
-                    self.assertIsNotNone(admission_group(events(modified)))
+                    self.assertTrue(independently_triggered(events(modified)))
 
     def test_duplicate_on_block_is_rejected(self):
         for name in MAINTENANCE:
