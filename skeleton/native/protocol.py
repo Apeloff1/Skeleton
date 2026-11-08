@@ -4,21 +4,28 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
-import uuid
 import json
 import math
+import uuid
 
 MAX_ENVELOPE_PAYLOAD_BYTES = 1_048_576
 MAX_ENVELOPE_DEPTH = 16
+MAX_ENVELOPE_NODES = 262_144
 
 
 def _bounded_wire_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     """Validate the entire untrusted RPC payload before subprocess dispatch."""
+    if len(payload) > MAX_ENVELOPE_NODES:
+        raise AcceleratorProtocolError("payload node budget exceeded")
     root = dict(payload)
     pending: list[tuple[Any, int]] = [(root, 0)]
     visited: set[int] = set()
+    nodes = 0
     while pending:
         value, depth = pending.pop()
+        nodes += 1
+        if nodes > MAX_ENVELOPE_NODES:
+            raise AcceleratorProtocolError("payload node budget exceeded")
         if depth > MAX_ENVELOPE_DEPTH:
             raise AcceleratorProtocolError("payload nesting limit exceeded")
         if isinstance(value, (dict, list, tuple)):
@@ -27,13 +34,26 @@ def _bounded_wire_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
                 raise AcceleratorProtocolError("payload contains cyclic or aliased containers")
             visited.add(identity)
             if isinstance(value, dict):
-                if any(not isinstance(k, str) for k in value):
-                    raise AcceleratorProtocolError("payload object keys must be text")
+                if len(value) > MAX_ENVELOPE_NODES - nodes:
+                    raise AcceleratorProtocolError("payload node budget exceeded")
+                for key in value:
+                    if not isinstance(key, str):
+                        raise AcceleratorProtocolError("payload object keys must be text")
+                    if len(key) > MAX_ENVELOPE_PAYLOAD_BYTES:
+                        raise AcceleratorProtocolError("payload text budget exceeded")
                 pending.extend((v, depth + 1) for v in value.values())
             else:
+                if len(value) > MAX_ENVELOPE_NODES - nodes:
+                    raise AcceleratorProtocolError("payload node budget exceeded")
                 pending.extend((v, depth + 1) for v in value)
-        elif value is None or isinstance(value, (str, bool, int)):
+        elif isinstance(value, str):
+            if len(value) > MAX_ENVELOPE_PAYLOAD_BYTES:
+                raise AcceleratorProtocolError("payload text budget exceeded")
+        elif isinstance(value, bool) or value is None:
             continue
+        elif isinstance(value, int):
+            if value.bit_length() > MAX_ENVELOPE_PAYLOAD_BYTES * 4:
+                raise AcceleratorProtocolError("payload integer budget exceeded")
         elif isinstance(value, float) and math.isfinite(value):
             continue
         else:
