@@ -87,6 +87,14 @@ function copyApprovedAction(value: FrontierEventAction): FrontierEventAction | n
   }
 }
 
+/** Compare all action fields. A reused ID with different parameters never
+ * inherits the approval of an earlier request. Key ordering differences only
+ * cause conservative rejection, not accidental authorization. */
+function sameAction(a: FrontierEventAction, b: FrontierEventAction): boolean {
+  return a.id === b.id && a.label === b.label && a.editor === b.editor
+    && a.action === b.action && JSON.stringify(a.parameters) === JSON.stringify(b.parameters);
+}
+
 function patch(queue: ApprovalQueue, id: string, allowed: ApprovalStatus[],
                next: (entry: ApprovalEntry) => ApprovalEntry): ApprovalQueue {
   return queue.map(entry => entry.action.id === id && allowed.includes(entry.status) ? next(entry) : entry);
@@ -97,7 +105,16 @@ export function approvalReducer(queue: ApprovalQueue, event: ApprovalEvent): App
     case 'request': {
       if (queue.length >= MAX_QUEUE) return queue;
       const action = copyApprovedAction(event.action);
-      if (!action || queue.some(entry => entry.action.id === action.id)) return queue;
+      if (!action) return queue;
+      const existing = queue.find(entry => entry.action.id === action.id);
+      if (existing) {
+        if (sameAction(existing.action, action)) return queue;
+        // Reused action IDs can change project, intent and parameters.
+        // Invalidate the old approval rather than carrying it to new content.
+        return queue.map(entry => entry.action.id === action.id
+          ? { action: entry.action, status: 'rejected', intent: 'reject' }
+          : entry);
+      }
       return [...queue, { action, status: 'pending' }];
     }
     case 'ask':
@@ -112,6 +129,11 @@ export function approvalReducer(queue: ApprovalQueue, event: ApprovalEvent): App
         return entry;
       });
     case 'succeeded':
+      if (typeof event.receipt !== 'string' || !/^[a-f0-9]{64}$/.test(event.receipt)) {
+        return patch(queue, event.id, ['running'], entry => ({
+          action: entry.action, status: 'error', error: 'Invalid authenticated runtime receipt',
+        }));
+      }
       return patch(queue, event.id, ['running'], entry => ({ ...entry, status: 'approved', receipt: event.receipt }));
     case 'failed':
       return patch(queue, event.id, ['running'], entry => ({ ...entry, status: 'error', error: event.error }));
@@ -127,8 +149,8 @@ export function approvalReducer(queue: ApprovalQueue, event: ApprovalEvent): App
 export function visibleApprovals(
   queue: ApprovalQueue, actions: readonly FrontierEventAction[],
 ): ApprovalQueue {
-  const ids = new Set(actions.map(action => action.id));
-  return queue.filter(entry => ids.has(entry.action.id));
+  return queue.filter(entry =>
+    actions.some(action => action.id === entry.action.id && sameAction(entry.action, action)));
 }
 
 /** True only for the single transition that is allowed to call the runtime. */

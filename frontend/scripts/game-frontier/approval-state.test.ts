@@ -20,9 +20,9 @@ test('approve requires confirmation before runtime may be called', () => {
   const confirmed = approvalReducer(asked, { type: 'confirm', id: 'a1' });
   assert.equal(at(confirmed).status, 'running');
   assert.equal(mayCallRuntime(at(asked), at(confirmed)), true);
-  const done = approvalReducer(confirmed, { type: 'succeeded', id: 'a1', receipt: 'abc' });
+  const done = approvalReducer(confirmed, { type: 'succeeded', id: 'a1', receipt: 'a'.repeat(64) });
   assert.equal(at(done).status, 'approved');
-  assert.equal(at(done).receipt, 'abc');
+  assert.equal(at(done).receipt, 'a'.repeat(64));
 });
 
 test('confirm without ask is a no-op (no runtime call from pending)', () => {
@@ -95,4 +95,40 @@ test('editor tab visibility cannot re-admit or erase an in-flight action', () =>
   assert.equal(at(repeated).status, 'running');
   const done = approvalReducer(all, { type: 'succeeded', id: action.id, receipt: 'a'.repeat(64) });
   assert.equal(visibleApprovals(done, [action])[0].status, 'approved');
+});
+
+
+test('runtime cannot approve an action without an exact receipt hash', () => {
+  const asked = approvalReducer(seed(), { type: 'ask', id: action.id, intent: 'approve' });
+  const running = approvalReducer(asked, { type: 'confirm', id: action.id });
+  for (const receipt of (['abc', 'G'.repeat(64), '', undefined] as const)) {
+    const result = approvalReducer(running, { type: 'succeeded', id: action.id, receipt });
+    assert.equal(at(result).status, 'error');
+    assert.equal(at(result).receipt, undefined);
+  }
+  const verified = approvalReducer(running, {
+    type: 'succeeded', id: action.id, receipt: 'f'.repeat(64),
+  });
+  assert.equal(at(verified).status, 'approved');
+});
+
+
+test('reused action ID with changed parameters revokes prior approval', () => {
+  const asked = approvalReducer(seed(), { type: 'ask', id: action.id, intent: 'approve' });
+  const changed = { ...action, parameters: { x: 999 } };
+  assert.equal(visibleApprovals(asked, [changed]).length, 0);
+  const revoked = approvalReducer(asked, { type: 'request', action: changed });
+  assert.equal(at(revoked).status, 'rejected');
+  assert.equal(at(approvalReducer(revoked, { type: 'confirm', id: action.id })).status, 'rejected');
+  assert.equal(mayCallRuntime(at(asked), at(revoked)), false);
+});
+
+
+test('editor visibility requires source action identity not id alone', () => {
+  const before = seed();
+  assert.equal(visibleApprovals(before, [action]).length, 1);
+  assert.equal(visibleApprovals(before, [{ ...action, editor: 'handbook' }]).length, 0);
+  assert.equal(visibleApprovals(before, [{ ...action, action: 'delete_project' }]).length, 0);
+  assert.equal(visibleApprovals(before, [{ ...action, label: 'Other intent' }]).length, 0);
+  assert.equal(visibleApprovals(before, [{ ...action, parameters: { x: -1 } }]).length, 0);
 });

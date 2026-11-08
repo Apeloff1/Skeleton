@@ -38,7 +38,8 @@ export default function GameFrontierOperatorApprovalPanel({ actions, runAction, 
     const before = latest.current.find(e => e.action.id === entry.action.id);
     const after = approvalReducer(latest.current, { type: 'confirm', id: entry.action.id })
       .find(e => e.action.id === entry.action.id);
-    if (!before || !after || before.status !== 'confirming') return;
+    if (!before || !after || before.status !== 'confirming'
+        || visibleApprovals([before], actions).length !== 1) return;
     if (!mayCallRuntime(before, after)) {
       dispatch({ type: 'confirm', id: entry.action.id });
       return;
@@ -59,7 +60,7 @@ export default function GameFrontierOperatorApprovalPanel({ actions, runAction, 
     } finally {
       inFlight.current.delete(entry.action.id);
     }
-  }, [dispatch, runAction, disabled]);
+  }, [dispatch, runAction, disabled, actions]);
 
   const visible = visibleApprovals(queue, actions);
   return (
