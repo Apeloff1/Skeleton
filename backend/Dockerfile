@@ -5,9 +5,11 @@
 # skeleton/ alongside backend/.
 # ============================================================================
 
-# Stage 1: dependency builder. Alpine keeps the builder/runtime ABI aligned
+# Stage 1: dependency builder. Python 3.14.10 is supported (<3.15).
+# Pin the official multi-arch 3.14.10 Alpine 3.24 index across ALL stages.
+# Alpine keeps the builder/runtime ABI aligned
 # so compiled wheels and native extensions do not cross a glibc/musl boundary.
-FROM python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211 AS builder
+FROM python:3.14.10-alpine3.24@sha256:04357e8d728ac6a88a12b808f9b377762f937271ecaf5b99feb242c04de1ffc1 AS builder
 
 WORKDIR /app
 
@@ -38,7 +40,7 @@ RUN --mount=type=secret,id=proxy_ca \
 
 # Prepare the existing flat backend layout in a source-only stage. The
 # Dockerfile-specific context allowlist excludes secrets and runtime data.
-FROM python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211 AS runtime-source
+FROM python:3.14.10-alpine3.24@sha256:04357e8d728ac6a88a12b808f9b377762f937271ecaf5b99feb242c04de1ffc1 AS runtime-source
 WORKDIR /source
 COPY . .
 RUN mv backend /runtime \
@@ -48,7 +50,7 @@ RUN mv backend /runtime \
     && cp scripts/check_jeeves_training_modules.py /runtime/scripts/check_jeeves_training_modules.py
 
 # Stage 2: Production
-FROM python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211 AS production
+FROM python:3.14.10-alpine3.24@sha256:04357e8d728ac6a88a12b808f9b377762f937271ecaf5b99feb242c04de1ffc1 AS production
 
 # Apply the current Alpine security repository updates to the runtime layer.
 # The pinned base remains reproducible while util-linux and other OS packages
