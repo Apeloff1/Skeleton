@@ -102,6 +102,11 @@ class ExactHeadEvidenceTests(unittest.TestCase):
         self.assertIn("Sealed Context Guard", policy)
         self.assertIn("Dependency Review", policy)
 
+    def test_custom_gate_override_cannot_downgrade_mandatory_checks(self):
+        weak = frozenset(f"untrusted-gate-{i}" for i in range(15))
+        with self.assertRaises(EvidenceHold):
+            validate(self.bundle, required=weak)
+
     def test_parent_commit_drift_denied(self):
         self.bundle["pr_chain"][1]["base_head_sha"] = "e" * 40
         self.must_hold("parent head changed before review")
