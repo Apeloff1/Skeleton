@@ -318,7 +318,55 @@ const ending = new Map(world.endings.map(e => [e.scene, e.label]));
 let current = world.start;
 let flags = new Set();
 let trace = [];
+// Save belongs to the standalone browser player, not to the studio's
+// authoritative SessionStore. Never silently import an untrusted save.
+const saveKey = "skeleton-world-save-v1:" + model.proof.source_digest;
 const root = document.getElementById("play");
+let notice = "";
+function replaySave(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw) ||
+      raw.schema !== "jeeves.world.browser_save.v1" ||
+      raw.source_digest !== model.proof.source_digest ||
+      !Array.isArray(raw.choices) || raw.choices.length > 512) {
+    throw new Error("save_schema_or_source_mismatch");
+  }
+  let scene = world.start;
+  const earned = new Set();
+  for (const id of raw.choices) {
+    if (typeof id !== "string" || ending.has(scene)) {
+      throw new Error("save_invalid_choice");
+    }
+    const edge = world.choices.find(c => c.id === id && c.from === scene &&
+      c.requires.every(flag => earned.has(flag)));
+    if (!edge) throw new Error("save_invalid_transition");
+    for (const flag of edge.grants) earned.add(flag);
+    scene = edge.to;
+  }
+  return {scene, earned, choices: raw.choices.slice()};
+}
+function saveGame() {
+  try {
+    localStorage.setItem(saveKey, JSON.stringify({
+      schema: "jeeves.world.browser_save.v1",
+      source_digest: model.proof.source_digest, choices: trace.slice()
+    }));
+    notice = "Progress saved on this browser.";
+  } catch (_) { notice = "Save unavailable; progress remains in memory."; }
+  render();
+}
+function loadGame() {
+  try {
+    const saved = localStorage.getItem(saveKey);
+    if (saved === null) throw new Error("save_missing");
+    if (saved.length > 32768) throw new Error("save_too_large");
+    const replayed = replaySave(JSON.parse(saved));
+    current = replayed.scene;
+    flags = replayed.earned;
+    trace = replayed.choices;
+    notice = "Verified saved progress restored.";
+  } catch (_) { notice = "Saved progress unavailable or invalid; current game unchanged."; }
+  render();
+}
 function element(tag, text) {
   const node = document.createElement(tag);
   node.textContent = text;
@@ -330,6 +378,14 @@ function render() {
   root.append(element("h1", scene.title));
   root.append(element("p", scene.narrative));
   root.append(element("p", "Choices taken: " + trace.join(", ")));
+  const controls = element("div", "");
+  const save = element("button", "Save progress");
+  save.addEventListener("click", saveGame);
+  const load = element("button", "Load saved progress");
+  load.addEventListener("click", loadGame);
+  controls.append(save, load);
+  root.append(controls);
+  if (notice) root.append(element("p", notice));
   if (ending.has(current)) {
     root.append(element("h2", "Ending: " + ending.get(current)));
     const restart = element("button", "Restart");
@@ -341,8 +397,9 @@ function render() {
   }
   const choices = world.choices.filter(c => c.from === current &&
     c.requires.every(f => flags.has(f)));
-  for (const choice of choices) {
-    const button = element("button", choice.label);
+  choices.forEach((choice, index) => {
+    const button = element("button", (index < 9 ? (index + 1) + ". " : "") + choice.label);
+    button.dataset.choiceIndex = String(index);
     button.addEventListener("click", () => {
       for (const flag of choice.grants) flags.add(flag);
       trace.push(choice.id);
@@ -350,8 +407,21 @@ function render() {
       render();
     });
     root.append(button);
-  }
+  });
 }
+// Digit shortcuts target only currently rendered numbered choice controls.
+// Save, Load and Restart are not choices and cannot be activated by digits.
+document.addEventListener("keydown", event => {
+  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey ||
+      event.repeat || event.target?.isContentEditable ||
+      ["INPUT", "TEXTAREA", "SELECT"].includes(event.target?.tagName)) return;
+  if (!/^[1-9]$/.test(event.key)) return;
+  const button = root.querySelector('button[data-choice-index="' + (Number(event.key) - 1) + '"]');
+  if (button && !button.disabled) {
+    event.preventDefault();
+    button.click();
+  }
+});
 render();
 """.strip()
 
@@ -409,12 +479,26 @@ class WorldStore:
             raise CanonError("not_found", name) from None
         try:
             info = os.fstat(handle)
-            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_SOURCE_BYTES:
+            if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
+                    info.st_size > MAX_SOURCE_BYTES):
                 raise CanonError("unsafe_source_file", name)
             with os.fdopen(os.dup(handle), "rb") as stream:
                 data = stream.read(MAX_SOURCE_BYTES + 1)
             if len(data) > MAX_SOURCE_BYTES:
                 raise CanonError("source_too_large")
+            # The opened descriptor must still be the directory's current
+            # source. Reject rename/replacement races instead of accepting
+            # bytes from an unlinked or superseded source inode.
+            try:
+                current = os.stat(name, dir_fd=fd, follow_symlinks=False)
+            except OSError as exc:
+                raise CanonError("source_replaced_during_read", name) from exc
+            after = os.fstat(handle)
+            if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1 or
+                    (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino) or
+                    (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) !=
+                    (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)):
+                raise CanonError("source_replaced_during_read", name)
             return data
         finally:
             os.close(handle)

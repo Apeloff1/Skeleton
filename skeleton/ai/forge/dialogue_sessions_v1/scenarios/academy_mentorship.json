@@ -1,0 +1,59 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "academy_mentorship",
+  "domain": "academy",
+  "role": "mentorship",
+  "rapport_gate": 29,
+  "rapport_gain": 6,
+  "tension_cost": 5,
+  "steps": [
+    {
+      "id": "academy_mentorship:0",
+      "choice": "introduce",
+      "version": 0,
+      "evidence": ""
+    },
+    {
+      "id": "academy_mentorship:1",
+      "choice": "listen",
+      "version": 1,
+      "evidence": ""
+    },
+    {
+      "id": "academy_mentorship:2",
+      "choice": "reveal",
+      "version": 2,
+      "evidence": "academy_mentorship:proof-1"
+    },
+    {
+      "id": "academy_mentorship:3",
+      "choice": "propose",
+      "version": 3,
+      "evidence": "academy_mentorship:proof-2"
+    },
+    {
+      "id": "academy_mentorship:4",
+      "choice": "agree",
+      "version": 4,
+      "evidence": ""
+    },
+    {
+      "id": "academy_mentorship:5",
+      "choice": "leave",
+      "version": 5,
+      "evidence": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate",
+    "out-of-order",
+    "proof-used",
+    "proof-required"
+  ],
+  "production_certified": false
+}

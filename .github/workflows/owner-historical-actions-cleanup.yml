@@ -1,35 +1,26 @@
 name: Owner-ordered historical Actions cleanup
 
 on:
-  issue_comment:
-    types: [created]
+  # Deleting historical Actions runs is a privileged, operator-initiated act.
+  # Issue comments are not a durable authorization channel.
   workflow_dispatch:
 
-# Admin-triggered issue comment provides a distinct GitHub event admission path.
-# macOS uses a separate hosted-runner pool from stalled Linux cleanup runs.
-# No push/PR fanout; the one owner-authored issue command is strictly validated.
-# Current-head CI and security protections remain independent and unchanged.
+# Owner-only manual invocation; the old issue-comment command cannot trigger
+# privileged deletion. The canary-first immutable-ID and 404-confirmed checks
+# in the underlying script remain mandatory.
 permissions: {}
 
-# Every trigger gets an independent workflow-wide slot. In particular, unrelated
-# issue comments must NEVER queue behind/cancel an owner-approved cleanup.
+# Each approved manual invocation gets an independent workflow-wide slot.
+# No untrusted issue-comment event can queue or cancel owner work.
 # The only shared lock stays on the authorized job after its strict event gate.
 concurrency:
   group: owner-historical-actions-cleanup-trigger-${{ github.run_id }}
   cancel-in-progress: false
 
-# Apply shared concurrency at JOB scope, after the exact owner-command if gate.
-# Otherwise any unrelated issue_comment can cancel pending owner work before
-# it ever reaches a runner, even when that comment's job would be skipped.
+# Apply shared concurrency only after the exact owner-identity job guard.
 jobs:
   owner-cleanup:
-    if: >-
-      github.actor == github.repository_owner &&
-      (github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'issue_comment' &&
-        github.event.issue.number == 3902 &&
-        github.event.issue.pull_request == null &&
-        github.event.comment.body == '/owner-historical-cleanup-30-arm-v5'))
+    if: github.event_name == 'workflow_dispatch' && github.actor == github.repository_owner
     concurrency:
       # A queued macOS v4 job must not occupy the ARM runner's recovery slot.
       group: owner-historical-actions-cleanup-v5-arm-${{ github.repository }}
