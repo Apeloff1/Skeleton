@@ -89,12 +89,22 @@ def _imports_forbidden_kernel_dependency(module: str) -> bool:
     return root in _KERNEL_FORBIDDEN_ROOTS or module == "skeleton.api" or module.startswith("skeleton.api.")
 
 
-def _imports_api(module: str, level: int = 0) -> bool:
-    if module == "skeleton.api" or module.startswith("skeleton.api."):
-        return True
-    # Relative imports such as ``from ..api import routes`` should not bypass
-    # the same boundary merely because they omit the absolute package prefix.
-    return level > 0 and (module == "api" or module.startswith("api."))
+def _imports_api(module: str, level: int = 0, *, source_rel: str = "") -> bool:
+    """Resolve relative imports from their actual Python package location.
+
+    A package-local ``from .api import LocalAPI`` is not a dependency
+    on the canonical ``skeleton.api`` application adapter.
+    """
+    if level == 0:
+        return module == "skeleton.api" or module.startswith("skeleton.api.")
+    if not source_rel.startswith("skeleton/"):
+        return False
+    package = source_rel.split("/")[:-1]
+    if level > len(package):
+        return False
+    base = package[: len(package) - level + 1]
+    target = ".".join(base + [part for part in module.split(".") if part])
+    return target == "skeleton.api" or target.startswith("skeleton.api.")
 
 
 def _matches_module(module: str, forbidden: str) -> bool:
@@ -197,7 +207,16 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                 if isinstance(node, ast.Import):
                     imports.extend((alias.name, 0) for alias in node.names)
                 elif isinstance(node, ast.ImportFrom):
-                    imports.append((node.module or "", node.level))
+                    if node.module is None:
+                        # ``from .. import api`` can resolve to skeleton.api.
+                        imports.extend((alias.name, node.level) for alias in node.names)
+                    else:
+                        imports.append((node.module, node.level))
+                        if node.level == 0 and node.module == "skeleton":
+                            imports.extend(
+                                ("skeleton.api", 0)
+                                for alias in node.names if alias.name == "api"
+                            )
                 else:
                     continue
 
@@ -217,7 +236,7 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                         and not production_exempt
                         and not api_composition_root
                         and not _is_staged_api_mirror(rel, repo_root)
-                        and _imports_api(module, level)
+                        and _imports_api(module, level, source_rel=rel)
                     ):
                         violations.append(
                             Violation(
