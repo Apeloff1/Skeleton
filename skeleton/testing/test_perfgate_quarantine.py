@@ -58,3 +58,46 @@ def test_warmup_failures_cannot_be_reported_successful(capsys):
         if calls["n"]==1:raise RuntimeError("do-not-log-private-message")
     outcome=run_soak("broken",flaky,SoakConfig(iterations=1,warmup=1))
     assert outcome.warmup_errors==1
+
+
+def test_empty_or_all_error_budgeted_measurement_is_not_a_pass():
+    from skeleton.perfgate.budget import MissingBudgetedWorkload
+    budgets=load_budgets({"version":1,"workloads":{"required":{"p95_ms":500}}})
+    for stats in (summarize([]),summarize([],errors=3),summarize([0.0])):
+        failures=budgets.check({"required":stats})
+        assert len(failures)==1 and isinstance(failures[0],MissingBudgetedWorkload)
+
+
+def test_baseline_cannot_be_published_without_positive_measured_sample():
+    for sample in (summarize([]),summarize([],errors=3),summarize([0.0])):
+        with pytest.raises(ValueError,match="measured"):
+            Baseline.from_summaries({"unmeasured":sample})
+    baseline=Baseline.from_summaries({"required":summarize([1.0])})
+    for sample in (summarize([]),summarize([],errors=2),summarize([0.0])):
+        report=compare(baseline,{"required":sample})
+        assert not report.ok and report.missing == ["required"]
+
+
+def test_invalid_summary_and_zero_initial_drift_fail_closed():
+    from skeleton.perfgate.stats import Summary
+    for name,value in (("mean_ms",float("nan")),
+                       ("p95_ms",float("inf")),
+                       ("error_rate",1.1),
+                       ("drift_ratio",float("nan"))):
+        values={"count":1,"errors":0,"mean_ms":1.0,"p50_ms":1.0,
+                "p95_ms":1.0,"p99_ms":1.0,"max_ms":1.0,
+                "error_rate":0.0,"drift_ratio":1.0}
+        values[name]=value
+        with pytest.raises(ValueError):
+            Summary(**values)
+    with pytest.raises(ValueError,match="drift"):
+        summarize([0.0,0.0,10.0])
+
+
+def test_zero_duration_clock_does_not_create_positive_soak_evidence():
+    from skeleton.perfgate.soak import run_soak
+    outcome=run_soak("unmeasured",lambda:None,SoakConfig(iterations=3,warmup=0),
+                     clock=lambda:1.0)
+    assert outcome.aborted is True
+    assert outcome.samples_ms==[]
+    assert outcome.errors==["InvalidClock"]

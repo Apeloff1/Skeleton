@@ -37,6 +37,19 @@ class Summary:
     error_rate: float
     drift_ratio: float  # mean(last third) / mean(first third); >1 means slowing down
 
+    def __post_init__(self) -> None:
+        if (type(self.count) is not int or type(self.errors) is not int
+                or not 0 <= self.errors <= self.count <= 200000):
+            raise ValueError("invalid bounded performance sample counts")
+        metrics = ("mean_ms", "p50_ms", "p95_ms", "p99_ms",
+                   "max_ms", "error_rate", "drift_ratio")
+        if any(type(getattr(self, name)) not in (int, float)
+               or not math.isfinite(getattr(self, name))
+               or getattr(self, name) < 0 for name in metrics):
+            raise ValueError("nonfinite or negative performance metric")
+        if self.error_rate > 1 or self.drift_ratio <= 0:
+            raise ValueError("invalid performance error or drift ratio")
+
     def as_dict(self) -> Dict[str, float]:
         return asdict(self)
 
@@ -54,8 +67,13 @@ def _drift(samples: Sequence[float]) -> float:
     head = sum(samples[:third]) / third
     tail = sum(samples[-third:]) / third
     if head <= 0:
+        if tail > 0:
+            raise ValueError("cannot certify drift from zero baseline latency")
         return 1.0
-    return tail / head
+    ratio = tail / head
+    if not math.isfinite(ratio):
+        raise ValueError("unbounded latency drift")
+    return ratio
 
 
 def summarize(samples_ms: Sequence[float], errors: int = 0) -> Summary:

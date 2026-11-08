@@ -73,7 +73,7 @@ def run_soak(name: str, workload: Callable[[], object], config: SoakConfig = Soa
             continue
         streak = 0
         elapsed = (clock() - t0) * 1000.0
-        if not math.isfinite(elapsed) or elapsed < 0:
+        if not math.isfinite(elapsed) or elapsed <= 0:
             res.errors.append("InvalidClock")
             res.aborted = True
             break

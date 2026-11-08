@@ -23,6 +23,9 @@ class Baseline:
     @classmethod
     def from_summaries(cls, summaries: Mapping[str, Summary],
                        meta: Optional[Dict[str, str]] = None) -> "Baseline":
+        if (not summaries or any(s.count <= s.errors or s.max_ms <= 0
+                                  for s in summaries.values())):
+            raise ValueError("baseline requires successful positive measured samples")
         return cls({n: {m: s.metric(m) for m in COMPARED} for n, s in summaries.items()},
                    dict(meta or {}))
 
@@ -114,13 +117,15 @@ def compare(baseline: Baseline, summaries: Mapping[str, Summary],
             or not math.isfinite(noise_floor_ms) or noise_floor_ms < 0):
         raise ValueError("finite bounded tolerance/noise floor required")
     rep = RegressionReport()
-    rep.missing = sorted(set(baseline.workloads) - set(summaries))
-    rep.new = sorted(set(summaries) - set(baseline.workloads))
-    for name in sorted(set(baseline.workloads) & set(summaries)):
+    measured = {name: sample for name, sample in summaries.items()
+                if sample.count > sample.errors and sample.max_ms > 0}
+    rep.missing = sorted(set(baseline.workloads) - set(measured))
+    rep.new = sorted(set(measured) - set(baseline.workloads))
+    for name in sorted(set(baseline.workloads) & set(measured)):
         for metric, base in sorted(baseline.workloads[name].items()):
             if metric not in COMPARED:
                 continue
-            cur = summaries[name].metric(metric)
+            cur = measured[name].metric(metric)
             delta = Delta(name, metric, base, cur)
             if abs(cur - base) < noise_floor_ms:
                 continue

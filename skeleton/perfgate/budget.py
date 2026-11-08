@@ -61,7 +61,8 @@ class BudgetSet:
     def check(self, summaries: Mapping[str, Summary]) -> List[BudgetViolation]:
         out: List[BudgetViolation] = []
         for name, budget in sorted(self.budgets.items()):
-            if name not in summaries:
+            if (name not in summaries or summaries[name].count <= summaries[name].errors
+                    or summaries[name].max_ms <= 0):
                 out.append(MissingBudgetedWorkload(name))
             else:
                 out.extend(budget.check(summaries[name]))
