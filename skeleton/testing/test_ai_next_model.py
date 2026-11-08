@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from hashlib import sha256
 from types import SimpleNamespace
 from unittest.mock import patch
 import io
@@ -35,7 +36,8 @@ class InvalidBackend:
             return {'text':'not a native receipt'}
         prompt=10000 if self.kind=='context' else 3
         generated=900 if self.kind=='output' else 3
-        return Generated('hello',prompt,generated,B,
+        return Generated('hello',prompt,generated,
+                         B if self.kind=='digest' else sha256(b'hello').hexdigest(),
                          B if self.kind=='identity' else A,A,'stop')
 
 
@@ -65,6 +67,13 @@ class TestNativeReceiptCustody(unittest.TestCase):
         gateway,backend,breaker=self.gateway('identity')
         with self.assertRaises(ContractViolation):self.run_gateway(gateway)
         self.assertTrue(breaker.health['open'])
+
+    def test_output_receipt_digest_mismatch_trips_circuit(self):
+        gateway,backend,breaker=self.gateway('digest')
+        with self.assertRaises(ContractViolation):
+            self.run_gateway(gateway)
+        self.assertTrue(breaker.health['open'])
+        self.assertEqual(backend.calls, 1)
 
     def test_context_overrun_trips_circuit(self):
         gateway,backend,breaker=self.gateway('context')
