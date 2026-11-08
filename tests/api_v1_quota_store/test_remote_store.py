@@ -125,3 +125,24 @@ def test_flaky_wrapper():
         with pytest.raises(StoreUnavailable):
             op()
     assert not f.healthy()
+
+
+def test_backend_explicit_unavailability_trips_bounded_circuit():
+    now = [0.0]
+
+    class UnavailableClient:
+        calls = 0
+        def eval_take(self, *args):
+            self.calls += 1
+            raise StoreUnavailable("offline", backend="fake")
+
+    client = UnavailableClient()
+    s = RemoteCounterStore(client, clock=lambda: now[0], trip_after=2)
+    spec = BucketSpec(2, 1.0)
+    for _ in range(2):
+        with pytest.raises(StoreUnavailable):
+            s.take("key", spec)
+    assert s.circuit_open
+    with pytest.raises(StoreUnavailable, match="circuit open"):
+        s.take("key", spec)
+    assert client.calls == 2

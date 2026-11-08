@@ -1,9 +1,9 @@
 """Process-local :class:`CounterStore` — the default and the reference semantics.
 
-Thread-safe (one lock around the read-modify-write), LRU-bounded so a flood of
-distinct tenants or routes cannot grow memory without bound, and idle buckets
-expire once they would have refilled completely (an expired bucket and a full
-one are indistinguishable, so expiry never changes a verdict).
+Thread-safe (one lock around the read-modify-write), capacity-bounded and
+fail-closed under distinct-tenant pressure: unexpired rate-limit history must
+not be evicted or replaced with a full bucket. Expired idle buckets are
+reclaimed once they have fully refilled (expiry then preserves the verdict).
 
 It is "shared" only within one process. Multi-replica deployments plug in a
 remote store (see :mod:`.remote`) behind the same interface.
@@ -15,7 +15,7 @@ import time
 from collections import OrderedDict
 from typing import Callable, Optional, Tuple
 
-from .store import BucketSpec, TakeResult, compute_take
+from .store import BucketSpec, StoreUnavailable, TakeResult, compute_take
 
 
 class InMemoryCounterStore:
@@ -43,11 +43,15 @@ class InMemoryCounterStore:
         return tokens, updated
 
     def _store(self, key: str, tokens: float, now: float, spec: BucketSpec) -> None:
+        if key not in self._data and len(self._data) >= self._max:
+            expired = [k for k, (_, _, expiry) in self._data.items() if now >= expiry]
+            for expired_key in expired:
+                del self._data[expired_key]
+                self.evictions += 1
+            if len(self._data) >= self._max:
+                raise StoreUnavailable("quota store capacity exhausted", backend=self.name)
         self._data[key] = (tokens, now, now + spec.full_after_s)
         self._data.move_to_end(key)
-        while len(self._data) > self._max:
-            self._data.popitem(last=False)
-            self.evictions += 1
 
     def take(self, key: str, spec: BucketSpec, cost: float = 1.0,
              now: Optional[float] = None) -> TakeResult:

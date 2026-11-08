@@ -74,3 +74,15 @@ def test_idempotency_capture_overflow_never_enters_replay_cache(overflow):
     asyncio.run(_idempotent(app, cache, {"type": "http"}, b"", sink, "k", "a" * 64))
     assert observed[0] == "http.response.start"
     assert cache.begin("k", "a" * 64) is None  # overflow response was not stored
+
+def test_completed_idempotency_records_cannot_be_evicted_inside_ttl():
+    now = [100.0]
+    cache = IdempotencyCache(max_entries=1, ttl_s=10, clock=lambda: now[0])
+    assert cache.begin("first", "a" * 64) is None
+    cache.complete("first", 201, [], b"committed")
+    with pytest.raises(EdgeError) as exc:
+        cache.begin("second", "b" * 64)
+    assert exc.value.status == 503 and exc.value.code == "EDGE.IDEMPOTENCY.CAPACITY"
+    assert cache.begin("first", "a" * 64).body == b"committed"
+    now[0] = 111.0
+    assert cache.begin("second", "b" * 64) is None

@@ -39,16 +39,18 @@ class IdempotencyCache:
         return hashlib.sha256(method.encode() + b" " + path.encode() + b"\n" + body).hexdigest()
 
     def _gc(self) -> None:
-        """Locked eviction: never discard an active reservation to make capacity."""
+        """Expire completed replay records only after their full custody window.
+
+        Evicting an unexpired completed record for space would allow duplicate
+        execution of the same side effect within the advertised TTL. Keep all
+        active and still-replayable records; fail closed on capacity pressure.
+        """
         now = self._clock()
         for key in [key for key, rec in self._data.items()
                     if rec.done and now - rec.created > self.ttl_s]:
             del self._data[key]
-        while len(self._data) >= self.max_entries:
-            finished = next((key for key, rec in self._data.items() if rec.done), None)
-            if finished is None:
-                raise EdgeError(503, "EDGE.IDEMPOTENCY.CAPACITY", "idempotency admission capacity exhausted")
-            del self._data[finished]
+        if len(self._data) >= self.max_entries:
+            raise EdgeError(503, "EDGE.IDEMPOTENCY.CAPACITY", "idempotency admission capacity exhausted")
 
     def begin(self, key: str, fp: str) -> Optional[Stored]:
         """Only the first thread reserves a fresh key; all others replay or block."""

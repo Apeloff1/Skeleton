@@ -111,8 +111,8 @@ class RemoteCounterStore:
                     or allowed not in (0, 1) or type(reply) not in (list, tuple)
                     or len(reply) != 2):
                 raise ValueError("malformed reply")
-        except StoreUnavailable:
-            raise
+        except StoreUnavailable as exc:
+            raise self._fail(exc) from exc
         except Exception as exc:  # noqa: BLE001 - any backend fault fails closed
             raise self._fail(exc) from exc
         self._ok()

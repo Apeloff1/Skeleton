@@ -4,7 +4,7 @@ import threading
 import pytest
 
 from skeleton.api.v1_edge.quota_store import (BucketSpec, CounterStore, InMemoryCounterStore,
-                                              compute_take)
+                                              StoreUnavailable, compute_take)
 
 
 def test_compute_take_starts_full_and_refills():
@@ -74,12 +74,20 @@ def test_memory_expiry_equals_full_bucket():
     assert r.allowed and math.isclose(r.remaining, 3)
 
 
-def test_memory_lru_bound():
-    s = InMemoryCounterStore(max_keys=5, clock=lambda: 0.0)
+def test_memory_capacity_fails_closed_without_refilling_active_tenant():
+    now = [0.0]
+    s = InMemoryCounterStore(max_keys=5, clock=lambda: now[0])
     spec = BucketSpec(1, 0.001)
-    for i in range(12):
-        s.take(f"k{i}", spec)
-    assert len(s) == 5 and s.evictions == 7
+    for i in range(5):
+        assert s.take(f"k{i}", spec).allowed
+    with pytest.raises(StoreUnavailable, match="capacity"):
+        s.take("new", spec)
+    assert len(s) == 5
+    assert s.evictions == 0
+    assert not s.take("k0", spec).allowed  # first key not reset by eviction
+    now[0] = 1001.0
+    assert s.take("new", spec).allowed  # stale full buckets may be reclaimed
+    assert s.evictions == 5
     with pytest.raises(ValueError):
         InMemoryCounterStore(max_keys=0)
 
