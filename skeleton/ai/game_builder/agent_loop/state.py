@@ -127,7 +127,11 @@ class AuthoritativeGameState:
             raise StateMutationError("protected keys must be a frozenset")
         if any(not callable(v) for v in self.validators):
             raise StateMutationError("all validators must be callable")
-        self._data: dict[str, Any] = copy.deepcopy(dict(self.initial))
+        if len(self.initial) > MAX_FIELDS or len(self.validators) > 128:
+            raise StateMutationError("initial state or validators exceed budget")
+        initial = dict(self.initial)
+        _check(initial)
+        self._data: dict[str, Any] = copy.deepcopy(initial)
         initial_digest = _digest(self._data)
         self._version = 0
         self._lock = threading.Lock()
@@ -157,7 +161,13 @@ class AuthoritativeGameState:
                 or type(mutation.reason) is not str or len(mutation.reason) > 256):
             raise StateMutationError("unbounded mutation identity or reason")
         try:
-            delta = copy.deepcopy(dict(mutation.updates))
+            untrusted = dict(mutation.updates)
+            # Never deepcopy an unbounded/cyclic/malicious proposal before
+            # the bounded shape and JSON leaf contract has been checked.
+            _check(untrusted)
+            delta = copy.deepcopy(untrusted)
+        except StateMutationError:
+            raise
         except (TypeError, ValueError, RecursionError) as exc:
             raise StateMutationError("invalid mutation values") from exc
         _check(delta)

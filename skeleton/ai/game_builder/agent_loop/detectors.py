@@ -42,7 +42,10 @@ class WinLossDetector:
             if not isinstance(rule, Rule) or not isinstance(rule.outcome, Outcome):
                 return Outcome.LOSS, "invalid-terminal-rule-configuration"
             try:
-                if rule.predicate(snap):
+                result = rule.predicate(snap)
+                if type(result) is not bool:
+                    return Outcome.LOSS, "invalid-terminal-rule-result"
+                if result:
                     fired.append(rule)
             except Exception:
                 # Unknown terminal outcome is a hold, not permission to proceed.

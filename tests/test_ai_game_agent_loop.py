@@ -216,6 +216,63 @@ def test_postcommit_verifier_failure_holds_without_fake_rollback():
     assert game.step().outcome==Outcome.LOSS and s.version==1
 
 
+def test_rejection_budget_persistently_holds_future_runs():
+    class AlwaysInvalid:
+        def __init__(self):
+            self.calls = 0
+        def reason(self, observation):
+            self.calls += 1
+            return None
+        def act(self, plan, snapshot):
+            return {"seed": 99}
+
+    state = make_state()
+    agent = AlwaysInvalid()
+    loop = GameLoop(state, agent, WinLossDetector(), max_rejections=2)
+    assert loop.run() is Outcome.LOSS
+    assert loop.held is True
+    assert agent.calls == 2
+    assert len(loop.steps) == 2
+    assert loop.run() is Outcome.LOSS
+    assert agent.calls == 2
+    assert len(loop.steps) == 2
+    assert state.version == 0
+
+
+def test_nonboolean_predicate_cannot_fabricate_winner():
+    for outcome in (1, "yes", [], object(), None):
+        detector = WinLossDetector([
+            Rule("forged", Outcome.WIN, lambda snapshot, value=outcome: value)
+        ])
+        assert detector.evaluate(make_state().snapshot()) == (
+            Outcome.LOSS, "invalid-terminal-rule-result"
+        )
+
+
+def test_untrusted_update_rejected_before_copying_or_running_validator():
+    from unittest.mock import patch
+    import skeleton.ai.game_builder.agent_loop.state as state_module
+    state = make_state()
+    cyclic = []
+    cyclic.append(cyclic)
+    with patch.object(state_module.copy, "deepcopy",
+                      side_effect=AssertionError("copy must not occur")) as copied:
+        with pytest.raises(StateMutationError):
+            state.apply(Mutation(0, {"cycle": cyclic}))
+    copied.assert_not_called()
+    assert state.version == 0
+
+
+def test_malformed_initial_state_cannot_trigger_untrusted_deepcopy():
+    from unittest.mock import patch
+    import skeleton.ai.game_builder.agent_loop.state as state_module
+    with patch.object(state_module.copy, "deepcopy",
+                      side_effect=AssertionError("copy must not occur")) as copied:
+        with pytest.raises(StateMutationError):
+            AuthoritativeGameState({"untrusted": object()})
+    copied.assert_not_called()
+
+
 def test_loop_rejects_invalid_step_caps():
     s=make_state()
     with pytest.raises(StateMutationError):GameLoop(s,Climber(),WinLossDetector(),max_rejections=0)

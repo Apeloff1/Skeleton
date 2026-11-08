@@ -126,6 +126,10 @@ class GameLoop:
             if not rec.accepted or not rec.verified:
                 rejections += 1
                 if rejections >= self.max_rejections:
+                    # A terminal refusal is durable for this loop instance;
+                    # a second run cannot turn a previously failed verdict
+                    # into a write-capable fresh attempt.
+                    self.held = True
                     return Outcome.LOSS
             else:
                 rejections = 0
