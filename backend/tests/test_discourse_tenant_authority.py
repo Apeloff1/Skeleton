@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -169,7 +170,12 @@ def test_durable_async_admission_records_owner_before_worker_starts(monkeypatch)
     assert accepted["status"] == "running"
     assert inserted[0]["tenant_id"] == ALICE["tenant_id"]
     assert inserted[0]["owner_id"] == ALICE["owner_id"]
-    assert queries == [{"job_id": accepted["job_id"], **ALICE}]
+    # Terminal compare-and-set must retain both owner scope and the current
+    # unforgeable run token; the old fixture incorrectly omitted this guard.
+    assert queries == [{
+        "job_id": accepted["job_id"], **ALICE,
+        "run_token": inserted[0]["run_token"], "status": "running",
+    }]
     assert not discourse._ACTIVE_DELIBERATIONS
 
 
@@ -192,3 +198,40 @@ def test_terminal_job_write_rejects_unmatched_owner_record(monkeypatch):
     ))
     assert [state for _query, state in updates] == ["done", "error"]
     assert all(query["owner_id"] == ALICE["owner_id"] for query, _ in updates)
+
+
+def test_disclosure_safe_validation_and_catalog_error_envelopes(monkeypatch):
+    """Never return provider, prompt or catalog exception strings to clients."""
+    secret = "Bearer private-repository-provider-credential"
+
+    async def unavailable(**_kwargs):
+        raise discourse.PanelUnavailable(secret)
+
+    monkeypatch.setattr(discourse, "tenant_panel", unavailable)
+    panel = asyncio.run(discourse.get_panel(identity=ALICE))
+    direct = asyncio.run(discourse.deliberate(
+        "creative", "Create an original puzzle world", identity=ALICE,
+    ))
+    admission = asyncio.run(discourse.deliberate_async(
+        discourse.DeliberateBody(prompt="Create an original puzzle world"),
+        identity=ALICE,
+    ))
+    for public in (panel, direct, admission):
+        assert secret not in json.dumps(public)
+    assert panel["readiness"] == "model_panel_unavailable"
+    assert direct["error"] == admission["error"] == "model_panel_unavailable"
+
+    def invalid(*_args, **_kwargs):
+        raise ValueError(secret)
+
+    monkeypatch.setattr(discourse, "_admit", invalid)
+    direct = asyncio.run(discourse.deliberate(
+        "creative", "Create an original puzzle world", identity=ALICE,
+    ))
+    admission = asyncio.run(discourse.deliberate_async(
+        discourse.DeliberateBody(prompt="Create an original puzzle world"),
+        identity=ALICE,
+    ))
+    for public in (direct, admission):
+        assert public == {"error": "invalid_deliberation_request"}
+        assert secret not in json.dumps(public)
