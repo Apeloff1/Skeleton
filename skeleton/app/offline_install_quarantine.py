@@ -112,7 +112,7 @@ def inspect_offline_install_quarantine(
         for name, (digest, identity, limit) in fingerprints.items():
             if (_file_identity(fd, name) != identity or not hmac.compare_digest(
                 sha256(_read(fd, name, limit, owner_controlled=True)).digest(), digest
-            ):
+            )):
                 raise OfflineInstallQuarantineError(
                     "quarantined source changed during inspection"
                 )

@@ -123,7 +123,7 @@ def test_unauthorized_batch_never_reads(chain_delivery, monkeypatch):
 def test_malformed_and_oversized_signed_entries_rejected(chain_delivery):
     entry = _entry(chain_delivery)
     for raw in ("null", "[]", '{"archive":"x","archive":"y"}',
-                "{" + "x" * 8200 + "}")
+                "{" + "x" * 8200 + "}"):
         with pytest.raises((ValueError, TypeError)):
             parse_signed_game_entry(raw)
 
