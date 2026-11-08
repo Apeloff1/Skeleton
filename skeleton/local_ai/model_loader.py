@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import os
 import stat
+import struct
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +16,8 @@ from .fail_closed import guard_cas
 
 _CHUNK = 1024 * 1024
 _GGUF_MAGIC = b"GGUF"
+_GGUF_HEADER_SIZE = 24
+_SUPPORTED_GGUF_VERSIONS = frozenset({2, 3})
 
 
 class ModelLoader:
@@ -35,7 +38,7 @@ class ModelLoader:
         if (not isinstance(expected_sha256, str) or len(expected_sha256) != 64
                 or any(c not in "0123456789abcdef" for c in expected_sha256)):
             raise ValueError("expected full SHA-256 digest required")
-        if type(max_bytes) is not int or not 4 <= max_bytes <= 64 * 1024**3:
+        if type(max_bytes) is not int or not _GGUF_HEADER_SIZE <= max_bytes <= 64 * 1024**3:
             raise ValueError("invalid model byte budget")
         if self.model_path is None:
             raise FileNotFoundError("GGUF model path is required")
@@ -49,20 +52,20 @@ class ModelLoader:
             before = os.fstat(fd)
             if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
                 raise ValueError("model must be a regular non-hardlinked file")
-            if not 4 <= before.st_size <= max_bytes:
+            if not _GGUF_HEADER_SIZE <= before.st_size <= max_bytes:
                 raise ValueError("model size outside admitted budget")
             path_stat = os.lstat(self.model_path)
             if (path_stat.st_dev, path_stat.st_ino) != (before.st_dev, before.st_ino):
                 raise OSError("model path changed during open")
             digest = hashlib.sha256()
             total = 0
-            magic = b""
+            header = bytearray()
             while True:
                 chunk = os.read(fd, min(_CHUNK, max_bytes - total + 1))
                 if not chunk:
                     break
-                if not magic:
-                    magic = chunk[:4]
+                if len(header) < _GGUF_HEADER_SIZE:
+                    header.extend(chunk[:_GGUF_HEADER_SIZE - len(header)])
                 total += len(chunk)
                 if total > max_bytes:
                     raise ValueError("model exceeded byte budget")
@@ -75,8 +78,13 @@ class ModelLoader:
                 raise OSError("model changed during verification")
             if (path_after.st_dev, path_after.st_ino) != (after.st_dev, after.st_ino):
                 raise OSError("model path replaced during verification")
-            if magic != _GGUF_MAGIC:
+            if header[:4] != _GGUF_MAGIC:
                 raise ValueError("not a GGUF artifact")
+            version, tensors, metadata = struct.unpack_from("<IQQ", header, 4)
+            if version not in _SUPPORTED_GGUF_VERSIONS or tensors == 0 or metadata == 0:
+                raise ValueError("unsupported or empty GGUF header")
+            if tensors > before.st_size // 8 or metadata > before.st_size // 8:
+                raise ValueError("GGUF header counts exceed artifact bounds")
             if digest.hexdigest() != expected_sha256:
                 raise ValueError("model SHA-256 mismatch")
             self.digest = expected_sha256
