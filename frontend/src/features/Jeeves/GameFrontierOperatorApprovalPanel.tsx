@@ -17,7 +17,7 @@ import {
 export type RuntimeRunner = (action: FrontierEventAction) => Promise<{ receipt?: string } | void>;
 
 export default function GameFrontierOperatorApprovalPanel({ actions, runAction, disabled = false }: {
-  actions: ReadonlyArray<FrontierEventAction>;
+  actions: readonly FrontierEventAction[];
   runAction: RuntimeRunner;
   disabled?: boolean;
 }) {
