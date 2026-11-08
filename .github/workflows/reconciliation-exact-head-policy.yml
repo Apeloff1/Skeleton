@@ -37,6 +37,7 @@ jobs:
         run: |
           python -m py_compile scripts/check_reconciliation_exact_head.py
           python -m py_compile tests/test_reconciliation_exact_head.py
+          python -m py_compile tests/test_reconciliation_workflow_admission_20261108.py
           python -m py_compile scripts/check_backlog19_actions.py
           python -m py_compile scripts/check_draft19_reconciliation.py
           python -m py_compile tests/test_backlog19_actions.py
@@ -48,6 +49,7 @@ jobs:
       - name: Exercise strict negative and structural evidence regression
         run: |
           python -m unittest discover -s tests -p test_reconciliation_exact_head.py -v
+          python -m unittest discover -s tests -p test_reconciliation_workflow_admission_20261108.py -v
           python -m unittest discover -s tests -p test_backlog19_actions.py -v
           python -m unittest discover -s tests -p test_draft19_reconciliation.py -v
       - name: Hold publication and merge claims despite policy-only green
