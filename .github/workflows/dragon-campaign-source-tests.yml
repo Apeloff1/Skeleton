@@ -1,0 +1,314 @@
+name: Dragon campaign source qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/webcrawler/dragon_campaign_stack/**"
+      - "skeleton/ai/webcrawler/operations.py"
+      - "skeleton/ai/webcrawler/core.py"
+      - "skeleton/ai/webcrawler/document_formats.py"
+      - "skeleton/ai/webcrawler/frontier_scheduler.py"
+      - "skeleton/ai/webcrawler/link_header_discovery.py"
+      - "skeleton/ai/webcrawler/structured_discovery.py"
+      - "tests/test_ai_webcrawler_dragon_text_sitemaps.py"
+      - "tests/test_ai_webcrawler_dragon_redirect_semantics.py"
+      - "tests/test_ai_webcrawler_dragon_opml_catalog.py"
+      - "skeleton/ai/webcrawler/bound_http.py"
+      - "skeleton/ai/webcrawler/content_coding.py"
+      - "skeleton/ai/webcrawler/archive_documents.py"
+      - "skeleton/ai/webcrawler/host_backpressure.py"
+      - "skeleton/ai/webcrawler/xml_documents.py"
+      - "skeleton/ai/webcrawler/capture_rights.py"
+      - "skeleton/ai/webcrawler/html_semantics.py"
+      - "skeleton/ai/webcrawler/media_probe.py"
+      - "skeleton/ai/webcrawler/pdf_documents.py"
+      - "skeleton/ai/webcrawler/pdf_worker.py"
+      - "skeleton/ai/webcrawler/office_suites.py"
+      - "skeleton/ai/webcrawler/robots_rate.py"
+      - "tests/test_ai_webcrawler_dragon_robots_rate.py"
+      - "tests/test_ai_webcrawler_dragon_office_suites.py"
+      - "tests/test_ai_webcrawler_dragon_pdf_documents.py"
+      - "tests/test_ai_webcrawler_dragon_media_probe.py"
+      - "tests/test_ai_webcrawler_dragon_html_semantics.py"
+      - "tests/test_ai_webcrawler_dragon_capture_rights.py"
+      - "tests/test_ai_webcrawler_dragon_xml_documents.py"
+      - "tests/test_ai_webcrawler_dragon_host_backpressure.py"
+      - "tests/test_ai_webcrawler_dragon_archive_documents.py"
+      - "tests/test_ai_webcrawler_dragon_http_coding.py"
+      - "tests/test_ai_webcrawler_dragon_feed_pagination.py"
+      - "tests/test_ai_webcrawler_dragon_gain7.py"
+      - "tests/test_ai_webcrawler_dragon_campaign_stack.py"
+      - "tests/test_ai_webcrawler_dragon_campaign_depth.py"
+      - "tests/test_ai_webcrawler_dragon_atlas.py"
+      - "tests/test_ai_webcrawler_dragon_invalidation.py"
+      - "tests/test_ai_webcrawler_dragon_review_ops.py"
+      - "tests/test_ai_webcrawler_dragon_retrieval_intel.py"
+      - "tests/test_ai_webcrawler_dragon_frontier_ops.py"
+      - "tests/test_ai_webcrawler_dragon_retrieval_robustness.py"
+      - "tests/test_ai_webcrawler_dragon_source_similarity.py"
+      - "tests/test_ai_webcrawler_dragon_family_stress.py"
+      - "tests/test_ai_webcrawler_dragon_forensics.py"
+      - "tests/test_ai_webcrawler_dragon_deep_forensics.py"
+      - "tests/test_ai_webcrawler_dragon_custody_wave3.py"
+      - "tests/test_ai_webcrawler_dragon_research_ops_wave4.py"
+      - "tests/test_ai_webcrawler_dragon_wave5.py"
+      - "backend/core/dragon_crawler.py"
+      - "backend/routes/dragon_academy.py"
+      - ".github/workflows/dragon-campaign-source-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dragon-campaign-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  campaign_source:
+    name: Bounded campaign integrity, custody and recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact source-head checkout identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Use supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install pinned guarded PDF parser
+        run: python -m pip install --disable-pip-version-check "pypdf==7.0.0"
+      - name: Compile the completed Dragon campaign stack
+        run: |
+          python -m compileall -q skeleton/ai/webcrawler/dragon_campaign_stack
+          python -m py_compile skeleton/ai/webcrawler/document_formats.py
+          python -m py_compile skeleton/ai/webcrawler/research_projection.py
+          python -m py_compile skeleton/ai/webcrawler/research_artifacts.py
+          python -m py_compile skeleton/ai/webcrawler/discovery_relations.py
+          python -m py_compile skeleton/ai/webcrawler/frontier_coverage.py
+          python -m py_compile skeleton/ai/webcrawler/frontier_antichain.py
+          python -m py_compile skeleton/ai/webcrawler/federated_activity.py
+          python -m py_compile skeleton/ai/webcrawler/memento_relations.py
+          python -m py_compile skeleton/ai/webcrawler/archive_catalog_common.py
+          python -m py_compile skeleton/ai/webcrawler/opds_discovery.py
+          python -m py_compile skeleton/ai/webcrawler/iiif_discovery.py
+          python -m py_compile skeleton/ai/webcrawler/oai_pmh_discovery.py
+          python -m py_compile skeleton/ai/webcrawler/iiif_manifest_documents.py
+          python -m py_compile skeleton/ai/webcrawler/warc_catalog.py
+          python -m py_compile skeleton/ai/webcrawler/har_documents.py
+          python -m py_compile skeleton/ai/webcrawler/patch_documents.py
+          python -m py_compile skeleton/ai/webcrawler/csl_documents.py
+          python -m py_compile skeleton/ai/webcrawler/geojson_documents.py
+          python -m py_compile skeleton/ai/webcrawler/openapi_documents.py
+          python -m py_compile skeleton/ai/webcrawler/jsonschema_documents.py
+          python -m py_compile skeleton/ai/webcrawler/tsv_documents.py
+          python -m py_compile skeleton/ai/webcrawler/technical_documents.py
+          python -m py_compile skeleton/ai/webcrawler/html_landmarks.py
+          python -m py_compile skeleton/ai/webcrawler/binary_media_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/zip_inventory.py
+          python -m py_compile skeleton/ai/webcrawler/obj_documents.py
+          python -m py_compile skeleton/ai/webcrawler/gltf_documents.py
+          python -m py_compile skeleton/ai/webcrawler/asset_formats.py
+          python -m py_compile skeleton/ai/webcrawler/webp_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/flac_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/ogg_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/mp4_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/glb_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/stl_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/ico_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/tar_inventory.py
+          python -m py_compile skeleton/ai/webcrawler/extended_media.py
+          python -m py_compile skeleton/ai/webcrawler/api_discovery.py
+          python -m py_compile skeleton/ai/webcrawler/sbom_graph.py
+          python -m py_compile skeleton/ai/webcrawler/sbom_parsing.py
+          python -m py_compile skeleton/ai/webcrawler/cyclonedx_documents.py
+          python -m py_compile skeleton/ai/webcrawler/spdx_documents.py
+          python -m py_compile skeleton/ai/webcrawler/vex_documents.py
+          python -m py_compile skeleton/ai/webcrawler/supply_chain_artifacts.py
+          python -m py_compile skeleton/ai/webcrawler/source_signatures.py
+          python -m py_compile skeleton/ai/webcrawler/python_signatures.py
+          python -m py_compile skeleton/ai/webcrawler/lexical_signatures.py
+          python -m py_compile skeleton/ai/webcrawler/source_structure.py
+          python -m py_compile skeleton/ai/webcrawler/svg_inventory.py
+          python -m py_compile skeleton/ai/webcrawler/ply_inventory.py
+          python -m py_compile skeleton/ai/webcrawler/off_inventory.py
+          python -m py_compile skeleton/ai/webcrawler/godot_scene.py
+          python -m py_compile skeleton/ai/webcrawler/unity_scene.py
+          python -m py_compile skeleton/ai/webcrawler/usda_scene.py
+          python -m py_compile skeleton/ai/webcrawler/ldraw_scene.py
+          python -m py_compile skeleton/ai/webcrawler/scene_asset_formats.py
+          python -m py_compile skeleton/ai/webcrawler/npm_lock_documents.py
+          python -m py_compile skeleton/ai/webcrawler/cargo_lock_documents.py
+          python -m py_compile skeleton/ai/webcrawler/go_mod_documents.py
+          python -m py_compile skeleton/ai/webcrawler/pylock_documents.py
+          python -m py_compile skeleton/ai/webcrawler/package_lock_artifacts.py
+          python -m py_compile skeleton/ai/webcrawler/sbom_topology.py
+          python -m py_compile skeleton/ai/webcrawler/html_structured_entities.py
+          python -m py_compile skeleton/ai/webcrawler/frontier_circuit.py
+          python -m py_compile skeleton/ai/webcrawler/scene_topology.py
+          python -m py_compile skeleton/ai/webcrawler/godot_hierarchy.py
+          python -m py_compile skeleton/ai/webcrawler/unity_hierarchy.py
+          python -m py_compile skeleton/ai/webcrawler/usda_hierarchy.py
+          python -m py_compile skeleton/ai/webcrawler/openapi_graph.py
+          python -m py_compile skeleton/ai/webcrawler/http_freshness.py
+          python -m py_compile skeleton/ai/webcrawler/graphql_documents.py
+          python -m py_compile skeleton/ai/webcrawler/asyncapi_documents.py
+          python -m py_compile skeleton/ai/webcrawler/proto_documents.py
+          python -m py_compile skeleton/ai/webcrawler/interface_artifacts.py
+          python -m py_compile skeleton/ai/webcrawler/graph_topology.py
+          python -m py_compile skeleton/ai/webcrawler/graphml_documents.py
+          python -m py_compile skeleton/ai/webcrawler/gexf_documents.py
+          python -m py_compile skeleton/ai/webcrawler/dot_documents.py
+          python -m py_compile skeleton/ai/webcrawler/graph_artifacts.py
+          python -m py_compile skeleton/ai/webcrawler/safetensors_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/gguf_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/onnx_metadata.py
+          python -m py_compile skeleton/ai/webcrawler/ml_model_artifacts.py
+          python -m py_compile skeleton/ai/webcrawler/tiled_map_contracts.py
+          python -m py_compile skeleton/ai/webcrawler/tiled_xml_documents.py
+          python -m py_compile skeleton/ai/webcrawler/tiled_json_documents.py
+          python -m py_compile skeleton/ai/webcrawler/tiled_artifacts.py
+          python -m py_compile skeleton/ai/webcrawler/robot_xml_guard.py
+          python -m py_compile skeleton/ai/webcrawler/urdf_documents.py
+          python -m py_compile skeleton/ai/webcrawler/sdf_documents.py
+          python -m py_compile skeleton/ai/webcrawler/mjcf_documents.py
+          python -m py_compile skeleton/ai/webcrawler/robot_scene_artifacts.py
+          python -m py_compile skeleton/ai/webcrawler/timed_media.py
+          python -m py_compile skeleton/ai/webcrawler/calendar_documents.py
+          python -m py_compile skeleton/ai/webcrawler/bibliography_documents.py
+          python -m py_compile skeleton/ai/webcrawler/notebook_documents.py
+          python -m py_compile skeleton/ai/webcrawler/rdf_documents.py
+          python -m py_compile skeleton/ai/webcrawler/frontier_scheduler.py
+          python -m py_compile skeleton/ai/webcrawler/link_header_discovery.py
+          python -m py_compile skeleton/ai/webcrawler/structured_discovery.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_text_sitemaps.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_redirect_semantics.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_opml_catalog.py
+          python -m py_compile skeleton/ai/webcrawler/core.py
+          python -m py_compile skeleton/ai/webcrawler/operations.py
+          python -m py_compile skeleton/ai/webcrawler/bound_http.py
+          python -m py_compile skeleton/ai/webcrawler/content_coding.py
+          python -m py_compile skeleton/ai/webcrawler/archive_documents.py
+          python -m py_compile skeleton/ai/webcrawler/host_backpressure.py
+          python -m py_compile skeleton/ai/webcrawler/xml_documents.py
+          python -m py_compile skeleton/ai/webcrawler/capture_rights.py
+          python -m py_compile skeleton/ai/webcrawler/html_semantics.py
+          python -m py_compile skeleton/ai/webcrawler/media_probe.py
+          python -m py_compile skeleton/ai/webcrawler/pdf_documents.py
+          python -m py_compile skeleton/ai/webcrawler/pdf_worker.py
+          python -m py_compile skeleton/ai/webcrawler/office_suites.py
+          python -m py_compile skeleton/ai/webcrawler/robots_rate.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_robots_rate.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_office_suites.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_pdf_documents.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_media_probe.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_html_semantics.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_capture_rights.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_xml_documents.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_host_backpressure.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_archive_documents.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_http_coding.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_feed_pagination.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_campaign_stack.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_campaign_depth.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_atlas.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_invalidation.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_review_ops.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_retrieval_intel.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_frontier_ops.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_retrieval_robustness.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_source_similarity.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_family_stress.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_forensics.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_deep_forensics.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_custody_wave3.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_research_ops_wave4.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_wave5.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_ops_wave6.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_live_discovery.py
+          python -m py_compile tests/test_ai_webcrawler_dragon_gain7.py
+          python -m py_compile backend/core/dragon_crawler.py backend/routes/dragon_academy.py
+      - name: Execute source-only campaign regressions
+        env:
+          PYTHONPATH: "."
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_campaign_stack.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_campaign_depth.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_atlas.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_invalidation.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_review_ops.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_retrieval_intel.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_frontier_ops.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_retrieval_robustness.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_source_similarity.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_family_stress.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_forensics.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_deep_forensics.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_custody_wave3.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_research_ops_wave4.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_wave5.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_ops_wave6.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_live_discovery.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_gain7.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_research_formats.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_research_ingestion.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_multilingual_discovery.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_intelligence.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_technical_ingestion.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_rss1_landmarks.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_multimodal_assets.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_webp.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_flac.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_ogg.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_mp4.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_glb.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_stl.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_ico.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_tar.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_extended_media.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_api_discovery.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_supply_chain.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_source_structure.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_vector_mesh.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_game_scenes.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_scene_ingestion.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_package_lock.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_sbom_topology.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_html_structured_entities.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_frontier_circuit.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_coverage_frontier.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_antichain.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_activitystreams.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_catalogs.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_memento.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_scene_topology.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_extended_scene_graphs.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_openapi_graph.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_http_freshness.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_interface_contracts.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_graph_artifacts.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_ml_model_artifacts.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_tiled_maps.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_robot_scenes.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_http_coding.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_feed_pagination.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_documents.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_host_backpressure.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_xml_documents.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_capture_rights.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_html_semantics.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_media_probe.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_pdf_documents.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_office_suites.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_robots_rate.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_text_sitemaps.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_redirect_semantics.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_opml_catalog.py' -v

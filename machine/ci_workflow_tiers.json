@@ -29,5 +29,143 @@
   },
   "required_reusable_workflows": [
     "ci.yml"
-  ]
+  ],
+  "automatic_event_workflows": [
+    "actions-housekeeping-cli.yml",
+    "app-foundation-e2e.yml",
+    "artifact-policy.yml",
+    "automation-traffic-manager.yml",
+    "automerge-control-plane.yml",
+    "backend-quality.yml",
+    "dependency-review.yml",
+    "dragon-atlas-backend-bridge.yml",
+    "dragon-campaign-frontend-checks.yml",
+    "dragon-campaign-source-tests.yml",
+    "game-frontier-validation.yml",
+    "jeeves-integrated-source-qualification.yml",
+    "jeeves-laptop-dispatcher-source-tests.yml",
+    "jeeves-native-sqlite-source-qualification.yml",
+    "malware-gate.yml",
+    "merge-readiness.yml",
+    "owner-historical-actions-cleanup.yml",
+    "queue-drain.yml",
+    "release-images.yml",
+    "repository-hygiene-gate.yml",
+    "reproducible-release.yml",
+    "sealed-context-guard.yml",
+    "secret-scanning.yml",
+    "security-alert-inventory.yml",
+    "three-hour-actions-queue-expiry.yml",
+    "workflow-input-security.yml"
+  ],
+  "automatic_event_triggers": {
+    "actions-housekeeping-cli.yml": [
+      "workflow_dispatch",
+      "schedule",
+      "push"
+    ],
+    "app-foundation-e2e.yml": [
+      "pull_request",
+      "push",
+      "workflow_dispatch"
+    ],
+    "artifact-policy.yml": [
+      "pull_request",
+      "workflow_dispatch",
+      "schedule"
+    ],
+    "automation-traffic-manager.yml": [
+      "schedule",
+      "workflow_dispatch"
+    ],
+    "automerge-control-plane.yml": [
+      "workflow_run"
+    ],
+    "backend-quality.yml": [
+      "push",
+      "pull_request",
+      "workflow_dispatch"
+    ],
+    "dependency-review.yml": [
+      "pull_request"
+    ],
+    "dragon-atlas-backend-bridge.yml": [
+      "pull_request"
+    ],
+    "dragon-campaign-frontend-checks.yml": [
+      "pull_request"
+    ],
+    "dragon-campaign-source-tests.yml": [
+      "pull_request"
+    ],
+    "game-frontier-validation.yml": [
+      "pull_request",
+      "workflow_dispatch"
+    ],
+    "jeeves-integrated-source-qualification.yml": [
+      "pull_request"
+    ],
+    "jeeves-laptop-dispatcher-source-tests.yml": [
+      "pull_request"
+    ],
+    "jeeves-native-sqlite-source-qualification.yml": [
+      "pull_request"
+    ],
+    "malware-gate.yml": [
+      "pull_request",
+      "push",
+      "workflow_dispatch",
+      "schedule"
+    ],
+    "merge-readiness.yml": [
+      "workflow_dispatch",
+      "pull_request",
+      "push"
+    ],
+    "owner-historical-actions-cleanup.yml": [
+      "issue_comment",
+      "workflow_dispatch"
+    ],
+    "queue-drain.yml": [
+      "workflow_dispatch",
+      "schedule",
+      "push"
+    ],
+    "release-images.yml": [
+      "push",
+      "workflow_dispatch"
+    ],
+    "repository-hygiene-gate.yml": [
+      "pull_request",
+      "push"
+    ],
+    "reproducible-release.yml": [
+      "push",
+      "workflow_dispatch"
+    ],
+    "sealed-context-guard.yml": [
+      "pull_request",
+      "push",
+      "workflow_dispatch"
+    ],
+    "secret-scanning.yml": [
+      "pull_request",
+      "push",
+      "workflow_dispatch"
+    ],
+    "security-alert-inventory.yml": [
+      "workflow_dispatch",
+      "push",
+      "schedule"
+    ],
+    "three-hour-actions-queue-expiry.yml": [
+      "schedule",
+      "workflow_dispatch",
+      "push"
+    ],
+    "workflow-input-security.yml": [
+      "pull_request",
+      "push"
+    ]
+  }
 }
