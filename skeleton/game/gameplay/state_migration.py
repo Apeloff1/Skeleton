@@ -132,7 +132,9 @@ class GameplayStateEnvelope:
 
     @property
     def state_digest(self) -> str:
-        actual = dig(self.payload)
+        # Recheck bounds before hashing; callers can still hold a reference
+        # to the detached dict and must not expand it after admission.
+        actual = dig(_payload_snapshot(self.payload))
         if actual != self._admitted_digest:
             raise GameplayMigrationError("gameplay payload mutated after admission")
         return actual
@@ -147,10 +149,11 @@ class GameplayStateEnvelope:
 
     def to_section(self) -> Dict[str, Any]:
         """Plain dict for a GF-B (#4246) save section; round-trips via ``from_section``."""
+        admitted_digest = self.state_digest
         return {"schema": ENVELOPE_SCHEMA, "world_id": self.world_id,
                 "schema_version": self.schema_version, "tick": self.tick,
                 "payload": copy.deepcopy(dict(self.payload)), "canon_digest": self.canon_digest,
-                "parent_save_digest": self.parent_save_digest, "state_digest": self.state_digest}
+                "parent_save_digest": self.parent_save_digest, "state_digest": admitted_digest}
 
     @classmethod
     def from_section(cls, section: Mapping[str, Any]) -> "GameplayStateEnvelope":
