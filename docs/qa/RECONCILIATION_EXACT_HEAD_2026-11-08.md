@@ -97,3 +97,47 @@ Unit tests exercise hypothetical successful source structures only to prove deni
 ## 7. Rollback
 
 Review and revert an incremental child commit if necessary, never force-rewrite main, prune donor branches, delete source signatures, disable quarantine, loosen symlink/hardlink/path protections, or silently override a source tree SHA. Recheck workflow identities after rollback. Source-only improvements cannot revoke the recorded release holds.
+
+
+## 8. Finite independent workflow admission repair
+
+The repository's machine contract limits independently event-triggered GitHub
+Actions workflows to 26; an extra pull_request workflow is a policy violation,
+not an excuse to relax the ceiling. The upstream #5074 repair converted three
+privileged workflows to workflow_dispatch-only: release-images,
+reproducible-release and owner-historical-actions-cleanup. Their historical
+automatic-event registry entries were stale and misclassified manual work.
+
+The repaired #5074 and #5081 source registries each contain 23 explicitly
+authorized independent subscribers, rather than the stale 26. The #5089 child
+registers exactly three additional PR source qualifiers:
+- Draft19 GGUF and source custody qualification.
+- Jeeves atomic reviewed-source regression.
+- Reconciliation original-game and first-install source qualification.
+
+The total is again exactly 26. Neither the limit nor any core PR security
+subscriptions have been weakened. The parent registry contains no fictitious
+automatic trigger for privileged owner cleanup or release publication.
+
+VOL-249/250 Research Reasoning Qualification and Reconciliation exact-head
+policy and evidence custody are now dispatch-or-call only. They do not consume
+separate independent event slots. Their existing workloads are executed by
+reusable job calls from the registered original-game source and Draft19 source
+qualifiers respectively. There is no new unregistered PR subscriber or
+mainline release path. Existing independent Backend Quality, Malware Gate,
+Workflow Input Security, Artifact Policy, Secret Scanning and dependency
+review remain separately mandatory for actual signoff.
+
+The Jeeves atomic qualifier previously checked out the GitHub PR merge ref.
+Its repaired checkout now pins the immutable PR head SHA and fails closed if
+the actual checkout does not match that head. A merge-ref green result never
+qualifies a different head.
+
+Run scripts/check_ci_workflow_tiers.py and the new
+tests/test_reconciliation_workflow_admission_20261108.py regressions on the
+final source. Correct any newly observed admission drift with explicit
+registry reconciliation, not by increasing the numeric cap, deleting core
+security gates or treating manually dispatched release as automatic CI.
+
+The case work remains source-only. Call and child workflow results still
+must report success for the *final exact head* before review can proceed.
