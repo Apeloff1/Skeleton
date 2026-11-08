@@ -11,6 +11,8 @@ on:
       - ".machine/repository.toml"
       - "tests/test_repo_machine_budget_20261108.py"
       - "skeleton/testing/test_ai_next_model.py"
+      - "skeleton/testing/test_app_offline_archive_schema_parity.py"
+      - "skeleton/testing/test_repo_machine_inventory_budget.py"
       - "skeleton/testing/test_app_offline_mixed_game_library_continuity.py"
       - "skeleton/testing/dialogue_sessions_v1/__init__.py"
       - "skeleton/testing/questflows_v1/__init__.py"
@@ -53,6 +55,7 @@ jobs:
           python -m py_compile skeleton/app/offline_delivery_archive.py skeleton/testing/test_app_offline_delivery_archive.py
           python -m py_compile tests/test_repo_machine_budget_20261108.py
           python -m py_compile skeleton/testing/test_ai_next_model.py skeleton/testing/test_app_offline_mixed_game_library_continuity.py
+          python -m py_compile skeleton/testing/test_app_offline_archive_schema_parity.py skeleton/testing/test_repo_machine_inventory_budget.py
           python -m py_compile scripts/check_draft19_reconciliation.py tests/test_draft19_reconciliation.py
       - name: Verify complete held-source registry
         run: python scripts/check_draft19_reconciliation.py
@@ -105,5 +108,13 @@ jobs:
           skeleton/testing/test_app_offline_archive_signature.py::test_valid_detached_signature_is_not_consumer_release
           skeleton/testing/test_app_consumer_first_run_readiness.py::test_real_installed_game_and_private_save_replayed_without_release_claim
           skeleton/testing/test_app_offline_mixed_game_library_continuity.py::test_real_signed_unsigned_progress_continuity_and_cli
+      - name: Qualify source-bound Studio manifest resealing attacks
+        env:
+          PYTHONPATH: ".:backend:tests"
+        run: python -m pytest -q --noconftest skeleton/testing/test_app_offline_archive_schema_parity.py
+      - name: Qualify finite scanner boundaries from independent regression
+        env:
+          PYTHONPATH: ".:backend:tests"
+        run: python -m pytest -q --noconftest skeleton/testing/test_repo_machine_inventory_budget.py
       - name: Verify complete repository scan without truncation
         run: python scripts/check_repo_machine.py
