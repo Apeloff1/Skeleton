@@ -64,7 +64,7 @@ export default function GameFrontierCockpitPanel({ projectId, actions = [], runA
       </View>
       <Text style={styles.muted}>{FRONTIER_EDITORS.find(e => e.id === selected)?.summary}</Text>
       {runner
-        ? <GameFrontierOperatorApprovalPanel key={projectId ?? "custom-runtime"} actions={visible} runAction={runner} disabled={disabled} />
+        ? <GameFrontierOperatorApprovalPanel key={projectId ?? 'custom-runtime'} actions={visible} runAction={runner} disabled={disabled} />
         : <Text style={styles.muted} accessibilityRole="alert">
             Open a Forge Studio project to connect event actions to the game runtime.
           </Text>}
