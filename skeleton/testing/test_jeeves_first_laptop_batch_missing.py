@@ -12,8 +12,6 @@ from skeleton.jeeves.native_fabric.laptop_ops.batch.runner import (
 from skeleton.jeeves.native_fabric.laptop_ops.contracts import LaptopGateHold
 from skeleton.jeeves.native_fabric.laptop_ops.runner import list_domains
 
-import importlib
-
 class TestIncompleteBundleSafety(unittest.TestCase):
     def test_one_of_twenty_missing_domains_is_rejected(self):
         for domain in list_domains():
@@ -25,12 +23,14 @@ class TestIncompleteBundleSafety(unittest.TestCase):
 
     def test_one_of_160_missing_stage_names_is_rejected(self):
         total = 0
-        for domain in list_domains():
-            module = importlib.import_module(
-                "skeleton.jeeves.native_fabric.laptop_ops.domains."
-                + domain + ".registry"
-            )
-            for stage in module.STAGES:
+        # The catalog validates all allowlisted registry contracts. Consume its
+        # frozen stage names rather than dynamically importing module strings.
+        entries = manifest()["domains"]
+        self.assertEqual(tuple(row["domain"] for row in entries), list_domains())
+        for row in entries:
+            domain = row["domain"]
+            for record in row["stages"]:
+                stage = record["name"]
                 with self.subTest(domain=domain, stage=stage):
                     sample = successful_bundle()
                     del sample[domain][stage]
