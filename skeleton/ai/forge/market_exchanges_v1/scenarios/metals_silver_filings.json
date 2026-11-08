@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.market_exchange_scenario.v1",
+  "id": "metals_silver_filings",
+  "domain": "metals",
+  "commodity": "silver_filings",
+  "pricing": {
+    "base": 41,
+    "markup_percent": 105,
+    "tariff": 5,
+    "capacity": 164
+  },
+  "initial": {
+    "stock": 76,
+    "treasury": 4856,
+    "holdings": 0,
+    "wallet": 4856,
+    "version": 0,
+    "tick": 0
+  },
+  "commands": [
+    {
+      "id": "metals_silver_filings:buy:1",
+      "side": "buy",
+      "quantity": 2,
+      "expected_version": 0,
+      "tick": 1
+    },
+    {
+      "id": "metals_silver_filings:sell:2",
+      "side": "sell",
+      "quantity": 1,
+      "expected_version": 1,
+      "tick": 2
+    },
+    {
+      "id": "metals_silver_filings:buy:3",
+      "side": "buy",
+      "quantity": 3,
+      "expected_version": 2,
+      "tick": 3
+    }
+  ],
+  "invariants": [
+    "total-units-conserved",
+    "total-credits-conserved",
+    "no-negative-balances",
+    "version-advances-on-accept-only",
+    "duplicate-identity-rejected",
+    "optimistic-version-fencing"
+  ],
+  "qualification": {
+    "fixture_only": true,
+    "no_external_payment_settlement": true,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "combat_defense",
+  "domain": "combat",
+  "stages": [
+    {
+      "key": "discover_defense",
+      "evidence": "combat:defense:discover:proof",
+      "grants": "combat:defense:stage:1",
+      "risk": 4,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_defense",
+      "evidence": "combat:defense:prepare:proof",
+      "grants": "combat:defense:stage:2",
+      "risk": 5,
+      "sequence": 1,
+      "requires_previous_grant": "combat:defense:stage:1"
+    },
+    {
+      "key": "execute_defense",
+      "evidence": "combat:defense:execute:proof",
+      "grants": "combat:defense:stage:3",
+      "risk": 6,
+      "sequence": 2,
+      "requires_previous_grant": "combat:defense:stage:2"
+    },
+    {
+      "key": "resolve_defense",
+      "evidence": "combat:defense:resolve:proof",
+      "grants": "combat:defense:stage:4",
+      "risk": 7,
+      "sequence": 3,
+      "requires_previous_grant": "combat:defense:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "combat_defense:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "combat:defense:discover:proof"
+      ]
+    },
+    {
+      "id": "combat_defense:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "combat:defense:prepare:proof"
+      ]
+    },
+    {
+      "id": "combat_defense:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "combat:defense:execute:proof"
+      ]
+    },
+    {
+      "id": "combat_defense:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "combat:defense:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
