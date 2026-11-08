@@ -367,9 +367,9 @@ class StreamDecoder:
             required_keys=("sequence", "kind", "payload"),
             allowed_keys=("sequence", "kind", "payload"),
         )
-        if event["sequence"] != self._count:
+        if not _is_int(event["sequence"]) or event["sequence"] != self._count:
             raise FLGBInferenceError("non-contiguous stream sequence")
-        if event["kind"] not in {
+        if not isinstance(event["kind"], str) or event["kind"] not in {
             "text",
             "structured",
             "tool_call",
