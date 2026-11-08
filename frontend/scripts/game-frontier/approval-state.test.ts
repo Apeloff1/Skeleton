@@ -1,7 +1,7 @@
 // GF-P0-58 operator approval state machine. Run: npx -y tsx --test scripts/game-frontier/approval-state.test.ts
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { approvalReducer, mayCallRuntime, type ApprovalQueue } from '../../src/features/Jeeves/GameFrontierApprovalState';
+import { approvalReducer, mayCallRuntime, visibleApprovals, type ApprovalQueue } from '../../src/features/Jeeves/GameFrontierApprovalState';
 
 const action = { id: 'a1', label: 'Spawn quest giver', editor: 'authoring', action: 'add_actor', parameters: { x: 1 } };
 const seed = (): ApprovalQueue => approvalReducer([], { type: 'request', action });
@@ -78,4 +78,21 @@ test('unknown confirmation intent cannot authorize runtime', () => {
   const asked = approvalReducer(seed(), { type: 'ask', id: 'a1', intent: 'forged' as any });
   assert.equal(at(asked).status, 'pending');
   assert.equal(at(approvalReducer(asked, { type: 'confirm', id: 'a1' })).status, 'pending');
+});
+
+test('editor tab visibility cannot re-admit or erase an in-flight action', () => {
+  const other = { ...action, id: 'handbook-one', editor: 'handbook' };
+  let all = approvalReducer(seed(), { type: 'request', action: other });
+  all = approvalReducer(all, { type: 'ask', id: action.id, intent: 'approve' });
+  all = approvalReducer(all, { type: 'confirm', id: action.id });
+  assert.equal(at(all).status, 'running');
+  assert.deepEqual(visibleApprovals(all, [other]).map(e => e.action.id), [other.id]);
+  const restored = visibleApprovals(all, [action]);
+  assert.equal(restored.length, 1);
+  assert.equal(restored[0].status, 'running');
+  const repeated = approvalReducer(all, { type: 'confirm', id: action.id });
+  assert.equal(mayCallRuntime(at(all), at(repeated)), false);
+  assert.equal(at(repeated).status, 'running');
+  const done = approvalReducer(all, { type: 'succeeded', id: action.id, receipt: 'a'.repeat(64) });
+  assert.equal(visibleApprovals(done, [action])[0].status, 'approved');
 });
