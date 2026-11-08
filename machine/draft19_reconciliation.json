@@ -1,0 +1,194 @@
+{
+  "schema": "draft19-reconciliation/v1",
+  "owner": "Apeloff1/Skeleton",
+  "baseline_pr": 5074,
+  "baseline_head": "5166439f8f79319efc6099f49b05e28b19abef6c",
+  "admission": "review_only",
+  "merge_approved": false,
+  "release_approved": false,
+  "required_gates": [
+    "Merge Readiness",
+    "Backend Quality",
+    "App Foundation E2E",
+    "Malware Gate",
+    "Artifact Policy",
+    "Repository Hygiene Gate",
+    "Secret scanning",
+    "Dependency Review",
+    "Workflow Input Security",
+    "Sealed Context Guard"
+  ],
+  "source_prs": [
+    {
+      "number": 5069,
+      "head_sha": "bfd5222ebfb3e755db22314a110a7c61000205bf",
+      "classification": "overlap",
+      "changed_paths": 2,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 5062,
+      "head_sha": "9cb932c9bcb107cb20b0117dd561da5f40ab7b01",
+      "classification": "overlap",
+      "changed_paths": 1752,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 5056,
+      "head_sha": "2b94826a04ef4a14f0621acf5300c620e5f17a93",
+      "classification": "overlap",
+      "changed_paths": 2,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 5055,
+      "head_sha": "9fd17f4addebcb9c68c570a0c4ee01fa5ddb7893",
+      "classification": "overlap",
+      "changed_paths": 2,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 5049,
+      "head_sha": "55f94e4ea4587d80d7a492bff06e5c30472713b7",
+      "classification": "overlap",
+      "changed_paths": 2,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 5038,
+      "head_sha": "4271151e9851e03ebcea5569249ac880c766addd",
+      "classification": "unwired",
+      "changed_paths": 2,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 5033,
+      "head_sha": "e0012e00ce1cc51af13be22f841001257ef7a06c",
+      "classification": "overlap",
+      "changed_paths": 2,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 5028,
+      "head_sha": "0aacf5c80aa07302f66bb5bceffe4c3c472c69be",
+      "classification": "overlap",
+      "changed_paths": 2,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 5022,
+      "head_sha": "fd8a0955de287e25b7c3413ab1556e525dca9de4",
+      "classification": "quarantine",
+      "changed_paths": 30,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 4994,
+      "head_sha": "72e8dd88d9c6c77e43b5ecb673e7b1ab6cd78b0e",
+      "classification": "overlap",
+      "changed_paths": 2,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 4991,
+      "head_sha": "7c5941dc1c4865eba052a4c89721bcea981ad351",
+      "classification": "historical",
+      "changed_paths": 50,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 4990,
+      "head_sha": "045fb1048981fe765b2173203a2fa478ca6e958e",
+      "classification": "overlap",
+      "changed_paths": 2,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 4902,
+      "head_sha": "e310c97cf8ada39ed092c7a703cb435bfbb35dc6",
+      "classification": "overlap",
+      "changed_paths": 6,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 4889,
+      "head_sha": "1312e07295502b36377a92f2656c6cb5ca12fcd5",
+      "classification": "overlap",
+      "changed_paths": 6,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 4885,
+      "head_sha": "0e05cc571c83fee1865c697790f16085361545ae",
+      "classification": "overlap",
+      "changed_paths": 1649,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 4870,
+      "head_sha": "ab21228ed68b3faa38448b98f1ae84e12155e62c",
+      "classification": "overlap",
+      "changed_paths": 1667,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 4853,
+      "head_sha": "4098168589095368be1e1a5f2ec9e26e9bec0d70",
+      "classification": "overlap",
+      "changed_paths": 31,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 4838,
+      "head_sha": "7ac14d6d61816adf9762de7f1d532b5312521c1f",
+      "classification": "overlap",
+      "changed_paths": 1675,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    },
+    {
+      "number": 4836,
+      "head_sha": "d1169a372ba77c92d2f12d116cbd013951e97480",
+      "classification": "overlap",
+      "changed_paths": 6,
+      "source_admitted": false,
+      "merge_approved": false,
+      "release_approved": false
+    }
+  ]
+}

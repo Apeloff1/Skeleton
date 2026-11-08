@@ -1,0 +1,49 @@
+name: Draft19 GGUF and source custody qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/local_ai/model_loader.py"
+      - "skeleton/testing/test_local_ai_gguf_custody.py"
+      - "machine/draft19_reconciliation.json"
+      - "scripts/check_draft19_reconciliation.py"
+      - "tests/test_draft19_reconciliation.py"
+      - ".github/workflows/draft19-gguf-source-qualification.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: draft19-gguf-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  descriptor_custody_and_provenance:
+    name: GGUF custody and draft admission-denial regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source revision without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify checkout identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Install supported Python runtime
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Compile changed sources
+        run: |
+          python -m py_compile skeleton/local_ai/model_loader.py skeleton/testing/test_local_ai_gguf_custody.py
+          python -m py_compile scripts/check_draft19_reconciliation.py tests/test_draft19_reconciliation.py
+      - name: Verify complete held-source registry
+        run: python scripts/check_draft19_reconciliation.py
+      - name: Run adversarial ledger tests
+        run: python -m unittest discover -s tests -p 'test_draft19_reconciliation.py' -v
+      - name: Run GGUF custody and prior compatibility tests
+        run: python -m unittest skeleton.testing.test_local_ai_gguf_qualification skeleton.testing.test_local_ai_gguf_custody -v
