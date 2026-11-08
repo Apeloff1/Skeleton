@@ -1,9 +1,10 @@
 """Offline game CLI; never starts a server or downloads model weights."""
 from __future__ import annotations
 import argparse
+from contextlib import closing
 from pathlib import Path
 import sys
-from ..contracts.canonical import loads
+from ..contracts.canonical import MAX_JSON_BYTES, loads
 from ..contracts.errors import FabricError
 from ..persistence.journal import Journal
 from ..planning.engine import ProductionEngine
@@ -18,11 +19,17 @@ def main(argv: list[str] | None=None) -> int:
     try:
         if args.world.is_symlink() or args.db.is_symlink():
             raise FabricError('symlink input not admitted')
-        raw = args.world.read_bytes()
+        # The JSON parser has a 2 MiB ceiling; enforce it before allocation.
+        with args.world.open('rb') as source:
+            raw = source.read(MAX_JSON_BYTES + 1)
+        if len(raw) > MAX_JSON_BYTES:
+            raise FabricError('world input exceeds byte limit')
         world = loads(raw)
-        engine = ProductionEngine(world, Journal(args.db))
-        sys.stdout.buffer.write(LocalAPI(engine).json(args.request.encode('utf-8')))
-        engine.journal.close()
+        # Always close operator-owned SQLite even when engine validation,
+        # request dispatch or the output pipe fails.
+        with closing(Journal(args.db)) as journal:
+            engine = ProductionEngine(world, journal)
+            sys.stdout.buffer.write(LocalAPI(engine).json(args.request.encode('utf-8')))
     except (OSError, FabricError) as exc:
         sys.stderr.write(f'offline production CLI: {exc}\n')
         return 1
