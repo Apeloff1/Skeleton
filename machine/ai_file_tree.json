@@ -6260,7 +6260,7 @@
       "source": "skeleton/inference",
       "destination": "skeleton/ai/runtime/inference/core",
       "kind": "tree",
-      "source_git_object_sha": "70cd31a539451c77ae15d23e406cda647a795631",
+      "source_git_object_sha": "3665807155ebd8a31aee9303cff4b5d670f02d97",
       "role": "Core inference session, provider-bridge, replay, and async-runtime compatibility plane staged beneath the canonical inference runtime without colliding with native local/neural/KV engines.",
       "work_package_refs": [
         "WP-W05",
