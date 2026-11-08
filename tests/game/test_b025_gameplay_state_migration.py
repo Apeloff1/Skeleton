@@ -88,6 +88,44 @@ def test_section_migrations_match_gf_b_shape():
     direct, _ = _registry().load_section(V1_SECTION)
     assert s == direct.to_section()
 
+def test_budget_rejects_oversized_and_deep_saved_payloads_before_copy():
+    with pytest.raises(GameplayMigrationError, match="budget"):
+        GameplayStateEnvelope("w1", 1, 0, {"large": "x" * 1_100_000}, CANON)
+    nested = {}
+    value = nested
+    for index in range(40):
+        value["inside"] = {}
+        value = value["inside"]
+    with pytest.raises(GameplayMigrationError, match="budget"):
+        GameplayStateEnvelope("w1", 1, 0, nested, CANON)
+    with pytest.raises(GameplayMigrationError, match="budget"):
+        GameplayStateEnvelope("w1", 1, 0, {"huge": 2 ** 256}, CANON)
+
+
+def test_cycles_and_non_json_objects_fail_closed_before_deepcopy():
+    cycle = []
+    cycle.append(cycle)
+    for payload in ({"cycle": cycle}, {"object": object()}, {1: "integer-key"}):
+        with pytest.raises(GameplayMigrationError):
+            GameplayStateEnvelope("w1", 1, 0, payload, CANON)
+
+
+def test_mutated_admitted_payload_cannot_be_migrated_or_saved():
+    env = GameplayStateEnvelope.from_section(V1_SECTION)
+    env.payload["hp"] = 999
+    with pytest.raises(GameplayMigrationError, match="mutated"):
+        env.to_section()
+    with pytest.raises(GameplayMigrationError, match="mutated"):
+        _registry().migrate(env)
+
+
+def test_migration_output_cannot_exceed_content_budget():
+    reg = GameplayMigrations(2)
+    reg.register(1, lambda payload: {"too_large": "x" * 1_100_000})
+    with pytest.raises(GameplayMigrationError, match="budget"):
+        reg.load_section(V1_SECTION)
+
+
 def test_strict_section_custody_rejects_missing_unknown_and_wrong_types():
     section = dict(V1_SECTION)
     for key in ("schema", "world_id", "schema_version", "tick",

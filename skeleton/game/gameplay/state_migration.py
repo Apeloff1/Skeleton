@@ -17,7 +17,9 @@ emits a plain section dict for a GF-B save.
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+import json
+import math
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Mapping
 
 from skeleton.game.gameplay.flgb_gameplay_runtime import (
@@ -31,6 +33,10 @@ from skeleton.game.gameplay.flgb_gameplay_runtime import (
 
 ENVELOPE_SCHEMA = "skeleton.game.gameplay_state.v1"
 MAX_SCHEMA_VERSION = 10_000
+MAX_PAYLOAD_BYTES = 1024 * 1024
+MAX_PAYLOAD_NODES = 20_000
+MAX_PAYLOAD_DEPTH = 32
+MAX_COLLECTION_ITEMS = 4096
 
 Migration = Callable[[Dict[str, Any]], Dict[str, Any]]
 
@@ -50,6 +56,56 @@ def _version(v: object, name: str) -> int:
     return v  # type: ignore[return-value]
 
 
+def _payload_snapshot(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Make a bounded JSON-only source snapshot before copying or hashing.
+
+    Reject cyclic, exotic, nonfinite and oversized values rather than letting
+    deepcopy or json.dumps allocate an unbounded, mutable migration envelope.
+    """
+    if not isinstance(payload, Mapping) or len(payload) > MAX_COLLECTION_ITEMS:
+        raise GameplayMigrationError("gameplay payload top-level budget exceeded")
+    original = dict(payload)
+    pending = [(original, 0)]
+    remaining = MAX_PAYLOAD_NODES
+    while pending:
+        value, depth = pending.pop()
+        remaining -= 1
+        if remaining < 0 or depth > MAX_PAYLOAD_DEPTH:
+            raise GameplayMigrationError("gameplay payload structural budget exceeded")
+        if type(value) is dict:
+            if len(value) > MAX_COLLECTION_ITEMS:
+                raise GameplayMigrationError("gameplay payload mapping budget exceeded")
+            for key, child in value.items():
+                if type(key) is not str or len(key) > 256:
+                    raise GameplayMigrationError("gameplay payload keys must be bounded text")
+                pending.append((child, depth + 1))
+        elif type(value) in (list, tuple):
+            if len(value) > MAX_COLLECTION_ITEMS:
+                raise GameplayMigrationError("gameplay payload sequence budget exceeded")
+            pending.extend((child, depth + 1) for child in value)
+        elif type(value) is str:
+            if len(value) > MAX_PAYLOAD_BYTES:
+                raise GameplayMigrationError("gameplay payload text budget exceeded")
+        elif value is None or type(value) is bool:
+            pass
+        elif type(value) is int:
+            if not -(2 ** 63) <= value < 2 ** 63:
+                raise GameplayMigrationError("gameplay payload integer budget exceeded")
+        elif type(value) is float and math.isfinite(value):
+            pass
+        else:
+            raise GameplayMigrationError("gameplay payload contains non-JSON value")
+    try:
+        encoded = json.dumps(original, sort_keys=True, separators=(",", ":"),
+                             ensure_ascii=False, allow_nan=False).encode("utf-8")
+        if len(encoded) > MAX_PAYLOAD_BYTES:
+            raise GameplayMigrationError("gameplay payload encoded byte budget exceeded")
+        return json.loads(encoded)
+    except (ValueError, TypeError, UnicodeError, OverflowError,
+            RecursionError) as exc:
+        raise GameplayMigrationError("invalid bounded gameplay payload") from exc
+
+
 @dataclass(frozen=True)
 class GameplayStateEnvelope:
     world_id: str
@@ -58,6 +114,7 @@ class GameplayStateEnvelope:
     payload: Mapping[str, Any]
     canon_digest: str
     parent_save_digest: str | None = None
+    _admitted_digest: str = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         req_id(self.world_id, "world_id")
@@ -69,12 +126,16 @@ class GameplayStateEnvelope:
         req_digest(self.canon_digest, "canon_digest")
         if self.parent_save_digest is not None:
             req_digest(self.parent_save_digest, "parent_save_digest")
-        object.__setattr__(self, "payload", copy.deepcopy(dict(self.payload)))
-        dig(self.payload)  # rejects non-canonical (NaN, non-JSON) payloads
+        snapshot = _payload_snapshot(self.payload)
+        object.__setattr__(self, "payload", snapshot)
+        object.__setattr__(self, "_admitted_digest", dig(snapshot))
 
     @property
     def state_digest(self) -> str:
-        return dig(self.payload)
+        actual = dig(self.payload)
+        if actual != self._admitted_digest:
+            raise GameplayMigrationError("gameplay payload mutated after admission")
+        return actual
 
     def metadata(self) -> SaveableGameplayState:
         return SaveableGameplayState(self.world_id, self.schema_version, self.tick,
@@ -146,13 +207,18 @@ class GameplayMigrations:
             raise GameplayMigrationError(f"missing migration step {v}->{v + 1}")
         a = fn(copy.deepcopy(payload))
         b = fn(copy.deepcopy(payload))
-        if not isinstance(a, dict) or not isinstance(b, dict) or dig(a) != dig(b):
+        if not isinstance(a, dict) or not isinstance(b, dict):
             raise GameplayMigrationError(f"non-deterministic migration {v}->{v + 1}")
-        return a
+        a_snapshot = _payload_snapshot(a)
+        b_snapshot = _payload_snapshot(b)
+        if dig(a_snapshot) != dig(b_snapshot):
+            raise GameplayMigrationError(f"non-deterministic migration {v}->{v + 1}")
+        return a_snapshot
 
     def migrate(self, env: GameplayStateEnvelope) -> tuple[GameplayStateEnvelope, MigrationReport]:
         if env.schema_version > self.current_version:
             raise GameplayMigrationError("save is newer than this build")
+        source_digest = env.state_digest
         payload = copy.deepcopy(dict(env.payload))
         steps = []
         for v in range(env.schema_version, self.current_version):
@@ -161,7 +227,7 @@ class GameplayMigrations:
         out = GameplayStateEnvelope(env.world_id, self.current_version, env.tick, payload,
                                     env.canon_digest, env.parent_save_digest)
         return out, MigrationReport(env.schema_version, self.current_version, tuple(steps),
-                                    env.state_digest, out.state_digest)
+                                    source_digest, out.state_digest)
 
     def load_section(self, section: Mapping[str, Any]) -> tuple[GameplayStateEnvelope, MigrationReport]:
         return self.migrate(GameplayStateEnvelope.from_section(section))
