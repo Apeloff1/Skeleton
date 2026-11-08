@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.market_exchange_scenario.v1",
+  "id": "ecology_river_filters",
+  "domain": "ecology",
+  "commodity": "river_filters",
+  "pricing": {
+    "base": 134,
+    "markup_percent": 110,
+    "tariff": 1,
+    "capacity": 381
+  },
+  "initial": {
+    "stock": 59,
+    "treasury": 8359,
+    "holdings": 0,
+    "wallet": 8359,
+    "version": 0,
+    "tick": 0
+  },
+  "commands": [
+    {
+      "id": "ecology_river_filters:buy:1",
+      "side": "buy",
+      "quantity": 2,
+      "expected_version": 0,
+      "tick": 1
+    },
+    {
+      "id": "ecology_river_filters:sell:2",
+      "side": "sell",
+      "quantity": 1,
+      "expected_version": 1,
+      "tick": 2
+    },
+    {
+      "id": "ecology_river_filters:buy:3",
+      "side": "buy",
+      "quantity": 3,
+      "expected_version": 2,
+      "tick": 3
+    }
+  ],
+  "invariants": [
+    "total-units-conserved",
+    "total-credits-conserved",
+    "no-negative-balances",
+    "version-advances-on-accept-only",
+    "duplicate-identity-rejected",
+    "optimistic-version-fencing"
+  ],
+  "qualification": {
+    "fixture_only": true,
+    "no_external_payment_settlement": true,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
