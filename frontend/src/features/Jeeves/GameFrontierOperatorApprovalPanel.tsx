@@ -10,7 +10,7 @@ import React, { useCallback, useEffect, useReducer, useRef } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import theme from '../../theme/tokens';
 import {
-  approvalReducer, mayCallRuntime, statusLabel,
+  approvalReducer, mayCallRuntime, statusLabel, visibleApprovals,
   type ApprovalEntry, type ApprovalEvent, type ApprovalQueue, type FrontierEventAction,
 } from './GameFrontierApprovalState';
 
@@ -65,7 +65,7 @@ export default function GameFrontierOperatorApprovalPanel({ actions, runAction, 
     <View style={styles.root} accessibilityLabel="Operator approval queue">
       <Text style={styles.heading} accessibilityRole="header">Operator approval</Text>
       {queue.length === 0 && <Text style={styles.muted}>No event actions are waiting.</Text>}
-      {queue.map(entry => {
+      {visibleApprovals(queue, actions).map(entry => {
         const { action, status } = entry;
         return (
           <View key={action.id} style={styles.card} testID={'approval-' + action.id}
