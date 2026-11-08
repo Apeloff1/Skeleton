@@ -55,6 +55,47 @@ class VerifiedExportTests(unittest.TestCase):
                 )
                 self.assertEqual(result.code, 74)
 
+    def test_nul_and_traversal_paths_rejected_before_launch(self):
+        with tempfile.TemporaryDirectory() as root:
+            def forbid(argv, cwd, timeout):
+                self.fail("invalid path must never launch Godot")
+            runner = GodotRunner("godot", exec_fn=forbid)
+            for path in ("bad\x00name", "../escape", "nested/../game.exe",
+                         "game.exe\nother", "game.exe\r"):
+                with self.subTest(path=path), self.assertRaises(ValueError):
+                    runner.export_verified(Path(root), "Windows Desktop", path)
+            with self.assertRaises(ValueError):
+                runner.export_verified(Path(root), "invalid\x00preset", "game.exe")
+
+    def test_hardlinked_artifact_is_refused(self):
+        import os
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor-backed export")
+        with tempfile.TemporaryDirectory() as root:
+            project = Path(root)
+            def execute(argv, cwd, timeout):
+                (cwd / "other.bin").write_bytes(b"original")
+                os.link(cwd / "other.bin", cwd / "game.exe")
+                return RunResult(0, "ok", tuple(argv))
+            result = GodotRunner("godot", exec_fn=execute).export_verified(
+                project, "Windows Desktop", "game.exe")
+            self.assertEqual(result.code, 74)
+
+    def test_symlink_parent_refused_without_launch(self):
+        import os
+        if os.name != "posix":
+            self.skipTest("POSIX descriptor-backed export")
+        with tempfile.TemporaryDirectory() as root:
+            project = Path(root)
+            real = project / "actual"
+            real.mkdir()
+            (project / "alias").symlink_to(real, target_is_directory=True)
+            def forbid(argv, cwd, timeout):
+                self.fail("symlinked output parent must not launch Godot")
+            with self.assertRaises(OSError):
+                GodotRunner("godot", exec_fn=forbid).export_verified(
+                    project, "Windows Desktop", "alias/game.exe")
+
     def test_invalid_preset_rejected_before_launch(self):
         with tempfile.TemporaryDirectory() as root:
             def forbidden(argv, cwd, timeout):
