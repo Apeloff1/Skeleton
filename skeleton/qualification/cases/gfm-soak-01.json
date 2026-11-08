@@ -1,0 +1,14 @@
+{
+  "id": "GFM-SOAK-01",
+  "gate": "soak",
+  "title": "72 h runtime soak",
+  "todo_ref": "P3: weeks-to-months-long runtime qualifications",
+  "severity": "sev1",
+  "params": {
+    "min_hours": 72.0,
+    "max_rss_mb_per_hour": 2.0,
+    "max_error_rate": 0.001,
+    "max_restarts": 0
+  },
+  "requires_hardware": false
+}

@@ -1,0 +1,18 @@
+{
+  "id": "GFM-FPS-01",
+  "gate": "fps",
+  "title": "30/50/60/120 presentation profiles keep fixed sim rate",
+  "todo_ref": "P3: Validate all 30/50/60/120 presentation profiles",
+  "severity": "sev2",
+  "params": {
+    "profiles": [
+      30,
+      50,
+      60,
+      120
+    ],
+    "sim_hz": 60,
+    "min_ratio": 0.95
+  },
+  "requires_hardware": true
+}
