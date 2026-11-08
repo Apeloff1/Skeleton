@@ -1,12 +1,12 @@
 """Version-negotiated envelope for optional accelerator subprocesses."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Iterable, Mapping
 import json
 import math
 import uuid
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Iterable, Mapping
 
 MAX_ENVELOPE_PAYLOAD_BYTES = 1_048_576
 MAX_ENVELOPE_DEPTH = 16
@@ -59,7 +59,9 @@ def _bounded_wire_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         else:
             raise AcceleratorProtocolError("payload contains unsupported or non-finite values")
     try:
-        encoded = json.dumps(root, allow_nan=False, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        encoded = json.dumps(
+            root, allow_nan=False, ensure_ascii=False, separators=(",", ":")
+        ).encode("utf-8")
     except (ValueError, TypeError, OverflowError, UnicodeError) as exc:
         raise AcceleratorProtocolError("payload cannot be encoded as JSON") from exc
     if len(encoded) > MAX_ENVELOPE_PAYLOAD_BYTES:
