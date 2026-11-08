@@ -69,11 +69,11 @@ class WorkflowTierTests(unittest.TestCase):
             for name in CONTROL_ONLY_EVENTS:
                 control = root / ".github/workflows" / name
                 original = control.read_text(encoding="utf-8")
-                control.write_text(original.replace("on:\\n", "on:\\n  pull_request:\\n", 1), encoding="utf-8")
+                control.write_text(original.replace("on:\n", "on:\n  pull_request:\n", 1), encoding="utf-8")
                 self.assertTrue(any("owner-scoped controller event contract drift" in reason for reason in audit(root)), name)
                 control.write_text(original, encoding="utf-8")
             extra = root / ".github/workflows" / "unreviewed-schedule-controller.yml"
-            extra.write_text("name: Unreviewed\\non:\\n  schedule:\\n    - cron: '0 * * * *'\\njobs:\\n  x:\\n    runs-on: ubuntu-latest\\n    steps:\\n      - run: true\\n", encoding="utf-8")
+            extra.write_text("name: Unreviewed\non:\n  schedule:\n    - cron: '0 * * * *'\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n", encoding="utf-8")
             self.assertTrue(any("unexpected active workflow count" in reason for reason in audit(root)))
 
     def test_event_parser(self):
