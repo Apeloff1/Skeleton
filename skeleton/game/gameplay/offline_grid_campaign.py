@@ -123,6 +123,13 @@ class Campaign:
                 _fail("object outside grid")
             if rows[y][x] == "#" or (x, y) in occupied:
                 _fail("object on wall or overlapping")
+            # Goal reachability alone is insufficient: an authored quest
+            # can otherwise demand an item/NPC behind a sealed wall, or
+            # place an unreachable enemy in the supposedly playable world.
+            # Validate every interactive object against the same four-way
+            # walkable connected component used to qualify the goal.
+            if (x, y) not in visited:
+                _fail("campaign contains unreachable interactive object")
             occupied.add((x, y))
             if obj["kind"] == "enemy":
                 if (type(obj.get("hp")) is not int or not 1 <= obj["hp"] <= 20

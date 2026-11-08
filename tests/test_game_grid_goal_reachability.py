@@ -33,6 +33,38 @@ class ReachableGoalTests(unittest.TestCase):
         campaign = Campaign.load(fixture(["#######", "#S#..G#", "#.....#", "#######"]))
         self.assertEqual(campaign.start, (1, 1))
 
+    def test_required_item_in_sealed_room_rejected_at_source(self):
+        candidate = fixture(["#######", "#S.G###", "#######", "###.###", "#######"])
+        candidate["objects"] = [{"id": "key", "kind": "item", "x": 3, "y": 3}]
+        candidate["quests"] = [{"id": "unlock", "requires_items": ["key"],
+                                "requires_npcs": [], "requires_quests": []}]
+        candidate["endings"][0]["requires_quests"] = ["unlock"]
+        with self.assertRaisesRegex(GameplayContractError, "unreachable interactive object"):
+            Campaign.load(candidate)
+
+    def test_all_isolated_interactive_object_kinds_denied(self):
+        rows = ["#######", "#S.G###", "#######", "###.###", "#######"]
+        for obj in (
+            {"id": "secret", "kind": "item", "x": 3, "y": 3},
+            {"id": "speaker", "kind": "npc", "x": 3, "y": 3},
+            {"id": "guard", "kind": "enemy", "x": 3, "y": 3, "hp": 2, "attack": 1},
+        ):
+            with self.subTest(kind=obj["kind"]):
+                candidate = fixture(rows)
+                candidate["objects"] = [obj]
+                with self.assertRaisesRegex(GameplayContractError, "unreachable interactive object"):
+                    Campaign.load(candidate)
+
+    def test_reachable_interactive_objects_remain_valid(self):
+        candidate = fixture(["#######", "#S..G##", "#.....#", "#######"])
+        candidate["objects"] = [{"id": "key", "kind": "item", "x": 3, "y": 2},
+                                {"id": "friend", "kind": "npc", "x": 4, "y": 2}]
+        candidate["quests"] = [{"id": "unlock", "requires_items": ["key"],
+                                "requires_npcs": ["friend"], "requires_quests": []}]
+        candidate["endings"][0]["requires_quests"] = ["unlock"]
+        campaign = Campaign.load(candidate)
+        self.assertEqual(campaign.start, (1, 1))
+
     def test_source_identity_rejects_foreign_restore(self):
         campaign = Campaign.load(fixture(["#####", "#S.G#", "#####"]))
         other = Campaign.load(fixture(["#####", "#SG.#", "#####"]))
