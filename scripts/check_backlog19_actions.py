@@ -1,6 +1,7 @@
 """Fail-closed offline validator for the 2026-11-08 nineteen-PR action snapshot.
 
-This record documents source/metadata custody; it never authorizes a merge,
+This immutable observed-head snapshot may predate its own bookkeeping commit;
+it documents source/metadata custody and never authorizes a merge,
 release, production admission, or substitute for live GitHub exact-head checks.
 """
 from __future__ import annotations
@@ -16,11 +17,15 @@ CLOSED = {4885: (5062, "closed_superseded"),
           5056: (5041, "closed_duplicate"),
           5055: (5028, "closed_duplicate"),
           5049: (5028, "closed_duplicate"),
-          5033: (5028, "closed_duplicate")}
+          5033: (5028, "closed_duplicate"),
+          4902: (5078, "closed_superseded"),
+          4990: (5075, "closed_superseded"),
+          4889: (5097, "closed_superseded"),
+          4836: (5089, "closed_superseded")}
 REVIEW = frozenset({5090, 5091, 5038})
-QUARANTINE = frozenset({4902, 5022, 4990, 4991})
-STACKED = frozenset({5089, 5081, 4889, 4870})
-OVERLAP = frozenset({4853, 4838, 4836})
+QUARANTINE = frozenset({5022, 4991})
+STACKED = frozenset({5089, 5081, 4870})
+OVERLAP = frozenset({4853, 4838})
 EXPECTED = frozenset(CLOSED) | REVIEW | QUARANTINE | STACKED | OVERLAP
 ROOT_KEYS = frozenset({"schema", "owner", "record_date", "source", "admission",
                        "total_at_intake", "merges_performed", "releases_performed",
@@ -64,7 +69,7 @@ def validate(data: Any) -> dict[str, Any]:
     require(data["schema"] == "skeleton.backlog19.actions.v1"
             and data["owner"] == "Apeloff1/Skeleton"
             and data["record_date"] == "2026-11-08"
-            and data["source"] == "github-exact-head-metadata-review"
+            and data["source"] == "github-observed-heads-before-ledger-commit"
             and data["admission"] == "source_review_only", "untrusted provenance")
     require(type(data["total_at_intake"]) is int and data["total_at_intake"] == 19,
             "intake scope changed")

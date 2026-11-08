@@ -20,6 +20,10 @@ class Backlog19ActionsTests(unittest.TestCase):
     def test_frozen_snapshot_is_review_only(self):
         result = parse(self.raw)
         self.assertEqual(result["sources"], 19)
+        self.assertEqual(result["classes"]["closed_duplicate"], 4)
+        self.assertEqual(result["classes"]["closed_superseded"], 5)
+        self.assertEqual(result["classes"]["review_only"], 3)
+        self.assertEqual(result["classes"]["held_quarantine"], 2)
         self.assertEqual(result["merged"], 0)
         self.assertEqual(result["status"], "held")
         self.assertIs(result["current_head_ci_verified"], False)
