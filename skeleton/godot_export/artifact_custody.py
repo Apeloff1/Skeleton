@@ -68,7 +68,7 @@ def inspect_export(path: Path, platform: str, *, root: Path, result: RunResult) 
             signature = stream.read(4)
             if platform == "windows" and signature[:2] != b"MZ":
                 raise ExportCustodyError("invalid-pe-signature")
-            if platform == "linux" and signature != b"\\x7fELF":
+            if platform == "linux" and signature != b"\x7fELF":
                 raise ExportCustodyError("invalid-elf-signature")
             digest.update(signature)
             total = len(signature)

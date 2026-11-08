@@ -45,9 +45,18 @@ class ArtifactCustodyTests(unittest.TestCase):
         self.assertEqual(reopened.sha256, evidence.sha256)
 
     def test_linux_elf(self):
-        payload = b"\\x7fELF" + bytes(256)
+        payload = b"\x7fELF" + bytes(256)
         evidence = export_and_inspect(FakeRunner(payload), self.project, "Linux", self.root / "game.x86_64", "linux")
         self.assertEqual(evidence.size, len(payload))
+
+    def test_linux_escaped_text_header_rejected(self):
+        # ASCII backslash-x7f is not the four-byte ELF magic sequence.
+        payload = b"\\x7fELF" + bytes(256)
+        with self.assertRaisesRegex(ExportCustodyError, "invalid-elf-signature"):
+            export_and_inspect(
+                FakeRunner(payload), self.project, "Linux",
+                self.root / "fake-elf", "linux",
+            )
 
     def test_bad_header_fails_closed(self):
         with self.assertRaisesRegex(ExportCustodyError, "invalid-pe-signature"):
