@@ -44,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--commands", type=Path)
     parser.add_argument("--resume", type=Path)
+    parser.add_argument("--out-save", type=Path, help="Publish immutable crash-safe save (new path only)")
     parser.add_argument("--view-width", type=int, default=11)
     parser.add_argument("--view-height", type=int, default=9)
     parser.add_argument("--accessible", action="store_true")
@@ -54,6 +55,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         campaign = Campaign.load(_read(args.source))
         camera = viewport(Session.new(campaign), args.view_width, args.view_height)
+        if args.out_save is not None and args.operation not in ("play", "run"):
+            raise ValueError("--out-save requires play or run")
         if args.operation == "solve":
             if args.commands or args.resume or not args.goal_ending:
                 raise ValueError("solve requires goal and forbids commands/resume")
@@ -77,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.operation == "play":
             if args.commands is not None:
                 raise ValueError("play reads commands from the terminal")
-            session = Session.restore(campaign, _read(args.resume)) if args.resume else Session.new(campaign)
+            session = __import__("skeleton.game.gameplay.grid_save_custody", fromlist=["read_save"]).read_save(args.resume, campaign) if args.resume else Session.new(campaign)
             print("Offline grid campaign: move north/south/east/west, collect ID, talk ID, finish ID, wait, quit")
             while session.ending is None and session.tick < 4096:
                 camera = viewport(session, args.view_width, args.view_height)
@@ -98,8 +101,14 @@ def main(argv: list[str] | None = None) -> int:
                     session = session.step(Command(f"terminal-{session.tick + 1}", kind, target))
                 except GameplayContractError as exc:
                     print(f"Rejected: {exc}", file=sys.stderr)
+            if args.out_save is not None:
+                from skeleton.game.gameplay.grid_save_custody import publish_save
+                publish_save(args.out_save, session)
             print()
-            print(json.dumps({"save": session.snapshot(), "map": session.render(),
+            if args.out_save is not None:
+            from skeleton.game.gameplay.grid_save_custody import publish_save
+            publish_save(args.out_save, session)
+        print(json.dumps({"save": session.snapshot(), "map": session.render(),
                               "viewport": viewport(session, args.view_width, args.view_height).record()},
                              sort_keys=True))
             return 0
