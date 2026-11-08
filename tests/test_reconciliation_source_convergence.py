@@ -61,7 +61,7 @@ EXPLICIT_RETAINS = {
 }
 LEDGERS = tuple(
     f"docs/qa/DRAFT_SOURCE_CONVERGENCE_2026-11-08_R{i:02d}.md"
-    for i in range(3, 8)
+    for i in range(3, 14)
 )
 
 
@@ -124,7 +124,7 @@ class SourceConvergenceAssurance(unittest.TestCase):
                 self.assertTrue((ROOT / path).exists())
         self.assertEqual(self.manifest["status"], "staged_mirror")
 
-    def test_five_audit_ledgers_remain_review_only(self) -> None:
+    def test_all_eleven_audit_ledgers_remain_review_only(self) -> None:
         for name in LEDGERS:
             with self.subTest(ledger=name):
                 path = ROOT / name
@@ -133,10 +133,10 @@ class SourceConvergenceAssurance(unittest.TestCase):
                 self.assertIn("DRAFT", content.upper())
                 status = content.upper()
                 self.assertTrue(any(phrase in status for phrase in (
-                    "NO MERGE", "NO MAIN MERGE",
+                    "NO MERGE", "NO MAIN MERGE", "NO MAINLINE SQUASH",
                 )), "ledger must hold mainline merge")
                 self.assertTrue(any(phrase in status for phrase in (
-                    "NO RELEASE", "NO MERGE, RELEASE",
+                    "NO RELEASE", "NO MERGE, RELEASE", "NO MERGE OR RELEASE AUTHORITY",
                 )), "ledger must hold production release")
 
     def test_mime_provenance_does_not_promote_unverified_types(self) -> None:
