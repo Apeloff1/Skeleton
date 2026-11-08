@@ -39,6 +39,41 @@ class FirstInstallProviderIdentityTests(unittest.TestCase):
         self.assertTrue(ai["observed"])
         self.assertTrue(ai["available"])
 
+    def test_active_not_advertised_cannot_certify_provider(self):
+        for providers in ([], ["openai"], ["local", None], ["local"] * 33):
+            with self.subTest(providers=providers):
+                service = lambda name: SimpleNamespace(public_url="http://127.0.0.1:8001")
+                manifest = SimpleNamespace(service=service)
+                host = SimpleNamespace(ready=True, checks=[])
+                payload = {
+                    "engine": "skeleton-engine", "providers": providers,
+                    "llm_available": True, "availability_observed": True, "active": "local",
+                }
+                with (
+                    patch.object(module, "inspect_host", return_value=host),
+                    patch.object(module, "preflight", return_value=[]),
+                    patch.object(module, "checks_ok", return_value=True),
+                    patch.object(module, "_runtime_env", return_value={
+                        "AI_PROVIDER": "local", "AI_LOCAL_MODEL_PATH": "/models/owned.gguf"
+                    }),
+                    patch.object(module, "load_manifest", return_value=manifest),
+                    patch.object(module, "runtime_manifest", return_value=manifest),
+                    patch.object(module, "critical_backend_route_report", return_value={
+                        "observed": True, "ready": True, "missing": [],
+                    }),
+                    patch.object(module, "_bounded_json", return_value=payload),
+                    patch("skeleton.app.health.probe_application", return_value=[]),
+                    patch("skeleton.app.health.probes_ok", return_value=True),
+                ):
+                    ai = module.first_install_report(Path("."), live=True)["ai"]
+                    self.assertFalse(ai["observed"])
+                    self.assertIsNone(ai["available"])
+
+    def test_non_boolean_live_flag_rejected(self):
+        for value in (1, "true", [], None):
+            with self.subTest(value=value), self.assertRaises(TypeError):
+                module.first_install_report(Path("."), live=value)
+
     def test_other_active_provider_cannot_certify_local(self):
         ai = self.report("openai")["ai"]
         self.assertFalse(ai["observed"])
