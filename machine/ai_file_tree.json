@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "b80362482d10e791ed3db1de9bf0514d96324ae4",
+      "source_git_object_sha": "a06aff1d4ffe6c2b5c76486a82448a428cc1ca9b",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -735,7 +735,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "e8a70fd9bad74a5991f645fcc291a902a6a0df29",
+      "source_git_object_sha": "0c4c6b06b32c10df770c978606f1c914359c8135",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "70b81369ac031a034c1c8265f439ad4bceaf3c76",
+      "source_git_object_sha": "71fa3ec7bed9f343b545255a4dfc2fe619125e24",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "731609c17eb88524e0eec50e1f7db04fddffe637",
+      "source_git_object_sha": "4256c9b1e2b57a6435d668933c2f19f3c8d4e180",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1544,7 +1544,7 @@
       "source": "skeleton/native",
       "destination": "skeleton/ai/runtime/native",
       "kind": "tree",
-      "source_git_object_sha": "285d4ff927fe9a7cacf77d436fcd128d08aef7f2",
+      "source_git_object_sha": "db3581ca674125faaad65303a87d0570469db002",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
         "VOL-032",
@@ -2713,7 +2713,7 @@
       "source": "skeleton/forge/creator",
       "destination": "skeleton/ai/forge/creator",
       "kind": "tree",
-      "source_git_object_sha": "78bfd4f83ea74946ed8779493e319e253ebd0338",
+      "source_git_object_sha": "7cfc48c5d0ba128aaa99e0804138e5ea70ad8427",
       "role": "Canonical engine-neutral intent compilation, persistent design graph, typed command surface, transactional preview, semantic diff, reversible generated-state history, approval boundaries, and work leases under skeleton/forge/creator; mirrored exactly into AI Forge.",
       "work_package_refs": [
         "WP-W12",
@@ -2777,7 +2777,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "e75ba2a3266ec1cd88988688bb74aba62cbf1f0b",
+      "source_git_object_sha": "88339e1cdedacc799473d504b85782a23e74191c",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
