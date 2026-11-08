@@ -34,7 +34,7 @@ def _bounded_wire_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
                 raise AcceleratorProtocolError("payload contains cyclic or aliased containers")
             visited.add(identity)
             if isinstance(value, dict):
-                if len(value) > MAX_ENVELOPE_NODES - nodes:
+                if len(value) > MAX_ENVELOPE_NODES - nodes - len(pending):
                     raise AcceleratorProtocolError("payload node budget exceeded")
                 for key in value:
                     if not isinstance(key, str):
