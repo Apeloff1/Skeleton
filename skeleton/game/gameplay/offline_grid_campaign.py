@@ -81,6 +81,24 @@ class Campaign:
             _fail("invalid grid character")
         if sum(row.count("S") for row in rows) != 1 or sum(row.count("G") for row in rows) != 1:
             _fail("campaign needs exactly one start and goal")
+        # A blocked goal cannot be completed by any input sequence. Check the
+        # authored topology before accepting a source-bound playable campaign.
+        start = next((row.index("S"), y) for y, row in enumerate(rows) if "S" in row)
+        goal = next((row.index("G"), y) for y, row in enumerate(rows) if "G" in row)
+        frontier = [start]
+        visited = {start}
+        for x, y in frontier:
+            if (x, y) == goal:
+                break
+            for dx, dy in DIRECTIONS.values():
+                neighbor = (x + dx, y + dy)
+                nx, ny = neighbor
+                if (0 <= nx < width and 0 <= ny < len(rows)
+                        and rows[ny][nx] != "#" and neighbor not in visited):
+                    visited.add(neighbor)
+                    frontier.append(neighbor)
+        if goal not in visited:
+            _fail("campaign goal unreachable from start")
         objects = source["objects"]
         if not isinstance(objects, list) or len(objects) > MAX_OBJECTS:
             _fail("invalid objects")
