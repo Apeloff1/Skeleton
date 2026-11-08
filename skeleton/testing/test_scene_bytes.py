@@ -36,11 +36,16 @@ class SceneByteTransportTests(unittest.TestCase):
 
     def test_reject_invalid_utf8(self):
         with self.assertRaises(PortableGameError):
-            decode_scene_bytes(b"\\xff")
+            decode_scene_bytes(b"\xff")
 
     def test_reject_nonfinite_json(self):
         with self.assertRaises(PortableGameError):
             decode_scene_bytes(b'{"value":NaN}')
+
+    def test_reject_exponent_overflow_before_scene_replay(self):
+        # JSON permits exponent syntax; Python may decode it to infinite float.
+        with self.assertRaisesRegex(PortableGameError, "nonfinite portable gameplay number"):
+            decode_scene_bytes(b'{"value":1e1000000}')
 
     def test_reject_over_budget_before_parse(self):
         with self.assertRaises(PortableGameError):

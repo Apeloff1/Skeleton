@@ -7,6 +7,7 @@ No filesystem or network I/O occurs in this module.
 from __future__ import annotations
 
 import json
+import math
 from typing import Any
 
 from skeleton.game.gameplay.offline_portable import (
@@ -24,6 +25,18 @@ def _unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
             raise PortableGameError("duplicate portable gameplay JSON key")
         result[key] = value
     return result
+
+
+
+def _finite_json_float(token: str) -> float:
+    """Reject exponent overflow before untrusted replay-schema decoding."""
+    try:
+        number = float(token)
+    except (OverflowError, ValueError) as exc:
+        raise PortableGameError("nonfinite portable gameplay number") from exc
+    if not math.isfinite(number):
+        raise PortableGameError("nonfinite portable gameplay number")
+    return number
 
 
 def encode_scene_bytes(session: Any) -> bytes:
@@ -51,6 +64,7 @@ def decode_scene_bytes(payload: bytes) -> dict[str, Any]:
         text = payload.decode("utf-8", errors="strict")
         value = json.loads(
             text, object_pairs_hook=_unique_pairs,
+            parse_float=_finite_json_float,
             parse_constant=lambda _: (_ for _ in ()).throw(
                 PortableGameError("nonfinite portable gameplay number")
             ),
