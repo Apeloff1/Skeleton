@@ -188,6 +188,12 @@ def export_and_inspect(
         except (OSError, ValueError) as exc:
             raise ExportCustodyError("godot-export-failed") from exc
         inspect_export(staged, platform, root=staged_root, result=run)
+        # Godot may emit a separate .pck or other runtime dependency. This
+        # single-artifact API cannot publish a multi-file bundle atomically;
+        # silently discarding it would return a truthful digest for an unusable
+        # game. Refuse to publish until bundle custody is implemented.
+        if any(item.name != staged.name for item in staged_root.iterdir()):
+            raise ExportCustodyError("export-has-unqualified-sidecars")
         try:
             os.link(staged, output, follow_symlinks=False)
         except (FileExistsError, OSError) as exc:

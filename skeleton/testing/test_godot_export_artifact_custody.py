@@ -167,6 +167,22 @@ class ExportArtifactCustodyTests(unittest.TestCase):
         self.assertFalse(self.output.exists())
         self.assertFalse(list(self.root.glob(".godot-export-*")))
 
+    def test_sidecar_exports_are_not_silently_discarded(self):
+        class SidecarRunner(SyntheticGodotRunner):
+            def export(self, project, preset, out, timeout=600):
+                result = super().export(project, preset, out, timeout=timeout)
+                Path(out).with_suffix(".pck").write_bytes(b"separate-unverified-runtime")
+                return result
+
+        runner = SidecarRunner(fake_pe())
+        with self.assertRaisesRegex(ExportCustodyError,
+                                    "export-has-unqualified-sidecars"):
+            export_and_inspect(runner, self.project, "Windows",
+                               self.output, "windows")
+        self.assertEqual(runner.calls, 1)
+        self.assertFalse(self.output.exists())
+        self.assertFalse(list(self.root.glob(".godot-export-*")))
+
     def test_replacement_during_hash_fails_closed(self):
         self.output.write_bytes(fake_pe())
         # The descriptor has already been opened when header verification
