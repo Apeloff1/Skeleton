@@ -17,6 +17,37 @@ _GGUF_MAGIC = b"GGUF"
 _CHUNK = 1024 * 1024
 
 
+
+def _open_guarded_model(path: Path) -> tuple[int, int]:
+    """Open a model using no-follow descriptors for every parent component.
+
+    This is a POSIX-only qualification boundary. Unsupported hosts fail closed;
+    portable consumer packaging does not imply that model weights were loaded.
+    The caller owns both returned descriptors, file first and directory second.
+    """
+    if (os.name != "posix" or not hasattr(os, "O_NOFOLLOW") or
+            not hasattr(os, "O_DIRECTORY") or os.open not in os.supports_dir_fd):
+        raise OSError("descriptor-anchored model custody unavailable")
+    parts = Path(os.path.abspath(os.fspath(path))).parts
+    if len(parts) < 2:
+        raise OSError("model path does not name a regular file")
+    directory = os.open(parts[0], os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for component in parts[1:-1]:
+            nxt = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                          dir_fd=directory)
+            os.close(directory)
+            directory = nxt
+        model = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW |
+                        getattr(os, "O_NONBLOCK", 0) |
+                        getattr(os, "O_CLOEXEC", 0),
+                        dir_fd=directory)
+        return model, directory
+    except BaseException:
+        os.close(directory)
+        raise
+
+
 class ModelLoader:
     def __init__(
         self,
@@ -46,11 +77,11 @@ class ModelLoader:
             raise ValueError("pinned lowercase SHA-256 is required")
         if isinstance(self.max_bytes, bool) or not isinstance(self.max_bytes, int) or self.max_bytes < 8:
             raise ValueError("invalid model size bound")
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
-        fd = os.open(self.model_path, flags)
+        fd, parent_fd = _open_guarded_model(self.model_path)
         try:
             before = os.fstat(fd)
-            if not stat.S_ISREG(before.st_mode) or before.st_size < 8 or before.st_size > self.max_bytes:
+            if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or
+                    before.st_size < 8 or before.st_size > self.max_bytes):
                 raise ValueError("GGUF model size/type rejected")
             with os.fdopen(fd, "rb", closefd=False) as source:
                 header = source.read(8)
@@ -72,6 +103,18 @@ class ModelLoader:
                 after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns
             ) or count != before.st_size:
                 raise RuntimeError("GGUF changed during qualification")
+            # Rewalk from the filesystem root with no-follow on every parent.
+            # An attacker must not redirect a pathname to a different inode
+            # while the opened file is being verified.
+            current_fd, current_parent_fd = _open_guarded_model(self.model_path)
+            try:
+                current = os.fstat(current_fd)
+                if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1 or
+                        (current.st_dev, current.st_ino) != (before.st_dev, before.st_ino)):
+                    raise RuntimeError("GGUF path replaced during qualification")
+            finally:
+                os.close(current_fd)
+                os.close(current_parent_fd)
             digest = sha.hexdigest()
             if digest != expected:
                 raise ValueError("GGUF SHA-256 mismatch")
@@ -79,6 +122,7 @@ class ModelLoader:
             return {"status": "artifact_verified_not_loaded", "digest": digest, "bytes": count}
         finally:
             os.close(fd)
+            os.close(parent_fd)
 
     def verify(self, expected: str) -> bool:
         return self.loaded and self.digest == expected
