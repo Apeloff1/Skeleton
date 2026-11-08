@@ -68,7 +68,7 @@ class FirstLaptopPreflightQuarantine(unittest.TestCase):
         self.assertTrue(self.preflight.provenance)
         outcome = self.run_preflight(telemetry={"ram_free": float("nan")})
         self.assertFalse(outcome["passed"])
-        self.assertEqual(outcome["reason"], "invalid-hardware-telemetry")
+        self.assertEqual(outcome["reason"], "invalid-bounded-evidence")
         self.assertEqual(self.preflight.results, [])
         self.assertIsNone(self.preflight.provenance)
         self.assertEqual(len(self.preflight.recovery_log), 1)
@@ -108,6 +108,7 @@ class FirstLaptopPreflightQuarantine(unittest.TestCase):
             {"cpu_affinity": 1.2}, {"cpu_affinity": True},
             {"disk_total": float("inf")}, {"ram_free": float("nan")},
             {"ram_total": 10**100}, {"disk_total": 10**100},
+            {"ram_total": 10**1000},
         )
         for change in overrides:
             with self.subTest(change=change):
