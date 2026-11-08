@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "b80362482d10e791ed3db1de9bf0514d96324ae4",
+      "source_git_object_sha": "cbdd817518da7feba19955c882db588e72bba2f7",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -7239,6 +7239,11 @@
       "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
     },
     {
+      "path": "skeleton/mass_build",
+      "owner": "build-pipeline source owner",
+      "reason": "Original mass-build orchestration stays in the governed build pipeline. This records retention only, not AI-source cutover, generator approval or release admission."
+    },
+    {
       "path": "skeleton/masterplan",
       "owner": "masterplan volume authority",
       "reason": "executable masterplan/volume evidence surface; authority is machine/ai_master_plan.json, not an AI runtime mirror."
@@ -7329,6 +7334,11 @@
       "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
     },
     {
+      "path": "skeleton/perf_profiler",
+      "owner": "performance monitoring and tests",
+      "reason": "Runtime performance sampling stays with performance instrumentation; profile and release benchmarks remain separately gated."
+    },
+    {
       "path": "skeleton/persist",
       "owner": "persistence compatibility boundary",
       "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
@@ -7362,6 +7372,11 @@
       "path": "skeleton/provider_contract.py",
       "owner": "provider compatibility boundary",
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
+    },
+    {
+      "path": "skeleton/provider_environment.py",
+      "owner": "environment replay and holdout-boundary compatibility",
+      "reason": "Provider environment simulation retains its original source and holdout authority; independent integrity, security and AI migration signoff remain mandatory."
     },
     {
       "path": "skeleton/providers",
@@ -7772,7 +7787,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 157,
+    "retained_outside_ai_tree_count": 163,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
