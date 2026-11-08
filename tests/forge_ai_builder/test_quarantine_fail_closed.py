@@ -122,8 +122,10 @@ def test_stream_name_newline_and_provenance_inventory_limit_rejected():
 
 
 def test_gaussian_overflow_refused_even_if_parameters_are_finite():
-    class Half:
+    class Samples:
+        def __init__(self):
+            self._samples = iter((0.5, 0.0))
         def random(self):
-            return 0.5
+            return next(self._samples)
     with pytest.raises(ProcgenError, match="finite"):
-        gauss(Half(), mu=1.7e308, sigma=1.7e308)
+        gauss(Samples(), mu=1.7e308, sigma=1.7e308)
