@@ -6,6 +6,8 @@ that already speak the FLGB-14 contract can verify a chunk by digest.
 """
 from __future__ import annotations
 
+import math
+import re
 from dataclasses import dataclass, field
 
 from skeleton.game.generation.terrain_generation import TerrainChunkReceipt, TerrainChunkRequest
@@ -45,8 +47,36 @@ class TerrainConfig:
             v = getattr(self, name)
             if isinstance(v, bool) or not isinstance(v, int) or not 8 <= v <= 512:
                 raise ProcgenError(f"terrain {name} must be an int in [8, 512]")
-        if not 0.0 <= self.island <= 1.0:
-            raise ProcgenError("island must be in [0, 1]")
+        for name, lower, upper in (
+            ("scale", 1.0, 4096.0),
+            ("moisture_scale", 1.0, 4096.0),
+            ("persistence", 0.0, 1.0),
+            ("roughness", 0.0, 1.0),
+            ("island", 0.0, 1.0),
+            ("talus", 0.0, 1.0),
+        ):
+            value = getattr(self, name)
+            if (type(value) not in (int, float) or not math.isfinite(value)
+                    or (value <= lower if name in ("persistence", "roughness") else value < lower)
+                    or (value >= upper if name in ("roughness", "talus") else value > upper)):
+                raise ProcgenError(f"terrain {name} must be finite and bounded")
+        for name, lower, upper in (
+            ("octaves", 1, 12), ("thermal_iterations", 0, 200),
+            ("droplets", 0, 100000),
+        ):
+            value = getattr(self, name)
+            if type(value) is not int or not lower <= value <= upper:
+                raise ProcgenError(f"terrain {name} exceeds bounded iteration range")
+        # Bound integrated work rather than allowing many independently legal
+        # settings to produce runaway CPU iteration and memory pressure.
+        cells = self.width * self.height
+        if (cells * (1 + self.octaves + self.thermal_iterations) > 20_000_000
+                or self.droplets * 32 > 2_000_000):
+            raise ProcgenError("terrain integrated execution budget exceeded")
+        if (not isinstance(self.biomes, BiomeTable)
+                or type(self.world_id) is not str
+                or re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,127}", self.world_id) is None):
+            raise ProcgenError("terrain requires typed biome table and bounded world identity")
 
     def as_dict(self) -> dict:
         return {"width": self.width, "height": self.height, "method": self.method, "scale": self.scale,
@@ -97,6 +127,8 @@ def _base(cfg: TerrainConfig, streams: Streams) -> Heightmap:
 
 
 def generate_terrain(streams: Streams, cfg: TerrainConfig = TerrainConfig()) -> Terrain:
+    if not isinstance(streams, Streams) or not isinstance(cfg, TerrainConfig):
+        raise ProcgenError("typed terrain source and finite configuration required")
     base = _base(cfg, streams)
     if cfg.island > 0:
         base = radial_falloff(base, strength=cfg.island)

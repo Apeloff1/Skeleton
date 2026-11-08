@@ -90,3 +90,40 @@ def test_failed_history_undo_preserves_stacks():
         session.undo()
     assert session.plan == before and len(session.undo_stack)==1 and not session.redo_stack
     assert session._held
+
+
+def test_terrain_parameters_are_bounded_before_any_generation():
+    from skeleton.forge.ai_builder.procgen.terrain import TerrainConfig, generate_terrain
+    from skeleton.forge.ai_builder.procgen.rng import Streams
+    invalid = (
+        {"island": True}, {"octaves": True}, {"octaves": 0},
+        {"thermal_iterations": 201}, {"droplets": 100001},
+        {"persistence": float("nan")}, {"roughness": float("inf")},
+        {"moisture_scale": 0}, {"talus": "0.05"},
+        {"biomes": None}, {"world_id": "../escape"},
+        {"width": 512, "height": 512, "thermal_iterations": 200},
+    )
+    for kwargs in invalid:
+        with pytest.raises(ProcgenError):
+            TerrainConfig(**kwargs)
+    with pytest.raises(ProcgenError, match="typed"):
+        generate_terrain(object(), TerrainConfig(width=8,height=8))
+
+
+def test_stream_name_newline_and_provenance_inventory_limit_rejected():
+    from skeleton.forge.ai_builder.procgen.rng import Streams
+    streams = Streams(123)
+    for bad in ("terrain\n", "terrain/rooms\n"):
+        with pytest.raises(ProcgenError):
+            streams.digest(bad)
+    streams._issued = {f"n{i}": "0" * 64 for i in range(4096)}
+    with pytest.raises(ProcgenError, match="budget"):
+        streams.digest("newstream")
+
+
+def test_gaussian_overflow_refused_even_if_parameters_are_finite():
+    class Half:
+        def random(self):
+            return 0.5
+    with pytest.raises(ProcgenError, match="finite"):
+        gauss(Half(), mu=1.7e308, sigma=1.7e308)

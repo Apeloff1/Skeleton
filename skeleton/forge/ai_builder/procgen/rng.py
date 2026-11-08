@@ -23,7 +23,7 @@ _NAME = re.compile(r"^[a-z][a-z0-9_.-]{0,47}(/[a-z0-9][a-z0-9_.-]{0,47}){0,7}$")
 
 
 def root_digest(seed: int | str) -> str:
-    if isinstance(seed, bool) or not isinstance(seed, (int, str)):
+    if type(seed) not in (int, str):
         raise ProcgenError("seed must be int or str")
     if isinstance(seed, str) and (not seed or len(seed) > 1024):
         raise ProcgenError("seed must be non-empty and bounded")
@@ -49,9 +49,11 @@ class Streams:
         return self.contract.root_seed_digest
 
     def digest(self, name: str) -> str:
-        if not isinstance(name, str) or not _NAME.match(name):
+        if type(name) is not str or _NAME.fullmatch(name) is None:
             raise ProcgenError(f"invalid substream name {name!r}")
         domain, _, identity = name.partition("/")
+        if name not in self._issued and len(self._issued) >= 4096:
+            raise ProcgenError("named substream provenance budget exhausted")
         d = self.contract.derive(domain, identity or "root")
         self._issued[name] = d
         return d
@@ -89,4 +91,7 @@ def gauss(rng: DeterministicRng, mu: float = 0.0, sigma: float = 1.0) -> float:
     u2 = rng.random()
     if type(u2) not in (int, float) or not math.isfinite(u2) or not 0.0 <= u2 < 1.0:
         raise ProcgenError("invalid Gaussian generator sample")
-    return mu + sigma * math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
+    sample = mu + sigma * math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
+    if not math.isfinite(sample):
+        raise ProcgenError("Gaussian output exceeds finite range")
+    return sample
