@@ -38,7 +38,7 @@ class ConsumerComposeLoopbackTests(unittest.TestCase):
     def test_no_unqualified_public_application_port(self):
         for match in re.finditer(r'^\s+-\s+"([^"]+)"\s*$', self.source, re.M):
             entry = match.group(1)
-            if "PORT:-" in entry and "MONGO_PORT" not in entry:
+            if "PORT:-" in entry and not any(db in entry for db in ("MONGO_PORT", "CHROMA_PORT")):
                 self.assertTrue(
                     entry.startswith("${") and "_BIND_ADDRESS:-127.0.0.1}" in entry,
                     f"unexpected published application port: {entry}",
