@@ -10,6 +10,10 @@ on:
       - "skeleton/testing/test_app_offline_delivery_archive.py"
       - ".machine/repository.toml"
       - "tests/test_repo_machine_budget_20261108.py"
+      - "skeleton/testing/test_ai_next_model.py"
+      - "skeleton/testing/test_app_offline_mixed_game_library_continuity.py"
+      - "skeleton/testing/dialogue_sessions_v1/__init__.py"
+      - "skeleton/testing/questflows_v1/__init__.py"
       - "skeleton/testing/test_local_ai_gguf_custody.py"
       - "machine/draft19_reconciliation.json"
       - "scripts/check_draft19_reconciliation.py"
@@ -48,6 +52,7 @@ jobs:
           python -m py_compile backend/core/lazy_registry.py
           python -m py_compile skeleton/app/offline_delivery_archive.py skeleton/testing/test_app_offline_delivery_archive.py
           python -m py_compile tests/test_repo_machine_budget_20261108.py
+          python -m py_compile skeleton/testing/test_ai_next_model.py skeleton/testing/test_app_offline_mixed_game_library_continuity.py
           python -m py_compile scripts/check_draft19_reconciliation.py tests/test_draft19_reconciliation.py
       - name: Verify complete held-source registry
         run: python scripts/check_draft19_reconciliation.py
@@ -85,3 +90,20 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_repo_machine_budget_20261108.py' -v
       - name: Verify complete repository scan without truncation
         run: python scripts/check_repo_machine.py
+      - name: Qualify strict native generation receipt and circuit denial
+        run: python -m unittest skeleton.testing.test_ai_next_model -v
+      - name: Qualify collided quest/dialogue pytest module identities
+        env:
+          PYTHONPATH: ".:backend:tests"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/dialogue_sessions_v1/test_companions_rescue.py
+          skeleton/testing/questflows_v1/test_companions_rescue.py
+      - name: Qualify signed and unsigned first-playable continuity
+        env:
+          PYTHONPATH: ".:backend:tests"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_app_offline_archive_signature.py::test_valid_detached_signature_is_not_consumer_release
+          skeleton/testing/test_app_consumer_first_run_readiness.py::test_real_installed_game_and_private_save_replayed_without_release_claim
+          skeleton/testing/test_app_offline_mixed_game_library_continuity.py::test_real_signed_unsigned_progress_continuity_and_cli
