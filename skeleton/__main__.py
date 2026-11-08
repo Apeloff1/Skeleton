@@ -121,6 +121,13 @@ Commands:
     scene-market-party        Play earned cooperative market campaigns
     scene-market-party-play   Play cooperative market checkpoints interactively
     scene-market-party-vault  Manage verified offline cooperative saves
+    scene-market-party-route  Solve replay-certified cooperative market routes
+    scene-evacuation           Play source-bound timed rescue and evacuation
+    scene-evacuation-board     Inspect legal evacuation action choices
+    scene-evacuation-author    Edit bounded evacuation NPC source contracts
+    scene-evacuation-accept    Verify replay and earned evacuation outcomes
+    scene-evacuation-solve     Solve bounded evacuation rescue routes
+    scene-evacuation-play      Interactively play and resume evacuations
     scene-market-contract     Play source-bound market contracts
     scene-market-contract-play Interactively play market contracts
     scene-tiles  Play authored grid movement/collision and replay scene saves
@@ -1123,6 +1130,27 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market-party-play":
         from skeleton.game.gameplay.scene_market_party_interactive import cli as handler_cli
         return handler_cli(rest)
+    if cmd == "scene-market-party-route":
+        from skeleton.game.gameplay.scene_market_party_route import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation":
+        from skeleton.game.gameplay.scene_evacuation import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation-board":
+        from skeleton.game.gameplay.scene_evacuation_board import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation-author":
+        from skeleton.game.gameplay.scene_evacuation_author import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation-accept":
+        from skeleton.game.gameplay.scene_evacuation_acceptance import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation-solve":
+        from skeleton.game.gameplay.scene_evacuation_solver import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation-play":
+        from skeleton.game.gameplay.scene_evacuation_interactive import cli as source_bound_cli
+        return source_bound_cli(rest)
     if cmd == "scene-market-party-vault":
         from skeleton.game.gameplay.scene_market_party_vault import cli as handler_cli
         return handler_cli(rest)
