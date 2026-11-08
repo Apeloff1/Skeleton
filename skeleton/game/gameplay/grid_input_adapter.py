@@ -6,7 +6,6 @@ The canonical Session.step remains sole authority for collision and endings.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import isfinite
 
 from .flgb_gameplay_runtime import GameplayContractError
 from .offline_grid_campaign import Command, Session
