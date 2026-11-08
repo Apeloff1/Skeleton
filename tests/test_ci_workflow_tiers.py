@@ -57,6 +57,29 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
 
+    def test_triggers_are_fail_closed_for_inline_duplicates_and_missing_events(self):
+        for example in (
+            "on:\n  schedule: [daily]\njobs:\n",
+            "on:\n  push: [main]\njobs:\n",
+            "on:\n  push:\n  push:\njobs:\n",
+            "on:\n  workflow_dispatch:\non:\n  push:\njobs:\n",
+            "on:\n  # only comments\njobs:\n",
+        ):
+            with self.subTest(example=example):
+                with self.assertRaises(ValueError):
+                    events(example)
+        self.assertEqual(events("on:\n  workflow_dispatch:\n"
+                                "  schedule:\n    - cron: '0 * * * *'\n"
+                                "jobs:\n"),
+                         {"workflow_dispatch", "schedule"})
+
+    def test_privileged_recovery_push_scope_cannot_be_widened(self):
+        from scripts.check_ci_workflow_tiers import RECOVERY_PUSH_CONTRACTS
+        self.assertEqual(len(RECOVERY_PUSH_CONTRACTS), 3)
+        for workflow, expected in RECOVERY_PUSH_CONTRACTS.items():
+            body = (ROOT / ".github/workflows" / workflow).read_text(encoding="utf-8")
+            self.assertIn(expected, body)
+
     def test_specialists_are_archived_and_active_core_remains_required(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)
@@ -112,6 +135,16 @@ class WorkflowTierTests(unittest.TestCase):
                 "permissions: {}", "permissions: write-all", 1
             ))
             self.assertTrue(any("operational-only trigger" in issue for issue in audit(root)))
+            recovery_path.write_text(
+                recovery_before.replace(
+                    "paths: ['.github/workflows/queue-drain.yml']",
+                    "paths: ['**']", 1
+                ), encoding="utf-8"
+            )
+            self.assertTrue(
+                any("operational-only trigger or permission drift" in reason
+                    for reason in audit(root))
+            )
             recovery_path.write_text(recovery_before)
             self.assertEqual(audit(root), [])
             for index in range(10):

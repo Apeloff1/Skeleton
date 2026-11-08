@@ -27,20 +27,51 @@ SCHEDULED_RECOVERY = frozenset({
 })
 
 
+# These string contracts are intentionally exact. The three privileged
+# maintenance lanes cannot widen their default-branch push admission paths
+# or acquire an unreviewed file pattern while bypassing the twenty-check cap.
+RECOVERY_PUSH_CONTRACTS = {
+    "actions-housekeeping-cli.yml": (
+        "  push:\n    branches: [main]\n    paths:\n"
+        "      - '.github/workflows/actions-housekeeping-cli.yml'"
+    ),
+    "queue-drain.yml": (
+        "  push:\n    branches: [main]\n"
+        "    paths: ['.github/workflows/queue-drain.yml']"
+    ),
+    "three-hour-actions-queue-expiry.yml": (
+        "  push:\n    branches: [main]\n    paths:\n"
+        "      - '.github/workflows/three-hour-actions-queue-expiry.yml'\n"
+        "      - 'scripts/cancel_stale_actions_queue.py'\n"
+        "      - 'tests/test_cancel_stale_actions_queue.py'"
+    ),
+}
+
+
 def events(source: str) -> set[str]:
-    """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
+    """Parse exactly one YAML event map without undercounting unsafe triggers."""
     lines = source.splitlines()
-    try:
-        start = next(i for i, line in enumerate(lines) if line == "on:")
-    except StopIteration as exc:
-        raise ValueError("workflow missing multiline 'on:' trigger") from exc
+    positions = [i for i, line in enumerate(lines) if line == "on:"]
+    if len(positions) != 1:
+        raise ValueError("workflow requires exactly one multiline on: event map")
     found: set[str] = set()
-    for line in lines[start + 1:]:
-        if line and not line[0].isspace() and not line.startswith("#"):
+    for line in lines[positions[0] + 1:]:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line[0].isspace():
             break
-        match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
-        if match:
-            found.add(match.group(1))
+        if line.startswith("  ") and not line.startswith("   "):
+            match = re.fullmatch(r"  ([a-z_][a-z0-9_]*):\s*(?:#.*)?", line)
+            if match is None:
+                raise ValueError("inline or unclassified workflow admission")
+            name = match.group(1)
+            if name in found:
+                raise ValueError("duplicate workflow event")
+            found.add(name)
+        elif not found:
+            raise ValueError("nested workflow event before event declaration")
+    if not found:
+        raise ValueError("no classifiable workflow admissions")
     return found
 
 
@@ -107,9 +138,7 @@ def audit(root: Path = ROOT) -> list[str]:
             # default branch, explicit path filter, or root permission ceiling.
             source = path.read_text(encoding="utf-8")
             if (found != {"workflow_dispatch", "schedule", "push"}
-                    or not re.search(
-                        r"(?m)^  push:\n    branches: \[main\]\n    paths:", source
-                    )
+                    or RECOVERY_PUSH_CONTRACTS[path.name] not in source
                     or not re.search(r"(?m)^permissions: \{\}$", source)):
                 failures.append(f"{path.name}: operational-only trigger or permission drift")
             continue
