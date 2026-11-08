@@ -42,6 +42,7 @@ MAX_CONDITION_NODES = 256
 MAX_AI_TRANSITIONS = 128
 MAX_AI_OPTIONS = 128
 MAX_ENTITY_SENSE = 100000
+MAX_SENSE_CANDIDATES_PER_TICK = 1_000_000
 RESPONSE_S = 0.25  # seconds to close a steering velocity error
 _OPS = {
     "lt": lambda a, b: a < b, "le": lambda a, b: a <= b, "gt": lambda a, b: a > b,
@@ -266,11 +267,30 @@ def sense(ctx: SystemContext, view_radius: float) -> None:
     # all-to-all scans. Counts remain deterministic and distance-exact.
     grid: dict[tuple[int,int], list[tuple[int, float, float]]] = {}
     for item, (xx, yy) in positions.items():
-        if not math.isfinite(xx) or not math.isfinite(yy):
+        if (type(xx) not in (int, float) or type(yy) not in (int, float)
+                or not math.isfinite(xx) or not math.isfinite(yy)
+                or abs(xx) > 1_000_000_000 or abs(yy) > 1_000_000_000):
             raise ValidationError("invalid finite perception coordinates")
         cell = (math.floor(xx / view_radius), math.floor(yy / view_radius))
         grid.setdefault(cell, []).append((item, xx, yy))
-    for e, agent, brain in ctx.query("agent", "brain"):
+    agents = list(ctx.query("agent", "brain"))
+    if len(agents) > MAX_ENTITY_SENSE:
+        raise ValidationError("perception agent budget exceeded")
+    # Preflight the exact number of candidate comparisons across every
+    # active brain before any ctx.set call. Dense buckets cannot cause
+    # quadratic unbounded work or partially published perception updates.
+    candidates = 0
+    for entity, _agent, _brain in agents:
+        if entity not in positions:
+            continue
+        px, py = positions[entity]
+        cx, cy = math.floor(px / view_radius), math.floor(py / view_radius)
+        for gx in (cx - 1, cx, cx + 1):
+            for gy in (cy - 1, cy, cy + 1):
+                candidates += len(grid.get((gx, gy), ()))
+                if candidates > MAX_SENSE_CANDIDATES_PER_TICK:
+                    raise ValidationError("perception pair budget exceeded before state mutation")
+    for e, agent, brain in agents:
         if e not in positions:
             continue
         px, py = positions[e]

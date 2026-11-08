@@ -52,3 +52,46 @@ def test_sense_radius_is_bounded_before_registration():
     tick=TickScheduler(fixed_dt=1/30)
     with pytest.raises(ValidationError):
         install_ai(tick,world,view_radius=float("inf"))
+
+
+def test_dense_perception_budget_refuses_before_any_brain_write():
+    from unittest.mock import Mock
+    from skeleton.ecs.ai import sense, MAX_SENSE_CANDIDATES_PER_TICK
+    # A hostile dense input would otherwise scan every agent against every
+    # other agent. 1,100 agents in one cell already exceed the pair cap.
+    count = 1100
+    assert count * count > MAX_SENSE_CANDIDATES_PER_TICK
+    class DenseContext:
+        def __init__(self):
+            self.set = Mock()
+        def query(self, *components):
+            if components == ("transform",):
+                return iter((i, {"x": 0.0, "y": 0.0}) for i in range(count))
+            if components == ("agent", "brain"):
+                return iter((i, {"target": None}, {"memory": {}}) for i in range(count))
+            raise AssertionError("unexpected query")
+    ctx = DenseContext()
+    with pytest.raises(ValidationError, match="pair budget"):
+        sense(ctx, 8.0)
+    ctx.set.assert_not_called()
+
+
+def test_hostile_perception_coordinates_are_rejected_without_float_hooks():
+    from unittest.mock import Mock
+    from skeleton.ecs.ai import sense
+    class Hostile(float):
+        def __float__(self):
+            raise AssertionError("untrusted float hook called")
+    class Context:
+        def __init__(self):
+            self.set=Mock()
+        def query(self, *components):
+            if components == ("transform",):
+                return iter([(1, {"x": Hostile(0.0), "y": 0.0})])
+            if components == ("agent", "brain"):
+                return iter([(1, {"target": None}, {"memory": {}})])
+            raise AssertionError("unexpected query")
+    ctx=Context()
+    with pytest.raises(ValidationError,match="finite perception"):
+        sense(ctx, 8.0)
+    ctx.set.assert_not_called()
