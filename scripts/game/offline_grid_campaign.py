@@ -17,6 +17,7 @@ import sys
 from skeleton.game.gameplay.flgb_gameplay_runtime import GameplayContractError
 from skeleton.game.gameplay.offline_grid_campaign import Campaign, Command, Session
 from skeleton.game.gameplay.grid_viewport import viewport
+from skeleton.game.gameplay.grid_save_custody import publish_save, read_save
 
 DEFAULT_SOURCE = Path(__file__).resolve().parents[2] / "skeleton/game/gameplay/content/lantern_harbor.json"
 MAX_READ = 2_000_000
@@ -80,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.operation == "play":
             if args.commands is not None:
                 raise ValueError("play reads commands from the terminal")
-            session = __import__("skeleton.game.gameplay.grid_save_custody", fromlist=["read_save"]).read_save(args.resume, campaign) if args.resume else Session.new(campaign)
+            session = read_save(args.resume, campaign) if args.resume else Session.new(campaign)
             print("Offline grid campaign: move north/south/east/west, collect ID, talk ID, finish ID, wait, quit")
             while session.ending is None and session.tick < 4096:
                 camera = viewport(session, args.view_width, args.view_height)
@@ -102,11 +103,9 @@ def main(argv: list[str] | None = None) -> int:
                 except GameplayContractError as exc:
                     print(f"Rejected: {exc}", file=sys.stderr)
             if args.out_save is not None:
-                from skeleton.game.gameplay.grid_save_custody import publish_save
                 publish_save(args.out_save, session)
             print()
             if args.out_save is not None:
-            from skeleton.game.gameplay.grid_save_custody import publish_save
             publish_save(args.out_save, session)
         print(json.dumps({"save": session.snapshot(), "map": session.render(),
                               "viewport": viewport(session, args.view_width, args.view_height).record()},
