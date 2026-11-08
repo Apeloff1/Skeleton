@@ -55,7 +55,8 @@ class GameForgeRun:
                 generation: Optional[str] = None,
                 playtest: Optional[str] = None,
                 repair_mode: str = "apply",
-                operator_tensor: Optional[ContextTensor] = None) -> Dict[str, Any]:
+                operator_tensor: Optional[ContextTensor] = None,
+                playable_content: bool = False) -> Dict[str, Any]:
         """Run the ten-stage pipeline.
 
         ``playtest``: ``None``/"off" (default, static checks only), "auto"
@@ -67,6 +68,10 @@ class GameForgeRun:
         from skeleton.forge.playtest import normalise_mode
         from skeleton.forge.repair import REPAIR_MODES
         playtest_mode = normalise_mode(playtest)
+        if type(playable_content) is not bool:
+            raise ValueError("playable_content must be an explicit boolean opt-in")
+        if playable_content and target != "godot":
+            raise ValueError("playable archetype scenes require the Godot target")
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
         cockpit = self.cockpit
@@ -140,6 +145,7 @@ class GameForgeRun:
             "max_rounds": 3,
             "playtest_mode": playtest_mode,
             "repair_mode": repair_mode,
+            "playable_content": playable_content,
         }
         stages = [
             Stage("ingest", _stage_ingest),
@@ -188,6 +194,7 @@ class GameForgeRun:
                 "verify_loop": run.context.get("verify_loop"),
                 "repair": run.context.get("repair"),
                 "composition": run.context.get("composition"),
+                "playable_archetype": run.context.get("playable_archetype"),
             },
             "jeeves": run.context.get("jeeves_advice"),
             "cortex": run.context.get("cortex"),
@@ -427,6 +434,13 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.forge.source_manifest import source_manifest
 
     files = ctx.get("files") or {}
+    if ctx.get("playable_content"):
+        from skeleton.forge.archetype_content import content_archetypes, attach_archetype_content
+        requested = ctx.get("archetype") or "extraction"
+        files = attach_archetype_content(files, requested)
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
+        ctx["playable_archetype"] = requested if requested in content_archetypes() else "extraction"
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
     source_manifest(files)

@@ -278,7 +278,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "502ea2af6d42ff58dc2a4f1b5e01b2c3e98a336f",
+      "source_git_object_sha": "c2ad7951bc3b6d2be1631f080f77b585e3cb9abf",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "c5a33e6415c18d94618d10f7a467232607fd6ac8",
+      "source_git_object_sha": "cf3d877882a18157c6303a4e8118eaf04e2c46b9",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "c9d5f4609e0b63513504ba638f765c1c1baa3af5",
+      "source_git_object_sha": "33104d999f7517a1702048be1f1075f56f8f7979",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "48b29b39beb5a3e184c6ca0b31eb3ce1488fad4f",
+      "source_git_object_sha": "dda5cfe35cad824f602759fdf85d35ecdb3303e6",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "3eee887a11b2acee992c6bdf7c29c259a7c4e63a"
+      "source_git_object_sha": "ad01e5e181b781cc6e6592e38485a9ebbad4a664"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
