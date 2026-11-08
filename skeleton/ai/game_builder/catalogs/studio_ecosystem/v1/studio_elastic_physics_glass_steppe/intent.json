@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_glass_steppe",
+  "title": "Glass Steppe: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Glass Steppe; only the grid preview compiles today.",
+  "seed": 203010316359,
+  "width": 19,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 11,
+  "theme": "desert",
+  "starting_health": 5
+}

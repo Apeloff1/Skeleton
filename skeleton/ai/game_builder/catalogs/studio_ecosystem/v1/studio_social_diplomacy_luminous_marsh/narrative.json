@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_social_diplomacy_luminous_marsh",
+  "genre": "social_diplomacy",
+  "biome": "luminous_marsh",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Luminous Marsh: Social Diplomacy",
+  "foundation": {
+    "setting": "Luminous Marsh",
+    "era": "near-future renewal",
+    "environment": "glowing reed fields",
+    "history": "A forgotten submerged civic bell once protected reeds and peat, until recurring bioluminescent flooding forced residents to abandon it.",
+    "theme": "collective repair versus extractive control",
+    "realism": "grounded speculative original"
+  },
+  "premise": "Orin Rowan, a envoy, must negotiate a multilateral truce, relying on faction trust despite bioluminescent flooding.",
+  "central_conflict": "an opportunist alliance threatens the submerged civic bell by restricting reeds and peat.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Discovery",
+      "cause": "bioluminescent flooding destroys the primary approach",
+      "effect": "The player must choose an alternative entry"
+    },
+    {
+      "act": 2,
+      "name": "Competing truths",
+      "cause": "an opportunist alliance contests access to reeds and peat",
+      "effect": "The protagonist must reconcile independent testimony"
+    },
+    {
+      "act": 3,
+      "name": "Reconstruction",
+      "cause": "The submerged civic bell becomes operable",
+      "effect": "The choice of stewardship rewrites the alliance map"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "public_proof",
+      "consequence": "Open council administers reeds and peat"
+    },
+    {
+      "id": "autonomy",
+      "requires": "self_organized_repair",
+      "consequence": "Locals create an autonomous stewardship cooperative"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimal_access",
+      "consequence": "Survival is proven but structural inequity remains"
+    }
+  ],
+  "canon": {
+    "landmark": "submerged civic bell",
+    "critical_resource": "reeds and peat",
+    "causal_order": [
+      "arrival",
+      "dispute",
+      "repair"
+    ],
+    "continuity_review_required": true
+  }
+}

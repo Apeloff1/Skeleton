@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stellar_colony_verdant_caldera",
+  "title": "Verdant Caldera: Outer Settlement",
+  "subtitle": "Original outer settlement design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010311412,
+  "width": 27,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 11,
+  "theme": "forest",
+  "starting_health": 6
+}

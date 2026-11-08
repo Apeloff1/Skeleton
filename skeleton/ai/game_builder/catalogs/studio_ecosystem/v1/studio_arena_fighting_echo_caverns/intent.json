@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_echo_caverns",
+  "title": "Echo Caverns: The Open Tournament",
+  "subtitle": "Original the open tournament design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010311143,
+  "width": 19,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 10,
+  "theme": "arcade",
+  "starting_health": 3
+}

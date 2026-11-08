@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_verdant_caldera",
+  "title": "Verdant Caldera: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010313867,
+  "width": 27,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 4,
+  "theme": "forest",
+  "starting_health": 3
+}

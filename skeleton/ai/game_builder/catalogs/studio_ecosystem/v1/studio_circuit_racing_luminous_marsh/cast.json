@@ -1,0 +1,93 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "project_id": "studio_circuit_racing_luminous_marsh",
+  "genre": "circuit_racing",
+  "biome": "luminous_marsh",
+  "release_certified": false,
+  "protagonist": {
+    "id": "protagonist",
+    "name": "Iva Vale",
+    "role": "driver",
+    "public_goal": "restore access to a fair multi-region endurance series",
+    "private_burden": "An earlier bioluminescent flooding report ignored by peers",
+    "abilities": [
+      "traction, cornering and regenerative braking",
+      "race"
+    ],
+    "weakness": "Refuses to publish uncertain evidence",
+    "arc": "Learns transparent stewardship of other people's work"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Tavi Morrow",
+      "role": "local testimony keeper",
+      "knows": "Three conflicting accounts of submerged civic bell",
+      "relationship": "trust grows when corrections are acknowledged"
+    },
+    {
+      "id": "technician",
+      "name": "Lio Ashe",
+      "role": "Maintainer of reeds and peat",
+      "knows": "Repair topology under slow flood rise",
+      "relationship": "cooperates when measured evidence is shared"
+    },
+    {
+      "id": "rival",
+      "name": "Pela Juno",
+      "role": "contested operations director",
+      "organization": "a telemetry-tampering sponsor",
+      "goal": "Exclusive access to reeds and peat",
+      "relationship": "can relent under documented public review"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "interest": "security and agency",
+      "reputation": 0
+    },
+    {
+      "id": "operators",
+      "interest": "measurable restoration of tires and battery state",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "interest": "priority over reeds and peat",
+      "reputation": 0
+    }
+  ],
+  "social_rules": [
+    {
+      "decision": "publish_ledger",
+      "reputation_delta": {
+        "residents": 2,
+        "operators": 1,
+        "claimants": -1
+      }
+    },
+    {
+      "decision": "private_deal",
+      "reputation_delta": {
+        "residents": -2,
+        "operators": 0,
+        "claimants": 2
+      }
+    },
+    {
+      "decision": "neutral_audit",
+      "reputation_delta": {
+        "residents": 1,
+        "operators": 2,
+        "claimants": 0
+      }
+    }
+  ],
+  "conversation_flags": [
+    "evidence_seen",
+    "consent_granted",
+    "repair_receipt_recorded",
+    "faction_proposal_accepted"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_verdant_caldera",
+  "title": "Verdant Caldera: The Open Tournament",
+  "subtitle": "Original the open tournament design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010310921,
+  "width": 27,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 10,
+  "theme": "forest",
+  "starting_health": 5
+}

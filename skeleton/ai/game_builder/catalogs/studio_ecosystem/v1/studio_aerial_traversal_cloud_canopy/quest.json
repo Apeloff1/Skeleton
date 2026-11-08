@@ -1,0 +1,67 @@
+{
+  "project_id": "studio_aerial_traversal_cloud_canopy",
+  "genre": "aerial_traversal",
+  "biome": "cloud_canopy",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_aerial_traversal_cloud_canopy:restore",
+  "objective": "deliver emergency medicine",
+  "stage_graph": [
+    {
+      "id": "arrival",
+      "entry": "new_game",
+      "location": "multi-tier boughs",
+      "verb": "survey",
+      "requirements": [
+        "Trace a safe route before severe canopy winds"
+      ],
+      "alternatives": [
+        "inspect_markers",
+        "interview_residents"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "dispute",
+      "entry": "arrival_complete",
+      "location": "suspended library",
+      "verb": "glide",
+      "requirements": [
+        "Establish control of aerial roots"
+      ],
+      "alternatives": [
+        "publish_witness_records",
+        "negotiate_with_claimants"
+      ],
+      "reward": "social_legitimacy"
+    },
+    {
+      "id": "repair",
+      "entry": "dispute_complete",
+      "location": "suspended library",
+      "verb": "audit",
+      "requirements": [
+        "Demonstrate restoration of the suspended library"
+      ],
+      "alternatives": [
+        "cooperative_governance",
+        "independent_distribution"
+      ],
+      "reward": "world_state_update"
+    }
+  ],
+  "branch_outcomes": [
+    "public_proof",
+    "self_organized_repair",
+    "minimal_access"
+  ],
+  "risk_register": [
+    "severe canopy winds",
+    "a disrupted air network"
+  ],
+  "resource_constraints": {
+    "resource": "aerial roots",
+    "max_mint_without_source": 0
+  },
+  "genre_runtime_implemented": false
+}

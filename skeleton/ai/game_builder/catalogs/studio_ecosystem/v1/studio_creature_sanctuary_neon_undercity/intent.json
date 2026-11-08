@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_neon_undercity",
+  "title": "Neon Undercity: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010314015,
+  "width": 25,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 12,
+  "theme": "arcade",
+  "starting_health": 3
+}

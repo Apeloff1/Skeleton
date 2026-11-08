@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stealth_route_orbital_gardens",
+  "title": "Orbital Gardens: Stealth Route",
+  "subtitle": "An original stealth route brief in Orbital Gardens; prototype maps are not full genre implementations.",
+  "seed": 202610300444,
+  "width": 25,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "space",
+  "starting_health": 3
+}

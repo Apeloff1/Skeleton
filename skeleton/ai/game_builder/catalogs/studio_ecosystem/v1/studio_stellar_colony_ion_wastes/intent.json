@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stellar_colony_ion_wastes",
+  "title": "Ion Wastes: Outer Settlement",
+  "subtitle": "Original outer settlement design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010311264,
+  "width": 19,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "space",
+  "starting_health": 6
+}

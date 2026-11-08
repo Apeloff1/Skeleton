@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_neon_undercity",
+  "title": "Neon Undercity: City Stewardship",
+  "subtitle": "An original city stewardship brief in Neon Undercity; prototype maps are not full genre implementations.",
+  "seed": 202610303550,
+  "width": 21,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "arcade",
+  "starting_health": 5
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_echo_caverns",
+  "title": "Echo Caverns: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Echo Caverns; prototype maps are not full genre implementations.",
+  "seed": 202610302560,
+  "width": 25,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "arcade",
+  "starting_health": 3
+}

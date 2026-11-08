@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_ion_wastes",
+  "title": "Ion Wastes: The Maker Commons",
+  "subtitle": "Original the maker commons design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010312737,
+  "width": 19,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 6,
+  "theme": "space",
+  "starting_health": 5
+}

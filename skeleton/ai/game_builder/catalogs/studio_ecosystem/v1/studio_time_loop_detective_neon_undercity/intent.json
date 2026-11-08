@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_time_loop_detective_neon_undercity",
+  "title": "Neon Undercity: Time Loop Detective",
+  "subtitle": "An original time loop detective brief in Neon Undercity; prototype maps are not full genre implementations.",
+  "seed": 202610303294,
+  "width": 21,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 7,
+  "theme": "arcade",
+  "starting_health": 4
+}

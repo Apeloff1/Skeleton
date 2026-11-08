@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_cooperative_rescue_orbital_gardens",
+  "title": "Orbital Gardens: Cooperative Rescue",
+  "subtitle": "An original cooperative rescue brief in Orbital Gardens; prototype maps are not full genre implementations.",
+  "seed": 202610304028,
+  "width": 25,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "space",
+  "starting_health": 5
+}

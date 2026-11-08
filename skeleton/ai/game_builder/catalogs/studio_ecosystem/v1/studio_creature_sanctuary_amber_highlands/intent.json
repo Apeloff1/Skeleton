@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_amber_highlands",
+  "title": "Amber Highlands: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010314052,
+  "width": 27,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 14,
+  "theme": "forest",
+  "starting_health": 4
+}

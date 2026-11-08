@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_glacial_fjord",
+  "title": "Glacial Fjord: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010312098,
+  "width": 21,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 9,
+  "theme": "ocean",
+  "starting_health": 4
+}

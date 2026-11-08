@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_neon_undercity",
+  "title": "Neon Undercity: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Neon Undercity; prototype maps are not full genre implementations.",
+  "seed": 202610302526,
+  "width": 21,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 4,
+  "theme": "arcade",
+  "starting_health": 5
+}

@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_puzzle_expedition_neon_undercity",
+  "genre": "puzzle_expedition",
+  "biome": "neon_undercity",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Neon Undercity: Puzzle Expedition",
+  "foundation": {
+    "setting": "Neon Undercity",
+    "era": "decades after the crossing",
+    "environment": "elevated night markets",
+    "history": "The hidden radio library was built to protect community capacitors, but grid brownouts interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Ari Sen, a cartographer, must restore the lost waypoints using pattern decoding while grid brownouts threatens the hidden radio library.",
+  "central_conflict": "a rival archivist seeks control of community capacitors; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "grid brownouts isolates the hidden radio library",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "a rival archivist offers privileged access to community capacitors",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "hidden radio library",
+    "critical_resource": "community capacitors",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}

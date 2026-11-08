@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_echo_caverns",
+  "title": "Echo Caverns: The Maker Commons",
+  "subtitle": "Original the maker commons design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010313107,
+  "width": 19,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 14,
+  "theme": "arcade",
+  "starting_health": 3
+}

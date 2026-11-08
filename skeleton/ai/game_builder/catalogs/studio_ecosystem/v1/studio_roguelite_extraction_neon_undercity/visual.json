@@ -1,0 +1,61 @@
+{
+  "project_id": "studio_roguelite_extraction_neon_undercity",
+  "genre": "roguelite_extraction",
+  "biome": "neon_undercity",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.visual.v1",
+  "art_direction": {
+    "environment": "elevated night markets",
+    "landmark": "hidden radio library",
+    "palette": [
+      "#211C38",
+      "#64418C",
+      "#DE6EC6",
+      "#FFF0EC"
+    ],
+    "readability": "depth_and_high_contrast",
+    "inspiration": "original_asset_concepts_only"
+  },
+  "asset_recipes": [
+    {
+      "id": "navigator",
+      "type": "character",
+      "brief": "Distinct delver equipment, readable at handheld resolution",
+      "production": "design_only"
+    },
+    {
+      "id": "biome_modular",
+      "type": "landscape",
+      "brief": "Tessellated original elevated night markets with reactive grid brownouts",
+      "production": "design_only"
+    },
+    {
+      "id": "architecture",
+      "type": "modular_structure",
+      "brief": "Interlocking geometry derived from hidden radio library",
+      "production": "design_only"
+    },
+    {
+      "id": "resource",
+      "type": "prop_and_hud",
+      "brief": "Readable 3D and 2D depictions of community capacitors",
+      "production": "design_only"
+    },
+    {
+      "id": "weather",
+      "type": "volumetric_effect",
+      "brief": "Performance-limited grid brownouts field",
+      "production": "design_only"
+    }
+  ],
+  "streaming_profile": {
+    "target": "hardware_adaptive",
+    "gpu_budget_source": "measured_at_runtime",
+    "offload_strategy": "required_not_implemented"
+  },
+  "rights": {
+    "external_asset_source": "none",
+    "approval_pending": true
+  },
+  "owner": "existing game_builder original-studio and scene editor owners"
+}

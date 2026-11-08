@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_verdant_caldera",
+  "title": "Verdant Caldera: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010312394,
+  "width": 27,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 13,
+  "theme": "forest",
+  "starting_health": 4
+}

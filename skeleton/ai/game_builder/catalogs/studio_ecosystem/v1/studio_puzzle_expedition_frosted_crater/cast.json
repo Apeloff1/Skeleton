@@ -1,0 +1,57 @@
+{
+  "project_id": "studio_puzzle_expedition_frosted_crater",
+  "genre": "puzzle_expedition",
+  "biome": "frosted_crater",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Ari Halden",
+    "role": "cartographer",
+    "skill": "pattern decoding",
+    "goal": "restore the lost waypoints",
+    "fear": "Failing the communities cut off by cryogenic pockets",
+    "arc": "Moves from solitary problem solving to accountable stewardship"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Lark Tavi",
+      "role": "local witness",
+      "knows": "The original operating records of the impact-hollow vault",
+      "condition": "Willing to testify when evidence is preserved"
+    },
+    {
+      "id": "rival",
+      "name": "Kela Bryn",
+      "role": "contested resource steward",
+      "wants": "Exclusive rights to basalt shelters",
+      "condition": "May cooperate if losses are openly accounted for"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "priority": "safe equitable access",
+      "reputation": 0
+    },
+    {
+      "id": "extractors",
+      "priority": "control of basalt shelters",
+      "reputation": 0
+    }
+  ],
+  "social_effects": [
+    {
+      "choice": "publish_records",
+      "residents": 2,
+      "extractors": -1
+    },
+    {
+      "choice": "private_treaty",
+      "residents": -2,
+      "extractors": 2
+    }
+  ],
+  "authorship": "original_design_proposal"
+}

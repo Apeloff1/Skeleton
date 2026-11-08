@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_cloud_canopy",
+  "title": "Cloud Canopy: The Open Tournament",
+  "subtitle": "Original the open tournament design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010310736,
+  "width": 27,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 12,
+  "theme": "forest",
+  "starting_health": 4
+}

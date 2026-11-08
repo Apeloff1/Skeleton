@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_salt_dunes",
+  "title": "Salt Dunes: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Salt Dunes; only the grid preview compiles today.",
+  "seed": 203010314284,
+  "width": 23,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 13,
+  "theme": "desert",
+  "starting_health": 6
+}

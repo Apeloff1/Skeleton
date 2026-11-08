@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_settlement_survival_sunken_metro",
+  "title": "Sunken Metro: Settlement Survival",
+  "subtitle": "An original settlement survival brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610301673,
+  "width": 19,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "arcade",
+  "starting_health": 5
+}

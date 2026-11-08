@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underground_exploration_sunken_metro",
+  "title": "Sunken Metro: Underground Exploration",
+  "subtitle": "An original underground exploration brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610303721,
+  "width": 19,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 4,
+  "theme": "arcade",
+  "starting_health": 5
+}

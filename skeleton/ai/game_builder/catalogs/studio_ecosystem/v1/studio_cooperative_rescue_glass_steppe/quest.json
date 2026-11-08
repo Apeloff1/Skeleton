@@ -1,0 +1,67 @@
+{
+  "project_id": "studio_cooperative_rescue_glass_steppe",
+  "genre": "cooperative_rescue",
+  "biome": "glass_steppe",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_cooperative_rescue_glass_steppe:restore",
+  "objective": "coordinate multiple rescue teams",
+  "stage_graph": [
+    {
+      "id": "arrival",
+      "entry": "new_game",
+      "location": "prismatic plains",
+      "verb": "survey",
+      "requirements": [
+        "Trace a safe route before glass-shard gales"
+      ],
+      "alternatives": [
+        "inspect_markers",
+        "interview_residents"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "dispute",
+      "entry": "arrival_complete",
+      "location": "shattered outpost",
+      "verb": "coordinate",
+      "requirements": [
+        "Establish control of ceramic heat tiles"
+      ],
+      "alternatives": [
+        "publish_witness_records",
+        "negotiate_with_claimants"
+      ],
+      "reward": "social_legitimacy"
+    },
+    {
+      "id": "repair",
+      "entry": "dispute_complete",
+      "location": "shattered outpost",
+      "verb": "audit",
+      "requirements": [
+        "Demonstrate restoration of the shattered outpost"
+      ],
+      "alternatives": [
+        "cooperative_governance",
+        "independent_distribution"
+      ],
+      "reward": "world_state_update"
+    }
+  ],
+  "branch_outcomes": [
+    "public_proof",
+    "self_organized_repair",
+    "minimal_access"
+  ],
+  "risk_register": [
+    "glass-shard gales",
+    "a cascading emergency"
+  ],
+  "resource_constraints": {
+    "resource": "ceramic heat tiles",
+    "max_mint_without_source": 0
+  },
+  "genre_runtime_implemented": false
+}

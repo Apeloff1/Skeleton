@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_salt_dunes",
+  "title": "Salt Dunes: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Salt Dunes; only the grid preview compiles today.",
+  "seed": 203010312320,
+  "width": 23,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "desert",
+  "starting_health": 6
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_salt_dunes",
+  "title": "Salt Dunes: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Salt Dunes; only the grid preview compiles today.",
+  "seed": 203010310356,
+  "width": 23,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 5,
+  "theme": "desert",
+  "starting_health": 6
+}

@@ -1,0 +1,67 @@
+{
+  "project_id": "studio_time_loop_detective_sunken_metro",
+  "genre": "time_loop_detective",
+  "biome": "sunken_metro",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_time_loop_detective_sunken_metro:restore",
+  "objective": "prevent a repeat reactor incident",
+  "stage_graph": [
+    {
+      "id": "arrival",
+      "entry": "new_game",
+      "location": "submerged tunnels",
+      "verb": "survey",
+      "requirements": [
+        "Trace a safe route before rising flood gates"
+      ],
+      "alternatives": [
+        "inspect_markers",
+        "interview_residents"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "dispute",
+      "entry": "arrival_complete",
+      "location": "underwater tram hub",
+      "verb": "replay",
+      "requirements": [
+        "Establish control of recycled batteries"
+      ],
+      "alternatives": [
+        "publish_witness_records",
+        "negotiate_with_claimants"
+      ],
+      "reward": "social_legitimacy"
+    },
+    {
+      "id": "repair",
+      "entry": "dispute_complete",
+      "location": "underwater tram hub",
+      "verb": "audit",
+      "requirements": [
+        "Demonstrate restoration of the underwater tram hub"
+      ],
+      "alternatives": [
+        "cooperative_governance",
+        "independent_distribution"
+      ],
+      "reward": "world_state_update"
+    }
+  ],
+  "branch_outcomes": [
+    "public_proof",
+    "self_organized_repair",
+    "minimal_access"
+  ],
+  "risk_register": [
+    "rising flood gates",
+    "a self-reinforcing paradox"
+  ],
+  "resource_constraints": {
+    "resource": "recycled batteries",
+    "max_mint_without_source": 0
+  },
+  "genre_runtime_implemented": false
+}

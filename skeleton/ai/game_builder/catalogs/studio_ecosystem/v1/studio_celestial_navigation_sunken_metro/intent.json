@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_sunken_metro",
+  "title": "Sunken Metro: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010315794,
+  "width": 25,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 6,
+  "theme": "arcade",
+  "starting_health": 6
+}

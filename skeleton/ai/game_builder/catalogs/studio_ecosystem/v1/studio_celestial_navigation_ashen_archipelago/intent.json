@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_ashen_archipelago",
+  "title": "Ashen Archipelago: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010315572,
+  "width": 23,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 6,
+  "theme": "ocean",
+  "starting_health": 4
+}

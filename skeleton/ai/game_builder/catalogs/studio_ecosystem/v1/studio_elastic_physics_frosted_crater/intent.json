@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_frosted_crater",
+  "title": "Frosted Crater: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Frosted Crater; only the grid preview compiles today.",
+  "seed": 203010316211,
+  "width": 21,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 3,
+  "theme": "space",
+  "starting_health": 5
+}

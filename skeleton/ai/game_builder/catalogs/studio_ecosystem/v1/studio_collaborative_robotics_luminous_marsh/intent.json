@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_luminous_marsh",
+  "title": "Luminous Marsh: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Luminous Marsh; only the grid preview compiles today.",
+  "seed": 203010317573,
+  "width": 25,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 12,
+  "theme": "forest",
+  "starting_health": 5
+}

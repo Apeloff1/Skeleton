@@ -1,0 +1,57 @@
+{
+  "project_id": "studio_settlement_survival_copper_mesa",
+  "genre": "settlement_survival",
+  "biome": "copper_mesa",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Iri Vale",
+    "role": "builder",
+    "skill": "needs and crafting",
+    "goal": "establish a resilient shelter network",
+    "fear": "Failing the communities cut off by dust squalls",
+    "arc": "Moves from solitary problem solving to accountable stewardship"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Rowan Amea",
+      "role": "local witness",
+      "knows": "The original operating records of the abandoned observatory",
+      "condition": "Willing to testify when evidence is preserved"
+    },
+    {
+      "id": "rival",
+      "name": "Rika Lark",
+      "role": "contested resource steward",
+      "wants": "Exclusive rights to solar mirrors",
+      "condition": "May cooperate if losses are openly accounted for"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "priority": "safe equitable access",
+      "reputation": 0
+    },
+    {
+      "id": "extractors",
+      "priority": "control of solar mirrors",
+      "reputation": 0
+    }
+  ],
+  "social_effects": [
+    {
+      "choice": "publish_records",
+      "residents": 2,
+      "extractors": -1
+    },
+    {
+      "choice": "private_treaty",
+      "residents": -2,
+      "extractors": 2
+    }
+  ],
+  "authorship": "original_design_proposal"
+}

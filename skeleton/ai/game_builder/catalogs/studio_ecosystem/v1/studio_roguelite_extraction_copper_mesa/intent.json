@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_copper_mesa",
+  "title": "Copper Mesa: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Copper Mesa; prototype maps are not full genre implementations.",
+  "seed": 202610302817,
+  "width": 19,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 7,
+  "theme": "desert",
+  "starting_health": 6
+}

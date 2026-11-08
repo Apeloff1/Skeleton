@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_naval_navigation_copper_mesa",
+  "title": "Copper Mesa: Naval Navigation",
+  "subtitle": "An original naval navigation brief in Copper Mesa; prototype maps are not full genre implementations.",
+  "seed": 202610301793,
+  "width": 19,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "desert",
+  "starting_health": 6
+}

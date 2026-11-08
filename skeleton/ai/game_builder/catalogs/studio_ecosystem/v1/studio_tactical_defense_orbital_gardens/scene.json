@@ -1,0 +1,64 @@
+{
+  "project_id": "studio_tactical_defense_orbital_gardens",
+  "genre": "tactical_defense",
+  "biome": "orbital_gardens",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.scene.v1",
+  "world": "Orbital Gardens",
+  "episode_plan": [
+    {
+      "id": "arrival",
+      "setting": "rotating arboretums",
+      "quest_stage": "survey",
+      "environmental_trigger": "life-support imbalance",
+      "interactive_objects": [
+        "survey_marker",
+        "community_notice",
+        "route_gate"
+      ]
+    },
+    {
+      "id": "negotiation",
+      "setting": "ring garden habitat",
+      "quest_stage": "mediate",
+      "environmental_trigger": "Shortfall of hydroponic nutrients",
+      "interactive_objects": [
+        "records_table",
+        "faction_delegate",
+        "shared_access_gate"
+      ]
+    },
+    {
+      "id": "restoration",
+      "setting": "outer rotating arboretums",
+      "quest_stage": "deliver",
+      "environmental_trigger": "Restoration reaches a measurable threshold",
+      "interactive_objects": [
+        "repair_console",
+        "witness_terminal",
+        "community_vote"
+      ]
+    }
+  ],
+  "cross_scene_state": [
+    "survey_complete",
+    "mediate_complete",
+    "repaired_infrastructure",
+    "public_trust"
+  ],
+  "camera": {
+    "primary": "isometric_or_third_person_design_requirement",
+    "fallback": "existing_offline_grid_preview"
+  },
+  "spatial_rules": {
+    "navigation": "at_least_two_feasible_routes_design_target",
+    "hazard": "life-support imbalance",
+    "checkpoint": "after_each_act"
+  },
+  "preview_binding": {
+    "source": "intent.json",
+    "adapter": "skeleton.ai.game_builder.playable_compiler.compile_original_game",
+    "runtime": "offline_html5_grid",
+    "production_genre_claim": false
+  }
+}

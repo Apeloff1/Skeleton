@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_echo_caverns",
+  "title": "Echo Caverns: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Echo Caverns; prototype maps are not full genre implementations.",
+  "seed": 202610303072,
+  "width": 25,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 8,
+  "theme": "arcade",
+  "starting_health": 5
+}

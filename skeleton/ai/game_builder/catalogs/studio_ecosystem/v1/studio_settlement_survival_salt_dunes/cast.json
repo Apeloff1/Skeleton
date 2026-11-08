@@ -1,0 +1,57 @@
+{
+  "project_id": "studio_settlement_survival_salt_dunes",
+  "genre": "settlement_survival",
+  "biome": "salt_dunes",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Iri Yun",
+    "role": "builder",
+    "skill": "needs and crafting",
+    "goal": "establish a resilient shelter network",
+    "fear": "Failing the communities cut off by salt storms",
+    "arc": "Moves from solitary problem solving to accountable stewardship"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Bell Amea",
+      "role": "local witness",
+      "knows": "The original operating records of the buried aqueduct",
+      "condition": "Willing to testify when evidence is preserved"
+    },
+    {
+      "id": "rival",
+      "name": "Rika Vale",
+      "role": "contested resource steward",
+      "wants": "Exclusive rights to brine reservoirs",
+      "condition": "May cooperate if losses are openly accounted for"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "priority": "safe equitable access",
+      "reputation": 0
+    },
+    {
+      "id": "extractors",
+      "priority": "control of brine reservoirs",
+      "reputation": 0
+    }
+  ],
+  "social_effects": [
+    {
+      "choice": "publish_records",
+      "residents": 2,
+      "extractors": -1
+    },
+    {
+      "choice": "private_treaty",
+      "residents": -2,
+      "extractors": 2
+    }
+  ],
+  "authorship": "original_design_proposal"
+}

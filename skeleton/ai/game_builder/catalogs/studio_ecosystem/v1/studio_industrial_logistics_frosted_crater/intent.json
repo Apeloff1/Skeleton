@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_frosted_crater",
+  "title": "Frosted Crater: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Frosted Crater; prototype maps are not full genre implementations.",
+  "seed": 202610302407,
+  "width": 23,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 4,
+  "theme": "space",
+  "starting_health": 6
+}

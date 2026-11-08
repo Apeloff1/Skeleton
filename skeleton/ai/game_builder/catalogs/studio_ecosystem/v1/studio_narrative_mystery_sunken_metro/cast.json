@@ -1,0 +1,57 @@
+{
+  "project_id": "studio_narrative_mystery_sunken_metro",
+  "genre": "narrative_mystery",
+  "biome": "sunken_metro",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Tavi Navin",
+    "role": "investigator",
+    "skill": "evidence synthesis",
+    "goal": "reconstruct an erased civic record",
+    "fear": "Failing the communities cut off by rising flood gates",
+    "arc": "Moves from solitary problem solving to accountable stewardship"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Oriel Daro",
+      "role": "local witness",
+      "knows": "The original operating records of the underwater tram hub",
+      "condition": "Willing to testify when evidence is preserved"
+    },
+    {
+      "id": "rival",
+      "name": "Fen Kest",
+      "role": "contested resource steward",
+      "wants": "Exclusive rights to recycled batteries",
+      "condition": "May cooperate if losses are openly accounted for"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "priority": "safe equitable access",
+      "reputation": 0
+    },
+    {
+      "id": "extractors",
+      "priority": "control of recycled batteries",
+      "reputation": 0
+    }
+  ],
+  "social_effects": [
+    {
+      "choice": "publish_records",
+      "residents": 2,
+      "extractors": -1
+    },
+    {
+      "choice": "private_treaty",
+      "residents": -2,
+      "extractors": 2
+    }
+  ],
+  "authorship": "original_design_proposal"
+}

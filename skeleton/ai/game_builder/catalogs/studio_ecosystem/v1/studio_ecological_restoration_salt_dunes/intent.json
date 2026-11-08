@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_salt_dunes",
+  "title": "Salt Dunes: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610300888,
+  "width": 25,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "desert",
+  "starting_health": 5
+}

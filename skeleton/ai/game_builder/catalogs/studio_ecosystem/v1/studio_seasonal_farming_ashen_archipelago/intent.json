@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_ashen_archipelago",
+  "title": "Ashen Archipelago: The Four Harvests",
+  "subtitle": "Original the four harvests design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010315081,
+  "width": 23,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 5,
+  "theme": "ocean",
+  "starting_health": 3
+}

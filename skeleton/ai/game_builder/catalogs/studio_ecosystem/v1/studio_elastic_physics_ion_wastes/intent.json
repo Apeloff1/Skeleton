@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_ion_wastes",
+  "title": "Ion Wastes: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010316174,
+  "width": 19,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 13,
+  "theme": "space",
+  "starting_health": 4
+}

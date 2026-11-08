@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_sunken_metro",
+  "title": "Sunken Metro: The Open Tournament",
+  "subtitle": "Original the open tournament design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010310884,
+  "width": 25,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 8,
+  "theme": "arcade",
+  "starting_health": 4
+}

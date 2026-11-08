@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_ecological_restoration_orbital_gardens",
+  "genre": "ecological_restoration",
+  "biome": "orbital_gardens",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Orbital Gardens: Ecological Restoration",
+  "foundation": {
+    "setting": "Orbital Gardens",
+    "era": "post-isolation",
+    "environment": "rotating arboretums",
+    "history": "The ring garden habitat was built to protect hydroponic nutrients, but life-support imbalance interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Noa Oriel, a field ecologist, must rebuild the broken food web using resource stewardship while life-support imbalance threatens the ring garden habitat.",
+  "central_conflict": "a resource consortium seeks control of hydroponic nutrients; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "life-support imbalance isolates the ring garden habitat",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "a resource consortium offers privileged access to hydroponic nutrients",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "ring garden habitat",
+    "critical_resource": "hydroponic nutrients",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}

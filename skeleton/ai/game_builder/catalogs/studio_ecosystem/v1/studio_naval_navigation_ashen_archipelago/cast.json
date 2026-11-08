@@ -1,0 +1,57 @@
+{
+  "project_id": "studio_naval_navigation_ashen_archipelago",
+  "genre": "naval_navigation",
+  "biome": "ashen_archipelago",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Kela Morrow",
+    "role": "captain",
+    "skill": "route and tide planning",
+    "goal": "reconnect isolated trading ports",
+    "fear": "Failing the communities cut off by volcanic ash",
+    "arc": "Moves from solitary problem solving to accountable stewardship"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Rene Fen",
+      "role": "local witness",
+      "knows": "The original operating records of the cliffside signal tower",
+      "condition": "Willing to testify when evidence is preserved"
+    },
+    {
+      "id": "rival",
+      "name": "Jori Oriel",
+      "role": "contested resource steward",
+      "wants": "Exclusive rights to freshwater cisterns",
+      "condition": "May cooperate if losses are openly accounted for"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "priority": "safe equitable access",
+      "reputation": 0
+    },
+    {
+      "id": "extractors",
+      "priority": "control of freshwater cisterns",
+      "reputation": 0
+    }
+  ],
+  "social_effects": [
+    {
+      "choice": "publish_records",
+      "residents": 2,
+      "extractors": -1
+    },
+    {
+      "choice": "private_treaty",
+      "residents": -2,
+      "extractors": 2
+    }
+  ],
+  "authorship": "original_design_proposal"
+}

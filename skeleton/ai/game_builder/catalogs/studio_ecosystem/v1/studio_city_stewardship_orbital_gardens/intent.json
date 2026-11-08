@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_orbital_gardens",
+  "title": "Orbital Gardens: City Stewardship",
+  "subtitle": "An original city stewardship brief in Orbital Gardens; prototype maps are not full genre implementations.",
+  "seed": 202610303516,
+  "width": 25,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 6,
+  "theme": "space",
+  "starting_health": 3
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_merchant_caravan_sunken_metro",
+  "title": "Sunken Metro: The Last Trade Route",
+  "subtitle": "Original the last trade route design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010314812,
+  "width": 25,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "arcade",
+  "starting_health": 4
+}

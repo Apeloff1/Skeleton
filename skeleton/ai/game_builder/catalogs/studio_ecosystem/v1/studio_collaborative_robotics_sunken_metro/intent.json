@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_sunken_metro",
+  "title": "Sunken Metro: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010317758,
+  "width": 25,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 10,
+  "theme": "arcade",
+  "starting_health": 6
+}

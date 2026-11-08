@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stellar_colony_neon_undercity",
+  "title": "Neon Undercity: Outer Settlement",
+  "subtitle": "Original outer settlement design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010311560,
+  "width": 25,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 7,
+  "theme": "arcade",
+  "starting_health": 6
+}

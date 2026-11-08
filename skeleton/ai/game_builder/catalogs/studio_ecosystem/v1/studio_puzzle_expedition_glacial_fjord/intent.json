@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_puzzle_expedition_glacial_fjord",
+  "title": "Glacial Fjord: Puzzle Expedition",
+  "subtitle": "An original puzzle expedition brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610300018,
+  "width": 21,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 4,
+  "theme": "ocean",
+  "starting_health": 4
+}

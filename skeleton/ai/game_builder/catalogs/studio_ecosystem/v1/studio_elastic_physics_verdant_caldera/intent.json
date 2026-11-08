@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_verdant_caldera",
+  "title": "Verdant Caldera: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010316322,
+  "width": 27,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "forest",
+  "starting_health": 4
+}

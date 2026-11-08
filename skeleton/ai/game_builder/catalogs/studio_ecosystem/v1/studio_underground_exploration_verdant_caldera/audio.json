@@ -1,0 +1,40 @@
+{
+  "project_id": "studio_underground_exploration_verdant_caldera",
+  "genre": "underground_exploration",
+  "biome": "verdant_caldera",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.audio.v1",
+  "composition": {
+    "leading_voice": "bells",
+    "tempo": 81,
+    "meter": "5/4",
+    "harmonic_intent": "unresolved_progression_to_shared_cadence",
+    "originality": "new_composition_required"
+  },
+  "sound_layers": [
+    {
+      "cue": "arrival",
+      "trigger": "geothermal plumes",
+      "source": "Spatial reflections around stepped jungle terraces",
+      "mix": "reactive"
+    },
+    {
+      "cue": "dispute",
+      "trigger": "faction_tension",
+      "source": "Original motif for an unstable cavern network",
+      "mix": "sidechain_duck_under_dialogue"
+    },
+    {
+      "cue": "repair",
+      "trigger": "mission_resolution",
+      "source": "Original bells cadence accompanying public choice",
+      "mix": "adaptive"
+    }
+  ],
+  "audio_accessibility": [
+    "closed_captions",
+    "independent_channels",
+    "visual_information_parity"
+  ],
+  "render_status": "not_rendered"
+}

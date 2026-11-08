@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_cloud_canopy",
+  "title": "Cloud Canopy: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610302885,
+  "width": 19,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 4,
+  "theme": "forest",
+  "starting_health": 6
+}

@@ -1,0 +1,64 @@
+{
+  "project_id": "studio_naval_navigation_salt_dunes",
+  "genre": "naval_navigation",
+  "biome": "salt_dunes",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.scene.v1",
+  "world": "Salt Dunes",
+  "episode_plan": [
+    {
+      "id": "arrival",
+      "setting": "white salt flats",
+      "quest_stage": "survey",
+      "environmental_trigger": "salt storms",
+      "interactive_objects": [
+        "survey_marker",
+        "community_notice",
+        "route_gate"
+      ]
+    },
+    {
+      "id": "negotiation",
+      "setting": "buried aqueduct",
+      "quest_stage": "mediate",
+      "environmental_trigger": "Shortfall of brine reservoirs",
+      "interactive_objects": [
+        "records_table",
+        "faction_delegate",
+        "shared_access_gate"
+      ]
+    },
+    {
+      "id": "restoration",
+      "setting": "outer white salt flats",
+      "quest_stage": "deliver",
+      "environmental_trigger": "Restoration reaches a measurable threshold",
+      "interactive_objects": [
+        "repair_console",
+        "witness_terminal",
+        "community_vote"
+      ]
+    }
+  ],
+  "cross_scene_state": [
+    "survey_complete",
+    "mediate_complete",
+    "repaired_infrastructure",
+    "public_trust"
+  ],
+  "camera": {
+    "primary": "isometric_or_third_person_design_requirement",
+    "fallback": "existing_offline_grid_preview"
+  },
+  "spatial_rules": {
+    "navigation": "at_least_two_feasible_routes_design_target",
+    "hazard": "salt storms",
+    "checkpoint": "after_each_act"
+  },
+  "preview_binding": {
+    "source": "intent.json",
+    "adapter": "skeleton.ai.game_builder.playable_compiler.compile_original_game",
+    "runtime": "offline_html5_grid",
+    "production_genre_claim": false
+  }
+}

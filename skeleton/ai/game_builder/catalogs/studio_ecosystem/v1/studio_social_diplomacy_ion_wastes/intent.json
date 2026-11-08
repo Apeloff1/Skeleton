@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_social_diplomacy_ion_wastes",
+  "title": "Ion Wastes: Social Diplomacy",
+  "subtitle": "An original social diplomacy brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610302134,
+  "width": 21,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 9,
+  "theme": "space",
+  "starting_health": 4
+}
