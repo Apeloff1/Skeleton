@@ -17,28 +17,43 @@ WORKFLOWS = Path(".github/workflows")
 ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
 
-# These are independent *controller* admissions, not application CI jobs.
-# Keep all three exact event contracts and never quietly exempt arbitrary
-# scheduled/privileged workflows from the 20 automatic-check admission cap.
-CONTROL_ONLY_EVENTS = {
-    "automerge-control-plane.yml": frozenset({"workflow_run"}),
-    "automation-traffic-manager.yml": frozenset({"schedule"}),
-    "owner-historical-actions-cleanup.yml": frozenset({"issue_comment"}),
+# Scheduled Actions recovery has its own three-slot budget. It never consumes
+# PR CI admission or waives a check. The identity is intentionally hard-coded:
+# changing registry metadata cannot exempt an arbitrary future workflow.
+SCHEDULED_RECOVERY = frozenset({
+    "actions-housekeeping-cli.yml",
+    "queue-drain.yml",
+    "three-hour-actions-queue-expiry.yml",
+})
+
+
+# These string contracts are intentionally exact. The three privileged
+# maintenance lanes cannot widen their default-branch push admission paths
+# or acquire an unreviewed file pattern while bypassing the twenty-check cap.
+RECOVERY_PUSH_CONTRACTS = {
+    "actions-housekeeping-cli.yml": (
+        "  push:\n    branches: [main]\n    paths:\n"
+        "      - '.github/workflows/actions-housekeeping-cli.yml'"
+    ),
+    "queue-drain.yml": (
+        "  push:\n    branches: [main]\n"
+        "    paths: ['.github/workflows/queue-drain.yml']"
+    ),
+    "three-hour-actions-queue-expiry.yml": (
+        "  push:\n    branches: [main]\n    paths:\n"
+        "      - '.github/workflows/three-hour-actions-queue-expiry.yml'\n"
+        "      - 'scripts/cancel_stale_actions_queue.py'\n"
+        "      - 'tests/test_cancel_stale_actions_queue.py'"
+    ),
 }
-MANUAL_EVENTS = frozenset({"workflow_dispatch", "workflow_call"})
 
 
 def events(source: str) -> set[str]:
-    """Classify a single explicit YAML on: map; deny ambiguous subscriptions.
-
-    Never count an inline/duplicate event as a manual-only admission. The
-    repository policy supports multiline triggers only, so future syntaxes
-    require a reviewed parser change before they may run.
-    """
+    """Parse exactly one YAML event map without undercounting unsafe triggers."""
     lines = source.splitlines()
     positions = [i for i, line in enumerate(lines) if line == "on:"]
     if len(positions) != 1:
-        raise ValueError("workflow requires exactly one multiline 'on:' trigger")
+        raise ValueError("workflow requires exactly one multiline on: event map")
     found: set[str] = set()
     for line in lines[positions[0] + 1:]:
         if not line.strip() or line.lstrip().startswith("#"):
@@ -48,15 +63,15 @@ def events(source: str) -> set[str]:
         if line.startswith("  ") and not line.startswith("   "):
             match = re.fullmatch(r"  ([a-z_][a-z0-9_]*):\s*(?:#.*)?", line)
             if match is None:
-                raise ValueError("workflow has inline or unclassified event")
-            event = match.group(1)
-            if event in found:
-                raise ValueError("duplicate independent workflow event")
-            found.add(event)
+                raise ValueError("inline or unclassified workflow admission")
+            name = match.group(1)
+            if name in found:
+                raise ValueError("duplicate workflow event")
+            found.add(name)
         elif not found:
-            raise ValueError("workflow has nested event body without event name")
+            raise ValueError("nested workflow event before event declaration")
     if not found:
-        raise ValueError("workflow has no classifiable triggers")
+        raise ValueError("no classifiable workflow admissions")
     return found
 
 
@@ -85,7 +100,17 @@ def audit(root: Path = ROOT) -> list[str]:
             or any(not isinstance(name, str) or not name.endswith(".yml") or "/" in name
                    for group in tiers for name in group)):
         return ["CI tiers require nonempty sets of plain .yml file names"]
-    names = specialised + core + reusable
+    recovery = policy.get("operational_scheduled_non_pr")
+    if (type(recovery) is not list
+            or len(recovery) != len(SCHEDULED_RECOVERY)
+            or any(type(name) is not str for name in recovery)
+            or set(recovery) != SCHEDULED_RECOVERY):
+        failures.append("operational recovery registry must be the exact three scheduled lanes")
+        recovery = []
+    for name in SCHEDULED_RECOVERY:
+        if not (root / WORKFLOWS / name).is_file():
+            failures.append(f"{name}: required scheduled recovery workflow missing")
+    names = specialised + core + reusable + recovery
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
     rules = policy.get("release_rules")
@@ -95,15 +120,10 @@ def audit(root: Path = ROOT) -> list[str]:
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
     if not active:
         failures.append("unexpected active workflow count: 0")
-    # The budget is for independently triggered CI/validation jobs, not for
-    # three separate, security-reviewed owner/control admission channels.
-    # Each controller must retain its exact limited event family: a new push,
-    # PR, schedule or workflow_run event cannot inherit an exemption.
+    # Scheduled queue-maintenance has three separately bounded non-PR lanes.
+    # All other independently triggered workflows continue to consume the
+    # unchanged 20-workflow CI capacity cap, including security/release lanes.
     automatic = 0
-    active_names = {path.name for path in active}
-    for name in CONTROL_ONLY_EVENTS:
-        if name not in active_names:
-            failures.append(f"required owner-scoped controller missing: {name}")
     for path in active:
         try:
             found = events(path.read_text(encoding="utf-8"))
@@ -112,14 +132,15 @@ def audit(root: Path = ROOT) -> list[str]:
                 f"{path.name}: cannot inspect active workflow ({exc})"
             )
             continue
-        controller_events = CONTROL_ONLY_EVENTS.get(path.name)
-        if controller_events is not None:
-            actual = found - MANUAL_EVENTS
-            if actual != controller_events:
-                failures.append(
-                    f"{path.name}: owner-scoped controller event contract drift: "
-                    f"expected {sorted(controller_events)}, got {sorted(actual)}"
-                )
+        if path.name in SCHEDULED_RECOVERY and path.name in recovery:
+            # These are privilege-bounded scheduled maintenance, not source
+            # validation. Reject any PR admission or change to their triggers,
+            # default branch, explicit path filter, or root permission ceiling.
+            source = path.read_text(encoding="utf-8")
+            if (found != {"workflow_dispatch", "schedule", "push"}
+                    or RECOVERY_PUSH_CONTRACTS[path.name] not in source
+                    or not re.search(r"(?m)^permissions: \{\}$", source)):
+                failures.append(f"{path.name}: operational-only trigger or permission drift")
             continue
         if independently_triggered(found):
             automatic += 1
