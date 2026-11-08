@@ -51,6 +51,27 @@ class AtomicReviewTests(unittest.TestCase):
         self.assertEqual(result["source_digest"], preview["candidate_digest"])
         self.assertTrue(self.flow.inspect(BRIEF["id"])["reviewed"])
 
+    def test_review_operation_intent_is_source_bound_and_fail_closed(self):
+        preview = self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+        self.assertEqual(len(preview["operation_digest"]), 64)
+        for incorrect in ("0" * 64, "invalid", True):
+            with self.subTest(incorrect=incorrect):
+                with self.assertRaises(CanonError) as raised:
+                    self.flow.review(
+                        BRIEF["id"], self.initial, OPERATION, NOTE,
+                        expected_candidate_digest=preview["candidate_digest"],
+                        expected_operation_digest=incorrect)
+                self.assertEqual(raised.exception.code, "review_operation_mismatch")
+                self.assertEqual(self.flow.inspect(BRIEF["id"])["source_digest"],
+                                 self.initial)
+                self.assertFalse(self.flow.inspect(BRIEF["id"])["reviewed"])
+        approved = self.flow.review(
+            BRIEF["id"], self.initial, OPERATION, NOTE,
+            expected_candidate_digest=preview["candidate_digest"],
+            expected_operation_digest=preview["operation_digest"])
+        self.assertEqual(approved["source_digest"], preview["candidate_digest"])
+        self.assertTrue(self.flow.inspect(BRIEF["id"])["reviewed"])
+
     def test_review_rejects_changed_candidate_before_any_publication(self):
         preview = self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
         changed = {
