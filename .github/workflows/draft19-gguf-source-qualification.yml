@@ -20,6 +20,9 @@ on:
       - "skeleton/testing/questflows_v1/__init__.py"
       - "skeleton/testing/test_local_ai_gguf_custody.py"
       - "machine/draft19_reconciliation.json"
+      - "machine/backlog19_actions_20261108.json"
+      - "scripts/check_backlog19_actions.py"
+      - "tests/test_backlog19_actions.py"
       - "scripts/check_draft19_reconciliation.py"
       - "tests/test_draft19_reconciliation.py"
       - ".github/workflows/draft19-gguf-source-qualification.yml"
@@ -60,10 +63,15 @@ jobs:
           python -m py_compile skeleton/testing/test_ai_next_model.py skeleton/testing/test_app_offline_mixed_game_library_continuity.py
           python -m py_compile skeleton/testing/test_app_offline_archive_schema_parity.py skeleton/testing/test_repo_machine_inventory_budget.py
           python -m py_compile scripts/check_draft19_reconciliation.py tests/test_draft19_reconciliation.py
+          python -m py_compile scripts/check_backlog19_actions.py tests/test_backlog19_actions.py
       - name: Verify complete held-source registry
         run: python scripts/check_draft19_reconciliation.py
       - name: Run adversarial ledger tests
         run: python -m unittest discover -s tests -p 'test_draft19_reconciliation.py' -v
+      - name: Verify nineteen-PR exact-head action custody
+        run: |
+          python scripts/check_backlog19_actions.py
+          python -m unittest discover -s tests -p 'test_backlog19_actions.py' -v
       - name: Install approved local-AI import-chain test dependencies
         run: >-
           python -m pip install --disable-pip-version-check
