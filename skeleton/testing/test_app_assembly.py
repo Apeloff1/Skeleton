@@ -1251,3 +1251,20 @@ def test_unique_chroma_port_still_builds_canonical_runtime_manifest(tmp_path):
     manifest = runtime_manifest(root=tmp_path, environ={})
     assert manifest.service("chroma").public_url == "http://localhost:8222"
     assert public_service_urls(tmp_path, environ={})["chroma"] == "http://localhost:8222"
+
+
+def test_frontend_compose_port_is_loopback_bound_and_assembly_selectable():
+    from pathlib import Path
+
+    compose = (Path(__file__).resolve().parents[2] / "docker-compose.yml").read_text(encoding="utf-8")
+    expected = '"127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"'
+    assert expected in compose
+    assert '"${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' not in compose
+    assert '"0.0.0.0:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' not in compose
+
+
+def test_assembly_auditor_requires_loopback_not_unrestricted_frontend_port():
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[2] / "scripts/check_app_assembly.py").read_text(encoding="utf-8")
+    assert "'\"127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\"' in base" in source
