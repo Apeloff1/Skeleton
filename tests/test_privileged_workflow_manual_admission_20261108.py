@@ -1,4 +1,4 @@
-"""Regression for privileged workflow admission under the strict 20-auto ceiling.
+"""Regression for privileged workflow admission under the finite workflow ceiling.
 
 Release publication and destructive historical cleanup are opt-in operations.
 This does not downgrade the required PR/security workflows or their CI gates.
@@ -55,8 +55,24 @@ class ManualPrivilegedWorkflowAdmission(unittest.TestCase):
             with self.subTest(name=name):
                 source = (WORKFLOWS / name).read_text(encoding="utf-8")
                 self.assertIn("pull_request", trigger_events(source))
-        script = (ROOT / "scripts" / "check_ci_workflow_tiers.py").read_text(encoding="utf-8")
-        self.assertIn("if automatic > 20:", script)
+        from scripts.check_ci_workflow_tiers import (
+            MAX_INDEPENDENT_WORKFLOWS, audit, independently_triggered,
+        )
+
+        registered = registry["automatic_event_workflows"]
+        self.assertLessEqual(len(registered), MAX_INDEPENDENT_WORKFLOWS)
+        self.assertEqual(len(registered), len(set(registered)))
+        for name in MANUAL:
+            with self.subTest(name=name):
+                self.assertNotIn(name, registered)
+                self.assertFalse(
+                    independently_triggered(
+                        trigger_events(
+                            (WORKFLOWS / name).read_text(encoding="utf-8")
+                        )
+                    )
+                )
+        self.assertEqual(audit(ROOT), [])
 
 
 if __name__ == "__main__":
