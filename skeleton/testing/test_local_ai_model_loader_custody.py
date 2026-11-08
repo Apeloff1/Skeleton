@@ -1,6 +1,7 @@
 """GGUF custody: no simulated activation, full hash, restart and fail-closed inputs."""
 import hashlib
 import os
+import struct
 from pathlib import Path
 import tempfile
 import unittest
@@ -13,7 +14,7 @@ class ModelLoaderCustodyTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / "model.gguf"
-        self.data = b"GGUF" + b"sample-model-bytes"
+        self.data = b"GGUF" + struct.pack("<IQQ", 3, 1, 1) + b"sample-model-bytes"
         self.path.write_bytes(self.data)
         self.sha = hashlib.sha256(self.data).hexdigest()
 
@@ -52,6 +53,20 @@ class ModelLoaderCustodyTests(unittest.TestCase):
         self.path.write_bytes(self.data + b"modified-after-first-kilobyte")
         with self.assertRaises(ValueError):
             self.qualify()
+
+    def test_reject_magic_only_and_invalid_header(self):
+        cases = [
+            b"GGUF",
+            b"GGUF" + struct.pack("<IQQ", 1, 1, 1),
+            b"GGUF" + struct.pack("<IQQ", 3, 0, 1),
+            b"GGUF" + struct.pack("<IQQ", 3, 1, 0),
+            b"GGUF" + struct.pack("<IQQ", 3, 999999, 1),
+        ]
+        for data in cases:
+            with self.subTest(data=data):
+                self.path.write_bytes(data)
+                with self.assertRaises(ValueError):
+                    self.qualify(expected_sha256=hashlib.sha256(data).hexdigest())
 
     @unittest.skipUnless(hasattr(os, "O_NOFOLLOW"), "requires no-follow descriptors")
     def test_symlink_and_hardlink_denied(self):
