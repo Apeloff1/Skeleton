@@ -91,7 +91,8 @@ def _link(value: object) -> str | None:
 
 
 def _public_item(value: object) -> str | None:
-    if not isinstance(value, dict) or value.get("type") not in _PUBLIC_TYPES:
+    if (not isinstance(value, dict) or not isinstance(value.get("type"), str)
+            or value["type"] not in _PUBLIC_TYPES):
         return None
     if any(field in value for field in ("bto", "bcc", "inReplyTo", "replies")):
         return None
@@ -157,7 +158,7 @@ def discover_activity_page(
         raise ActivityDiscoveryError("ActivityStreams root must be an object")
     _validate_context(document.get("@context"))
     kind = document.get("type")
-    if kind not in _COLLECTIONS:
+    if not isinstance(kind, str) or kind not in _COLLECTIONS:
         raise ActivityDiscoveryError("non-public ActivityStreams collection root")
     items = document.get("orderedItems", document.get("items", []))
     if not isinstance(items, list) or len(items) > max_entries:
