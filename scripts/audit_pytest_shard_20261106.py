@@ -11,6 +11,24 @@ import sys
 import time
 
 
+def bounded_log_tail(path: Path, *, max_bytes: int = 131072, max_lines: int = 180) -> str:
+    """Emit only a bounded tail; never materialize an unbounded pytest log."""
+    if type(max_bytes) is not int or not 0 < max_bytes <= 1048576:
+        raise ValueError("invalid log byte bound")
+    if type(max_lines) is not int or not 0 < max_lines <= 500:
+        raise ValueError("invalid log line bound")
+    with path.open("rb") as stream:
+        stream.seek(0, os.SEEK_END)
+        size = stream.tell()
+        stream.seek(max(0, size - max_bytes))
+        data = stream.read(max_bytes)
+    if size > max_bytes:
+        # Discard a partial first line; do not fabricate an entire failing log.
+        boundary = data.find(b"\\n")
+        data = data[boundary + 1:] if boundary >= 0 else b""
+    return "\\n".join(data.decode("utf-8", errors="replace").splitlines()[-max_lines:])
+
+
 def main() -> int:
     if len(sys.argv) != 4:
         print("Usage: audit_pytest_shard_20261106.py AREA SHARD TOTAL_SHARDS")
@@ -69,9 +87,8 @@ def main() -> int:
     metadata["duration_seconds"] = round(time.monotonic() - started, 2)
     metadata["exit_code"] = code
     (result_dir / f"{key}-selection.json").write_text(json.dumps(metadata, indent=2))
-    lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
     print(f"Scope={area}, shard={shard}/{total}, modules={len(selected)}, exit={code}")
-    print("\n".join(lines[-180:]))
+    print(bounded_log_tail(log))
     return code
 
 

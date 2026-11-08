@@ -31,6 +31,17 @@ SIZE_CEILING = 100_000_000
 OUTDIR = Path("audit-sweep-results")
 
 
+def bounded_source_bytes(path: Path, *, limit: int = SIZE_CEILING) -> bytes:
+    """Bound text parsing even if a tracked file grows after the stat check."""
+    if type(limit) is not int or limit < 0:
+        raise ValueError("invalid tracked source byte bound")
+    with path.open("rb") as stream:
+        data = stream.read(limit + 1)
+    if len(data) > limit:
+        raise ValueError("tracked source text exceeds audit byte bound")
+    return data
+
+
 def main() -> int:
     OUTDIR.mkdir(exist_ok=True)
     start = time.monotonic()
@@ -75,6 +86,7 @@ def main() -> int:
                     total_bytes += size
                     counts["readable_files"] += 1
                     if size > SIZE_CEILING:
+                        record["status"] = "error"
                         defects.append({"path": path_string, "error": "file exceeds 100MB gate", "bytes": size})
                     digest = hashlib.sha256()
                     with p.open("rb") as inp:
@@ -88,7 +100,7 @@ def main() -> int:
                     else:
                         counts["duplicate-content_files"] += 1
                     if suffix in SOURCE_TEXT_EXT:
-                        raw = p.read_bytes()
+                        raw = bounded_source_bytes(p)
                         if suffix == ".py" or suffix == ".pyi":
                             compile(raw, path_string, "exec", dont_inherit=True)
                             counts["python_syntax_ok"] += 1

@@ -1,7 +1,7 @@
 name: Isolated full repository test sweep 2026-11-06
 on:
-  push:
-    branches: [audit/full-repo-sweep-20261106]
+  # This expensive full-tree audit is explicit/manual only. It must not add
+  # a new automatic PR/push subscriber or consume the normal CI conveyor.
   workflow_dispatch:
 permissions:
   contents: read
