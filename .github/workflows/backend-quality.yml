@@ -109,6 +109,19 @@ jobs:
           "pytest>=8,<9" "fastapi==0.161.1"
           "pydantic-settings>=2.15.0,<3" "httpx==0.28.1" "pymongo>=4,<5" "motor>=3,<4"
           "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2"
+      - name: Qualify quarantined API edge, shared quotas and CI budget before broad scans
+        if: steps.scope.outputs.full == 'true'
+        working-directory: ${{ github.workspace }}
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: ".:backend"
+        run: |
+          python scripts/check_ci_workflow_tiers.py
+          python -m pytest -q --maxfail=1 \
+            tests/test_ci_workflow_admission_budgets_20261108.py \
+            tests/api_v1_edge tests/api_v1_quota_store \
+            tests/test_ai_tree_quarantined_api_mirror_20261108.py
+          python -m compileall -q skeleton/api/v1_edge skeleton/ai/runtime/api/v1_edge
       - name: Install plan-only quality runtime
         if: steps.scope.outputs.plan_only == 'true'
         run: python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic>=2.14.1,<3"
