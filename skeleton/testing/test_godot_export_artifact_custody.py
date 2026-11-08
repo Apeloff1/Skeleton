@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-import stat
 import struct
 import tempfile
 import unittest
@@ -170,20 +169,20 @@ class ExportArtifactCustodyTests(unittest.TestCase):
 
     def test_replacement_during_hash_fails_closed(self):
         self.output.write_bytes(fake_pe())
-        # A changed file identity between descriptor open and final stat
-        # is caught by the custody checks. Reject a replaced directory entry.
-        original = Path.lstat
+        # The descriptor has already been opened when header verification
+        # runs. Replace the path then; the final dir-entry identity check
+        # must reject the stale opened inode rather than trusting its bytes.
+        from skeleton.godot_export import artifact_custody as custody
+        original = custody._validate_image
         moved = self.root / "moved"
-        changed = False
-        def swap(path):
-            nonlocal changed
-            if Path(path) == self.output and not changed:
-                changed = True
-                self.output.rename(moved)
-                self.output.write_bytes(fake_pe())
-            return original(path)
-        with mock.patch.object(Path, "lstat", autospec=True, side_effect=swap):
-            with self.assertRaises(ExportCustodyError):
+        def replace_after_open(stream, platform, size):
+            original(stream, platform, size)
+            self.output.rename(moved)
+            self.output.write_bytes(fake_pe())
+        with mock.patch.object(custody, "_validate_image",
+                               side_effect=replace_after_open):
+            with self.assertRaisesRegex(ExportCustodyError,
+                                        "artifact-changed-during-verification"):
                 self.inspected()
 
 
