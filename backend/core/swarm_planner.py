@@ -26,6 +26,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import random
 from typing import Any
 
@@ -111,18 +112,69 @@ def plan_build(
     Returns a JSON-serialisable plan with director/leads/platoons/workers,
     dependency edges, topological waves and a coverage proof.
     """
-    phases = list(phases or DEFAULT_PHASES)
+    if not isinstance(build_id, str) or not 1 <= len(build_id.strip()) <= 128:
+        raise ValueError("build_id must be a bounded non-empty string")
+    # None selects canonical defaults; an explicitly empty request must never
+    # manufacture 100 phases or invent a sequential dependency chain.
+    if phases is None:
+        phases = list(DEFAULT_PHASES)
+    elif not isinstance(phases, (list, tuple)):
+        raise ValueError("phases must be a list of phase identifiers")
+    else:
+        phases = list(phases)
     if not phases:
         raise ValueError("at least one phase is required")
     if len(phases) > MAX_PHASES:
         raise ValueError(f"too many phases (max {MAX_PHASES})")
+    if any(
+        not isinstance(phase, str)
+        or not 1 <= len(phase.strip()) <= 128
+        or any(ord(ch) < 32 or ord(ch) == 127 for ch in phase)
+        for phase in phases
+    ):
+        raise ValueError("phase ids must be bounded non-empty strings")
     if len(set(phases)) != len(phases):
         raise ValueError("duplicate phase ids are not allowed")
+    if type(platoon_size) is not int or platoon_size < 1:
+        raise ValueError("platoon_size must be a positive integer")
     platoon_size = max(MIN_PLATOON, min(MAX_PLATOON, platoon_size))
-    game_ctx = game_ctx or {}
-    objectives = objectives or ["ship a complete, polished, original game"]
+    if type(seed) is not int or not -(2 ** 63) <= seed < 2 ** 63:
+        raise ValueError("seed must be a signed 64-bit integer")
+    if game_ctx is None:
+        game_ctx = {}
+    if not isinstance(game_ctx, dict):
+        raise ValueError("game context must be an object")
+    genre = game_ctx.get("genre", "")
+    if not isinstance(genre, str) or len(genre) > 256:
+        raise ValueError("game context genre must be bounded text")
+    if objectives is None:
+        objectives = ["ship a complete, polished, original game"]
+    elif not isinstance(objectives, (list, tuple)):
+        raise ValueError("objectives must be a list of text")
+    else:
+        objectives = list(objectives)
+    if not 1 <= len(objectives) <= 100 or any(
+        not isinstance(obj, str) or not 1 <= len(obj.strip()) <= 512 for obj in objectives
+    ):
+        raise ValueError("objectives must contain bounded non-empty text")
 
-    deps = deps or _default_chain_deps(phases)
+    if deps is None:
+        deps = _default_chain_deps(phases)
+    elif not isinstance(deps, dict):
+        raise ValueError("dependencies must be a phase-to-list mapping")
+    else:
+        if any(not isinstance(key, str) for key in deps):
+            raise ValueError("dependency keys must be phase identifiers")
+        unknown = set(deps) - set(phases)
+        if unknown:
+            raise ValueError(f"dependencies name unknown phases: {sorted(unknown)[:5]}")
+        for phase, required in deps.items():
+            if (not isinstance(required, (list, tuple)) or len(required) > len(phases)) or any(
+                not isinstance(dep, str) for dep in required
+            ):
+                raise ValueError(f"invalid dependency list for phase {phase}")
+            if len(set(required)) != len(required):
+                raise ValueError(f"duplicate dependencies for phase {phase}")
     waves = topo_waves(phases, deps)
     depth_of: dict[str, int] = {}
     for w_idx, wave in enumerate(waves):
@@ -229,6 +281,7 @@ def plan_build(
         "build_id": build_id,
         "seed": seed,
         "platoon_size": platoon_size,
+        "genre": genre,
         "phase_count": len(phases),
         "lead_count": n_leads,
         "objectives": objectives,
@@ -268,12 +321,28 @@ def _coverage(plan: dict, phases: list[str]) -> dict:
 
 
 def _plan_hash(plan: dict) -> str:
-    basis = "|".join(
-        f"{n['id']}:{','.join(w['code'] for w in n.get('workers', []))}"
-        for n in plan["nodes"] if n["tier"] == "platoon"
+    """Versioned, unambiguous identity for a fully specified build plan.
+
+    Former hashes covered only worker codes, DAG edges and seed. Distinct
+    builds or changed objectives could therefore share the same receipt ID.
+    """
+    basis = {
+        "schema": "swarm-plan-v2",
+        "build_id": plan["build_id"],
+        "seed": plan["seed"],
+        "platoon_size": plan["platoon_size"],
+        "genre": plan["genre"],
+        "objectives": plan["objectives"],
+        "phases": [
+            {"id": node["phase_id"], "workers": [worker["code"] for worker in node["workers"]]}
+            for node in plan["nodes"] if node["tier"] == "platoon"
+        ],
+        "edges": plan["edges"],
+    }
+    encoded = json.dumps(
+        basis, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
     )
-    basis += "||" + "|".join(f"{e['from']}->{e['to']}" for e in plan["edges"])
-    return hashlib.sha256(f"{plan['seed']}::{basis}".encode()).hexdigest()[:16]
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
 
 
 def verify_plan(plan: dict) -> dict:
@@ -281,6 +350,11 @@ def verify_plan(plan: dict) -> dict:
     nodes = {n["id"]: n for n in plan.get("nodes", [])}
     edges = plan.get("edges", [])
     problems: list[str] = []
+    if len(nodes) != len(plan.get("nodes", [])):
+        problems.append("duplicate node identities")
+    for edge in edges:
+        if edge.get("from") not in nodes or edge.get("to") not in nodes:
+            problems.append("edge references an unknown node")
 
     # 1) acyclicity over the platoon dependency sub-graph
     phase_nodes = [n["phase_id"] for n in plan.get("nodes", []) if n["tier"] == "platoon"]
@@ -314,21 +388,54 @@ def verify_plan(plan: dict) -> dict:
     if unreachable:
         problems.append(f"{len(unreachable)} unreachable node(s) from director")
 
-    # 3) coverage
-    cov = plan.get("coverage", {})
-    if not cov.get("all_covered"):
-        problems.append("coverage incomplete")
+    # 3) Independently recompute expected phases from the plan's declared
+    # execution waves. Never trust a mutable coverage summary as proof.
+    expected_phases = [
+        phase for wave in plan.get("waves", []) for phase in wave.get("phases", [])
+    ]
+    expected_set = set(expected_phases)
+    actual_set = set(phase_nodes)
+    unique = (
+        bool(expected_phases)
+        and len(expected_phases) == len(expected_set)
+        and len(phase_nodes) == len(actual_set)
+        and len(expected_phases) == plan.get("phase_count")
+        and len(phase_nodes) == len(expected_phases)
+        and actual_set == expected_set
+    )
+    computed = _coverage(plan, expected_phases)
+    provided = plan.get("coverage", {})
+    coverage_ok = unique and computed["all_covered"] and provided == computed
+    if not coverage_ok:
+        problems.append("coverage incomplete or stale versus actual nodes")
 
-    # 4) every platoon has ≥1 worker
+    # 4) A platoon with missing/duplicated worker identities is not complete.
     for n in plan.get("nodes", []):
-        if n["tier"] == "platoon" and n.get("size", 0) < 1:
-            problems.append(f"platoon {n['id']} has no workers")
+        if n["tier"] != "platoon":
+            continue
+        worker_codes = [worker.get("code") for worker in n.get("workers", [])]
+        if (
+            n.get("size", 0) < 1
+            or n.get("size") != len(worker_codes)
+            or any(not isinstance(code, str) or not code for code in worker_codes)
+            or len(set(worker_codes)) != len(worker_codes)
+        ):
+            problems.append(f"platoon {n['id']} has invalid worker custody")
+
+    # 5) Rebuild the receipt from current plan contents. Changed objectives,
+    # participants, source identity or edges invalidate historical attestations.
+    try:
+        receipt_ok = plan.get("plan_hash") == _plan_hash(plan)
+    except (KeyError, TypeError, ValueError):
+        receipt_ok = False
+    if not receipt_ok:
+        problems.append("plan source receipt does not match current contents")
 
     return {
         "valid": not problems,
         "acyclic": acyclic,
         "fully_reachable": not unreachable,
-        "coverage_ok": bool(cov.get("all_covered")),
+        "coverage_ok": coverage_ok,
         "node_count": len(nodes),
         "edge_count": len(edges),
         "problems": problems,
