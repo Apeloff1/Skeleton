@@ -15,7 +15,7 @@
 
 services:
   # ==========================================================================
-  # Skeleton API (hexagonal v16 rewrite)
+  # Local first-install APIs are loopback-only. Remote access requires an\n  # independently authenticated TLS ingress, never an implicit 0.0.0.0 bind.\n  # Skeleton API (hexagonal v16 rewrite)
   # ==========================================================================
   skeleton:
     build:
@@ -31,7 +31,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
     ports:
-      - "${SKELETON_PORT:-8010}:8001"
+      - "127.0.0.1:${SKELETON_PORT:-8010}:8001"
     environment:
       - SKL_ENVIRONMENT=${ENVIRONMENT:-development}
       - SKL_MONGO_URI=${SKL_MONGO_URI:?SKL_MONGO_URI must be set to an authenticated MongoDB URI}
@@ -115,7 +115,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
     ports:
-      - "${BACKEND_PORT:-8001}:8001"
+      - "127.0.0.1:${BACKEND_PORT:-8001}:8001"
     environment:
       - MONGO_URL=${MONGO_URL:?MONGO_URL must be set to an authenticated MongoDB URI}
       - DB_NAME=${DB_NAME:-tutolage}
@@ -179,7 +179,7 @@ services:
     container_name: tutolage-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
     environment:
       # EXPO_PUBLIC_* values are embedded into the browser bundle, so they
       # must be host-resolvable rather than Docker-internal service names.
