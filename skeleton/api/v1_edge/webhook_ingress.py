@@ -34,8 +34,8 @@ class WebhookIngressVerifier:
         self._lock = threading.RLock()
 
     def rotate(self, source: str, new_secret: bytes) -> None:
-        if len(new_secret) < 16:
-            raise ValueError("secret too short")
+        if type(new_secret) is not bytes or len(new_secret) < 16:
+            raise ValueError("secret must be at least 16 bytes")
         with self._lock:
             self._secrets[source] = new_secret
 
@@ -64,7 +64,9 @@ class WebhookIngressVerifier:
         expected = sign(secret, ts, body).split("v1=", 1)[1]
         if not any(hmac.compare_digest(expected, v) for v in parts.get("v1", [])):
             raise EdgeError(401, "EDGE.WEBHOOK.BAD_SIGNATURE", "signature mismatch")
-        nonce = f"{source}:{ts}:{expected}"
+        # Rotation must not reset replay identity for the same verified event.
+        # Bind custody to the source, timestamp and body, not the current key.
+        nonce = f"{source}:{ts}:{hashlib.sha256(body).hexdigest()}"
         with self._lock:
             now = self._clock()
             for key in [key for key, seen_at in self._seen.items()

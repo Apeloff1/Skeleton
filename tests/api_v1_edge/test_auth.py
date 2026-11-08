@@ -39,6 +39,9 @@ def test_session_roundtrip_tamper_expiry():
         sv.issue("u|x", "t")
     with pytest.raises(ValueError):
         SessionVerifier(b"short")
+    # The issuer must not mint a cookie that the verifier's own bound rejects.
+    with pytest.raises(ValueError, match="capacity"):
+        sv.issue("u", "t", [f"s{i:02}" + "x" * 125 for i in range(64)])
 
 
 def test_enforce_policy_binding():

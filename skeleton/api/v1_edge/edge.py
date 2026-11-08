@@ -193,21 +193,43 @@ async def _idempotent(app, cache: IdempotencyCache, scope, body, send, key, fp):
         await send({"type": "http.response.start", "status": stored.status, "headers": hdrs})
         await send({"type": "http.response.body", "body": stored.body})
         return
-    cap = {"status": 500, "headers": [], "body": []}
+    cap = {"status": 500, "headers": [], "body": [], "size": 0, "frames": 0}
 
     async def capture(msg):
         if msg["type"] == "http.response.start":
-            cap["status"], cap["headers"] = msg["status"], list(msg.get("headers", []))
+            headers = msg.get("headers", [])
+            if not isinstance(headers, (list, tuple)):
+                cache.abandon(key)
+                raise EdgeError(502, "EDGE.IDEMPOTENCY.BAD_RESPONSE", "invalid downstream headers")
+            cap["status"] = msg["status"]
+            if len(headers) > 128:
+                cap["overflow"] = True
+            else:
+                total = 0
+                for pair in headers:
+                    if (not isinstance(pair, (list, tuple)) or len(pair) != 2
+                            or type(pair[0]) is not bytes or type(pair[1]) is not bytes):
+                        cache.abandon(key)
+                        raise EdgeError(502, "EDGE.IDEMPOTENCY.BAD_RESPONSE", "invalid downstream headers")
+                    total += len(pair[0]) + len(pair[1])
+                    if total > 16 * 1024:
+                        cap["overflow"] = True
+                        break
+                if not cap.get("overflow"):
+                    cap["headers"] = list(headers)
         elif msg["type"] == "http.response.body":
             payload = msg.get("body", b"")
             if type(payload) is not bytes:
                 cache.abandon(key)
                 raise EdgeError(502, "EDGE.IDEMPOTENCY.BAD_RESPONSE", "invalid downstream body")
-            if sum(len(p) for p in cap["body"]) + len(payload) > cache.max_body:
-                cap["overflow"] = True
-                cap["body"].clear()
-            elif not cap.get("overflow"):
-                cap["body"].append(payload)
+            cap["frames"] += 1
+            if not cap.get("overflow"):
+                if cap["frames"] > 4096 or cap["size"] + len(payload) > cache.max_body:
+                    cap["overflow"] = True
+                    cap["body"].clear()
+                else:
+                    cap["size"] += len(payload)
+                    cap["body"].append(payload)
         await send(msg)
 
     try:

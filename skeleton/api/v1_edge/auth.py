@@ -113,7 +113,11 @@ class SessionVerifier:
                     or any(ch in part for ch in ("|", ",", "\r", "\n"))):
                 raise ValueError("illegal or unbounded character in session field")
         payload = f"{subject}|{tenant}|{','.join(sorted(scopes))}|{int(self._clock() + ttl_s)}"
-        return f"{payload}|{self._sign(payload)}"
+        value = f"{payload}|{self._sign(payload)}"
+        # Do not issue a token that verify() will reject as oversized.
+        if len(value) > 8192:
+            raise ValueError("session cookie exceeds verifier capacity")
+        return value
 
     def verify(self, value: str) -> Optional[Principal]:
         if type(value) is not str or len(value) > 8192:

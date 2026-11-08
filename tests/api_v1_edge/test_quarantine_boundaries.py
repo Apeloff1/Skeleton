@@ -1,7 +1,9 @@
 """Recovered API v1 edge adversarial quarantine boundaries."""
 from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
+import asyncio
 import pytest
+from skeleton.api.v1_edge.edge import _idempotent
 from skeleton.api.v1_edge.auth import ApiKeyStore, EdgeAuthenticator
 from skeleton.api.v1_edge.envelope import EdgeError
 from skeleton.api.v1_edge.idempotency import IdempotencyCache
@@ -53,3 +55,22 @@ def test_webhook_no_replay_eviction_and_strict_timestamp():
                 "t=1000,v1=nan","t=1000,v1="+first.split("v1=")[1]+",hack=true"):
         with pytest.raises(EdgeError):
             guard.verify("gh",sig,b"one")
+
+
+@pytest.mark.parametrize("overflow", ["headers", "frames"])
+def test_idempotency_capture_overflow_never_enters_replay_cache(overflow):
+    cache = IdempotencyCache(max_entries=2, max_body=16)
+    observed = []
+
+    async def app(scope, receive, send):
+        headers = [(b"x-unbounded", b"x" * 20000)] if overflow == "headers" else []
+        await send({"type": "http.response.start", "status": 200, "headers": headers})
+        for _ in range(4097 if overflow == "frames" else 1):
+            await send({"type": "http.response.body", "body": b""})
+
+    async def sink(msg):
+        observed.append(msg["type"])
+
+    asyncio.run(_idempotent(app, cache, {"type": "http"}, b"", sink, "k", "a" * 64))
+    assert observed[0] == "http.response.start"
+    assert cache.begin("k", "a" * 64) is None  # overflow response was not stored

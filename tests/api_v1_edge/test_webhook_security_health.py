@@ -34,6 +34,18 @@ def test_webhook_rotation_multi_sig():
     assert v.verify("gh", both, b"x") == 5
     with pytest.raises(ValueError):
         v.rotate("gh", b"short")
+    with pytest.raises(ValueError):
+        v.rotate("gh", "not-bytes" * 4)
+
+
+def test_rotation_does_not_reopen_replay_custody():
+    verifier = WebhookIngressVerifier({"gh": K}, clock=lambda: 5)
+    assert verifier.verify("gh", sign(K, 5, b"same"), b"same") == 5
+    next_secret = b"n" * 16
+    verifier.rotate("gh", next_secret)
+    with pytest.raises(EdgeError) as replay:
+        verifier.verify("gh", sign(next_secret, 5, b"same"), b"same")
+    assert replay.value.code == "EDGE.WEBHOOK.REPLAY"
 
 
 def test_cors_policy():
