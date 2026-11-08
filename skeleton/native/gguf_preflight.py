@@ -28,13 +28,18 @@ class GGUFHeader:
     sha256: str
 
 
+def _trusted_owner(info: os.stat_result) -> bool:
+    """Only root-controlled or current-principal source inodes are trusted."""
+    return info.st_uid in (0, os.geteuid())
+
+
 def _identity(info: os.stat_result) -> tuple[int, ...]:
     return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
             info.st_nlink, info.st_uid, info.st_gid,
             info.st_mtime_ns, info.st_ctime_ns)
 
 
-def _open_beneath_trusted_parent(path: str | Path) -> tuple[int, int, str]:
+def _open_beneath_trusted_parent(path: str | Path) -> tuple[int, int, str, str]:
     """Pin each parent inode; refuse symlinks and writable parent directories."""
     if (os.name != "posix" or not hasattr(os, "O_DIRECTORY")
             or not hasattr(os, "O_NOFOLLOW")
@@ -55,19 +60,21 @@ def _open_beneath_trusted_parent(path: str | Path) -> tuple[int, int, str]:
         parent_fd = os.open("/", directory_flags)
         file_fd = None
         try:
-            if os.fstat(parent_fd).st_mode & 0o022:
-                raise GGUFPreflightError("untrusted writable root")
+            root_info = os.fstat(parent_fd)
+            if root_info.st_mode & 0o022 or not _trusted_owner(root_info):
+                raise GGUFPreflightError("untrusted writable or foreign-owned root")
             for name in pieces[:-1]:
                 next_fd = os.open(name, directory_flags, dir_fd=parent_fd)
                 os.close(parent_fd)
                 parent_fd = next_fd
                 info = os.fstat(parent_fd)
-                if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
-                    raise GGUFPreflightError("untrusted writable model parent")
+                if (not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022
+                        or not _trusted_owner(info)):
+                    raise GGUFPreflightError("untrusted writable or foreign-owned model parent")
             file_flags = (os.O_RDONLY | os.O_NOFOLLOW
                           | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0))
             file_fd = os.open(pieces[-1], file_flags, dir_fd=parent_fd)
-            return parent_fd, file_fd, pieces[-1]
+            return parent_fd, file_fd, pieces[-1], absolute
         except BaseException:
             if file_fd is not None:
                 os.close(file_fd)
@@ -97,15 +104,17 @@ def _verify_parent_custody(path: str | Path, original: os.stat_result) -> None:
         current = os.open("/", flags)
         try:
             info = os.fstat(current)
-            if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
-                raise GGUFPreflightError("model root changed or writable")
+            if (not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022
+                    or not _trusted_owner(info)):
+                raise GGUFPreflightError("model root changed, writable or foreign-owned")
             for part in parts[:-1]:
                 child = os.open(part, flags, dir_fd=current)
                 os.close(current)
                 current = child
                 info = os.fstat(current)
-                if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
-                    raise GGUFPreflightError("model parent became writable")
+                if (not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022
+                        or not _trusted_owner(info)):
+                    raise GGUFPreflightError("model parent became writable or foreign-owned")
             if _identity(os.fstat(current)) != _identity(original):
                 raise GGUFPreflightError("model parent path changed during inspection")
         finally:
@@ -135,15 +144,15 @@ def inspect_gguf(
         if type(value) is not int or value <= 0:
             raise GGUFPreflightError("limits must be positive integers")
 
-    parent_fd, file_fd, name = _open_beneath_trusted_parent(path)
+    parent_fd, file_fd, name, canonical_path = _open_beneath_trusted_parent(path)
     try:
         parent_before = os.fstat(parent_fd)
         before = os.fstat(file_fd)
         if (not stat.S_ISREG(before.st_mode)
                 or before.st_size < 24 or before.st_size > max_bytes):
             raise GGUFPreflightError("model file size/type rejected")
-        if before.st_nlink != 1 or before.st_mode & 0o022:
-            raise GGUFPreflightError("model source permissions or hardlink unsafe")
+        if before.st_nlink != 1 or before.st_mode & 0o022 or not _trusted_owner(before):
+            raise GGUFPreflightError("model source permissions, owner or hardlink unsafe")
         header = os.read(file_fd, 24)
         if len(header) != 24 or header[:4] != b"GGUF":
             raise GGUFPreflightError("not a GGUF model")
@@ -178,7 +187,7 @@ def inspect_gguf(
             raise GGUFPreflightError("model source changed during inspection")
         if _identity(os.fstat(parent_fd)) != _identity(parent_before):
             raise GGUFPreflightError("model parent changed during inspection")
-        _verify_parent_custody(path, parent_before)
+        _verify_parent_custody(canonical_path, parent_before)
         actual = digest.hexdigest()
         if not hmac.compare_digest(actual, expected_sha256):
             raise GGUFPreflightError("model SHA-256 mismatch")

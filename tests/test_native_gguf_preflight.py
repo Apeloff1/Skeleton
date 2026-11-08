@@ -114,6 +114,24 @@ class GGUFPreflightTests(unittest.TestCase):
         self.assertTrue(swapped)
 
 
+    def test_mutating_pathlike_is_frozen_at_initial_descriptor_open(self):
+        path = self.path
+        invalid = Path(self.temp.name) / "different.gguf"
+        invalid.write_bytes(b"not a model")
+        invalid.chmod(0o600)
+
+        class VolatilePath(os.PathLike[str]):
+            calls = 0
+
+            def __fspath__(self):
+                self.calls += 1
+                return str(path if self.calls == 1 else invalid)
+
+        candidate = VolatilePath()
+        receipt = inspect_gguf(candidate, expected_sha256=self.digest)
+        self.assertEqual(receipt.sha256, self.digest)
+        self.assertEqual(candidate.calls, 1)
+
     def test_replaced_parent_denied_even_with_identical_bytes(self):
         parent = Path(self.temp.name) / "active"
         parent.mkdir(mode=0o700)
