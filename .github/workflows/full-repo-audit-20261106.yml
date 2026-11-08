@@ -1,0 +1,170 @@
+name: Isolated full repository test sweep 2026-11-06
+on:
+  # This expensive full-tree audit is explicit/manual only. It must not add
+  # a new automatic PR/push subscriber or consume the normal CI conveyor.
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: isolated-full-repo-audit-20261106
+  cancel-in-progress: true
+jobs:
+  whole-tree:
+    name: Every tracked file / source syntax / Git integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11.16'
+      - name: Install format parser
+        run: python -m pip install 'PyYAML>=6,<7'
+      - name: Hash every tracked file and parse Python JSON TOML YAML
+        run: python scripts/audit_sweep_20261106.py
+      - name: Verify entire Git object graph
+        if: always()
+        run: timeout 1200s git fsck --full --no-reflogs
+      - name: Inspect every tracked Bash script
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files -z '*.sh' | xargs -0 -r -P 4 -n 1 bash -n
+      - name: Save detailed audit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: full-tree-syntax-and-hash-audit
+          path: audit-sweep-results/
+          if-no-files-found: warn
+          retention-days: 7
+  pytest-shards:
+    name: 'Pytest ${{ matrix.area }} ${{ matrix.shard }} of ${{ matrix.of }}'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include:
+          - {area: 'skeleton/testing', shard: 0, of: 8}
+          - {area: 'skeleton/testing', shard: 1, of: 8}
+          - {area: 'skeleton/testing', shard: 2, of: 8}
+          - {area: 'skeleton/testing', shard: 3, of: 8}
+          - {area: 'skeleton/testing', shard: 4, of: 8}
+          - {area: 'skeleton/testing', shard: 5, of: 8}
+          - {area: 'skeleton/testing', shard: 6, of: 8}
+          - {area: 'skeleton/testing', shard: 7, of: 8}
+          - {area: 'tests', shard: 0, of: 4}
+          - {area: 'tests', shard: 1, of: 4}
+          - {area: 'tests', shard: 2, of: 4}
+          - {area: 'tests', shard: 3, of: 4}
+          - {area: 'backend/tests', shard: 0, of: 2}
+          - {area: 'backend/tests', shard: 1, of: 2}
+          - {area: 'uncovered', shard: 0, of: 2}
+          - {area: 'uncovered', shard: 1, of: 2}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11.16'
+      - name: Install complete root runtime and test extras
+        run: python -m pip install -e '.[dev,local-inference]'
+      - name: Install backend runtime when applicable
+        if: matrix.area == 'backend/tests'
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run every module in this disjoint test shard
+        run: python scripts/audit_pytest_shard_20261106.py '${{ matrix.area }}' '${{ matrix.shard }}' '${{ matrix.of }}'
+      - name: Save test selection, JUnit and failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pytest-${{ matrix.area == 'skeleton/testing' && 'skeleton' || matrix.area == 'backend/tests' && 'backend' || 'tests' }}-${{ matrix.shard }}
+          path: audit-sweep-results/
+          if-no-files-found: warn
+          retention-days: 7
+  frontend-all:
+    name: Frontend all scripts, lint, typecheck and export
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.20.0'
+      - name: Install lockfile dependencies without postinstall scripts
+        shell: bash
+        run: |
+          corepack enable
+          cd frontend
+          yarn install --frozen-lockfile --ignore-scripts --non-interactive
+      - name: Run all defined frontend test scripts and validation
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p audit-sweep-results
+          cd frontend
+          node -e 'for (const name of Object.keys(require("./package.json").scripts).filter(x => x.startsWith("test:"))) console.log(name)' > ../audit-sweep-results/frontend-test-scripts.txt
+          failure=0
+          while IFS= read -r script; do
+            echo "### $script" | tee -a ../audit-sweep-results/frontend-results.log
+            timeout -k 10s 600s yarn run "$script" >> ../audit-sweep-results/frontend-results.log 2>&1
+            rc=$?
+            echo "$script: $rc" | tee -a ../audit-sweep-results/frontend-status.txt
+            if [ "$rc" -ne 0 ]; then failure=1; fi
+          done < ../audit-sweep-results/frontend-test-scripts.txt
+          for script in lint:ci typecheck typecheck:jeeves export:web check:expo-native-compat; do
+            echo "### $script" >> ../audit-sweep-results/frontend-results.log
+            timeout -k 10s 1200s yarn run "$script" >> ../audit-sweep-results/frontend-results.log 2>&1
+            rc=$?
+            echo "$script: $rc" | tee -a ../audit-sweep-results/frontend-status.txt
+            if [ "$rc" -ne 0 ]; then failure=1; fi
+          done
+          tail -n 150 ../audit-sweep-results/frontend-results.log || true
+          exit "$failure"
+      - name: Save frontend suite evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: frontend-full-test-evidence
+          path: audit-sweep-results/
+          if-no-files-found: warn
+          retention-days: 7
+  canonical-gates:
+    name: Canonical integration/precompile source gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11.16'
+      - name: Install runtime extras
+        run: python -m pip install -e '.[dev,local-inference]'
+      - name: Run all declared read-only precompile gates
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p audit-sweep-results
+          make precompile 2>&1 | tee audit-sweep-results/precompile.log
+      - name: Save canonical gate logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: canonical-precompile-evidence
+          path: audit-sweep-results/
+          if-no-files-found: warn
+          retention-days: 7
