@@ -61,4 +61,8 @@ jobs:
         env:
           PYTHONPATH: ".:backend:tests"
           PYTHONDONTWRITEBYTECODE: "1"
-        run: python -m pytest -q backend/tests/test_storage_lazy_registry.py
+        # This independently imported storage module needs no backend/tests
+        # conftest fixtures. The default conftest eagerly imports the entire
+        # server (including bcrypt/JWT provider dependencies), obscuring the
+        # actual lazy-registry assertions. Full backend CI is still mandatory.
+        run: python -m pytest -q --noconftest backend/tests/test_storage_lazy_registry.py
