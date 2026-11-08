@@ -18,7 +18,9 @@ def build(now, **kw):
         route_limits={"POST /projects": Limit(1, 3)},
         tenant_route_limits={"GET /projects/{pid}": Limit(1, 2)},
         method_cost=kw.pop("cost", {}))
-    store = kw.pop("store", None) or InMemoryCounterStore(clock=lambda: now[0])
+    store = kw.pop("store", None)
+    if store is None:
+        store = InMemoryCounterStore(clock=lambda: now[0])
     return DistributedQuotas(plan, store=store, **kw)
 
 
