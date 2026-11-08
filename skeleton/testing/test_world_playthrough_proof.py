@@ -5,7 +5,7 @@ import unittest
 from skeleton.jeeves.worlds.world_canon import (
     CanonError, WorldStore, compile_html, propose, digest,
 )
-from skeleton.jeeves.worlds.playthrough_proof import verify_playthrough
+from skeleton.jeeves.worlds.playthrough_proof import verify_playthrough, replay_checkpoint
 from hashlib import sha256
 
 
@@ -38,6 +38,37 @@ class PlaythroughProofTests(unittest.TestCase):
     def test_stale_revision_fails_closed(self):
         with self.assertRaisesRegex(CanonError, "stale_source"):
             verify_playthrough(self.world, ["pursue_goal"], expected_source_sha="0" * 64)
+
+    def test_checkpoint_replay_and_resume(self):
+        opening = replay_checkpoint(self.world, [], expected_source_sha=self.sha)
+        self.assertEqual(opening["scene"], "opening")
+        self.assertFalse(opening["finished"])
+        finished = replay_checkpoint(self.world, ["pursue_goal"],
+                                     expected_source_sha=self.sha,
+                                     previous_checkpoint=opening)
+        self.assertTrue(finished["finished"])
+        self.assertEqual(finished["scene"], "resolution")
+
+    def test_checkpoint_tamper_stale_and_divergence(self):
+        opening = replay_checkpoint(self.world, [], expected_source_sha=self.sha)
+        corrupted = dict(opening, scene="resolution")
+        for checkpoint, trace in ((corrupted, ["pursue_goal"]),
+                                  (opening, [])):
+            if checkpoint is opening:
+                continue
+            with self.assertRaisesRegex(CanonError, "checkpoint_tampered"):
+                replay_checkpoint(self.world, trace,
+                                  expected_source_sha=self.sha,
+                                  previous_checkpoint=checkpoint)
+        finished = replay_checkpoint(self.world, ["pursue_goal"],
+                                     expected_source_sha=self.sha)
+        with self.assertRaisesRegex(CanonError, "checkpoint_divergence"):
+            replay_checkpoint(self.world, [], expected_source_sha=self.sha,
+                              previous_checkpoint=finished)
+        with self.assertRaisesRegex(CanonError, "stale_source"):
+            replay_checkpoint(self.world, [], expected_source_sha="0" * 64)
+        with self.assertRaisesRegex(CanonError, "invalid_trace"):
+            replay_checkpoint(self.world, [True], expected_source_sha=self.sha)
 
     def test_reopen_persisted_world(self):
         with tempfile.TemporaryDirectory() as folder:
