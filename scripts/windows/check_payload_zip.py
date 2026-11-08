@@ -120,8 +120,17 @@ def archive_errors(
         errors.extend(f"{name!r}: {problem}" for problem in problems)
         if entry.flag_bits & 1:
             errors.append(f"{name!r}: encrypted ZIP entry not supported")
-        if stat.S_IFMT(entry.external_attr >> 16) == stat.S_IFLNK:
-            errors.append(f"{name!r}: symbolic link not supported in Windows payload")
+        # Reject Unix devices, sockets and FIFOs as well as symlinks.
+        # DOS-origin ZIPs do not carry meaningful Unix mode bits.
+        if entry.create_system == 3:
+            mode = entry.external_attr >> 16
+            kind = stat.S_IFMT(mode)
+            if kind not in (0, stat.S_IFREG, stat.S_IFDIR):
+                errors.append(f"{name!r}: unsupported Unix special file type")
+            if kind == stat.S_IFDIR and not name.endswith("/"):
+                errors.append(f"{name!r}: directory mode without trailing slash")
+            if kind == stat.S_IFREG and name.endswith("/"):
+                errors.append(f"{name!r}: regular file mode with directory suffix")
         if entry.file_size > MAX_SINGLE_FILE_BYTES:
             errors.append(f"{name!r}: single file exceeds {MAX_SINGLE_FILE_BYTES} bytes")
         total_bytes += entry.file_size
