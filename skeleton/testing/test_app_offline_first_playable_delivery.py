@@ -482,6 +482,12 @@ def test_consumer_first_run_rejects_forged_upstream_evidence(
         "persistent_rollback_protection": False,
     }
     monkeypatch.setattr(module, "_custody", lambda *args: ((1, 2),) * 4)
+    # Claim-forgery tests do not access a real installed game. Supply the
+    # canonical immutable inode inventory shape rather than a dict or path:
+    # the digest function must still validate it and must not be disabled.
+    fixed_inventory = (("", (1, 2, 3, 4, 1, 0, 0, 0)),)
+    monkeypatch.setattr(module, "snapshot_installed_tree",
+                        lambda *_args: fixed_inventory)
     def inspect(**overrides):
         monkeypatch.setattr(
             module, "inspect_first_playable_delivery",
