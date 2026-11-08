@@ -43,6 +43,34 @@ class AtomicReviewTests(unittest.TestCase):
         reviewed = self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
         self.assertEqual(reviewed["source_digest"], first["candidate_digest"])
 
+    def test_review_can_bind_to_exact_preview_candidate(self):
+        preview = self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+        result = self.flow.review(
+            BRIEF["id"], self.initial, OPERATION, NOTE,
+            expected_candidate_digest=preview["candidate_digest"])
+        self.assertEqual(result["source_digest"], preview["candidate_digest"])
+        self.assertTrue(self.flow.inspect(BRIEF["id"])["reviewed"])
+
+    def test_review_rejects_changed_candidate_before_any_publication(self):
+        preview = self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+        changed = {
+            "action": "replace_scene",
+            "value": {"id": "opening", "title": "Unexpected revision",
+                      "narrative": "A different change than the preview."},
+        }
+        for candidate in (preview["candidate_digest"], None, True, "bad"):
+            if candidate is None:
+                continue
+            with self.subTest(candidate=candidate):
+                with self.assertRaises(CanonError) as raised:
+                    self.flow.review(
+                        BRIEF["id"], self.initial, changed, NOTE,
+                        expected_candidate_digest=candidate)
+                self.assertEqual(raised.exception.code, "review_candidate_mismatch")
+                self.assertEqual(
+                    self.flow.inspect(BRIEF["id"])["source_digest"], self.initial)
+                self.assertFalse(self.flow.inspect(BRIEF["id"])["reviewed"])
+
     def test_preview_rejects_stale_source_and_invalid_edit_without_writes(self):
         for expected, operation, error in (
             ("f" * 64, OPERATION, "stale_source"),
