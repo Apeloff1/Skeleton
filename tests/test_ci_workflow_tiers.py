@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from scripts.check_ci_workflow_tiers import ROOT, audit, events
+from scripts.check_ci_workflow_tiers import ROOT, audit, events, admission_group
 
 
 class WorkflowTierTests(unittest.TestCase):
@@ -44,6 +44,29 @@ class WorkflowTierTests(unittest.TestCase):
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
+
+    def test_event_parser_rejects_undercounted_and_duplicate_admissions(self):
+        for candidate in (
+            "on:\n  push: [main]\njobs:\n",
+            "on:\n  pull_request: {}\njobs:\n",
+            "on:\n  push:\n  push:\njobs:\n",
+            "on:\n  workflow_dispatch:\non:\n  push:\njobs:\n",
+            "on:\n  # no event\njobs:\n",
+        ):
+            with self.subTest(source=candidate):
+                with self.assertRaises(ValueError):
+                    events(candidate)
+        self.assertEqual(
+            admission_group({"pull_request", "push", "workflow_dispatch"}), "pr")
+        self.assertEqual(
+            admission_group({"schedule", "workflow_dispatch"}), "other")
+        self.assertIsNone(admission_group({"workflow_dispatch", "workflow_call"}))
+
+    def test_mixed_event_workflow_is_never_unclassified(self):
+        self.assertEqual(events("on:\n  pull_request: # guarded\n"
+                                "  workflow_dispatch:\n  schedule:\njobs:\n"),
+                         {"pull_request", "workflow_dispatch", "schedule"})
+        self.assertEqual(admission_group({"pull_request", "schedule"}), "pr")
 
     def test_specialists_are_archived_and_active_core_remains_required(self):
         with TemporaryDirectory() as temp:
@@ -101,6 +124,18 @@ class WorkflowTierTests(unittest.TestCase):
             )
             for index in range(10):
                 (root / ".github/workflows" / f"automatic-extra-{index}.yml").unlink()
+            for index in range(13):
+                (root / ".github/workflows" / f"scheduled-extra-{index}.yml").write_text(
+                    "name: scheduled\non:\n  schedule:\n"
+                    "    - cron: '17 * * * *'\njobs:\n  noop:\n"
+                    "    runs-on: ubuntu-latest\n    steps:\n      - run: echo no-op\n",
+                    encoding="utf-8",
+                )
+            self.assertTrue(
+                any("unexpected active non-PR workflow count" in item for item in audit(root))
+            )
+            for index in range(13):
+                (root / ".github/workflows" / f"scheduled-extra-{index}.yml").unlink()
             name = registry["specialized_manual_only"][0]
             spec = root / ".github/workflows-archive" / name
             original = spec.read_text()

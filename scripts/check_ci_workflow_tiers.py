@@ -31,14 +31,27 @@ def events(source: str) -> set[str]:
     positions = [i for i, line in enumerate(lines) if line == "on:"]
     if len(positions) != 1:
         raise ValueError("workflow requires exactly one multiline 'on:' trigger")
-    start = positions[0]
     found: set[str] = set()
-    for line in lines[start + 1:]:
-        if line and not line[0].isspace() and not line.startswith("#"):
+    for line in lines[positions[0] + 1:]:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line[0].isspace():
             break
-        match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
-        if match:
-            found.add(match.group(1))
+        # An inline trigger such as "push: [main]" is an independent event,
+        # not a manual-only workflow. Reject it until explicitly classified,
+        # rather than silently dropping it from the admission count.
+        if line.startswith("  ") and not line.startswith("   "):
+            match = re.fullmatch(r"  ([a-z_][a-z0-9_]*):\s*(?:#.*)?", line)
+            if match is None:
+                raise ValueError("workflow has unsupported or inline event")
+            event = match.group(1)
+            if event in found:
+                raise ValueError("workflow has duplicate event")
+            found.add(event)
+        elif not found:
+            raise ValueError("workflow has nested payload without event")
+    if not found:
+        raise ValueError("workflow declares no classifiable events")
     return found
 
 
