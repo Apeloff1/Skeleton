@@ -51,7 +51,7 @@ class WorkflowTierTests(unittest.TestCase):
             with self.subTest(name=name):
                 source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
                 self.assertEqual(events(source), {"workflow_dispatch", "schedule", "push"})
-                self.assertRegex(source, r"(?m)^permissions: \\{\\}$")
+                self.assertRegex(source, r"(?m)^permissions: \{\}$")
 
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
