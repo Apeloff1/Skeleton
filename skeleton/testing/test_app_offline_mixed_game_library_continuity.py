@@ -19,6 +19,11 @@ from skeleton.testing.test_app_offline_game_library_audit import (
 from skeleton.testing.test_app_offline_signed_game_library_audit import (
     _entry as _signed_entry,
 )
+# Expose the full signed-custody fixture graph to individually sharded pytest.
+from skeleton.testing.test_app_offline_archive_signature import signed
+from skeleton.testing.test_app_offline_signed_progress_migration import migration
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
+from skeleton.testing.test_app_offline_policy_signed_delivery import delivered
 from skeleton.testing.test_app_offline_policy_chain_delivery import chain_delivery
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX private custody")
@@ -147,7 +152,7 @@ def test_cross_project_save_alias_rejected(catalog, tmp_path):
     unsigned, signed = catalog
     advanced = _advance(unsigned, tmp_path / "cross-save.json")
     invalid = replace(signed, private_save=unsigned.private_save)
-    with pytest.raises(OfflineMixedGameLibraryContinuityError, match="custody"):
+    with pytest.raises(OfflineMixedGameLibraryContinuityError, match="custody|cross-project private save alias"):
         _audit([unsigned], [advanced], [signed], [invalid])
 
 

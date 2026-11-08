@@ -52,8 +52,49 @@ Commands:
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--repair-mode apply|suggest]
                     [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
+    combat-checkpoints  Replay and verify portable expedition checkpoints
+    combat-expedition  Play source-bound tactical expedition with earned rewards
+    quest-expedition  Play source-bound quest expeditions and replay
+    quest-checkpoints        Replay portable quest expedition checkpoints
+    quest-decisions          Audit replay-bound expedition decisions
+    quest-expedition-play    Play original quest expeditions interactively
+    quest-expedition-route   Solve replay-bound expedition routes
+    quest-inventory          Inspect earned quest inventory
+    quest-author  Author and validate original expedition quests
+    quest-campaign  Replay source-authored quest chapters and endings
+    quest-campaign-accept    Audit earned campaign endings
+    quest-campaign-author    Author original quest chapters
+    quest-campaign-play      Play original quest chapters interactively
+    quest-campaign-route     Solve replay-verified campaign routes
+    quest-factions  Replay source-bound faction choices and diplomacy
+    quest-factions-accept    Audit source-bound faction decisions
+    quest-factions-author    Author offline faction campaigns
+    quest-factions-play      Interactively play faction campaigns
+    quest-factions-route     Solve legal faction campaign routes
+    game-vertical-accept  Verify integrated original-game vertical acceptance
+    combat-expedition-audit  Audit replay-bound expedition economy
+    combat-expedition-solve  Solve original expedition routes
+    combat-expedition-playbook  Rehearse tactical expedition playbooks
+    arena-terrain  Run original tactical terrain
+    combat-contract  Play source-bound combat contracts
+    combat-contract-author  Author bounded combat contracts
+    combat-contract-solve  Solve replay-verified combat contracts
+    combat-contract-package  Package authored combat contracts
+    combat-campaign-player  Play and checkpoint combat campaigns
+    combat-campaign-timeline  Audit player turns and earned campaign checkpoints
+    combat-drill  Run original combat drills
+    combat-drill-solve  Solve replay-verified combat drills
+    combat-league  Play original combat leagues
+    combat-league-author  Author original combat leagues
+    combat-career  Play original league careers
+    combat-career-advice  Inspect replay-bound career advice
+    combat-career-author  Author original league careers
+    combat-career-roadmap  Plan bounded career routes
+    combat-stamina  Run source-bound stamina combat
+    combat-inspect  Inspect combat session evidence
     scene-author  Atomically edit playable scene worlds and preview routes
     scene-circuit  Play switch puzzles and conditional gates
+    scene-circuit-accept  Audit source-authored switch puzzle play, replay and export
     scene-circuit-solve  Solve replayable circuit routes with bounded search
     scene-circuit-author  Atomically edit and preview playable circuit sources
     scene-patrol-solve  Find bounded legal routes through timed guards
@@ -74,6 +115,21 @@ Commands:
     scene-market-play  Play offline market quests with durable checkpoints
     scene-market-author  Edit and preview source-bound trading quests
     scene-market  Play earned-currency trading, crafting and delivery quests
+    scene-market-hours        Play merchant opening-hours campaigns
+    scene-market-hours-play   Interactively play merchant opening-hours campaigns
+    scene-market-hours-accept Verify merchant gameplay replay and custody
+    scene-market-party        Play earned cooperative market campaigns
+    scene-market-party-play   Play cooperative market checkpoints interactively
+    scene-market-party-vault  Manage verified offline cooperative saves
+    scene-market-party-route  Solve replay-certified cooperative market routes
+    scene-evacuation           Play source-bound timed rescue and evacuation
+    scene-evacuation-board     Inspect legal evacuation action choices
+    scene-evacuation-author    Edit bounded evacuation NPC source contracts
+    scene-evacuation-accept    Verify replay and earned evacuation outcomes
+    scene-evacuation-solve     Solve bounded evacuation rescue routes
+    scene-evacuation-play      Interactively play and resume evacuations
+    scene-market-contract     Play source-bound market contracts
+    scene-market-contract-play Interactively play market contracts
     scene-tiles  Play authored grid movement/collision and replay scene saves
     scene-tiles-route  Solve collision-aware replayable tile game routes
     scene-achievements  Earn replay-verified authored scene milestones
@@ -87,7 +143,9 @@ Commands:
     scene-mission-board  Inspect replay-derived mission objectives and legal actions
     scene-mission-author  Transactionally edit authored missions and preview play
     scene-mission-route  Solve replayable authored mission ending paths
-    scene-mission-assist  Offer replay-proven non-mutating mission hints\n    scene-mission-liveness  Find replayable authored mission softlocks\n    scene-mission-accept  Verify authored endings through playable export
+    scene-mission-assist  Offer replay-proven non-mutating mission hints
+    scene-mission-liveness Find replayable authored mission softlocks
+    scene-mission-accept Verify authored endings through playable export
     scene-mission-timeline  Play replay-verified offline mission checkpoints
     scene-mission-league  Rank completed source-bound mission replays offline
     scene-mission-league-author  Transactionally edit and preview league scoring
@@ -95,6 +153,41 @@ Commands:
     scene-escort-author  Transactionally edit and preview escort missions
     scene-escort-solve  Find replay-proven safe convoy routes with bounded search
     scene-escort-play  Interactively play and checkpoint offline convoy deliveries
+    world-route                 Source-bound reviewed Jeeves world command
+    world-cast                  Source-bound reviewed Jeeves world command
+    world-quest                 Source-bound reviewed Jeeves world command
+    world-counterfactual        Source-bound reviewed Jeeves world command
+    world-lore                  Source-bound reviewed Jeeves world command
+    world-events                Source-bound reviewed Jeeves world command
+    combat-balance              Source-bound original-game operator command
+    scene-market-fork           Replay-verified market branch proposals and choices
+    scene-market-fork-author    Source-bound original-game operator command
+    scene-market-fork-accept    Source-bound original-game operator command
+    scene-market-fork-play      Source-bound original-game operator command
+    scene-market-party-handoff  Source-bound original-game operator command
+    scene-market-party-league-author Source-bound original-game operator command
+    scene-market-contract-accept Source-bound offline-market operator command
+    scene-market-party-board    Source-bound offline-market operator command
+    scene-market-party-league   Source-bound offline-market operator command
+    scene-market-contract-author Source-bound offline-market operator command
+    scene-market-party-accept   Source-bound offline-market operator command
+    scene-market-party-compare  Source-bound offline-market operator command
+    scene-market-party-timeline Source-bound offline-market operator command
+    scene-market-route-accept    Replay-verified market route acceptance and portability
+    campaign                           Play an original offline grid campaign
+    quest                              Source-verified offline gameplay command
+    scene-market-party-vault-history   Source-verified offline gameplay command
+    scene-weather-play                 Source-verified offline gameplay command
+    scene-market-contract-route        Source-verified offline gameplay command
+    scene-market-party-author          Source-verified offline gameplay command
+    scene-market-party-balance         Source-verified offline gameplay command
+    scene-market-party-portfolio       Source-verified offline gameplay command
+    scene-market-route                 Source-verified offline gameplay command
+    scene-market-board                 Source-verified offline gameplay command
+    scene-push                         Source-verified offline gameplay command
+    scene-push-play                    Interactive verified tile push puzzles
+    scene-push-accept                  Audit earned tile push victory and replay
+    combat-arena                       Play source-bound tactical arena
     game        Build a playable Godot project from a natural-language brief
                 game <brief> [--out DIR] [--overwrite]
                     [--playtest off|auto|require] [--max-rounds N] [--json]
@@ -779,6 +872,126 @@ def main(argv: Optional[List[str]] = None) -> int:
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
+    if cmd == "combat-checkpoints":
+        from skeleton.game.gameplay.arena_checkpoint_timeline import cli as checkpoint_cli
+        return checkpoint_cli(rest)
+    if cmd == "combat-expedition":
+        from skeleton.game.gameplay.arena_expedition import cli as expedition_cli
+        return expedition_cli(rest)
+    if cmd == "quest-expedition":
+        from skeleton.game.gameplay.expedition_quest import cli as quest_cli
+        return quest_cli(rest)
+    if cmd == "quest-author":
+        from skeleton.game.gameplay.expedition_quest_author import cli as quest_author_cli
+        return quest_author_cli(rest)
+    if cmd == "game-vertical-accept":
+        from skeleton.game.gameplay.game_vertical_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-checkpoints":
+        from skeleton.game.gameplay.expedition_quest_checkpoints import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-decisions":
+        from skeleton.game.gameplay.expedition_quest_decisions import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-expedition-play":
+        from skeleton.game.gameplay.expedition_quest_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-expedition-route":
+        from skeleton.game.gameplay.expedition_quest_route import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-inventory":
+        from skeleton.game.gameplay.expedition_quest_inventory import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-campaign":
+        from skeleton.game.gameplay.quest_chapter_campaign import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-campaign-accept":
+        from skeleton.game.gameplay.quest_chapter_campaign_accept import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-campaign-author":
+        from skeleton.game.gameplay.quest_chapter_campaign_author import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-campaign-play":
+        from skeleton.game.gameplay.quest_chapter_campaign_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-campaign-route":
+        from skeleton.game.gameplay.quest_chapter_campaign_route import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-factions":
+        from skeleton.game.gameplay.quest_factions import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-factions-accept":
+        from skeleton.game.gameplay.quest_factions_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-factions-author":
+        from skeleton.game.gameplay.quest_factions_author import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-factions-play":
+        from skeleton.game.gameplay.quest_factions_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "quest-factions-route":
+        from skeleton.game.gameplay.quest_factions_route import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "combat-expedition-audit":
+        from skeleton.game.gameplay.arena_expedition_economy import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-expedition-solve":
+        from skeleton.game.gameplay.arena_expedition_solver import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-expedition-playbook":
+        from skeleton.game.gameplay.arena_expedition_playbook import cli as route_cli
+        return route_cli(rest)
+    if cmd == "arena-terrain":
+        from skeleton.game.gameplay.arena_terrain import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-contract":
+        from skeleton.game.gameplay.combat_contract import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-contract-author":
+        from skeleton.game.gameplay.combat_contract_author import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-contract-solve":
+        from skeleton.game.gameplay.combat_contract_solver import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-contract-package":
+        from skeleton.game.gameplay.combat_contract_package import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-campaign-player":
+        from skeleton.game.gameplay.combat_campaign_player import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-campaign-timeline":
+        from skeleton.game.gameplay.combat_campaign_timeline import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-drill":
+        from skeleton.game.gameplay.combat_drill import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-drill-solve":
+        from skeleton.game.gameplay.combat_drill_solver import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-league":
+        from skeleton.game.gameplay.combat_league import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-league-author":
+        from skeleton.game.gameplay.combat_league_author import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-career":
+        from skeleton.game.gameplay.combat_league_career import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-career-advice":
+        from skeleton.game.gameplay.combat_league_career_advice import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-career-author":
+        from skeleton.game.gameplay.combat_league_career_author import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-career-roadmap":
+        from skeleton.game.gameplay.combat_league_career_roadmap import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-stamina":
+        from skeleton.game.gameplay.combat_stamina import cli as route_cli
+        return route_cli(rest)
+    if cmd == "combat-inspect":
+        from skeleton.game.gameplay.combat_inspector import cli as route_cli
+        return route_cli(rest)
     if cmd == "scene-escort":
         from skeleton.game.gameplay.scene_escort import cli as escort_cli
         return escort_cli(rest)
@@ -845,6 +1058,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-circuit":
         from skeleton.game.gameplay.scene_circuit import cli as circuit_cli
         return circuit_cli(rest)
+    if cmd == "scene-circuit-accept":
+        from skeleton.game.gameplay.scene_circuit_accept import cli as handler_cli
+        return handler_cli(rest)
     if cmd == "scene-patrol-solve":
         from skeleton.game.gameplay.scene_guard_patrol_solver import cli as patrol_solver_cli
         return patrol_solver_cli(rest)
@@ -899,6 +1115,51 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market":
         from skeleton.game.gameplay.scene_market import cli as market_cli
         return market_cli(rest)
+    if cmd == "scene-market-hours":
+        from skeleton.game.gameplay.scene_market_hours import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-hours-play":
+        from skeleton.game.gameplay.scene_market_hours_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-hours-accept":
+        from skeleton.game.gameplay.scene_market_hours_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party":
+        from skeleton.game.gameplay.scene_market_party import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-play":
+        from skeleton.game.gameplay.scene_market_party_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-route":
+        from skeleton.game.gameplay.scene_market_party_route import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation":
+        from skeleton.game.gameplay.scene_evacuation import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation-board":
+        from skeleton.game.gameplay.scene_evacuation_board import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation-author":
+        from skeleton.game.gameplay.scene_evacuation_author import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation-accept":
+        from skeleton.game.gameplay.scene_evacuation_acceptance import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation-solve":
+        from skeleton.game.gameplay.scene_evacuation_solver import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-evacuation-play":
+        from skeleton.game.gameplay.scene_evacuation_interactive import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-party-vault":
+        from skeleton.game.gameplay.scene_market_party_vault import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-contract":
+        from skeleton.game.gameplay.scene_market_contract import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-contract-play":
+        from skeleton.game.gameplay.scene_market_contract_interactive import cli as handler_cli
+        return handler_cli(rest)
     if cmd == "scene-tiles":
         from skeleton.game.gameplay.scene_tile_walk import cli as scene_tiles_cli
         return scene_tiles_cli(rest)
@@ -914,6 +1175,111 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-npc-play":
         from skeleton.game.gameplay.scene_npc_interactive import cli as npc_play_cli
         return npc_play_cli(rest)
+    if cmd == "world-route":
+        from skeleton.jeeves.worlds.route_cli import run as world_route_cli
+        return world_route_cli(rest)
+    if cmd == "world-cast":
+        from skeleton.jeeves.worlds.cast_cli import run as world_cast_cli
+        return world_cast_cli(rest)
+    if cmd == "world-quest":
+        from skeleton.jeeves.worlds.quest_cli import run as world_quest_cli
+        return world_quest_cli(rest)
+    if cmd == "world-counterfactual":
+        from skeleton.jeeves.worlds.counterfactual_cli import run as world_counterfactual_cli
+        return world_counterfactual_cli(rest)
+    if cmd == "world-lore":
+        from skeleton.jeeves.worlds.lore_cli import run as world_lore_cli
+        return world_lore_cli(rest)
+    if cmd == "world-events":
+        from skeleton.jeeves.worlds.events_cli import run as world_events_cli
+        return world_events_cli(rest)
+    if cmd == "combat-balance":
+        from skeleton.game.gameplay.combat_balance import cli as combat_balance_cli
+        return combat_balance_cli(rest)
+    if cmd == "scene-market-fork":
+        from skeleton.game.gameplay.scene_market_fork import cli as market_fork_cli
+        return market_fork_cli(rest)
+    if cmd == "scene-market-fork-author":
+        from skeleton.game.gameplay.scene_market_fork_author import cli as market_fork_author_cli
+        return market_fork_author_cli(rest)
+    if cmd == "scene-market-fork-accept":
+        from skeleton.game.gameplay.scene_market_fork_acceptance import cli as market_fork_accept_cli
+        return market_fork_accept_cli(rest)
+    if cmd == "scene-market-fork-play":
+        from skeleton.game.gameplay.scene_market_fork_interactive import cli as market_fork_play_cli
+        return market_fork_play_cli(rest)
+    if cmd == "scene-market-party-handoff":
+        from skeleton.game.gameplay.scene_market_party_handoff import cli as market_party_handoff_cli
+        return market_party_handoff_cli(rest)
+    if cmd == "scene-market-party-league-author":
+        from skeleton.game.gameplay.scene_market_party_league_author import cli as market_party_league_author_cli
+        return market_party_league_author_cli(rest)
+    if cmd == "scene-market-contract-accept":
+        from skeleton.game.gameplay.scene_market_contract_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-board":
+        from skeleton.game.gameplay.scene_market_party_board import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-league":
+        from skeleton.game.gameplay.scene_market_party_league import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-contract-author":
+        from skeleton.game.gameplay.scene_market_contract_author import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-accept":
+        from skeleton.game.gameplay.scene_market_party_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-compare":
+        from skeleton.game.gameplay.scene_market_party_compare import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-party-timeline":
+        from skeleton.game.gameplay.scene_market_party_timeline import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-market-route-accept":
+        from skeleton.game.gameplay.scene_market_route_acceptance import cli as route_accept_cli
+        return route_accept_cli(rest)
+    if cmd == "campaign":
+        from scripts.game.offline_grid_campaign import main as campaign_cli
+        return campaign_cli(rest)
+    if cmd == "quest":
+        from skeleton.game.gameplay.quest_cli import main as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-party-vault-history":
+        from skeleton.game.gameplay.scene_market_party_vault_history import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-weather-play":
+        from skeleton.game.gameplay.scene_weather_interactive import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-contract-route":
+        from skeleton.game.gameplay.scene_market_contract_route import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-party-author":
+        from skeleton.game.gameplay.scene_market_party_author import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-party-balance":
+        from skeleton.game.gameplay.scene_market_party_balance import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-party-portfolio":
+        from skeleton.game.gameplay.scene_market_party_portfolio import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-route":
+        from skeleton.game.gameplay.scene_market_route import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-market-board":
+        from skeleton.game.gameplay.scene_market_board import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-push":
+        from skeleton.game.gameplay.scene_tile_push import cli as source_bound_cli
+        return source_bound_cli(rest)
+    if cmd == "scene-push-play":
+        from skeleton.game.gameplay.scene_tile_push_interactive import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "scene-push-accept":
+        from skeleton.game.gameplay.scene_tile_push_acceptance import cli as handler_cli
+        return handler_cli(rest)
+    if cmd == "combat-arena":
+        from skeleton.game.gameplay.tactical_arena import cli as handler_cli
+        return handler_cli(rest)
     if cmd == "game":
         from skeleton.forge.game_builder import cli as game_cli
         return game_cli(rest)

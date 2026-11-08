@@ -83,14 +83,26 @@ def test_invalid_editor_transactions_fail_closed_without_mutation(edits):
 
 def test_authoring_rejects_disconnected_resource_and_dock():
     source = world()
-    # Block the only corridor between the western food deposit and the start.
-    # The map stays geometrically valid, but the food is now unreachable.
+    # Seal all three open neighbors of the western food deposit. Two
+    # closures still leave a route through the southern corridor, so the
+    # third closure is essential to actually test an unreachable resource.
+    edits = [
+        {"op": "tile", "at": [1, 2], "tile": "#"},
+        {"op": "tile", "at": [2, 3], "tile": "#"},
+        {"op": "tile", "at": [1, 4], "tile": "#"},
+    ]
+    with pytest.raises(HarborError, match="unreachable"):
+        author_revision(source, edits, expected_source_digest=digest(source))
+
+
+def test_authoring_keeps_a_real_alternate_food_approach():
+    source = world()
     edits = [
         {"op": "tile", "at": [1, 2], "tile": "#"},
         {"op": "tile", "at": [2, 3], "tile": "#"},
     ]
-    with pytest.raises(HarborError, match="unreachable"):
-        author_revision(source, edits, expected_source_digest=digest(source))
+    revised = author_revision(source, edits, expected_source_digest=digest(source))
+    assert verify_revision(revised) == revised["source"]
 
 
 @pytest.mark.parametrize("mutation", [

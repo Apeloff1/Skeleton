@@ -82,7 +82,7 @@ def main() -> int:
     print(f"canonical domain shard {args.index + 1}/{args.count}: {len(selected)} files", flush=True)
     return subprocess.call(
         [sys.executable, "-m", "pytest", "-q", "--noconftest",
-         "-p", "pytest_asyncio.plugin", "--tb=short", "--maxfail=1", *selected],
+         "-p", "pytest_asyncio.plugin", "--tb=short", "--maxfail=20", *selected],
         cwd=ROOT,
     )
 

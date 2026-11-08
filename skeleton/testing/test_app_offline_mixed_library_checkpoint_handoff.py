@@ -16,6 +16,12 @@ from skeleton.testing.test_app_offline_mixed_library_epoch_receipt_chain import 
     _checkpoints, _cli, _private_checkpoint_file,
 )
 from skeleton.testing.test_app_offline_mixed_library_epoch_chain import catalog
+# Expose the complete transitive fixture graph for isolated pytest shards.
+from skeleton.testing.test_app_offline_archive_signature import signed
+from skeleton.testing.test_app_offline_signed_progress_migration import migration
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
+from skeleton.testing.test_app_offline_policy_signed_delivery import delivered
+from skeleton.testing.test_app_offline_policy_chain_delivery import chain_delivery
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX private custody")
 

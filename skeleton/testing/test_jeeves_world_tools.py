@@ -76,7 +76,13 @@ def test_real_player_tools_use_saved_session(tmp_path):
     evidence = approve_evidence(propose_evidence(
         source, prompt="Clue.", clue_id="letter", title="Letter",
         detail="Secret.", unlock_choice="pursue_goal"), source, "Reviewed.")
-    FactionStore(root).publish("marsh", faction, create=True)
+    # Publication deliberately revokes faction approval; only the durable
+    # explicit CAS review transition may authorize player-facing rules.
+    factions = FactionStore(root)
+    first = factions.publish("marsh", faction, create=True)
+    assert factions.read("marsh")["approved"] is False
+    reviewed = factions.approve("marsh", expected_digest=first, note="Reviewed.")
+    factions.compile("marsh", reviewed)
     EvidenceStore(root).publish("marsh", evidence, create=True)
     sessions = SessionStore(root)
     sessions.create("marsh", "one")

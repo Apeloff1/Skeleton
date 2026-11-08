@@ -77,6 +77,9 @@ def run_with_executor(plan: dict, executor: Executor) -> dict:
     Pure orchestration: no DB, no platoon internals — fully testable.
     Returns an execution summary with per-phase handoffs in wave order.
     """
+    verification = planner.verify_plan(plan)
+    if not verification["valid"]:
+        raise ValueError("cannot execute an unverified swarm plan: " + "; ".join(verification["problems"][:3]))
     deps = deps_from_plan(plan)
     handoffs: dict[str, str] = {}
     phase_order: list[str] = []
@@ -163,6 +166,8 @@ def execute_schedule(
             )
 
     verification = planner.verify_plan(plan)
+    if not verification["valid"]:
+        raise ValueError("planned execution failed independent DAG verification")
 
     if persist:
         # Persistent/live execution owns the database-backed platoon runtime.

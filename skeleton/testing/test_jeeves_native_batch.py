@@ -20,6 +20,8 @@ from unittest import mock
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.contracts import (
     Identity, SpineLimits, Conflict, Busy, IntegrityFailure,
 )
+from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import ContractViolation
+from skeleton.jeeves.agent.native_source_fence import NativeSourceFence
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.database import SpineDatabase
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.lease import SessionGate
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.coordinator import ExecutionSpine
@@ -281,6 +283,9 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                        return_value=(nullcontext(), self.worker, object())) as active,
             mock.patch("skeleton.jeeves.agent.native_batch_cli.inspect_native_jeeves",
                        return_value=SimpleNamespace(source_bridge_ready=True)),
+            # Only the synthetic fixture overrides native source custody;
+            # production NativeSourceFence and publication stay fail closed.
+            mock.patch("skeleton.jeeves.agent.native_batch_cli.NativeSourceFence"),
         ):
             arguments = [
                 "--model-root", "/approved/private/model",
@@ -292,6 +297,13 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                 arguments.append("--approve-native")
             status = batch_cli(arguments)
         return status, stdout.getvalue(), stderr.getvalue(), active.call_count
+
+    def test_synthetic_worker_cannot_forge_installed_native_source(self):
+        with self.assertRaises(ContractViolation):
+            NativeSourceFence(
+                self.worker, object(),
+                expected_tenant="local", expected_subject="operator",
+            )
 
     def test_cli_real_path_commits_synthetic_source_only_batch(self):
         status, stdout, stderr, calls = self._cli()

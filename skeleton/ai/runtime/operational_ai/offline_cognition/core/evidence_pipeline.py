@@ -58,11 +58,15 @@ class EvidenceSpan:
         integer(self.end,minimum=self.start+1,maximum=MAX_BYTES)
         sha(self.passage_sha256)
 
-def partition(document, *, window_bytes=2048, overlap_bytes=128, limit=MAX_SPANS):
+def partition(document, *, window_bytes=2048, overlap_bytes=None, limit=MAX_SPANS):
     """Split UTF8 on codepoint boundaries while retaining original byte offsets."""
     if type(document) is not EvidenceDocument:
         refuse("source-bound document required")
     integer(window_bytes,minimum=16,maximum=65536)
+    # The implicit overlap scales down for small evidence windows; explicitly
+    # supplied invalid overlaps still fail closed without silent coercion.
+    if overlap_bytes is None:
+        overlap_bytes=min(128,window_bytes//4)
     integer(overlap_bytes,maximum=65535)
     integer(limit,minimum=1,maximum=MAX_SPANS)
     if overlap_bytes >= window_bytes:

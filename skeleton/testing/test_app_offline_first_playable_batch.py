@@ -603,8 +603,8 @@ def test_cohort_record_rejects_untyped_canonical_delivery_contract(
         "archive_sha256": "b" * 64,
         "save_sha256": "c" * 64,
         "independent_receipt_sha256": "d" * 64,
-        "world_digest": "world-digest",
-        "replay_digest": "replay-digest",
+        "world_digest": "e" * 64,
+        "replay_digest": "f" * 64,
         "action_count": 2,
         "offline_gameplay_reexecuted": True,
         "release_certified": False,
@@ -625,8 +625,8 @@ def test_cohort_record_rejects_replay_count_mismatch_and_unsupported_moves():
         "archive_sha256": "b" * 64,
         "save_sha256": "c" * 64,
         "independent_receipt_sha256": "d" * 64,
-        "world_digest": "world-digest",
-        "replay_digest": "replay-digest",
+        "world_digest": "e" * 64,
+        "replay_digest": "f" * 64,
         "action_count": 2,
         "offline_gameplay_reexecuted": True,
         "release_certified": False,
@@ -938,7 +938,9 @@ def test_second_cohort_replay_detects_late_in_place_installed_file_edit(
             expected_summary_sha256=published["independent_summary_sha256"],
             authorized=True,
         )
-    assert calls >= 3
+    # Earlier fail-closed inode/content fences can reject immediately after
+    # the second replay; a third replay is not required for rejection.
+    assert calls >= 2
     assert target.read_bytes() != original
     assert published["release_certified"] is False
 
