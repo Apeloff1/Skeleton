@@ -1321,13 +1321,27 @@ def _ratio_to_mille(value: Any) -> int:
             "ratio must be numeric",
             context={"reason": "malformed_spec"},
         )
-    number = float(value)
+    try:
+        number = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise GameReplayError(
+            "ratio must be a finite non-negative number",
+            context={"reason": "malformed_spec"},
+        ) from exc
     if not math.isfinite(number) or number < 0:
         raise GameReplayError(
             "ratio must be a finite non-negative number",
             context={"reason": "malformed_spec"},
         )
-    return round(number * 1000)
+    scaled = number * 1000
+    # Never permit a nonfinite or effectively unbounded combat multiplier
+    # to overflow Python's integer conversion or amplify a game replay.
+    if not math.isfinite(scaled) or scaled > (1 << 63) - 1:
+        raise GameReplayError(
+            "ratio exceeds the replay arithmetic budget",
+            context={"reason": "malformed_spec"},
+        )
+    return round(scaled)
 
 
 def _json_object_no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
