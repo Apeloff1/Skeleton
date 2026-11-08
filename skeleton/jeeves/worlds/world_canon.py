@@ -397,8 +397,9 @@ function render() {
   }
   const choices = world.choices.filter(c => c.from === current &&
     c.requires.every(f => flags.has(f)));
-  for (const choice of choices) {
-    const button = element("button", choice.label);
+  choices.forEach((choice, index) => {
+    const button = element("button", (index < 9 ? (index + 1) + ". " : "") + choice.label);
+    button.dataset.choiceIndex = String(index);
     button.addEventListener("click", () => {
       for (const flag of choice.grants) flags.add(flag);
       trace.push(choice.id);
@@ -406,8 +407,21 @@ function render() {
       render();
     });
     root.append(button);
-  }
+  });
 }
+// Digit shortcuts target only currently rendered numbered choice controls.
+// Save, Load and Restart are not choices and cannot be activated by digits.
+document.addEventListener("keydown", event => {
+  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey ||
+      event.repeat || event.target?.isContentEditable ||
+      ["INPUT", "TEXTAREA", "SELECT"].includes(event.target?.tagName)) return;
+  if (!/^[1-9]$/.test(event.key)) return;
+  const button = root.querySelector('button[data-choice-index="' + (Number(event.key) - 1) + '"]');
+  if (button && !button.disabled) {
+    event.preventDefault();
+    button.click();
+  }
+});
 render();
 """.strip()
 
