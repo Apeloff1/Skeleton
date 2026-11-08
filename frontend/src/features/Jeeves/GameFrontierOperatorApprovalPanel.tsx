@@ -61,11 +61,12 @@ export default function GameFrontierOperatorApprovalPanel({ actions, runAction, 
     }
   }, [dispatch, runAction, disabled]);
 
+  const visible = visibleApprovals(queue, actions);
   return (
     <View style={styles.root} accessibilityLabel="Operator approval queue">
       <Text style={styles.heading} accessibilityRole="header">Operator approval</Text>
-      {queue.length === 0 && <Text style={styles.muted}>No event actions are waiting.</Text>}
-      {visibleApprovals(queue, actions).map(entry => {
+      {visible.length === 0 && <Text style={styles.muted}>No event actions are waiting.</Text>}
+      {visible.map(entry => {
         const { action, status } = entry;
         return (
           <View key={action.id} style={styles.card} testID={'approval-' + action.id}
