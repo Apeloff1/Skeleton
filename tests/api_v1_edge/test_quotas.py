@@ -38,8 +38,53 @@ def test_policy_validation_and_eviction():
     with pytest.raises(ValueError):
         QuotaPolicy(1, 0)
     with pytest.raises(ValueError):
+        QuotaPolicy(1, 1, window_s=0)
+    with pytest.raises(ValueError):
+        QuotaPolicy(1, 1, window_s=float("nan"))
+    with pytest.raises(ValueError):
         TenantQuotas({})
-    q = TenantQuotas({"default": QuotaPolicy(1, 1)}, max_buckets=10)
-    for i in range(30):
+    with pytest.raises(ValueError):
+        TenantQuotas({"default": QuotaPolicy(1, 1)}, max_buckets=0)
+    now = [0.0]
+    q = TenantQuotas({"default": QuotaPolicy(1, 1)}, max_buckets=10, clock=lambda: now[0])
+    for i in range(10):
         q.check(f"t{i}", "default")
+    with pytest.raises(EdgeError) as capacity:
+        q.check("extra", "default")
+    assert capacity.value.code == "EDGE.QUOTA.CAPACITY" and capacity.value.status == 503
+    with pytest.raises(EdgeError) as retained:
+        q.check("t0", "default")
+    assert retained.value.status == 429  # tenant allowance not reset on capacity
+    now[0] = 2.0
+    q.check("extra", "default")
     assert len(q._buckets) <= 10
+
+
+def test_legacy_window_history_not_evicted_until_expiry():
+    now = [0.0]
+    q = TenantQuotas(
+        {"default": QuotaPolicy(100, 1, window_s=30, window_limit=1)},
+        max_buckets=1, clock=lambda: now[0]
+    )
+    q.check("a", "default")
+    now[0] = 2.0  # burst refilled, but window custody still active
+    with pytest.raises(EdgeError) as capacity:
+        q.check("b", "default")
+    assert capacity.value.code == "EDGE.QUOTA.CAPACITY"
+    now[0] = 31.0
+    q.check("b", "default")
+
+
+def test_legacy_quota_concurrent_requests_have_single_budget():
+    from concurrent.futures import ThreadPoolExecutor
+    q = TenantQuotas({"default": QuotaPolicy(0.001, 5)}, clock=lambda: 0.0)
+    def take(_):
+        try:
+            q.check("same", "default")
+            return 1
+        except EdgeError as err:
+            assert err.status == 429
+            return 0
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        result = list(pool.map(take, range(200)))
+    assert sum(result) == 5
