@@ -1,91 +1,75 @@
-"""Massive-depth SOTA event stream stack.
+"""Quarantined event-stream facade reusing canonical authenticated SSE delivery.
 
-Large stacked layers:
-- Adaptive multi-interval polling with load feedback
-- Multi-cursor concurrent reads with conflict and epoch fencing
-- Provenance-stamped snapshots and receipt chains
-- Bounded backpressure and circuit integration
-- Fail-closed cursor authentication with principal isolation
-- Histogram telemetry and adaptive ceilings
+The previous implementation returned only an SHA-256 digest of repr(snapshot)
+and therefore lost events, cursor, replay and response semantics. A digest is
+not a stream. This class delegates to the existing verified ledger, HMAC cursor,
+long-poll and bounded SSE encoder. No new public transport is registered.
 """
 from __future__ import annotations
-from dataclasses import dataclass, field
-from hashlib import sha256
-from time import monotonic_ns, sleep
-from typing import Any
+
+import hmac
 from collections import deque
-from .contracts import StreamError, StreamSnapshot, StreamQuery
-from .reader import EventReader
-from .cursor import CursorAuthority
+from threading import BoundedSemaphore
+from time import monotonic_ns
 
-@dataclass
-class AdaptivePollStack:
-    base_ms: int = 20
-    max_ms: int = 4000
-    load_factor: float = 1.0
-    history: deque = field(default_factory=lambda: deque(maxlen=32))
+from .contracts import StreamError, StreamPolicy
+from .query import StreamQuery
+from .reader import StreamSnapshot
+from .render import encode
+from .service import EventStream
 
-    def next_interval(self, recent_events: int) -> float:
-        self.history.append(recent_events)
-        avg = sum(self.history) / max(1, len(self.history))
-        if avg > 8:
-            self.load_factor = min(6.0, self.load_factor * 1.3)
-        else:
-            self.load_factor = max(0.4, self.load_factor * 0.85)
-        return min(self.max_ms, self.base_ms * self.load_factor) / 1000.0
-
-@dataclass
-class CursorFence:
-    active: dict[str, int] = field(default_factory=dict)
-    epochs: dict[str, int] = field(default_factory=dict)
-    ceiling: int = 12
-
-    def enter(self, key: str, epoch: int) -> None:
-        if self.active.get(key, 0) >= self.ceiling:
-            raise StreamError("cursor concurrency ceiling reached")
-        if self.epochs.get(key, 0) > epoch:
-            raise StreamError("stale cursor epoch")
-        self.active[key] = self.active.get(key, 0) + 1
-        self.epochs[key] = epoch
-
-    def exit(self, key: str) -> None:
-        self.active[key] = max(0, self.active.get(key, 0) - 1)
 
 class EventStreamSOTA:
-    def __init__(self, ledger, bearer: str, principal: str):
-        self.reader = EventReader(ledger, CursorAuthority(bearer, principal))
-        self.poll = AdaptivePollStack()
-        self.fence = CursorFence()
-        self.provenance = sha256(f"{bearer}:{principal}".encode()).hexdigest()
-        self.telemetry: deque = deque(maxlen=128)
+    """Opt-in, strictly owner-scoped wrapper over canonical flight SSE."""
+
+    def __init__(self, ledger, bearer: str, principal: str,
+                 *, policy: StreamPolicy | None = None):
+        try:
+            actual_principal = ledger.identity.key()
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise StreamError("authoritative ledger principal required") from exc
+        if (type(principal) is not str or not principal
+                or type(actual_principal) is not str
+                or not hmac.compare_digest(principal, actual_principal)):
+            raise StreamError("event stream principal does not own ledger")
+        self._stream = EventStream(ledger, bearer, policy=policy)
+        self.policy = self._stream.policy
+        self.reader = self._stream.reader
+        self._slots = BoundedSemaphore(12)
+        self.telemetry: deque[dict] = deque(maxlen=128)
+
+    def _encode(self, snapshot: StreamSnapshot) -> bytes:
+        # Never return a digest or stringify an untrusted snapshot.
+        return encode(snapshot, limit_bytes=self.policy.max_payload_bytes)
 
     def read(self, query: StreamQuery, *, epoch: int = 0) -> tuple[bytes, dict]:
         if not isinstance(query, StreamQuery):
-            raise StreamError("validated query required")
-        start = monotonic_ns()
-        cursor_key = query.cursor or "head"
-        self.fence.enter(cursor_key, epoch)
+            raise StreamError("validated stream query required")
+        # Canonical cursor MAC does not attest a separate epoch. Do not claim a
+        # cross-epoch authenticated cursor feature until the ledger supports it.
+        if type(epoch) is not int or epoch != 0:
+            raise StreamError("authenticated cursor epoch is not available")
+        if not self._slots.acquire(blocking=False):
+            raise StreamError("bounded event-stream admission exhausted")
         try:
-            snapshot = self._adaptive_read(query)
-            raw = self._encode(snapshot)
-            elapsed = monotonic_ns() - start
+            start = monotonic_ns()
+            raw, record = self._stream.read(query)
+            if (type(raw) is not bytes or len(raw) > self.policy.max_payload_bytes
+                    or type(record) is not dict
+                    or record.get("schema") != "skeleton.ai.flight-snapshot.v1"):
+                raise StreamError("invalid canonical event projection")
             receipt = {
                 "schema": "event-stream-receipt.v3-sota",
-                "provenance": self.provenance,
-                "epoch": epoch,
-                "latency_ns": elapsed,
-                "events": getattr(snapshot, "events", []).__len__() if hasattr(snapshot, "events") else 0,
-                "load_factor": self.poll.load_factor,
+                "epoch": 0,
+                "latency_ns": max(0, monotonic_ns() - start),
+                "job_id": record["job_id"],
+                "state": record["state"],
+                "events": record["events"],
+                "latest_ordinal": record["latest_ordinal"],
+                "terminal": record["terminal"],
+                "backlog": record["backlog"],
             }
             self.telemetry.append(receipt)
-            return raw, receipt
+            return raw, dict(receipt)
         finally:
-            self.fence.exit(cursor_key)
-
-    def _adaptive_read(self, query: StreamQuery):
-        interval = self.poll.next_interval(0)
-        # Production would sleep adaptively; here we delegate
-        return self.reader.read(query.job_id, query.cursor, limit=query.limit)
-
-    def _encode(self, snapshot) -> bytes:
-        return sha256(canonical({"snap": str(snapshot)})).digest() if "canonical" in dir() else sha256(str(snapshot).encode()).digest()
+            self._slots.release()
