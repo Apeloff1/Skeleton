@@ -121,6 +121,36 @@ def _setup_phase(result: SetupResult) -> InstallPhase:
     return InstallPhase("setup-runtime", True, detail)
 
 
+
+def _isolated_setup_recovery_command(manifest: object, *, hot: bool) -> tuple[str, ...]:
+    """Start only the independent setup frontend, regardless of Compose overlays.
+
+    A successful UI recovery is diagnostic only and cannot establish backend or
+    local-inference readiness. The command must remain shell-free.
+    """
+    command = compose_command("up", manifest=manifest, hot=hot)
+    if not command or command[-1] != "frontend" or command.count("up") != 1:
+        raise ValueError("diagnostic recovery must target only frontend")
+    up_index = command.index("up")
+    return (*command[:up_index + 1], "--no-deps", *command[up_index + 1:])
+
+
+def _probe_setup_route(frontend: object, url: str) -> bool:
+    """Best-effort setup availability; never replace a protected-stack failure.
+
+    Probe errors must not abort receipt publication. Do not retain exception
+    messages, which can include private hostnames, paths or credentials.
+    """
+    from skeleton.app.health import probe_local_setup
+
+    try:
+        return bool(probe_local_setup(
+            replace(frontend, public_url=url, health_path="/setup"), timeout=2.0,
+        ).ok)
+    except (OSError, ValueError, TypeError, KeyError, TimeoutError):
+        return False
+
+
 def install_application(
     root: Path | None = None,
     *,
@@ -207,8 +237,25 @@ def install_application(
             )
         )
 
-    manifest = load_manifest()
-    runtime_checks = preflight(root, runtime=True, manifest=manifest)
+    # Manifest and host-contract errors are installation failures, not uncaught
+    # exceptions. Do not interpolate exception messages: paths and configuration
+    # values may contain operator credentials or private host details.
+    try:
+        manifest = load_manifest()
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        phases.append(InstallPhase(
+            "manifest", False,
+            f"application manifest could not be loaded: {type(exc).__name__}",
+        ))
+        return InstallReceipt(root=root, phases=tuple(phases))
+    try:
+        runtime_checks = preflight(root, runtime=True, manifest=manifest)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        phases.append(InstallPhase(
+            "runtime-preflight", False,
+            f"runtime preflight could not complete: {type(exc).__name__}",
+        ))
+        return InstallReceipt(root=root, phases=tuple(phases))
     runtime_ok = checks_ok(runtime_checks)
     failed_codes = [check.code for check in runtime_checks if check.required and not check.ok]
     phases.append(
@@ -224,14 +271,29 @@ def install_application(
     )
     if not runtime_ok:
         return InstallReceipt(root=root, phases=tuple(phases))
-    manifest = runtime_manifest(manifest, root=root)
+    try:
+        manifest = runtime_manifest(manifest, root=root)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        phases.append(InstallPhase(
+            "runtime-manifest", False,
+            f"runtime manifest could not be assembled: {type(exc).__name__}",
+        ))
+        return InstallReceipt(root=root, phases=tuple(phases))
 
     # Validate precisely the configuration used for startup. The production
     # frontend uses port 8080, unlike the default development Compose model.
     mode = "production" if production else "development"
     compose_env = {**os.environ, **manifest.mode_env(mode), "COMPOSE_REMOVE_ORPHANS": "0"}
+    try:
+        config_command = compose_command("config", manifest=manifest, full=full, hot=hot)
+    except (ValueError, KeyError, TypeError) as exc:
+        phases.append(InstallPhase(
+            "compose-config", False,
+            f"compose validation command is invalid: {type(exc).__name__}",
+        ))
+        return InstallReceipt(root=root, phases=tuple(phases))
     compose_validate = _run(
-        compose_command("config", manifest=manifest, full=full, hot=hot),
+        config_command,
         root=root,
         runner=runner,
         label="compose-config",
@@ -245,7 +307,7 @@ def install_application(
     try:
         host_urls = public_service_urls(root, manifest=manifest)
     except ValueError as exc:
-        phases.append(InstallPhase("public-endpoints", False, str(exc)))
+        phases.append(InstallPhase("public-endpoints", False, f"invalid public endpoints: {type(exc).__name__}"))
         return InstallReceipt(root=root, phases=tuple(phases))
 
     try:
@@ -257,7 +319,7 @@ def install_application(
             hot=hot,
         )
     except ValueError as exc:
-        phases.append(InstallPhase("start", False, str(exc)))
+        phases.append(InstallPhase("start", False, f"invalid startup command: {type(exc).__name__}"))
         return InstallReceipt(root=root, phases=tuple(phases))
     try:
         completed = runner(
@@ -291,14 +353,25 @@ def install_application(
                 default_services=("frontend",),
                 full_services=("frontend",),
             )
-            recovery = _run(
-                compose_command("up", manifest=diagnostic_manifest, hot=hot),
-                root=root,
-                runner=runner,
-                label="setup-ui-recovery",
-                timeout=900.0,
-                env=compose_env,
-            )
+            try:
+                recovery_command = _isolated_setup_recovery_command(diagnostic_manifest, hot=hot)
+            except ValueError:
+                # Invalid diagnostic topology must not mask the original
+                # protected-stack failure or escape without a receipt.
+                recovery = InstallPhase(
+                    "setup-ui-recovery",
+                    False,
+                    "independent setup UI recovery configuration is invalid",
+                )
+            else:
+                recovery = _run(
+                    recovery_command,
+                    root=root,
+                    runner=runner,
+                    label="setup-ui-recovery",
+                    timeout=900.0,
+                    env=compose_env,
+                )
             phases.append(
                 InstallPhase(
                     "setup-ui-recovery", recovery.ok,
@@ -307,22 +380,15 @@ def install_application(
                 )
             )
             if recovery.ok:
-                from skeleton.app.health import probe_local_setup
-
-                probe = probe_local_setup(
-                    replace(
-                        frontend,
-                        public_url=host_urls.get("frontend", frontend.public_url),
-                        health_path="/setup",
-                    ),
-                    timeout=2.0,
+                setup_available = _probe_setup_route(
+                    frontend, host_urls.get("frontend", frontend.public_url),
                 )
                 phases.append(
                     InstallPhase(
-                        "setup-ui-availability", probe.ok,
+                        "setup-ui-availability", setup_available,
                         (
                             "local setup route answered directly; backend and AI remain unavailable"
-                            if probe.ok
+                            if setup_available
                             else "setup route unavailable; inspect frontend logs"
                         ),
                         required=False,
@@ -377,6 +443,35 @@ def install_application(
                     ),
                 )
             )
+
+    # A successful Compose launch is not evidence that the protected runtime is
+    # usable. Preserve readiness/API failures as required failures while
+    # independently reporting whether the setup route is still accessible.
+    # Never start additional services or infer backend/AI readiness here.
+    if full_start_ok and any(
+        phase.name in ("readiness", "critical-api-routes") and not phase.ok
+        for phase in phases
+    ):
+        frontend = manifest.service("frontend")
+        if frontend.depends_on:
+            phases.append(InstallPhase(
+                "setup-ui-availability", False,
+                "setup UI independence is unqualified; protected runtime remains unhealthy",
+                required=False,
+            ))
+        else:
+            setup_available = _probe_setup_route(
+                frontend, host_urls.get("frontend", frontend.public_url),
+            )
+            phases.append(InstallPhase(
+                "setup-ui-availability", setup_available,
+                (
+                    "setup route available; protected runtime remains unhealthy"
+                    if setup_available
+                    else "setup route unavailable; inspect frontend logs; protected runtime remains unhealthy"
+                ),
+                required=False,
+            ))
 
     return InstallReceipt(root=root, phases=tuple(phases))
 

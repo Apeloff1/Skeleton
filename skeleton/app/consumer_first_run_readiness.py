@@ -21,6 +21,7 @@ from skeleton.app.offline_delivery_assurance import (
 from skeleton.app.offline_first_playable_delivery import (
     inspect_first_playable_delivery,
 )
+from skeleton.app.consumer_first_run_handoff import validate_source_only_handoff
 from skeleton.app.installed_tree_custody import (
     installed_tree_snapshot_digest, snapshot_installed_tree,
 )
@@ -153,7 +154,7 @@ def inspect_consumer_first_run(
         raise ConsumerFirstRunReadinessError(
             "canonical playable replay lacks fail-closed readiness contracts"
         )
-    return {
+    evidence = {
         "schema": SCHEMA,
         "status": "source_level_first_run_replayed_release_blocked",
         "project_id": first["project_id"],
@@ -193,6 +194,8 @@ def inspect_consumer_first_run(
         "release_certified": False,
         "release_holds": list(RELEASE_HOLDS),
     }
+    validate_source_only_handoff(evidence)
+    return evidence
 
 
 def main(argv: Sequence[str] | None = None) -> int:

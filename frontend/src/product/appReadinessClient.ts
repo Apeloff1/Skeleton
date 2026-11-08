@@ -37,7 +37,11 @@ function localGuardIssue(data: Record<string, unknown> | null): { message: strin
 export async function readAppReadiness(signal?: AbortSignal): Promise<AppReadiness> {
   const healthPromise = probeAppHealth(2500, signal).catch(() => null);
   const epoch = getAuthEpoch();
-  const account = await checkMe(signal);
+  // A failed authentication transport must not hide the offline setup screen.
+  // Treat an exception as unobserved authority, never as an anonymous grant.
+  const account = await checkMe(signal).catch(() => ({
+    observed: false, authenticated: false, enforced: true, role: 'anonymous', user: null,
+  }));
   if (signal?.aborted) throw new Error('Readiness check cancelled.');
   if (epoch !== getAuthEpoch()) throw new Error('Your account changed. Check readiness again.');
   const token = getAuthToken();

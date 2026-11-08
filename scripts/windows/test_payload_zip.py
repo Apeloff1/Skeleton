@@ -6,7 +6,7 @@ import stat
 import tempfile
 import unittest
 from pathlib import Path
-from zipfile import ZipFile, ZipInfo
+from zipfile import ZIP_BZIP2, ZipFile, ZipInfo
 
 from scripts.windows.check_payload_zip import (
     MAX_ENTRIES,
@@ -86,6 +86,29 @@ class PayloadZipPreflightTests(unittest.TestCase):
         info.create_system = 3
         info.external_attr = (stat.S_IFLNK | 0o777) << 16
         self.assertTrue(any("symbolic link" in issue for issue in archive_errors([info])))
+
+    def test_unix_special_entries_are_rejected(self) -> None:
+        for kind in (stat.S_IFIFO, stat.S_IFCHR, stat.S_IFBLK, stat.S_IFSOCK):
+            with self.subTest(kind=kind):
+                info = ZipInfo("special")
+                info.create_system = 3
+                info.external_attr = (kind | 0o600) << 16
+                self.assertTrue(any("nonregular" in error for error in archive_errors([info])))
+
+    def test_unix_type_must_match_directory_suffix(self) -> None:
+        directory = ZipInfo("folder")
+        directory.create_system = 3
+        directory.external_attr = (stat.S_IFDIR | 0o755) << 16
+        regular = ZipInfo("regular/")
+        regular.create_system = 3
+        regular.external_attr = (stat.S_IFREG | 0o644) << 16
+        self.assertTrue(any("directory metadata" in e for e in archive_errors([directory])))
+        self.assertTrue(any("file metadata" in e for e in archive_errors([regular])))
+
+    def test_unsupported_compression_is_rejected(self) -> None:
+        info = ZipInfo("data.txt")
+        info.compress_type = ZIP_BZIP2
+        self.assertTrue(any("compression" in e for e in archive_errors([info])))
 
     def test_huge_entry_rejected_without_allocating(self) -> None:
         info = ZipInfo("big.bin")

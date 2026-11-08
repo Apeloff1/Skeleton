@@ -34,7 +34,7 @@ class ProbeResult:
 def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
     """Probe one HTTP endpoint without external client dependencies."""
 
-    if not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
+    if type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
         raise ValueError("health probe timeout must be finite and within (0, 30] seconds")
     request = Request(url, headers={"User-Agent": "skeleton-app-smoke/1"})
     try:
@@ -92,7 +92,7 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
     """
     from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
-    if not math.isfinite(timeout) or not 0 < timeout <= 10:
+    if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 10:
         raise ValueError("setup probe timeout must be finite and within (0, 10] seconds")
     # Reject invalid targets here as well as in the Windows launcher, so a
     # future caller cannot accidentally turn this local probe into an SSRF.
@@ -214,9 +214,9 @@ def wait_for_application(
 
     if not isinstance(attempts, int) or isinstance(attempts, bool) or not 1 <= attempts <= 120:
         raise ValueError("attempts must be an integer between 1 and 120")
-    if not math.isfinite(timeout) or not 0 < timeout <= 30:
+    if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 30:
         raise ValueError("timeout must be finite and within (0, 30] seconds")
-    if not math.isfinite(delay) or not 0 <= delay <= 30:
+    if type(delay) not in (int, float) or not math.isfinite(delay) or not 0 <= delay <= 30:
         raise ValueError("delay must be finite and within [0, 30] seconds")
 
     manifest = manifest or load_manifest()
