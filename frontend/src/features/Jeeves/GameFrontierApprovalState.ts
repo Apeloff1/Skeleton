@@ -122,6 +122,15 @@ export function approvalReducer(queue: ApprovalQueue, event: ApprovalEvent): App
   }
 }
 
+/** Tab visibility is a view, not a state reset. In-flight and terminal entries
+ * remain in the authoritative queue while another editor is selected. */
+export function visibleApprovals(
+  queue: ApprovalQueue, actions: readonly FrontierEventAction[],
+): ApprovalQueue {
+  const ids = new Set(actions.map(action => action.id));
+  return queue.filter(entry => ids.has(entry.action.id));
+}
+
 /** True only for the single transition that is allowed to call the runtime. */
 export function mayCallRuntime(before: ApprovalEntry | undefined, after: ApprovalEntry | undefined): boolean {
   return !!before && !!after && before.action === after.action
