@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from scripts.check_ci_workflow_tiers import ROOT, audit, events, admission_group
+from scripts.check_ci_workflow_tiers import ROOT, SCHEDULED_RECOVERY, audit, events
 
 
 class WorkflowTierTests(unittest.TestCase):
@@ -41,32 +41,44 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertIn("skeleton/testing --tb=short", readiness)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
+    def test_operational_recovery_is_bounded_and_cannot_register_pr_ci(self):
+        self.assertEqual(len(SCHEDULED_RECOVERY), 3)
+        policy = json.loads(
+            (ROOT / "machine/ci_workflow_tiers.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(set(policy["operational_scheduled_non_pr"]), SCHEDULED_RECOVERY)
+        for name in SCHEDULED_RECOVERY:
+            with self.subTest(name=name):
+                source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+                self.assertEqual(events(source), {"workflow_dispatch", "schedule", "push"})
+                self.assertRegex(source, r"(?m)^permissions: \{\}$")
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
 
-    def test_event_parser_rejects_undercounted_and_duplicate_admissions(self):
-        for candidate in (
+    def test_triggers_are_fail_closed_for_inline_duplicates_and_missing_events(self):
+        for example in (
+            "on:\n  schedule: [daily]\njobs:\n",
             "on:\n  push: [main]\njobs:\n",
-            "on:\n  pull_request: {}\njobs:\n",
             "on:\n  push:\n  push:\njobs:\n",
             "on:\n  workflow_dispatch:\non:\n  push:\njobs:\n",
-            "on:\n  # no event\njobs:\n",
+            "on:\n  # only comments\njobs:\n",
         ):
-            with self.subTest(source=candidate):
+            with self.subTest(example=example):
                 with self.assertRaises(ValueError):
-                    events(candidate)
-        self.assertEqual(
-            admission_group({"pull_request", "push", "workflow_dispatch"}), "pr")
-        self.assertEqual(
-            admission_group({"schedule", "workflow_dispatch"}), "other")
-        self.assertIsNone(admission_group({"workflow_dispatch", "workflow_call"}))
+                    events(example)
+        self.assertEqual(events("on:\n  workflow_dispatch:\n"
+                                "  schedule:\n    - cron: '0 * * * *'\n"
+                                "jobs:\n"),
+                         {"workflow_dispatch", "schedule"})
 
-    def test_mixed_event_workflow_is_never_unclassified(self):
-        self.assertEqual(events("on:\n  pull_request: # guarded\n"
-                                "  workflow_dispatch:\n  schedule:\njobs:\n"),
-                         {"pull_request", "workflow_dispatch", "schedule"})
-        self.assertEqual(admission_group({"pull_request", "schedule"}), "pr")
+    def test_privileged_recovery_push_scope_cannot_be_widened(self):
+        from scripts.check_ci_workflow_tiers import RECOVERY_PUSH_CONTRACTS
+        self.assertEqual(len(RECOVERY_PUSH_CONTRACTS), 3)
+        for workflow, expected in RECOVERY_PUSH_CONTRACTS.items():
+            body = (ROOT / ".github/workflows" / workflow).read_text(encoding="utf-8")
+            self.assertIn(expected, body)
 
     def test_specialists_are_archived_and_active_core_remains_required(self):
         with TemporaryDirectory() as temp:
@@ -111,6 +123,30 @@ class WorkflowTierTests(unittest.TestCase):
             )
             self.assertEqual(audit(root), [])
             evidence.unlink()
+            # An exempt queue-maintenance workflow must never become a PR
+            # admission or acquire broad workflow token permissions.
+            recovery_path = root / ".github/workflows" / "queue-drain.yml"
+            recovery_before = recovery_path.read_text(encoding="utf-8")
+            recovery_path.write_text(recovery_before.replace(
+                "  schedule:", "  pull_request:\n  schedule:", 1
+            ))
+            self.assertTrue(any("operational-only trigger" in issue for issue in audit(root)))
+            recovery_path.write_text(recovery_before.replace(
+                "permissions: {}", "permissions: write-all", 1
+            ))
+            self.assertTrue(any("operational-only trigger" in issue for issue in audit(root)))
+            recovery_path.write_text(
+                recovery_before.replace(
+                    "paths: ['.github/workflows/queue-drain.yml']",
+                    "paths: ['**']", 1
+                ), encoding="utf-8"
+            )
+            self.assertTrue(
+                any("operational-only trigger or permission drift" in reason
+                    for reason in audit(root))
+            )
+            recovery_path.write_text(recovery_before)
+            self.assertEqual(audit(root), [])
             for index in range(10):
                 (
                     root / ".github/workflows" / f"automatic-extra-{index}.yml"
@@ -120,22 +156,10 @@ class WorkflowTierTests(unittest.TestCase):
                     encoding="utf-8",
                 )
             self.assertTrue(
-                any("unexpected active PR workflow count" in item for item in audit(root))
+                any("unexpected active workflow count" in item for item in audit(root))
             )
             for index in range(10):
                 (root / ".github/workflows" / f"automatic-extra-{index}.yml").unlink()
-            for index in range(13):
-                (root / ".github/workflows" / f"scheduled-extra-{index}.yml").write_text(
-                    "name: scheduled\non:\n  schedule:\n"
-                    "    - cron: '17 * * * *'\njobs:\n  noop:\n"
-                    "    runs-on: ubuntu-latest\n    steps:\n      - run: echo no-op\n",
-                    encoding="utf-8",
-                )
-            self.assertTrue(
-                any("unexpected active non-PR workflow count" in item for item in audit(root))
-            )
-            for index in range(13):
-                (root / ".github/workflows" / f"scheduled-extra-{index}.yml").unlink()
             name = registry["specialized_manual_only"][0]
             spec = root / ".github/workflows-archive" / name
             original = spec.read_text()

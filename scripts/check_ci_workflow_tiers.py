@@ -17,41 +17,61 @@ WORKFLOWS = Path(".github/workflows")
 ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
 
-# Keep independently admitted pull-request checks bounded without counting
-# scheduled operations and explicit owner events as PR-check invocations.
-# A separate ceiling retains pressure on always-on operational workflows.
-MAX_PR_ADMISSIONS = 20
-MAX_OTHER_ADMISSIONS = 12
-PR_EVENTS = frozenset({"pull_request", "pull_request_target", "merge_group"})
+# Scheduled Actions recovery has its own three-slot budget. It never consumes
+# PR CI admission or waives a check. The identity is intentionally hard-coded:
+# changing registry metadata cannot exempt an arbitrary future workflow.
+SCHEDULED_RECOVERY = frozenset({
+    "actions-housekeeping-cli.yml",
+    "queue-drain.yml",
+    "three-hour-actions-queue-expiry.yml",
+})
+
+
+# These string contracts are intentionally exact. The three privileged
+# maintenance lanes cannot widen their default-branch push admission paths
+# or acquire an unreviewed file pattern while bypassing the twenty-check cap.
+RECOVERY_PUSH_CONTRACTS = {
+    "actions-housekeeping-cli.yml": (
+        "  push:\n    branches: [main]\n    paths:\n"
+        "      - '.github/workflows/actions-housekeeping-cli.yml'"
+    ),
+    "queue-drain.yml": (
+        "  push:\n    branches: [main]\n"
+        "    paths: ['.github/workflows/queue-drain.yml']"
+    ),
+    "three-hour-actions-queue-expiry.yml": (
+        "  push:\n    branches: [main]\n    paths:\n"
+        "      - '.github/workflows/three-hour-actions-queue-expiry.yml'\n"
+        "      - 'scripts/cancel_stale_actions_queue.py'\n"
+        "      - 'tests/test_cancel_stale_actions_queue.py'"
+    ),
+}
 
 
 def events(source: str) -> set[str]:
-    """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
+    """Parse exactly one YAML event map without undercounting unsafe triggers."""
     lines = source.splitlines()
     positions = [i for i, line in enumerate(lines) if line == "on:"]
     if len(positions) != 1:
-        raise ValueError("workflow requires exactly one multiline 'on:' trigger")
+        raise ValueError("workflow requires exactly one multiline on: event map")
     found: set[str] = set()
     for line in lines[positions[0] + 1:]:
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         if not line[0].isspace():
             break
-        # An inline trigger such as "push: [main]" is an independent event,
-        # not a manual-only workflow. Reject it until explicitly classified,
-        # rather than silently dropping it from the admission count.
         if line.startswith("  ") and not line.startswith("   "):
             match = re.fullmatch(r"  ([a-z_][a-z0-9_]*):\s*(?:#.*)?", line)
             if match is None:
-                raise ValueError("workflow has unsupported or inline event")
-            event = match.group(1)
-            if event in found:
-                raise ValueError("workflow has duplicate event")
-            found.add(event)
+                raise ValueError("inline or unclassified workflow admission")
+            name = match.group(1)
+            if name in found:
+                raise ValueError("duplicate workflow event")
+            found.add(name)
         elif not found:
-            raise ValueError("workflow has nested payload without event")
+            raise ValueError("nested workflow event before event declaration")
     if not found:
-        raise ValueError("workflow declares no classifiable events")
+        raise ValueError("no classifiable workflow admissions")
     return found
 
 
@@ -62,18 +82,6 @@ def independently_triggered(found: set[str]) -> bool:
     the existing PR workflow admission, while required native checks still run.
     """
     return bool(found - {"workflow_dispatch", "workflow_call"})
-
-
-def admission_group(found: set[str]) -> str | None:
-    """Classify a workflow by what independently admits it.
-
-    PR and merge-queue traffic must be budgeted separately from scheduled,
-    operator-comment, release-push and workflow-run maintenance. This does
-    not remove, skip, or change any security or required Actions workflow.
-    """
-    if not independently_triggered(found):
-        return None
-    return "pr" if found & PR_EVENTS else "other"
 
 
 def audit(root: Path = ROOT) -> list[str]:
@@ -92,7 +100,17 @@ def audit(root: Path = ROOT) -> list[str]:
             or any(not isinstance(name, str) or not name.endswith(".yml") or "/" in name
                    for group in tiers for name in group)):
         return ["CI tiers require nonempty sets of plain .yml file names"]
-    names = specialised + core + reusable
+    recovery = policy.get("operational_scheduled_non_pr")
+    if (type(recovery) is not list
+            or len(recovery) != len(SCHEDULED_RECOVERY)
+            or any(type(name) is not str for name in recovery)
+            or set(recovery) != SCHEDULED_RECOVERY):
+        failures.append("operational recovery registry must be the exact three scheduled lanes")
+        recovery = []
+    for name in SCHEDULED_RECOVERY:
+        if not (root / WORKFLOWS / name).is_file():
+            failures.append(f"{name}: required scheduled recovery workflow missing")
+    names = specialised + core + reusable + recovery
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
     rules = policy.get("release_rules")
@@ -102,10 +120,10 @@ def audit(root: Path = ROOT) -> list[str]:
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
     if not active:
         failures.append("unexpected active workflow count: 0")
-    # All independent admissions are still bounded. PR checks and other
-    # automatic operations have distinct caps: counting scheduled workers as
-    # PR checks artificially rejects the repository's required security gates.
-    counts = {"pr": 0, "other": 0}
+    # Scheduled queue-maintenance has three separately bounded non-PR lanes.
+    # All other independently triggered workflows continue to consume the
+    # unchanged 20-workflow CI capacity cap, including security/release lanes.
+    automatic = 0
     for path in active:
         try:
             found = events(path.read_text(encoding="utf-8"))
@@ -114,13 +132,20 @@ def audit(root: Path = ROOT) -> list[str]:
                 f"{path.name}: cannot inspect active workflow ({exc})"
             )
             continue
-        group = admission_group(found)
-        if group is not None:
-            counts[group] += 1
-    if counts["pr"] > MAX_PR_ADMISSIONS:
-        failures.append(f"unexpected active PR workflow count: {counts['pr']} > {MAX_PR_ADMISSIONS}")
-    if counts["other"] > MAX_OTHER_ADMISSIONS:
-        failures.append(f"unexpected active non-PR workflow count: {counts['other']} > {MAX_OTHER_ADMISSIONS}")
+        if path.name in SCHEDULED_RECOVERY and path.name in recovery:
+            # These are privilege-bounded scheduled maintenance, not source
+            # validation. Reject any PR admission or change to their triggers,
+            # default branch, explicit path filter, or root permission ceiling.
+            source = path.read_text(encoding="utf-8")
+            if (found != {"workflow_dispatch", "schedule", "push"}
+                    or RECOVERY_PUSH_CONTRACTS[path.name] not in source
+                    or not re.search(r"(?m)^permissions: \{\}$", source)):
+                failures.append(f"{path.name}: operational-only trigger or permission drift")
+            continue
+        if independently_triggered(found):
+            automatic += 1
+    if automatic > 20:
+        failures.append(f"unexpected active workflow count: {automatic}")
     for name in specialised:
         path = root / ARCHIVE / name
         if (root / WORKFLOWS / name).exists():
