@@ -31,7 +31,7 @@ export type ApprovalEvent =
   | { type: 'failed'; id: string; error: string }
   | { type: 'retry'; id: string };
 
-export type ApprovalQueue = ReadonlyArray<ApprovalEntry>;
+export type ApprovalQueue = readonly ApprovalEntry[];
 
 const MAX_QUEUE = 64;
 const ACTION_ID = /^[A-Za-z0-9_-]{1,128}$/;
