@@ -144,7 +144,7 @@ class QuarantinedKnowledgeRestoration(unittest.TestCase):
                          {self.identity.key(), other.key()})
         self.assertTrue(all(row[1:] == ("original", 1) for row in rows))
         self.assertTrue(self.knowledge.search("tenant one", include_text=True))
-        self.assertFalse(self.knowledge.search("tenant two", include_text=True))
+        self.assertFalse(self.knowledge.search("isolated", include_text=True))
 
 
 if __name__ == "__main__":
