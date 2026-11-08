@@ -1,6 +1,6 @@
 # 19-draft reconciliation custody — 2026-11-08
 
-Parent candidate: [#5074](https://github.com/Apeloff1/Skeleton/pull/5074), exact baseline `5166439f8f79319efc6099f49b05e28b19abef6c`. The original draft heads and branch protections remain unchanged. This document is a **source-review ledger**, not a CI, merge, Windows/WSL2, native inference, or release approval. A partial GitHub file listing is not a complete semantic diff; all claims below are limited to examined paths and observed workflow results.
+**Main-based qualification candidate only (2026-11-08).** Review base is now `main`, not the #5074 feature branch, to require full integrated exact-head CI. The branch retains [#5074](https://github.com/Apeloff1/Skeleton/pull/5074) at reviewed parent `2018a908b10ca298982439bfdd864fdf246a0a18` in its Git ancestry; earlier #5074 baseline `5166439f8f79319efc6099f49b05e28b19abef6c` is historical. The 19 recovered source changes remain separate in the branch tree. This retarget is **not** promotion to merge, device, security, or release readiness. The original draft heads and branch protections remain unchanged. This document is a **source-review ledger**, not a CI, merge, Windows/WSL2, native inference, or release approval. A partial GitHub file listing is not a complete semantic diff; all claims below are limited to examined paths and observed workflow results.
 
 ## Disposition by original PR
 
@@ -36,4 +36,4 @@ Parent candidate: [#5074](https://github.com/Apeloff1/Skeleton/pull/5074), exact
 
 ## Admission and rollback
 
-This branch is stacked on #5074 and must not be independently merged to `main` without rechecking ancestry, duplicate source, final-head tests, architecture/mirror index, mandatory malware/secret/dependency/workflow/CI gates, independent review and device checks. To revert the incremental change, revert its dedicated commit only after confirming downstream integration dependencies. Keep #5022 and the historic recovery branches quarantined.
+This branch includes #5074 in Git ancestry and is now compared directly with `main` solely for **complete integrated exact-final-head qualification**. It must not be merged to `main` without rechecking ancestry, duplicate source, final-head tests, architecture/mirror index, mandatory malware/secret/dependency/workflow/CI gates, independent review and device checks. To revert the incremental change, revert its dedicated commit only after confirming downstream integration dependencies. Keep #5022 and the historic recovery branches quarantined.
