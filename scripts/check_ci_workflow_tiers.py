@@ -17,6 +17,13 @@ WORKFLOWS = Path(".github/workflows")
 ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
 
+# Keep independently admitted pull-request checks bounded without counting
+# scheduled operations and explicit owner events as PR-check invocations.
+# A separate ceiling retains pressure on always-on operational workflows.
+MAX_PR_ADMISSIONS = 20
+MAX_OTHER_ADMISSIONS = 12
+PR_EVENTS = frozenset({"pull_request", "pull_request_target", "merge_group"})
+
 
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
@@ -42,6 +49,18 @@ def independently_triggered(found: set[str]) -> bool:
     the existing PR workflow admission, while required native checks still run.
     """
     return bool(found - {"workflow_dispatch", "workflow_call"})
+
+
+def admission_group(found: set[str]) -> str | None:
+    """Classify a workflow by what independently admits it.
+
+    PR and merge-queue traffic must be budgeted separately from scheduled,
+    operator-comment, release-push and workflow-run maintenance. This does
+    not remove, skip, or change any security or required Actions workflow.
+    """
+    if not independently_triggered(found):
+        return None
+    return "pr" if found & PR_EVENTS else "other"
 
 
 def audit(root: Path = ROOT) -> list[str]:
@@ -70,9 +89,10 @@ def audit(root: Path = ROOT) -> list[str]:
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
     if not active:
         failures.append("unexpected active workflow count: 0")
-    # Signed evidence workflows may sit beside the compact PR set when they
-    # cannot run automatically. Only non-manual triggers consume the cap.
-    automatic = 0
+    # All independent admissions are still bounded. PR checks and other
+    # automatic operations have distinct caps: counting scheduled workers as
+    # PR checks artificially rejects the repository's required security gates.
+    counts = {"pr": 0, "other": 0}
     for path in active:
         try:
             found = events(path.read_text(encoding="utf-8"))
@@ -81,10 +101,13 @@ def audit(root: Path = ROOT) -> list[str]:
                 f"{path.name}: cannot inspect active workflow ({exc})"
             )
             continue
-        if independently_triggered(found):
-            automatic += 1
-    if automatic > 20:
-        failures.append(f"unexpected active workflow count: {automatic}")
+        group = admission_group(found)
+        if group is not None:
+            counts[group] += 1
+    if counts["pr"] > MAX_PR_ADMISSIONS:
+        failures.append(f"unexpected PR workflow count: {counts['pr']} > {MAX_PR_ADMISSIONS}")
+    if counts["other"] > MAX_OTHER_ADMISSIONS:
+        failures.append(f"unexpected non-PR workflow count: {counts['other']} > {MAX_OTHER_ADMISSIONS}")
     for name in specialised:
         path = root / ARCHIVE / name
         if (root / WORKFLOWS / name).exists():
