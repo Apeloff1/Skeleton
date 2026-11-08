@@ -268,15 +268,6 @@ def test_sandbox_output_bounds_and_argument_types_are_strict(spec_kw) -> None:
         ToolSpec("echo", ECHO, **spec_kw)
 
 
-@pytest.mark.parametrize("policy_kw", [
-    {"output_block_threshold": 0.0},
-    {"output_block_threshold": 1.01},
-    {"output_block_threshold": float("nan")},
-    {"output_block_threshold": True},
-    {"max_executions": -1},
-    {"max_executions": True},
-    {"max_executions": 1.5},
-])
 @pytest.mark.parametrize("field", [
     "require_sealed_mediator", "require_network_isolation", "scan_output",
 ])
@@ -292,6 +283,15 @@ def test_tool_stdin_admission_requires_exact_boolean(invalid) -> None:
         ToolSpec("echo", ECHO, allow_stdin=invalid)
 
 
+@pytest.mark.parametrize("policy_kw", [
+    {"output_block_threshold": 0.0},
+    {"output_block_threshold": 1.01},
+    {"output_block_threshold": float("nan")},
+    {"output_block_threshold": True},
+    {"max_executions": -1},
+    {"max_executions": True},
+    {"max_executions": 1.5},
+])
 def test_sandbox_policy_cannot_disable_output_scanning_by_bad_limits(policy_kw) -> None:
     with pytest.raises(ExecutorConfigError):
         ExecutorPolicy(**policy_kw)
