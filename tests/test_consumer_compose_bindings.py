@@ -35,6 +35,20 @@ class ConsumerComposeBindingTests(unittest.TestCase):
         for service in ("SKELETON", "BACKEND", "FRONTEND"):
             self.assertNotRegex(source, rf"\$\{{{service}_BIND_HOST:-(?:0\.0\.0\.0|::)\}}")
 
+    def test_frontend_setup_remains_visible_during_backend_outage(self):
+        source = COMPOSE.read_text(encoding="utf-8")
+        section = source.split("\\n  frontend:\\n", 1)[1].split("\\n  mongo:\\n", 1)[0]
+        self.assertNotRegex(section, r"(?m)^\\s+depends_on:")
+        self.assertIn("EXPO_PUBLIC_BACKEND_URL", section)
+
+    def test_service_specific_opt_in_never_changes_private_data_ports(self):
+        source = COMPOSE.read_text(encoding="utf-8")
+        for service in ("SKELETON", "BACKEND", "FRONTEND"):
+            self.assertIn("${" + service + "_BIND_HOST:-127.0.0.1}", source)
+        for service, port in (("MONGO", "27017"), ("CHROMA", "8000")):
+            self.assertIn('127.0.0.1:${' + service + '_PORT:-' + port + '}', source)
+            self.assertNotIn("${" + service + "_BIND_HOST:-", source)
+
 
 if __name__ == "__main__":
     unittest.main()
