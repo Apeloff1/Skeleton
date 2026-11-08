@@ -277,6 +277,21 @@ def test_sandbox_output_bounds_and_argument_types_are_strict(spec_kw) -> None:
     {"max_executions": True},
     {"max_executions": 1.5},
 ])
+@pytest.mark.parametrize("field", [
+    "require_sealed_mediator", "require_network_isolation", "scan_output",
+])
+@pytest.mark.parametrize("invalid", [None, 0, 1, "", "false", [], {}])
+def test_policy_security_toggles_require_exact_boolean(field, invalid) -> None:
+    with pytest.raises(ExecutorConfigError, match="explicit booleans"):
+        ExecutorPolicy(**{field: invalid})
+
+
+@pytest.mark.parametrize("invalid", [None, 0, 1, "", "false", [], {}])
+def test_tool_stdin_admission_requires_exact_boolean(invalid) -> None:
+    with pytest.raises(ExecutorConfigError, match="explicit boolean"):
+        ToolSpec("echo", ECHO, allow_stdin=invalid)
+
+
 def test_sandbox_policy_cannot_disable_output_scanning_by_bad_limits(policy_kw) -> None:
     with pytest.raises(ExecutorConfigError):
         ExecutorPolicy(**policy_kw)

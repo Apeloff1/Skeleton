@@ -95,6 +95,8 @@ class ToolSpec:
     def __post_init__(self) -> None:
         if not self.name or len(self.name) > MAX_TOOL_NAME or not self.name.replace("_", "").replace("-", "").replace(".", "").isalnum():
             raise ExecutorConfigError("tool name must be a short identifier", context={"name": self.name[:80]})
+        if type(self.allow_stdin) is not bool:
+            raise ExecutorConfigError("tool stdin admission must be an explicit boolean", context={"tool": self.name})
         if not self.executable or any(ch in self.executable for ch in "\x00\n\r"):
             raise ExecutorConfigError("tool executable is invalid", context={"tool": self.name})
         if self.arg_context not in CONTEXT_FAMILIES or (self.stdin_context is not None and self.stdin_context not in CONTEXT_FAMILIES):
@@ -133,6 +135,9 @@ class ExecutorPolicy:
     output_block_threshold: float = 0.7
 
     def __post_init__(self) -> None:
+        for name in ("require_sealed_mediator", "require_network_isolation", "scan_output"):
+            if type(getattr(self, name)) is not bool:
+                raise ExecutorConfigError("sandbox security toggles must be explicit booleans")
         if self.max_executions is not None and (
             type(self.max_executions) is not int or self.max_executions < 0
         ):
