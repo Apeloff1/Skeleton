@@ -231,18 +231,24 @@ class PrefabSpec:
 def validate_prefabs(prefabs:Sequence[PrefabSpec])->tuple[PrefabSpec,...]:
     by_id={p.prefab_id:p for p in prefabs}
     if len(by_id)!=len(prefabs): raise GameProjectError("duplicate prefab identity")
-    state={}
-    def visit(pid:str)->None:
-        mark=state.get(pid,0)
-        if mark==1: raise GameProjectError("prefab inheritance cycle")
-        if mark==2:return
-        state[pid]=1
-        parent=by_id[pid].parent_prefab_id
-        if parent is not None:
-            if parent not in by_id: raise GameProjectError("unknown prefab parent")
-            visit(parent)
-        state[pid]=2
-    for pid in by_id: visit(pid)
+    # Walk parent chains iteratively: user-authored inheritance may exceed the
+    # interpreter recursion limit even when it is valid and acyclic.
+    state: dict[str, int] = {}
+    for start in by_id:
+        if state.get(start) == 2:
+            continue
+        chain: list[str] = []
+        current: str | None = start
+        while current is not None and state.get(current) != 2:
+            if current not in by_id:
+                raise GameProjectError("unknown prefab parent")
+            if state.get(current) == 1:
+                raise GameProjectError("prefab inheritance cycle")
+            state[current] = 1
+            chain.append(current)
+            current = by_id[current].parent_prefab_id
+        for pid in reversed(chain):
+            state[pid] = 2
     return tuple(sorted(prefabs,key=lambda p:p.prefab_id))
 
 @dataclass(frozen=True)
