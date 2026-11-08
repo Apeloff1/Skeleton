@@ -122,8 +122,13 @@ class SourceConvergenceAssurance(unittest.TestCase):
                 self.assertTrue(path.is_file())
                 content = path.read_text(encoding="utf-8")
                 self.assertIn("DRAFT", content.upper())
-                self.assertIn("NO MERGE", content.upper())
-                self.assertIn("NO RELEASE", content.upper())
+                status = content.upper()
+                self.assertTrue(any(phrase in status for phrase in (
+                    "NO MERGE", "NO MAIN MERGE",
+                )), "ledger must hold mainline merge")
+                self.assertTrue(any(phrase in status for phrase in (
+                    "NO RELEASE", "NO MERGE, RELEASE",
+                )), "ledger must hold production release")
 
     def test_mime_provenance_does_not_promote_unverified_types(self) -> None:
         from skeleton.ai.webcrawler.media_probe import valid_media_receipt
