@@ -91,8 +91,14 @@ function copyApprovedAction(value: FrontierEventAction): FrontierEventAction | n
  * inherits the approval of an earlier request. Key ordering differences only
  * cause conservative rejection, not accidental authorization. */
 function sameAction(a: FrontierEventAction, b: FrontierEventAction): boolean {
-  return a.id === b.id && a.label === b.label && a.editor === b.editor
-    && a.action === b.action && JSON.stringify(a.parameters) === JSON.stringify(b.parameters);
+  try {
+    return a.id === b.id && a.label === b.label && a.editor === b.editor
+      && a.action === b.action && strictJson(b.parameters)
+      && JSON.stringify(a.parameters) === JSON.stringify(b.parameters);
+  } catch {
+    // An untrusted incoming view must not crash a mounted approval cockpit.
+    return false;
+  }
 }
 
 function patch(queue: ApprovalQueue, id: string, allowed: ApprovalStatus[],

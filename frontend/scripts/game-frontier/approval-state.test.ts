@@ -132,3 +132,16 @@ test('editor visibility requires source action identity not id alone', () => {
   assert.equal(visibleApprovals(before, [{ ...action, label: 'Other intent' }]).length, 0);
   assert.equal(visibleApprovals(before, [{ ...action, parameters: { x: -1 } }]).length, 0);
 });
+
+
+test('cyclic or accessor-bearing incoming views cannot reactivate stale approval', () => {
+  const saved = seed();
+  const cyclic: any = {};
+  cyclic.self = cyclic;
+  assert.equal(visibleApprovals(saved, [{ ...action, parameters: cyclic }]).length, 0);
+  const hostile: any = {};
+  Object.defineProperty(hostile, 'x', { enumerable: true, get() {
+    throw new Error('never evaluate untrusted view getter');
+  }});
+  assert.equal(visibleApprovals(saved, [{ ...action, parameters: hostile }]).length, 0);
+});
