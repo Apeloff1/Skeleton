@@ -43,7 +43,7 @@ def _bounded_wire_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
                         raise AcceleratorProtocolError("payload text budget exceeded")
                 pending.extend((v, depth + 1) for v in value.values())
             else:
-                if len(value) > MAX_ENVELOPE_NODES - nodes:
+                if len(value) > MAX_ENVELOPE_NODES - nodes - len(pending):
                     raise AcceleratorProtocolError("payload node budget exceeded")
                 pending.extend((v, depth + 1) for v in value)
         elif isinstance(value, str):
@@ -65,8 +65,6 @@ def _bounded_wire_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     if len(encoded) > MAX_ENVELOPE_PAYLOAD_BYTES:
         raise AcceleratorProtocolError("payload byte budget exceeded")
     return root
-
-
 
 
 class AcceleratorProtocolError(RuntimeError):
