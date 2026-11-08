@@ -1,21 +1,22 @@
-"""Fail-closed, bounded GGUF header preflight; not model activation or rights approval.
+"""Bounded source-only GGUF framing and SHA inspection under descriptor custody.
 
-This checks the file identity and basic GGUF framing before an independently
-authorized loader opens the weights. It does not attest a tokenizer, license,
-tensor contents, or inference capability.
+This is NOT full GGUF parsing, tensor admission, license approval, tokenizer
+verification, loading, device qualification or inference readiness. A caller
+must independently bind the approved model and operator before runtime use.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
+import hmac
 import os
+from pathlib import Path
 import stat
 import struct
-from dataclasses import dataclass
-from pathlib import Path
 
 
 class GGUFPreflightError(ValueError):
-    """Model bytes cannot be admitted for further qualification."""
+    """Model bytes cannot be admitted for further independent qualification."""
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,57 @@ class GGUFHeader:
     sha256: str
 
 
+def _identity(info: os.stat_result) -> tuple[int, ...]:
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
+            info.st_nlink, info.st_uid, info.st_gid,
+            info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _open_beneath_trusted_parent(path: str | Path) -> tuple[int, int, str]:
+    """Pin each parent inode; refuse symlinks and writable parent directories."""
+    if (os.name != "posix" or not hasattr(os, "O_DIRECTORY")
+            or not hasattr(os, "O_NOFOLLOW")
+            or os.open not in os.supports_dir_fd
+            or os.stat not in os.supports_dir_fd):
+        raise GGUFPreflightError("POSIX descriptor-bound no-follow custody unavailable")
+    raw = os.fspath(path)
+    if (type(raw) is not str or not raw or len(raw) > 4096 or
+            "\x00" in raw or "\\" in raw or
+            any(part in (".", "..") for part in raw.split("/"))):
+        raise GGUFPreflightError("unsafe or noncanonical model path")
+    try:
+        absolute = raw if os.path.isabs(raw) else os.path.join(os.getcwd(), raw)
+        pieces = [part for part in absolute.split("/") if part]
+        if not pieces:
+            raise GGUFPreflightError("missing model filename")
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+        parent_fd = os.open("/", directory_flags)
+        file_fd = None
+        try:
+            if os.fstat(parent_fd).st_mode & 0o022:
+                raise GGUFPreflightError("untrusted writable root")
+            for name in pieces[:-1]:
+                next_fd = os.open(name, directory_flags, dir_fd=parent_fd)
+                os.close(parent_fd)
+                parent_fd = next_fd
+                info = os.fstat(parent_fd)
+                if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
+                    raise GGUFPreflightError("untrusted writable model parent")
+            file_flags = (os.O_RDONLY | os.O_NOFOLLOW
+                          | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0))
+            file_fd = os.open(pieces[-1], file_flags, dir_fd=parent_fd)
+            return parent_fd, file_fd, pieces[-1]
+        except BaseException:
+            if file_fd is not None:
+                os.close(file_fd)
+            os.close(parent_fd)
+            raise
+    except GGUFPreflightError:
+        raise
+    except OSError as exc:
+        raise GGUFPreflightError("model file or parent unavailable or unsafe") from exc
+
+
 def inspect_gguf(
     path: str | Path,
     *,
@@ -35,31 +87,26 @@ def inspect_gguf(
     max_tensors: int = 1_000_000,
     max_metadata: int = 1_000_000,
 ) -> GGUFHeader:
-    """Read a stable regular file through a no-follow descriptor and hash all bytes.
+    """Inspect a complete, private, immutable regular file by exact source SHA.
 
-    The caller must independently validate rights, tokenizer and trusted model
-    binding; this function never activates a model or follows a symbolic link.
+    A syntactically plausible header alone does not qualify any model.
     """
-    if not isinstance(expected_sha256, str) or len(expected_sha256) != 64 or any(
-        ch not in "0123456789abcdef" for ch in expected_sha256
-    ):
+    if (type(expected_sha256) is not str or len(expected_sha256) != 64
+            or any(ch not in "0123456789abcdef" for ch in expected_sha256)):
         raise GGUFPreflightError("expected_sha256 must be lowercase SHA-256")
     for value in (max_bytes, max_tensors, max_metadata):
         if type(value) is not int or value <= 0:
             raise GGUFPreflightError("limits must be positive integers")
-    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
-    if not hasattr(os, "O_NOFOLLOW"):
-        raise GGUFPreflightError("no-follow file open unavailable")
-    flags |= os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+
+    parent_fd, file_fd, name = _open_beneath_trusted_parent(path)
     try:
-        fd = os.open(os.fspath(path), flags)
-    except OSError as exc:
-        raise GGUFPreflightError("model file unavailable or unsafe") from exc
-    try:
-        before = os.fstat(fd)
-        if not stat.S_ISREG(before.st_mode) or before.st_size < 24 or before.st_size > max_bytes:
+        before = os.fstat(file_fd)
+        if (not stat.S_ISREG(before.st_mode)
+                or before.st_size < 24 or before.st_size > max_bytes):
             raise GGUFPreflightError("model file size/type rejected")
-        header = os.read(fd, 24)
+        if before.st_nlink != 1 or before.st_mode & 0o022:
+            raise GGUFPreflightError("model source permissions or hardlink unsafe")
+        header = os.read(file_fd, 24)
         if len(header) != 24 or header[:4] != b"GGUF":
             raise GGUFPreflightError("not a GGUF model")
         version = struct.unpack_from("<I", header, 4)[0]
@@ -68,25 +115,35 @@ def inspect_gguf(
         tensors, metadata = struct.unpack_from("<QQ", header, 8)
         if tensors == 0 or tensors > max_tensors or metadata > max_metadata:
             raise GGUFPreflightError("GGUF counts exceed bounds")
+
         digest = hashlib.sha256()
         digest.update(header)
         total = len(header)
         while True:
-            block = os.read(fd, min(1024 * 1024, max_bytes - total + 1))
+            block = os.read(file_fd, min(1024 * 1024, max_bytes - total + 1))
             if not block:
                 break
             total += len(block)
             if total > max_bytes:
                 raise GGUFPreflightError("model exceeds byte budget")
             digest.update(block)
-        after = os.fstat(fd)
-        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
-            after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns
-        ) or total != before.st_size:
-            raise GGUFPreflightError("model changed during inspection")
+
+        after_fd = os.fstat(file_fd)
+        try:
+            after_path = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise GGUFPreflightError("model source path changed during inspection") from exc
+        if (_identity(before) != _identity(after_fd)
+                or _identity(before) != _identity(after_path)
+                or not stat.S_ISREG(after_path.st_mode)
+                or total != before.st_size):
+            raise GGUFPreflightError("model source changed during inspection")
         actual = digest.hexdigest()
-        if actual != expected_sha256:
+        if not hmac.compare_digest(actual, expected_sha256):
             raise GGUFPreflightError("model SHA-256 mismatch")
         return GGUFHeader(version, tensors, metadata, total, actual)
+    except OSError as exc:
+        raise GGUFPreflightError("model source read or reinspection failed") from exc
     finally:
-        os.close(fd)
+        os.close(file_fd)
+        os.close(parent_fd)
