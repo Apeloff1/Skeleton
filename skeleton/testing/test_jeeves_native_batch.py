@@ -39,6 +39,29 @@ from skeleton.testing.test_jeeves_native_sqlite_integration import (
 )
 
 
+class _SourceOnlyFenceDouble:
+    """Exact synthetic-worker lease used only by CLI fixture tests.
+
+    Unlike a generic Mock it exposes the required assert_live method (names
+    beginning with assert_ are reserved by unittest.mock). It cannot attest
+    installed GGUF rights, production source identity, or device execution.
+    """
+
+    def __init__(self, worker, installed, *, expected_tenant, expected_subject):
+        if type(installed) is not object:
+            raise AssertionError("synthetic source fixture changed")
+        identity = worker.spine.identity
+        if (identity.tenant, identity.subject) != (expected_tenant, expected_subject):
+            raise AssertionError("source fixture principal mismatch")
+        self._worker = worker
+        self.inspections = 0
+
+    def assert_live(self, worker):
+        if worker is not self._worker:
+            raise AssertionError("source fixture worker changed")
+        self.inspections += 1
+
+
 def tasks(n=2, *, output=None):
     return tuple(
         NativeBatchTask(f"task_{i}", f"Private work item number {i}",
@@ -290,7 +313,8 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                        return_value=SimpleNamespace(source_bridge_ready=True)),
             # Only the synthetic fixture overrides native source custody;
             # production NativeSourceFence and publication stay fail closed.
-            mock.patch("skeleton.jeeves.agent.native_batch_cli.NativeSourceFence"),
+            mock.patch("skeleton.jeeves.agent.native_batch_cli.NativeSourceFence",
+                       new=_SourceOnlyFenceDouble),
         ):
             arguments = [
                 "--model-root", "/approved/private/model",
