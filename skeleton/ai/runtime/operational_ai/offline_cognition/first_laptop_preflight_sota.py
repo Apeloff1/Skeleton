@@ -49,7 +49,12 @@ class AdaptiveScoreStack:
 
 
 def _finite(value: Any) -> bool:
-    return type(value) in (int, float) and math.isfinite(value)
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(value)
+    except (OverflowError, ValueError):
+        return False
 
 
 def _sha(value: Any) -> bool:
