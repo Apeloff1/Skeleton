@@ -370,5 +370,9 @@ class TestGameDesignProbes(unittest.TestCase):
                          first.control.decision_digest)
 
 
+    def test_unbounded_integer_intervention_is_denied_by_contract(self):
+        with self.assertRaises(ProbePlanningError):
+            replace(_request(preview=True), intervention_delta=10 ** 1000)
+
 if __name__ == "__main__":
     unittest.main()

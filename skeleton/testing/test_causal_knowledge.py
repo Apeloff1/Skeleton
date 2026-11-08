@@ -209,5 +209,13 @@ class TestCausalKnowledge(unittest.TestCase):
         self.assertFalse(result.observed)
 
 
+    def test_unbounded_integer_coefficient_is_denied_by_contract(self):
+        digest = _source(self.sources, "SRC.OVERFLOW")
+        with self.assertRaises(CausalKnowledgeError):
+            self.graph.add(_claim(
+                "EDGE.OVERFLOW", "A", "B", "SRC.OVERFLOW", digest,
+                coefficient=10 ** 1000,
+            ))
+
 if __name__ == "__main__":
     unittest.main()

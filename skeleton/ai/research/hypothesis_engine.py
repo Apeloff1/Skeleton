@@ -45,9 +45,13 @@ def _sha(value: str) -> str:
 def _finite(value: float, name: str, low: float, high: float) -> float:
     if isinstance(value, bool) or not isinstance(value, (float, int)):
         raise HypothesisError(name + " must be a finite numeric value")
-    if not math.isfinite(value) or not low <= value <= high:
+    try:
+        number = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise HypothesisError(name + " outside admitted finite interval") from exc
+    if not math.isfinite(number) or not low <= number <= high:
         raise HypothesisError(name + " outside admitted finite interval")
-    return float(value)
+    return number
 
 
 def _hash(payload: object) -> str:

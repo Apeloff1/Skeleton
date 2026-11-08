@@ -95,9 +95,13 @@ class DesignProbeRequest:
         else:
             _token(self.intervention_variable, "intervention_variable")
             delta = self.intervention_delta
-            if isinstance(delta, bool) or not isinstance(delta, (int, float)) or (
-                not math.isfinite(delta)
-            ) or not -10.0 <= delta <= 10.0:
+            if isinstance(delta, bool) or not isinstance(delta, (int, float)):
+                raise ProbePlanningError("intervention delta outside bounded model range")
+            try:
+                bounded_delta = float(delta)
+            except (OverflowError, ValueError) as exc:
+                raise ProbePlanningError("intervention delta outside bounded model range") from exc
+            if not math.isfinite(bounded_delta) or not -10.0 <= bounded_delta <= 10.0:
                 raise ProbePlanningError("intervention delta outside bounded model range")
 
     def payload(self) -> dict[str, Any]:

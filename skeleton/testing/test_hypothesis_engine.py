@@ -202,5 +202,9 @@ class TestHypothesisEngine(unittest.TestCase):
         self.assertEqual(value.classification, "provisional-model-plausibility")
 
 
+    def test_unbounded_integer_prior_is_denied_by_contract(self):
+        with self.assertRaises(HypothesisError):
+            _hyp("H.OVERFLOW", prior=10 ** 1000)
+
 if __name__ == "__main__":
     unittest.main()

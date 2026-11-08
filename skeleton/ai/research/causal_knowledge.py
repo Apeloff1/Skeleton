@@ -41,9 +41,13 @@ def _text(value: object, field: str) -> str:
 def _finite(value: object, field: str, maximum: float) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise CausalKnowledgeError(field + " must be finite numeric")
-    if not math.isfinite(value) or abs(value) > maximum:
+    try:
+        number = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise CausalKnowledgeError(field + " outside safe model bounds") from exc
+    if not math.isfinite(number) or abs(number) > maximum:
         raise CausalKnowledgeError(field + " outside safe model bounds")
-    return float(value)
+    return number
 
 
 def _digest(data: object) -> str:
