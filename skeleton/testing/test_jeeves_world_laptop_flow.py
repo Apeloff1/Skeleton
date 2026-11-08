@@ -87,8 +87,8 @@ def test_stale_review_and_artifact_tampering_fail_closed(tmp_path):
     changed = dict(world)
     changed["prompt"] = world["prompt"] + " revised"
     flow.worlds.publish(changed, expected_digest=digest(world))
-    reject("review_stale_source", lambda: flow.verify("lighthouse"))
-    reject("review_stale_source", lambda: flow.create_session("lighthouse", "one"))
+    reject("review_required", lambda: flow.verify("lighthouse"))
+    reject("review_required", lambda: flow.create_session("lighthouse", "one"))
 
 
 def test_no_unreviewed_compile_and_bad_operations(tmp_path):
@@ -221,7 +221,7 @@ def test_laptop_session_create_rejects_revision_between_verify_and_write(tmp_pat
 
     monkeypatch.setattr(flow.sessions, "create", concurrent_edit)
     # A changed unreviewed world is denied by the stronger review fence first.
-    reject("review_stale_source",
+    reject("review_required",
            lambda: flow.create_session("lighthouse", "raced"))
     assert not (tmp_path / "lighthouse.raced.session.json").exists()
 
@@ -241,7 +241,7 @@ def test_laptop_session_choose_rejects_revision_between_verify_and_write(tmp_pat
         return original(world_id, slot, choice_id, expected_digest, **kwargs)
 
     monkeypatch.setattr(flow.sessions, "choose", concurrent_edit)
-    reject("review_stale_source", lambda: flow.choose(
+    reject("review_required", lambda: flow.choose(
         "lighthouse", "raced", "rescue", initial["session_digest"]))
     assert path.read_bytes() == before
 
@@ -259,7 +259,7 @@ def test_session_read_and_export_fail_if_source_changes_after_laptop_proof(tmp_p
         return original(world_id, slot, **kwargs)
 
     monkeypatch.setattr(flow.sessions, "inspect", concurrent_edit)
-    reject("review_stale_source",
+    reject("review_required",
            lambda: flow.inspect_session("lighthouse", "raced"))
 
 
@@ -292,7 +292,7 @@ def test_laptop_restore_preflight_rejects_forgery_and_unreviewed_source(tmp_path
     changed = dict(world)
     changed["prompt"] = world["prompt"] + " unreviewed"
     flow.worlds.publish(changed, expected_digest=digest(world))
-    reject("review_stale_source", lambda: flow.preflight_restore(
+    reject("review_required", lambda: flow.preflight_restore(
         "lighthouse", exported))
 
 
