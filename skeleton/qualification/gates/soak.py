@@ -19,9 +19,14 @@ def evaluate(params: dict, data: dict) -> tuple[list[str], dict]:
             or any(type(x) not in (int, float) or not math.isfinite(x) or x < 0
                    for x in data["rss_mb"])
             or any(type(data[x]) is not int or data[x] < 0
-                   for x in ("requests", "errors", "restarts"))
-            or data["errors"] > data["requests"]):
+                   for x in ("requests", "errors", "restarts"))):
         return ["invalid bounded soak measurement"], {}
+    # A zero denominator or impossible count must never be marked as passing.
+    # Diagnose these specifically so the operator can remediate the error-rate gate.
+    if data["requests"] == 0:
+        return ["error rate unavailable: zero observed requests"], {}
+    if data["errors"] > data["requests"]:
+        return ["error rate invalid: errors exceed observed requests"], {}
     reasons: list[str] = []
     hours = float(data["hours"])
     rss = data["rss_mb"]
