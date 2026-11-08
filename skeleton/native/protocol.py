@@ -5,6 +5,48 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 import uuid
+import json
+import math
+
+MAX_ENVELOPE_PAYLOAD_BYTES = 1_048_576
+MAX_ENVELOPE_DEPTH = 16
+
+
+def _bounded_wire_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate the entire untrusted RPC payload before subprocess dispatch."""
+    root = dict(payload)
+    pending: list[tuple[Any, int]] = [(root, 0)]
+    visited: set[int] = set()
+    while pending:
+        value, depth = pending.pop()
+        if depth > MAX_ENVELOPE_DEPTH:
+            raise AcceleratorProtocolError("payload nesting limit exceeded")
+        if isinstance(value, (dict, list, tuple)):
+            identity = id(value)
+            if identity in visited:
+                raise AcceleratorProtocolError("payload contains cyclic or aliased containers")
+            visited.add(identity)
+            if isinstance(value, dict):
+                if any(not isinstance(k, str) for k in value):
+                    raise AcceleratorProtocolError("payload object keys must be text")
+                pending.extend((v, depth + 1) for v in value.values())
+            else:
+                pending.extend((v, depth + 1) for v in value)
+        elif value is None or isinstance(value, (str, bool, int)):
+            continue
+        elif isinstance(value, float) and math.isfinite(value):
+            continue
+        else:
+            raise AcceleratorProtocolError("payload contains unsupported or non-finite values")
+    try:
+        encoded = json.dumps(root, allow_nan=False, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    except (ValueError, TypeError, OverflowError, UnicodeError) as exc:
+        raise AcceleratorProtocolError("payload cannot be encoded as JSON") from exc
+    if len(encoded) > MAX_ENVELOPE_PAYLOAD_BYTES:
+        raise AcceleratorProtocolError("payload byte budget exceeded")
+    return root
+
+
 
 
 class AcceleratorProtocolError(RuntimeError):
@@ -136,7 +178,7 @@ def make_request_envelope(
         "request_id": rid,
         "operation": operation,
         "deadline_utc": deadline_utc,
-        "payload": dict(payload),
+        "payload": _bounded_wire_payload(payload),
     }
 
 
