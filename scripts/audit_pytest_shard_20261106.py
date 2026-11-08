@@ -24,9 +24,9 @@ def bounded_log_tail(path: Path, *, max_bytes: int = 131072, max_lines: int = 18
         data = stream.read(max_bytes)
     if size > max_bytes:
         # Discard a partial first line; do not fabricate an entire failing log.
-        boundary = data.find(b"\\n")
+        boundary = data.find(b"\n")
         data = data[boundary + 1:] if boundary >= 0 else b""
-    return "\\n".join(data.decode("utf-8", errors="replace").splitlines()[-max_lines:])
+    return "\n".join(data.decode("utf-8", errors="replace").splitlines()[-max_lines:])
 
 
 def main() -> int:
