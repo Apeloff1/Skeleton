@@ -177,9 +177,9 @@ class FreeModelClient:
         try:
             if cancellation is not None:
                 cancellation.require_active()
-            with urllib.request.build_opener(_RejectRedirects()).open(
-                req, timeout=self.timeout
-            ) as response:
+            with urllib.request.build_opener(
+                urllib.request.ProxyHandler({}), _RejectRedirects()
+            ).open(req, timeout=self.timeout) as response:
                 raw_bytes = response.read(_MAX_RESPONSE_BYTES + 1)
             if cancellation is not None:
                 cancellation.require_active()

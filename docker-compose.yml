@@ -125,6 +125,8 @@ services:
       # Explicit trusted browser origin; never build share links from Host headers.
       - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost:${FRONTEND_PORT:-3000}}
       - DEBUG=${DEBUG:-false}
+      # Keep browser admission aligned with the published frontend port. A
+      # tester may need a non-default port when another local app owns 3000.
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-3000},http://127.0.0.1:${FRONTEND_PORT:-3000}}
       # Runtime model-provider credentials are engine-owned after Stage-5 cutover.
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a high-entropy value}

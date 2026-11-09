@@ -41,6 +41,24 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertIn("skeleton/testing --tb=short", readiness)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
+    def test_backlog_housekeeping_is_manual_without_weakening_recovery(self):
+        """Owner-directed backlog work pauses optional writers, not CI gates."""
+        manual = (
+            "actions-housekeeping-cli.yml",
+            "three-hour-actions-queue-expiry.yml",
+            "owner-historical-actions-cleanup.yml",
+        )
+        for name in manual:
+            source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+            self.assertEqual(events(source), {"workflow_dispatch"}, name)
+        queue_drain = (ROOT / ".github/workflows/queue-drain.yml").read_text(encoding="utf-8")
+        self.assertIn("schedule", events(queue_drain))
+        for name in ("merge-readiness.yml", "backend-quality.yml", "malware-gate.yml",
+                     "dependency-review.yml", "secret-scanning.yml",
+                     "workflow-input-security.yml"):
+            source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+            self.assertIn("pull_request", events(source), name)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
