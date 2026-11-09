@@ -6,9 +6,10 @@
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
+import asyncio
 import uuid
 
 router = APIRouter(prefix="/agents", tags=["Multi-Agent Systems"])
@@ -174,18 +175,18 @@ AGENT_SYSTEMS = {
 # ============================================================================
 
 class AgentTask(BaseModel):
-    task: str
-    context: Optional[str] = None
-    language: str = "python"
-    preferences: Optional[Dict[str, Any]] = None
+    task: str = Field(..., min_length=1, max_length=50_000)
+    context: Optional[str] = Field(default=None, max_length=100_000)
+    language: str = Field(default="python", min_length=1, max_length=64)
+    preferences: Optional[Dict[str, Any]] = Field(default=None, max_length=100)
 
 class MultiAgentRequest(BaseModel):
-    system: str  # code_architect, debug_swarm, etc.
-    task: str
-    code: Optional[str] = None
-    language: str = "python"
-    context: Optional[Dict[str, Any]] = None
-    max_iterations: int = 3
+    system: str = Field(default="", max_length=64)
+    task: str = Field(..., min_length=1, max_length=50_000)
+    code: Optional[str] = Field(default=None, max_length=200_000)
+    language: str = Field(default="python", min_length=1, max_length=64)
+    context: Optional[Dict[str, Any]] = Field(default=None, max_length=100)
+    max_iterations: int = Field(default=1, ge=1, le=5)
 
 # ============================================================================
 # AGENT EXECUTION
@@ -217,11 +218,11 @@ _AGENT_ROUTER_TASK = {
 async def run_agent(agent_id: str, task: str, context: str = "") -> Dict[str, Any]:
     """Run a single agent — now backed by Jeeves consult + vault patterns."""
     if not LLM_AVAILABLE:
-        return {"agent": agent_id, "error": "LLM not available", "output": ""}
+        raise HTTPException(status_code=503, detail="AI engine unavailable")
     
     agent = AGENT_ROLES.get(agent_id)
     if not agent:
-        return {"agent": agent_id, "error": "Unknown agent", "output": ""}
+        raise HTTPException(status_code=404, detail="Unknown agent")
     
     # ─────────────────────────────────────────────────────────────────
     # 2026 wiring — every agent step now:
@@ -336,14 +337,16 @@ async def run_agent(agent_id: str, task: str, context: str = "") -> Dict[str, An
             session_id=f"agent_{agent_id}",
         )
         if routed.get("error"):
-            return {"agent": agent_id, "error": routed["error"], "output": ""}
+            raise HTTPException(status_code=502, detail="Agent model execution failed")
         output = routed.get("content", "")
+        if not isinstance(output, str) or not output.strip():
+            raise HTTPException(status_code=502, detail="Agent model returned empty output")
         
         return {
             "agent": agent_id,
             "name": agent["name"],
             "role": agent["role"],
-            "output": output,
+            "output": output.strip(),
             "timestamp": datetime.utcnow().isoformat(),
             "model":                 routed.get("model"),
             "provider":              routed.get("provider"),
@@ -355,10 +358,12 @@ async def run_agent(agent_id: str, task: str, context: str = "") -> Dict[str, An
             "knowledge_used":        bool(knowledge_block),
             "quote_included":        bool(quote_block),
         }
+    except HTTPException:
+        raise
     except Exception:
-        return {"agent": agent_id, "error": "agent_request_failed", "output": ""}
+        raise HTTPException(status_code=502, detail="Agent request failed")
 
-async def run_agent_system(system_id: str, task: str, code: str = "", language: str = "python", max_iterations: int = 3) -> Dict[str, Any]:
+async def run_agent_system(system_id: str, task: str, code: str = "", language: str = "python", max_iterations: int = 1) -> Dict[str, Any]:
     """Run a complete multi-agent system"""
     
     system = AGENT_SYSTEMS.get(system_id)
@@ -378,15 +383,32 @@ async def run_agent_system(system_id: str, task: str, code: str = "", language: 
     context = f"Language: {language}\nCode:\n```{language}\n{code}\n```" if code else f"Language: {language}"
     current_output = ""
     
-    for agent_id in system["agents"]:
-        agent_task = f"{task}\n\nPrevious agent output:\n{current_output}" if current_output else task
-        agent_result = await run_agent(agent_id, agent_task, context)
-        results["agents"].append(agent_result)
-        current_output = agent_result.get("output", "")
+    for iteration in range(max_iterations):
+        if system.get("flow") == "parallel":
+            prior = current_output[-20_000:]
+            iteration_task = f"{task}\n\nPrior iteration output:\n{prior}" if prior else task
+            batch = await asyncio.gather(*(
+                run_agent(agent_id, iteration_task, context)
+                for agent_id in system["agents"]
+            ))
+            for agent_result in batch:
+                agent_result["iteration"] = iteration + 1
+                results["agents"].append(agent_result)
+            current_output = "\n\n".join(result["output"] for result in batch)[-50_000:]
+            continue
+
+        for agent_id in system["agents"]:
+            prior = current_output[-20_000:]
+            agent_task = f"{task}\n\nPrevious agent output:\n{prior}" if prior else task
+            agent_result = await run_agent(agent_id, agent_task, context)
+            agent_result["iteration"] = iteration + 1
+            results["agents"].append(agent_result)
+            current_output = agent_result["output"]
     
     results["final_output"] = current_output
     results["completed_at"] = datetime.utcnow().isoformat()
-    results["total_agents"] = len(system["agents"])
+    results["total_agents"] = len(results["agents"])
+    results["iterations_completed"] = max_iterations
     
     return results
 
