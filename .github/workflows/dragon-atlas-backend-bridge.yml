@@ -1,25 +1,14 @@
 name: Dragon Atlas backend adapter qualification
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "backend/core/dragon_crawler.py"
-      - "skeleton/ai/webcrawler/core.py"
-      - "skeleton/ai/webcrawler/operations.py"
-      - "skeleton/ai/webcrawler/media_probe.py"
-      - "tests/test_ai_webcrawler_dragon_atlas.py"
-      - "tests/test_ai_webcrawler_dragon_mime_custody.py"
-      - "backend/routes/dragon_academy.py"
-      - "backend/tests/test_dragon_atlas_bridge.py"
-      - "skeleton/ai/webcrawler/dragon_campaign_stack/**"
-      - ".github/workflows/dragon-atlas-backend-bridge.yml"
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: dragon-atlas-backend-${{ github.event.pull_request.number }}
+  group: dragon-atlas-backend-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -32,10 +21,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Prove exact source head identity
         env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - name: Supported Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0

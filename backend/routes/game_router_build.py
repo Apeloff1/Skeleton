@@ -166,27 +166,47 @@ async def execute_build_step(req: BuildStepRequest):
         "raw": llm_result.get("response", ""),
         "parsed": parse_json_response(llm_result.get("response", "")) if llm_result["success"] else {},
         "agent": step_def["agent"], "agent_name": step_def["name"],
-        "success": llm_result["success"], "completed_at": datetime.utcnow().isoformat(),
+        "success": llm_result["success"], "attempted_at": datetime.utcnow().isoformat(),
+        "execution": {
+            key: llm_result[key]
+            for key in ("operation_id", "execution_id", "context_digest", "provider_receipts")
+            if key in llm_result
+        },
     }
 
     if not llm_result["success"]:
         step_result["error"] = llm_result.get("error", "LLM call failed")
-        step_result["parsed"] = {"status": "fallback", "note": f"Agent {step_def['agent']} output pending LLM availability"}
+        await projects_collection.update_one(
+            {"project_id": req.project_id},
+            {"$set": {
+                f"steps_data.{prompt_key}": step_result,
+                "status": "generation_failed",
+                "updated_at": datetime.utcnow().isoformat(),
+            }},
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "game_step_generation_failed",
+                "message": "The model did not produce this build step. The step remains incomplete and can be retried.",
+                "step": next_step_num,
+            },
+        )
 
     holodeck_render_result = None
-    if llm_result["success"]:
-        try:
-            render_output = llm_result.get("response", "")[:600]
-            game_desc = project.get("description", "Unknown game")
-            holodeck_render_result = await generate_holodeck_render(
-                team_name=f"Step {next_step_num}: {step_def['name']} ({step_def['agent']})",
-                team_output=render_output,
-                game_context=f"{game_desc} | Phase: {step_def['phase']}",
-            )
-            step_result["holodeck_render"] = holodeck_render_result
-        except Exception:
-            holodeck_render_result = {"success": False, "error": "Holodeck render skipped"}
-            step_result["holodeck_render"] = holodeck_render_result
+    step_result["completed_at"] = datetime.utcnow().isoformat()
+    try:
+        render_output = llm_result.get("response", "")[:600]
+        game_desc = project.get("description", "Unknown game")
+        holodeck_render_result = await generate_holodeck_render(
+            team_name=f"Step {next_step_num}: {step_def['name']} ({step_def['agent']})",
+            team_output=render_output,
+            game_context=f"{game_desc} | Phase: {step_def['phase']}",
+        )
+        step_result["holodeck_render"] = holodeck_render_result
+    except Exception:
+        holodeck_render_result = {"success": False, "error": "Holodeck render skipped"}
+        step_result["holodeck_render"] = holodeck_render_result
 
     completed.append(next_step_num)
     update_data = {
@@ -250,18 +270,32 @@ async def compile_game(req: CompileRequest):
 
     llm_result = await call_llm(sys_prompt, user_prompt, f"compile_{req.project_id}")
 
-    compile_output = {}
-    if llm_result["success"]:
-        compile_output = parse_json_response(llm_result.get("response", ""))
-        compile_output["_raw"] = llm_result["response"]
-        compile_output["compilation_status"] = "SUCCESS"
-    else:
-        compile_output = {
-            "compilation_status": "FALLBACK", "error": llm_result.get("error"),
-            "note": "Compile used fallback - check LLM availability",
-            "partial_assembly": {"steps_available": list(steps_data.keys()),
-                                 "total_content": sum(len(str(v.get("raw", ""))) for v in steps_data.values())},
+    if not llm_result["success"]:
+        failure = {
+            "compilation_status": "FAILED",
+            "error": llm_result.get("error", "llm_request_failed"),
+            "failed_at": datetime.utcnow().isoformat(),
         }
+        await projects_collection.update_one(
+            {"project_id": req.project_id},
+            {"$set": {"compile_failure": failure, "status": "compile_failed", "updated_at": failure["failed_at"]}},
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "game_compile_failed",
+                "message": "Compilation synthesis failed. No compiled game was issued; retry the same project.",
+            },
+        )
+
+    compile_output = parse_json_response(llm_result.get("response", ""))
+    compile_output["_raw"] = llm_result["response"]
+    compile_output["compilation_status"] = "SUCCESS"
+    compile_output["execution"] = {
+        key: llm_result[key]
+        for key in ("operation_id", "execution_id", "context_digest", "provider_receipts")
+        if key in llm_result
+    }
 
     compile_holodeck = None
     try:

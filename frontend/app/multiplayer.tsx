@@ -13,7 +13,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { toast } from '../src/components/AppToast';
+import { apiFetch } from '../src/utils/apiController';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -37,33 +40,52 @@ export default function NetcodeStudio() {
   const [files, setFiles] = React.useState<File[]>([]);
   const [meta, setMeta] = React.useState<any>(null);
   const [openFile, setOpenFile] = React.useState<File | null>(null);
+  const [catalogError, setCatalogError] = React.useState('');
+  const [exporting, setExporting] = React.useState(false);
 
   const loadModels = React.useCallback(async (g: string) => {
+    setLoading(true);
+    setCatalogError('');
     try {
-      const r = await fetch(`${BACKEND}/api/multiplayer/models?genre=${encodeURIComponent(g)}`);
+      const r = await apiFetch(`${BACKEND}/api/multiplayer/models?genre=${encodeURIComponent(g)}`);
+      if (!r.ok) throw new Error(`Model catalog unavailable (${r.status})`);
       const j = await r.json();
-      setModels(j.models || []);
+      if (!Array.isArray(j.models) || j.models.length < 1 || j.models.length > 16 ||
+          j.models.some((item: unknown) => !item || typeof item !== 'object' ||
+            typeof (item as Model).id !== 'string' || typeof (item as Model).label !== 'string' ||
+            !Number.isFinite((item as Model).recommended_tick))) {
+        throw new Error('The sync model catalog is invalid.');
+      }
+      setModels(j.models);
       setRecommended(j.recommended || '');
       setSelected((prev) => prev || j.recommended || (j.models?.[0]?.id ?? ''));
-    } catch { /* keep prior */ }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Model catalog unavailable';
+      setModels([]); setSelected(''); setRecommended(''); setCatalogError(message); toast.error(message);
+    }
     setLoading(false);
   }, []);
 
   React.useEffect(() => { loadModels(genre); }, [loadModels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onGenerate = async () => {
+    if (!selected || !game.trim() || !genre.trim()) { toast.error('Enter a game, genre, and available sync model.'); return; }
     setBusy(true); setFiles([]); setMeta(null);
     try {
-      const r = await fetch(`${BACKEND}/api/multiplayer/scaffold`, {
+      const r = await apiFetch(`${BACKEND}/api/multiplayer/scaffold`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ game: game.trim() || 'Your Game', genre, model: selected, max_players: players }),
       });
       const j = await r.json();
-      setFiles(j.files || []);
+      if (!r.ok) throw new Error(j?.detail || `Generation failed (${r.status})`);
+      if (!Array.isArray(j.files) || !j.files.length || j.files.length > 32 ||
+          j.files.some((item: unknown) => !item || typeof item !== 'object' ||
+            typeof (item as File).path !== 'string' || typeof (item as File).content !== 'string' ||
+            (item as File).content.length > 1_000_000)) throw new Error('The generated scaffold response is invalid.');
+      setFiles(j.files);
       setMeta(j);
-      if (!j.files?.length) toast.warn('No files generated');
-    } catch {
-      toast.warn('Could not generate — check connection');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not generate');
     }
     setBusy(false);
   };
@@ -74,13 +96,19 @@ export default function NetcodeStudio() {
   };
 
   const onExportZip = async () => {
+    if (!selected || exporting) return;
+    setExporting(true);
     try {
-      const r = await fetch(`${BACKEND}/api/multiplayer/scaffold/zip`, {
+      const r = await apiFetch(`${BACKEND}/api/multiplayer/scaffold/zip`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ game: game.trim() || 'Your Game', genre, model: selected, max_players: players }),
       });
       const j = await r.json();
-      if (!j.zip_base64) { toast.warn('Export failed'); return; }
+      if (!r.ok) throw new Error(j?.detail || `Export failed (${r.status})`);
+      if (typeof j.zip_base64 !== 'string' || !j.zip_base64 || j.zip_base64.length > 32_000_000 ||
+          typeof j.filename !== 'string' || !/^[A-Za-z0-9._-]+\.zip$/.test(j.filename)) {
+        throw new Error('The export response is invalid.');
+      }
       if (Platform.OS === 'web') {
         const bin = atob(j.zip_base64);
         const bytes = new Uint8Array(bin.length);
@@ -91,14 +119,15 @@ export default function NetcodeStudio() {
         URL.revokeObjectURL(url);
         toast.success(`Downloaded ${j.filename}`);
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const FS = require('expo-file-system/legacy');
-        const uri = `${FS.cacheDirectory}${j.filename}`;
-        await FS.writeAsStringAsync(uri, j.zip_base64, { encoding: 'base64' });
-        toast.success(`Saved ${j.filename}`);
+        const uri = `${FileSystem.cacheDirectory}${j.filename}`;
+        await FileSystem.writeAsStringAsync(uri, j.zip_base64, { encoding: FileSystem.EncodingType.Base64 });
+        if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/zip', dialogTitle: 'Export multiplayer scaffold' });
+        else toast.success(`Saved ${j.filename}`);
       }
-    } catch {
-      toast.warn('Export failed — check connection');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Export failed');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -113,7 +142,7 @@ export default function NetcodeStudio() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
-        <Text style={s.intro}>Generate a ready-to-run multiplayer scaffold — authoritative server, client sync, wire protocol, lobby & matchmaking — tuned to your game.</Text>
+        <Text style={s.intro}>Generate an operational reference runtime with bounded authoritative simulation, client sync, wire protocol, lobby capacity and explicit deployment requirements.</Text>
 
         <Text style={s.lbl}>Game</Text>
         <TextInput testID="mp-game" value={game} onChangeText={setGame} style={s.input} placeholder="Game name" placeholderTextColor="#64748b" />
@@ -131,7 +160,12 @@ export default function NetcodeStudio() {
           {!!recommended && <Text style={s.recHint}>★ recommended: {recommended}</Text>}
         </View>
 
-        {loading ? <ActivityIndicator color="#3B82F6" style={{ marginTop: 16 }} /> : (
+        {loading ? <ActivityIndicator color="#3B82F6" style={{ marginTop: 16 }} /> : catalogError ? (
+          <View style={s.errorCard}>
+            <Text style={s.errorText}>{catalogError}</Text>
+            <TouchableOpacity style={s.retryBtn} onPress={() => loadModels(genre)}><Text style={s.retryText}>Retry model catalog</Text></TouchableOpacity>
+          </View>
+        ) : (
           <View style={{ gap: 10 }}>
             {models.map((m) => {
               const on = m.id === selected;
@@ -163,7 +197,7 @@ export default function NetcodeStudio() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity testID="mp-generate" onPress={onGenerate} style={s.genBtn} activeOpacity={0.9}>
+        <TouchableOpacity testID="mp-generate" disabled={busy || loading || !selected || !game.trim() || !genre.trim()} onPress={onGenerate} style={[s.genBtn, (busy || loading || !selected || !game.trim() || !genre.trim()) && s.disabled]} activeOpacity={0.9}>
           {busy ? <ActivityIndicator color="#fff" /> : <><Ionicons name="construct" size={18} color="#fff" /><Text style={s.genTxt}>Generate scaffold</Text></>}
         </TouchableOpacity>
 
@@ -171,9 +205,13 @@ export default function NetcodeStudio() {
           <View style={s.resultHead}>
             <Text style={s.resultTitle}>{meta.model_label}</Text>
             <Text style={s.resultMeta}>{meta.max_players} players · {meta.tick_rate}Hz tick · {meta.snapshot_rate}Hz snapshots · {meta.file_count} files</Text>
-            <TouchableOpacity testID="mp-export-zip" onPress={onExportZip} style={s.zipBtn} activeOpacity={0.9}>
+            <Text style={s.readiness}>Readiness: {meta.readiness?.replace('_', ' ') || 'unverified'}</Text>
+            {Array.isArray(meta.deployment_requirements) && meta.deployment_requirements.length > 0 && (
+              <Text style={s.requirements}>Deployment requirements: {meta.deployment_requirements.join(' · ')}</Text>
+            )}
+            <TouchableOpacity testID="mp-export-zip" disabled={exporting} onPress={onExportZip} style={[s.zipBtn, exporting && s.disabled]} activeOpacity={0.9}>
               <Ionicons name="download-outline" size={16} color="#fff" />
-              <Text style={s.zipTxt}>Export .zip</Text>
+              <Text style={s.zipTxt}>{exporting ? 'Preparing export…' : 'Export .zip'}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -238,9 +276,16 @@ const s = StyleSheet.create({
   stepVal: { color: '#F8FAFC', fontSize: 20, fontWeight: '800', minWidth: 36, textAlign: 'center' },
   genBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1D4ED8', borderRadius: 14, paddingVertical: 15, marginTop: 20 },
   genTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  disabled: { opacity: 0.45 },
+  errorCard: { borderWidth: 1, borderColor: '#EF444466', backgroundColor: '#EF444412', borderRadius: 12, padding: 14, gap: 10 },
+  errorText: { color: '#FCA5A5', fontSize: 13, lineHeight: 18 },
+  retryBtn: { alignSelf: 'flex-start', borderRadius: 8, backgroundColor: '#1D4ED8', paddingHorizontal: 12, paddingVertical: 8 },
+  retryText: { color: '#FFF', fontSize: 12, fontWeight: '800' },
   resultHead: { marginTop: 22, marginBottom: 8 },
   resultTitle: { color: '#3B82F6', fontSize: 15, fontWeight: '800' },
   resultMeta: { color: '#94a3b8', fontSize: 12, marginTop: 3 },
+  readiness: { color: '#10B981', fontSize: 11, fontWeight: '700', marginTop: 4, textTransform: 'uppercase' },
+  requirements: { color: '#CBD5E1', fontSize: 11, lineHeight: 16, marginTop: 7 },
   zipBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, backgroundColor: '#7c3aed', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10 },
   zipTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
   fileRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f1830', borderRadius: 12, borderWidth: 1, borderColor: '#1e293b', padding: 12, marginTop: 8 },

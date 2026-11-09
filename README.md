@@ -77,7 +77,9 @@ not been qualified on the target Windows laptop.
 Install **Git**, **Python 3.11+**, and **Docker Desktop or Docker Engine with Compose v2**.
 Start Docker before running the installer. Host Node/Yarn are optional; the
 container build supplies frontend dependencies. Initial dependency/image builds
-need internet access. Models, compiler SDKs, cores and firmware have separate setup.
+need internet access and at least **6 GiB free** on the installation filesystem;
+**12 GiB** is recommended for safe Docker build headroom. Models, compiler SDKs,
+cores and firmware have separate setup.
 
 ### Linux and macOS
 
