@@ -345,7 +345,6 @@ async def auto_quiz_from_chapter(payload: dict = Body(...)):
                     ),
                 ),
             )
-            .with_model("openai", "gpt-4o-mini")
         )
         msg = UserMessage(text=(
             f"Chapter excerpt:\n\n{excerpt}\n\n"

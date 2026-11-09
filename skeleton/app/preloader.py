@@ -103,8 +103,8 @@ def inspect_host(
     root: Path | None = None,
     *,
     runner: Runner = subprocess.run,
-    min_free_bytes: int = 2 * 1024**3,
-    recommended_free_bytes: int = 8 * 1024**3,
+    min_free_bytes: int = 6 * 1024**3,
+    recommended_free_bytes: int = 12 * 1024**3,
     require_python: bool = True,
     require_pip: bool = True,
 ) -> PreloadReport:

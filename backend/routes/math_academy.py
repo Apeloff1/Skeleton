@@ -4,7 +4,7 @@ Algebra, Linear Algebra, Geometry, Pre-Calculus, Calculus, Multivariable Calculu
 AAA Studio Quality Mathematics Education
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from typing import Dict, List, Any
 
 router = APIRouter(prefix="/api/math-academy", tags=["math-academy"])
@@ -183,6 +183,31 @@ CS_COURSES = {
 }
 
 
+def _course_detail(course: Dict[str, Any], category: str) -> Dict[str, Any]:
+    """Return one stable course shape for every academy category."""
+    units = []
+    for index, raw in enumerate(course.get("units", []), 1):
+        if isinstance(raw, dict):
+            units.append(raw)
+        else:
+            units.append({
+                "id": f"{course['id']}_{index:02d}",
+                "name": str(raw),
+                "topics": [],
+                "hours": round(course.get("hours", 0) / max(len(course.get("units", [])), 1), 1),
+            })
+    return {
+        **course,
+        "category": category,
+        "level": course.get("level", "Advanced" if category != "math" else "Foundation"),
+        "description": course.get("description", f"Structured {course['name']} curriculum."),
+        "prerequisites": course.get("prerequisites", []),
+        "applications": course.get("applications", []),
+        "game_dev_relevance": course.get("game_dev_relevance", ""),
+        "units": units,
+    }
+
+
 @router.get("/courses")
 async def get_all_math_courses():
     return {
@@ -196,30 +221,30 @@ async def get_all_math_courses():
 @router.get("/math/{course_id}")
 async def get_math_course(course_id: str):
     if course_id not in MATH_COURSES:
-        return {"error": f"Math course '{course_id}' not found"}
-    return MATH_COURSES[course_id]
+        raise HTTPException(404, f"Math course '{course_id}' not found")
+    return _course_detail(MATH_COURSES[course_id], "math")
 
 
 @router.get("/math/{course_id}/unit/{unit_id}")
 async def get_math_unit(course_id: str, unit_id: str):
     if course_id not in MATH_COURSES:
-        return {"error": "Course not found"}
+        raise HTTPException(404, "Course not found")
     course = MATH_COURSES[course_id]
     unit = next((u for u in course["units"] if u["id"] == unit_id), None)
     if not unit:
-        return {"error": "Unit not found"}
+        raise HTTPException(404, "Unit not found")
     return {"course": course["name"], "unit": unit}
 
 
 @router.get("/physics/{course_id}")
 async def get_physics_course(course_id: str):
     if course_id not in PHYSICS_COURSES:
-        return {"error": "Physics course not found"}
-    return PHYSICS_COURSES[course_id]
+        raise HTTPException(404, "Physics course not found")
+    return _course_detail(PHYSICS_COURSES[course_id], "physics")
 
 
 @router.get("/cs/{course_id}")
 async def get_cs_course(course_id: str):
     if course_id not in CS_COURSES:
-        return {"error": "CS course not found"}
-    return CS_COURSES[course_id]
+        raise HTTPException(404, "CS course not found")
+    return _course_detail(CS_COURSES[course_id], "cs")
