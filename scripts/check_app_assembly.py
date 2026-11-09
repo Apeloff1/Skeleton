@@ -969,7 +969,7 @@ def audit_product_control_contract() -> None:
         "product control client root drift",
     )
     check(
-        'router = project_router(prefix="/api/admin/ops"' in ops,
+        re.search(r'router\s*=\s*project_router\s*\(\s*prefix\s*=\s*["\']/api/admin/ops["\']', ops) is not None,
         "backend ops prefix drift",
     )
     check('("routes.ops",' in registry, "backend ops router is not registered")
