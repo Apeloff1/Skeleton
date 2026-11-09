@@ -21,6 +21,7 @@ interface MathAcademyModalProps {
   visible: boolean;
   onClose: () => void;
   colors: any;
+  userId?: string;
 }
 
 interface MathCourse {
@@ -48,13 +49,15 @@ interface CourseDetail {
   game_dev_relevance: string;
 }
 
-export const MathAcademyModal: React.FC<MathAcademyModalProps> = ({ visible, onClose, colors }) => {
+export const MathAcademyModal: React.FC<MathAcademyModalProps> = ({ visible, onClose, colors, userId = 'default_user' }) => {
   const [courses, setCourses] = useState<Record<string, Record<string, MathCourse>>>({});
   const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState<CourseDetail | null>(null);
   const [activeTab, setActiveTab] = useState<'math' | 'physics' | 'cs'>('math');
   const [totalHours, setTotalHours] = useState(0);
   const [completedUnits, setCompletedUnits] = useState<Set<string>>(new Set());
+  const [savingUnit, setSavingUnit] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) loadCourses();
@@ -62,30 +65,45 @@ export const MathAcademyModal: React.FC<MathAcademyModalProps> = ({ visible, onC
 
   const loadCourses = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await apiFetch(`${API_BASE}/api/math-academy/courses`);
-      if (res.ok) {
-        const data = await res.json();
-        setCourses({ math: data.math, physics: data.physics, cs: data.cs });
-        setTotalHours(data.total_hours || 0);
+      const [res, progressRes] = await Promise.all([
+        apiFetch(`${API_BASE}/api/math-academy/courses`),
+        apiFetch(`${API_BASE}/api/class-progress/user/${encodeURIComponent(userId)}/overview`),
+      ]);
+      if (!res.ok) throw new Error(`Curriculum request failed (${res.status})`);
+      const data = await res.json();
+      setCourses({ math: data.math || {}, physics: data.physics || {}, cs: data.cs || {} });
+      setTotalHours(data.total_hours || 0);
+      if (progressRes.ok) {
+        const progress = await progressRes.json();
+        setCompletedUnits(new Set(Array.isArray(progress.completed_class_ids) ? progress.completed_class_ids : []));
       }
-    } catch {
+    } catch (cause) {
       setCourses({});
+      setError(cause instanceof Error ? cause.message : 'Unable to load the STEM curriculum.');
     }
     setLoading(false);
   };
 
   const loadCourseDetail = async (courseId: string, category: string) => {
+    setError(null);
     try {
-      const res = await apiFetch(`${API_BASE}/api/math-academy/${category}/${courseId}`);
-      if (res.ok) setSelectedCourse(await res.json());
-    } catch {}
+      const res = await apiFetch(`${API_BASE}/api/math-academy/${category}/${encodeURIComponent(courseId)}`);
+      if (!res.ok) throw new Error(`Course request failed (${res.status})`);
+      const detail = await res.json();
+      if (!Array.isArray(detail.units)) throw new Error('The course response is incomplete.');
+      setSelectedCourse(detail);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to load this course.');
+    }
   };
 
   const handleCompleteUnit = async (unitId: string) => {
-    setCompletedUnits(prev => new Set([...prev, unitId]));
+    if (savingUnit) return;
+    setSavingUnit(unitId);
     try {
-      await apiFetch(`${API_BASE}/api/class-progress/complete`, {
+      const response = await apiFetch(`${API_BASE}/api/class-progress/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -93,12 +111,17 @@ export const MathAcademyModal: React.FC<MathAcademyModalProps> = ({ visible, onC
           class_id: unitId,
           class_name: selectedCourse?.units.find(u => u.id === unitId)?.name || unitId,
           category: activeTab,
-          score: Math.floor(Math.random() * 20) + 80,
         }),
       });
-      toast.info('Progress saved. Repeat to master!');
-    } catch {
-      toast.info('Progress recorded locally.');
+      if (!response.ok) throw new Error(`Progress request failed (${response.status})`);
+      const result = await response.json();
+      if (result?.status !== 'completed') throw new Error(result?.detail || 'Progress was not confirmed.');
+      setCompletedUnits(prev => new Set([...prev, unitId]));
+      toast.success(result.is_repeat ? 'Repeat completion saved' : 'Unit completion saved');
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Unable to save completion.');
+    } finally {
+      setSavingUnit(null);
     }
   };
 
@@ -226,8 +249,9 @@ export const MathAcademyModal: React.FC<MathAcademyModalProps> = ({ visible, onC
             <TouchableOpacity
               style={[styles.completeBtn, { backgroundColor: completedUnits.has(unit.id) ? '#8B5CF6' : c.color }]}
               onPress={() => handleCompleteUnit(unit.id)}
+              disabled={savingUnit !== null}
             >
-              <Ionicons name={completedUnits.has(unit.id) ? 'refresh' : 'play'} size={14} color="#FFF" />
+              {savingUnit === unit.id ? <ActivityIndicator size="small" color="#FFF" /> : <Ionicons name={completedUnits.has(unit.id) ? 'refresh' : 'play'} size={14} color="#FFF" />}
               <Text style={styles.completeBtnText}>
                 {completedUnits.has(unit.id) ? 'Repeat' : 'Complete'}
               </Text>
@@ -283,6 +307,14 @@ export const MathAcademyModal: React.FC<MathAcademyModalProps> = ({ visible, onC
           <View style={styles.loadingView}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
+        ) : error && !selectedCourse && Object.keys(courses).length === 0 ? (
+          <View style={styles.loadingView}>
+            <Ionicons name="alert-circle" size={36} color={colors.error || '#EF4444'} />
+            <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
+            <TouchableOpacity style={[styles.completeBtn, { backgroundColor: colors.primary }]} onPress={loadCourses}>
+              <Text style={styles.completeBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
         ) : selectedCourse ? renderCourseDetail() : renderCourseList()}
       </View>
     </Modal>
@@ -297,6 +329,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '700' },
   headerSub: { fontSize: 12, marginTop: 2 },
   loadingView: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorText: { fontSize: 14, textAlign: 'center', margin: 16 },
   content: { flex: 1, paddingHorizontal: 16 },
   statBar: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 10, marginTop: 12 },
   statText: { fontSize: 14, fontWeight: '600' },
