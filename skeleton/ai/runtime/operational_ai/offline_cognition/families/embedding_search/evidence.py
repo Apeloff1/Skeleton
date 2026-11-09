@@ -23,6 +23,10 @@ def query(catalog,text,*,limit=10,query_vector=None,embedding_model_sha256=None)
 def passages(document,*,window_bytes=2048,overlap_bytes=None):
     # Delegate implicit overlap selection to the shared bounded evidence engine.
     # Explicit invalid overlaps must still be rejected, never silently clamped.
+    # Select a bounded overlap only when the caller leaves it implicit.
+    # Preserve the shared core's explicit invalid-overlap rejection.
+    if overlap_bytes is None:
+        overlap_bytes=min(128,window_bytes//4) if type(window_bytes) is int and window_bytes>=16 else 0
     return partition(document,window_bytes=window_bytes,overlap_bytes=overlap_bytes)
 
 def citation(catalog,span,*,quoted_text=None):

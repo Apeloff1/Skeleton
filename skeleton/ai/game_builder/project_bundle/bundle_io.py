@@ -138,7 +138,10 @@ def import_bundle(raw: str, codec: BundleCodec, saver: ProjectSaver, *,
     _bounded_bundle_bytes(raw)
     try:
         payload = codec.decode(raw).payload
-    except ValueError as exc:  # SaveIntegrityError is a ValueError
+    except Exception as exc:
+        # The injected codec and its payload accessor are an external trust
+        # boundary. Fail closed with a stable, non-leaking bundle error even
+        # for malformed adapters that raise outside SaveIntegrityError.
         raise BundleError("bundle envelope failed integrity check") from exc
     if (type(payload) is not dict or set(payload) != {"manifest", "sections", "receipts"}
             or type(payload["sections"]) is not dict
@@ -180,8 +183,11 @@ def bundle_path(base_dir: str | Path, tenant_id: str, project_id: str, namespace
     """
     ns = namespace(tenant_id, purpose="game_project_bundles")
     m = _NS.fullmatch(ns)
-    if not m:
-        raise BundleError("unexpected tenant namespace shape")
+    # The injected namespace is an identity boundary, not a free-form path.
+    # An alternate purpose (including "..") must never alias another tenant
+    # or storage class, even if the caller later uses this lexical path.
+    if not m or m.group(2) != "game_project_bundles":
+        raise BundleError("unexpected tenant namespace shape or purpose")
     base = os.fspath(base_dir)
     if not isinstance(base, str) or not base or "\x00" in base or ".." in Path(base).parts:
         raise BundleError("unsafe bundle storage base")

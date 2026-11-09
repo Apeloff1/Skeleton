@@ -175,8 +175,13 @@ class Command:
 
     def __post_init__(self) -> None:
         req_id(self.command_id, "command_id")
-        if self.kind not in ("move", "collect", "talk", "craft", "strike", "finish", "wait"):
+        # Commands arrive from CLI, JSON saves and external input adapters.
+        # Reject container and numeric payloads before membership checks: an
+        # unhashable direction must not escape as an unexpected TypeError.
+        if type(self.kind) is not str or self.kind not in ("move", "collect", "talk", "craft", "strike", "finish", "wait"):
             _fail("unknown command")
+        if type(self.target) is not str:
+            _fail("invalid command target")
         if self.kind == "move" and self.target not in DIRECTIONS:
             _fail("unknown direction")
         if self.kind in ("collect", "talk", "craft", "strike", "finish"):
