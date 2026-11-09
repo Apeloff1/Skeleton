@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "b80362482d10e791ed3db1de9bf0514d96324ae4",
+      "source_git_object_sha": "cbdd817518da7feba19955c882db588e72bba2f7",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -735,7 +735,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "e8a70fd9bad74a5991f645fcc291a902a6a0df29",
+      "source_git_object_sha": "0c4c6b06b32c10df770c978606f1c914359c8135",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -6739,16 +6739,6 @@
   },
   "retained_outside_ai_tree": [
     {
-      "path": "skeleton/mass_build",
-      "owner": "legacy game mass-build batch source",
-      "reason": "Tracked batch-range implementation slices remain a legacy game-build source, not a canonical AI/provider runtime. Retain source and provenance without granting move, cutover, completion, or release authority."
-    },
-    {
-      "path": "skeleton/perf_profiler",
-      "owner": "product/game runtime performance instrumentation",
-      "reason": "Stdlib-only allocation, frame and load timing CLI is a product performance instrument that delegates percentile statistics to canonical AI observability. Retain instrumentation ownership outside AI engine move scope; local-callable execution remains explicitly gated."
-    },
-    {
       "path": "skeleton/__main__.py",
       "owner": "package CLI shell",
       "reason": "top-level CLI dispatch remains a shell/compatibility entrypoint around canonical subsystems"
@@ -7249,6 +7239,11 @@
       "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
     },
     {
+      "path": "skeleton/mass_build",
+      "owner": "delivery-plane / batch build orchestration",
+      "reason": "Git-tracked batch build execution and build-manifest tooling stay under the governed delivery plane; source is retained and never treated as AI runtime cutover or completed work-package evidence."
+    },
+    {
       "path": "skeleton/masterplan",
       "owner": "masterplan volume authority",
       "reason": "executable masterplan/volume evidence surface; authority is machine/ai_master_plan.json, not an AI runtime mirror."
@@ -7337,6 +7332,11 @@
       "path": "skeleton/parse",
       "owner": "package/parsing compatibility boundary",
       "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
+    },
+    {
+      "path": "skeleton/perf_profiler",
+      "owner": "platform-runtime / observability",
+      "reason": "Canonical CPU and runtime profiling instrumentation belongs to the platform observability substrate and remains outside AI-tree implementation ownership until an explicit, independently qualified cutover."
     },
     {
       "path": "skeleton/persist",
@@ -7782,7 +7782,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 162,
+    "retained_outside_ai_tree_count": 157,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
