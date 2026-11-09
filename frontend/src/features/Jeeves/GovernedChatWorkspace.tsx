@@ -4,7 +4,7 @@ import {
   ScrollView, Text, TextInput, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import { useChatController } from '../../product/useChatController';
@@ -175,6 +175,7 @@ export type ChatWorkspaceProps = { initialThreadId?: string };
 
 export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = {}) {
   const router = useRouter();
+  const params = useLocalSearchParams<{ plan?: string; plan_receipt?: string; feature?: string }>();
   const { controller, state } = useChatController({ initialThreadId });
   const { readiness, refresh: refreshReadiness, error: readinessError, observedAt: readinessObservedAt } = useChatReadiness();
   const dragonAcademy = useDragonAcademy();
@@ -223,6 +224,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const previousAccountToken = useRef(accountToken);
   const draftAccountScope = useRef<string | null>(null);
   const recoveryDrafts = useRef(new Map<string, { key: string; text: string }>());
+  const acceptedPlanHandoff = useRef<string | null>(null);
   const liveController = useRef(controller);
   liveController.current = controller;
   const threadId = state.activeThread?.thread_id || '__new';
@@ -284,6 +286,23 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const setDraft = (value: string) => {
     if (accountDraftsReady && accountToken === getAuthToken() && liveController.current === controller) setDrafts(current => ({ ...current, [threadId]: value }));
   };
+  useEffect(() => {
+    const plan = typeof params.plan === 'string' ? params.plan : '';
+    const receipt = typeof params.plan_receipt === 'string' ? params.plan_receipt : '';
+    const feature = typeof params.feature === 'string' ? params.feature : '';
+    if (!accountDraftsReady || !state.ready || draft || acceptedPlanHandoff.current === receipt
+      || !/^[a-f0-9]{64}$/.test(receipt) || !plan.trim() || plan.length > 12000
+      || !feature.trim() || feature.length > 160) return;
+    acceptedPlanHandoff.current = receipt;
+    setDrafts(current => ({ ...current, [threadId]: [
+      `Help me turn the governed implementation plan for "${feature}" into a concrete repository change.`,
+      `Planning receipt: ${receipt}`,
+      '', plan,
+      '', 'Inspect the current repository before proposing actions. Preserve authorization boundaries and ask before any irreversible external action.',
+    ].join('\n') }));
+    setToast('Implementation plan loaded into the composer. Review it before sending.');
+    requestAnimationFrame(() => input.current?.focus());
+  }, [params.plan, params.plan_receipt, params.feature, accountDraftsReady, state.ready, draft, threadId]);
   const scrollToBottom = useCallback((animated = true) => {
     scroll.current?.scrollToEnd({ animated }); nearBottom.current = true; setNewBelow(false);
   }, []);
