@@ -320,8 +320,10 @@ def inspect_offline_game_archive(
             digest = manifest.get("manifest_digest")
             body = {key: value for key, value in manifest.items()
                     if key != "manifest_digest"}
-            if (manifest.get("schema") != "skeleton.game_builder.dual_runtime_package.v1"
-                    or type(digest) is not str or digest != canonical_digest(body)
+            if (manifest.get("schema") not in {
+                    "skeleton.game_builder.dual_runtime_package.v1",
+                    "skeleton.game_builder.studio_package.v1",
+                    } or type(digest) is not str or digest != canonical_digest(body)
                     or manifest.get("automatic_publication") is not False
                     or manifest.get("godot_hardware_tested") is not False):
                 raise OfflineGameArchiveError("unsupported archived release authority")
