@@ -344,8 +344,13 @@ def install_application(
             manifest=manifest,
             full=full,
             timeout=3.0,
-            attempts=12,
-            delay=1.0,
+            # Cold production startup is dependency ordered: Mongo must become
+            # healthy before the engine starts, and the backend waits for both.
+            # Their image health checks allow a 60-second start period, so the
+            # old twelve-second budget routinely called a healthy first install
+            # failed while containers were still inside their declared grace.
+            attempts=60,
+            delay=2.0,
             public_url_overrides=host_urls,
         )
         healthy = probes_ok(results)
