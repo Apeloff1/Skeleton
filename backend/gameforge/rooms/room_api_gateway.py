@@ -52,18 +52,28 @@ def _canonical_allowed_host(hostname: str) -> str:
     raise ValueError("external API URL is not on the HTTPS host allowlist")
 
 
-def _resolve_public_host(hostname: str) -> None:
-    """Fail closed unless every current address for the allowlisted host is public."""
+def _resolve_public_host(hostname: str) -> str:
+    """Resolve once, reject mixed/private DNS answers, and select a pinned IP.
+
+    Passing the approved IP as the actual HTTP connection authority prevents a
+    later DNS rebind from changing the network destination after validation.
+    """
     try:
         addresses = socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)
     except OSError as exc:
         raise ValueError("external API host could not be resolved") from exc
     if not addresses:
         raise ValueError("external API host resolved to no addresses")
+    approved: set[str] = set()
     for address in addresses:
-        ip = ipaddress.ip_address(address[4][0])
+        try:
+            ip = ipaddress.ip_address(address[4][0])
+        except (ValueError, IndexError, TypeError) as exc:
+            raise ValueError("external API host returned an invalid address") from exc
         if not ip.is_global:
             raise ValueError("external API host resolves to a non-public address")
+        approved.add(ip.compressed)
+    return sorted(approved, key=lambda item: (ipaddress.ip_address(item).version, item))[0]
 
 
 def _origin_for_host(hostname: str) -> str:
@@ -182,12 +192,23 @@ async def _api_query(target: dict) -> dict:
         base_url, request_target = _prepare_external_request(url)
         method = _safe_method(target.get("method", "GET"))
         timeout = _safe_timeout(target.get("timeout", 8))
-        headers = _safe_headers(target.get("headers"))
+        headers = _safe_headers(target.get("headers")) or {}
+        hostname = urlsplit(base_url).hostname
+        if hostname is None:
+            raise ValueError("external API host is missing")
+        # Use the checked address as the HTTP connection authority. HTTPX's
+        # documented SNI extension verifies the HTTPS certificate against the
+        # original allowlisted hostname, while Host preserves virtual hosting.
+        # Disable environment proxy handling so the selected IP cannot be
+        # redirected through an uncontrolled proxy or resolver.
+        pinned_ip = _resolve_public_host(hostname)
+        headers["Host"] = hostname
         import httpx
         async with httpx.AsyncClient(
-            base_url=base_url,
+            base_url=_origin_for_host(pinned_ip),
             timeout=timeout,
             follow_redirects=False,
+            trust_env=False,
         ) as c:
             r = await c.request(
                 method,
@@ -195,6 +216,7 @@ async def _api_query(target: dict) -> dict:
                 params=target.get("params"),
                 headers=headers,
                 json=target.get("json"),
+                extensions={"sni_hostname": hostname},
             )
             body = r.text[:2000]
             return {"channel": "api", "target": name, "ok": r.is_success,
