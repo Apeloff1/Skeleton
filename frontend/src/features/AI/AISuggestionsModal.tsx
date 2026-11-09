@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { useRouter } from 'expo-router';
 
 import { apiFetch } from '../../utils/apiController';
 interface AISuggestionsModalProps {
@@ -59,6 +60,7 @@ export const AISuggestionsModal: React.FC<AISuggestionsModalProps> = ({
   colors,
   context = EMPTY_CONTEXT,
 }) => {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<FeatureSuggestion[]>([]);
   const [sotaAnalysis, setSotaAnalysis] = useState<string | null>(null);
@@ -271,6 +273,10 @@ export const AISuggestionsModal: React.FC<AISuggestionsModalProps> = ({
                         <Text selectable style={[styles.planDigest, { color: colors.textMuted }]}>SHA-256 {plans[String(suggestion.id)].plan_digest}</Text>
                         <Text style={[styles.planMeta, { color: colors.textMuted }]}>Planning receipt only · execution requires a separately authorized Studio goal.</Text>
                         <TouchableOpacity accessibilityRole="button" onPress={() => void Clipboard.setStringAsync(plans[String(suggestion.id)].implementation_plan)} style={[styles.copyButton, { borderColor: colors.primary }]}><Ionicons name="copy-outline" size={16} color={colors.primary} /><Text style={{ color: colors.primary, fontWeight: '700' }}>Copy plan</Text></TouchableOpacity>
+                        <TouchableOpacity accessibilityRole="button" disabled={plans[String(suggestion.id)].implementation_plan.length > 12000} onPress={() => {
+                          const plan = plans[String(suggestion.id)];
+                          router.push({ pathname: '/ai-chat', params: { plan: plan.implementation_plan, plan_receipt: plan.plan_digest, feature: plan.feature } });
+                        }} style={[styles.copyButton, { borderColor: colors.primary }, plans[String(suggestion.id)].implementation_plan.length > 12000 && { opacity: 0.45 }]}><Ionicons name="chatbox-ellipses-outline" size={16} color={colors.primary} /><Text style={{ color: colors.primary, fontWeight: '700' }}>{plans[String(suggestion.id)].implementation_plan.length > 12000 ? 'Plan is too large for chat handoff' : 'Continue with Jeeves'}</Text></TouchableOpacity>
                       </View>}
                     </View>
                   ))}
