@@ -1,0 +1,55 @@
+{
+  "schema": "skeleton.game_mechanic_scenario.v1",
+  "name": "overdrive",
+  "domain": "arcane",
+  "initial": 53,
+  "capacity": 160,
+  "events": [
+    {
+      "id": "overdrive:gain:1",
+      "action": "gain",
+      "amount": 6,
+      "tick": 1
+    },
+    {
+      "id": "overdrive:spend:2",
+      "action": "spend",
+      "amount": 13,
+      "tick": 2
+    },
+    {
+      "id": "overdrive:recover:3",
+      "action": "recover",
+      "amount": 2,
+      "tick": 3
+    },
+    {
+      "id": "overdrive:observe:4",
+      "action": "observe",
+      "amount": 0,
+      "tick": 4
+    },
+    {
+      "id": "overdrive:decay:5",
+      "action": "decay",
+      "amount": 1,
+      "tick": 5
+    }
+  ],
+  "assertions": {
+    "bounds": [
+      0,
+      160
+    ],
+    "accepted_receipts": 5,
+    "duplicate_receipts_change_state": false,
+    "stable_ordering": true,
+    "no_authorization_side_effects": true
+  },
+  "notes": [
+    "Designed for arcane simulation with bounded energy units.",
+    "Event IDs carry replay identity within a world instance.",
+    "Timestamps are logical ticks, not wall-clock time.",
+    "This fixture is synthetic and does not claim gameplay/device qualification."
+  ]
+}

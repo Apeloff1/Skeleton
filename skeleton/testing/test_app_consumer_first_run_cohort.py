@@ -255,7 +255,10 @@ def _isolated_installs(delivered_games, tmp_path):
 def _replace_nested_asset_with_identical_bytes(tmp_path, installed):
     """Same-byte replacement must still invalidate the inode inventory."""
     target = Path(installed) / "godot" / "scripts" / "main.gd"
-    replacement = tmp_path / "new-main.gd"
+    # Stage beside the target so only the nested directory changes; staging
+    # in tmp_path would also mutate the install's parent directory and trip
+    # the (earlier) parent-custody check instead of the nested-inode check.
+    replacement = target.with_name(".swap-main.gd")
     replacement.write_bytes(target.read_bytes())
     replacement.chmod(target.stat().st_mode & 0o777)
     os.replace(replacement, target)

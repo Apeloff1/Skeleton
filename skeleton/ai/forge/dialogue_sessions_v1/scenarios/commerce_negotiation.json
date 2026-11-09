@@ -1,0 +1,58 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "commerce_negotiation",
+  "domain": "commerce",
+  "role": "negotiation",
+  "rapport_threshold": 28,
+  "rapport_gain": 6,
+  "stress_increment": 4,
+  "steps": [
+    {
+      "id": "commerce_negotiation:0",
+      "choice": "opening",
+      "version": 0,
+      "proof": ""
+    },
+    {
+      "id": "commerce_negotiation:1",
+      "choice": "question",
+      "version": 1,
+      "proof": ""
+    },
+    {
+      "id": "commerce_negotiation:2",
+      "choice": "disclosure",
+      "version": 2,
+      "proof": "commerce_negotiation:proof-1"
+    },
+    {
+      "id": "commerce_negotiation:3",
+      "choice": "offer",
+      "version": 3,
+      "proof": "commerce_negotiation:proof-2"
+    },
+    {
+      "id": "commerce_negotiation:4",
+      "choice": "agreement",
+      "version": 4,
+      "proof": ""
+    },
+    {
+      "id": "commerce_negotiation:5",
+      "choice": "departure",
+      "version": 5,
+      "proof": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6
+  },
+  "failure_modes": [
+    "reused-evidence",
+    "stale-version",
+    "wrong-order",
+    "untrusted-evidence"
+  ],
+  "production_certified": false
+}

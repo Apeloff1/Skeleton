@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mystery_interview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "choice",
+    "version",
+    "proof"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "choice": {
+      "type": "string",
+      "enum": [
+        "opening",
+        "question",
+        "disclosure",
+        "offer",
+        "agreement",
+        "departure",
+        "withdraw"
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "proof": {
+      "type": "string",
+      "maxLength": 128
+    }
+  }
+}

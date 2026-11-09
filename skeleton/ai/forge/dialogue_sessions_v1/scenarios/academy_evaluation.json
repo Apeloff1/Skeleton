@@ -1,0 +1,59 @@
+{
+  "schema": "skeleton.dialogue_scenario.v1",
+  "id": "academy_evaluation",
+  "domain": "academy",
+  "role": "evaluation",
+  "rapport_gate": 21,
+  "rapport_gain": 4,
+  "tension_cost": 3,
+  "steps": [
+    {
+      "id": "academy_evaluation:0",
+      "choice": "introduce",
+      "version": 0,
+      "evidence": ""
+    },
+    {
+      "id": "academy_evaluation:1",
+      "choice": "listen",
+      "version": 1,
+      "evidence": ""
+    },
+    {
+      "id": "academy_evaluation:2",
+      "choice": "reveal",
+      "version": 2,
+      "evidence": "academy_evaluation:proof-1"
+    },
+    {
+      "id": "academy_evaluation:3",
+      "choice": "propose",
+      "version": 3,
+      "evidence": "academy_evaluation:proof-2"
+    },
+    {
+      "id": "academy_evaluation:4",
+      "choice": "agree",
+      "version": 4,
+      "evidence": ""
+    },
+    {
+      "id": "academy_evaluation:5",
+      "choice": "leave",
+      "version": 5,
+      "evidence": ""
+    }
+  ],
+  "expected": {
+    "status": "resolved",
+    "version": 6
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate",
+    "out-of-order",
+    "proof-used",
+    "proof-required"
+  ],
+  "production_certified": false
+}
