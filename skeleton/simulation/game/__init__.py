@@ -93,3 +93,6 @@ __all__ = [
     "compose_gameplay",
     "initial_composition_state",
 ]
+
+from .golden_grid import GridState, GameplayError, checkpoint as checkpoint_grid, restore as restore_grid, step as step_grid, play as play_grid
+__all__ += ["GridState", "GameplayError", "checkpoint_grid", "restore_grid", "step_grid", "play_grid"]
