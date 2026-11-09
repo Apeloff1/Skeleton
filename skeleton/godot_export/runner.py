@@ -6,6 +6,7 @@ and launch failures become machine-readable results instead of tracebacks.
 from __future__ import annotations
 
 import subprocess
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Sequence
@@ -51,7 +52,8 @@ def subprocess_exec(argv: Sequence[str], cwd: Path, timeout: int) -> RunResult:
         return RunResult(124, out, tuple(argv))
     except OSError as exc:
         return RunResult(127, "Godot launch failed: " + type(exc).__name__, tuple(argv))
-    return RunResult(r.returncode, r.stdout + "\n" + r.stderr, tuple(argv))
+    output = (r.stdout or "") + "\n" + (r.stderr or "")
+    return RunResult(r.returncode, output[-TAIL:], tuple(argv))
 
 
 class GodotRunner:
@@ -67,6 +69,10 @@ class GodotRunner:
         return base + list(args)
 
     def run(self, args: Sequence[str], cwd: Path, timeout: int = 180) -> RunResult:
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0 or timeout > 3600:
+            raise ValueError("Godot timeout must be finite and within (0, 3600]")
+        if not isinstance(cwd, Path):
+            raise TypeError("Godot working directory must be a Path")
         return self.exec_fn(self.argv(args), cwd, timeout)
 
     def version(self, cwd: Path) -> RunResult:

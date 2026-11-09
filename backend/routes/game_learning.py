@@ -213,6 +213,20 @@ def _scope(user):
     return workspace._scope(tenant, owner)
 
 
+def _write_scope(user):
+    """Resolve an owned workspace and require durable studio-write authority."""
+    scope = _scope(user)
+    if user.get("role") not in {"editor", "admin"}:
+        raise HTTPException(
+            403,
+            detail={
+                "code": "game_learning_write_denied",
+                "message": "Editor permission is required to change sources, simulations, builds, or training.",
+            },
+        )
+    return scope
+
+
 async def _call(awaitable):
     try:
         return await awaitable
@@ -256,7 +270,7 @@ async def list_projects(user: User, limit: int = Query(default=50, ge=1, le=64))
 @router.post("/projects")
 async def create_project(body: CreateProject, user: User):
     return {
-        "project": await _call(workspace.create_project(_scope(user), body.model_dump(exclude_none=True)))
+        "project": await _call(workspace.create_project(_write_scope(user), body.model_dump(exclude_none=True)))
     }
 
 
@@ -269,7 +283,7 @@ async def get_project(project_id: str, user: User):
 async def edit_project(project_id: str, body: EditorRequest, user: User):
     return {
         "project": await _call(
-            workspace.save_editor(_scope(user), project_id, body.model_dump(exclude_none=True))
+            workspace.save_editor(_write_scope(user), project_id, body.model_dump(exclude_none=True))
         )
     }
 
@@ -277,7 +291,7 @@ async def edit_project(project_id: str, body: EditorRequest, user: User):
 @router.post("/projects/{project_id}/sources")
 async def add_source(project_id: str, body: SourceRequest, user: User):
     project, source = await _call(
-        workspace.ingest_source(_scope(user), project_id, body.model_dump(exclude_none=True))
+        workspace.ingest_source(_write_scope(user), project_id, body.model_dump(exclude_none=True))
     )
     return {"project": project, "source": source}
 
@@ -286,7 +300,7 @@ async def add_source(project_id: str, body: SourceRequest, user: User):
 async def revoke_source(project_id: str, source_id: str, body: RevokeRequest, user: User):
     return {
         "project": await _call(
-            workspace.revoke_source(_scope(user), project_id, source_id, body.expected_version)
+            workspace.revoke_source(_write_scope(user), project_id, source_id, body.expected_version)
         )
     }
 
@@ -294,7 +308,7 @@ async def revoke_source(project_id: str, source_id: str, body: RevokeRequest, us
 @router.post("/projects/{project_id}/simulate")
 async def simulate(project_id: str, body: SimulationRequest, user: User):
     project, session = await _call(
-        workspace.simulate(_scope(user), project_id, body.model_dump(exclude_none=True))
+        workspace.simulate(_write_scope(user), project_id, body.model_dump(exclude_none=True))
     )
     return {"project": project, "session": session}
 
@@ -302,7 +316,7 @@ async def simulate(project_id: str, body: SimulationRequest, user: User):
 @router.post("/projects/{project_id}/train")
 async def train(project_id: str, body: TrainRequest, user: User):
     return {
-        "job": await _call(workspace.start_job(_scope(user), project_id, "train", body.admitted_request()))
+        "job": await _call(workspace.start_job(_write_scope(user), project_id, "train", body.admitted_request()))
     }
 
 
@@ -310,7 +324,7 @@ async def train(project_id: str, body: TrainRequest, user: User):
 async def generate(project_id: str, body: GenerateRequest, user: User):
     return {
         "job": await _call(
-            workspace.start_job(_scope(user), project_id, "generate", body.model_dump(exclude_none=True))
+            workspace.start_job(_write_scope(user), project_id, "generate", body.model_dump(exclude_none=True))
         )
     }
 
@@ -322,12 +336,12 @@ async def get_job(job_id: str, user: User):
 
 @router.post("/jobs/{job_id}/cancel")
 async def cancel_job(job_id: str, user: User):
-    return {"job": await _call(workspace.cancel_job(_scope(user), job_id))}
+    return {"job": await _call(workspace.cancel_job(_write_scope(user), job_id))}
 
 
 @router.post("/jobs/{job_id}/resume")
 async def resume_job(job_id: str, user: User):
-    return {"job": await _call(workspace.resume_job(_scope(user), job_id))}
+    return {"job": await _call(workspace.resume_job(_write_scope(user), job_id))}
 
 
 @router.get("/projects/{project_id}/export")
