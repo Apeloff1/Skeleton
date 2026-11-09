@@ -29,5 +29,12 @@
   },
   "required_reusable_workflows": [
     "ci.yml"
+  ],
+  "operational_scheduled_non_pr": [
+    "queue-drain.yml"
+  ],
+  "operational_paused_manual_only": [
+    "actions-housekeeping-cli.yml",
+    "three-hour-actions-queue-expiry.yml"
   ]
 }

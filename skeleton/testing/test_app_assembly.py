@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
@@ -288,7 +289,19 @@ def test_product_control_client_matches_mounted_backend_routes():
     registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
 
     assert "const ROOT = '/api/admin/ops/product-control';" in client
-    assert 'router = project_router(prefix="/api/admin/ops"' in ops
+    ops_tree = ast.parse(ops)
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "project_router"
+        and any(
+            keyword.arg == "prefix"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "/api/admin/ops"
+            for keyword in node.keywords
+        )
+        for node in ast.walk(ops_tree)
+    )
     assert '("routes.ops",' in registry
 
     required_routes = (
