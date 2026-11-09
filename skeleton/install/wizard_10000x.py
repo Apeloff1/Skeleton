@@ -5,11 +5,31 @@ Fail-closed.
 """
 from __future__ import annotations
 import hashlib
+from typing import Mapping
+from skeleton.install.loopback_readiness import SERVICES, loopback_probe
 
 class WizardError(Exception):
     pass
 
 class FirstRunWizard10000x:
+    def observe_local_services(self, endpoints: Mapping[str, str]) -> dict[str, object]:
+        """Report bounded live observations without certifying an install or game."""
+        if not isinstance(endpoints, Mapping) or set(endpoints) - SERVICES:
+            raise WizardError("invalid-service-map")
+        status: dict[str, bool] = {}
+        for service in sorted(SERVICES):
+            url = endpoints.get(service)
+            if url is None:
+                status[service] = False
+                continue
+            try:
+                status[service] = loopback_probe(service, url)()
+            except (TypeError, ValueError):
+                status[service] = False
+        return {"setup_accessible": True, "services": status,
+                "all_services_observed_ready": all(status.values()),
+                "device_qualified": False, "release_ready": False}
+
     def step(self, name: str) -> str:
         if name not in ("admin", "ai", "services", "ready"):
             raise WizardError("invalid")

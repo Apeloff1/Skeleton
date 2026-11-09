@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "cbdd817518da7feba19955c882db588e72bba2f7",
+      "source_git_object_sha": "d43b5584cf38e65ab22e67dc8788b45627f948f9",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "b3da8b1d32da9f7a0174d8b628237497a6b7f18d",
+      "source_git_object_sha": "b16f256487e8c13b1f3cc97fa61777e8926a1d97",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1544,7 +1544,7 @@
       "source": "skeleton/native",
       "destination": "skeleton/ai/runtime/native",
       "kind": "tree",
-      "source_git_object_sha": "6269da3a6e4c48e8d965ea4444827cec914d477b",
+      "source_git_object_sha": "715c1deb0a549d5e60992e6793b6d30b7d2c6e33",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
         "VOL-032",
@@ -2777,7 +2777,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "e75ba2a3266ec1cd88988688bb74aba62cbf1f0b",
+      "source_git_object_sha": "ea2f401f7501951ad534b37848b6425417a2549e",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -5654,7 +5654,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_execution_sandbox_tree_exactly_mirrored",
-      "source_git_object_sha": "a19734e6dc90b85d3c26c3a322105fbc88d44f04"
+      "source_git_object_sha": "1e412ea4ee0d79c490bf8c8b2938d963378f2b64"
     },
     {
       "id": "AIFT-STORAGE",
@@ -6260,7 +6260,7 @@
       "source": "skeleton/inference",
       "destination": "skeleton/ai/runtime/inference/core",
       "kind": "tree",
-      "source_git_object_sha": "70cd31a539451c77ae15d23e406cda647a795631",
+      "source_git_object_sha": "3665807155ebd8a31aee9303cff4b5d670f02d97",
       "role": "Core inference session, provider-bridge, replay, and async-runtime compatibility plane staged beneath the canonical inference runtime without colliding with native local/neural/KV engines.",
       "work_package_refs": [
         "WP-W05",
