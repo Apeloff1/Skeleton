@@ -8,7 +8,7 @@ import math
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from skeleton.app.assembly import AssemblyManifest, ServiceSpec, load_manifest
 
@@ -31,17 +31,56 @@ class ProbeResult:
         }
 
 
-def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
-    """Probe one HTTP endpoint without external client dependencies."""
+def _open_direct_health(request: Request, *, timeout: float):
+    """Fetch one declared health endpoint without ambient proxies or redirects.
 
-    if not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
+    A remote redirect must not cause a second network request, even when a
+    subsequent URL comparison would have rejected its final 200 response.
+    """
+
+    class RejectRedirect(HTTPRedirectHandler):
+        def redirect_request(self, request, fp, code, msg, headers, newurl):
+            return None
+
+    return build_opener(ProxyHandler({}), RejectRedirect()).open(request, timeout=timeout)
+
+
+def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
+    """Probe one health endpoint with no proxy or redirect side effects."""
+
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
         raise ValueError("health probe timeout must be finite and within (0, 30] seconds")
+    try:
+        # Reject non-string and whitespace/control characters before urllib parsing.
+        # urllib strips some control bytes, which can change the actual target.
+        if not isinstance(url, str) or not url or any(ord(ch) <= 32 or ord(ch) == 127 for ch in url):
+            raise ValueError("invalid health target characters")
+        target = urlsplit(url)
+        valid = (
+            target.scheme in {"http", "https"}
+            and target.hostname is not None
+            and target.hostname != ""
+            # Reject ambiguous authority delimiters before urllib transport.
+            and "\\" not in target.netloc
+            and "%" not in target.netloc
+            and target.username is None
+            and target.password is None
+            and not target.fragment
+            and target.port != 0
+        )
+    except ValueError:
+        valid = False
+    if not valid:
+        return ProbeResult(
+            service=name, url="", ok=False, status=None,
+            detail="health probe requires HTTP(S) without credentials",
+        )
     request = Request(url, headers={"User-Agent": "skeleton-app-smoke/1"})
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with _open_direct_health(request, timeout=timeout) as response:
             status = int(getattr(response, "status", 200))
-            # urllib automatically follows redirects. A redirected login page
-            # returning 200 is NOT evidence the declared health endpoint works.
+            # Preserve the original URL check as a second fence even though
+            # _open_direct_health already blocks redirect traversal.
             geturl = getattr(response, "geturl", None)
             effective_url = geturl() if callable(geturl) else url
             response.read(256)
@@ -63,12 +102,13 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
             detail=detail,
         )
     except HTTPError as exc:
+        code = int(exc.code)
         return ProbeResult(
             service=name,
             url=url,
             ok=False,
-            status=int(exc.code),
-            detail=f"HTTP error {exc.code}",
+            status=code,
+            detail="health endpoint redirected" if 300 <= code < 400 else f"HTTP error {code}",
         )
     except (URLError, TimeoutError, OSError) as exc:
         return ProbeResult(
@@ -92,11 +132,24 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
     """
     from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
-    if not math.isfinite(timeout) or not 0 < timeout <= 10:
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(timeout)
+        or not 0 < timeout <= 10
+    ):
         raise ValueError("setup probe timeout must be finite and within (0, 10] seconds")
     # Reject invalid targets here as well as in the Windows launcher, so a
     # future caller cannot accidentally turn this local probe into an SSRF.
     try:
+        # urllib can silently strip controls from a URL. Reject before parsing
+        # to prevent a malformed setup origin from becoming a different target.
+        if (
+            not isinstance(service.public_url, str)
+            or not service.public_url
+            or any(ord(ch) <= 32 or ord(ch) == 127 for ch in service.public_url)
+        ):
+            raise ValueError("invalid setup origin")
         parts = urlsplit(service.public_url)
         local = (
             parts.scheme == "http"
@@ -214,9 +267,9 @@ def wait_for_application(
 
     if not isinstance(attempts, int) or isinstance(attempts, bool) or not 1 <= attempts <= 120:
         raise ValueError("attempts must be an integer between 1 and 120")
-    if not math.isfinite(timeout) or not 0 < timeout <= 30:
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or not 0 < timeout <= 30:
         raise ValueError("timeout must be finite and within (0, 30] seconds")
-    if not math.isfinite(delay) or not 0 <= delay <= 30:
+    if isinstance(delay, bool) or not isinstance(delay, (int, float)) or not math.isfinite(delay) or not 0 <= delay <= 30:
         raise ValueError("delay must be finite and within [0, 30] seconds")
 
     manifest = manifest or load_manifest()
