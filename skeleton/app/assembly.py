@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
@@ -487,6 +488,59 @@ def _authenticated_mongo_uri(value: str) -> bool:
     return True
 
 
+
+def backend_python_image_errors(source: str) -> tuple[str, ...]:
+    """Detect backend image Python/dependency incompatibility before Docker build.
+
+    All stages must use one digest-pinned Alpine ABI. The embedded Python
+    compatibility assertion is the dependency boundary; changing the base
+    tag without qualifying that assertion must not reach the installer.
+    """
+    stages: dict[str, tuple[int, int, str]] = {}
+    errors: list[str] = []
+    expected = {"builder", "runtime-source", "production"}
+    for raw in source.splitlines():
+        line = raw.strip()
+        if not line.startswith("FROM python:"):
+            continue
+        match = re.fullmatch(
+            r"FROM python:(\d+)\.(\d+)-alpine@sha256:([0-9a-f]{64}) AS (builder|runtime-source|production)",
+            line,
+        )
+        if match is None:
+            errors.append("backend Python image must use a recognized digest-pinned Alpine stage")
+            continue
+        major, minor, digest, stage = match.groups()
+        if stage in stages:
+            errors.append(f"duplicate backend Python image stage: {stage}")
+        stages[stage] = (int(major), int(minor), digest)
+
+    if set(stages) != expected:
+        errors.append("backend Python image builder, runtime-source and production stages must all be pinned")
+    if len(set(stages.values())) > 1:
+        errors.append("backend Python image stages must share the same pinned Python/Alpine ABI")
+
+    # An assertion copied into a comment is not an executable build guard.
+    guard_lines = [
+        line.strip() for line in source.splitlines()
+        if line.lstrip().startswith("RUN python -c ")
+    ]
+    guard = (
+        re.search(
+            r"sys\.version_info\[:2\]\s*<\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)",
+            guard_lines[0],
+        )
+        if len(guard_lines) == 1 else None
+    )
+    if guard is None:
+        errors.append("backend dependency Python upper-bound guard is missing")
+    else:
+        bound = (int(guard.group(1)), int(guard.group(2)))
+        if any(version[:2] >= bound for version in stages.values()):
+            errors.append("backend Python image version violates its dependency guard")
+    return tuple(errors)
+
+
 def preflight(
     root: Path | None = None,
     *,
@@ -552,6 +606,29 @@ def preflight(
                 ),
             )
         )
+
+    backend_dockerfile = root / "backend/Dockerfile"
+    try:
+        # Small, bounded, source-only inspection; no Docker invocation and
+        # no host mutations before the existing setup process lock.
+        if backend_dockerfile.stat().st_size > 128 * 1024:
+            raise ValueError("backend Dockerfile exceeds the preflight size limit")
+        image_errors = backend_python_image_errors(
+            backend_dockerfile.read_text(encoding="utf-8")
+        )
+    except (OSError, UnicodeError, ValueError):
+        image_errors = ("backend Dockerfile could not be inspected safely",)
+    checks.append(
+        AssemblyCheck(
+            code="image:backend-python",
+            ok=not image_errors,
+            message=(
+                "backend Python image and dependency guard agree"
+                if not image_errors
+                else "; ".join(image_errors)
+            ),
+        )
+    )
 
     if runtime:
         docker = shutil.which("docker")
