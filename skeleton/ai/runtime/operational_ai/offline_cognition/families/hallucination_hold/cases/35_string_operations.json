@@ -1,0 +1,24 @@
+{
+  "schema": "offline-cognition-case.v1",
+  "family": "hallucination_hold",
+  "id": "35_string_operations",
+  "expected": "reject",
+  "payload": {
+    "name": "hallucination_hold",
+    "category": "quality",
+    "source_role": "retrieval",
+    "retrieval_mode": "hybrid",
+    "context_limit": 11264,
+    "byte_limit": 86016,
+    "latency_ms": 57000,
+    "min_evidence": 2,
+    "priority": 11,
+    "rank_lexical": 0.6,
+    "rank_dense": 0.3,
+    "rank_freshness": 0.1,
+    "operations": "source"
+  },
+  "risk": "Reject string operations",
+  "native_e2e": false,
+  "release_certified": false
+}

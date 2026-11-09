@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from skeleton.app.assembly import (
@@ -278,7 +278,66 @@ def install_application(
     except (OSError, subprocess.SubprocessError) as exc:
         phases.append(InstallPhase("start", False, f"application start failed: {type(exc).__name__}"))
 
-    if phases[-1].ok:
+    full_start_ok = phases[-1].ok
+    if not full_start_ok:
+        # A failed protected-stack start must remain a required failure. When
+        # the canonical frontend is independently startable, attempt only its
+        # diagnostic surface; never remove backend/engine health fences or
+        # promote setup liveness into full application readiness.
+        frontend = manifest.service("frontend")
+        if not frontend.depends_on:
+            diagnostic_manifest = replace(
+                manifest,
+                default_services=("frontend",),
+                full_services=("frontend",),
+            )
+            recovery = _run(
+                compose_command("up", manifest=diagnostic_manifest, hot=hot),
+                root=root,
+                runner=runner,
+                label="setup-ui-recovery",
+                timeout=900.0,
+                env=compose_env,
+            )
+            phases.append(
+                InstallPhase(
+                    "setup-ui-recovery", recovery.ok,
+                    recovery.detail + "; protected application start remains failed",
+                    required=False,
+                )
+            )
+            if recovery.ok:
+                from skeleton.app.health import probe_local_setup
+
+                probe = probe_local_setup(
+                    replace(
+                        frontend,
+                        public_url=host_urls.get("frontend", frontend.public_url),
+                        health_path="/setup",
+                    ),
+                    timeout=2.0,
+                )
+                phases.append(
+                    InstallPhase(
+                        "setup-ui-availability", probe.ok,
+                        (
+                            "local setup route answered directly; backend and AI remain unavailable"
+                            if probe.ok
+                            else "setup route unavailable; inspect frontend logs"
+                        ),
+                        required=False,
+                    )
+                )
+        else:
+            phases.append(
+                InstallPhase(
+                    "setup-ui-recovery", False,
+                    "frontend has protected startup dependencies; qualify #4682 before independent setup recovery",
+                    required=False,
+                )
+            )
+
+    if full_start_ok:
         from skeleton.app.health import probes_ok, wait_for_application
 
         results = wait_for_application(
@@ -305,7 +364,11 @@ def install_application(
         if healthy:
             from skeleton.app.first_install import critical_backend_route_report
 
-            route_status = critical_backend_route_report(host_urls["backend"], timeout=3.0)
+            # public_service_urls is intentionally a sparse *override* map.
+            # On a clean install with default ports it has no "backend" key;
+            # use the already resolved canonical manifest URL as the fallback.
+            backend_url = host_urls["backend"] if "backend" in host_urls else manifest.service("backend").public_url
+            route_status = critical_backend_route_report(backend_url, timeout=3.0)
             routes_ready = route_status["ready"] is True
             phases.append(
                 InstallPhase(

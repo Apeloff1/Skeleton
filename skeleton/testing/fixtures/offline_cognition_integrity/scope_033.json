@@ -1,0 +1,27 @@
+{
+  "schema": "offline-cognition-integrity-case.v1",
+  "id": "scope_033",
+  "kind": "scope_invariant",
+  "expected": "equal",
+  "query": "forest",
+  "local_documents": [
+    {
+      "document_id": "local_a",
+      "text": "forest forest forest verified original source bounded operator"
+    },
+    {
+      "document_id": "local_b",
+      "text": "local private reading forest signed evidence source"
+    },
+    {
+      "document_id": "local_c",
+      "text": "document forest finite history proof replay"
+    }
+  ],
+  "foreign_documents": [
+    {
+      "document_id": "foreign_x",
+      "text": "forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest forest foreign confidential vocabulary native 18"
+    }
+  ]
+}

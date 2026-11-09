@@ -30,19 +30,23 @@ CMD ["npx", "expo", "start", "--web", "--port", "3000"]
 FROM deps AS builder
 # Expo inlines public endpoints into the exported browser bundle. These are
 # public URLs only; model credentials remain confined to the engine.
-ARG EXPO_PUBLIC_BACKEND_URL=http://localhost:8001
-ARG EXPO_PUBLIC_SKELETON_URL=http://localhost:8010
+# Leave production web endpoints unset by default: the browser must use the
+# installed application's same-origin nginx ingress, not the visitor's localhost.
+# Explicit build arguments remain supported for deliberately external deployments.
+ARG EXPO_PUBLIC_BACKEND_URL=
+ARG EXPO_PUBLIC_SKELETON_URL=
 ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL \
     EXPO_PUBLIC_SKELETON_URL=$EXPO_PUBLIC_SKELETON_URL
 COPY . .
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    yarn export:web
+    yarn export:web \
+    && (test -f /app/dist/setup.html || test -f /app/dist/setup/index.html)
 
 # Stage 4: Production (Nginx)
 # Use the minimal official nginx runtime to reduce the production package/CVE
 # surface. Keep the multi-platform index immutable for reproducible rebuilds.
-FROM nginx:1.31-alpine-slim@sha256:ebd058041a732a2b2dc0b606e34572dd8e0034de6a4aa4d50d8c13a240ac6005 AS production
+FROM nginx:1.31-alpine-slim@sha256:9c68ad4f28e7dee4b9484a7859bf451da39ef661bcd038ef62e87593fcd91c86 AS production
 
 # The official image starts as root so it can prepare runtime directories.
 # Grant the nginx user access to the real /run directory used for nginx.pid,

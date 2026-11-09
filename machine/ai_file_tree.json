@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "e9704b1af00ef7c7ced2c2623dc7a3704a699034",
+      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -98,7 +98,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/runtime/provider_runtime.py",
       "kind": "file",
-      "source_git_object_sha": "e9704b1af00ef7c7ced2c2623dc7a3704a699034",
+      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
       "role": "Existing legacy runtime import alias for the canonical credential-bearing provider runtime; a non-owning compatibility facade.",
       "work_package_refs": [
         "WP-W05",
@@ -439,7 +439,7 @@
       "source": "skeleton/frontier",
       "destination": "skeleton/ai/runtime/frontier",
       "kind": "tree",
-      "source_git_object_sha": "fc6e0664c8f1651992bb54cc2df9761f4fc844e4",
+      "source_git_object_sha": "41e62600c69806833671a00aac122bb36ee9fd44",
       "role": "Frontier domain runtime with canonical runtime/control-plane primitives under runtime/, progression/meta systems under progression/, ecology/lifecycle systems under ecology/, commerce/cooking/crafting/energy/equipment systems under economy/, NPC/character systems under characters/, and gameplay/voyage/world systems under game/, mirrored exactly into skeleton/ai/runtime/frontier.",
       "work_package_refs": [
         "WP-W04",
@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "35f62c0110d883c376a42fb5b85c327eb90c3ac7",
+      "source_git_object_sha": "cbdd817518da7feba19955c882db588e72bba2f7",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -583,7 +583,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "11f03d5e1eea61236be38940b89d202c95d05523",
+      "source_git_object_sha": "70d5bbfd7213cf2a9b19ee7f5ee6875f61edee1b",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -735,7 +735,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "e8a70fd9bad74a5991f645fcc291a902a6a0df29",
+      "source_git_object_sha": "0c4c6b06b32c10df770c978606f1c914359c8135",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "6c45cf1631eab8971f6b7c813128d3718749732b",
+      "source_git_object_sha": "731609c17eb88524e0eec50e1f7db04fddffe637",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1681,7 +1681,7 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "6a56c3528c5e8145fe3c15d995ef8ae679d82043",
+      "source_git_object_sha": "0eaeac6586a9ae37ab3fa7d84b765abbd8ef44a2",
       "role": "Incremental build graph, resource-bounded parallel scheduling, deterministic asset invalidation, build observability, release/remote build controls, and network audit support autonomous AI work.",
       "work_package_refs": [
         "WP-W27",
@@ -1945,7 +1945,7 @@
       "source": "skeleton/gate_plane",
       "destination": "skeleton/ai/runtime/policy/gate_plane",
       "kind": "tree",
-      "source_git_object_sha": "9d595f8dcd38b37c5993dad135ab3cff7674b820",
+      "source_git_object_sha": "d2af77fe98edff1550a2c37301549ed40a92ce11",
       "role": "Admission, proxy, chaos, and gate evidence are deterministic policy/reliability controls around AI execution.",
       "work_package_refs": [
         "WP-W14",
@@ -6012,7 +6012,7 @@
       "source": "skeleton/audio",
       "destination": "skeleton/ai/runtime/extensions/audio",
       "kind": "tree",
-      "source_git_object_sha": "350b556d9ab66a4c7d3a563309ed01796fe6606b",
+      "source_git_object_sha": "0a0cf7ae82b1078d7fc81c6bf903f733bf66bfdf",
       "role": "Bounded audio asset, segmentation, timestamp, confidence, and model-provenance contracts.",
       "work_package_refs": [
         "WP-W28",
@@ -6438,6 +6438,11 @@
         "path": "skeleton/shells",
         "owner": "shell/product compatibility surfaces",
         "reason": "shell/UI adapters remain product-facing compatibility surfaces rather than canonical AI engine ownership"
+      },
+      {
+        "path": "skeleton/godot_export",
+        "owner": "product/game export and native engine qualification",
+        "reason": "Godot 4 project parsing, export and device certification are product delivery adapters, not canonical AI inference or model ownership"
       },
       {
         "path": "skeleton/testing",
@@ -7234,6 +7239,11 @@
       "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
     },
     {
+      "path": "skeleton/mass_build",
+      "owner": "delivery-plane / batch build orchestration",
+      "reason": "Git-tracked batch build execution and build-manifest tooling stay under the governed delivery plane; source is retained and never treated as AI runtime cutover or completed work-package evidence."
+    },
+    {
       "path": "skeleton/masterplan",
       "owner": "masterplan volume authority",
       "reason": "executable masterplan/volume evidence surface; authority is machine/ai_master_plan.json, not an AI runtime mirror."
@@ -7322,6 +7332,11 @@
       "path": "skeleton/parse",
       "owner": "package/parsing compatibility boundary",
       "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
+    },
+    {
+      "path": "skeleton/perf_profiler",
+      "owner": "platform-runtime / observability",
+      "reason": "Canonical CPU and runtime profiling instrumentation belongs to the platform observability substrate and remains outside AI-tree implementation ownership until an explicit, independently qualified cutover."
     },
     {
       "path": "skeleton/persist",

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/quantization_drift.schema.json",
+  "title": "models.quantization_drift observation contract",
+  "description": "Bound quantization error",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quantization_error_ppm",
+        "outlier_tensor_count"
+      ],
+      "properties": {
+        "quantization_error_ppm": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1500,
+          "description": "Upper bound for quantization_error_ppm"
+        },
+        "outlier_tensor_count": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 20,
+          "description": "Upper bound for outlier_tensor_count"
+        }
+      }
+    }
+  }
+}

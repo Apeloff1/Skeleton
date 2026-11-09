@@ -95,6 +95,16 @@ def _validate_model_url(value: str) -> str:
     return value
 
 
+class _RejectRedirects(urllib.request.HTTPRedirectHandler):
+    """Never forward the model bearer token to a redirect destination."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # urllib's default redirect handler may copy Authorization to another
+        # origin. Reject even same-origin redirects: the configured endpoint
+        # is the sole authorized destination for repository content and keys.
+        return None
+
+
 class FreeModelClient:
     provider_id = "repository-automation"
     provider_family = "automation_model"
@@ -167,16 +177,19 @@ class FreeModelClient:
         try:
             if cancellation is not None:
                 cancellation.require_active()
-            with urllib.request.urlopen(req, timeout=self.timeout) as response:
+            with urllib.request.build_opener(_RejectRedirects()).open(
+                req, timeout=self.timeout
+            ) as response:
                 raw_bytes = response.read(_MAX_RESPONSE_BYTES + 1)
             if cancellation is not None:
                 cancellation.require_active()
-        except (urllib.error.URLError, TimeoutError) as exc:
+        except (urllib.error.URLError, TimeoutError):
             if cancellation is not None and cancellation.cancelled:
                 cancellation.require_active()
-            raise ModelError(
-                f"model request failed: {_secret(str(exc))}"
-            ) from exc
+            # Provider exceptions are untrusted: they may contain arbitrary
+            # credentials, response fragments, or request content. Never
+            # stringify or chain them into worker logs.
+            raise ModelError("model request failed") from None
 
         if len(raw_bytes) > _MAX_RESPONSE_BYTES:
             raise ModelError("model response exceeded size limit")

@@ -15,6 +15,8 @@
 
 services:
   # ==========================================================================
+  # Local first-install APIs are loopback-only. Remote access requires an
+  # independently authenticated TLS ingress, never an implicit 0.0.0.0 bind.
   # Skeleton API (hexagonal v16 rewrite)
   # ==========================================================================
   skeleton:
@@ -31,7 +33,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
     ports:
-      - "${SKELETON_PORT:-8010}:8001"
+      - "127.0.0.1:${SKELETON_PORT:-8010}:8001"
     environment:
       - SKL_ENVIRONMENT=${ENVIRONMENT:-development}
       - SKL_MONGO_URI=${SKL_MONGO_URI:?SKL_MONGO_URI must be set to an authenticated MongoDB URI}
@@ -115,7 +117,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
     ports:
-      - "${BACKEND_PORT:-8001}:8001"
+      - "127.0.0.1:${BACKEND_PORT:-8001}:8001"
     environment:
       - MONGO_URL=${MONGO_URL:?MONGO_URL must be set to an authenticated MongoDB URI}
       - DB_NAME=${DB_NAME:-tutolage}
@@ -179,7 +181,7 @@ services:
     container_name: tutolage-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
     environment:
       # EXPO_PUBLIC_* values are embedded into the browser bundle, so they
       # must be host-resolvable rather than Docker-internal service names.
@@ -189,11 +191,10 @@ services:
       - EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}
       - EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:${SKELETON_PORT:-8010}}
       - NODE_ENV=${NODE_ENV:-development}
-    depends_on:
-      backend:
-        condition: service_healthy
-      skeleton:
-        condition: service_healthy
+    # First-run setup and diagnostics must start independently of backend
+    # and engine. Even service_started would transitively block this UI:
+    # backend requires a healthy engine, which requires healthy MongoDB.
+    # Keep the backend/engine health fences unchanged; failed APIs stay closed.
     networks:
       - tutolage
 

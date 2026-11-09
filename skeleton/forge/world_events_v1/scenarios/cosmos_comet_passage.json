@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.world_event_scenario.v1",
+  "id": "cosmos_comet_passage",
+  "domain": "cosmos",
+  "sensor": "exposure",
+  "threshold": 53,
+  "severity": 5,
+  "cost": 4,
+  "boost": 7,
+  "cooldown": 3,
+  "initial": {
+    "region": "central",
+    "pressure": 100,
+    "resources": 100,
+    "resilience": 50
+  },
+  "commands": [
+    {
+      "id": "cosmos_comet_passage:open",
+      "action": "activate",
+      "tick": 1,
+      "expected_version": 0,
+      "intensity": 0,
+      "evidence": ""
+    },
+    {
+      "id": "cosmos_comet_passage:finish",
+      "action": "resolve",
+      "tick": 2,
+      "expected_version": 1,
+      "intensity": 0,
+      "evidence": "trusted-world-proof"
+    },
+    {
+      "id": "cosmos_comet_passage:ready",
+      "action": "release_cooldown",
+      "tick": 5,
+      "expected_version": 2,
+      "intensity": 0,
+      "evidence": ""
+    }
+  ],
+  "expected": {
+    "final_lifecycle": "idle",
+    "final_version": 3,
+    "accepted": 3,
+    "resolution_requires_evidence": true,
+    "duplicate_events_rejected": true,
+    "optimistic_version_fence": true
+  },
+  "qualification": {
+    "synthetic": true,
+    "provenance_authenticated": false,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

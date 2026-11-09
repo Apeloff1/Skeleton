@@ -50,6 +50,12 @@ from skeleton.providers.contract import FinishReason, ProviderToolCall, Provider
 from skeleton.skills.tool_contract import ToolContractError, validate_json_value
 
 from .adaptive_serving import AdaptiveServingController, ServingResources
+from .linux_pressure import read_linux_memory_pressure
+from .linux_thermal import sample_linux_thermal
+from .linux_io_pressure import read_linux_io_pressure
+from .linux_swap import read_linux_swap
+from .windows_commit import probe_windows_commit
+from .darwin_swap import probe_darwin_swap
 
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _EOS = "<|eos|>"
@@ -1216,7 +1222,31 @@ def _sample_linux_resources() -> ServingResources:
         except (OSError, ValueError, KeyError):
             cpu = None
             sources.append("cgroup_cpu_unknown")
-    return ServingResources(memory, cpu, rss, available, ",".join(sources) or "unavailable")
+    pressure = read_linux_memory_pressure(
+        _resource_text, cgroup_directory=unified[0] if unified is not None else None
+    )
+    sources.append(pressure.source)
+    io_pressure = read_linux_io_pressure(
+        _resource_text, cgroup_directory=unified[0] if unified is not None else None
+    )
+    sources.append(io_pressure.source)
+    swap = read_linux_swap(
+        _resource_text, cgroup_directory=unified[0] if unified is not None else None
+    )
+    sources.append(swap.source)
+    thermal = sample_linux_thermal(_resource_text)
+    sources.append(thermal.source)
+    return ServingResources(
+        memory, cpu, rss, available, ",".join(sources),
+        memory_stall_fraction=pressure.some_avg10,
+        memory_full_stall_fraction=pressure.full_avg10,
+        io_stall_fraction=io_pressure.some_avg10,
+        io_full_stall_fraction=io_pressure.full_avg10,
+        swap_used_fraction=swap.used_fraction,
+        swap_available_bytes=swap.available_bytes,
+        thermal_level=thermal.level,
+        thermal_headroom_c=thermal.minimum_headroom_c,
+    )
 
 
 def _sample_windows_resources() -> ServingResources:
@@ -1225,6 +1255,8 @@ def _sample_windows_resources() -> ServingResources:
 
     memory = available = rss = cpu = None
     sources: list[str] = []
+    commit = probe_windows_commit()
+    sources.append(commit.source)
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     psapi = ctypes.WinDLL("psapi", use_last_error=True)
 
@@ -1329,7 +1361,11 @@ def _sample_windows_resources() -> ServingResources:
     kernel.IsProcessInJob.restype = wintypes.BOOL
     in_job = wintypes.BOOL()
     if not kernel.IsProcessInJob(process, None, ctypes.byref(in_job)):
-        return ServingResources(None, None, rss, None, ",".join(sources + ["windows_job_unknown"]))
+        return ServingResources(
+            None, None, rss, None, ",".join(sources + ["windows_job_unknown"]),
+            commit_used_fraction=commit.used_fraction,
+            commit_available_bytes=commit.available_bytes,
+        )
     if in_job.value:
 
         class BasicLimits(ctypes.Structure):
@@ -1446,7 +1482,11 @@ def _sample_windows_resources() -> ServingResources:
         else:
             cpu = None
             sources.append("windows_job_cpu_unknown")
-    return ServingResources(memory, cpu, rss, available, ",".join(sources) or "unavailable")
+    return ServingResources(
+        memory, cpu, rss, available, ",".join(sources),
+        commit_used_fraction=commit.used_fraction,
+        commit_available_bytes=commit.available_bytes,
+    )
 
 
 def _sample_darwin_resources() -> ServingResources:
@@ -1454,6 +1494,8 @@ def _sample_darwin_resources() -> ServingResources:
 
     memory = available = rss = cpu = None
     sources: list[str] = []
+    swap = probe_darwin_swap()
+    sources.append(swap.source)
     library = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
     library.mach_host_self.restype = ctypes.c_uint32
     task = ctypes.c_uint32.in_dll(library, "mach_task_self_").value
@@ -1566,7 +1608,11 @@ def _sample_darwin_resources() -> ServingResources:
         if library.task_info(task, 20, ctypes.byref(info), ctypes.byref(count)) == 0:
             rss = int(info.resident)
             sources.append("darwin_rss")
-        return ServingResources(memory, cpu, rss, available, ",".join(sources) or "unavailable")
+        return ServingResources(
+            memory, cpu, rss, available, ",".join(sources),
+            swap_used_fraction=swap.used_fraction,
+            swap_available_bytes=swap.available_bytes,
+        )
     finally:
         library.mach_port_deallocate(task, host)
 
@@ -1840,7 +1886,7 @@ class LocalInferenceEngine:
         return memory is not None and memory >= self._serving.policy.memory_shed_watermark
 
     def _memory_headroom_locked(self, ticket: _ServingTicket) -> bool:
-        available = self._serving.resources.available_memory_bytes
+        available = self._serving.resources.allocation_headroom_bytes
         if not ticket.estimated_memory_bytes or available is None:
             return True
         # Reserve the conservative native KV estimate until physical drain.
@@ -2437,7 +2483,7 @@ class LocalInferenceEngine:
                 self._memory_shed_rejections += 1
                 self._overloaded += 1
                 raise LocalInferenceOverloaded("local inference admission shed for memory pressure")
-            available = self._serving.resources.available_memory_bytes
+            available = self._serving.resources.allocation_headroom_bytes
             if (
                 estimated_memory_bytes and available is not None and not self._active
                 and estimated_memory_bytes + 32 * 1024 * 1024 > available

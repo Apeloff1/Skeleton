@@ -1,0 +1,15 @@
+{
+  "case": "02_missing_field",
+  "gate": "evaluation",
+  "expect": "reject",
+  "reason": "Missing authority field cannot default to allowance",
+  "payload": {
+    "dataset_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "model_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "samples": 50,
+    "passes": 45,
+    "failures": 4,
+    "empty_errors": 1,
+    "approved": true
+  }
+}

@@ -470,7 +470,9 @@ def live_server(monkeypatch):
 def _seal_headers():
     from skeleton.api.hmac_seal import mint_seal
 
-    return {"x-gf-seal": mint_seal("ui-tester", secret=_SECRET)}
+    # Seal v2: realtime refuses legacy seals by default; mint a fresh
+    # domain-bound single-use seal per request/connect.
+    return {"x-gf-seal": mint_seal("ui-tester", secret=_SECRET, domain="realtime")}
 
 
 async def _wait_for_sub(hub, timeout=10.0):

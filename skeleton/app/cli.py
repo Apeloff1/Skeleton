@@ -134,6 +134,156 @@ def _parser() -> argparse.ArgumentParser:
         help="operator-selected prompt/output protocol for the pinned local executable",
     )
     prepare.add_argument("--json", action="store_true", dest="as_json")
+    sub.add_parser(
+        "audit-signed-library-relocation", add_help=False,
+        help="verify signed game relocation without policy or replay rollback",
+    )
+    sub.add_parser(
+        "audit-offline-library-relocation", add_help=False,
+        help="verify original-game installation relocation without replay loss",
+    )
+    sub.add_parser(
+        "mixed-library-handoff", add_help=False,
+        help="publish or inspect a pinned mixed original-game receipt",
+    )
+    sub.add_parser(
+        "mixed-library-continuity-handoff", add_help=False,
+        help="publish or inspect a pinned mixed replay progression receipt",
+    )
+    sub.add_parser(
+        "audit-mixed-library-epoch-relocation", add_help=False,
+        help="verify multi-generation original-game relocation without replay loss",
+    )
+    sub.add_parser(
+        "audit-mixed-library-epoch-receipts", add_help=False,
+        help="reverify an ordered series of independently pinned game handoffs",
+    )
+    sub.add_parser(
+        "mixed-library-checkpoint-handoff", add_help=False,
+        help="publish or independently inspect a private checkpoint-chain replay receipt",
+    )
+    sub.add_parser(
+        "audit-mixed-library-epoch-successor", add_help=False,
+        help="verify a pinned original-game epoch handoff strictly extends another",
+    )
+    sub.add_parser(
+        "mixed-library-epoch-handoff", add_help=False,
+        help="publish or inspect a pinned multi-epoch original-game receipt",
+    )
+    sub.add_parser(
+        "audit-mixed-library-epochs", add_help=False,
+        help="replay and verify 2-6 signed/unsigned library generations",
+    )
+    sub.add_parser(
+        "audit-mixed-library-continuity", add_help=False,
+        help="verify that mixed signed/unsigned private replays advance without forks",
+    )
+    sub.add_parser(
+        "audit-mixed-library-relocation", add_help=False,
+        help="verify mixed signed/unsigned game library relocation and replay",
+    )
+    sub.add_parser(
+        "audit-mixed-game-library", add_help=False,
+        help="audit a bounded mixed signed/unsigned original-game catalog",
+    )
+    sub.add_parser(
+        "audit-signed-game-library", add_help=False,
+        help="audit independently pinned signer histories across installed games",
+    )
+    sub.add_parser(
+        "audit-offline-game-library", add_help=False,
+        help="audit 1-8 independently pinned original game installations and saves",
+    )
+    sub.add_parser(
+        "delivery-assurance", add_help=False,
+        help="verify installed game, archive and save custody (delivery-assurance --help)",
+    )
+    sub.add_parser(
+        "inspect-original-provenance", add_help=False,
+        help="inspect original browser/Godot source claim inventory without rights certification",
+    )
+    sub.add_parser(
+        "recover-policy-chain-signed-install", add_help=False,
+        help="recover quarantined signed game under pinned signer history",
+    )
+    sub.add_parser(
+        "migrate-policy-chain-signed-progress", add_help=False,
+        help="migrate signed original game and save under pinned signer history",
+    )
+    sub.add_parser(
+        "install-policy-chain-signed-source", add_help=False,
+        help="install signed original game under pinned signer history",
+    )
+    sub.add_parser(
+        "policy-chain-delivery-assurance", add_help=False,
+        help="verify pinned signer history, installed game and private replay",
+    )
+    sub.add_parser(
+        "inspect-trust-policy-chain", add_help=False,
+        help="inspect independently pinned multi-epoch signer revocation history",
+    )
+    sub.add_parser(
+        "inspect-trust-policy-transition", add_help=False,
+        help="inspect independently pinned signer rotation and revocation transition",
+    )
+    sub.add_parser(
+        "recover-policy-signed-install", add_help=False,
+        help="recover quarantined original game from policy-authorized signed source",
+    )
+    sub.add_parser(
+        "policy-signed-delivery-assurance", add_help=False,
+        help="verify pinned policy, source signature, installed game and private replay",
+    )
+    sub.add_parser(
+        "migrate-policy-signed-progress", add_help=False,
+        help="migrate original private replay under independently pinned signer policy",
+    )
+    sub.add_parser(
+        "verify-policy-signed-source", add_help=False,
+        help="verify Ed25519 source against an independently pinned local trust policy",
+    )
+    sub.add_parser(
+        "install-policy-signed-source", add_help=False,
+        help="install verified signed source under an independently pinned trust policy",
+    )
+    sub.add_parser(
+        "install-signed-source", add_help=False,
+        help="verify detached source signature before no-clobber game installation",
+    )
+    sub.add_parser(
+        "migrate-signed-progress", add_help=False,
+        help="verify signed source, migrate pinned private progress, replay and reconcile",
+    )
+    sub.add_parser(
+        "signed-delivery-assurance", add_help=False,
+        help="verify signed source archive, installed game and saved replay",
+    )
+    sub.add_parser(
+        "verify-archive-signature", add_help=False,
+        help="verify detached Ed25519 original source archive signature",
+    )
+    sub.add_parser(
+        "recover-install", add_help=False,
+        help="reinstall pinned offline source while preserving quarantine (recover-install --help)",
+    )
+    sub.add_parser(
+        "inspect-uncertain-offline-receipt", add_help=False,
+        help="read-only quarantine triage of an independently pinned offline receipt",
+    )
+    sub.add_parser("first-playable-jobfile", add_help=False,
+                   help="run original playable cohort from independently pinned private job file")
+    sub.add_parser("first-playable-batch-triage", add_help=False,
+                   help="read-only quarantine inspection of interrupted playable deliveries")
+    sub.add_parser("first-playable-batch", add_help=False,
+                   help="publish or independently reverify 2-8 original playable deliveries")
+    sub.add_parser("first-playable-delivery", add_help=False,
+                   help="exercise original source, fresh install, interactive save and pinned delivery acceptance")
+    sub.add_parser("consumer-first-run-readiness", add_help=False,
+                   help="read-only two-pass installed playable evidence with explicit release holds")
+    sub.add_parser("consumer-first-run-cohort", add_help=False,
+                   help="read-only pinned 2-8 game consumer first-run replay; release blocked")
+    sub.add_parser("studio-journey", add_help=False,
+                   help="build and replay-verify a real original browser/Godot game (studio-journey --help)")
     sub.add_parser("chat", add_help=False, help="open durable native/GGUF terminal chat (chat --help)")
     sub.add_parser("serve-local-ai", add_help=False, help="open the authenticated offline AI workspace (serve-local-ai --help)")
     sub.add_parser("down", help="stop the assembled application")
@@ -268,6 +418,138 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
         return boomerang_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
+    if arguments and arguments[0] == "inspect-original-provenance":
+        from skeleton.app.offline_original_content_provenance import main as provenance_main
+        return provenance_main(arguments[1:])
+    if arguments and arguments[0] == "recover-policy-chain-signed-install":
+        from skeleton.app.offline_policy_chain_recovery import main as chain_recovery_main
+        return chain_recovery_main(arguments[1:])
+    if arguments and arguments[0] == "migrate-policy-chain-signed-progress":
+        from skeleton.app.offline_policy_chain_progress import main as chain_progress_main
+        return chain_progress_main(arguments[1:])
+    if arguments and arguments[0] == "install-policy-chain-signed-source":
+        from skeleton.app.offline_policy_chain_install import main as chain_install_main
+        return chain_install_main(arguments[1:])
+    if arguments and arguments[0] == "policy-chain-delivery-assurance":
+        from skeleton.app.offline_policy_chain_delivery import main as chain_delivery_main
+        return chain_delivery_main(arguments[1:])
+    if arguments and arguments[0] == "inspect-trust-policy-chain":
+        from skeleton.app.offline_trust_policy_chain import main as policy_chain_main
+        return policy_chain_main(arguments[1:])
+    if arguments and arguments[0] == "inspect-trust-policy-transition":
+        from skeleton.app.offline_trust_policy_transition import main as policy_transition_main
+        return policy_transition_main(arguments[1:])
+    if arguments and arguments[0] == "recover-policy-signed-install":
+        from skeleton.app.offline_policy_signed_install_recovery import main as policy_recover_main
+        return policy_recover_main(arguments[1:])
+    if arguments and arguments[0] == "policy-signed-delivery-assurance":
+        from skeleton.app.offline_policy_signed_delivery import main as policy_delivery_main
+        return policy_delivery_main(arguments[1:])
+    if arguments and arguments[0] == "migrate-policy-signed-progress":
+        from skeleton.app.offline_policy_signed_progress_migration import main as policy_migrate_main
+        return policy_migrate_main(arguments[1:])
+    if arguments and arguments[0] == "verify-policy-signed-source":
+        from skeleton.app.offline_source_trust_policy import main as policy_verify_main
+        return policy_verify_main(arguments[1:])
+    if arguments and arguments[0] == "install-policy-signed-source":
+        from skeleton.app.offline_policy_signed_install import main as policy_install_main
+        return policy_install_main(arguments[1:])
+    if arguments and arguments[0] == "install-signed-source":
+        from skeleton.app.offline_signed_source_install import main as signed_install_main
+        return signed_install_main(arguments[1:])
+    if arguments and arguments[0] == "migrate-signed-progress":
+        from skeleton.app.offline_signed_progress_migration import main as migrate_signed_main
+        return migrate_signed_main(arguments[1:])
+    if arguments and arguments[0] == "signed-delivery-assurance":
+        from skeleton.app.offline_signed_delivery import main as signed_delivery_main
+        return signed_delivery_main(arguments[1:])
+    if arguments and arguments[0] == "source-signing-request":
+        from skeleton.app.offline_source_signing_request import main as source_signing_request_main
+        return source_signing_request_main(arguments[1:])
+    if arguments and arguments[0] == "verify-archive-signature":
+        from skeleton.app.offline_archive_signature import main as signature_main
+        return signature_main(arguments[1:])
+    if arguments and arguments[0] == "recover-signed-progress":
+        from skeleton.app.offline_signed_quarantine_progress import main as signed_progress_recovery_main
+        return signed_progress_recovery_main(arguments[1:])
+    if arguments and arguments[0] == "recover-signed-install":
+        from skeleton.app.offline_signed_install_recovery import main as signed_recovery_main
+        return signed_recovery_main(arguments[1:])
+    if arguments and arguments[0] == "recover-install":
+        from skeleton.app.offline_install_recovery import main as recovery_main
+        return recovery_main(arguments[1:])
+    if arguments and arguments[0] == "audit-signed-library-relocation":
+        from skeleton.app.offline_signed_game_library_relocation import main as signed_relocation_main
+        return signed_relocation_main(arguments[1:])
+    if arguments and arguments[0] == "audit-offline-library-relocation":
+        from skeleton.app.offline_game_library_relocation import main as relocation_main
+        return relocation_main(arguments[1:])
+    if arguments and arguments[0] == "mixed-library-handoff":
+        from skeleton.app.offline_mixed_game_library_handoff import main as mixed_handoff_main
+        return mixed_handoff_main(arguments[1:])
+    if arguments and arguments[0] == "mixed-library-continuity-handoff":
+        from skeleton.app.offline_mixed_game_library_continuity_handoff import main as continuity_handoff_main
+        return continuity_handoff_main(arguments[1:])
+    if arguments and arguments[0] == "audit-mixed-library-epoch-relocation":
+        from skeleton.app.offline_mixed_library_epoch_relocation import main as epoch_relocation_main
+        return epoch_relocation_main(arguments[1:])
+    if arguments and arguments[0] == "inspect-uncertain-offline-receipt":
+        from skeleton.app.offline_uncertain_receipt_inspection import main as uncertain_main
+        return uncertain_main(arguments[1:])
+    if arguments and arguments[0] == "audit-mixed-library-epoch-receipts":
+        from skeleton.app.offline_mixed_library_epoch_receipt_chain import main as receipt_chain_main
+        return receipt_chain_main(arguments[1:])
+    if arguments and arguments[0] == "mixed-library-checkpoint-handoff":
+        from skeleton.app.offline_mixed_library_checkpoint_handoff import main as checkpoint_handoff_main
+        return checkpoint_handoff_main(arguments[1:])
+    if arguments and arguments[0] == "audit-mixed-library-epoch-successor":
+        from skeleton.app.offline_mixed_library_epoch_successor import main as successor_main
+        return successor_main(arguments[1:])
+    if arguments and arguments[0] == "mixed-library-epoch-handoff":
+        from skeleton.app.offline_mixed_library_epoch_handoff import main as epoch_handoff_main
+        return epoch_handoff_main(arguments[1:])
+    if arguments and arguments[0] == "audit-mixed-library-epochs":
+        from skeleton.app.offline_mixed_library_epoch_chain import main as epochs_main
+        return epochs_main(arguments[1:])
+    if arguments and arguments[0] == "audit-mixed-library-continuity":
+        from skeleton.app.offline_mixed_game_library_continuity import main as continuity_main
+        return continuity_main(arguments[1:])
+    if arguments and arguments[0] == "audit-mixed-library-relocation":
+        from skeleton.app.offline_mixed_game_library_relocation import main as mixed_relocation_main
+        return mixed_relocation_main(arguments[1:])
+    if arguments and arguments[0] == "audit-mixed-game-library":
+        from skeleton.app.offline_mixed_game_library_audit import main as mixed_library_main
+        return mixed_library_main(arguments[1:])
+    if arguments and arguments[0] == "audit-signed-game-library":
+        from skeleton.app.offline_signed_game_library_audit import main as signed_library_main
+        return signed_library_main(arguments[1:])
+    if arguments and arguments[0] == "audit-offline-game-library":
+        from skeleton.app.offline_game_library_audit import main as library_audit_main
+        return library_audit_main(arguments[1:])
+    if arguments and arguments[0] == "delivery-assurance":
+        from skeleton.app.offline_delivery_assurance import main as assurance_main
+        return assurance_main(arguments[1:])
+    if arguments and arguments[0] == "first-playable-jobfile":
+        from skeleton.app.offline_first_playable_jobfile import main as jobfile_main
+        return jobfile_main(arguments[1:])
+    if arguments and arguments[0] == "first-playable-batch-triage":
+        from skeleton.app.offline_first_playable_batch_triage import main as triage_main
+        return triage_main(arguments[1:])
+    if arguments and arguments[0] == "first-playable-batch":
+        from skeleton.app.offline_first_playable_batch import main as batch_main
+        return batch_main(arguments[1:])
+    if arguments and arguments[0] == "first-playable-delivery":
+        from skeleton.app.offline_first_playable_delivery import main as delivery_main
+        return delivery_main(arguments[1:])
+    if arguments and arguments[0] == "consumer-first-run-readiness":
+        from skeleton.app.consumer_first_run_readiness import main as readiness_main
+        return readiness_main(arguments[1:])
+    if arguments and arguments[0] == "consumer-first-run-cohort":
+        from skeleton.app.consumer_first_run_cohort import main as cohort_readiness_main
+        return cohort_readiness_main(arguments[1:])
+    if arguments and arguments[0] == "studio-journey":
+        from skeleton.app.studio_journey import main as journey_main
+        return journey_main(arguments[1:])
     if arguments and arguments[0] == "chat":
         from skeleton.app.offline_chat_cli import main as chat_main
         return chat_main(arguments[1:])
