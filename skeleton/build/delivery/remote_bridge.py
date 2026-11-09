@@ -36,6 +36,8 @@ def entries_from_receipts(
     ``paths`` optionally maps remote ``artifact_id`` to a release path; by
     default the artifact id is used as the path.
     """
+    if paths is not None and not isinstance(paths, Mapping):
+        raise DeliveryError("remote path remapping must be an object")
     out: dict[str, ArtifactEntry] = {}
     source_by_path: dict[str, str] = {}
     seen_jobs: dict[str, VerifiedRemoteReceipt] = {}
@@ -56,6 +58,8 @@ def entries_from_receipts(
         if previous is not None and previous != receipt:
             raise DeliveryError(f"conflicting remote receipts for job {receipt.job_id}")
         seen_jobs[receipt.job_id] = receipt
+        if type(receipt.output_artifacts) not in (tuple, list):
+            raise DeliveryError("remote output inventory must be bounded")
         if len(receipt.output_artifacts) > MAX_REMOTE_OUTPUTS - output_count:
             raise DeliveryError("remote output inventory exceeds bound")
         output_count += len(receipt.output_artifacts)
@@ -65,11 +69,14 @@ def entries_from_receipts(
                 raise DeliveryError("remote artifact count exceeds bound")
             if not isinstance(ref, RemoteArtifactRef):
                 raise DeliveryError("remote artifact reference must be verified")
+            if type(ref.artifact_id) is not str:
+                raise DeliveryError("invalid remote artifact path identity")
             path = (paths or {}).get(ref.artifact_id, ref.artifact_id)
-            if type(path) is not str or type(ref.artifact_id) is not str:
+            if type(path) is not str:
                 raise DeliveryError("invalid remote artifact path identity")
             kind = _kind_for(path)
-            assert kind in ARTIFACT_KINDS
+            if kind not in ARTIFACT_KINDS:
+                raise DeliveryError("unsupported artifact kind")
             entry = ArtifactEntry(path, kind, ref.size_bytes, ref.sha256, platform)
             source = source_by_path.get(entry.path)
             if source is not None and source != ref.artifact_id:
