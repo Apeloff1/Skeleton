@@ -31,7 +31,7 @@ def _policy_chat(policy_id: str, instructions: str) -> EngineChat:
         ),
         actor_id="sota-2026",
         capability="assistant.compat",
-    ).with_model("openai", "gpt-4o")
+    )
 
 
 # ============================================================================

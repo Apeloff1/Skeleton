@@ -38,4 +38,6 @@ def parse_terminal_input(line: str, command_id: str) -> Command:
         raise GameplayContractError("move requires direction")
     if key == "wait" and target:
         raise GameplayContractError("wait cannot have target")
+    if key in {"collect", "talk", "craft", "strike", "finish"} and not target:
+        raise GameplayContractError("action requires an explicit target")
     return Command(command_id, key, target)

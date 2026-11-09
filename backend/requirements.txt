@@ -59,6 +59,8 @@ APScheduler==3.11.3
 stripe==15.6.1
 
 # --- Documents / media ---
+# PDF text parsing occurs only in a finite memory/CPU-limited POSIX worker.
+pypdf==7.0.0
 # Studio video and LAFS probability paths import these lazily; install them
 # explicitly so a healthy boot does not hide missing production capabilities.
 imageio==2.38.1
