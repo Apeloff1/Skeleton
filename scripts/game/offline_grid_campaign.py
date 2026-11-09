@@ -18,6 +18,7 @@ import tempfile
 from skeleton.game.gameplay.flgb_gameplay_runtime import GameplayContractError
 from skeleton.game.gameplay.offline_grid_campaign import Campaign, Command, Session
 from skeleton.game.gameplay.grid_viewport import viewport
+from skeleton.game.gameplay.grid_terminal_input import parse_terminal_input
 
 DEFAULT_SOURCE = Path(__file__).resolve().parents[2] / "skeleton/game/gameplay/content/lantern_harbor.json"
 MAX_READ = 2_000_000
@@ -102,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.commands is not None:
                 raise ValueError("play reads commands from the terminal")
             session = Session.restore(campaign, _read(args.resume)) if args.resume else Session.new(campaign)
-            print("Offline grid campaign: move north/south/east/west, collect ID, talk ID, finish ID, wait, quit")
+            print("Offline grid campaign: W/A/S/D or arrow words to move; collect ID, talk ID, strike ID, finish ID, wait, quit")
             while session.ending is None and session.tick < 4096:
                 camera = viewport(session, args.view_width, args.view_height)
                 print(camera.description if args.accessible else camera.render())
@@ -112,14 +113,9 @@ def main(argv: list[str] | None = None) -> int:
                     break
                 if line == "quit":
                     break
-                parts = line.split()
-                if not parts or len(parts) > 2:
-                    print("Enter a command and optional target.", file=sys.stderr)
-                    continue
-                kind = parts[0]
-                target = parts[1] if len(parts) == 2 else ""
                 try:
-                    session = session.step(Command(f"terminal-{session.tick + 1}", kind, target))
+                    command = parse_terminal_input(line, f"terminal-{session.tick + 1}")
+                    session = session.step(command)
                 except GameplayContractError as exc:
                     print(f"Rejected: {exc}", file=sys.stderr)
             if args.out_save is not None:
