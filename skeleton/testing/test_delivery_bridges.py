@@ -103,3 +103,42 @@ def test_remote_bridge_rejects_distinct_sources_mapped_to_one_release_path():
         with pytest.raises(DeliveryError, match="alias collision"):
             convert([first, second], paths=aliases)
         assert len(convert([first, first])) == 1
+
+
+def test_farm_requires_distinct_attestation_evidence():
+    from dataclasses import replace
+
+    good = [_farm("w1"), _farm("w2")]
+    forged = [good[0], replace(good[1], attestation_evidence=good[0].attestation_evidence)]
+    for bad in (forged,
+                [good[0], replace(good[1], attestation_evidence="")],
+                [good[0], replace(good[1], environment_digest="invalid")],
+                [good[0], replace(good[1], output_digest="invalid")]):
+        with pytest.raises(DeliveryError, match="attestation evidence"):
+            entry_from_reproducible(bad, path="artifact.whl", kind="wheel", size=3)
+        with pytest.raises(DeliveryError):
+            witness_metadata(bad)
+    with pytest.raises(DeliveryError):
+        witness_metadata([])
+
+
+def test_farm_bridge_rejects_ambiguous_identity_and_oversized_manifest_metadata():
+    from dataclasses import replace
+    from skeleton.ai.build.core.delivery import farm_bridge as mirrored
+
+    good = [_farm("w1"), _farm("w2")]
+    for module in (None, mirrored):
+        entry = entry_from_reproducible if module is None else module.entry_from_reproducible
+        metadata = witness_metadata if module is None else module.witness_metadata
+        for bad in (
+            [good[0], replace(good[1], worker_id="w2,forged")],
+            [good[0], replace(good[1], attestation_evidence="ev\nforged")],
+        ):
+            with pytest.raises(DeliveryError):
+                entry(bad, path="artifact.whl", kind="wheel", size=3)
+        long_witnesses = [
+            replace(_farm(f"w{i}"), attestation_evidence="ev-" + str(i) + "x" * 100)
+            for i in range(8)
+        ]
+        with pytest.raises(DeliveryError, match="metadata exceeds manifest bound"):
+            metadata(long_witnesses)
