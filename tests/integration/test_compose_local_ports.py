@@ -15,6 +15,39 @@ class ComposeLocalPortsTests(unittest.TestCase):
                 self.assertIn(expected, config)
                 self.assertNotIn(unsafe, config)
 
+    def test_frontend_port_remains_local(self):
+        config = COMPOSE.read_text(encoding="utf-8")
+        self.assertIn('127.0.0.1:' + '
+        config = COMPOSE.read_text(encoding="utf-8")
+        self.assertIn('127.0.0.1:' + '$' + '{MONGO_PORT:-27017}:27017', config)
+
+
+if __name__ == "__main__":
+    unittest.main()
+ + '{FRONTEND_PORT:-3000}:' + '
+        config = COMPOSE.read_text(encoding="utf-8")
+        self.assertIn('127.0.0.1:' + '$' + '{MONGO_PORT:-27017}:27017', config)
+
+
+if __name__ == "__main__":
+    unittest.main()
+ + '{FRONTEND_CONTAINER_PORT:-3000}', config)
+        self.assertNotIn('"' + '
+        config = COMPOSE.read_text(encoding="utf-8")
+        self.assertIn('127.0.0.1:' + '$' + '{MONGO_PORT:-27017}:27017', config)
+
+
+if __name__ == "__main__":
+    unittest.main()
+ + '{FRONTEND_PORT:-3000}:' + '
+        config = COMPOSE.read_text(encoding="utf-8")
+        self.assertIn('127.0.0.1:' + '$' + '{MONGO_PORT:-27017}:27017', config)
+
+
+if __name__ == "__main__":
+    unittest.main()
+ + '{FRONTEND_CONTAINER_PORT:-3000}"', config)
+
     def test_database_port_remains_local(self):
         config = COMPOSE.read_text(encoding="utf-8")
         self.assertIn('127.0.0.1:' + '$' + '{MONGO_PORT:-27017}:27017', config)
