@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 MAX_OUTPUT = 2 * 1024**2
 LOCAL_SECONDS = 20
@@ -231,7 +231,14 @@ def _server_snapshot(
         headers["Authorization"] = "Bearer " + token
     request = Request(base.rstrip("/") + endpoint, headers=headers)
     try:
-        with build_opener(_NoRedirect).open(request, timeout=timeout) as response:
+        # Local diagnostics must never send bearer tokens or private readiness
+        # requests through inherited HTTP(S)_PROXY/ALL_PROXY settings.
+        # The opener is per-request; global urllib configuration is unchanged.
+        opener = (
+            build_opener(ProxyHandler({}), _NoRedirect())
+            if loopback else build_opener(_NoRedirect())
+        )
+        with opener.open(request, timeout=timeout) as response:
             raw = response.read(max_response_bytes + 1)
         if len(raw) > max_response_bytes:
             return {"observed": False, "code": "server_inventory_exceeds_capacity"}
