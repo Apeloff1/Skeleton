@@ -20,7 +20,8 @@ from zipfile import ZipFile, ZipInfo, ZIP_STORED, BadZipFile, LargeZipFile
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.dual_runtime_verify import (
     DualRuntimeVerificationError, _MAX_BYTES, _MAX_FILES, _MAX_MANIFEST,
-    _REQUIRED, _assert_original_root, _json, _parts, _read, _root_fd,
+    _REQUIRED, _STUDIO_SCHEMA, _validate_studio_metadata,
+    _assert_original_root, _json, _parts, _read, _root_fd,
     verify_exported_package,
 )
 
@@ -320,10 +321,18 @@ def inspect_offline_game_archive(
             digest = manifest.get("manifest_digest")
             body = {key: value for key, value in manifest.items()
                     if key != "manifest_digest"}
-            if (manifest.get("schema") != "skeleton.game_builder.dual_runtime_package.v1"
+            schema = manifest.get("schema")
+            if (type(schema) is not str
+                    or schema not in (
+                        "skeleton.game_builder.dual_runtime_package.v1", _STUDIO_SCHEMA,
+                    )
                     or type(digest) is not str or digest != canonical_digest(body)
                     or manifest.get("automatic_publication") is not False
-                    or manifest.get("godot_hardware_tested") is not False):
+                    or manifest.get("godot_hardware_tested") is not False
+                    or any(manifest.get(flag) is True for flag in (
+                        "release_certified", "rights_certified",
+                        "native_device_qualified",
+                    ))):
                 raise OfflineGameArchiveError("unsupported archived release authority")
             declared = manifest.get("files")
             if (type(declared) is not dict or not 1 <= len(declared) <= _MAX_FILES
@@ -336,6 +345,11 @@ def inspect_offline_game_archive(
                 if (type(expected_digest) is not str or not _HEX.fullmatch(expected_digest)
                         or sha256(files[name]).hexdigest() != expected_digest):
                     raise OfflineGameArchiveError("archived source digest mismatch")
+            # Studio evidence is never authority to publish. Check against
+            # the same source contract as the independently pinned verifier,
+            # and only after every archived member has passed its digest.
+            if schema == _STUDIO_SCHEMA:
+                _validate_studio_metadata(files, manifest)
         if not hmac.compare_digest(_canonical_zip(files), raw):
             raise OfflineGameArchiveError("noncanonical or ambiguous source archive")
     except (OSError, BadZipFile, LargeZipFile, KeyError, TypeError,

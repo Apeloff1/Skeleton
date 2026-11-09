@@ -1,0 +1,105 @@
+name: Jeeves offline game custody qualification
+
+on:
+  pull_request:
+    paths:
+      - skeleton/app/offline_install_quarantine.py
+      - skeleton/app/offline_delivery_archive.py
+      - skeleton/ai/game_builder/dual_runtime_verify.py
+      - skeleton/testing/test_dual_runtime_verify.py
+      - skeleton/testing/test_app_offline_delivery_archive.py
+      - skeleton/testing/test_app_studio_journey.py
+      - skeleton/testing/test_app_offline_install_quarantine.py
+      - skeleton/testing/test_app_offline_signed_game_library_audit.py
+      - skeleton/testing/test_app_offline_signed_game_library_relocation.py
+      - skeleton/ai/runtime/production_fabric/product/api.py
+      - skeleton/ai/runtime/production_fabric/product/cli.py
+      - .github/workflows/jeeves-offline-game-custody-qualification.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-offline-custody-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quarantine-and-signed-games:
+    name: Read-only quarantine and signed-game replay qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source without persistent credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Install canonical Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11"
+      - name: Install existing local-native fixture dependencies
+        run: |
+          python -m pip install --disable-pip-version-check "PyYAML>=6,<7" "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "httpx>=0.28.1,<1" "motor==3.7.1" "pymongo==4.19.0" "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3" "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2" "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
+      - name: Compile all guarded custody entrypoints and tests
+        run: |
+          python -m compileall -q skeleton/app/offline_install_quarantine.py skeleton/app/offline_delivery_archive.py skeleton/app/offline_signed_game_library_audit.py skeleton/ai/game_builder/dual_runtime_verify.py skeleton/testing/test_app_offline_install_quarantine.py skeleton/testing/test_app_offline_delivery_archive.py skeleton/testing/test_app_offline_signed_game_library_audit.py skeleton/testing/test_app_offline_signed_game_library_relocation.py skeleton/testing/test_dual_runtime_verify.py skeleton/testing/test_app_studio_journey.py skeleton/ai/runtime/production_fabric/product
+      - name: Reproduce first-playable source proof using a generated fixture
+        env:
+          PYTHONPATH: .:backend
+          PYTHONNOUSERSITE: "1"
+        run: |
+          export TMPDIR="$HOME"
+          python - <<'PY'
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          from skeleton.app.studio_journey import build_first_playable_journey
+          from skeleton.ai.game_builder.playable_world import GameBuildIntent
+          intent = GameBuildIntent(
+              project_id="quarantine-original", title="Original Harbor",
+              subtitle="An original offline adventure", seed=1735,
+              theme="forest", width=9, height=9, levels=1,
+              collectibles_per_level=1, hazards_per_level=0,
+              starting_health=3,
+          )
+          with TemporaryDirectory(prefix="game-custody-proof-", dir=Path.home()) as tmp:
+              try:
+                  result = build_first_playable_journey(
+                      intent, Path(tmp) / "original", authorized=True,
+                  )
+              except Exception as exc:
+                  # This fixture has no user-supplied content or secrets.
+                  print("OFFLINE_SOURCE_PROOF_FAILURE:", type(exc).__name__, str(exc))
+                  if exc.__cause__ is not None:
+                      print("OFFLINE_SOURCE_PROOF_CAUSE:", type(exc.__cause__).__name__, str(exc.__cause__))
+                  raise
+              assert result["offline_gameplay_reexecuted"] is True
+              assert result["release_certified"] is False
+              assert result["native_device_qualified"] is False
+          PY
+      - name: Test actual private-custody and signed-game replay
+        env:
+          PYTHONPATH: .:backend
+          PYTHONNOUSERSITE: "1"
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          export TMPDIR="$HOME"
+          # These existing provenance fixtures are defined in separate test
+          # modules, not conftest.py. Register them explicitly for this
+          # focused selection; no test is skipped or silently substituted.
+          python -m pytest -q --maxfail=1 \
+            -p skeleton.testing.test_app_offline_archive_signature \
+            -p skeleton.testing.test_app_offline_signed_progress_migration \
+            -p skeleton.testing.test_app_offline_policy_signed_progress_migration \
+            skeleton/testing/test_app_offline_install_quarantine.py \
+            skeleton/testing/test_app_offline_delivery_archive.py \
+            skeleton/testing/test_app_offline_signed_game_library_audit.py \
+            skeleton/testing/test_app_offline_signed_game_library_relocation.py \
+            skeleton/testing/test_dual_runtime_verify.py \
+            skeleton/testing/test_app_studio_journey.py
+      - name: Prove single offline API dispatcher compatibility
+        env:
+          PYTHONPATH: .:backend
+          PYTHONNOUSERSITE: "1"
+        run: |
+          python -m unittest skeleton.testing.test_jeeves_architecture_and_evidence_window -v
