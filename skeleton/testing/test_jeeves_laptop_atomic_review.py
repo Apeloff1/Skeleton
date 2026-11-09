@@ -304,5 +304,39 @@ class AtomicReviewTests(unittest.TestCase):
             self.flow.compile(BRIEF["id"], prior_digest)
         self.assertEqual(raised.exception.code, "review_required")
 
+    def test_interrupted_re_review_revokes_prior_approval(self):
+        first = self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
+        self.flow.compile(BRIEF["id"], first["source_digest"])
+        next_operation = {
+            "action": "replace_scene",
+            "value": {
+                "id": "opening", "title": "Mira finds a second route",
+                "narrative": "A new trail changes the journey.",
+            },
+        }
+        original_write = self.flow.worlds._write
+        writes = 0
+
+        def interrupted(fd, name, data):
+            nonlocal writes
+            writes += 1
+            if writes == 2:
+                raise OSError("interrupted review publication")
+            return original_write(fd, name, data)
+
+        with patch.object(self.flow.worlds, "_write", side_effect=interrupted):
+            with self.assertRaises(OSError):
+                self.flow.review(BRIEF["id"], first["source_digest"],
+                                 next_operation, NOTE)
+        current = self.flow.inspect(BRIEF["id"])
+        self.assertFalse(current["reviewed"])
+        self.assertNotEqual(current["source_digest"], first["source_digest"])
+        with self.assertRaises(CanonError) as raised:
+            self.flow.compile(BRIEF["id"], current["source_digest"])
+        self.assertEqual(raised.exception.code, "review_required")
+        with self.assertRaises(CanonError):
+            self.flow.verify(BRIEF["id"])
+
+
 if __name__ == "__main__":
     unittest.main()
