@@ -983,3 +983,31 @@ def test_python_image_unpinned_stage_is_rejected():
     assert changed != source
     errors = backend_python_image_errors(changed)
     assert any("digest-pinned Alpine stage" in error for error in errors)
+
+
+def test_fresh_install_backend_cors_tracks_selected_frontend_port():
+    """A custom published frontend port cannot be blocked by stale CORS defaults."""
+    root = find_repo_root(Path(__file__))
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    template = (root / ".env.example").read_text(encoding="utf-8")
+
+    assert (
+        "CORS_ORIGINS=${CORS_ORIGINS:-"
+        "http://localhost:${FRONTEND_PORT:-3000},"
+        "http://127.0.0.1:${FRONTEND_PORT:-3000}}"
+    ) in compose
+    assert "\nCORS_ORIGINS=\n" in template
+    assert "\nCORS_ORIGINS=http://localhost:3000" not in template
+
+
+def test_fresh_install_cors_defaults_preserve_operator_override(tmp_path):
+    from skeleton.app.setup_runtime import ensure_runtime_environment
+
+    # Operator policies and upgrades must not be expanded automatically.
+    manual = "https://operator.example.invalid"
+    (tmp_path / ".env").write_text(
+        f"CORS_ORIGINS={manual}\n", encoding="utf-8"
+    )
+    ensure_runtime_environment(tmp_path)
+    values = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert f"CORS_ORIGINS={manual}" in values
