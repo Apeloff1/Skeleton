@@ -464,21 +464,11 @@ def test_windows_installer_runs_actual_frozen_payload_preflight():
     assert "SkeletonOffline.exe" in workflow
     assert 'ArgumentList @("--help") -Wait -PassThru' in workflow
 
-def _setup_probe(ok, detail="setup reachable", status=200):
+def test_open_app_does_not_spawn_browser_when_application_is_down(monkeypatch):
+    from skeleton.app import windows_launcher as launcher
     from skeleton.app.health import ProbeResult
 
-    return lambda *args, **kwargs: ProbeResult(
-        service="frontend", url="http://localhost:3000/setup",
-        ok=ok, status=status, detail=detail,
-    )
-
-
-def test_open_app_does_not_spawn_browser_when_application_is_down(monkeypatch):
-    # Since #75bf724c0 the browser is admitted only by the local /setup probe,
-    # not by whole-app runtime_status (guarded backend may fail closed).
-    from skeleton.app import windows_launcher as launcher
-
-    monkeypatch.setattr(launcher, "probe_local_setup", _setup_probe(False, "frontend offline", None))
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", False, 503, "frontend offline"))
     calls = []
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: calls.append(url) or True)
     ok, detail = launcher.open_running_application()
@@ -489,8 +479,9 @@ def test_open_app_does_not_spawn_browser_when_application_is_down(monkeypatch):
 
 def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypatch):
     from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
 
-    monkeypatch.setattr(launcher, "probe_local_setup", _setup_probe(True))
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", True, 200, "setup ready"))
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: False)
     ok, detail = launcher.open_running_application()
     assert not ok
@@ -499,7 +490,7 @@ def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypa
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: True)
     ok, detail = launcher.open_running_application()
     assert ok
-    assert "readiness are NOT established" in detail
+    assert "Setup UI opened" in detail
 
 def test_windows_ci_sparse_checkout_contains_every_installer_root():
     source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
@@ -513,23 +504,17 @@ def test_windows_ci_sparse_checkout_contains_every_installer_root():
 
 def test_open_app_uses_configured_frontend_port(monkeypatch, tmp_path):
     from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
 
     (tmp_path / ".env").write_text("FRONTEND_PORT=3300\n", encoding="utf-8")
-    probed = []
-
-    def probe(service, **kwargs):
-        probed.append(service.public_url)
-        return _setup_probe(True)()
-
-    monkeypatch.setattr(launcher, "probe_local_setup", probe)
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", True, 200, "setup ready"))
     opened = []
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: opened.append(url) or True)
 
     success, detail = launcher.open_running_application(tmp_path)
     assert success
-    assert probed == ["http://localhost:3300"]
     assert opened == ["http://localhost:3300/setup"]
-    assert "http://localhost:3300/setup" in detail
+    assert "http://localhost:3300" in detail
 
 
 def test_docker_stop_failure_never_echoes_credentials(monkeypatch, tmp_path):

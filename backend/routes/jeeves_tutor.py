@@ -172,10 +172,6 @@ async def call_jeeves(
     from .dna_translator_core import translate as translate_dna
     from .dna_domains import JEEVES_DOMAIN
 
-    if not EMERGENT_LLM_KEY:
-        log.error("call_jeeves: EMERGENT_LLM_KEY is empty")
-        raise HTTPException(status_code=503, detail="AI provider is not configured")
-
     # Bound the user-supplied prompt to keep token usage under control.
     if len(prompt) > 40_000:
         raise HTTPException(status_code=413, detail="prompt exceeds 40k char limit")
@@ -205,18 +201,20 @@ Max response length: 600 words. Be direct. Use code examples when helpful but ke
 Always be helpful, accurate, and adapt to the user's level."""
 
     timeout_s = float(os.environ.get('JEEVES_AI_TIMEOUT_S', '60'))
+    invocation_id = uuid.uuid4().hex
     attempts = max(1, int(os.environ.get('JEEVES_AI_MAX_RETRIES', '1')) + 1)
     last_err: Optional[Exception] = None
     for attempt in range(1, attempts + 1):
         try:
             chat = EngineChat(
-                session_id=session_id or f"jeeves-{uuid.uuid4().hex[:8]}",
+                session_id=session_id or f"jeeves-{invocation_id[:16]}",
+                turn_idempotency_key=f"jeeves-tutor:{invocation_id}",
                 instruction_policy=InstructionPolicy(
                     policy_id="backend.jeeves-tutor.response",
                     version="1",
                     instructions=system.strip(),
                 ),
-            ).with_model("openai", "gpt-4o")
+            )
             response = await asyncio.wait_for(
                 chat.send_message(UserMessage(text=prompt)),
                 timeout=timeout_s,
