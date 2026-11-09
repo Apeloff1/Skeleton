@@ -15,7 +15,9 @@
 
 services:
   # ==========================================================================
-  # Local first-install APIs are loopback-only. Remote access requires an\n  # independently authenticated TLS ingress, never an implicit 0.0.0.0 bind.\n  # Skeleton API (hexagonal v16 rewrite)
+  # Local first-install APIs are loopback-only. Remote access requires an
+  # independently authenticated TLS ingress, never an implicit 0.0.0.0 bind.
+  # Skeleton API (hexagonal v16 rewrite)
   # ==========================================================================
   skeleton:
     build:
