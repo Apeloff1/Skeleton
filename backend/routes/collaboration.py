@@ -77,7 +77,7 @@ async def call_llm(system: str, prompt: str) -> str:
                 version="1",
                 instructions=system.strip(),
             )
-        ).with_model("openai", "gpt-4o")
+        )
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
     except Exception:

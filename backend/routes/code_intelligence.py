@@ -117,7 +117,7 @@ async def call_llm(
             instruction_policy=policy,
             actor_id="code-intelligence",
             capability="assistant.compat",
-        ).with_model("openai", "gpt-4o")
+        )
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
     except EngineTextError:
