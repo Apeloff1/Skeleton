@@ -1,0 +1,414 @@
+{
+  "schema_version": "skeleton.product_vertical_readiness.v1",
+  "registry_version": "1.0.0",
+  "status": "active",
+  "architecture_tag": "arch-map/v3.7",
+  "purpose": "Fail-closed acceptance registry for every canonical user-facing product vertical. It sets an S-grade contract without asserting runtime readiness.",
+  "sources": {
+    "architecture": "machine/architecture.json",
+    "construction": "machine/ai_app_construction.json",
+    "product_kernel": "backend/core/product_kernel.py",
+    "product_policy": "backend/core/canonical_product_policy.py",
+    "product_catalog": "frontend/src/product/productCatalog.ts",
+    "runtime_readiness": "backend/core/capability_readiness.py"
+  },
+  "grade_contract": {
+    "target": "S",
+    "required_dimensions": [
+      "product_surface",
+      "real_data_and_state",
+      "complete_actions",
+      "authority_and_provenance",
+      "failure_and_recovery",
+      "observability",
+      "vertical_validation"
+    ],
+    "laws": [
+      "every canonical product vertical has exactly one entry",
+      "every governed operation has policy and executor evidence",
+      "evidence paths are repository-owned and exact-head validated",
+      "static contract qualification never implies runtime readiness",
+      "missing or malformed evidence fails closed"
+    ]
+  },
+  "verticals": [
+    {
+      "vertical_id": "studio",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "create"
+      },
+      "backend_surface": "/api/gameforge-studio",
+      "governed_operations": [
+        "project.create",
+        "build.submit",
+        "pipeline.inspect"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/studio.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "backend/tests/test_execution_lifecycle_integration.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_game_learning_studio_project_creation.py",
+          "backend/tests/test_execution_lifecycle_integration.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      }
+    },
+    {
+      "vertical_id": "world-forge",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "create"
+      },
+      "backend_surface": "/api/worldforge",
+      "governed_operations": [
+        "world.create",
+        "world.systems.compose",
+        "asset.forge"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/world-workbench.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "tests/test_original_world_simulator.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_world_system_composer.py",
+          "tests/test_original_world_simulator.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      }
+    },
+    {
+      "vertical_id": "playables",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "play"
+      },
+      "backend_surface": "/api/playable",
+      "governed_operations": [
+        "playable.launch",
+        "runtime.sessions",
+        "progress.inspect"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/playable.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "backend/tests/test_playable_review_authority.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_playable_engine_bridge.py",
+          "backend/tests/test_playable_review_authority.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      }
+    },
+    {
+      "vertical_id": "jeeves",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "learn"
+      },
+      "backend_surface": "/api/jeeves",
+      "governed_operations": [
+        "jeeves.reason",
+        "jeeves.plan",
+        "agents.review"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/jeeves-hub.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "backend/tests/test_jeeves_local_engine_selection.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_jeeves_control_plane.py",
+          "backend/tests/test_jeeves_local_engine_selection.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      }
+    },
+    {
+      "vertical_id": "academy",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "learn"
+      },
+      "backend_surface": "/api/academy",
+      "governed_operations": [
+        "academy.continue",
+        "academy.practice",
+        "academy.progress"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/mega-academy.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "backend/tests/test_dragon_academy_routes.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_academy_legacy_compat.py",
+          "backend/tests/test_dragon_academy_routes.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      }
+    },
+    {
+      "vertical_id": "operations",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "operate"
+      },
+      "backend_surface": "/api/ops",
+      "governed_operations": [
+        "ops.agents",
+        "ops.runtime",
+        "ops.deployments"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/control-plane.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      }
+    },
+    {
+      "vertical_id": "governance",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "operate"
+      },
+      "backend_surface": "/api/governance",
+      "governed_operations": [
+        "governance.policy",
+        "governance.audit",
+        "governance.safety"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/control-plane.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "tests/test_governance_decide_gate.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_governance.py",
+          "tests/test_governance_decide_gate.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      }
+    }
+  ]
+}

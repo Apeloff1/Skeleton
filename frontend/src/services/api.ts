@@ -309,8 +309,15 @@ class ReadingCurriculumService extends BaseAPI {
     return this.get<{ manuals: any[]; language_manuals: any[] }>('/api/reading/manuals');
   }
 
-  async updateProgress(userId: string, moduleId: string, progress: number, completed: boolean = false) {
-    return this.post<{ updated: boolean }>(`/api/reading/progress/update?user_id=${userId}&module_id=${moduleId}&progress_percent=${progress}&completed=${completed}`, {});
+  async updateProgress(userId: string, moduleId: string, progress: number, completed: boolean = false, timeSpentMinutes: number = 0) {
+    const params = new URLSearchParams({
+      user_id: userId,
+      module_id: moduleId,
+      progress_percent: String(progress),
+      completed: String(completed),
+      time_spent_minutes: String(timeSpentMinutes),
+    });
+    return this.post<{ updated: boolean }>(`/api/reading/progress/update?${params.toString()}`, {});
   }
 
   async getProgress(userId: string) {
