@@ -1215,3 +1215,39 @@ def test_new_install_contract_module_is_required_in_windows_payload():
 
     manifest = load_manifest()
     assert "skeleton/app/install_source_contracts.py" in manifest.required_paths
+
+
+@pytest.mark.parametrize(
+    ("other", "conflicting_port"),
+    [
+        ("FRONTEND_PORT", "3000"),
+        ("BACKEND_PORT", "8001"),
+        ("SKELETON_PORT", "8010"),
+        ("MONGO_PORT", "27017"),
+    ],
+)
+def test_chroma_published_host_port_cannot_overlap_existing_service(
+    tmp_path, other, conflicting_port,
+):
+    from skeleton.app.assembly import public_service_urls, runtime_manifest
+
+    # The Chroma full profile may be guarded at startup, but its published
+    # port must never silently collide with the canonical service sockets.
+    (tmp_path / ".env").write_text(
+        f"CHROMA_PORT={conflicting_port}\n", encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="CHROMA_PORT"):
+        runtime_manifest(root=tmp_path, environ={})
+    with pytest.raises(ValueError, match="CHROMA_PORT"):
+        public_service_urls(tmp_path, environ={})
+
+
+def test_unique_chroma_port_still_builds_canonical_runtime_manifest(tmp_path):
+    from skeleton.app.assembly import public_service_urls, runtime_manifest
+
+    (tmp_path / ".env").write_text(
+        "CHROMA_PORT=8222\n", encoding="utf-8",
+    )
+    manifest = runtime_manifest(root=tmp_path, environ={})
+    assert manifest.service("chroma").public_url == "http://localhost:8222"
+    assert public_service_urls(tmp_path, environ={})["chroma"] == "http://localhost:8222"

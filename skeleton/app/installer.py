@@ -229,8 +229,25 @@ def install_application(
             )
         )
 
+    # Admit one process environment before runtime preflight; all later
+    # manifest, Compose and readiness decisions consume the same snapshot.
+    admitted_process_env = dict(os.environ)
+    # Observe the .env source before preflight itself can read its contents.
+    # Recheck afterward so configuration changes during validation cannot
+    # certify startup using a different source or inode.
+    admitted_digest: str | None = None
+    if start:
+        try:
+            # A fresh installed runtime must have a bounded private source.
+            # No bypass for a missing or replaced .env, including bundled EXEs.
+            admitted_digest = runtime_source_fingerprint(root)
+        except (OSError, ValueError, UnicodeError):
+            phases.append(_runtime_source_rejection())
+            return InstallReceipt(root=root, phases=tuple(phases))
     manifest = load_manifest()
-    runtime_checks = preflight(root, runtime=True, manifest=manifest)
+    runtime_checks = preflight(
+        root, runtime=True, manifest=manifest, environ=admitted_process_env,
+    )
     runtime_ok = checks_ok(runtime_checks)
     failed_codes = [check.code for check in runtime_checks if check.required and not check.ok]
     phases.append(
@@ -246,17 +263,15 @@ def install_application(
     )
     if not runtime_ok:
         return InstallReceipt(root=root, phases=tuple(phases))
-    admitted_digest: str | None = None
-    if start:
-        try:
-            # A fresh installed runtime must have a bounded private source.
-            # No bypass for a missing or replaced .env, including bundled EXEs.
-            admitted_digest = runtime_source_fingerprint(root)
-        except (OSError, ValueError, UnicodeError):
-            phases.append(_runtime_source_rejection())
-            return InstallReceipt(root=root, phases=tuple(phases))
+    if admitted_digest is not None and not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
+    # A concurrent operator change to os.environ after preflight cannot make
+    # startup validate one port while a later probe uses another port.
     try:
-        manifest = runtime_manifest(manifest, root=root)
+        manifest = runtime_manifest(
+            manifest, root=root, environ=admitted_process_env,
+        )
     except (OSError, ValueError, UnicodeError):
         phases.append(
             InstallPhase(
@@ -272,7 +287,7 @@ def install_application(
     # Validate precisely the configuration used for startup. The production
     # frontend uses port 8080, unlike the default development Compose model.
     mode = "production" if production else "development"
-    compose_env = {**os.environ, **manifest.mode_env(mode), "COMPOSE_REMOVE_ORPHANS": "0"}
+    compose_env = {**admitted_process_env, **manifest.mode_env(mode), "COMPOSE_REMOVE_ORPHANS": "0"}
     compose_validate = _run(
         compose_command("config", manifest=manifest, full=full, hot=hot),
         root=root,
@@ -289,7 +304,9 @@ def install_application(
         return InstallReceipt(root=root, phases=tuple(phases))
 
     try:
-        host_urls = public_service_urls(root, manifest=manifest)
+        host_urls = public_service_urls(
+            root, manifest=manifest, environ=admitted_process_env,
+        )
     except (OSError, ValueError, UnicodeError):
         phases.append(
             InstallPhase("public-endpoints", False, "public endpoint configuration unsafe or invalid")
@@ -340,9 +357,13 @@ def install_application(
         # A failed protected-stack start must remain a required failure. When
         # the canonical frontend is independently startable, attempt only its
         # diagnostic surface; never remove backend/engine health fences or
-        # promote setup liveness into full application readiness.
+        # promote setup liveness into full application readiness. The same
+        # admitted private configuration epoch fences recovery and its probe.
         frontend = manifest.service("frontend")
         if not frontend.depends_on:
+            if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+                phases.append(_runtime_source_rejection())
+                return InstallReceipt(root=root, phases=tuple(phases))
             diagnostic_manifest = replace(
                 manifest,
                 default_services=("frontend",),
@@ -356,6 +377,9 @@ def install_application(
                 timeout=900.0,
                 env=compose_env,
             )
+            if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+                phases.append(_runtime_source_rejection())
+                return InstallReceipt(root=root, phases=tuple(phases))
             phases.append(
                 InstallPhase(
                     "setup-ui-recovery", recovery.ok,
@@ -374,6 +398,9 @@ def install_application(
                     ),
                     timeout=2.0,
                 )
+                if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+                    phases.append(_runtime_source_rejection())
+                    return InstallReceipt(root=root, phases=tuple(phases))
                 phases.append(
                     InstallPhase(
                         "setup-ui-availability", probe.ok,
