@@ -7,6 +7,7 @@ from __future__ import annotations
 from hashlib import sha256
 import time
 from .contracts import BurnInPolicy,QualificationHeld
+from skeleton.ai.runtime.operational_ai.authority.canonical import ContractViolation
 from .latency import summarize
 from .records import trial_record
 
@@ -47,7 +48,10 @@ def measure(backend, policy:BurnInPolicy,*,clock=time.monotonic_ns) -> dict:
         elapsed=clock()-begin
         if elapsed<=0 or elapsed>policy.inference_ms*1_000_000:
             raise QualificationHeld('native generation missed monotonic deadline')
-        recorded=trial_record(index,elapsed,receipt,model,tokenizer,policy.max_output_tokens)
+        try:
+            recorded=trial_record(index,elapsed,receipt,model,tokenizer,policy.max_output_tokens)
+        except ContractViolation:
+            raise QualificationHeld('native generation receipt failed contract validation') from None
         if recorded['generated_tokens']<policy.minimum_generated_tokens:
             raise QualificationHeld('native token floor was not met')
         results.append(recorded)
