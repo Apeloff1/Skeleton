@@ -179,7 +179,7 @@ services:
     container_name: tutolage-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
     environment:
       # EXPO_PUBLIC_* values are embedded into the browser bundle, so they
       # must be host-resolvable rather than Docker-internal service names.
