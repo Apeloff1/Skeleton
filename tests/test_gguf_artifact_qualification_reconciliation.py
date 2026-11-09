@@ -29,7 +29,7 @@ class GuardedGGUFArtifactTests(unittest.TestCase):
         target = path or self.path
         expected = sha or hashlib.sha256(self.data).hexdigest()
         loader = ModelLoader(str(target), expected_sha256=expected)
-        return loader, loader.load("c" * 32)
+        return loader, loader.load("c" * 32, license_accepted=True)
 
     @unittest.skipUnless(hasattr(os, "O_NOFOLLOW"), "secure no-follow open required")
     def test_full_header_and_full_digest_never_claim_model_loaded(self):
@@ -74,7 +74,7 @@ class GuardedGGUFArtifactTests(unittest.TestCase):
     def test_unconfigured_loader_remains_not_loaded(self):
         loader = ModelLoader()
         with self.assertRaises(FileNotFoundError):
-            loader.load("c" * 32)
+            loader.load("c" * 32, license_accepted=True)
         self.assertFalse(loader.loaded)
 
 
