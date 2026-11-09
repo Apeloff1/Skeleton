@@ -264,9 +264,9 @@ def wait_for_application(
 
     if not isinstance(attempts, int) or isinstance(attempts, bool) or not 1 <= attempts <= 120:
         raise ValueError("attempts must be an integer between 1 and 120")
-    if not math.isfinite(timeout) or not 0 < timeout <= 30:
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or not 0 < timeout <= 30:
         raise ValueError("timeout must be finite and within (0, 30] seconds")
-    if not math.isfinite(delay) or not 0 <= delay <= 30:
+    if isinstance(delay, bool) or not isinstance(delay, (int, float)) or not math.isfinite(delay) or not 0 <= delay <= 30:
         raise ValueError("delay must be finite and within [0, 30] seconds")
 
     manifest = manifest or load_manifest()
