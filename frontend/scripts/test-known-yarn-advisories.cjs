@@ -24,8 +24,14 @@ function fixture(braces = '3.0.3', forge = '1.4.0') {
     '  version "' + forge + '"', '',
     'brace-expansion@^1.1.0, brace-expansion@^2.0.0:',
     '  version "2.1.7"', '',
-    'decode-uri-component@0.5.0:',
-    '  version "0.5.0"', '',
+    'decode-uri-component@0.5.1:',
+    '  version "0.5.1"', '',
+    'follow-redirects@1.16.2:',
+    '  version "1.16.2"', '',
+    'glob@14.0.2:',
+    '  version "14.0.2"', '',
+    'minimatch@11.0.1:',
+    '  version "11.0.1"', '',
     'http-cache-semantics@^4.0.0:',
     '  version "4.3.0"', '',
     'undici@^6.18.2:',
@@ -45,6 +51,9 @@ test('Yarn v1 reader binds parents, reports the withdrawal and blocks affected v
   assert.deepEqual(byName['node-forge'].parents, ['@expo/code-signing-certificates@0.0.6']);
   assert.equal(byName['brace-expansion'].status, 'patched_in_lock');
   assert.equal(byName['decode-uri-component'].status, 'patched_in_lock');
+  assert.equal(byName['follow-redirects'].status, 'patched_in_lock');
+  assert.equal(byName.glob.status, 'patched_in_lock');
+  assert.equal(byName.minimatch.status, 'patched_in_lock');
   assert.equal(byName.undici.status, 'patched_in_lock');
   assert.equal(byName['image-size'].status, 'not_in_lock');
 });
@@ -53,6 +62,20 @@ test('older patchable packages are not accepted', () => {
   const s = fixture().replace('version "2.1.7"', 'version "2.1.6"');
   const result = auditLock(s);
   assert.deepEqual(result.outstanding.sort(), ['brace-expansion', 'node-forge']);
+});
+
+test('new navigation and redirect advisories require the first fixed releases', () => {
+  const vulnerableDecoder = fixture().replaceAll('0.5.1', '0.5.0');
+  const vulnerableRedirect = fixture().replaceAll('1.16.2', '1.16.1');
+  assert.equal(auditLock(vulnerableDecoder).findings.find(x => x.name === 'decode-uri-component').status, 'patch_required');
+  assert.equal(auditLock(vulnerableRedirect).findings.find(x => x.name === 'follow-redirects').status, 'unpatched_affected');
+});
+
+test('major-only glob and minimatch fixes remain blocked on affected major lines', () => {
+  const vulnerableGlob = fixture().replaceAll('14.0.2', '13.0.6');
+  const vulnerableMinimatch = fixture().replaceAll('11.0.1', '10.2.5');
+  assert.equal(auditLock(vulnerableGlob).findings.find(x => x.name === 'glob').status, 'unpatched_affected');
+  assert.equal(auditLock(vulnerableMinimatch).findings.find(x => x.name === 'minimatch').status, 'patch_required');
 });
 
 test('new unreviewed outside-range versions do not auto-clear an active advisory', () => {
@@ -112,6 +135,19 @@ test('actual undici resolution and lock bind the reviewed published artifact', (
   assert.match(lock, /^undici@6\.29\.1, undici@\^6\.18\.2:\n  version "6\.29\.1"\n  resolved "https:\/\/registry\.yarnpkg\.com\/undici\/-\/undici-6\.29\.1\.tgz#a3317c5df0236e0633727d9a7bd4f7ed195d8575"\n  integrity sha512-EvRlUt\/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE\/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==$/m);
 });
 
+test('actual high-severity resolutions bind reviewed patched artifacts', () => {
+  const root = path.resolve(__dirname, '..');
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const lock = fs.readFileSync(path.join(root, 'yarn.lock'), 'utf8');
+  const entries = parseYarnV1(lock);
+  assert.equal(manifest.resolutions['**/decode-uri-component'], '0.5.1');
+  assert.equal(manifest.resolutions['**/follow-redirects'], '1.16.2');
+  assert.deepEqual(entries.filter(row => row.name === 'decode-uri-component').map(row => row.version), ['0.5.1']);
+  assert.deepEqual(entries.filter(row => row.name === 'follow-redirects').map(row => row.version), ['1.16.2']);
+  assert.match(lock, /decode-uri-component@0\.5\.1, decode-uri-component@\^0\.2\.2:\n  version "0\.5\.1"/);
+  assert.match(lock, /follow-redirects@1\.16\.2, follow-redirects@\^1\.16\.0:\n  version "1\.16\.2"/);
+});
+
 test('the newly observed low-severity deepmerge advisory remains a blocking finding', () => {
   const lock = fixture('3.0.3', '1.4.2') + '\ndeepmerge@^4.3.1:\n  version "4.3.1"\n';
   const result = auditLock(lock);
@@ -140,8 +176,12 @@ test('the actual lockfile records only the reviewed snapshot, not a release cert
   assert.equal(status['node-forge'], 'outside_published_range');
   assert.equal(status['http-cache-semantics'], 'outside_published_range');
   assert.equal(status.undici, 'patched_in_lock');
+  assert.equal(status['decode-uri-component'], 'patched_in_lock');
+  assert.equal(status['follow-redirects'], 'patched_in_lock');
+  assert.equal(status.glob, 'unpatched_affected');
+  assert.equal(status.minimatch, 'patch_required');
   assert.equal(status.deepmerge, 'unpatched_affected');
-  assert.deepEqual(result.outstanding, ['deepmerge']);
+  assert.deepEqual(result.outstanding, ['minimatch', 'glob', 'deepmerge']);
   assert.equal(result.release_accepted, false);
   assert.equal(result.automatic_alert_dismissal_authorized, false);
 });
