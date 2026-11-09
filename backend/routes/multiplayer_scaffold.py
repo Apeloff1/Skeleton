@@ -375,6 +375,12 @@ declared in `capabilities.json`; this package does not claim production readines
 """
 
 
+DEPLOYMENT_REQUIRED = [
+    "authenticated_session_tokens", "durable_matchmaking", "distributed_room_authority",
+    "rate_limit_gateway", "observability_and_alerting", "load_and_fault_qualification",
+]
+
+
 def _capabilities(model: str) -> str:
     return json.dumps({
         "schema": "skeleton.multiplayer-capabilities.v1",
@@ -385,10 +391,7 @@ def _capabilities(model: str) -> str:
             "payload_limit", "heartbeat_cleanup", "room_capacity", "snapshot_broadcast",
             "reference_movement_and_action_rules",
         ],
-        "deployment_required": [
-            "authenticated_session_tokens", "durable_matchmaking", "distributed_room_authority",
-            "rate_limit_gateway", "observability_and_alerting", "load_and_fault_qualification",
-        ],
+        "deployment_required": DEPLOYMENT_REQUIRED,
     }, indent=2)
 
 
@@ -447,6 +450,7 @@ async def scaffold(body: ScaffoldBody, user=Depends(get_current_user)):
         "model_label": MODELS[model]["label"], "max_players": mp,
         "tick_rate": tick, "snapshot_rate": snap, "file_count": len(files), "files": files,
         "readiness": "operational_reference",
+        "deployment_requirements": DEPLOYMENT_REQUIRED,
     }
 
 
