@@ -28,7 +28,7 @@ const VIDEO_TYPES = [
 
 function VideoPlayerCard({ url }: { url: string }) {
   const player = useVideoPlayer(url, (p) => { p.loop = true; });
-  return <VideoView style={st.video} player={player} allowsFullscreen contentFit="contain" />;
+  return <VideoView style={st.video} player={player} fullscreenOptions={{ enable: true }} contentFit="contain" />;
 }
 
 export default function MediaStudio() {

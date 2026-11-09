@@ -56,6 +56,22 @@ class TestNativeReceiptCustody(unittest.TestCase):
         self.assertEqual(receipt.generation.text,'hello')
         self.assertEqual(breaker.health['failures'],0)
 
+    def test_native_output_digest_tamper_trips_circuit(self):
+        gateway,backend,breaker=self.gateway('digest')
+        with self.assertRaisesRegex(ContractViolation,'native output digest'):
+            self.run_gateway(gateway)
+        self.assertTrue(breaker.health['open'])
+        with self.assertRaises(CircuitOpen):
+            self.run_gateway(gateway)
+        self.assertEqual(backend.calls,1)
+
+    def test_valid_receipt_is_bound_to_exact_utf8_output(self):
+        gateway,backend,breaker=self.gateway('valid')
+        receipt=self.run_gateway(gateway)
+        self.assertEqual(receipt.generation.output_digest,sha256(receipt.generation.text.encode('utf-8')).hexdigest())
+        self.assertEqual(backend.calls,1)
+        self.assertEqual(breaker.health['failures'],0)
+
     def test_untyped_native_output_trips_circuit(self):
         gateway,backend,breaker=self.gateway('untyped')
         with self.assertRaises(ContractViolation):self.run_gateway(gateway)

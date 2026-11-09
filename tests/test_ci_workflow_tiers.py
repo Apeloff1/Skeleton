@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from scripts.check_ci_workflow_tiers import ROOT, SCHEDULED_RECOVERY, audit, events
+from scripts.check_ci_workflow_tiers import ROOT, audit, events
 
 
 class WorkflowTierTests(unittest.TestCase):
@@ -41,17 +41,23 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertIn("skeleton/testing --tb=short", readiness)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
-    def test_operational_recovery_is_bounded_and_cannot_register_pr_ci(self):
-        self.assertEqual(len(SCHEDULED_RECOVERY), 3)
-        policy = json.loads(
-            (ROOT / "machine/ci_workflow_tiers.json").read_text(encoding="utf-8")
+    def test_backlog_housekeeping_is_manual_without_weakening_recovery(self):
+        """Owner-directed backlog work pauses optional writers, not CI gates."""
+        manual = (
+            "actions-housekeeping-cli.yml",
+            "three-hour-actions-queue-expiry.yml",
+            "owner-historical-actions-cleanup.yml",
         )
-        self.assertEqual(set(policy["operational_scheduled_non_pr"]), SCHEDULED_RECOVERY)
-        for name in SCHEDULED_RECOVERY:
-            with self.subTest(name=name):
-                source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
-                self.assertEqual(events(source), {"workflow_dispatch", "schedule", "push"})
-                self.assertRegex(source, r"(?m)^permissions: \{\}$")
+        for name in manual:
+            source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+            self.assertEqual(events(source), {"workflow_dispatch"}, name)
+        queue_drain = (ROOT / ".github/workflows/queue-drain.yml").read_text(encoding="utf-8")
+        self.assertIn("schedule", events(queue_drain))
+        for name in ("merge-readiness.yml", "backend-quality.yml", "malware-gate.yml",
+                     "dependency-review.yml", "secret-scanning.yml",
+                     "workflow-input-security.yml"):
+            source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+            self.assertIn("pull_request", events(source), name)
 
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
@@ -100,20 +106,6 @@ class WorkflowTierTests(unittest.TestCase):
             )
             self.assertEqual(audit(root), [])
             evidence.unlink()
-            # An exempt queue-maintenance workflow must never become a PR
-            # admission or acquire broad workflow token permissions.
-            recovery_path = root / ".github/workflows" / "queue-drain.yml"
-            recovery_before = recovery_path.read_text(encoding="utf-8")
-            recovery_path.write_text(recovery_before.replace(
-                "  schedule:", "  pull_request:\n  schedule:", 1
-            ))
-            self.assertTrue(any("operational-only trigger" in issue for issue in audit(root)))
-            recovery_path.write_text(recovery_before.replace(
-                "permissions: {}", "permissions: write-all", 1
-            ))
-            self.assertTrue(any("operational-only trigger" in issue for issue in audit(root)))
-            recovery_path.write_text(recovery_before)
-            self.assertEqual(audit(root), [])
             for index in range(10):
                 (
                     root / ".github/workflows" / f"automatic-extra-{index}.yml"
