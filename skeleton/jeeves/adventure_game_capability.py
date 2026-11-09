@@ -90,6 +90,17 @@ class AdventureGameCapability:
         }
 
     def create_inventory_system(self, items: list[str]) -> dict[str, Any]:
+        """Admit only bounded, unambiguous item identities to the game design."""
+        import re
+
+        if type(items) is not list or len(items) > 256:
+            raise ValueError("invalid_inventory_size")
+        if any(type(iid) is not str or
+               re.fullmatch(r"[a-z][a-z0-9_]{0,47}", iid) is None
+               for iid in items):
+            raise ValueError("invalid_item_id")
+        if len(set(items)) != len(items):
+            raise ValueError("duplicate_item_id")
         item_objs = []
         for iid in items:
             item_objs.append(Item(
