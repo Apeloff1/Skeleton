@@ -35,7 +35,7 @@ class Quota:
             or not request_id or len(tenant)>48 or len(request_id)>128):
             fail("invalid quota principal")
         if (type(prompt) is not int or type(output) is not int or
-            prompt<0 or output<0 or not prompt+output<=100000000):
+            prompt<0 or output<0 or not 1<=prompt+output<=100000000):
             fail("quota reservation must be exact bounded integers")
         key=(tenant,request_id)
         with self._lock:
