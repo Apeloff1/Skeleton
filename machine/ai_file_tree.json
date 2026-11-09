@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "50eaebbeab932bd90d64d51de9a598d7a8ea428a",
+      "source_git_object_sha": "53b2408064e15c037b4e418702c63b4615895df1",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "70b81369ac031a034c1c8265f439ad4bceaf3c76",
+      "source_git_object_sha": "c510cf358e71fdb8b54569d9bcce349457d8ab4f",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -2777,7 +2777,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "e75ba2a3266ec1cd88988688bb74aba62cbf1f0b",
+      "source_git_object_sha": "6879b8fc691abaeda1d435e5530439daf7988e08",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -4537,7 +4537,7 @@
       "source": "backend/core/swarm_planner.py",
       "destination": "skeleton/ai/compat/backend_core/swarm_planner.py",
       "kind": "file",
-      "source_git_object_sha": "0387783abf2ebd830aa20654a24f815073a8adc5",
+      "source_git_object_sha": "de61d33c0d71ccbb3519383d1ee78e3a2e6ffb98",
       "role": "Legacy swarm planner staged for convergence into canonical planning owners.",
       "work_package_refs": [
         "WP-W11",
@@ -4559,7 +4559,7 @@
       "source": "backend/core/swarm_scheduler.py",
       "destination": "skeleton/ai/compat/backend_core/swarm_scheduler.py",
       "kind": "file",
-      "source_git_object_sha": "bba85badab3b1ba1fe426d8a3b18e9c62ccd8cc0",
+      "source_git_object_sha": "28bc2d19506e948525a1df374fd66dd81d7a461d",
       "role": "Legacy swarm scheduler staged for convergence into canonical scheduling/orchestration owners.",
       "work_package_refs": [
         "WP-W12",
@@ -5027,7 +5027,7 @@
       "source": "backend/gameforge/knowledge",
       "destination": "skeleton/ai/research/legacy/gameforge/knowledge",
       "kind": "tree",
-      "source_git_object_sha": "39fe2b55156976d19a9db8ecb96a491d45c26cea",
+      "source_git_object_sha": "e746337edcead75de6741dc9105ad8a28314ceb2",
       "role": "Legacy knowledge/free-API ingestion retained as untrusted research evidence.",
       "work_package_refs": [
         "WP-W08",

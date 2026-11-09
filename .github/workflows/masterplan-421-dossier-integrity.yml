@@ -1,0 +1,50 @@
+name: Masterplan 421 Volume Dossier Integrity
+
+on:
+  pull_request:
+    paths:
+      - 'docs/plan/volume_completion/**'
+      - 'machine/ai_master_plan.json'
+      - 'machine/ai_masterplan_parse_index.json'
+      - 'machine/ai_build_accountability.json'
+      - 'machine/ai_100_large_delivery_milestones.json'
+      - 'scripts/check_masterplan_volume_dossiers.py'
+      - 'tests/test_masterplan_volume_dossiers.py'
+      - '.github/workflows/masterplan-421-dossier-integrity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: masterplan-421-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-source-indexed-421-volumes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      EXPECTED_SHA: '${{ github.event.pull_request.head.sha || github.sha }}'
+      PYTHONPATH: '.'
+    steps:
+      - name: Exact-head checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify immutable checkout
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: '3.11.16'
+      - name: Compile dossier verifier and focused tests
+        run: python -m py_compile scripts/check_masterplan_volume_dossiers.py tests/test_masterplan_volume_dossiers.py
+      - name: Validate canonical 100 milestone source pins
+        run: python scripts/check_ai_100_large_milestones.py --json
+      - name: Verify all 421 source-bound dossiers
+        run: python scripts/check_masterplan_volume_dossiers.py --json
+      - name: Run dossier negative regression suite
+        run: python -m unittest tests.test_masterplan_volume_dossiers -v
