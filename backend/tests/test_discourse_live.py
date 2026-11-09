@@ -27,6 +27,15 @@ def live_base_url() -> str:
     return _base_url()
 
 
+@pytest.fixture(scope="module")
+def private_discourse_headers() -> dict[str, str]:
+    """Credentialed live checks must be explicitly enabled by the operator."""
+    token = (os.environ.get("DISCOURSE_TEST_BEARER_TOKEN") or "").strip()
+    if not token:
+        pytest.skip("Private discourse live tests need DISCOURSE_TEST_BEARER_TOKEN")
+    return {"Authorization": "Bearer " + token}
+
+
 @pytest.mark.live_service
 class TestLiveDeliberation:
     """Real multi-LLM panel through /api/discourse/deliberate."""
@@ -38,7 +47,7 @@ class TestLiveDeliberation:
         assert d["default_judge"]
         assert isinstance(d["default_panel"], list) and len(d["default_panel"]) >= 2
 
-    def test_deliberate_no_discord_returns_winner_shape(self, live_base_url):
+    def test_deliberate_no_discord_returns_winner_shape(self, live_base_url, private_discourse_headers):
         """The hot path used by the /discourse screen — discord=False."""
         body = {
             "task": "creative",
@@ -47,7 +56,7 @@ class TestLiveDeliberation:
         }
         r = requests.post(
             f"{live_base_url}/api/discourse/deliberate",
-            json=body,
+            json=body, headers=private_discourse_headers,
             timeout=180,
         )
         assert r.status_code == 200, r.text
@@ -74,11 +83,11 @@ class TestLiveDeliberation:
         for c in d["candidates"]:
             assert not c.get("critique"), "expected no critique when discord=False"
 
-    def test_short_prompt_rejected(self, live_base_url):
+    def test_short_prompt_rejected(self, live_base_url, private_discourse_headers):
         r = requests.post(
             f"{live_base_url}/api/discourse/deliberate",
             json={"task": "creative", "prompt": "hi", "discord": False},
-            timeout=20,
+            headers=private_discourse_headers, timeout=20,
         )
         assert r.status_code == 200
         assert r.json().get("error") == "prompt too short"

@@ -52,6 +52,15 @@ def live_base_url() -> str:
     return _base_url()
 
 
+@pytest.fixture(scope="module")
+def private_discourse_headers() -> dict[str, str]:
+    """Credentialed live checks must be explicitly enabled by the operator."""
+    token = (os.environ.get("DISCOURSE_TEST_BEARER_TOKEN") or "").strip()
+    if not token:
+        pytest.skip("Private discourse live tests need DISCOURSE_TEST_BEARER_TOKEN")
+    return {"Authorization": "Bearer " + token}
+
+
 @pytest.mark.live_service
 class TestLive:
     def test_panel_endpoint(self, live_base_url):
@@ -60,7 +69,8 @@ class TestLive:
         d = r.json()
         assert "default_panel" in d and "default_judge" in d and "available_models" in d
 
-    def test_history_endpoint(self, live_base_url):
-        r = requests.get(f"{live_base_url}/api/discourse/history?limit=5", timeout=15)
+    def test_history_endpoint(self, live_base_url, private_discourse_headers):
+        r = requests.get(f"{live_base_url}/api/discourse/history?limit=5",
+                         headers=private_discourse_headers, timeout=15)
         assert r.status_code == 200, r.text
         assert "deliberations" in r.json()

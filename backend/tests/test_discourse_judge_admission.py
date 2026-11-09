@@ -8,6 +8,8 @@ from pydantic import ValidationError
 
 from routes import discourse
 
+ALICE = {"tenant_id": "tenant-1", "owner_id": "alice@example.test"}
+
 
 @pytest.mark.parametrize("value", [
     "[]", "true", "null", "NaN", '{"winner_index":NaN}',
@@ -51,7 +53,7 @@ def test_async_overlong_prompt_rejected_before_any_database_access(monkeypatch):
     body = discourse.DeliberateBody.model_construct(prompt="x" * 20_001, task="creative",
                                                     system="", panel=[], judge_model="",
                                                     discord=True, rounds=1)
-    result = asyncio.run(discourse.deliberate_async(body))
+    result = asyncio.run(discourse.deliberate_async(body, identity=ALICE))
     assert result["error"] == "prompt exceeds 20k char limit"
 
 
@@ -61,7 +63,7 @@ def test_direct_input_rejects_unknown_selected_panel_before_model_invocation(mon
 
     monkeypatch.setattr(discourse, "route_complete", forbidden)
     result = asyncio.run(discourse.deliberate(
-        "creative", "valid prompt", panel=[{"unhashable": "model"}], do_discord=False
+        "creative", "valid prompt", panel=[{"unhashable": "model"}], do_discord=False, identity=ALICE
     ))
     assert "error" in result
 
@@ -78,7 +80,7 @@ def test_malformed_judge_scores_do_not_create_fabricated_winner(monkeypatch):
 
     monkeypatch.setattr(discourse, "route_complete", fake_route)
     result = asyncio.run(discourse.deliberate(
-        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False
+        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False, identity=ALICE
     ))
     assert result["error"] == "judge_scores_unavailable"
     assert "winner_model" not in result
@@ -107,7 +109,7 @@ def test_provider_exception_does_not_cancel_surviving_candidate(monkeypatch):
     monkeypatch.setattr(discourse, "route_complete", fake_route)
     monkeypatch.setattr(discourse, "_db", Database())
     result = asyncio.run(discourse.deliberate(
-        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False
+        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False, identity=ALICE
     ))
     assert result["winner_model"] == "m2"
     assert result["judge_status"] == "reported_scores"
@@ -136,7 +138,7 @@ def test_boolean_judge_index_must_not_select_second_candidate(monkeypatch):
     monkeypatch.setattr(discourse, "route_complete", fake_route)
     monkeypatch.setattr(discourse, "_db", Database())
     result = asyncio.run(discourse.deliberate(
-        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False
+        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False, identity=ALICE
     ))
     assert result["winner_index"] == 0
     assert result["winner_model"] == "m1"
@@ -169,7 +171,7 @@ def test_unacknowledged_log_write_is_not_reported_as_durable(monkeypatch):
     monkeypatch.setattr(discourse, "route_complete", fake_route)
     monkeypatch.setattr(discourse, "_db", Database())
     result = asyncio.run(discourse.deliberate(
-        "creative", "valid prompt", panel=["m1"], judge_model="judge", do_discord=False
+        "creative", "valid prompt", panel=["m1"], judge_model="judge", do_discord=False, identity=ALICE
     ))
     assert result["error"] == "deliberation_not_durable"
     assert result["persistence_status"] == "unconfirmed"
@@ -205,7 +207,7 @@ def test_unacknowledged_async_admission_never_schedules_work(monkeypatch):
     monkeypatch.setattr(discourse, "_db", Database())
     body = discourse.DeliberateBody(prompt="Build the game system")
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(discourse.deliberate_async(body))
+        asyncio.run(discourse.deliberate_async(body, identity=ALICE))
     assert exc.value.status_code == 503
     assert not discourse._ACTIVE_DELIBERATIONS
 
@@ -224,7 +226,7 @@ def test_async_capacity_refuses_new_jobs_before_database(monkeypatch):
     ))
     with pytest.raises(HTTPException) as exc:
         asyncio.run(discourse.deliberate_async(
-            discourse.DeliberateBody(prompt="Build the game system")
+            discourse.DeliberateBody(prompt="Build the game system"), identity=ALICE
         ))
     assert exc.value.status_code == 503
 
@@ -241,7 +243,7 @@ def test_acknowledged_async_job_completes_and_frees_capacity(monkeypatch):
 
         async def update_one(self, query, update, **_kw):
             seen.append(("terminal", update["$set"]["status"]))
-            return SimpleNamespace(acknowledged=True)
+            return SimpleNamespace(acknowledged=True, matched_count=1)
 
     class Database:
         discourse_jobs = Jobs()
@@ -254,7 +256,7 @@ def test_acknowledged_async_job_completes_and_frees_capacity(monkeypatch):
 
     async def scenario():
         result = await discourse.deliberate_async(
-            discourse.DeliberateBody(prompt="Build the game system")
+            discourse.DeliberateBody(prompt="Build the game system"), identity=ALICE
         )
         for _ in range(10):
             if not discourse._ACTIVE_DELIBERATIONS:
@@ -289,7 +291,7 @@ def test_async_terminal_write_without_ack_marks_error(monkeypatch):
     did = "a" * 32
     discourse._ACTIVE_DELIBERATIONS.add(did)
     asyncio.run(discourse._run_bg(
-        did, discourse.DeliberateBody(prompt="Build the game system")
+        did, discourse.DeliberateBody(prompt="Build the game system"), ALICE
     ))
     assert [row["status"] for row in updates] == ["done", "error"]
     assert not discourse._ACTIVE_DELIBERATIONS
@@ -322,7 +324,7 @@ def test_history_db_outage_is_not_an_empty_success(monkeypatch):
 
     monkeypatch.setattr(discourse, "_db", Database())
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(discourse.history())
+        asyncio.run(discourse.history(identity=ALICE))
     assert exc.value.status_code == 503
 
 
