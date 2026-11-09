@@ -3,7 +3,9 @@
 Usage:
   python -m scripts.game.offline_grid_campaign inspect [--source FILE]
   python -m scripts.game.offline_grid_campaign run --commands FILE [--source FILE] [--resume FILE]
-The run command prints a replay-verifiable JSON save to stdout; redirect to a file.
+The run command prints a replay-verifiable JSON save to stdout.
+--out-save creates an immutable new save; --save-slot atomically replaces a
+user-owned checkpoint after full replay validation. These modes cannot mix.
 """
 from __future__ import annotations
 
@@ -19,6 +21,7 @@ from skeleton.game.gameplay.flgb_gameplay_runtime import GameplayContractError
 from skeleton.game.gameplay.offline_grid_campaign import Campaign, Command, Session
 from skeleton.game.gameplay.grid_viewport import viewport
 from skeleton.game.gameplay.grid_terminal_input import parse_terminal_input
+from skeleton.game.gameplay.offline_grid_save_slot import read_slot, write_slot
 
 DEFAULT_SOURCE = Path(__file__).resolve().parents[2] / "skeleton/game/gameplay/content/lantern_harbor.json"
 MAX_READ = 2_000_000
@@ -69,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--commands", type=Path)
     parser.add_argument("--resume", type=Path)
     parser.add_argument("--out-save", type=Path, help="Create a durable no-clobber replay save")
+    parser.add_argument("--save-slot", type=Path, help="Atomically replace a user-owned resume checkpoint")
     parser.add_argument("--view-width", type=int, default=11)
     parser.add_argument("--view-height", type=int, default=9)
     parser.add_argument("--accessible", action="store_true")
@@ -77,6 +81,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-depth", type=int, default=64)
     args = parser.parse_args(argv)
     try:
+        if args.out_save is not None and args.save_slot is not None:
+            raise ValueError("--out-save and --save-slot are mutually exclusive")
+        if args.save_slot is not None and args.operation not in ("play", "run"):
+            raise ValueError("--save-slot requires play or run")
         campaign = Campaign.load(_read(args.source))
         camera = viewport(Session.new(campaign), args.view_width, args.view_height)
         if args.operation == "solve":
@@ -102,7 +110,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.operation == "play":
             if args.commands is not None:
                 raise ValueError("play reads commands from the terminal")
-            session = Session.restore(campaign, _read(args.resume)) if args.resume else Session.new(campaign)
+            session = Session.restore(
+                campaign, read_slot(args.resume) if args.save_slot is not None else _read(args.resume)
+            ) if args.resume else Session.new(campaign)
             print("Offline grid campaign: W/A/S/D or arrow words to move; collect ID, talk ID, strike ID, finish ID, wait, quit")
             while session.ending is None and session.tick < 4096:
                 camera = viewport(session, args.view_width, args.view_height)
@@ -120,6 +130,8 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"Rejected: {exc}", file=sys.stderr)
             if args.out_save is not None:
                 _write_new_save(args.out_save, session.snapshot())
+            if args.save_slot is not None:
+                write_slot(args.save_slot, session.snapshot())
             print()
             print(json.dumps({"save": session.snapshot(), "map": session.render(),
                               "viewport": viewport(session, args.view_width, args.view_height).record()},
@@ -130,13 +142,17 @@ def main(argv: list[str] | None = None) -> int:
         raw_commands = _read(args.commands)
         if not isinstance(raw_commands, list) or len(raw_commands) > 4096:
             raise ValueError("invalid command batch")
-        session = Session.restore(campaign, _read(args.resume)) if args.resume else Session.new(campaign)
+        session = Session.restore(
+                campaign, read_slot(args.resume) if args.save_slot is not None else _read(args.resume)
+            ) if args.resume else Session.new(campaign)
         for item in raw_commands:
             if not isinstance(item, dict) or set(item) - {"command_id", "kind", "target"}:
                 raise ValueError("invalid command fields")
             session = session.step(Command(**item))
         if args.out_save is not None:
             _write_new_save(args.out_save, session.snapshot())
+        if args.save_slot is not None:
+            write_slot(args.save_slot, session.snapshot())
         print(json.dumps({"save": session.snapshot(), "map": session.render(),
                           "viewport": viewport(session, args.view_width, args.view_height).record()},
                          sort_keys=True))
