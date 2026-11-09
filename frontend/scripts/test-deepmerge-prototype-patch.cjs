@@ -1,6 +1,8 @@
 'use strict';
-// Run the production postinstall hook only on isolated copies of the exact
-// installed upstream package. No install or live node_modules mutation.
+// Run the production postinstall hook only on isolated, explicitly
+// de-guarded copies of the checked-in hardened vendor. These test fixtures
+// are not independently authenticated upstream package bytes.
+// No install or live node_modules mutation.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
