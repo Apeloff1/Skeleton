@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { toast } from '../src/components/AppToast';
+import { apiFetch } from '../src/utils/apiController';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -40,12 +41,15 @@ export default function NetcodeStudio() {
 
   const loadModels = React.useCallback(async (g: string) => {
     try {
-      const r = await fetch(`${BACKEND}/api/multiplayer/models?genre=${encodeURIComponent(g)}`);
+      const r = await apiFetch(`${BACKEND}/api/multiplayer/models?genre=${encodeURIComponent(g)}`);
+      if (!r.ok) throw new Error(`Model catalog unavailable (${r.status})`);
       const j = await r.json();
       setModels(j.models || []);
       setRecommended(j.recommended || '');
       setSelected((prev) => prev || j.recommended || (j.models?.[0]?.id ?? ''));
-    } catch { /* keep prior */ }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Model catalog unavailable');
+    }
     setLoading(false);
   }, []);
 
@@ -54,16 +58,17 @@ export default function NetcodeStudio() {
   const onGenerate = async () => {
     setBusy(true); setFiles([]); setMeta(null);
     try {
-      const r = await fetch(`${BACKEND}/api/multiplayer/scaffold`, {
+      const r = await apiFetch(`${BACKEND}/api/multiplayer/scaffold`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ game: game.trim() || 'Your Game', genre, model: selected, max_players: players }),
       });
       const j = await r.json();
+      if (!r.ok) throw new Error(j?.detail || `Generation failed (${r.status})`);
       setFiles(j.files || []);
       setMeta(j);
       if (!j.files?.length) toast.warn('No files generated');
-    } catch {
-      toast.warn('Could not generate — check connection');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not generate');
     }
     setBusy(false);
   };
@@ -75,11 +80,12 @@ export default function NetcodeStudio() {
 
   const onExportZip = async () => {
     try {
-      const r = await fetch(`${BACKEND}/api/multiplayer/scaffold/zip`, {
+      const r = await apiFetch(`${BACKEND}/api/multiplayer/scaffold/zip`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ game: game.trim() || 'Your Game', genre, model: selected, max_players: players }),
       });
       const j = await r.json();
+      if (!r.ok) throw new Error(j?.detail || `Export failed (${r.status})`);
       if (!j.zip_base64) { toast.warn('Export failed'); return; }
       if (Platform.OS === 'web') {
         const bin = atob(j.zip_base64);
@@ -97,8 +103,8 @@ export default function NetcodeStudio() {
         await FS.writeAsStringAsync(uri, j.zip_base64, { encoding: 'base64' });
         toast.success(`Saved ${j.filename}`);
       }
-    } catch {
-      toast.warn('Export failed — check connection');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Export failed');
     }
   };
 
@@ -113,7 +119,7 @@ export default function NetcodeStudio() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
-        <Text style={s.intro}>Generate a ready-to-run multiplayer scaffold — authoritative server, client sync, wire protocol, lobby & matchmaking — tuned to your game.</Text>
+        <Text style={s.intro}>Generate an operational reference runtime with bounded authoritative simulation, client sync, wire protocol, lobby capacity and explicit deployment requirements.</Text>
 
         <Text style={s.lbl}>Game</Text>
         <TextInput testID="mp-game" value={game} onChangeText={setGame} style={s.input} placeholder="Game name" placeholderTextColor="#64748b" />
@@ -171,6 +177,7 @@ export default function NetcodeStudio() {
           <View style={s.resultHead}>
             <Text style={s.resultTitle}>{meta.model_label}</Text>
             <Text style={s.resultMeta}>{meta.max_players} players · {meta.tick_rate}Hz tick · {meta.snapshot_rate}Hz snapshots · {meta.file_count} files</Text>
+            <Text style={s.readiness}>Readiness: {meta.readiness?.replace('_', ' ') || 'unverified'}</Text>
             <TouchableOpacity testID="mp-export-zip" onPress={onExportZip} style={s.zipBtn} activeOpacity={0.9}>
               <Ionicons name="download-outline" size={16} color="#fff" />
               <Text style={s.zipTxt}>Export .zip</Text>
@@ -241,6 +248,7 @@ const s = StyleSheet.create({
   resultHead: { marginTop: 22, marginBottom: 8 },
   resultTitle: { color: '#3B82F6', fontSize: 15, fontWeight: '800' },
   resultMeta: { color: '#94a3b8', fontSize: 12, marginTop: 3 },
+  readiness: { color: '#10B981', fontSize: 11, fontWeight: '700', marginTop: 4, textTransform: 'uppercase' },
   zipBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, backgroundColor: '#7c3aed', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10 },
   zipTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
   fileRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f1830', borderRadius: 12, borderWidth: 1, borderColor: '#1e293b', padding: 12, marginTop: 8 },

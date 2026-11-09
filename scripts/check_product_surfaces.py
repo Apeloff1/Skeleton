@@ -27,10 +27,10 @@ SURFACES = (
     "frontend/app/snowball.tsx",
     "frontend/app/settings/index.tsx",
     "frontend/app/settings/jeeves.tsx",
-    "frontend/features/Jeeves/ChatWorkspace.tsx",
-    "frontend/features/Jeeves/GovernedChatWorkspace.tsx",
-    "frontend/features/Jeeves/WorkspaceController.ts",
-    "frontend/state/settingsStore.ts",
+    "frontend/src/features/Jeeves/ChatWorkspace.tsx",
+    "frontend/src/features/Jeeves/GovernedChatWorkspace.tsx",
+    "frontend/src/features/Jeeves/WorkspaceController.ts",
+    "frontend/src/state/settingsStore.ts",
     "frontend/src/product/productCatalog.ts",
 )
 
