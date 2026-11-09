@@ -68,7 +68,10 @@ type StoryView={ok:boolean;actual_decisions:string[];
 type OptionalAccessProof={
   ok:boolean;gate:string;found_within_budget:boolean;
   actions:string[];actual_replay_digest?:string;
-  not_a_global_unwinnability_claim:boolean;reason?:string;
+  not_a_global_unwinnability_claim:boolean;reason:string;
+  proof_status:'proven'|'inconclusive';requested_horizon:number;
+  independent_replay_verified:boolean;proof_receipt_sha256:string;
+  original_world_digest:string;
 };
 async function api<T>(path:string,body?:object):Promise<T>{
   const response=await fetch(API+path,{
@@ -278,7 +281,12 @@ function Editor(){
     try{
       const actual=await api<OptionalAccessProof>(
         '/access-proof',{index:address,gate_id:id,horizon:96});
-      if(!actual.ok||!actual.not_a_global_unwinnability_claim)
+      if(!actual.ok||!actual.not_a_global_unwinnability_claim||
+         actual.gate!==id||actual.requested_horizon!==96||
+         !/^[a-f0-9]{64}$/.test(actual.proof_receipt_sha256)||
+         actual.original_world_digest!==opened.design.codex_digest||
+         (actual.found_within_budget&&
+          (!actual.independent_replay_verified||!actual.actual_replay_digest)))
         throw Error('Optional route evidence is inconsistent.');
       if(ticket===generation.current){
         setAccessProof(actual);

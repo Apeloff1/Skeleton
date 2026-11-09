@@ -23,6 +23,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from core.exec_guard import code_execution_enabled, execution_disabled_response
+from models.compiler_pipeline import CompilationRequest
 
 router = APIRouter(tags=["compiler-tools"])
 
@@ -30,15 +31,6 @@ router = APIRouter(tags=["compiler-tools"])
 # ─── Local Pydantic models (mirror of the ones in server.py) ───────────
 # These were declared in server.py originally. We re-declare them here
 # so this sub-router has no compile-time dep on server.py.
-class CompilationRequest(BaseModel):
-    code:        str
-    language:    str
-    sanitizers:  list[str] = []
-    optimizers:  list[str] = []
-    target_arch: str       = "x86_64"
-    optimization_level: str = "O2"
-
-
 class CodeExecutionRequest(BaseModel):
     code:     str
     language: str
