@@ -99,3 +99,48 @@ def test_wait_budget_validation_precedes_probe(monkeypatch, field, value):
     monkeypatch.setattr("skeleton.app.health.probe_application", forbidden)
     with pytest.raises(ValueError, match=field):
         wait_for_application(**{field: value})
+
+
+@pytest.mark.parametrize("status,final_url", [
+    (None, "http://127.0.0.1:8010/health"),
+    (True, "http://127.0.0.1:8010/health"),
+    ("200", "http://127.0.0.1:8010/health"),
+    (0, "http://127.0.0.1:8010/health"),
+    (600, "http://127.0.0.1:8010/health"),
+    (200, None),
+    (200, 123),
+])
+def test_untrusted_transport_metadata_cannot_report_healthy(monkeypatch, status, final_url):
+    url = "http://127.0.0.1:8010/health"
+    class Response:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def read(self, _size):
+            return b""
+        def geturl(self):
+            return final_url
+    response = Response()
+    response.status = status
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: response)
+    result = probe_http("engine", url)
+    assert result.ok is False
+    assert result.status is None
+    assert result.detail == "health transport returned invalid response metadata"
+
+
+def test_missing_transport_url_method_fails_closed(monkeypatch):
+    class Response:
+        status = 200
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def read(self, _size):
+            return b""
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: Response())
+    result = probe_http("engine", "http://127.0.0.1:8010/health")
+    assert not result.ok
+    assert result.status is None
+    assert result.detail == "health transport returned invalid response metadata"

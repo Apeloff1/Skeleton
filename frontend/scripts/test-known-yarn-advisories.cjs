@@ -36,6 +36,8 @@ function fixture(braces = '3.0.3', forge = '1.4.0') {
     '  version "4.3.0"', '',
     'undici@^6.18.2:',
     '  version "6.29.1"', '',
+    'zod@^4.6.6:',
+    '  version "4.6.7"', '',
   ].join('\n');
 }
 
@@ -55,6 +57,7 @@ test('Yarn v1 reader binds parents, reports the withdrawal and blocks affected v
   assert.equal(byName.glob.status, 'patched_in_lock');
   assert.equal(byName.minimatch.status, 'patched_in_lock');
   assert.equal(byName.undici.status, 'patched_in_lock');
+  assert.equal(byName.zod.status, 'patched_in_lock');
   assert.equal(byName['image-size'].status, 'not_in_lock');
 });
 
@@ -75,7 +78,7 @@ test('major-only glob and minimatch fixes remain blocked on affected major lines
   const vulnerableGlob = fixture().replaceAll('14.0.2', '13.0.6');
   const vulnerableMinimatch = fixture().replaceAll('11.0.1', '10.2.5');
   assert.equal(auditLock(vulnerableGlob).findings.find(x => x.name === 'glob').status, 'unpatched_affected');
-  assert.equal(auditLock(vulnerableMinimatch).findings.find(x => x.name === 'minimatch').status, 'patch_required');
+  assert.equal(auditLock(vulnerableMinimatch).findings.find(x => x.name === 'minimatch').status, 'unpatched_affected');
 });
 
 test('new unreviewed outside-range versions do not auto-clear an active advisory', () => {
@@ -132,7 +135,7 @@ test('actual undici resolution and lock bind the reviewed published artifact', (
   const entries = parseYarnV1(lock).filter(row => row.name === 'undici');
   assert.equal(manifest.resolutions.undici, '6.29.1');
   assert.deepEqual(entries.map(row => row.version), ['6.29.1']);
-  assert.match(lock, /^undici@6\.29\.1, undici@\^6\.18\.2:\n  version "6\.29\.1"\n  resolved "https:\/\/registry\.yarnpkg\.com\/undici\/-\/undici-6\.29\.1\.tgz#a3317c5df0236e0633727d9a7bd4f7ed195d8575"\n  integrity sha512-EvRlUt\/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE\/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==$/m);
+  assert.match(lock, /^undici@6\.29\.1:\n  version "6\.29\.1"\n  resolved "https:\/\/registry\.yarnpkg\.com\/undici\/-\/undici-6\.29\.1\.tgz#a3317c5df0236e0633727d9a7bd4f7ed195d8575"\n  integrity sha512-EvRlUt\/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE\/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==$/m);
 });
 
 test('actual high-severity resolutions bind reviewed patched artifacts', () => {
@@ -156,7 +159,7 @@ test('the newly observed low-severity deepmerge advisory remains a blocking find
   assert.equal(finding.severity, 'low');
   assert.deepEqual(result.outstanding, ['deepmerge']);
   assert.equal(result.release_accepted, false);
-  const unknown = lock.replace('version "4.3.1"', 'version "4.3.2"');
+  const unknown = lock.replace('version "4.3.1"', 'version "4.3.3"');
   assert.equal(auditLock(unknown).findings.find(x => x.name === 'deepmerge').status, 'requires_advisory_reverification');
 });
 
@@ -178,10 +181,11 @@ test('the actual lockfile records only the reviewed snapshot, not a release cert
   assert.equal(status.undici, 'patched_in_lock');
   assert.equal(status['decode-uri-component'], 'patched_in_lock');
   assert.equal(status['follow-redirects'], 'patched_in_lock');
-  assert.equal(status.glob, 'unpatched_affected');
-  assert.equal(status.minimatch, 'patch_required');
-  assert.equal(status.deepmerge, 'unpatched_affected');
-  assert.deepEqual(result.outstanding, ['minimatch', 'glob', 'deepmerge']);
-  assert.equal(result.release_accepted, false);
+  assert.equal(status.zod, 'patched_in_lock');
+  assert.equal(status.glob, 'outside_published_range');
+  assert.equal(status.minimatch, 'outside_published_range');
+  assert.equal(status.deepmerge, 'outside_published_range');
+  assert.deepEqual(result.outstanding, []);
+  assert.equal(result.release_accepted, true);
   assert.equal(result.automatic_alert_dismissal_authorized, false);
 });
