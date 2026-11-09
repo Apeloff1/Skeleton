@@ -124,7 +124,11 @@ def test_automation_model_redacts_prompt_secrets_before_network(monkeypatch) -> 
             ).encode("utf-8")
         )
 
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    class _FakeOpener:
+        def open(self, request, timeout):
+            return fake_urlopen(request, timeout)
+
+    monkeypatch.setattr("urllib.request.build_opener", lambda *_handlers: _FakeOpener())
     client = FreeModelClient()
 
     result = client.chat("system sk-1234567890abcdefghijkl", "token=supersecretvalue")
