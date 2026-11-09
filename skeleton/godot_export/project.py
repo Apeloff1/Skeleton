@@ -12,16 +12,34 @@ IGNORED_DIRS = {".godot", ".import", ".git", "build", "export"}
 
 
 def res_to_path(root: Path, res: str) -> Path:
-    if not res.startswith("res://"):
-        raise ValueError(f"not a res:// path: {res}")
+    """Resolve a Godot resource without allowing traversal or symlink escapes.
+
+    Godot resource identifiers use POSIX separators on every host.  Reject
+    platform-specific separators and drive syntax instead of interpreting them
+    differently on Linux and Windows.
+    """
+    if not isinstance(res, str) or not res.startswith("res://"):
+        raise ValueError("expected a res:// resource identifier")
     rel = res[len("res://"):]
-    if ".." in Path(rel).parts:
-        raise ValueError(f"res:// path escapes project: {res}")
-    return root / rel
+    if (not rel or "\x00" in rel or "\\" in rel or ":" in rel
+            or rel.startswith("/")):
+        raise ValueError("invalid Godot resource identifier")
+    parts = rel.split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        raise ValueError("resource path contains an unsafe component")
+    base = root.resolve(strict=True)
+    target = (base / rel).resolve(strict=False)
+    if not target.is_relative_to(base):
+        raise ValueError("resource resolves outside project")
+    return target
 
 
 def path_to_res(root: Path, path: Path) -> str:
-    return "res://" + path.resolve().relative_to(root.resolve()).as_posix()
+    base = root.resolve(strict=True)
+    target = path.resolve(strict=False)
+    if not target.is_relative_to(base) or target == base:
+        raise ValueError("path is not a project resource")
+    return "res://" + target.relative_to(base).as_posix()
 
 
 @dataclass
@@ -87,11 +105,18 @@ class GodotProject:
             return False
 
     def iter_files(self, suffixes: tuple[str, ...]) -> list[Path]:
+        # Directory enumeration must not accept symlinked files/ancestors as
+        # ordinary in-project source. This is a source discovery filter, not
+        # an authorization for later I/O after a possible filesystem swap.
+        base = self.root.resolve(strict=True)
         out = []
         for p in sorted(self.root.rglob("*")):
-            if not p.is_file() or p.suffix not in suffixes:
+            rel = p.relative_to(self.root)
+            if any(part in IGNORED_DIRS for part in rel.parts):
                 continue
-            if any(part in IGNORED_DIRS for part in p.relative_to(self.root).parts):
+            if p.is_symlink() or p.resolve(strict=False) != base / rel:
+                continue
+            if not p.is_file() or p.suffix not in suffixes:
                 continue
             out.append(p)
         return out
