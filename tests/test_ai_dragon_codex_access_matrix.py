@@ -53,6 +53,12 @@ def test_constructive_original_optional_passage_is_traversed_from_real_progress(
     proof=attempt_unlock(source,gate,horizon=96)
     assert proof["schema"]==SCHEMA
     assert proof["found_within_budget"]
+    assert proof["proof_status"]=="proven"
+    assert proof["reason"]=="route_replayed"
+    assert proof["requested_horizon"]==96
+    assert proof["independent_replay_verified"]
+    assert len(proof["proof_receipt_sha256"])==64
+    assert proof["original_world_digest"]==source.codex_digest
     assert proof["actions"][-1]==gate
     journey=replay_access(source,tuple(proof["actions"]))
     assert journey.access_digest==proof["actual_replay_digest"]
@@ -96,6 +102,10 @@ def test_normal_world_is_not_falsely_unsolvable_when_optional_path_cannot_open_i
     })
     report=attempt_unlock(source,"access_elevation_tectonics",horizon=8)
     assert not report["found_within_budget"]
+    assert report["proof_status"]=="inconclusive"
+    assert not report["independent_replay_verified"]
+    assert report["requested_horizon"]==8
+    assert len(report["proof_receipt_sha256"])==64
     assert report["actions"]==[]
     assert report["not_a_global_unwinnability_claim"]
     # This is still a playable world, despite a path not proved in 8 moves.
