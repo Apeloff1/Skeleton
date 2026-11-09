@@ -48,13 +48,18 @@ def _open_direct_health(request: Request, *, timeout: float):
 def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
     """Probe one health endpoint with no proxy or redirect side effects."""
 
-    if not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
         raise ValueError("health probe timeout must be finite and within (0, 30] seconds")
     try:
+        # Reject non-string and whitespace/control characters before urllib parsing.
+        # urllib strips some control bytes, which can change the actual target.
+        if not isinstance(url, str) or not url or any(ord(ch) <= 32 or ord(ch) == 127 for ch in url):
+            raise ValueError("invalid health target characters")
         target = urlsplit(url)
         valid = (
             target.scheme in {"http", "https"}
             and target.hostname is not None
+            and target.hostname != ""
             and target.username is None
             and target.password is None
             and not target.fragment
