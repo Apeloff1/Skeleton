@@ -36,9 +36,19 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
 
     if not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
         raise ValueError("health probe timeout must be finite and within (0, 30] seconds")
+    # A health endpoint is not authorized to redirect the installer to a
+    # different origin. urllib's default redirect handler performs the second
+    # request *before* its final URL can be inspected.
+    from urllib.request import HTTPRedirectHandler, build_opener
+
+    class RejectRedirect(HTTPRedirectHandler):
+        def redirect_request(self, request, fp, code, msg, headers, newurl):
+            return None
+
     request = Request(url, headers={"User-Agent": "skeleton-app-smoke/1"})
+    opener = build_opener(RejectRedirect())
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with opener.open(request, timeout=timeout) as response:
             status = int(getattr(response, "status", 200))
             # urllib automatically follows redirects. A redirected login page
             # returning 200 is NOT evidence the declared health endpoint works.
