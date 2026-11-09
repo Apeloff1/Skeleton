@@ -14,12 +14,18 @@ on:
       - "scripts/quality-gates.sh"
       - "scripts/check_repository_python_sast.py"
       - "scripts/check_quality_gate_parity.py"
+      - "scripts/check_ci_workflow_tiers.py"
+      - "machine/ci_workflow_tiers.json"
+      - "tests/test_ci_workflow_tiers.py"
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".emergent/cron/**"
       - ".github/ci/security-exceptions.json"
+      - ".github/workflows/dragon-*.yml"
+      - "scripts/check_dragon_workflow_scope.py"
+      - "tests/test_dragon_workflow_scope.py"
       - "backend/**"
       - "skeleton/**"
       - "frontend/**"
@@ -31,6 +37,9 @@ on:
       - "scripts/check_context_execution_boundary.py"
       - "scripts/check_instruction_policy_boundary.py"
       - "scripts/check_quality_gate_parity.py"
+      - "scripts/check_ci_workflow_tiers.py"
+      - "machine/ci_workflow_tiers.json"
+      - "tests/test_ci_workflow_tiers.py"
       - "scripts/check_repository_python_sast.py"
       - "scripts/container_digest_refresh.py"
       - "scripts/quality-gates.sh"
@@ -53,6 +62,69 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Keep the strictly bounded 20 automatic-workflow budget. The three Dragon
+  # suites are still mandatory on relevant changes, but are now read-only
+  # reusable jobs inside this existing protected Backend Quality admission.
+  dragon_scope:
+    if: github.event_name == 'pull_request'
+    name: Exact-head Dragon source scope (fail closed)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      backend: ${{ steps.scope.outputs.backend }}
+      source: ${{ steps.scope.outputs.source }}
+      frontend: ${{ steps.scope.outputs.frontend }}
+    steps:
+      - name: Checkout actual PR head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+      - name: Pin supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Fetch immutable base and verify exact head
+        env:
+          DRAGON_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DRAGON_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$DRAGON_HEAD_SHA"
+          git fetch --no-tags --depth=1 origin "$DRAGON_BASE_SHA"
+      - name: Select exhaustive fail-closed Dragon jobs
+        id: scope
+        env:
+          DRAGON_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DRAGON_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/check_dragon_workflow_scope.py
+
+  dragon_backend:
+    needs: dragon_scope
+    if: ${{ needs.dragon_scope.outputs.backend == 'true' }}
+    name: Dragon Atlas backend adapter qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dragon-atlas-backend-bridge.yml
+
+  dragon_source:
+    needs: dragon_scope
+    if: ${{ needs.dragon_scope.outputs.source == 'true' }}
+    name: Dragon campaign source qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dragon-campaign-source-tests.yml
+
+  dragon_frontend:
+    needs: dragon_scope
+    if: ${{ needs.dragon_scope.outputs.frontend == 'true' }}
+    name: Dragon Atlas frontend qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dragon-campaign-frontend-checks.yml
+
   ruff:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     runs-on: ubuntu-latest
@@ -125,6 +197,14 @@ jobs:
       # .github/workflows/ci.yml. Repeating them here queued a second runner
       # on every backend pull request.
       # Deep suite remains available on explicit specialized dispatch.
+      - name: GGUF descriptor-bound source and parent-replacement regression
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m py_compile skeleton/native/gguf_preflight.py tests/test_native_gguf_preflight.py
+          python -m unittest discover -s tests -p 'test_native_gguf_preflight.py' -v
       - name: Jeeves game development, fidelity and continuous production contracts
         if: steps.scope.outputs.full == 'true' && github.event_name == 'workflow_dispatch'
         working-directory: .
@@ -401,7 +481,12 @@ jobs:
       - name: Verify specialized CI tier contract
         if: steps.scope.outputs.full == 'true'
         working-directory: .
-        run: python scripts/check_ci_workflow_tiers.py
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: |
+          python scripts/check_ci_workflow_tiers.py
+          python -m pytest -q --noconftest tests/test_ci_workflow_tiers.py
       - name: GitHub Actions trigger-fanout audit
         if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_trigger_fanout.py
