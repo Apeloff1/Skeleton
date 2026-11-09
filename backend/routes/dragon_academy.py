@@ -2611,6 +2611,8 @@ class CrawlerCreateRequest(CrawlerRequest):
     max_documents: int = Field(default=16, ge=1, le=64, strict=True)
     max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=32 * 1024 * 1024, strict=True)
     max_depth: int = Field(default=1, ge=0, le=3, strict=True)
+    discover_sitemaps: bool = Field(default=False, strict=True)
+    frontier_strategy: str = Field(default="fifo", pattern=r"^(fifo|balanced)$")
     consent: bool = Field(strict=True)
     rights_acknowledged: bool = Field(strict=True)
 
@@ -2660,6 +2662,47 @@ class CrawlerAutomationRequest(CrawlerWriteRequest):
 class CrawlerSourceUseRequest(CrawlerWriteRequest):
     enabled: bool = Field(strict=True)
     max_age_seconds: int = Field(ge=60, le=86400, strict=True)
+
+
+
+class CrawlerAtlasObjective(BaseModel):
+    """Operator-authored bounded research intent, not crawler admission."""
+
+    model_config = ConfigDict(extra="forbid")
+    objective_id: str = Field(min_length=3, max_length=64,
+                              pattern=r"^[a-z][a-z0-9_-]{2,63}$")
+    question: str = Field(min_length=3, max_length=512)
+    dimension: str = Field(pattern=r"^(fact|method|timeline|source|counterexample|implementation)$")
+    stage: str = Field(pattern=r"^(discovery|collection|verification|review)$")
+    priority: float = Field(ge=0.0, le=1.0)
+    minimum_reviewable_passages: int = Field(default=1, ge=1, le=32, strict=True)
+    minimum_attested_groups: int = Field(default=1, ge=1, le=16, strict=True)
+    max_source_age_seconds: int = Field(default=3600, ge=60, le=86400, strict=True)
+    required_terms: list[str] = Field(default_factory=list, max_length=16)
+    blocked_terms: list[str] = Field(default_factory=list, max_length=16)
+
+
+class CrawlerAtlasEffort(BaseModel):
+    """Explicit human-effort estimate; never fabricated measured history."""
+
+    model_config = ConfigDict(extra="forbid")
+    task_type: str = Field(pattern=(
+        r"^(source_policy|passage_integrity|source_provenance|"
+        r"claim_contradiction|claim_corroboration|objective_gap|human_fact_review)$"
+    ))
+    estimated_minutes: StrictInt = Field(ge=1, le=180)
+    estimate_basis: str = Field(default="operator_estimate",
+                                pattern=r"^operator_estimate$")
+
+
+class CrawlerAtlasRequest(BaseModel):
+    """Read-only research inspection; explicit user goals are mandatory."""
+
+    model_config = ConfigDict(extra="forbid")
+    objectives: list[CrawlerAtlasObjective] = Field(min_length=1, max_length=8)
+    review_effort: list[CrawlerAtlasEffort] = Field(default_factory=list, max_length=7)
+    review_budget_minutes: StrictInt = Field(default=240, ge=1, le=1440)
+    retrieval_mode: str = Field(default="fusion", pattern=r"^(fusion|lexical_bm25)$")
 
 
 def _crawler_scope(user: dict | None = Depends(get_current_user)) -> dict[str, str]:
@@ -2798,6 +2841,54 @@ async def crawler_automation(
             crawler_application.automation(scope, session_id, body.model_dump(), principal=user)
         ),
     }
+
+
+
+@router.get("/crawler/sessions/{session_id}/research/inspection")
+async def crawler_research_inspection(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Read-only evidence and frontier diagnostics under existing owner auth."""
+    return await _crawler_result(
+        crawler_application.campaign_inspection(scope, session_id)
+    )
+
+
+
+@router.post("/crawler/sessions/{session_id}/research/atlas")
+async def crawler_research_atlas(
+    body: CrawlerAtlasRequest,
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Read-only source-policy-first research audit, no external text returned."""
+    return await _crawler_result(
+        crawler_application.campaign_atlas(
+            scope, session_id,
+            tuple(goal.model_dump() for goal in body.objectives),
+            review_effort=tuple(estimate.model_dump()
+                                for estimate in body.review_effort),
+            review_budget_minutes=body.review_budget_minutes,
+            retrieval_mode=body.retrieval_mode,
+        )
+    )
+
+
+@router.get("/crawler/sessions/{session_id}/research/search")
+async def crawler_research_search(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    query: str = Query(min_length=1, max_length=512),
+    mode: str = Query(default="all", pattern="^(all|any)$"),
+    limit: int = Query(default=8, ge=1, le=8),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Search current retained evidence; withdrawals and consent checked now."""
+    return await _crawler_result(
+        crawler_application.campaign_index_search(
+            scope, session_id, query, mode=mode, limit=limit,
+        )
+    )
 
 
 @router.get("/crawler/sessions/{session_id}/search")
