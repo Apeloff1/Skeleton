@@ -415,7 +415,10 @@ class Session:
             if obj["kind"] == "enemy":
                 if dict(self.enemies)[obj["id"]] > 0:
                     rows[obj["y"]][obj["x"]] = "E"
+                # A defeated enemy leaves no phantom sprite.
+            elif obj["kind"] == "item":
+                rows[obj["y"]][obj["x"]] = "*"
             else:
-                rows[obj["y"]][obj["x"]] = "*" if obj["kind"] == "item" else "N"
+                rows[obj["y"]][obj["x"]] = "N"
         rows[self.y][self.x] = "@"
         return "\n".join("".join(row) for row in rows)
