@@ -415,10 +415,10 @@ def runtime_manifest(
             raise ValueError(f"{key} must be an integer from 1 to 65535")
     public_ports = [
         int(values.get(key, "") or port_keys[key])
-        for key in ("FRONTEND_PORT", "BACKEND_PORT", "SKELETON_PORT", "MONGO_PORT")
+        for key in ("FRONTEND_PORT", "BACKEND_PORT", "SKELETON_PORT", "MONGO_PORT", "CHROMA_PORT")
     ]
     if len(public_ports) != len(set(public_ports)):
-        raise ValueError("FRONTEND_PORT, BACKEND_PORT, SKELETON_PORT and MONGO_PORT must differ")
+        raise ValueError("FRONTEND_PORT, BACKEND_PORT, SKELETON_PORT, MONGO_PORT and CHROMA_PORT must differ")
     services = []
     for service in manifest.services:
         key = {
