@@ -7,6 +7,7 @@ from skeleton.app.health import probe_http
     "http://user:password@localhost:8010/health",
     "http://localhost:bad/health", "http://localhost:0/health",
     "http://localhost:8010/health#fragment", "http:///missing-host",
+    "http://local\\host:8010/health", "http://local%68ost:8010/health",
     "http://localhost:8010/health\nX-Injected: yes",
     " http://localhost:8010/health", "http://localhost:8010/health\t",
 ])
