@@ -20,6 +20,9 @@ REQUIRED_KEYS = ("tier", "replicas", "health", "rollout")
 MAX_DEPTH = 8
 MAX_REPLICAS = 512
 MAX_LAYER_BYTES = 256_000
+# Secondary limit retained for operator tests; the smaller limit always wins.
+MAX_LAYER_JSON_CHARS = 256_000
+MAX_CONFIG_LAYERS = 64
 
 
 def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any], *, _depth: int = 0) -> dict[str, Any]:
@@ -119,16 +122,22 @@ def _reject_nonfinite(value: str) -> None:
 
 
 def load_layers(texts: Mapping[str, str]) -> dict[str, dict[str, Any]]:
+    if not isinstance(texts, Mapping) or len(texts) > MAX_CONFIG_LAYERS:
+        raise DeliveryError("config layer inventory exceeds bound")
     out: dict[str, dict[str, Any]] = {}
-    for name, text in texts.items():
+    for count, (name, text) in enumerate(texts.items(), 1):
+        if count > MAX_CONFIG_LAYERS:
+            raise DeliveryError("config layer inventory exceeds bound")
         require_env_name(name)
-        if type(text) is not str or len(text) > MAX_LAYER_BYTES:
-            raise DeliveryError(f"{name}: config layer exceeds {MAX_LAYER_BYTES} characters")
+        if type(text) is not str or len(text) > min(MAX_LAYER_BYTES, MAX_LAYER_JSON_CHARS):
+            raise DeliveryError(f"{name}: config JSON text exceeds bound")
         try:
             data = json.loads(text, object_pairs_hook=_unique_object,
                               parse_constant=_reject_nonfinite)
-        except (json.JSONDecodeError, RecursionError) as exc:
-            raise DeliveryError(f"{name}: invalid JSON: {exc}") from exc
+        except DeliveryError:
+            raise
+        except (json.JSONDecodeError, RecursionError, ValueError) as exc:
+            raise DeliveryError(f"{name}: invalid JSON structure") from exc
         if not isinstance(data, dict):
             raise DeliveryError(f"{name}: config must be a JSON object")
         out[name] = data
