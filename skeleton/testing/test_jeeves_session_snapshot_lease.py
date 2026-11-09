@@ -41,6 +41,39 @@ class SessionSnapshotLeaseTests(unittest.TestCase):
         os.unlink(path)
         self.assertEqual(self.sessions.read("lease_world", "slot_a")["revision"], 0)
 
+    def test_inspect_export_and_preflight_reject_busy_writer(self):
+        from skeleton.jeeves.worlds.session import export_session
+        world = self.worlds.read("lease_world")
+        saved = self.sessions.read("lease_world", "slot_a")
+        portable = export_session(saved, world)
+        path = os.path.join(self.temp.name, "lease_world.lock")
+        with open(path, "xb") as handle:
+            handle.write(b"foreign writer")
+        operations = (
+            lambda: self.sessions.inspect("lease_world", "slot_a"),
+            lambda: self.sessions.export("lease_world", "slot_a"),
+            lambda: self.sessions.preflight_import("lease_world", portable),
+        )
+        for operation in operations:
+            with self.subTest(operation=operation):
+                with self.assertRaises(CanonError) as raised:
+                    operation()
+                self.assertEqual(raised.exception.code, "lease_busy")
+                with open(path, "rb") as handle:
+                    self.assertEqual(handle.read(), b"foreign writer")
+        os.unlink(path)
+        self.assertEqual(self.sessions.inspect("lease_world", "slot_a")["revision"], 0)
+        self.assertEqual(self.sessions.export("lease_world", "slot_a"), portable)
+        self.assertTrue(self.sessions.preflight_import("lease_world", portable)["restorable"])
+
+    def test_inspect_replay_failure_releases_lease(self):
+        with patch.object(self.sessions, "_session", side_effect=CanonError("simulated_corruption")):
+            with self.assertRaises(CanonError) as raised:
+                self.sessions.inspect("lease_world", "slot_a")
+        self.assertEqual(raised.exception.code, "simulated_corruption")
+        self.assertFalse(os.path.exists(os.path.join(self.temp.name, "lease_world.lock")))
+        self.assertEqual(self.sessions.inspect("lease_world", "slot_a")["revision"], 0)
+
     def test_failed_replay_releases_owned_lock_and_preserves_save(self):
         path = os.path.join(self.temp.name, "lease_world.slot_a.session.json")
         with open(path, "rb") as handle:
