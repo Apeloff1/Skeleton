@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "investigation_interrogation",
+  "domain": "investigation",
+  "stages": [
+    {
+      "key": "discover_interrogation",
+      "evidence": "investigation:interrogation:discover:proof",
+      "grants": "investigation:interrogation:stage:1",
+      "risk": 2,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_interrogation",
+      "evidence": "investigation:interrogation:prepare:proof",
+      "grants": "investigation:interrogation:stage:2",
+      "risk": 3,
+      "sequence": 1,
+      "requires_previous_grant": "investigation:interrogation:stage:1"
+    },
+    {
+      "key": "execute_interrogation",
+      "evidence": "investigation:interrogation:execute:proof",
+      "grants": "investigation:interrogation:stage:3",
+      "risk": 4,
+      "sequence": 2,
+      "requires_previous_grant": "investigation:interrogation:stage:2"
+    },
+    {
+      "key": "resolve_interrogation",
+      "evidence": "investigation:interrogation:resolve:proof",
+      "grants": "investigation:interrogation:stage:4",
+      "risk": 5,
+      "sequence": 3,
+      "requires_previous_grant": "investigation:interrogation:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "investigation_interrogation:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "investigation:interrogation:discover:proof"
+      ]
+    },
+    {
+      "id": "investigation_interrogation:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "investigation:interrogation:prepare:proof"
+      ]
+    },
+    {
+      "id": "investigation_interrogation:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "investigation:interrogation:execute:proof"
+      ]
+    },
+    {
+      "id": "investigation_interrogation:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "investigation:interrogation:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}
