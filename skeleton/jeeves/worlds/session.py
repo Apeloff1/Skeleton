@@ -255,12 +255,13 @@ class SessionStore:
                       source_guard: SourceGuard | None,
                       operation: Callable[[], Any]) -> Any:
         """Pin approved artifacts and player reads to one writer lease."""
-        if source_guard is None:
-            return operation()
+        # Pin the canonical world and session to the same writer lease,
+        # including reads without an optional source-review guard.
         lock_fd = self._lock(fd, world_id)
         try:
             os.close(lock_fd)
-            source_guard(fd, world_id)
+            if source_guard is not None:
+                source_guard(fd, world_id)
             return operation()
         finally:
             os.unlink(world_id + ".lock", dir_fd=fd)
