@@ -31,6 +31,93 @@ class AtomicReviewTests(unittest.TestCase):
         self.flow = LaptopFlow(self.temp.name)
         self.initial = self.flow.propose(BRIEF)["source_digest"]
 
+    def test_preview_is_deterministic_and_does_not_publish_or_approve(self):
+        first = self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+        second = self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+        self.assertEqual(first, second)
+        self.assertEqual(first["changes"]["scenes"]["modified"], ["opening"])
+        self.assertFalse(first["published"])
+        self.assertFalse(first["reviewed"])
+        self.assertEqual(self.flow.inspect(BRIEF["id"])["source_digest"], self.initial)
+        self.assertFalse(self.flow.inspect(BRIEF["id"])["reviewed"])
+        reviewed = self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
+        self.assertEqual(reviewed["source_digest"], first["candidate_digest"])
+
+    def test_review_can_bind_to_exact_preview_candidate(self):
+        preview = self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+        result = self.flow.review(
+            BRIEF["id"], self.initial, OPERATION, NOTE,
+            expected_candidate_digest=preview["candidate_digest"])
+        self.assertEqual(result["source_digest"], preview["candidate_digest"])
+        self.assertTrue(self.flow.inspect(BRIEF["id"])["reviewed"])
+
+    def test_review_operation_intent_is_source_bound_and_fail_closed(self):
+        preview = self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+        self.assertEqual(len(preview["operation_digest"]), 64)
+        for incorrect in ("0" * 64, "invalid", True):
+            with self.subTest(incorrect=incorrect):
+                with self.assertRaises(CanonError) as raised:
+                    self.flow.review(
+                        BRIEF["id"], self.initial, OPERATION, NOTE,
+                        expected_candidate_digest=preview["candidate_digest"],
+                        expected_operation_digest=incorrect)
+                self.assertEqual(raised.exception.code, "review_operation_mismatch")
+                self.assertEqual(self.flow.inspect(BRIEF["id"])["source_digest"],
+                                 self.initial)
+                self.assertFalse(self.flow.inspect(BRIEF["id"])["reviewed"])
+        approved = self.flow.review(
+            BRIEF["id"], self.initial, OPERATION, NOTE,
+            expected_candidate_digest=preview["candidate_digest"],
+            expected_operation_digest=preview["operation_digest"])
+        self.assertEqual(approved["source_digest"], preview["candidate_digest"])
+        self.assertTrue(self.flow.inspect(BRIEF["id"])["reviewed"])
+
+    def test_review_rejects_changed_candidate_before_any_publication(self):
+        preview = self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+        changed = {
+            "action": "replace_scene",
+            "value": {"id": "opening", "title": "Unexpected revision",
+                      "narrative": "A different change than the preview."},
+        }
+        for candidate in (preview["candidate_digest"], None, True, "bad"):
+            if candidate is None:
+                continue
+            with self.subTest(candidate=candidate):
+                with self.assertRaises(CanonError) as raised:
+                    self.flow.review(
+                        BRIEF["id"], self.initial, changed, NOTE,
+                        expected_candidate_digest=candidate)
+                self.assertEqual(raised.exception.code, "review_candidate_mismatch")
+                self.assertEqual(
+                    self.flow.inspect(BRIEF["id"])["source_digest"], self.initial)
+                self.assertFalse(self.flow.inspect(BRIEF["id"])["reviewed"])
+
+    def test_preview_rejects_stale_source_and_invalid_edit_without_writes(self):
+        for expected, operation, error in (
+            ("f" * 64, OPERATION, "stale_source"),
+            (self.initial, {"action": "remove_scene", "value": {"id": "opening"}},
+             "unknown_choice_source"),
+        ):
+            with self.subTest(error=error):
+                with self.assertRaises(CanonError):
+                    self.flow.preview_edit(BRIEF["id"], expected, operation)
+                self.assertEqual(self.flow.inspect(BRIEF["id"])["source_digest"], self.initial)
+                self.assertFalse(self.flow.inspect(BRIEF["id"])["reviewed"])
+
+    def test_preview_fails_closed_when_writer_lease_is_held(self):
+        import os
+        fd = self.flow.worlds._directory()
+        try:
+            self.flow._lock(fd, BRIEF["id"])
+            try:
+                with self.assertRaises(CanonError) as raised:
+                    self.flow.preview_edit(BRIEF["id"], self.initial, OPERATION)
+                self.assertEqual(raised.exception.code, "lease_busy")
+            finally:
+                os.unlink(BRIEF["id"] + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
     def test_review_approves_exact_published_revision(self):
         result = self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
         self.assertTrue(result["reviewed"])
@@ -70,6 +157,24 @@ class AtomicReviewTests(unittest.TestCase):
             self.flow.compile(BRIEF["id"], inspected["source_digest"])
         self.assertEqual(raised.exception.code, "review_required")
 
+    def test_writer_lock_rejects_concurrent_review_without_mutation(self):
+        fd = self.flow.worlds._directory()
+        try:
+            self.flow._lock(fd, BRIEF["id"])
+            try:
+                with self.assertRaises(CanonError) as raised:
+                    self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
+                self.assertEqual(raised.exception.code, "lease_busy")
+            finally:
+                import os
+                os.unlink(BRIEF["id"] + ".lock", dir_fd=fd)
+        finally:
+            import os
+            os.close(fd)
+        self.assertEqual(self.flow.inspect(BRIEF["id"])["source_digest"],
+                         self.initial)
+
+
     def test_prior_approval_cannot_authorize_interrupted_new_revision(self):
         first = self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
         self.assertTrue(self.flow.inspect(BRIEF["id"])["reviewed"])
@@ -107,24 +212,6 @@ class AtomicReviewTests(unittest.TestCase):
         receipt = self.flow.compile(BRIEF["id"], current["source_digest"])
         self.assertEqual(receipt["source_digest"], current["source_digest"])
         self.assertEqual(self.flow.verify(BRIEF["id"]), receipt)
-
-    def test_writer_lock_rejects_concurrent_review_without_mutation(self):
-        fd = self.flow.worlds._directory()
-        try:
-            self.flow._lock(fd, BRIEF["id"])
-            try:
-                with self.assertRaises(CanonError) as raised:
-                    self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
-                self.assertEqual(raised.exception.code, "lease_busy")
-            finally:
-                import os
-                os.unlink(BRIEF["id"] + ".lock", dir_fd=fd)
-        finally:
-            import os
-            os.close(fd)
-        self.assertEqual(self.flow.inspect(BRIEF["id"])["source_digest"],
-                         self.initial)
-
 
     def test_interrupted_rereview_revokes_previously_compiled_handoff(self):
         """A stale approval cannot preserve an already published playable."""
@@ -183,7 +270,39 @@ class AtomicReviewTests(unittest.TestCase):
         self.assertEqual(self.flow.verify(BRIEF["id"]), after)
         self.assertNotEqual(after["source_digest"], before["source_digest"])
 
+    def test_interrupted_reversion_cannot_replay_prior_approval(self):
+        first = self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
+        prior_digest = first["source_digest"]
+        revert = {
+            "action": "replace_scene",
+            "value": {
+                "id": "opening", "title": "Mira in North Marsh",
+                "narrative": BRIEF["premise"],
+            },
+        }
+        second = self.flow.review(BRIEF["id"], prior_digest, revert, NOTE)
+        self.assertEqual(second["source_digest"], self.initial)
+        # The earlier reviewed revision still exists in the source history.
+        # Simulate interruption while attempting to restore that digest.
+        real_write = self.flow.worlds._write
+        calls = 0
 
+        def interrupted(fd, name, data):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("interrupted approval publication")
+            return real_write(fd, name, data)
+
+        with patch.object(self.flow.worlds, "_write", side_effect=interrupted):
+            with self.assertRaises(OSError):
+                self.flow.review(BRIEF["id"], self.initial, OPERATION, NOTE)
+        inspected = self.flow.inspect(BRIEF["id"])
+        self.assertEqual(inspected["source_digest"], prior_digest)
+        self.assertFalse(inspected["reviewed"])
+        with self.assertRaises(CanonError) as raised:
+            self.flow.compile(BRIEF["id"], prior_digest)
+        self.assertEqual(raised.exception.code, "review_required")
 
 if __name__ == "__main__":
     unittest.main()
