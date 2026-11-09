@@ -28,6 +28,8 @@ class ProductVerticalReadinessTests(unittest.TestCase):
         self.assertTrue(report["contract_qualified"])
         self.assertEqual(report["vertical_count"], 7)
         self.assertEqual(report["operation_count"], 21)
+        self.assertEqual(report["horizontal_capability_count"], 18)
+        self.assertEqual(len(report["evidence_root_sha256"]), 64)
 
     def test_missing_vertical_evidence_fails_closed(self) -> None:
         changed = deepcopy(self.registry)
@@ -46,6 +48,26 @@ class ProductVerticalReadinessTests(unittest.TestCase):
         changed["verticals"][0]["governed_operations"].pop()
         errors = self.validate_registry(changed)
         self.assertTrue(any("governed operation drift" in error for error in errors))
+
+    def test_missing_horizontal_capability_fails_every_vertical_closed(self) -> None:
+        changed = deepcopy(self.registry)
+        changed["horizontal_contract"]["capabilities"].pop()
+        errors = self.validate_registry(changed)
+        self.assertTrue(any("horizontal capability inventory/order" in error for error in errors))
+
+    def test_vertical_cannot_opt_out_of_shared_platform_contract(self) -> None:
+        changed = deepcopy(self.registry)
+        changed["verticals"][0]["horizontal_capabilities"].remove("tenant_isolation")
+        errors = self.validate_registry(changed)
+        self.assertTrue(any("must declare every horizontal capability" in error for error in errors))
+
+    def test_horizontal_validation_must_be_executable(self) -> None:
+        changed = deepcopy(self.registry)
+        changed["horizontal_contract"]["capabilities"][0]["validation"] = [
+            "backend/core/auth_security.py"
+        ]
+        errors = self.validate_registry(changed)
+        self.assertTrue(any("executable validation evidence" in error for error in errors))
 
 
 if __name__ == "__main__":
