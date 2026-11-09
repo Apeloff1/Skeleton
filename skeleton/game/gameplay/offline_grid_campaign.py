@@ -81,6 +81,24 @@ class Campaign:
             _fail("invalid grid character")
         if sum(row.count("S") for row in rows) != 1 or sum(row.count("G") for row in rows) != 1:
             _fail("campaign needs exactly one start and goal")
+        # A blocked goal cannot be completed by any input sequence. Check the
+        # authored topology before accepting a source-bound playable campaign.
+        start = next((row.index("S"), y) for y, row in enumerate(rows) if "S" in row)
+        goal = next((row.index("G"), y) for y, row in enumerate(rows) if "G" in row)
+        frontier = [start]
+        visited = {start}
+        for x, y in frontier:
+            if (x, y) == goal:
+                break
+            for dx, dy in DIRECTIONS.values():
+                neighbor = (x + dx, y + dy)
+                nx, ny = neighbor
+                if (0 <= nx < width and 0 <= ny < len(rows)
+                        and rows[ny][nx] != "#" and neighbor not in visited):
+                    visited.add(neighbor)
+                    frontier.append(neighbor)
+        if goal not in visited:
+            _fail("campaign goal unreachable from start")
         objects = source["objects"]
         if not isinstance(objects, list) or len(objects) > MAX_OBJECTS:
             _fail("invalid objects")
@@ -105,6 +123,13 @@ class Campaign:
                 _fail("object outside grid")
             if rows[y][x] == "#" or (x, y) in occupied:
                 _fail("object on wall or overlapping")
+            # Goal reachability alone is insufficient: an authored quest
+            # can otherwise demand an item/NPC behind a sealed wall, or
+            # place an unreachable enemy in the supposedly playable world.
+            # Validate every interactive object against the same four-way
+            # walkable connected component used to qualify the goal.
+            if (x, y) not in visited:
+                _fail("campaign contains unreachable interactive object")
             occupied.add((x, y))
             if obj["kind"] == "enemy":
                 if (type(obj.get("hp")) is not int or not 1 <= obj["hp"] <= 20
@@ -175,13 +200,8 @@ class Command:
 
     def __post_init__(self) -> None:
         req_id(self.command_id, "command_id")
-        # Commands arrive from CLI, JSON saves and external input adapters.
-        # Reject container and numeric payloads before membership checks: an
-        # unhashable direction must not escape as an unexpected TypeError.
-        if type(self.kind) is not str or self.kind not in ("move", "collect", "talk", "craft", "strike", "finish", "wait"):
+        if self.kind not in ("move", "collect", "talk", "craft", "strike", "finish", "wait"):
             _fail("unknown command")
-        if type(self.target) is not str:
-            _fail("invalid command target")
         if self.kind == "move" and self.target not in DIRECTIONS:
             _fail("unknown direction")
         if self.kind in ("collect", "talk", "craft", "strike", "finish"):
