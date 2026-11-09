@@ -416,11 +416,7 @@ async def verify_apk(build_id: str):
 
 @router.post("/binary/rebuild/{build_id}")
 async def rebuild_apk(build_id: str):
-    """Force a fresh re-package (deletes existing artifacts first).
-
-    Falls back to a synthesized minimal build dict if galaxy_builds is missing
-    the source doc — useful for APKs that were created via the direct
-    binary_builder path (test harness, ad-hoc builds)."""
+    """Re-package a persisted build without inventing missing source files."""
     if not code_execution_enabled():
         return execution_disabled_response("APK rebuild")
 
@@ -428,35 +424,23 @@ async def rebuild_apk(build_id: str):
     db = _db()
     build = await db.galaxy_builds.find_one({"build_id": build_id}, {"_id": 0})
     if not build:
-        # Try to reconstruct from existing build_artifacts metadata or fall
-        # back to a minimal stub so the rebuild can still succeed.
-        art = await db.build_artifacts.find_one({"build_id": build_id, "kind": "apk"}, {"_id": 0})
-        if art:
-            build = {
-                "build_id": build_id,
-                "title": f"Rebuild {build_id}",
-                "files": [
-                    {"path": "rebuild.json", "content": '{"note":"synthesized minimal build for rebuild"}'},
-                ],
-            }
-        else:
-            # Last resort — synthesize a stub so the user can still invoke rebuild
-            build = {
-                "build_id": build_id,
-                "title": f"Galaxy {build_id}",
-                "files": [
-                    {"path": "index.txt", "content": f"Galaxy build {build_id} (synthesized stub)"},
-                ],
-            }
-    # Delete existing artifacts on disk
-    for kind in ("zip", "apk"):
-        p = _artifact_path(build_id, kind)
-        if p.exists():
-            p.unlink()
+        raise HTTPException(
+            404,
+            "The persisted build source is unavailable; an artifact cannot be used to reconstruct source.",
+        )
+
     out = await binary_builder.package_build(build, kinds=["zip", "apk"])
-    # Persist
+    artifacts = out.get("artifacts") or []
     for art in out.get("artifacts", []):
         await db.build_artifacts.update_one(
             {"artifact_id": art["artifact_id"]}, {"$set": art}, upsert=True,
         )
-    return {"build_id": build_id, "rebuilt": True, "source": "galaxy_builds" if await db.galaxy_builds.find_one({"build_id": build_id}, {"_id": 1}) else "synthesized", **out}
+    produced = {art.get("kind") for art in artifacts}
+    complete = {"zip", "apk"}.issubset(produced) and not out.get("errors")
+    return {
+        "build_id": build_id,
+        "rebuilt": complete,
+        "source": "galaxy_builds",
+        "status": "completed" if complete else "failed",
+        **out,
+    }

@@ -180,12 +180,16 @@ def discourse_simulate(req: DiscourseReq) -> dict:
 
 @router.get("/discourse/latest")
 async def discourse_latest_endpoint(limit: int = 10) -> dict:
-    rows = await asyncio.to_thread(discourse_latest, min(max(limit, 1), 100))
+    if not 1 <= limit <= 100:
+        raise HTTPException(422, "discourse limit must be within [1, 100]")
+    rows = await asyncio.to_thread(discourse_latest, limit)
     return {"logs": await visible_build_rows(rows)}
 
 
 @router.get("/discourse/build/{build_id}")
 def discourse_for_build(build_id: str, phase: str | None = None, limit: int = 20) -> dict:
+    if not 1 <= limit <= 100:
+        raise HTTPException(422, "discourse limit must be within [1, 100]")
     return {"build_id": build_id, "phase": phase, "logs": get_for_build(build_id, phase, limit)}
 
 

@@ -163,6 +163,11 @@ updates:
       time: "07:00"
       timezone: Europe/Oslo
     open-pull-requests-limit: 3
+    # backend/Dockerfile asserts Python <3.15 because the pinned backend
+    # dependency set is not yet qualified on 3.15; keep the base on 3.14.x.
+    ignore:
+      - dependency-name: python
+        versions: [">=3.15"]
     groups:
       backend-images:
         applies-to: version-updates
