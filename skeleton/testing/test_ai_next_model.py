@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from hashlib import sha256
 from types import SimpleNamespace
 from unittest.mock import patch
 import io
@@ -35,7 +36,7 @@ class InvalidBackend:
             return {'text':'not a native receipt'}
         prompt=10000 if self.kind=='context' else 3
         generated=900 if self.kind=='output' else 3
-        return Generated('hello',prompt,generated,B,
+        return Generated('hello',prompt,generated,sha256(b'hello').hexdigest(),
                          B if self.kind=='identity' else A,A,'stop')
 
 
