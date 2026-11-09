@@ -19,6 +19,14 @@ import tokenize
 from io import StringIO
 from typing import Any, Dict, List, Optional
 
+from models.compiler_pipeline import (
+    CompilationRequest,
+    CompilationResponse,
+    PipelineStage,
+    SanitizerResult,
+)
+from models.enums import LanguageType
+
 
 def _ai_service():
     """Lazy access to server.ai_service (breaks circular import)."""
@@ -419,43 +427,33 @@ class QuantumCompilerService:
         return "\n".join(asm_lines)
     
     async def run_micro_tests(self, code: str, language: "LanguageType") -> Dict[str, Any]:
-        """Generate and run micro-tests"""
-        tests = []
-        
+        """Describe micro-test candidates without fabricating execution outcomes.
+
+        Actual user-code execution belongs to the sandbox runner.  The compiler
+        analyzer can discover functions, but must not report guessed pass/fail,
+        timing, or coverage values as measurements.
+        """
+        candidates = []
         if language == LanguageType.PYTHON:
             try:
                 tree = ast.parse(code)
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.FunctionDef):
-                        # Generate basic test cases
-                        test = {
-                            "name": f"test_{node.name}",
-                            "function": node.name,
-                            "status": "passed" if hash(node.name) % 3 != 0 else "failed",
-                            "duration_ms": round(abs(hash(node.name) % 50) + 0.5, 1),
-                            "coverage": round(70 + (hash(node.name) % 25), 0)
-                        }
-                        if test["status"] == "failed":
-                            test["error"] = "Assertion failed" if hash(node.name) % 2 == 0 else "Timeout exceeded"
-                        tests.append(test)
+                candidates = [
+                    {"name": f"test_{node.name}", "function": node.name}
+                    for node in ast.walk(tree)
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                ]
             except SyntaxError:
-                pass
-        
-        # Default tests if none generated
-        if not tests:
-            tests = [
-                {"name": "test_basic_input", "status": "passed", "duration_ms": 2.3, "coverage": 85},
-                {"name": "test_edge_case_empty", "status": "passed", "duration_ms": 1.1, "coverage": 90},
-                {"name": "test_large_input", "status": "failed", "duration_ms": 150, "error": "Timeout exceeded", "coverage": 45}
-            ]
-        
-        passed = sum(1 for t in tests if t["status"] == "passed")
+                candidates = []
+
         return {
-            "total": len(tests),
-            "passed": passed,
-            "failed": len(tests) - passed,
-            "tests": tests,
-            "overall_coverage": round(sum(t.get("coverage", 0) for t in tests) / len(tests), 1) if tests else 0
+            "executed": False,
+            "total": 0,
+            "passed": 0,
+            "failed": 0,
+            "tests": [],
+            "candidates": candidates,
+            "overall_coverage": None,
+            "message": "Test candidates discovered; no tests were executed by the compiler analyzer.",
         }
     
     async def agentic_analysis(self, code: str, language: "LanguageType") -> Dict[str, Any]:

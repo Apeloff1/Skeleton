@@ -952,15 +952,8 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
         except Exception:
             pass
 
-    # Cache the full batch result — MASSIVE cap bump for AAA-scale volume.
-    # Floor: every batch guarantees ≥ 600 files even if phase generation was
-    # light; ceiling 10,000 per batch to allow AAA cranked-slider builds to
-    # reach 100k+ total files without memory explosion.
-    # BATCH_CAP/FLOOR tuned 16× bigger than original: BATCH_CAP lifted 2× on
-    # top of the 4× tier (3000→12000→24000) so heavy builds can fill cap;
-    # BATCH_FLOOR kept at 800 so 8-way parallel padding stays under ~3 GB
-    # peak. The big scale-up happens in the SERIAL floor pass below which
-    # reaches 96k+ files safely.
+    # Cache the actual phase output. File count is an observation of generated
+    # game content, never a target that may be satisfied with filler modules.
     # ═══ Apply per-category phase_weights from user settings (v7) ═══
     # User can dial any batch category from 0× (skip) to 3× (triple emphasis).
     # Maps directly to BATCH_NAMES keys (foundation, core_mechanics, etc.).
@@ -978,31 +971,17 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
     # Clamp for safety
     weight = max(0.0, min(3.0, weight))
     BATCH_CAP = 24000
-    BATCH_FLOOR = 0 if _explicit_file_budget(build) is not None else int(800 * weight)      # 0 → skipped, 1.0 → 800, 2.0 → 1600
     if weight == 0.0:
-        # Honor skip: emit a single marker file and return
-        marker = {
-            f"skipped/{BATCH_NAMES.get(batch_num, 'batch')}.md": (
-                f"# Batch {batch_num} ({BATCH_NAMES.get(batch_num,'?')}) skipped by user (weight=0)\n"
-            )
-        }
+        # A user-disabled batch produces no source artifacts.
         accepted = _new_phase_files(build)
-        accepted.update(marker)
         build["_gen_cache"][cache_key] = accepted
         return accepted
     _check_build_continuation(build)
     if batch_files:
         if len(batch_files) > BATCH_CAP:
             batch_files = dict(list(batch_files.items())[:BATCH_CAP])
-        # Floor-padding — augment with synthetic-but-real expansion files
-        if len(batch_files) < BATCH_FLOOR:
-            deficit = BATCH_FLOOR - len(batch_files)
-            batch_name = BATCH_NAMES.get(batch_num, f"batch_{batch_num}")
-            pad = _generate_floor_padding(batch_num, t, g, batch_name, deficit)
-            batch_files.update(pad)
-            print(f"[GALAXY] Batch {batch_num} floor-padded with {len(pad)} extra files (deficit was {deficit})")
         build["_gen_cache"][cache_key] = batch_files
-        print(f"[GALAXY] Batch {batch_num} complete: {len(batch_files)} files (cap={BATCH_CAP}, floor={BATCH_FLOOR})")
+        print(f"[GALAXY] Batch {batch_num} complete: {len(batch_files)} generated files (cap={BATCH_CAP})")
         # Heartbeat — watchdog reads this to detect zombie runners
         try:
             from datetime import datetime as _dt
@@ -1022,51 +1001,15 @@ from routes.galaxy_studio_padding import _expand_compact, _generate_floor_paddin
 
 
 def _generate_fallback_files(batch_id: int, title: str, genre: str, phase_name: str, error: str, build=None) -> dict:
-    """Emergency fallback generator — produces valid files even when phase function crashes.
-    Massively expanded: 60 substantial modules instead of 5, so a single failed
-    phase still contributes meaningfully to the AAA build."""
-    files = _new_phase_files(build)
-    prefix = f"fallback_phase_{batch_id}"
-    domains = [
-        "core", "entities", "systems", "combat", "ai", "ui", "hud", "menus",
-        "audio", "music", "vfx", "shaders", "lighting", "physics", "particles",
-        "save", "load", "network", "rpc", "matchmaking", "lobby", "chat",
-        "input", "controller", "accessibility", "localization", "telemetry",
-        "analytics", "achievements", "progression", "economy", "loot", "crafting",
-        "quest", "dialogue", "narrative", "cinematic", "cutscene",
-        "weather", "season", "mod_api", "anti_cheat", "leaderboard",
-        "store", "dlc", "live_ops", "events", "tutorial", "onboarding",
-        "dungeon", "world_gen", "biome", "ecosystem",
-        "camera", "animation", "ragdoll", "ik", "mocap_binding",
-        "tools", "debug", "profiler", "tests",
-    ]
-    safe_phase = (phase_name or "phase").lower().replace(' ', '_')
-    for i in range(60):
-        domain = domains[i % len(domains)]
-        name = f"{prefix}_{domain}_{i:03d}"
-        desc = f"Fallback {domain} module #{i} for {phase_name} — auto-recovered from: {(error or 'unknown')[:100]}"
-        try:
-            content = (
-                f"// ═══ {title} — FALLBACK: {phase_name} — {domain} #{i} ═══\n"
-                f"// Auto-generated fallback after phase failure. Genre: {genre}\n"
-                f"// Original error: {(error or 'none')[:200]}\n\n"
-                + _expand_massive(name, desc, title, genre, "fallback")
-            )
-        except Exception:
-            content = (
-                f"// {title} — {phase_name} fallback #{i}\n"
-                f"export const M{i} = {{ genre: '{genre}', domain: '{domain}' }};\n"
-            )
-        files[f"fallback/{safe_phase}/{domain}/{name}.ts"] = content
-    files[f"fallback/{safe_phase}/RECOVERY_LOG.md"] = (
-        f"# {title} — {phase_name} Recovery Log\n\n"
-        f"## Phase: {batch_id}\n"
-        f"## Status: RECOVERED via fallback\n"
-        f"## Error: {(error or 'none')[:500]}\n"
-        f"## Files Generated: 5 fallback modules\n"
-        f"## Timestamp: {datetime.utcnow().isoformat()}\n"
-    )
-    return files
+    """Legacy boundary: failed generation is a failed phase, not game source."""
+    if isinstance(build, dict):
+        build.setdefault("_bg_errors", []).append({
+            "batch": batch_id,
+            "phase": phase_name,
+            "error": str(error or "phase_generation_failed")[:500],
+        })
+        build["_bg_errors"] = build["_bg_errors"][-100:]
+    raise GalaxyBuildStopped("phase_generation_failed")
 
 
 def _run_batch_for_phase(build: dict, batch_num: int) -> int:
@@ -1630,9 +1573,9 @@ def _call_phase_func(phase_id: str, build: dict) -> dict:
     """Call the appropriate generator function for a phase_id.
     
     ★ HARDENING LAYER (2026-04-20) ★
-    Every path is wrapped in try/except so a bug, missing DB, malformed
-    build dict, or thread-unsafe global NEVER crashes the pipeline.
-    Generation returns files or the legacy fallback for content errors.
+    Every expected generator path is attempted, but a bug, malformed build,
+    or exhausted generator is recorded as a failed phase. It must never be
+    converted into placeholder game source.
     Stop, deadline and file-budget boundaries propagate to the existing runner;
     they must never trigger replacement output or a false successful phase.
     """
@@ -1653,7 +1596,7 @@ def _call_phase_func(phase_id: str, build: dict) -> dict:
         raise
     except Exception as _ig:
         print(f"[GALAXY _call_phase_func] input guard triggered: {_ig}")
-        return _generate_fallback_files(0, "Untitled", "rpg", phase_id, f"input_guard: {_ig}", build=build)
+        return _generate_fallback_files(0, "Untitled", "rpg", phase_id, "invalid_phase_input", build=build)
 
     # ── Phase spec lookup ───────────────────────────────────────────
     phase_info = None
@@ -1707,36 +1650,16 @@ def _call_phase_func(phase_id: str, build: dict) -> dict:
             accepted = _new_phase_files(build)
             accepted.update(result)
             return accepted
-        print(f"[GALAXY phase][{phase_id}] generic returned empty — using fallback stub")
+        print(f"[GALAXY phase][{phase_id}] generic returned empty")
     except GalaxyBuildStopped:
         raise
     except Exception as _ge:
-        print(f"[GALAXY phase][{phase_id}] generic FAILED: {_ge} — using fallback stub")
+        print(f"[GALAXY phase][{phase_id}] generic FAILED: {type(_ge).__name__}")
 
-    # ── Tertiary path: fallback files (guaranteed to work) ──────────
-    try:
-        return _generate_fallback_files(phase_info.get("batch", 0), t, g, phase_info.get("name", phase_id),
-                                         "phase_all_paths_failed", build=build)
-    except GalaxyBuildStopped:
-        raise
-    except Exception as _fe:
-        # Final safety net — even the fallback generator failed.
-        print(f"[GALAXY phase][{phase_id}] fallback FAILED: {_fe} — returning stub")
-        accepted = _new_phase_files(build)
-        accepted.update({
-            f"stubs/{phase_id}/emergency_stub.ts": (
-                f"// Emergency stub for phase '{phase_id}' — all generators failed.\n"
-                f"// title={t} genre={g}\n"
-                f"export const _emergency_{phase_id.replace('-', '_')} = {{\n"
-                f"  phase: '{phase_id}',\n"
-                f"  status: 'emergency_fallback',\n"
-                f"  title: '{t}',\n"
-                f"  genre: '{g}',\n"
-                f"  error: 'all_phase_generators_failed',\n"
-                f"}};\n"
-            )
-        })
-        return accepted
+    return _generate_fallback_files(
+        phase_info.get("batch", 0), t, g, phase_info.get("name", phase_id),
+        "phase_all_paths_failed", build=build,
+    )
 
 
 def _expand_for_scale(files: dict, title: str, genre: str, multiplier: int, vision: str, systems: str, laws: str, instructions: str):
@@ -3152,71 +3075,12 @@ async def _run_background_build_inner(
             raise GalaxyBuildStopped("artifact_file_budget_exhausted")
         await asyncio.to_thread(_worker_cooldown, context=f"after-batch-{batch_num}")
 
-    # Preserve the existing requested delivery floor while keeping physical
-    # custody and at most one small unharvested result. No RAM fallback on I/O
-    # failure and no further submissions until a durable append is confirmed.
-    complexity = int(build.get("complexity", 60) or 60)
-    floor_target = max(50000, 50000 + (complexity - 50) * 2500)
-    sliders = [
-        build.get(key, 0)
-        for key in (
-            "graphics_era",
-            "world_size",
-            "ai_complexity",
-            "physics_realism",
-            "narrative_branching",
-            "multiplayer_max",
-        )
-    ]
-    if any(int(value or 0) >= 8 for value in sliders):
-        floor_target += 75000
-    if all(int(value or 0) >= 9 for value in sliders):
-        floor_target += 125000
-    fusion = max(1.0, min(1.6, float(build.get("fusion_multiplier", 1.0) or 1.0)))
-    # Explicitly bounded builds receive real phase outputs only. Padding is
-    # not evidence of quality and must not inflate a caller's file ceiling.
-    floor_target = 0 if _explicit_file_budget(build) is not None else min(int(floor_target * fusion), GLOBAL_FILE_BUDGET)
+    # Delivery is the durable output of completed phases. A requested scale is
+    # a generation budget, not permission to inflate the artifact with filler.
     from core import build_vault as _bv
 
     current_files = await asyncio.to_thread(_bv.get_file_count, build_id)
-    deficit = max(0, floor_target - current_files)
-    genres = build.get("genres") or [build.get("genre", "rpg")]
-    if not isinstance(genres, list) or not 1 <= len(genres) <= 16:
-        raise GalaxyBuildStopped("build_genres_invalid")
-    build["_bg_floor_target"] = floor_target
-    build["_bg_floor_in_progress"] = deficit > 0
-    serial = 0
-    while deficit > 0:
-        _check_build_continuation(build)
-        await _await_build_io(build, _check_build_resources, build)
-        count = min(128, deficit)
-        genre = genres[serial % len(genres)]
-        params = (
-            99 + serial,
-            build.get("title", "Game"),
-            genre,
-            f"AAA_Delivery_Floor[{genre}]#{serial}",
-            count,
-        )
-        future = _track_build_future(build_id, _submit_floor_chunk(params))
-        extra = await _await_build_future(build, future, maximum_seconds=180.0)
-        if not isinstance(extra, dict) or not extra:
-            raise GalaxyBuildStopped("floor_generation_failed")
-        # The one pending chunk remains owned by the build if its durable
-        # append fails; no further generation follows a storage failure.
-        build.setdefault("files", {}).update(extra)
-        previous_count = current_files
-        await _await_build_io(build, _flush_to_vault, build, True)
-        current_files = int(build.get("_vault_file_count", 0))
-        if current_files <= previous_count:
-            raise GalaxyBuildStopped("floor_no_durable_progress")
-        extra.clear()
-        deficit = max(0, floor_target - current_files)
-        serial += 1
-        build["_bg_last_heartbeat"] = datetime.utcnow().isoformat()
-        if serial % 4 == 0 or not deficit:
-            await _save_build_required(build)
-        await asyncio.sleep(0)
+    build["_bg_floor_target"] = current_files
     build["_bg_floor_in_progress"] = False
     _check_build_continuation(build)
     await _await_build_io(build, _flush_to_vault, build, True)
@@ -3759,7 +3623,9 @@ async def get_status(build_id: str):
             "error_details": build.get("_bg_errors", [])[-3:],  # Last 3 errors
             "health": (
                 "excellent"
-                if build.get("_bg_fallbacks", 0) == 0
+                if not build.get("_bg_errors") and build.get("_bg_fallbacks", 0) == 0
+                else "failed" if build.get("status") == "failed"
+                else "degraded" if build.get("_bg_errors")
                 else "recovered" if build.get("_bg_fallbacks", 0) < 5 else "degraded"
             ),
         },
