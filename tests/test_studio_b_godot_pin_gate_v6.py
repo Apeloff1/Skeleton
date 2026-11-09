@@ -25,7 +25,7 @@ class EnginePinGateTests(TestCase):
                 with patch("skeleton.godot_export.certify.import_cert.certify", side_effect=AssertionError("unsafe import")):
                     report = certify(Path(td), Options(pin=binary.Pin("4.7.2", "a" * 64)), runner)
             self.assertFalse(report.results[-1].passed)
-            self.assertEqual(report.results[-1].id, "GFB-02")
+            self.assertEqual(report.results[-1].case_id, "GFB-02")
 
     def test_mismatched_digest_never_imports_project(self):
         with TemporaryDirectory() as td:
@@ -36,4 +36,4 @@ class EnginePinGateTests(TestCase):
                 with patch("skeleton.godot_export.certify.import_cert.certify", side_effect=AssertionError("unsafe import")):
                     report = certify(Path(td), Options(godot=str(executable), pin=binary.Pin("4.7.2", "0" * 64)), runner)
             self.assertFalse(report.results[-1].passed)
-            self.assertEqual(report.results[-1].id, "GFB-02")
+            self.assertEqual(report.results[-1].case_id, "GFB-02")
