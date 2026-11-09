@@ -1,4 +1,0 @@
-"""Explicit audited policy registry; no untrusted Python module import names."""
-NAMES=("native_identity","weight_custody","tokenizer_custody","model_capacity","memory_pressure","admission_queue","request_dedupe","context_packing","prompt_roles","output_receipt","stream_sequence","stream_backpressure","cancellation","retry_budget","session_scope","memory_consent","memory_deletion","retrieval_integrity","citation_provenance","tool_grant","tool_intent","audit_journal","outbox_ack","snapshot_cas","backup_integrity","restore_order","key_rotation","lease_epoch","transport_local","http_framing","device_probe","installer_attestation","process_isolation","health_circuit","metrics_sampling","evaluation_evidence","canary_evidence","rollout_authority","release_qualification","privacy_boundary",)
-def domains():
-    return NAMES

@@ -1,3 +1,0 @@
-"""Source-original six-objective quest dependency DAG for meridianspire."""
-from skeleton.ai.runtime.production_fabric.planning.quests import Quest
-QUESTS = (Quest('meridianspire_arrival', (), (), ('arrival_record',)), Quest('meridianspire_source', ('meridianspire_arrival',), ('arrival_record',), ('source_proof',)), Quest('meridianspire_witness', ('meridianspire_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('meridianspire_reconcile', ('meridianspire_source', 'meridianspire_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('meridianspire_crossing', ('meridianspire_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('meridianspire_conclusion', ('meridianspire_crossing',), ('crossing_pass',), ('ending_unlocked',)))

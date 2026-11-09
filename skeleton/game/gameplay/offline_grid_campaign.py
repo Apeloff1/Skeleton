@@ -309,44 +309,64 @@ class Session:
             health, tuple(sorted(enemies.items())), (*self._events, _canonical(event)),
         )
 
-    def shortest_goal_route(self) -> tuple[str, ...] | None:
-        """Find a bounded deterministic route through currently traversable tiles.
+    def shortest_route_to(self, x: int, y: int) -> tuple[str, ...] | None:
+        """Bounded immutable navigation to a specified walkable tile.
 
-        A living enemy blocks its tile. This advisory route never moves the
-        player, mutates source, spends ticks, or certifies quest completion.
-        None means the goal is presently unreachable; () means already there.
+        Used for quest item/NPC navigation as well as the campaign goal.
+        Boolean coordinates, off-map targets, walls and occupied enemy
+        destinations fail closed; no commands are issued by route planning.
         """
         from collections import deque
 
         rows = self.campaign.spec["rows"]
         width, height = len(rows[0]), len(rows)
+        if type(x) is not int or type(y) is not int:
+            _fail("route coordinates must be integers")
+        if not (0 <= x < width and 0 <= y < height) or rows[y][x] == "#":
+            _fail("route destination is not walkable")
+        living = dict(self.enemies)
         blockers = {
             (obj["x"], obj["y"])
             for obj in self.campaign.spec["objects"]
-            if obj["kind"] == "enemy" and dict(self.enemies).get(obj["id"], 0) > 0
+            if obj["kind"] == "enemy" and living.get(obj["id"], 0) > 0
         }
-        goal = next((row.index("G"), y) for y, row in enumerate(rows) if "G" in row)
+        goal = (x, y)
         start = (self.x, self.y)
+        if goal in blockers:
+            return None
         if start == goal:
             return ()
-        frontier = deque([(start, ())])
+        frontier = deque([start])
         visited = {start}
+        predecessor: dict[tuple[int, int], tuple[tuple[int, int], str]] = {}
         while frontier:
-            (x, y), route = frontier.popleft()
+            px, py = frontier.popleft()
             for direction in ("north", "east", "south", "west"):
                 dx, dy = DIRECTIONS[direction]
-                nx, ny = x + dx, y + dy
-                point = (nx, ny)
+                point = (px + dx, py + dy)
+                nx, ny = point
                 if (point in visited or point in blockers
                     or not (0 <= nx < width and 0 <= ny < height)
                     or rows[ny][nx] == "#"):
                     continue
-                next_route = (*route, direction)
-                if point == goal:
-                    return next_route
                 visited.add(point)
-                frontier.append((point, next_route))
+                predecessor[point] = ((px, py), direction)
+                if point == goal:
+                    route = []
+                    cursor = point
+                    while cursor != start:
+                        parent, move = predecessor[cursor]
+                        route.append(move)
+                        cursor = parent
+                    return tuple(reversed(route))
+                frontier.append(point)
         return None
+
+    def shortest_goal_route(self) -> tuple[str, ...] | None:
+        """Return the shortest live obstacle-aware route to the goal tile."""
+        rows = self.campaign.spec["rows"]
+        gx, gy = next((row.index("G"), y) for y, row in enumerate(rows) if "G" in row)
+        return self.shortest_route_to(gx, gy)
 
     @property
     def state_digest(self) -> str:

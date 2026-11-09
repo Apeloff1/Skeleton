@@ -1,3 +1,0 @@
-"""Source-original six-objective quest dependency DAG for driftglass."""
-from skeleton.ai.runtime.production_fabric.planning.quests import Quest
-QUESTS = (Quest('driftglass_arrival', (), (), ('arrival_record',)), Quest('driftglass_source', ('driftglass_arrival',), ('arrival_record',), ('source_proof',)), Quest('driftglass_witness', ('driftglass_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('driftglass_reconcile', ('driftglass_source', 'driftglass_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('driftglass_crossing', ('driftglass_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('driftglass_conclusion', ('driftglass_crossing',), ('crossing_pass',), ('ending_unlocked',)))

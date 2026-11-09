@@ -1,3 +1,0 @@
-"""Source-original six-objective quest dependency DAG for brinegarden."""
-from skeleton.ai.runtime.production_fabric.planning.quests import Quest
-QUESTS = (Quest('brinegarden_arrival', (), (), ('arrival_record',)), Quest('brinegarden_source', ('brinegarden_arrival',), ('arrival_record',), ('source_proof',)), Quest('brinegarden_witness', ('brinegarden_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('brinegarden_reconcile', ('brinegarden_source', 'brinegarden_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('brinegarden_crossing', ('brinegarden_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('brinegarden_conclusion', ('brinegarden_crossing',), ('crossing_pass',), ('ending_unlocked',)))

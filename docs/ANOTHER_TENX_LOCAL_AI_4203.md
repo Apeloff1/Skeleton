@@ -1,1 +1,0 @@
-# Another 10x on local AI #4203\n\nWeights, candidates, questionnaires, interaction. 10x again.

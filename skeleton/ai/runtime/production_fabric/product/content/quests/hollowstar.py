@@ -1,3 +1,0 @@
-"""Source-original six-objective quest dependency DAG for hollowstar."""
-from skeleton.ai.runtime.production_fabric.planning.quests import Quest
-QUESTS = (Quest('hollowstar_arrival', (), (), ('arrival_record',)), Quest('hollowstar_source', ('hollowstar_arrival',), ('arrival_record',), ('source_proof',)), Quest('hollowstar_witness', ('hollowstar_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('hollowstar_reconcile', ('hollowstar_source', 'hollowstar_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('hollowstar_crossing', ('hollowstar_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('hollowstar_conclusion', ('hollowstar_crossing',), ('crossing_pass',), ('ending_unlocked',)))

@@ -1,1 +1,0 @@
-# Another 10x on local AI #4204\n\nDeeper: inference, concurrent safety, book memory, canon, receipts, source, Godot, sprites, binding. 10x again. Complete. No stubs.

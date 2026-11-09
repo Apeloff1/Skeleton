@@ -1,1 +1,0 @@
-# Seams on #4198\nGodot, cockpit. Maximized.

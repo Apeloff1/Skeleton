@@ -1,1 +1,0 @@
-# 10x work on local AI #4203\n\nBook weights, full-book candidates, hash-linked receipts, questionnaires, game-creation flows, interaction. 10x scale. Complete.

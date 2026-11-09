@@ -1,2 +1,0 @@
-"""Still more."""
-STILL = True
