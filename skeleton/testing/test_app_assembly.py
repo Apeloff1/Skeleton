@@ -220,7 +220,7 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
         seen["timeout"] = timeout
         return _Response()
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", fake_urlopen)
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", fake_urlopen)
     service = load_manifest().service("skeleton")
 
     result = probe_url(service, timeout=1.25)
@@ -729,7 +729,7 @@ def test_probe_rejects_redirect_to_login_page_even_if_target_is_200(monkeypatch)
         def read(self, _size):
             return b"login page"
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: RedirectResponse())
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert not result.ok
     assert result.detail == "health endpoint redirected"
@@ -743,7 +743,7 @@ def test_probe_does_not_publish_sensitive_network_exception(monkeypatch):
     def unavailable(*_args, **_kwargs):
         raise URLError("private operator credential in daemon response")
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", unavailable)
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", unavailable)
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert result.ok is False
     assert "URLError" in result.detail
@@ -765,10 +765,65 @@ def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
         def read(self, _size):
             return b"redirect"
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: RedirectResponse())
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert not result.ok
     assert result.status == 302
+
+def test_health_probe_transport_forbids_redirects_and_proxy_environment(monkeypatch):
+    from urllib.request import HTTPRedirectHandler, ProxyHandler
+    from skeleton.app.health import probe_http
+
+    seen = {}
+
+    class DirectResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _size):
+            return b"ok"
+
+    class Opener:
+        def open(self, request, *, timeout):
+            seen["url"] = request.full_url
+            seen["timeout"] = timeout
+            return DirectResponse()
+
+    def fake_build_opener(*handlers):
+        proxies = [h for h in handlers if isinstance(h, ProxyHandler)]
+        assert len(proxies) == 1
+        assert proxies[0].proxies == {}
+        redirects = [h for h in handlers if isinstance(h, HTTPRedirectHandler)]
+        assert len(redirects) == 1
+        assert redirects[0].redirect_request(None, None, 302, "redirect", {}, "https://elsewhere.invalid") is None
+        return Opener()
+
+    monkeypatch.setattr("skeleton.app.health.build_opener", fake_build_opener)
+    result = probe_http("backend", "http://localhost:8001/api/health", timeout=1.75)
+
+    assert result.ok is True
+    assert seen == {"url": "http://localhost:8001/api/health", "timeout": 1.75}
+
+
+def test_direct_health_probe_rejects_302_before_network_follow(monkeypatch):
+    from urllib.error import HTTPError
+    from skeleton.app.health import probe_http
+
+    def redirect(_request, *, timeout):
+        raise HTTPError("http://localhost:8001/api/health", 302, "go", {}, None)
+
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", redirect)
+    result = probe_http("backend", "http://localhost:8001/api/health")
+
+    assert not result.ok
+    assert result.status == 302
+    assert result.detail == "health endpoint redirected"
+
 
 def test_full_profile_uses_custom_chroma_published_port(tmp_path):
     from skeleton.app.assembly import public_service_urls
