@@ -85,7 +85,10 @@ class Hypothesis:
         _id(self.question_id, "question_id")
         object.__setattr__(self, "proposition", _text(self.proposition, "proposition"))
         object.__setattr__(self, "falsifier", _text(self.falsifier, "falsifier"))
-        _finite(self.prior_plausibility, "prior_plausibility", 0.001, 0.999)
+        object.__setattr__(
+            self, "prior_plausibility",
+            _finite(self.prior_plausibility, "prior_plausibility", 0.001, 0.999),
+        )
 
     @property
     def digest(self) -> str:
@@ -120,6 +123,7 @@ class HypothesisEvidence:
         if not isinstance(self.direction, EvidenceDirection):
             raise HypothesisError("direction must be typed EvidenceDirection")
         ratio = _finite(self.likelihood_ratio, "likelihood_ratio", 0.05, 20.0)
+        object.__setattr__(self, "likelihood_ratio", ratio)
         if (self.direction is EvidenceDirection.SUPPORTS and ratio <= 1.0) or (
             self.direction is EvidenceDirection.CONTRADICTS and ratio >= 1.0
         ) or (self.direction is EvidenceDirection.NEUTRAL and ratio != 1.0):
@@ -128,10 +132,12 @@ class HypothesisEvidence:
             len(self.limitations) > 24
         ):
             raise HypothesisError("explicit bounded limitations required")
-        if len(set(self.limitations)) != len(self.limitations):
+        # Normalize and validate elements BEFORE hashing/deduplicating:
+        # an unhashable hostile item must fail as a typed domain error.
+        normalized = tuple(_text(value, "limitation") for value in self.limitations)
+        if len(set(normalized)) != len(normalized):
             raise HypothesisError("duplicate limitations")
-        for limitation in self.limitations:
-            _text(limitation, "limitation")
+        object.__setattr__(self, "limitations", normalized)
 
     @property
     def digest(self) -> str:
@@ -296,9 +302,11 @@ class HypothesisLedger:
             key=lambda result: (-result.plausibility, result.hypothesis_id),
         ))
         # Never turn a high mathematical score into an independently verified fact.
-        admitted = sum(bool(x.observed_sources) for x in rankings)
-        unique_winner = (rankings[0].plausibility > rankings[1].plausibility)
-        winner = rankings[0].hypothesis_id if admitted and unique_winner else None
+        # A high *prior* without direct observed source custody cannot win
+        # just because some different hypothesis has been observed.
+        top_is_observed = bool(rankings[0].observed_sources)
+        unique_winner = rankings[0].plausibility > rankings[1].plausibility
+        winner = rankings[0].hypothesis_id if top_is_observed and unique_winner else None
         resolution = "tentative-preference" if winner else "unresolved"
         return HypothesisComparison(
             key, rankings, winner, resolution,
