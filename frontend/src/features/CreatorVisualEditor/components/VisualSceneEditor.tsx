@@ -39,7 +39,7 @@ function Button(props: { label: string; onPress: () => void; disabled?: boolean;
       disabled={props.disabled}
       onPress={props.onPress}
       testID={props.testID}
-      hitSlop={theme.hitSlop}
+      hitSlop={theme.hitSlop.md}
       style={[styles.btn, tone === 'primary' && styles.btnPrimary, tone === 'danger' && styles.btnDanger, props.disabled && styles.btnDisabled]}
     >
       <Text style={[styles.btnText, tone === 'primary' && { color: c.onPrimary }]}>{props.label}</Text>
@@ -181,7 +181,7 @@ export function VisualSceneEditor({ source, onSubmitCommands, initialSelection, 
           <Text accessibilityRole="header" style={styles.h2}>{strings.approvalTitle}</Text>
           <Text style={styles.meta}>{strings.approvalHint}</Text>
           {diff.changes.map((ch, i) => (
-            <Text key={i} style={styles.text} testID="vse-change">{ch.action} {ch.subject}</Text>
+            <Text key={i} style={styles.text} testID="vse-change">{ch.summary}</Text>
           ))}
           <View style={styles.row}>
             <Button label={strings.approve} tone="primary" onPress={approve} disabled={submitting || designGraphDigest(source) !== designGraphDigest(session.base)} testID="vse-approve" />
