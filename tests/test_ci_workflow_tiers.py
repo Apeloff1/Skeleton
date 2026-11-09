@@ -38,7 +38,8 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertIn("os.environ.get('GH_ACTOR') != 'Apeloff1'", canary)
         self.assertIn("os.environ.get('GH_EVENT') != 'workflow_dispatch'", canary)
         readiness = (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
-        self.assertIn("skeleton/testing --tb=short", readiness)
+        self.assertIn("python scripts/run_domain_suite_shard.py --index", readiness)
+        self.assertIn("python tests/run_unit.py", readiness)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
     def test_event_parser(self):
