@@ -253,3 +253,36 @@ def test_bundle_receipt_chunk_size_and_declared_utf8_bytes_are_verified(saver):
     payload["sections"]["files"]["a.md"]["bytes"] = 4
     with pytest.raises(BundleError, match="byte count mismatch"):
         bio.import_bundle(CODEC.encode(payload), CODEC, ProjectSaver(GameSavePlane()))
+
+
+def test_bundle_codec_faults_fail_closed_without_publishing(saver):
+    """Malformed injected codec failures must never become partial imports."""
+    class ThrowingCodec:
+        def __init__(self, error):
+            self.error = error
+
+        def decode(self, raw):
+            raise self.error
+
+    class BrokenPayloadCodec:
+        def decode(self, raw):
+            class Broken:
+                @property
+                def payload(self):
+                    raise RuntimeError("private codec diagnostic")
+            return Broken()
+
+    for codec in (ThrowingCodec(RuntimeError("private secret")),
+                  ThrowingCodec(TypeError("bad adapter")), BrokenPayloadCodec()):
+        with pytest.raises(BundleError, match="bundle envelope failed integrity check"):
+            bio.import_bundle("{}", codec, saver)
+    assert saver.next_sequence("hero") == 1
+
+
+def test_bundle_path_refuses_namespace_purpose_aliases(tmp_path):
+    for bad_purpose in ("..", ".", "other_data", "game_project_bundles:.."):
+        def forged(tenant, *, purpose):
+            return "tenant:" + "a" * 24 + ":" + bad_purpose
+
+        with pytest.raises(BundleError, match="namespace shape or purpose"):
+            bio.bundle_path(tmp_path, "tenant-one", "hero", forged)
