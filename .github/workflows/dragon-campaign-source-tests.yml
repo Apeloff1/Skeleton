@@ -74,6 +74,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact source-head checkout identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - name: Use supported Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -282,6 +287,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_coverage_frontier.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_antichain.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_activitystreams.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_catalogs.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_memento.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_catalogs.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_scene_topology.py' -v

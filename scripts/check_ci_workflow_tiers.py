@@ -16,22 +16,31 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = Path(".github/workflows")
 ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
+# Explicit event-subscriber inventory: no extra independent Actions admission.
+MAX_INDEPENDENT_WORKFLOWS = 26
 
 
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
     lines = source.splitlines()
-    try:
-        start = next(i for i, line in enumerate(lines) if line == "on:")
-    except StopIteration as exc:
-        raise ValueError("workflow missing multiline 'on:' trigger") from exc
+    starts = [i for i, line in enumerate(lines) if line == "on:"]
+    if len(starts) != 1:
+        raise ValueError("workflow requires exactly one literal multiline 'on:' trigger")
     found: set[str] = set()
-    for line in lines[start + 1:]:
+    for line in lines[starts[0] + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
             break
         match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
         if match:
-            found.add(match.group(1))
+            event = match.group(1)
+            if event in found:
+                raise ValueError("duplicate workflow trigger event")
+            found.add(event)
+        elif re.match(r"^  \S", line) and not line.lstrip().startswith("#"):
+            # Do not silently miss inline, aliased, or quoted triggers.
+            raise ValueError("unsupported workflow trigger event declaration")
+    if not found:
+        raise ValueError("workflow has no explicit trigger events")
     return found
 
 
@@ -63,6 +72,22 @@ def audit(root: Path = ROOT) -> list[str]:
     names = specialised + core + reusable
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
+    approved = policy.get("automatic_event_workflows")
+    if (not isinstance(approved, list) or not approved
+            or any(type(name) is not str or not name.endswith((".yml", ".yaml"))
+                   or "/" in name or name.startswith(".") for name in approved)
+            or len(approved) != len(set(approved))
+            or len(approved) > MAX_INDEPENDENT_WORKFLOWS):
+        return ["invalid explicit automatic workflow inventory"]
+    profiles = policy.get("automatic_event_triggers")
+    if (not isinstance(profiles, dict) or set(profiles) != set(approved)
+            or any(not isinstance(event_names, list) or not event_names
+                   or len(set(event_names)) != len(event_names)
+                   or any(type(event) is not str
+                          or not re.fullmatch(r"[a-z_]+", event) for event in event_names)
+                   or not independently_triggered(set(event_names))
+                   for event_names in profiles.values())):
+        return ["invalid explicit automatic event trigger profiles"]
     rules = policy.get("release_rules")
     if not isinstance(rules, dict) or not rules or any(x is not True for x in rules.values()):
         failures.append("release rules must preserve explicit qualification")
@@ -73,6 +98,7 @@ def audit(root: Path = ROOT) -> list[str]:
     # Signed evidence workflows may sit beside the compact PR set when they
     # cannot run automatically. Only non-manual triggers consume the cap.
     automatic = 0
+    automatic_files: set[str] = set()
     for path in active:
         try:
             found = events(path.read_text(encoding="utf-8"))
@@ -83,8 +109,22 @@ def audit(root: Path = ROOT) -> list[str]:
             continue
         if independently_triggered(found):
             automatic += 1
-    if automatic > 20:
+            automatic_files.add(path.name)
+            if path.name in profiles and found != set(profiles[path.name]):
+                failures.append(
+                    f"{path.name}: event admission trigger drift "
+                    f"(expected={sorted(profiles[path.name])}, got={sorted(found)})"
+                )
+    if automatic > MAX_INDEPENDENT_WORKFLOWS:
         failures.append(f"unexpected active workflow count: {automatic}")
+    # Numeric caps alone admit unauthorized replacement beneath the ceiling.
+    # Both new automatic subscribers and missing expected gates fail closed.
+    unregistered = sorted(automatic_files - set(approved))
+    missing = sorted(set(approved) - automatic_files)
+    if unregistered:
+        failures.append(f"unregistered automatic workflows: {unregistered}")
+    if missing:
+        failures.append(f"expected automatic workflows not triggered: {missing}")
     for name in specialised:
         path = root / ARCHIVE / name
         if (root / WORKFLOWS / name).exists():

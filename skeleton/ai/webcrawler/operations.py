@@ -41,7 +41,7 @@ from .capture_rights import source_capture_rights
 from .http_freshness import (
     FreshnessError,observe_http_freshness,verify_freshness_receipt,
 )
-from .media_probe import inspect_download_media
+from .media_probe import inspect_download_media, valid_media_receipt
 from .link_header_discovery import parse_link_headers
 from .memento_relations import MementoDiscoveryError, discover_mementos
 from .document_formats import DocumentFormatError
@@ -584,19 +584,12 @@ class CrawlRun:
                 "mime_inferred", "declared_content_type", "mime_inference_reason",
             )
             if any(field in provenance for field in mime_fields):
-                inferred = provenance.get("mime_inferred")
-                declared = provenance.get("declared_content_type")
-                if (type(inferred) is not bool or not isinstance(declared, str)
-                        or len(declared) > 256
-                        or not isinstance(provenance.get("mime_inference_reason"), str)
-                        or (not inferred and declared != source["content_type"])
-                        or (inferred and (
-                            declared not in {
-                                "application/octet-stream", "binary/octet-stream",
-                                "application/zip",
-                            }
-                            or declared == source["content_type"]
-                        ))):
+                if not valid_media_receipt(
+                    source["content_type"],
+                    provenance.get("declared_content_type"),
+                    provenance.get("mime_inferred"),
+                    provenance.get("mime_inference_reason"),
+                ):
                     raise CrawlOperationError("source MIME inference receipt mismatch")
             if (
                 provenance.get("consent_id") != binding["consent"]["consent_id"]

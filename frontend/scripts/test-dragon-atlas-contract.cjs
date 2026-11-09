@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const NodeModule = require('node:module');
 const ts = require('typescript');
 const root = path.join(__dirname, '..');
 const clientPath = path.join(root, 'src/product/crawlerClient.ts');
@@ -65,6 +66,24 @@ function transpile(file) {
     .map(x => ts.flattenDiagnosticMessageText(x.messageText, '\n')), []);
   return result.outputText;
 }
+function loadRepositorySource(file, dependencies) {
+  // The only executable sources are explicitly approved, repository-owned TS
+  // files. Never compile a URL, operator input, or an arbitrary runtime path.
+  if (file !== clientPath && file !== path.join(root, 'src/features/Jeeves/atlasCampaignPlan.ts')) {
+    throw new Error('Unexpected Dragon test source');
+  }
+  const loaded = new NodeModule(file, module);
+  loaded.filename = file;
+  loaded.paths = [];
+  loaded.require = name => {
+    if (!Object.prototype.hasOwnProperty.call(dependencies, name)) {
+      throw new Error('Unexpected Dragon test dependency: ' + name);
+    }
+    return dependencies[name];
+  };
+  loaded._compile(transpile(file), file);
+  return loaded.exports;
+}
 const api = {
   post: async (url, body) => {
     posts.push({ url, body });
@@ -72,7 +91,6 @@ const api = {
   },
 };
 function loadClient() {
-  const module = { exports: {} };
   const dependencies = {
     'expo-crypto': { CryptoDigestAlgorithm: { SHA256: 'sha256' }, digestStringAsync: async () => H },
     '../utils/apiBase': { API_BASE: 'https://example.invalid' },
@@ -80,13 +98,7 @@ function loadClient() {
     '../auth/gameforgeAuth': { authHeaders: () => ({}), getAuthToken: () => token },
     './chatErrors': { ChatClientError, chatApiError: () => new ChatClientError('server rejected') },
   };
-  new Function('require','module','exports',transpile(clientPath))(
-    name => {
-      if (!(name in dependencies)) throw new Error('Unexpected client dependency: ' + name);
-      return dependencies[name];
-    }, module, module.exports,
-  );
-  return module.exports;
+  return loadRepositorySource(clientPath, dependencies);
 }
 const client = loadClient();
 const objective = () => ({
@@ -389,12 +401,7 @@ test('account switch while awaiting transport rejects stale source data', async 
 
 const planPath = path.join(root, 'src/features/Jeeves/atlasCampaignPlan.ts');
 function loadCampaignPlan() {
-  const module = { exports: {} };
-  new Function('require', 'module', 'exports', transpile(planPath))(
-    name => { throw new Error('Campaign plan must not import runtime authority: ' + name); },
-    module, module.exports,
-  );
-  return module.exports;
+  return loadRepositorySource(planPath, {});
 }
 const campaign = loadCampaignPlan();
 const draft = (question = 'Which archive methodology is supported?') => ({
