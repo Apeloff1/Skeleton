@@ -215,6 +215,65 @@ function patchHttpCacheSemanticsMaxStale() {
   );
 }
 
+function patchQueryStringDecoderInterop() {
+  const queryDir = path.join(ROOT, 'node_modules/query-string');
+  const decoderDir = path.join(ROOT, 'node_modules/decode-uri-component');
+  const queryMetadata = path.join(queryDir, 'package.json');
+  if (!fs.existsSync(queryMetadata)) return;
+  const queryFile = path.join(queryDir, 'index.js');
+  const decoderMetadata = path.join(decoderDir, 'package.json');
+  const decoderFile = path.join(decoderDir, 'index.js');
+  for (const dir of [queryDir, decoderDir]) {
+    if (!fs.lstatSync(dir).isDirectory()) {
+      throw new Error('[patch-node-modules] query decoder directory is unsafe');
+    }
+  }
+  for (const file of [queryMetadata, decoderMetadata, queryFile, decoderFile]) {
+    if (!fs.lstatSync(file).isFile()) {
+      throw new Error('[patch-node-modules] query decoder file is unsafe');
+    }
+  }
+  const queryPackage = JSON.parse(fs.readFileSync(queryMetadata, 'utf8'));
+  const decoderPackage = JSON.parse(fs.readFileSync(decoderMetadata, 'utf8'));
+  if (queryPackage.name !== 'query-string' || queryPackage.version !== '7.1.3'
+      || decoderPackage.name !== 'decode-uri-component' || decoderPackage.version !== '0.5.1'
+      || decoderPackage.type !== 'module'
+      || require.resolve('decode-uri-component', { paths: [queryDir] }) !== decoderFile) {
+    throw new Error('[patch-node-modules] query-string decoder binding requires compatibility review');
+  }
+  const hash = source => crypto.createHash('sha256').update(source).digest('hex');
+  // Both sources are bound to the published package bytes. query-string 7.1.3
+  // expects a callable CommonJS value while decode-uri-component 0.5.1 exports
+  // an ESM default function, so make that boundary explicit and fail on drift.
+  if (hash(fs.readFileSync(decoderFile)) !== '6a86ac891edf15c5efa0841ebb31935e3669d58b98318b57d7b08a4530317cb0') {
+    throw new Error('[patch-node-modules] query decoder source changed; review required');
+  }
+  const source = fs.readFileSync(queryFile, 'utf8');
+  const digest = hash(source);
+  const before = "const decodeComponent = require('decode-uri-component');";
+  const after = "const decodeComponent = require('decode-uri-component').default; // skeleton decoder ESM interop";
+  if (digest === 'caa3f2c8b45dfe1e91db22ae10743af68de8d96f26515132bb52485ec0f037fa') {
+    const output = source.replace(before, after);
+    if (hash(output) !== 'cc172b6a0e8251f5efef27feb6550e37f8a87c4efa1dd72a92a611c55ab90215') {
+      throw new Error('[patch-node-modules] query-string decoder patch postcondition failed');
+    }
+    fs.writeFileSync(queryFile, output, 'utf8');
+    patched++;
+    console.log('[patch-node-modules] ✓ query-string ESM decoder interoperability');
+  } else if (digest === 'cc172b6a0e8251f5efef27feb6550e37f8a87c4efa1dd72a92a611c55ab90215') {
+    skipped++;
+  } else {
+    throw new Error('[patch-node-modules] query-string source changed; review required');
+  }
+  const query = require(queryFile);
+  const normal = query.parse('screen=studio&name=Jeeves%20Dragon');
+  const malformed = query.parse('label=%E0%A4%A');
+  if (normal.screen !== 'studio' || normal.name !== 'Jeeves Dragon'
+      || malformed.label !== '%E0%A4%A') {
+    throw new Error('[patch-node-modules] query-string route decoding verification failed');
+  }
+}
+
 function patchDeepmergePrototypePoisoning() {
   const pkgPath = path.join(ROOT, 'node_modules/deepmerge/package.json');
   if (!fs.existsSync(pkgPath)) return;
@@ -515,6 +574,7 @@ function patchExpoStaticIndexPath() {
 patchImageSizeDoS();
 patchBracesDepthDoS();
 patchHttpCacheSemanticsMaxStale();
+patchQueryStringDecoderInterop();
 patchDeepmergePrototypePoisoning();
 patchNodeForgeNestedDigestAlgorithm();
 patchSprintfFormatBounds();

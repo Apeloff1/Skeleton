@@ -1,12 +1,9 @@
 from __future__ import annotations
 
+import builtins
 import importlib.util
 from pathlib import Path
 
-
-import pytest
-
-pytestmark = pytest.mark.live_service
 def _load_collection_boundary():
     path = Path(__file__).resolve().parents[1] / "tests" / "conftest.py"
     spec = importlib.util.spec_from_file_location("backend_tests_conftest_contract", path)
@@ -17,6 +14,19 @@ def _load_collection_boundary():
 
 
 conftest = _load_collection_boundary()
+
+
+def test_unit_collection_does_not_require_backend_app_dependencies(monkeypatch) -> None:
+    original_import = builtins.__import__
+
+    def import_without_server(name, *args, **kwargs):
+        if name == "server":
+            raise AssertionError("unit collection must not activate the backend application")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_server)
+    boundary = _load_collection_boundary()
+    assert callable(boundary.client)
 
 
 def _clear_live_env(monkeypatch) -> None:
