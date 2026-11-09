@@ -13,11 +13,14 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 import uuid
+from datetime import datetime, timezone
+
+from core.databases import core_db
 
 # Import LLM service
 from services.game_llm_service import get_game_llm_service
@@ -636,10 +639,56 @@ async def get_career_paths():
 
 @router.post("/progress/update")
 async def update_progress(request: ProgressRequest):
-    """Update user progress (stub for future implementation)."""
+    """Persist monotonic module progress in the canonical application database."""
+    module_exists = any(module["id"] == request.module_id for module in AI_BIBLE_CURRICULUM["modules"])
+    if not module_exists:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    now = datetime.now(timezone.utc)
+    existing = await core_db.ai_bible_progress.find_one(
+        {"user_id": request.user_id, "module_id": request.module_id},
+        {"_id": 0, "progress_percent": 1, "completed_at": 1},
+    )
+    previous = float((existing or {}).get("progress_percent", 0.0))
+    progress = max(previous, request.progress_percent)
+    update: Dict[str, Any] = {
+        "user_id": request.user_id,
+        "module_id": request.module_id,
+        "progress_percent": progress,
+        "updated_at": now,
+    }
+    if progress >= 100 and not (existing or {}).get("completed_at"):
+        update["completed_at"] = now
+    await core_db.ai_bible_progress.update_one(
+        {"user_id": request.user_id, "module_id": request.module_id},
+        {"$set": update, "$setOnInsert": {"created_at": now}},
+        upsert=True,
+    )
     return {
         "success": True,
-        "message": f"Progress updated for user {request.user_id}: Module {request.module_id} at {request.progress_percent}%"
+        "module_id": request.module_id,
+        "progress_percent": progress,
+        "completed": progress >= 100,
+        "changed": progress != previous,
+    }
+
+
+@router.get("/progress/{user_id}")
+async def get_progress(
+    user_id: str,
+    limit: int = Query(default=100, ge=1, le=100),
+):
+    """Return durable module progress without exposing database identifiers."""
+    if not user_id.strip() or len(user_id) > 200:
+        raise HTTPException(status_code=422, detail="Invalid user id")
+    rows = await core_db.ai_bible_progress.find(
+        {"user_id": user_id}, {"_id": 0}
+    ).sort("updated_at", -1).limit(limit).to_list(limit)
+    return {
+        "success": True,
+        "user_id": user_id,
+        "modules": rows,
+        "completed_modules": sum(1 for row in rows if float(row.get("progress_percent", 0)) >= 100),
     }
 
 

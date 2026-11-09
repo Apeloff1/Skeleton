@@ -1,0 +1,26 @@
+{
+  "name": "deepmerge",
+  "version": "4.3.2",
+  "description": "Skeleton-maintained hardened build of deepmerge 4.3.1",
+  "main": "dist/cjs.js",
+  "umd": "dist/umd.js",
+  "jsdelivr": "dist/umd.js",
+  "unpkg": "dist/umd.js",
+  "module": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "dist",
+    "readme.md",
+    "license.txt"
+  ],
+  "license": "MIT",
+  "repository": "https://github.com/Apeloff1/Skeleton",
+  "private": true,
+  "skeleton": {
+    "upstreamVersion": "4.3.1",
+    "advisory": "GHSA-gcqx-w48m-w2h4",
+    "hardened": true
+  }
+}
