@@ -32,6 +32,26 @@ REQUIRED_DIMENSIONS = (
     "observability",
     "vertical_validation",
 )
+REQUIRED_HORIZONTAL_CAPABILITIES = (
+    "identity_authority",
+    "tenant_isolation",
+    "idempotency",
+    "budgets_backpressure",
+    "cancellation",
+    "retries_reconciliation",
+    "durable_persistence",
+    "crash_recovery",
+    "streaming_realtime",
+    "observability",
+    "evaluation_assurance",
+    "accessibility",
+    "localization",
+    "offline_degraded",
+    "export_portability",
+    "retention_deletion",
+    "security_privacy",
+    "deployment_release",
+)
 
 
 def _json(path: Path) -> dict[str, Any]:
@@ -150,6 +170,23 @@ def validate(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
     elif grade.get("required_dimensions") != list(REQUIRED_DIMENSIONS):
         errors.append("grade contract dimensions must match the fail-closed S-grade contract")
 
+    horizontal = registry.get("horizontal_contract")
+    horizontal_rows: dict[str, dict[str, Any]] = {}
+    if not isinstance(horizontal, dict) or horizontal.get("applicability") != "required_for_every_vertical":
+        errors.append("horizontal contract must apply to every vertical")
+    else:
+        capabilities = horizontal.get("capabilities")
+        if not isinstance(capabilities, list):
+            errors.append("horizontal contract capabilities must be a list")
+        else:
+            horizontal_rows = {
+                row.get("capability_id"): row for row in capabilities if isinstance(row, dict)
+            }
+            if len(horizontal_rows) != len(capabilities):
+                errors.append("horizontal capability identities must be unique and non-empty")
+            if tuple(horizontal_rows) != REQUIRED_HORIZONTAL_CAPABILITIES:
+                errors.append("horizontal capability inventory/order must match the full-spec contract")
+
     verticals = registry.get("verticals")
     if not isinstance(verticals, list):
         return errors + ["registry verticals must be a list"], {}
@@ -162,6 +199,41 @@ def validate(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         )
 
     evidence_files: set[str] = set()
+    horizontal_evidence_files: set[str] = set()
+    for capability_id in REQUIRED_HORIZONTAL_CAPABILITIES:
+        row = horizontal_rows.get(capability_id)
+        label = f"horizontal_contract[{capability_id}]"
+        if not isinstance(row, dict):
+            continue
+        owner = row.get("owner")
+        try:
+            owner_path = _repo_path(owner)
+        except ValueError as exc:
+            errors.append(f"{label}.owner {exc}")
+        else:
+            horizontal_evidence_files.add(owner_path)
+            if not (root / owner_path).is_file():
+                errors.append(f"{label} missing owner file: {owner_path}")
+        for field in ("evidence", "validation"):
+            paths = row.get(field)
+            if not isinstance(paths, list) or not paths:
+                errors.append(f"{label}.{field} must contain evidence paths")
+                continue
+            if field == "validation" and not all(
+                isinstance(path, str) and path.startswith(("tests/", "backend/tests/", "frontend/scripts/"))
+                for path in paths
+            ):
+                errors.append(f"{label}.validation must contain executable validation evidence")
+            for index, raw in enumerate(paths):
+                try:
+                    path = _repo_path(raw)
+                except ValueError as exc:
+                    errors.append(f"{label}.{field}[{index}] {exc}")
+                    continue
+                horizontal_evidence_files.add(path)
+                if not (root / path).is_file():
+                    errors.append(f"{label}.{field} missing evidence file: {path}")
+
     for vertical_id in sorted(canonical):
         row = rows.get(vertical_id)
         if not isinstance(row, dict):
@@ -181,6 +253,8 @@ def validate(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         operations = row.get("governed_operations")
         if operations != list(policy[vertical_id]) or tuple(operations or ()) != cat_actions:
             errors.append(f"{label} governed operation drift")
+        if row.get("horizontal_capabilities") != list(REQUIRED_HORIZONTAL_CAPABILITIES):
+            errors.append(f"{label} must declare every horizontal capability in canonical order")
         for action in policy[vertical_id]:
             if (vertical_id, action) not in bindings:
                 errors.append(f"{label} missing executor binding for {action}")
@@ -211,13 +285,24 @@ def validate(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         if not isinstance(readiness, dict) or readiness.get("source") != "backend/core/capability_readiness.py":
             errors.append(f"{label} must delegate live readiness to the canonical evaluator")
 
+    all_evidence = evidence_files | horizontal_evidence_files
+    evidence_digests = {
+        path: hashlib.sha256((root / path).read_bytes()).hexdigest()
+        for path in sorted(all_evidence)
+        if (root / path).is_file()
+    }
+    evidence_root = hashlib.sha256(
+        json.dumps(evidence_digests, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     payload = {
         "schema_version": registry.get("schema_version"),
         "registry_version": registry.get("registry_version"),
         "target_grade": "S",
         "vertical_count": len(rows),
         "operation_count": sum(len(actions) for actions in policy.values()),
-        "evidence_file_count": len(evidence_files),
+        "horizontal_capability_count": len(horizontal_rows),
+        "evidence_file_count": len(all_evidence),
+        "evidence_root_sha256": evidence_root,
         "contract_qualified": not errors,
     }
     payload["attestation_sha256"] = hashlib.sha256(
@@ -241,6 +326,7 @@ def main() -> int:
         print(
             "product-vertical-readiness: OK "
             f"({report['vertical_count']} verticals, {report['operation_count']} governed operations, "
+            f"{report['horizontal_capability_count']} horizontal capabilities, "
             f"{report['evidence_file_count']} evidence files; runtime readiness remains dependency-evaluated)"
         )
     return 1 if errors else 0
