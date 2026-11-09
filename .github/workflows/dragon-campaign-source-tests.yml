@@ -289,6 +289,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_activitystreams.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_catalogs.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_memento.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_catalogs.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_scene_topology.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_extended_scene_graphs.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_openapi_graph.py' -v
