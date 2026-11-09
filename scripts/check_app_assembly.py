@@ -14,6 +14,11 @@ import re
 import sys
 from pathlib import Path
 
+try:
+    from scripts.check_product_vertical_readiness import validate as validate_vertical_readiness
+except ModuleNotFoundError:  # direct ``python scripts/check_app_assembly.py`` execution
+    from check_product_vertical_readiness import validate as validate_vertical_readiness
+
 ROOT = Path(__file__).resolve().parents[1]
 FAILURES: list[str] = []
 CHECKS = 0
@@ -459,7 +464,7 @@ def audit_compose_modes() -> None:
         "frontend build target must be assembly-selectable",
     )
     check(
-        '"${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
+        '${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
         "frontend container port must be assembly-selectable",
     )
     check(
@@ -550,12 +555,9 @@ def audit_compose_modes() -> None:
         else ""
     )
     check(
-        "backend:\n        condition: service_healthy" in frontend_block,
-        "frontend must wait for healthy backend",
-    )
-    check(
-        "skeleton:\n        condition: service_healthy" in frontend_block,
-        "frontend must wait for healthy Skeleton engine",
+        "depends_on:" not in frontend_block
+        and "First-run setup and diagnostics must start independently" in frontend_block,
+        "frontend first-run shell must start independently while protected APIs fail closed",
     )
 
 
@@ -588,9 +590,14 @@ def audit_production_ingress() -> None:
         if not isinstance(prefix, str) or not prefix.startswith("/") or not isinstance(port, int):
             continue
         location = f"location ^~ {prefix.rstrip('/')}/ {{"
-        upstream = f"proxy_pass http://{name}:{port};"
+        upstream_name = "application_backend" if name == "backend" else "application_engine"
+        upstream = f"proxy_pass http://{upstream_name};"
         check(location in nginx, f"production ingress missing manifest route: {location}")
         check(upstream in nginx, f"production ingress upstream drift: {upstream}")
+        check(
+            f"server {name}:{port} resolve;" in nginx,
+            f"production ingress service address drift: {name}:{port}",
+        )
         if isinstance(health_path, str) and health_path:
             check(
                 prefix == "/" or health_path.startswith(prefix.rstrip("/") + "/"),
@@ -962,7 +969,7 @@ def audit_product_control_contract() -> None:
         "product control client root drift",
     )
     check(
-        'router = APIRouter(prefix="/api/admin/ops"' in ops,
+        re.search(r'router\s*=\s*project_router\s*\(\s*prefix\s*=\s*["\']/api/admin/ops["\']', ops) is not None,
         "backend ops prefix drift",
     )
     check('("routes.ops",' in registry, "backend ops router is not registered")
@@ -1000,6 +1007,16 @@ def audit_product_route_registry() -> None:
         )
 
 
+def audit_product_vertical_readiness() -> None:
+    """Make the S-grade vertical contract part of the canonical assembly gate."""
+    errors, report = validate_vertical_readiness(ROOT)
+    check(not errors, "product vertical readiness contract failed: " + "; ".join(errors[:8]))
+    check(report.get("target_grade") == "S", "product vertical readiness target drift")
+    check(report.get("vertical_count") == 7, "canonical product vertical count drift")
+    check(report.get("operation_count") == 21, "canonical governed operation count drift")
+    check(report.get("contract_qualified") is True, "product vertical contract is not qualified")
+
+
 def main() -> int:
     audit_manifest()
     audit_topology_alignment()
@@ -1015,6 +1032,7 @@ def main() -> int:
     audit_public_product_readiness_contract()
     audit_product_control_contract()
     audit_product_route_registry()
+    audit_product_vertical_readiness()
 
     if FAILURES:
         print(f"App assembly audit failed: {len(FAILURES)} issue(s)", file=sys.stderr)
