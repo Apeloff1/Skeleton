@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib
 import json
 from pathlib import Path
@@ -20,10 +21,35 @@ def test_legacy_game_modules_reexport_canonical_runtime() -> None:
     assert legacy_replay.ReplayTrace is canonical_replay.ReplayTrace
 
 
+def _uses_legacy_game_import(source: str) -> bool:
+    """Inspect executable import statements, not stable checkpoint schema IDs."""
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            if any(alias.name == "skeleton.game" or alias.name.startswith("skeleton.game.")
+                   for alias in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom) and node.level == 0:
+            module = node.module or ""
+            if module == "skeleton.game" or module.startswith("skeleton.game."):
+                return True
+            if module == "skeleton" and any(alias.name == "game" for alias in node.names):
+                return True
+    return False
+
+
+def test_legacy_schema_identity_does_not_count_as_import() -> None:
+    fixture = (ROOT / "skeleton/simulation/game/golden_grid.py").read_text(encoding="utf-8")
+    assert 'skeleton.game.golden_grid.v1' in fixture
+    assert not _uses_legacy_game_import(fixture)
+    assert _uses_legacy_game_import("import skeleton.game.replay")
+    assert _uses_legacy_game_import("from skeleton.game import replay")
+    assert _uses_legacy_game_import("from skeleton import game")
+
+
 def test_canonical_and_ai_game_trees_do_not_import_legacy_namespace() -> None:
     for relative in ("skeleton/simulation/game", "skeleton/ai/simulation/game"):
         for path in (ROOT / relative).rglob("*.py"):
-            assert "skeleton.game" not in path.read_text(encoding="utf-8"), path
+            assert not _uses_legacy_game_import(path.read_text(encoding="utf-8")), path
 
 
 def test_ai_tree_retargets_game_and_closes_simulation_overlay() -> None:
