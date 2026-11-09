@@ -78,11 +78,27 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
     request = Request(url, headers={"User-Agent": "skeleton-app-smoke/1"})
     try:
         with _open_direct_health(request, timeout=timeout) as response:
-            status = int(getattr(response, "status", 200))
-            # Preserve the original URL check as a second fence even though
-            # _open_direct_health already blocks redirect traversal.
+            # A missing or malformed transport status is never an implicit 200.
+            # The final URL must be supplied by the transport, not assumed.
+            raw_status = getattr(response, "status", None)
             geturl = getattr(response, "geturl", None)
-            effective_url = geturl() if callable(geturl) else url
+            if (
+                isinstance(raw_status, bool)
+                or not isinstance(raw_status, int)
+                or not 100 <= raw_status <= 599
+                or not callable(geturl)
+            ):
+                return ProbeResult(
+                    service=name, url=url, ok=False, status=None,
+                    detail="health transport returned invalid response metadata",
+                )
+            status = raw_status
+            effective_url = geturl()
+            if not isinstance(effective_url, str):
+                return ProbeResult(
+                    service=name, url=url, ok=False, status=None,
+                    detail="health transport returned invalid response metadata",
+                )
             response.read(256)
         ok = 200 <= status < 300 and effective_url == url
         detail = (
