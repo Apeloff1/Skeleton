@@ -23,6 +23,33 @@ from typing import Protocol
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from urllib.robotparser import RobotFileParser
 
+from .document_formats import (
+    ADDITIONAL_TYPES, RESEARCH_ARTIFACT_TYPES,
+    HAR_MEDIA_TYPES, PATCH_MEDIA_TYPES, CSL_MEDIA_TYPES,
+    TECHNICAL_MEDIA_TYPES, ASSET_TEXT_MEDIA_TYPES, SUPPLY_CHAIN_TYPES,
+    SCENE_ASSET_TYPES, PACKAGE_LOCK_TYPES, INTERFACE_TYPES, IIIF_DOCUMENT_TYPES,
+    GRAPH_ARTIFACT_TYPES, TILED_ARTIFACT_TYPES, ROBOT_SCENE_TYPES,
+    DocumentFormatError, extract_additional_format,
+)
+from .archive_documents import ARCHIVE_TYPES, extract_archive_document
+from .xml_documents import GENERIC_XML_TYPES, extract_xml_evidence
+from .html_semantics import HTMLSemanticError, extract_html_semantics
+from .html_landmarks import HTMLLandmarkError, extract_html_landmarks
+from .html_structured_entities import (
+    StructuredHTMLError, extract_html_structured_entities,
+)
+from .pdf_documents import PDF_MEDIA_TYPE, extract_pdf_document
+from .discovery_relations import navigational_relation
+from .warc_catalog import WARC_MEDIA_TYPES, extract_warc_catalog
+from .research_projection import ResearchFormatError
+from .binary_media_metadata import BINARY_MEDIA_TYPES, extract_binary_media_metadata
+from .zip_inventory import ZIP_INVENTORY_TYPES, extract_zip_inventory
+from .extended_media import EXTENDED_MEDIA_TYPES, extract_extended_media
+from .ml_model_artifacts import ML_MODEL_TYPES, extract_ml_model
+from .source_structure import (
+    SOURCE_STRUCTURE_TYPES, SourceSignatureError, analyze_source_structure,
+)
+
 _TRACKING_PREFIXES = ("utm_",)
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
 _ALLOWED_SCHEMES = {"http", "https"}
@@ -90,6 +117,169 @@ class CrawlPolicy:
         "text/html",
         "text/plain",
         "application/xhtml+xml",
+        "text/markdown",
+        "text/x-markdown",
+        "text/csv",
+        "application/csv",
+        "application/json",
+        "application/ld+json",
+        "application/x-ndjson",
+        "application/ndjson",
+        "application/jsonl",
+        "text/x-jsonl",
+        "text/x-python",
+        "text/x-c",
+        "text/x-csrc",
+        "text/x-c++src",
+        "text/x-rust",
+        "text/x-go",
+        "text/x-java-source",
+        "text/javascript",
+        "application/javascript",
+        "application/x-javascript",
+        "text/x-typescript",
+        "application/typescript",
+        "text/css",
+        "text/x-rst",
+        "text/x-asciidoc",
+        "text/yaml",
+        "text/x-yaml",
+        "application/yaml",
+        "application/x-yaml",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.oasis.opendocument.text",
+        "application/epub+zip",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.oasis.opendocument.spreadsheet",
+        "application/vnd.oasis.opendocument.presentation",
+        "application/xml",
+        "text/xml",
+        "application/x-xml",
+        "application/gpx+xml",
+        "application/vnd.google-earth.kml+xml",
+        "application/pdf",
+        "text/vtt",
+        "application/x-subrip",
+        "text/srt",
+        "text/calendar",
+        "application/ics",
+        "application/x-research-info-systems",
+        "text/ris",
+        "application/x-bibtex",
+        "text/x-bibtex",
+        "application/x-ipynb+json",
+        "application/vnd.jupyter",
+        "application/n-triples",
+        "application/n-quads",
+        "application/warc",
+        "application/x-warc",
+        "application/har+json",
+        "application/x-har+json",
+        "text/x-diff",
+        "text/x-patch",
+        "application/x-diff",
+        "text/patch",
+        "application/vnd.citationstyles.csl+json",
+        "application/x-csl+json",
+        "model/urdf+xml",
+        "application/x-urdf+xml",
+        "model/sdf+xml",
+        "application/x-sdf+xml",
+        "application/x-mjcf+xml",
+        "model/mjcf+xml",
+        "application/x-tiled-tmx+xml",
+        "text/x-tiled-tmx",
+        "application/x-tiled-tsx+xml",
+        "text/x-tiled-tsx",
+        "application/x-tiled-map+json",
+        "application/vnd.tiled.map+json",
+        "application/vnd.safetensors",
+        "application/x-safetensors",
+        "application/vnd.gguf",
+        "application/x-gguf",
+        "application/onnx",
+        "application/x-onnx",
+        "application/graphml+xml",
+        "application/x-graphml+xml",
+        "application/gexf+xml",
+        "application/x-gexf+xml",
+        "text/vnd.graphviz",
+        "text/x-dot",
+        "application/vnd.graphql.introspection+json",
+        "application/graphql-response+json",
+        "application/vnd.asyncapi+json",
+        "application/asyncapi+json",
+        "text/x-protobuf",
+        "application/x-protobuf-schema",
+        "application/vnd.npm.package-lock+json",
+        "application/vnd.cargo.lock+toml",
+        "text/x-cargo-lock",
+        "text/x-go-mod",
+        "application/x-go-mod",
+        "application/vnd.python.pylock+toml",
+        "text/x-pylock",
+        "application/vnd.cyclonedx+json",
+        "application/spdx+json",
+        "application/vnd.openvex+json",
+        "application/opds+json",
+        "application/vnd.iiif.presentation+json",
+        "application/vnd.openarchives.oai-pmh+xml",
+        "application/activity+json",
+        "application/vnd.activitystreams+json",
+        "image/svg+xml",
+        "model/ply",
+        "application/x-ply",
+        "model/off",
+        "text/x-off",
+        "application/x-godot-scene",
+        "text/x-godot-scene",
+        "application/x-unity-scene",
+        "text/x-unity-scene",
+        "model/vnd.usda",
+        "application/x-usda",
+        "text/x-ldraw",
+        "application/x-ldraw",
+        "application/rdf+xml",
+        "application/geo+json",
+        "application/vnd.geo+json",
+        "application/openapi+json",
+        "application/vnd.oai.openapi+json",
+        "application/schema+json",
+        "application/vnd.schema+json",
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/vnd.wave",
+        "model/obj",
+        "text/x-obj",
+        "model/gltf+json",
+        "application/x-gltf+json",
+        "application/zip",
+        "application/x-zip-compressed",
+        "image/webp",
+        "image/x-icon",
+        "image/vnd.microsoft.icon",
+        "audio/flac",
+        "audio/x-flac",
+        "audio/ogg",
+        "audio/opus",
+        "audio/mp4",
+        "video/mp4",
+        "model/gltf-binary",
+        "application/x-gltf-binary",
+        "model/stl",
+        "application/sla",
+        "application/x-tar",
+        "application/tar",
+        "text/tab-separated-values",
+        "application/tsv",
+        "application/toml",
+        "text/x-toml",
+        "text/x-shellscript",
+        "application/x-sh",
     )
     allowed_hosts: frozenset[str] | None = None
 
@@ -154,6 +344,9 @@ class FetchResponse:
     headers: Mapping[str, str]
     body: bytes
     fetched_at: float
+    wire_bytes: int | None = None
+    wire_hash: str | None = None
+    content_encoding: str = "identity"
 
 
 class Fetcher(Protocol):
@@ -206,9 +399,18 @@ class _Extractor(HTMLParser):
             self.skip += 1
         if tag == "title":
             self.in_title = True
-        if tag == "a" and not self.skip:
-            href = dict(attrs).get("href")
-            if href and len(self.links) < self.max_links and len(href) <= 4096:
+        if tag in ("a", "link") and not self.skip:
+            attributes = dict(attrs)
+            href = attributes.get("href")
+            rel = set((attributes.get("rel") or "").lower().split())
+            eligible = tag == "a" and "nofollow" not in rel
+            if tag == "link":
+                eligible = navigational_relation(
+                    rel, media_type=attributes.get("type") or "",
+                    hreflang=attributes.get("hreflang") or "",
+                )
+            if (eligible and href and len(self.links) < self.max_links
+                    and len(href) <= 4096):
                 self.links.append(href)
 
     def handle_endtag(self, tag: str) -> None:
@@ -244,28 +446,206 @@ def _source_score(url: str, text: str, status: int) -> float:
     return max(0.0, min(1.0, score))
 
 
+
+def _archive_document_response(
+    response: FetchResponse, canonical_url: str, ctype: str,
+    text: str, title: str, links: list[str], truncated: bool,
+) -> CrawlDocument:
+    """Construct source receipts identically to ordinary text extraction."""
+    text = html.unescape(" ".join(text.split())).strip()
+    if not text:
+        raise ValueError("archived source contains no text")
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return CrawlDocument(
+        canonical_url=canonical_url,
+        fetched_url=response.url,
+        title=title[:1000],
+        text=text,
+        content_type=ctype,
+        content_hash=digest,
+        fetched_at=response.fetched_at,
+        source_score=_source_score(canonical_url, text, response.status),
+        provenance={
+            "schema": "skeleton.ai.crawl.provenance.v1",
+            "canonical_url": canonical_url,
+            "fetched_url": response.url,
+            "fetched_at": response.fetched_at,
+            "status": response.status,
+            "content_hash": digest,
+            "raw_body_hash": response.wire_hash or hashlib.sha256(response.body).hexdigest(),
+            "decoded_body_hash": hashlib.sha256(response.body).hexdigest(),
+            "wire_bytes": response.wire_bytes if response.wire_bytes is not None else len(response.body),
+            "content_encoding": response.content_encoding,
+            "parser_text_truncated": truncated,
+        },
+        links=tuple(links),
+    )
+
+
 def extract_document(
-    response: FetchResponse, canonical_url: str, *, max_links: int = 500, max_text_chars: int = 1_000_000
+    response: FetchResponse, canonical_url: str, *, max_links: int = 500,
+    max_text_chars: int = 1_000_000, link_base_url: str | None = None,
 ) -> CrawlDocument | None:
     ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
+    if ctype in ML_MODEL_TYPES:
+        try:
+            row=extract_ml_model(
+                response.body,ctype,max_chars=max_text_chars,
+            )
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return _archive_document_response(
+            response,canonical_url,ctype,row.text,row.title,[],row.truncated,
+        )
+    if ctype in EXTENDED_MEDIA_TYPES:
+        try:
+            row = extract_extended_media(
+                response.body, ctype, max_chars=max_text_chars,
+            )
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return _archive_document_response(
+            response, canonical_url, ctype, row.text, row.title,
+            [], row.truncated,
+        )
+    if ctype in BINARY_MEDIA_TYPES | ZIP_INVENTORY_TYPES:
+        try:
+            row = (
+                extract_binary_media_metadata(
+                    response.body, ctype, max_chars=max_text_chars,
+                ) if ctype in BINARY_MEDIA_TYPES else
+                extract_zip_inventory(response.body, max_chars=max_text_chars)
+            )
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return _archive_document_response(
+            response, canonical_url, ctype, row.text, row.title,
+            [], row.truncated,
+        )
+    if ctype in WARC_MEDIA_TYPES:
+        try:
+            row = extract_warc_catalog(response.body, max_chars=max_text_chars)
+        except ResearchFormatError as exc:
+            raise DocumentFormatError(str(exc)) from exc
+        return _archive_document_response(
+            response, canonical_url, ctype, row.text, row.title,
+            [], row.truncated,
+        )
+    if ctype == PDF_MEDIA_TYPE:
+        pdf = extract_pdf_document(response.body, max_chars=max(512, max_text_chars))
+        return _archive_document_response(
+            response, canonical_url, ctype, pdf.text, pdf.title, [], pdf.truncated,
+        )
+    if ctype in ARCHIVE_TYPES:
+        extracted = extract_archive_document(
+            response.body, ctype, max_chars=max_text_chars,
+        )
+        text = extracted.text
+        title = extracted.title
+        links = list(extracted.links)
+        parser_text_truncated = extracted.truncated
+        # Source encoding is binary: do not decode ZIP bytes as plain text.
+        return _archive_document_response(
+            response, canonical_url, ctype, text, title,
+            links, parser_text_truncated,
+        )
     charset = "utf-8"
     match = re.search(r"charset=([^;\s]+)", response.headers.get("content-type", ""), re.IGNORECASE)
     if match:
         charset = match.group(1).strip("\"'")
-    try:
-        raw = response.body.decode(charset, errors="replace")
-    except (LookupError, UnicodeError):
-        raw = response.body.decode("utf-8", errors="replace")
+    if ctype in (RESEARCH_ARTIFACT_TYPES | HAR_MEDIA_TYPES
+                 | PATCH_MEDIA_TYPES | CSL_MEDIA_TYPES
+                 | TECHNICAL_MEDIA_TYPES | ASSET_TEXT_MEDIA_TYPES
+                 | SUPPLY_CHAIN_TYPES | SCENE_ASSET_TYPES
+                 | PACKAGE_LOCK_TYPES | INTERFACE_TYPES
+                 | GRAPH_ARTIFACT_TYPES | TILED_ARTIFACT_TYPES
+                 | ROBOT_SCENE_TYPES | IIIF_DOCUMENT_TYPES):
+        # Parser-specific syntax and citations must not be silently altered by
+        # replacement decoding or unsupported source charset declarations.
+        if charset.casefold().replace("_", "-") not in ("utf-8", "utf8"):
+            raise DocumentFormatError("research artifact requires UTF-8")
+        try:
+            raw = response.body.decode("utf-8", errors="strict")
+        except UnicodeDecodeError as exc:
+            raise DocumentFormatError("invalid UTF-8 research artifact") from exc
+    else:
+        try:
+            raw = response.body.decode(charset, errors="replace")
+        except (LookupError, UnicodeError):
+            raw = response.body.decode("utf-8", errors="replace")
     title = ""
     links: list[str] = []
+    parser_text_truncated = False
     if ctype in {"text/html", "application/xhtml+xml"}:
         parser = _Extractor(max_links=max_links, max_text_chars=max_text_chars)
         parser.feed(raw)
         text = " ".join(parser.text)
         title = " ".join(parser.title)
         links = parser.links
+        try:
+            semantics = extract_html_semantics(
+                raw, max_chars=min(max_text_chars, 24000),
+            )
+        except HTMLSemanticError:
+            # Semantic annotations are best-effort and have no authority.
+            # A malformed JSON-LD/table cannot authorize or block HTML links.
+            pass
+        else:
+            if semantics.text:
+                text += "\n" + semantics.text
+            parser_text_truncated = semantics.truncated
+        try:
+            landmarks = extract_html_landmarks(
+                raw, max_chars=min(max_text_chars, 8192),
+            )
+        except HTMLLandmarkError:
+            # Landmark enrichment is advisory; it cannot grant or veto links.
+            pass
+        else:
+            if landmarks.text:
+                text += "\n" + landmarks.text
+            parser_text_truncated |= landmarks.truncated
+        try:
+            entities = extract_html_structured_entities(
+                raw,max_chars=min(max_text_chars,8192),
+            )
+        except StructuredHTMLError:
+            # Curated markup is unreviewed evidence, not an authority source.
+            pass
+        else:
+            if entities.text:
+                text += "\n" + entities.text
+            parser_text_truncated |= entities.truncated
     elif ctype == "text/plain":
         text = raw
+    elif ctype in GENERIC_XML_TYPES:
+        parsed = extract_xml_evidence(
+            response.body, max_chars=max_text_chars,
+        )
+        text, title = parsed.text, parsed.title
+        links = list(parsed.links)
+        parser_text_truncated = parsed.truncated
+    elif ctype in ADDITIONAL_TYPES:
+        parsed = extract_additional_format(
+            raw, ctype, max_chars=max_text_chars, max_links=max_links,
+        )
+        text, title = parsed.text, parsed.title
+        links = list(parsed.links)
+        parser_text_truncated = parsed.truncated
+        if ctype in SOURCE_STRUCTURE_TYPES:
+            # Structurally inspect only the already-acquired, bounded source.
+            # Syntax errors are never permission to discard ordinary text.
+            try:
+                structs = analyze_source_structure(
+                    raw, ctype, max_chars=min(8192, max_text_chars),
+                )
+            except SourceSignatureError:
+                pass
+            else:
+                annotation = "\n" + structs.text
+                remaining = max(0, max_text_chars-len(text))
+                text += annotation[:remaining]
+                parser_text_truncated |= structs.truncated or len(annotation)>remaining
     else:
         return None
     text = html.unescape(" ".join(text.split())).strip()
@@ -275,7 +655,7 @@ def extract_document(
     normalized_links: list[str] = []
     for link in links:
         try:
-            normalized_links.append(canonicalize_url(link, base=canonical_url))
+            normalized_links.append(canonicalize_url(link, base=link_base_url or canonical_url))
         except (ValueError, UnicodeError):
             continue
     provenance = {
@@ -285,7 +665,11 @@ def extract_document(
         "fetched_at": response.fetched_at,
         "status": response.status,
         "content_hash": digest,
-        "raw_body_hash": hashlib.sha256(response.body).hexdigest(),
+        "raw_body_hash": response.wire_hash or hashlib.sha256(response.body).hexdigest(),
+        "decoded_body_hash": hashlib.sha256(response.body).hexdigest(),
+        "wire_bytes": response.wire_bytes if response.wire_bytes is not None else len(response.body),
+        "content_encoding": response.content_encoding,
+        "parser_text_truncated": parser_text_truncated,
     }
     return CrawlDocument(
         canonical_url=canonical_url,
@@ -399,6 +783,11 @@ class RobotsCache:
         p = urlsplit(url)
         parser = self._parsers.get(f"{p.scheme}://{p.netloc}")
         return parser.crawl_delay(self.user_agent) if parser else None
+
+    def request_rate(self, url: str):
+        p = urlsplit(url)
+        parser = self._parsers.get(f"{p.scheme}://{p.netloc}")
+        return parser.request_rate(self.user_agent) if parser else None
 
 
 class CrawlEngine:
