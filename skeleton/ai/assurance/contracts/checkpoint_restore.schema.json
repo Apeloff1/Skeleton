@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-06:checkpoint_restore:v1",
+  "title": "FLGB-06 checkpoint restore",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkpoint_digest",
+    "expected_state_digest",
+    "restored_state_digest",
+    "replay_cursor",
+    "authority_digest"
+  ],
+  "properties": {
+    "checkpoint_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "expected_state_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "restored_state_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "replay_cursor": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authority_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

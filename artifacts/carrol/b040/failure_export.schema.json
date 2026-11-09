@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "skeleton/b040/failure_export.schema.json",
+  "title": "B040 -> B039 failure export (S6, draft). Safety failures are never auto-repairable.",
+  "type": "object",
+  "required": ["format", "format_version", "run_id", "set_version", "candidate", "git_sha", "budget", "failures"],
+  "additionalProperties": false,
+  "properties": {
+    "format": {"const": "b040-failure-export"},
+    "format_version": {"const": 1},
+    "run_id": {"type": "string"},
+    "set_version": {"type": "integer", "minimum": 1},
+    "candidate": {"type": "string"},
+    "git_sha": {"type": "string"},
+    "budget": {
+      "type": "object",
+      "required": ["max_mutations", "max_seconds", "max_usd"],
+      "properties": {"max_mutations": {"type": "integer", "minimum": 0}, "max_seconds": {"type": "number", "minimum": 0}, "max_usd": {"type": "number", "minimum": 0}}
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["case_id", "version", "seed", "build_id", "status", "failed_dimensions", "repairable"],
+        "properties": {
+          "case_id": {"type": "string"}, "version": {"type": "integer"}, "seed": {"type": "integer"},
+          "build_id": {"type": ["string", "null"]}, "status": {"enum": ["failed", "error"]},
+          "failed_dimensions": {"type": "array"}, "repairable": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

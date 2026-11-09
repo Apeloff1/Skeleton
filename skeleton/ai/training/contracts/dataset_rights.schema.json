@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-07:dataset_rights:v1",
+  "title": "FLGB-07 dataset rights",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dataset_id",
+    "source_id",
+    "rights_status",
+    "license_id",
+    "allowed_scopes",
+    "evidence_digest"
+  ],
+  "properties": {
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "rights_status": {
+      "enum": [
+        "allowed",
+        "restricted",
+        "quarantined",
+        "denied"
+      ]
+    },
+    "license_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    },
+    "allowed_scopes": {
+      "type": "array",
+      "maxItems": 1024,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

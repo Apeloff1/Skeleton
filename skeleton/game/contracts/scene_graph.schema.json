@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-09:scene_graph:v1",
+  "title": "FLGB-09 scene graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "node_id",
+    "parent_id",
+    "entity_id",
+    "order"
+  ],
+  "properties": {
+    "node_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "parent_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    },
+    "entity_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    },
+    "order": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

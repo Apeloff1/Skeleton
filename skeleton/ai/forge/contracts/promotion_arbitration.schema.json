@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-17:promotion_arbitration:v1",
+  "title": "FLGB-17 promotion arbitration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidate_id",
+    "artifact_digest",
+    "quality_ppm",
+    "risk_ppm",
+    "rights_clear",
+    "provenance_digest",
+    "verification_digest"
+  ],
+  "properties": {
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "quality_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "risk_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "rights_clear": {
+      "type": "boolean"
+    },
+    "provenance_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "verification_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

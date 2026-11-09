@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-16:performance_budget:v1",
+  "title": "FLGB-16 performance budget",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metric_id",
+    "maximum",
+    "unit"
+  ],
+  "properties": {
+    "metric_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "maximum": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}

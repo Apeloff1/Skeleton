@@ -1,0 +1,55 @@
+{
+  "schema_version": "skeleton.ai.chat_runtime_selection.v1",
+  "status": "implementation_candidate",
+  "canonical_owner": "skeleton/provider_runtime.py:ProviderRegistry",
+  "execution_owners": [
+    "skeleton/api/engine_service.py",
+    "skeleton/api/engine_runtime.py",
+    "skeleton/intelligence/execution_runtime.py"
+  ],
+  "startup_owner": "skeleton/api/server.py",
+  "existing_contract": "machine/ai_chat_model_catalog.json",
+  "selection": "context_policy.model_selection is an exact provider_id/model_id object; explicit selection only dispatches the registered configured adapter and never silently falls back. Automatic routing retains the declared active/fallback policy. Legacy provider_model is accepted only if equal to the selected or active configured model.",
+  "sampling": "Optional finite numeric context_policy.temperature in [0,2] binds to the immutable execution request and provider request. Only known OpenAI gpt-4o/gpt-4.1 hosted families support it; automatic routing requires every declared route to support it. Unsupported sampling fails before provider dispatch.",
+  "startup": "Only engine bootstrap opts into retain_unavailable. Local activation failures retain a non-dispatchable descriptor with no model identity and stable safe readiness code. Default registry construction remains fail-closed; local mode never falls through to hosted inference.",
+  "catalog": "Registry statuses are the sole authority for conservative engine chat policy capabilities and limits; route and backend expose allowlisted projections without model, network or credential probes.",
+  "new_runtime_owner": false,
+  "new_provider_transport": false,
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "validation": "Source validation and actual first-install and canonical model workloads; no automated tests per user instruction.",
+  "checkpoint_binding": {
+    "schema": "skeleton.provider.execution_binding.v1",
+    "owner": "existing SQLiteExecutionRepository checkpoint through CognitiveExecutionRuntime",
+    "before_dispatch": "Initial checkpoint binds execution_id/request identity/tenant, ordered generator routes, configured provider/model pair, secret-free endpoint/config identity, local model/runtime/profile/manifest/default-seed identities, separately configured verifier and canonical code/Python/package pins. Checkpoint precedes provider dispatch.",
+    "recovery": "Every unfinished resume and dispatch compares the entire pinned identity bundle. Legacy unfinished checkpoints missing the binding fail closed; never retrofitted. Completed historical results remain readable.",
+    "response_admission": "Response provider/model must exactly match one configured pair in the pinned declared route set; direct explicit selection has exactly one route. Automatic fallback membership admits successful declared secondary without accepting arbitrary providers.",
+    "limits": {
+      "binding_bytes": 65536,
+      "declared_routes": 8
+    },
+    "secrets": "No API keys, raw endpoint URLs, filesystem paths, headers or proxy credentials in durable binding; endpoint SHA256 only",
+    "limitations": "Pins configured adapter/model identity; hosted vendor adapters normalize configured model names. This does not attest remote vendor weights or local shared-library integrity beyond current canonical artifact receipts.",
+    "local_reference_integrity": "Recompute actual reference model canonical order/transitions content hash on each binding/assert, reject mismatch with claimed cached model_digest. Neural digest already hashes actual arrays; standalone runtime verifies pinned artifacts per dispatch."
+  },
+  "local_budget_guard": {
+    "owner": "existing skeleton/ai/runtime/inference/local.py:LocalModelAdapter",
+    "before_compute": "Exact reference tokens from full LocalInferenceRequest.rendered_input; UTF8 bytes+BOS for native neural; conservative full owned rendered-prompt UTF8 bytes+BOS for standalone GGUF. Input mustfit request.resource_budget.max_input_tokens. Requested output mustfit max_output_tokens; absent output defaults min(256,budget).",
+    "wall": "Every local dispatch has a finite ResourceBudget.max_wall_seconds ceiling; earlier explicit deadline wins; cooperative cancellation drains real worker. No unbounded deadline-free dispatch.",
+    "authority": "Existing engine admission remains quota authority; no new admission/store/provider owner."
+  },
+  "backend_prompt_admission": {
+    "owner": "backend/core/engine_text.py",
+    "authority": "Existing canonical ContextCompiler/model-catalog budgets and EngineClient only; no additional provider, transport or fallback.",
+    "invariant": "The exact current USER segment ID/content SHA must be present in selected evidence_segments and project_provider_context must materialize exactly the requested current prompt. source_snapshot is an input inventory and cannot prove selection; omitted input never reaches local request construction or engine admission.",
+    "failure": "EngineTextContextError (existing EngineTextError subclass, code engine_context_too_small) reports a bounded context-capacity failure without prompt/source text. Complete rendered local framing must also fit the selected canonical input budget; no budget relaxation or token heuristic replacement."
+  },
+  "current_main_compatibility": {
+    "context_keys": "Canonical new commands use model_selection/temperature. Existing main commands may use provider_selection/provider_temperature. One canonical resolver validates either spelling, rejects unequal dual keys and never silently ignores explicit selection or sampling. Original prepared request bytes and digest remain unchanged on replay.",
+    "provider_inventory": "Existing engine provider inventory remains the sole status authority. Backend tenant_model_inventory(actor_id,tenant_id) adapts the current scoped client contract to that same tenant-authorized endpoint and allowlisted projection; no global status fallback, new route, provider probe or credential exposure.",
+    "preserved_main_capabilities": "Keep main exact lease tokens, historical prepared-request read adapters, graceful backend signal forwarding, neural train_document and bounded input, engine CORS, Dragon native/world routes, native savestate/rewind/branch multimodal receipts and CLI entrypoints.",
+    "integration_parent": "020fa731fd3a295aa0fbc98f219a00503c788742",
+    "prior_work_checkpoint": "9467b9b12",
+    "authority": "Existing canonical owners/interfaces only; no new provider boundary, service or state owner."
+  }
+}

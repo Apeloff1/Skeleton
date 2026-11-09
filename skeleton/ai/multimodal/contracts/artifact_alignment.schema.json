@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-08:artifact_alignment:v1",
+  "title": "FLGB-08 artifact alignment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "alignment_id",
+    "left_artifact_digest",
+    "right_artifact_digest",
+    "relation",
+    "score_ppm",
+    "evidence_digest"
+  ],
+  "properties": {
+    "alignment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "left_artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "right_artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "relation": {
+      "enum": [
+        "same-event",
+        "derived-from",
+        "describes",
+        "transcript-of",
+        "frame-of",
+        "supports"
+      ]
+    },
+    "score_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

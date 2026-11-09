@@ -1,0 +1,397 @@
+"""
+Skeleton Memory Subsystem — RAG, CAG, MAG, and Trinity fusion
+
+Provides:
+- InMemoryTFIDFStore: Sparse retrieval with TF-IDF scoring
+- CAGStore: Contextual associative memory
+- MAGStore: Multi-agent episodic memory
+- MemoryTrinity: Unified query across RAG+CAG+MAG with fusion
+- RepetitionScheduler: Spaced repetition for memory consolidation
+"""
+
+from __future__ import annotations
+
+import hashlib
+import math
+import time
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+from skeleton.kernel.events import EventBus
+
+
+@dataclass
+class Chunk:
+    """A text chunk with metadata."""
+    text: str
+    chunk_id: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    embedding: Optional[List[float]] = None
+
+
+@dataclass
+class ScoredChunk:
+    """Retrieval result with score and provenance."""
+    chunk: Chunk
+    score: float
+    plane: str = "rag"
+    provenance: str = ""
+
+
+class InMemoryTFIDFStore:
+    """In-memory TF-IDF retrieval store (RAG plane)."""
+
+    def __init__(self):
+        self._docs: Dict[str, Chunk] = {}
+        self._term_freq: Dict[str, Dict[str, int]] = {}  # term -> {doc_id: count}
+        self._doc_freq: Dict[str, int] = {}  # term -> doc count
+        self._total_docs = 0
+
+    def add(self, chunk: Chunk) -> None:
+        chunk = self._coerce_chunk(chunk)
+        if chunk.chunk_id in self._docs:
+            self.delete(chunk.chunk_id)
+        self._docs[chunk.chunk_id] = chunk
+        terms = self._tokenize(chunk.text)
+        freq: Dict[str, int] = {}
+        for term in terms:
+            freq[term] = freq.get(term, 0) + 1
+
+        for term, count in freq.items():
+            self._term_freq.setdefault(term, {})[chunk.chunk_id] = count
+            self._doc_freq[term] = self._doc_freq.get(term, 0) + 1
+
+        self._total_docs += 1
+
+    def query(self, text: str, top_k: int = 5) -> List[ScoredChunk]:
+        terms = self._tokenize(text)
+        if not terms or self._total_docs == 0:
+            return []
+
+        scores: Dict[str, float] = {}
+        for term in terms:
+            if term not in self._term_freq:
+                continue
+            idf = math.log(self._total_docs / (1 + self._doc_freq.get(term, 0)))
+            for doc_id, tf in self._term_freq[term].items():
+                tf_weight = 1 + math.log(tf)
+                scores[doc_id] = scores.get(doc_id, 0) + tf_weight * idf
+
+        # Normalize by doc length
+        for doc_id in scores:
+            doc_len = len(self._tokenize(self._docs[doc_id].text))
+            scores[doc_id] /= math.sqrt(doc_len) if doc_len > 0 else 1
+
+        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_k]
+        return [
+            ScoredChunk(chunk=self._docs[doc_id], score=score, plane="rag")
+            for doc_id, score in ranked
+        ]
+
+    @staticmethod
+    def _coerce_chunk(chunk: Any) -> Chunk:
+        """Accept canonical ``MemoryChunk`` (``id``) as well as legacy ``Chunk``.
+
+        Canonical producers such as ``DreamEngine`` emit
+        ``skeleton.memory.types.MemoryChunk``; Genesis still wires this legacy
+        store, so normalize rather than fail on the missing ``chunk_id``.
+        """
+        if isinstance(chunk, Chunk):
+            return chunk
+        chunk_id = getattr(chunk, "chunk_id", None) or getattr(chunk, "id", None)
+        text = getattr(chunk, "text", None)
+        if not isinstance(chunk_id, str) or not chunk_id or not isinstance(text, str):
+            raise TypeError("RAG chunk must expose a non-empty id/chunk_id and text")
+        metadata = getattr(chunk, "metadata", None)
+        return Chunk(
+            text=text,
+            chunk_id=chunk_id,
+            metadata=dict(metadata) if isinstance(metadata, dict) else {},
+            embedding=getattr(chunk, "embedding", None),
+        )
+
+    def delete(self, chunk_id: str) -> bool:
+        chunk = self._docs.pop(chunk_id, None)
+        if chunk is None:
+            return False
+        for term in set(self._tokenize(chunk.text)):
+            postings = self._term_freq.get(term)
+            if postings is not None:
+                postings.pop(chunk_id, None)
+                if not postings:
+                    self._term_freq.pop(term, None)
+            remaining = self._doc_freq.get(term, 0) - 1
+            if remaining > 0:
+                self._doc_freq[term] = remaining
+            else:
+                self._doc_freq.pop(term, None)
+        self._total_docs = max(0, self._total_docs - 1)
+        return True
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "documents": len(self._docs),
+            "terms": len(self._term_freq),
+            "total_docs": self._total_docs,
+        }
+
+    @staticmethod
+    def _tokenize(text: str) -> List[str]:
+        return [t.lower() for t in text.split() if len(t) > 2]
+
+
+class CAGStore:
+    """Contextual Associative Memory store."""
+
+    def __init__(self):
+        self._entries: Dict[str, Dict[str, Any]] = {}
+        self._associations: Dict[str, Set[str]] = {}
+
+    def store(self, key: str, value: Any, context: Optional[str] = None) -> None:
+        self._entries[key] = {"value": value, "context": context, "stored_at": time.time()}
+        if context:
+            self._associations.setdefault(key, set()).add(context)
+
+    def recall(self, key: str) -> Optional[Any]:
+        entry = self._entries.get(key)
+        return entry["value"] if entry else None
+
+    def query(self, context: str) -> List[Dict[str, Any]]:
+        results = []
+        for key, contexts in self._associations.items():
+            if context in contexts:
+                entry = self._entries[key]
+                results.append({"key": key, "value": entry["value"], "context": context})
+        return results
+
+    def delete(self, key: str) -> bool:
+        existed = self._entries.pop(key, None) is not None
+        self._associations.pop(key, None)
+        return existed
+
+    def stats(self) -> Dict[str, Any]:
+        return {"entries": len(self._entries), "associations": len(self._associations)}
+
+
+class MAGStore:
+    """Multi-Agent Episodic Memory store."""
+
+    def __init__(self, agent_id: str):
+        self.agent_id = agent_id
+        # user_id is the canonical identity name used by DreamEngine and
+        # scoped/adaptive memory contracts. Keep agent_id for legacy callers.
+        self.user_id = agent_id
+        self._episodes: Dict[str, Dict[str, Any]] = {}
+        self._tag_index: Dict[str, Set[str]] = {}
+
+    def record(self, episode_id: str, content: str, tags: Optional[List[str]] = None) -> None:
+        if not isinstance(episode_id, str) or not episode_id:
+            raise ValueError("episode_id must be a non-empty string")
+        if not isinstance(content, str) or not content:
+            raise ValueError("content must be a non-empty string")
+        if tags is not None and (
+            not isinstance(tags, list)
+            or any(not isinstance(tag, str) or not tag for tag in tags)
+        ):
+            raise ValueError("tags must be a list of non-empty strings")
+
+        previous = self._episodes.get(episode_id)
+        if previous is not None:
+            for tag in previous.get("tags", []):
+                ids = self._tag_index.get(tag)
+                if ids is None:
+                    continue
+                ids.discard(episode_id)
+                if not ids:
+                    self._tag_index.pop(tag, None)
+
+        normalized_tags = list(dict.fromkeys(tags or []))
+        self._episodes[episode_id] = {
+            "content": content,
+            "tags": normalized_tags,
+            "recorded_at": time.time(),
+        }
+        for tag in normalized_tags:
+            self._tag_index.setdefault(tag, set()).add(episode_id)
+
+    def clusters(self, *, min_size: int = 2) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        """Return deterministic tag clusters for DreamEngine consolidation."""
+        if isinstance(min_size, bool) or not isinstance(min_size, int) or min_size < 2:
+            raise ValueError("min_size must be an integer >= 2")
+        grouped: list[tuple[str, tuple[str, ...]]] = []
+        for tag in sorted(self._tag_index):
+            episode_ids = tuple(
+                sorted(
+                    episode_id
+                    for episode_id in self._tag_index[tag]
+                    if episode_id in self._episodes
+                )
+            )
+            if len(episode_ids) >= min_size:
+                grouped.append((tag, episode_ids))
+        return tuple(grouped)
+
+    def recall_by_tag(self, tag: str) -> List[Dict[str, Any]]:
+        episode_ids = self._tag_index.get(tag, set())
+        return [self._episodes[eid] for eid in episode_ids if eid in self._episodes]
+
+    def delete(self, episode_id: str) -> bool:
+        episode = self._episodes.pop(episode_id, None)
+        if episode is None:
+            return False
+        for tag in episode.get("tags", []):
+            ids = self._tag_index.get(tag)
+            if ids is None:
+                continue
+            ids.discard(episode_id)
+            if not ids:
+                self._tag_index.pop(tag, None)
+        return True
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "episodes": len(self._episodes),
+            "tags": len(self._tag_index),
+            "agent_id": self.agent_id,
+            "user_id": self.user_id,
+        }
+
+
+@dataclass
+class TrinityResult:
+    """Unified result from MemoryTrinity query."""
+    facts: List[ScoredChunk]
+    persona_frame: List[ScoredChunk]
+    personal_history: List[ScoredChunk]
+    combined_score: float
+    token_estimate: int
+    provenance_chain: List[str]
+
+
+class MemoryTrinity:
+    """Unified RAG + CAG + MAG query with fusion."""
+
+    def __init__(self, rag: InMemoryTFIDFStore, cag: CAGStore, mag: MAGStore, bus: Optional[EventBus] = None):
+        self.rag = rag
+        self.cag = cag
+        self.mag = mag
+        self._bus = bus
+
+    def query_unified(self, query_text: str, top_k_per_tier: int = 3, metadata_filter: Optional[Dict[str, Any]] = None) -> TrinityResult:
+        # Query each plane
+        rag_results = self.rag.query(query_text, top_k=top_k_per_tier)
+
+        # CAG associative recall
+        cag_results = []
+        for entry in self.cag.query(query_text):
+            chunk = Chunk(text=str(entry["value"]), metadata={"source": "cag", "key": entry["key"]})
+            cag_results.append(ScoredChunk(chunk=chunk, score=0.7, plane="cag"))
+
+        # MAG episodic recall
+        mag_results = []
+        for tag in query_text.split():
+            for episode in self.mag.recall_by_tag(tag):
+                chunk = Chunk(text=episode["content"], metadata={"source": "mag", "tags": episode["tags"]})
+                mag_results.append(ScoredChunk(chunk=chunk, score=0.6, plane="mag"))
+
+        all_results = rag_results + cag_results + mag_results[:top_k_per_tier]
+
+        # RRF fusion
+        fused = self._reciprocal_rank_fusion(all_results)
+
+        result = TrinityResult(
+            facts=fused[:top_k_per_tier],
+            persona_frame=cag_results[:top_k_per_tier],
+            personal_history=mag_results[:top_k_per_tier],
+            combined_score=sum(r.score for r in fused[:top_k_per_tier]) / max(len(fused[:top_k_per_tier]), 1),
+            token_estimate=sum(len(r.chunk.text.split()) for r in fused[:top_k_per_tier]) * 1.3,
+            provenance_chain=[r.plane for r in fused[:top_k_per_tier]],
+        )
+
+        if self._bus:
+            self._bus.emit("memory.trinity.query", {
+                "query": query_text,
+                "results": len(all_results),
+                "fused": len(fused),
+            })
+
+        return result
+
+    @staticmethod
+    def _reciprocal_rank_fusion(results: List[ScoredChunk], k: int = 60) -> List[ScoredChunk]:
+        """RRF: fuse results from multiple retrieval planes."""
+        scores: Dict[str, float] = {}
+        chunks: Dict[str, Chunk] = {}
+
+        for rank, result in enumerate(results, 1):
+            cid = result.chunk.chunk_id or ("text:" + hashlib.sha256(result.chunk.text.encode("utf-8")).hexdigest())
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank)
+            chunks[cid] = result.chunk
+
+        ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+        return [ScoredChunk(chunk=chunks[cid], score=score, plane="fused") for cid, score in ranked]
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "rag": self.rag.stats(),
+            "cag": self.cag.stats(),
+            "mag": self.mag.stats(),
+        }
+
+
+class RepetitionScheduler:
+    """Spaced repetition scheduler for memory consolidation."""
+
+    def __init__(self, bus: Optional[EventBus] = None):
+        self._schedule: Dict[str, Dict[str, Any]] = {}
+        self._bus = bus
+
+    def is_scheduled(self, item_id: str) -> bool:
+        """Whether a review is already enrolled, including overdue reviews."""
+        return item_id in self._schedule
+
+    def schedule(self, item_id: str, interval_hours: float = 24) -> None:
+        now = time.time()
+        self._schedule[item_id] = {
+            "next_review": now + interval_hours * 3600,
+            "interval": interval_hours,
+            "repetitions": 0,
+        }
+
+    def review(self, item_id: str, performance: float) -> float:
+        """Process a review, return new interval in hours."""
+        if item_id not in self._schedule:
+            raise KeyError(item_id)
+        if isinstance(performance, bool) or not isinstance(performance, (int, float)):
+            raise ValueError("performance must be in [0, 1]")
+        score = float(performance)
+        if score != score or score in (float("inf"), float("-inf")) or not 0.0 <= score <= 1.0:
+            raise ValueError("performance must be in [0, 1]")
+
+        entry = self._schedule[item_id]
+        entry["repetitions"] += 1
+        if score >= 0.6:
+            entry["interval"] *= (1.5 + 0.1 * score)
+        else:
+            entry["interval"] = max(1, entry["interval"] * 0.5)
+
+        entry["next_review"] = time.time() + entry["interval"] * 3600
+
+        if self._bus:
+            self._bus.emit("memory.repetition.review", {
+                "item": item_id,
+                "performance": performance,
+                "interval": entry["interval"],
+            })
+
+        return entry["interval"]
+
+    def due_items(self) -> List[str]:
+        now = time.time()
+        return [item_id for item_id, entry in self._schedule.items() if entry["next_review"] <= now]
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "scheduled": len(self._schedule),
+            "due_now": len(self.due_items()),
+        }

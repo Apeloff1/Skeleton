@@ -1,0 +1,1624 @@
+{
+  "schema_version": "skeleton.ai_game_builder_levels_shard.v1",
+  "manifest": "machine/ai_game_builder_500_levels.json",
+  "start": 226,
+  "end": 250,
+  "count": 25,
+  "levels": [
+    {
+      "id": "GBL-226",
+      "ordinal": 226,
+      "family_id": "GB23",
+      "family": "NPC & Agent Cognition",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Ground NPC perception, goals, planning, memory, dialogue and fallback behavior in authoritative world state.",
+      "owner": "skeleton/ai/agents/jeeves/agent/world_model.py",
+      "batches": [
+        "B034"
+      ],
+      "metrics": [
+        "behavior plausibility",
+        "world grounding",
+        "bounded cognition",
+        "state consistency"
+      ],
+      "requirements": [
+        "Run deterministic long-horizon simulation and replayable playtests.",
+        "Attack omniscient NPC, memory contradiction, goal thrash, runaway planning.",
+        "Persist seeds and minimized failure traces."
+      ],
+      "adversarial": [
+        "omniscient NPC",
+        "memory contradiction",
+        "goal thrash",
+        "runaway planning",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-226 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-227",
+      "ordinal": 227,
+      "family_id": "GB23",
+      "family": "NPC & Agent Cognition",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Ground NPC perception, goals, planning, memory, dialogue and fallback behavior in authoritative world state.",
+      "owner": "skeleton/ai/agents/jeeves/agent/world_model.py",
+      "batches": [
+        "B034"
+      ],
+      "metrics": [
+        "behavior plausibility",
+        "world grounding",
+        "bounded cognition",
+        "state consistency"
+      ],
+      "requirements": [
+        "Improve behavior plausibility, world grounding, bounded cognition, state consistency with player value, accessibility, performance and maintainability jointly.",
+        "Reject apparent realism that harms fun/readability or creates unstable feedback.",
+        "Keep champion unless gain is Pareto-safe."
+      ],
+      "adversarial": [
+        "omniscient NPC",
+        "memory contradiction",
+        "goal thrash",
+        "runaway planning",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-227 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-228",
+      "ordinal": 228,
+      "family_id": "GB23",
+      "family": "NPC & Agent Cognition",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Ground NPC perception, goals, planning, memory, dialogue and fallback behavior in authoritative world state.",
+      "owner": "skeleton/ai/agents/jeeves/agent/world_model.py",
+      "batches": [
+        "B034"
+      ],
+      "metrics": [
+        "behavior plausibility",
+        "world grounding",
+        "bounded cognition",
+        "state consistency"
+      ],
+      "requirements": [
+        "Support semantic state/rule diff, migration, rollback and checkpoint recovery.",
+        "Resume exact world/canon/rival/evaluator identities.",
+        "Prevent duplicate/lost systemic events."
+      ],
+      "adversarial": [
+        "omniscient NPC",
+        "memory contradiction",
+        "goal thrash",
+        "runaway planning",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-228 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-229",
+      "ordinal": 229,
+      "family_id": "GB23",
+      "family": "NPC & Agent Cognition",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Ground NPC perception, goals, planning, memory, dialogue and fallback behavior in authoritative world state.",
+      "owner": "skeleton/ai/agents/jeeves/agent/world_model.py",
+      "batches": [
+        "B034"
+      ],
+      "metrics": [
+        "behavior plausibility",
+        "world grounding",
+        "bounded cognition",
+        "state consistency"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rival rounds with no wall-clock deadline and exactly three stages.",
+        "Stress long simulated horizons, many agents and adverse player interventions.",
+        "Prove bounded compute/memory/state growth and no evaluator drift."
+      ],
+      "adversarial": [
+        "omniscient NPC",
+        "memory contradiction",
+        "goal thrash",
+        "runaway planning",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-229 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort long-horizon report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-230",
+      "ordinal": 230,
+      "family_id": "GB23",
+      "family": "NPC & Agent Cognition",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Ground NPC perception, goals, planning, memory, dialogue and fallback behavior in authoritative world state.",
+      "owner": "skeleton/ai/agents/jeeves/agent/world_model.py",
+      "batches": [
+        "B034"
+      ],
+      "metrics": [
+        "behavior plausibility",
+        "world grounding",
+        "bounded cognition",
+        "state consistency"
+      ],
+      "requirements": [
+        "Require independent exact-head long-horizon evidence.",
+        "Block rights, similarity, determinism, canon or state-integrity failures.",
+        "Expire qualification on material code/model/canon/evaluator/effort drift."
+      ],
+      "adversarial": [
+        "omniscient NPC",
+        "memory contradiction",
+        "goal thrash",
+        "runaway planning",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-230 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort long-horizon report",
+        "independent promotion verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-231",
+      "ordinal": 231,
+      "family_id": "GB24",
+      "family": "Enemy & Encounter Direction",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Compose enemy groups, spawn logic, intensity, arenas, tactics, pacing and adaptive challenge without cheating or repetition.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/ai_fsm.py",
+      "batches": [
+        "B027",
+        "B073"
+      ],
+      "metrics": [
+        "encounter pacing",
+        "counterplay",
+        "difficulty fit",
+        "variety"
+      ],
+      "requirements": [
+        "Specify Enemy & Encounter Direction: Compose enemy groups, spawn logic, intensity, arenas, tactics, pacing and adaptive challenge without cheating or repetition.",
+        "Declare authoritative state, outcomes, invariants, anti-goals and acceptance tests.",
+        "Bind skeleton/ai/simulation/game/mechanics_depth/ai_fsm.py and B027, B073."
+      ],
+      "adversarial": [
+        "spawn unfairness",
+        "repetition",
+        "difficulty spike",
+        "encounter softlock",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-231 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-232",
+      "ordinal": 232,
+      "family_id": "GB24",
+      "family": "Enemy & Encounter Direction",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Compose enemy groups, spawn logic, intensity, arenas, tactics, pacing and adaptive challenge without cheating or repetition.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/ai_fsm.py",
+      "batches": [
+        "B027",
+        "B073"
+      ],
+      "metrics": [
+        "encounter pacing",
+        "counterplay",
+        "difficulty fit",
+        "variety"
+      ],
+      "requirements": [
+        "Define typed simulation/agent state, causal/event identity, provenance and deterministic serialization.",
+        "Separate authoritative world state from model-private reasoning.",
+        "Define migration and unknown-state behavior."
+      ],
+      "adversarial": [
+        "spawn unfairness",
+        "repetition",
+        "difficulty spike",
+        "encounter softlock",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-232 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-233",
+      "ordinal": 233,
+      "family_id": "GB24",
+      "family": "Enemy & Encounter Direction",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Compose enemy groups, spawn logic, intensity, arenas, tactics, pacing and adaptive challenge without cheating or repetition.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/ai_fsm.py",
+      "batches": [
+        "B027",
+        "B073"
+      ],
+      "metrics": [
+        "encounter pacing",
+        "counterplay",
+        "difficulty fit",
+        "variety"
+      ],
+      "requirements": [
+        "Build/tune only from ProjectDNA, canon, champion and rights-classified evidence.",
+        "Record rule/model/tool transformations.",
+        "Use rollback-safe deterministic state transitions and a reference path."
+      ],
+      "adversarial": [
+        "spawn unfairness",
+        "repetition",
+        "difficulty spike",
+        "encounter softlock",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-233 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-234",
+      "ordinal": 234,
+      "family_id": "GB24",
+      "family": "Enemy & Encounter Direction",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Compose enemy groups, spawn logic, intensity, arenas, tactics, pacing and adaptive challenge without cheating or repetition.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/ai_fsm.py",
+      "batches": [
+        "B027",
+        "B073"
+      ],
+      "metrics": [
+        "encounter pacing",
+        "counterplay",
+        "difficulty fit",
+        "variety"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate rivals.",
+        "Challenge believability, fairness, variety, exploitability and performance with a concrete better candidate.",
+        "Independent deterministic gates decide champion."
+      ],
+      "adversarial": [
+        "spawn unfairness",
+        "repetition",
+        "difficulty spike",
+        "encounter softlock",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-234 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-235",
+      "ordinal": 235,
+      "family_id": "GB24",
+      "family": "Enemy & Encounter Direction",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Compose enemy groups, spawn logic, intensity, arenas, tactics, pacing and adaptive challenge without cheating or repetition.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/ai_fsm.py",
+      "batches": [
+        "B027",
+        "B073"
+      ],
+      "metrics": [
+        "encounter pacing",
+        "counterplay",
+        "difficulty fit",
+        "variety"
+      ],
+      "requirements": [
+        "Verify against narrative canon, quests, economy, combat, schedules, save/replay, navigation and player-visible consequences.",
+        "Propagate systemic effects.",
+        "Block local changes that create world-state contradiction."
+      ],
+      "adversarial": [
+        "spawn unfairness",
+        "repetition",
+        "difficulty spike",
+        "encounter softlock",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-235 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-236",
+      "ordinal": 236,
+      "family_id": "GB24",
+      "family": "Enemy & Encounter Direction",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Compose enemy groups, spawn logic, intensity, arenas, tactics, pacing and adaptive challenge without cheating or repetition.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/ai_fsm.py",
+      "batches": [
+        "B027",
+        "B073"
+      ],
+      "metrics": [
+        "encounter pacing",
+        "counterplay",
+        "difficulty fit",
+        "variety"
+      ],
+      "requirements": [
+        "Run deterministic long-horizon simulation and replayable playtests.",
+        "Attack spawn unfairness, repetition, difficulty spike, encounter softlock.",
+        "Persist seeds and minimized failure traces."
+      ],
+      "adversarial": [
+        "spawn unfairness",
+        "repetition",
+        "difficulty spike",
+        "encounter softlock",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-236 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-237",
+      "ordinal": 237,
+      "family_id": "GB24",
+      "family": "Enemy & Encounter Direction",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Compose enemy groups, spawn logic, intensity, arenas, tactics, pacing and adaptive challenge without cheating or repetition.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/ai_fsm.py",
+      "batches": [
+        "B027",
+        "B073"
+      ],
+      "metrics": [
+        "encounter pacing",
+        "counterplay",
+        "difficulty fit",
+        "variety"
+      ],
+      "requirements": [
+        "Improve encounter pacing, counterplay, difficulty fit, variety with player value, accessibility, performance and maintainability jointly.",
+        "Reject apparent realism that harms fun/readability or creates unstable feedback.",
+        "Keep champion unless gain is Pareto-safe."
+      ],
+      "adversarial": [
+        "spawn unfairness",
+        "repetition",
+        "difficulty spike",
+        "encounter softlock",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-237 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-238",
+      "ordinal": 238,
+      "family_id": "GB24",
+      "family": "Enemy & Encounter Direction",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Compose enemy groups, spawn logic, intensity, arenas, tactics, pacing and adaptive challenge without cheating or repetition.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/ai_fsm.py",
+      "batches": [
+        "B027",
+        "B073"
+      ],
+      "metrics": [
+        "encounter pacing",
+        "counterplay",
+        "difficulty fit",
+        "variety"
+      ],
+      "requirements": [
+        "Support semantic state/rule diff, migration, rollback and checkpoint recovery.",
+        "Resume exact world/canon/rival/evaluator identities.",
+        "Prevent duplicate/lost systemic events."
+      ],
+      "adversarial": [
+        "spawn unfairness",
+        "repetition",
+        "difficulty spike",
+        "encounter softlock",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-238 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-239",
+      "ordinal": 239,
+      "family_id": "GB24",
+      "family": "Enemy & Encounter Direction",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Compose enemy groups, spawn logic, intensity, arenas, tactics, pacing and adaptive challenge without cheating or repetition.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/ai_fsm.py",
+      "batches": [
+        "B027",
+        "B073"
+      ],
+      "metrics": [
+        "encounter pacing",
+        "counterplay",
+        "difficulty fit",
+        "variety"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rival rounds with no wall-clock deadline and exactly three stages.",
+        "Stress long simulated horizons, many agents and adverse player interventions.",
+        "Prove bounded compute/memory/state growth and no evaluator drift."
+      ],
+      "adversarial": [
+        "spawn unfairness",
+        "repetition",
+        "difficulty spike",
+        "encounter softlock",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-239 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort long-horizon report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-240",
+      "ordinal": 240,
+      "family_id": "GB24",
+      "family": "Enemy & Encounter Direction",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Compose enemy groups, spawn logic, intensity, arenas, tactics, pacing and adaptive challenge without cheating or repetition.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/ai_fsm.py",
+      "batches": [
+        "B027",
+        "B073"
+      ],
+      "metrics": [
+        "encounter pacing",
+        "counterplay",
+        "difficulty fit",
+        "variety"
+      ],
+      "requirements": [
+        "Require independent exact-head long-horizon evidence.",
+        "Block rights, similarity, determinism, canon or state-integrity failures.",
+        "Expire qualification on material code/model/canon/evaluator/effort drift."
+      ],
+      "adversarial": [
+        "spawn unfairness",
+        "repetition",
+        "difficulty spike",
+        "encounter softlock",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-240 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort long-horizon report",
+        "independent promotion verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-241",
+      "ordinal": 241,
+      "family_id": "GB25",
+      "family": "Systemic World Simulation",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Simulate factions, ecology, resources, schedules, time and persistent consequences with inspectable causal rules.",
+      "owner": "skeleton/ai/simulation/world_model.py",
+      "batches": [
+        "B046",
+        "B047",
+        "B048",
+        "B049"
+      ],
+      "metrics": [
+        "simulation coherence",
+        "causal traceability",
+        "stability",
+        "save/replay fidelity"
+      ],
+      "requirements": [
+        "Specify Systemic World Simulation: Simulate factions, ecology, resources, schedules, time and persistent consequences with inspectable causal rules.",
+        "Declare authoritative state, outcomes, invariants, anti-goals and acceptance tests.",
+        "Bind skeleton/ai/simulation/world_model.py and B046, B047, B048, B049."
+      ],
+      "adversarial": [
+        "runaway feedback loop",
+        "causal inconsistency",
+        "schedule collision",
+        "state divergence",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-241 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-242",
+      "ordinal": 242,
+      "family_id": "GB25",
+      "family": "Systemic World Simulation",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Simulate factions, ecology, resources, schedules, time and persistent consequences with inspectable causal rules.",
+      "owner": "skeleton/ai/simulation/world_model.py",
+      "batches": [
+        "B046",
+        "B047",
+        "B048",
+        "B049"
+      ],
+      "metrics": [
+        "simulation coherence",
+        "causal traceability",
+        "stability",
+        "save/replay fidelity"
+      ],
+      "requirements": [
+        "Define typed simulation/agent state, causal/event identity, provenance and deterministic serialization.",
+        "Separate authoritative world state from model-private reasoning.",
+        "Define migration and unknown-state behavior."
+      ],
+      "adversarial": [
+        "runaway feedback loop",
+        "causal inconsistency",
+        "schedule collision",
+        "state divergence",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-242 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-243",
+      "ordinal": 243,
+      "family_id": "GB25",
+      "family": "Systemic World Simulation",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Simulate factions, ecology, resources, schedules, time and persistent consequences with inspectable causal rules.",
+      "owner": "skeleton/ai/simulation/world_model.py",
+      "batches": [
+        "B046",
+        "B047",
+        "B048",
+        "B049"
+      ],
+      "metrics": [
+        "simulation coherence",
+        "causal traceability",
+        "stability",
+        "save/replay fidelity"
+      ],
+      "requirements": [
+        "Build/tune only from ProjectDNA, canon, champion and rights-classified evidence.",
+        "Record rule/model/tool transformations.",
+        "Use rollback-safe deterministic state transitions and a reference path."
+      ],
+      "adversarial": [
+        "runaway feedback loop",
+        "causal inconsistency",
+        "schedule collision",
+        "state divergence",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-243 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-244",
+      "ordinal": 244,
+      "family_id": "GB25",
+      "family": "Systemic World Simulation",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Simulate factions, ecology, resources, schedules, time and persistent consequences with inspectable causal rules.",
+      "owner": "skeleton/ai/simulation/world_model.py",
+      "batches": [
+        "B046",
+        "B047",
+        "B048",
+        "B049"
+      ],
+      "metrics": [
+        "simulation coherence",
+        "causal traceability",
+        "stability",
+        "save/replay fidelity"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate rivals.",
+        "Challenge believability, fairness, variety, exploitability and performance with a concrete better candidate.",
+        "Independent deterministic gates decide champion."
+      ],
+      "adversarial": [
+        "runaway feedback loop",
+        "causal inconsistency",
+        "schedule collision",
+        "state divergence",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-244 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-245",
+      "ordinal": 245,
+      "family_id": "GB25",
+      "family": "Systemic World Simulation",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Simulate factions, ecology, resources, schedules, time and persistent consequences with inspectable causal rules.",
+      "owner": "skeleton/ai/simulation/world_model.py",
+      "batches": [
+        "B046",
+        "B047",
+        "B048",
+        "B049"
+      ],
+      "metrics": [
+        "simulation coherence",
+        "causal traceability",
+        "stability",
+        "save/replay fidelity"
+      ],
+      "requirements": [
+        "Verify against narrative canon, quests, economy, combat, schedules, save/replay, navigation and player-visible consequences.",
+        "Propagate systemic effects.",
+        "Block local changes that create world-state contradiction."
+      ],
+      "adversarial": [
+        "runaway feedback loop",
+        "causal inconsistency",
+        "schedule collision",
+        "state divergence",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-245 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-246",
+      "ordinal": 246,
+      "family_id": "GB25",
+      "family": "Systemic World Simulation",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Simulate factions, ecology, resources, schedules, time and persistent consequences with inspectable causal rules.",
+      "owner": "skeleton/ai/simulation/world_model.py",
+      "batches": [
+        "B046",
+        "B047",
+        "B048",
+        "B049"
+      ],
+      "metrics": [
+        "simulation coherence",
+        "causal traceability",
+        "stability",
+        "save/replay fidelity"
+      ],
+      "requirements": [
+        "Run deterministic long-horizon simulation and replayable playtests.",
+        "Attack runaway feedback loop, causal inconsistency, schedule collision, state divergence.",
+        "Persist seeds and minimized failure traces."
+      ],
+      "adversarial": [
+        "runaway feedback loop",
+        "causal inconsistency",
+        "schedule collision",
+        "state divergence",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-246 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-247",
+      "ordinal": 247,
+      "family_id": "GB25",
+      "family": "Systemic World Simulation",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Simulate factions, ecology, resources, schedules, time and persistent consequences with inspectable causal rules.",
+      "owner": "skeleton/ai/simulation/world_model.py",
+      "batches": [
+        "B046",
+        "B047",
+        "B048",
+        "B049"
+      ],
+      "metrics": [
+        "simulation coherence",
+        "causal traceability",
+        "stability",
+        "save/replay fidelity"
+      ],
+      "requirements": [
+        "Improve simulation coherence, causal traceability, stability, save/replay fidelity with player value, accessibility, performance and maintainability jointly.",
+        "Reject apparent realism that harms fun/readability or creates unstable feedback.",
+        "Keep champion unless gain is Pareto-safe."
+      ],
+      "adversarial": [
+        "runaway feedback loop",
+        "causal inconsistency",
+        "schedule collision",
+        "state divergence",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-247 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-248",
+      "ordinal": 248,
+      "family_id": "GB25",
+      "family": "Systemic World Simulation",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Simulate factions, ecology, resources, schedules, time and persistent consequences with inspectable causal rules.",
+      "owner": "skeleton/ai/simulation/world_model.py",
+      "batches": [
+        "B046",
+        "B047",
+        "B048",
+        "B049"
+      ],
+      "metrics": [
+        "simulation coherence",
+        "causal traceability",
+        "stability",
+        "save/replay fidelity"
+      ],
+      "requirements": [
+        "Support semantic state/rule diff, migration, rollback and checkpoint recovery.",
+        "Resume exact world/canon/rival/evaluator identities.",
+        "Prevent duplicate/lost systemic events."
+      ],
+      "adversarial": [
+        "runaway feedback loop",
+        "causal inconsistency",
+        "schedule collision",
+        "state divergence",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-248 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-249",
+      "ordinal": 249,
+      "family_id": "GB25",
+      "family": "Systemic World Simulation",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Simulate factions, ecology, resources, schedules, time and persistent consequences with inspectable causal rules.",
+      "owner": "skeleton/ai/simulation/world_model.py",
+      "batches": [
+        "B046",
+        "B047",
+        "B048",
+        "B049"
+      ],
+      "metrics": [
+        "simulation coherence",
+        "causal traceability",
+        "stability",
+        "save/replay fidelity"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rival rounds with no wall-clock deadline and exactly three stages.",
+        "Stress long simulated horizons, many agents and adverse player interventions.",
+        "Prove bounded compute/memory/state growth and no evaluator drift."
+      ],
+      "adversarial": [
+        "runaway feedback loop",
+        "causal inconsistency",
+        "schedule collision",
+        "state divergence",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-249 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort long-horizon report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-250",
+      "ordinal": 250,
+      "family_id": "GB25",
+      "family": "Systemic World Simulation",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Simulate factions, ecology, resources, schedules, time and persistent consequences with inspectable causal rules.",
+      "owner": "skeleton/ai/simulation/world_model.py",
+      "batches": [
+        "B046",
+        "B047",
+        "B048",
+        "B049"
+      ],
+      "metrics": [
+        "simulation coherence",
+        "causal traceability",
+        "stability",
+        "save/replay fidelity"
+      ],
+      "requirements": [
+        "Require independent exact-head long-horizon evidence.",
+        "Block rights, similarity, determinism, canon or state-integrity failures.",
+        "Expire qualification on material code/model/canon/evaluator/effort drift."
+      ],
+      "adversarial": [
+        "runaway feedback loop",
+        "causal inconsistency",
+        "schedule collision",
+        "state divergence",
+        "protected-expression leakage",
+        "cross-system longform regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "canon/system consistency",
+        "bounded resources",
+        "authoritative state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-250 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "world/system report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort long-horizon report",
+        "independent promotion verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    }
+  ]
+}

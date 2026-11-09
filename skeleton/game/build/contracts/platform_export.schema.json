@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-16:platform_export:v1",
+  "title": "FLGB-16 platform export",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "export_id",
+    "package_digest",
+    "platform",
+    "architecture",
+    "toolchain_digest",
+    "artifact_digest"
+  ],
+  "properties": {
+    "export_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "package_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "platform": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "architecture": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "toolchain_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

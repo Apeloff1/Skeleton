@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-12:presentation_replay:v1",
+  "title": "FLGB-12 presentation replay",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "frame_id",
+    "simulation_tick",
+    "animation_digest",
+    "audio_digest",
+    "ui_digest",
+    "input_digest",
+    "prior_frame_digest"
+  ],
+  "properties": {
+    "frame_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "simulation_tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "animation_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "audio_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ui_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "input_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prior_frame_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

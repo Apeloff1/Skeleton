@@ -1,0 +1,61 @@
+{
+  "schema": "eval.fixtures.creator_intent.v1",
+  "schema_version": 1,
+  "fixture_id": "hex_duel_turns",
+  "concept": {
+    "title": "Hex Duel",
+    "statement": "Two players alternate turns on a hex grid. Matches stay local. Piece count stays at most six per side."
+  },
+  "expected_normalized": {
+    "constraints": [
+      {
+        "id": "c_turn_structure",
+        "field": "turn_structure",
+        "op": "equals",
+        "value": "turn_based"
+      },
+      {
+        "id": "c_player_cap",
+        "field": "players",
+        "op": "max",
+        "value": 2
+      },
+      {
+        "id": "c_piece_cap",
+        "field": "pieces_per_side",
+        "op": "max",
+        "value": 6
+      }
+    ]
+  },
+  "expected_design_graph": {
+    "nodes": [
+      {
+        "id": "n_board",
+        "kind": "world",
+        "title": "Hex board",
+        "depends_on": []
+      },
+      {
+        "id": "n_turns",
+        "kind": "mechanic",
+        "title": "Alternate turns",
+        "depends_on": ["n_board"]
+      }
+    ],
+    "constraints": [
+      {
+        "id": "c_turn_structure",
+        "applies_to": ["n_turns"]
+      },
+      {
+        "id": "c_player_cap",
+        "applies_to": ["n_turns"]
+      },
+      {
+        "id": "c_piece_cap",
+        "applies_to": ["n_board"]
+      }
+    ]
+  }
+}

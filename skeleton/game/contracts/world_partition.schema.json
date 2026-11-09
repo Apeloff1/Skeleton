@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-09:world_partition:v1",
+  "title": "FLGB-09 world partition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "cell_id",
+    "x",
+    "y",
+    "z",
+    "entity_ids"
+  ],
+  "properties": {
+    "cell_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "x": {
+      "type": "integer"
+    },
+    "y": {
+      "type": "integer"
+    },
+    "z": {
+      "type": "integer"
+    },
+    "entity_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  }
+}

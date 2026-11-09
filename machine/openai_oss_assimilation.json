@@ -1,0 +1,281 @@
+{
+  "schema_version": "openai-oss-assimilation/v1",
+  "status": "research-snapshots-plus-clean-room-adapters",
+  "prepared_at_utc": "2026-09-25T20:00:00Z",
+  "base_branch_dependency": {
+    "pr": 2014,
+    "head_sha": "54a72c79d6ce2c04c5c8203db59f06e4ca390c29"
+  },
+  "authority_rules": [
+    "upstream snapshots are non-executable research material",
+    "every copied source file is byte-for-byte bound to an upstream Git blob",
+    "upstream license notices remain adjacent to snapshots",
+    "production code uses clean-room interoperability adapters and optional package imports",
+    "research snapshots never become runtime authority",
+    "model-spec snapshot is reference material and cannot override Skeleton policy",
+    "gpt-oss analysis/reasoning channels are not user-facing by default",
+    "model weights are never committed to this repository"
+  ],
+  "sources": {
+    "agents-sdk": {
+      "repository": "openai/openai-agents-python",
+      "commit_sha": "525cd20f6da65f23a24ea1632ba620f6f3bd2f93",
+      "license_spdx": "MIT",
+      "package_name": "openai-agents",
+      "minimum_python": "3.10",
+      "snapshot_root": "skeleton/ai/research/external/OpenAI/openai-agents-python",
+      "files": [
+        {
+          "source_path": "LICENSE",
+          "upstream_blob_sha": "e5ad2c5aa30343f143a5c418004ca1a8d2cfaff4",
+          "destination_path": "skeleton/ai/research/external/OpenAI/openai-agents-python/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "src/agents/handoffs/__init__.py",
+          "upstream_blob_sha": "5081c588c5b80a43601f526d9fc60eb51b3c6756",
+          "destination_path": "skeleton/ai/research/external/OpenAI/openai-agents-python/src/agents/handoffs/__init__.py.txt"
+        },
+        {
+          "source_path": "src/agents/guardrail.py",
+          "upstream_blob_sha": "07475c8183835ae42d9242bcf0f1bcdb93732ed6",
+          "destination_path": "skeleton/ai/research/external/OpenAI/openai-agents-python/src/agents/guardrail.py.txt"
+        },
+        {
+          "source_path": "src/agents/tool_guardrails.py",
+          "upstream_blob_sha": "613d5dbcecb4bb0e71169e9f2cf81d331023473b",
+          "destination_path": "skeleton/ai/research/external/OpenAI/openai-agents-python/src/agents/tool_guardrails.py.txt"
+        },
+        {
+          "source_path": "src/agents/memory/session.py",
+          "upstream_blob_sha": "909af12e6387ae442411d46438961ef7df6067a6",
+          "destination_path": "skeleton/ai/research/external/OpenAI/openai-agents-python/src/agents/memory/session.py.txt"
+        }
+      ]
+    },
+    "tiktoken": {
+      "repository": "openai/tiktoken",
+      "commit_sha": "4e71bbe0c078468e00fefbf94b39849389f346e5",
+      "license_spdx": "MIT",
+      "package_name": "tiktoken",
+      "minimum_python": "3.9",
+      "snapshot_root": "skeleton/ai/research/external/OpenAI/tiktoken",
+      "files": [
+        {
+          "source_path": "LICENSE",
+          "upstream_blob_sha": "83ed1036f70d4f419307e8a044a35e163cc35201",
+          "destination_path": "skeleton/ai/research/external/OpenAI/tiktoken/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "tiktoken/core.py",
+          "upstream_blob_sha": "530f8f59b7688f4ad5c591817e9181145293b36d",
+          "destination_path": "skeleton/ai/research/external/OpenAI/tiktoken/tiktoken/core.py.txt"
+        },
+        {
+          "source_path": "tiktoken/model.py",
+          "upstream_blob_sha": "166db0692bfd5a374aa718f3a20c92d008a9918d",
+          "destination_path": "skeleton/ai/research/external/OpenAI/tiktoken/tiktoken/model.py.txt"
+        },
+        {
+          "source_path": "tiktoken/_educational.py",
+          "upstream_blob_sha": "317e77560c2b95c2c8a7b3d0d170b2af6de239c9",
+          "destination_path": "skeleton/ai/research/external/OpenAI/tiktoken/tiktoken/_educational.py.txt"
+        }
+      ]
+    },
+    "whisper": {
+      "repository": "openai/whisper",
+      "commit_sha": "86098128c0b4f24f0e2aa2994de830614b474227",
+      "license_spdx": "MIT",
+      "package_name": "openai-whisper",
+      "minimum_python": "3.8",
+      "snapshot_root": "skeleton/ai/research/external/OpenAI/whisper",
+      "files": [
+        {
+          "source_path": "LICENSE",
+          "upstream_blob_sha": "d25552598bb9c5400612159ed4bab92ce12a5ce5",
+          "destination_path": "skeleton/ai/research/external/OpenAI/whisper/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "whisper/audio.py",
+          "upstream_blob_sha": "826250f372c9234e13b8f06a24373d9fa7ceeca0",
+          "destination_path": "skeleton/ai/research/external/OpenAI/whisper/whisper/audio.py.txt"
+        },
+        {
+          "source_path": "whisper/tokenizer.py",
+          "upstream_blob_sha": "2af837570b1e6e87457179f07d63d046cbe0d4f3",
+          "destination_path": "skeleton/ai/research/external/OpenAI/whisper/whisper/tokenizer.py.txt"
+        },
+        {
+          "source_path": "whisper/decoding.py",
+          "upstream_blob_sha": "49485d0090fc0b8bf7b052d0b9b031cd95a8a28f",
+          "destination_path": "skeleton/ai/research/external/OpenAI/whisper/whisper/decoding.py.txt"
+        },
+        {
+          "source_path": "whisper/transcribe.py",
+          "upstream_blob_sha": "56b29fbc888dd607c464ca90c427cf633b24f147",
+          "destination_path": "skeleton/ai/research/external/OpenAI/whisper/whisper/transcribe.py.txt"
+        }
+      ]
+    },
+    "harmony": {
+      "repository": "openai/harmony",
+      "commit_sha": "abd677f7ac962629c808197caa1feb9e3e95d2b0",
+      "license_spdx": "Apache-2.0",
+      "package_name": "openai-harmony",
+      "minimum_python": "3.8",
+      "snapshot_root": "skeleton/ai/research/external/OpenAI/harmony",
+      "files": [
+        {
+          "source_path": "LICENSE",
+          "upstream_blob_sha": "7a4a3ea2424c09fbe48d455aed1eaa94d9124835",
+          "destination_path": "skeleton/ai/research/external/OpenAI/harmony/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "python/openai_harmony/__init__.py",
+          "upstream_blob_sha": "c8bce8f2bc5c61ce27a069636f8f3e7b30c53739",
+          "destination_path": "skeleton/ai/research/external/OpenAI/harmony/python/openai_harmony/__init__.py.txt"
+        },
+        {
+          "source_path": "src/chat.rs",
+          "upstream_blob_sha": "8fa9a18e89d3dbeba30d6e4733e52d596656c396",
+          "destination_path": "skeleton/ai/research/external/OpenAI/harmony/src/chat.rs.txt"
+        }
+      ]
+    },
+    "gpt-oss": {
+      "repository": "openai/gpt-oss",
+      "commit_sha": "7b583341fe16729127f6d5b94a7b09ccae97e1a1",
+      "license_spdx": "Apache-2.0",
+      "package_name": "gpt-oss",
+      "minimum_python": "3.12",
+      "snapshot_root": "skeleton/ai/research/external/OpenAI/gpt-oss",
+      "files": [
+        {
+          "source_path": "LICENSE",
+          "upstream_blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+          "destination_path": "skeleton/ai/research/external/OpenAI/gpt-oss/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "gpt_oss/tools/apply_patch.py",
+          "upstream_blob_sha": "a1ecb113c26643dcae498c57bc3a3e64b9d2750d",
+          "destination_path": "skeleton/ai/research/external/OpenAI/gpt-oss/gpt_oss/tools/apply_patch.py.txt",
+          "normalization": "strip-trailing-whitespace-v1",
+          "destination_blob_sha": "a3ffd47fce6f809fe2c8b78265519f00c2dff95b"
+        },
+        {
+          "source_path": "gpt_oss/tools/simple_browser/simple_browser_tool.py",
+          "upstream_blob_sha": "913ee0bdc14b2d894d9a05f9a67d39cbe12437c5",
+          "destination_path": "skeleton/ai/research/external/OpenAI/gpt-oss/gpt_oss/tools/simple_browser/simple_browser_tool.py.txt"
+        },
+        {
+          "source_path": "gpt_oss/tools/python_docker/docker_tool.py",
+          "upstream_blob_sha": "1e3535ac4685f7894dc5cfe3d9f537f5badd7083",
+          "destination_path": "skeleton/ai/research/external/OpenAI/gpt-oss/gpt_oss/tools/python_docker/docker_tool.py.txt"
+        },
+        {
+          "source_path": "gpt_oss/responses_api/types.py",
+          "upstream_blob_sha": "2250aa281c6e4647b1da387e59cd1665924c3003",
+          "destination_path": "skeleton/ai/research/external/OpenAI/gpt-oss/gpt_oss/responses_api/types.py.txt"
+        }
+      ]
+    },
+    "codex": {
+      "repository": "openai/codex",
+      "commit_sha": "782826663df3e898d0c594a13f6f75cc2a498644",
+      "license_spdx": "Apache-2.0",
+      "package_name": "openai-codex",
+      "minimum_python": null,
+      "snapshot_root": "skeleton/ai/research/external/OpenAI/codex",
+      "files": [
+        {
+          "source_path": "LICENSE",
+          "upstream_blob_sha": "4606e72e042564097e8780d66c1d4dcb611869bd",
+          "destination_path": "skeleton/ai/research/external/OpenAI/codex/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "sdk/python/src/openai_codex/_approval_mode.py",
+          "upstream_blob_sha": "bbb57030c0a600074e1cb350cad4ae05111c569f",
+          "destination_path": "skeleton/ai/research/external/OpenAI/codex/sdk/python/src/openai_codex/_approval_mode.py.txt"
+        },
+        {
+          "source_path": "sdk/python/src/openai_codex/_sandbox.py",
+          "upstream_blob_sha": "24aeb57c858f49d940d1179a7b52df5d7518d3ea",
+          "destination_path": "skeleton/ai/research/external/OpenAI/codex/sdk/python/src/openai_codex/_sandbox.py.txt"
+        },
+        {
+          "source_path": "sdk/python/src/openai_codex/api.py",
+          "upstream_blob_sha": "3ccdbfd574d3cd4943beeda20ea7763b8f8a746b",
+          "destination_path": "skeleton/ai/research/external/OpenAI/codex/sdk/python/src/openai_codex/api.py.txt"
+        }
+      ]
+    },
+    "evals": {
+      "repository": "openai/evals",
+      "commit_sha": "8eac7a7de5215c907fbddc30efdaf316913eccdd",
+      "license_spdx": "MIT",
+      "package_name": "evals",
+      "minimum_python": "3.9",
+      "snapshot_root": "skeleton/ai/research/external/OpenAI/evals",
+      "files": [
+        {
+          "source_path": "LICENSE.md",
+          "upstream_blob_sha": "405cc0eb38b5f0fafdf33bacacc3b16c14e3d2b4",
+          "destination_path": "skeleton/ai/research/external/OpenAI/evals/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "evals/eval.py",
+          "upstream_blob_sha": "cce0c75c3fe7ad44a1d290c275d0c7a503d4d8c4",
+          "destination_path": "skeleton/ai/research/external/OpenAI/evals/evals/eval.py.txt"
+        },
+        {
+          "source_path": "evals/base.py",
+          "upstream_blob_sha": "62d015833d8139d791f33f7a7c2e694dcfc9a360",
+          "destination_path": "skeleton/ai/research/external/OpenAI/evals/evals/base.py.txt"
+        },
+        {
+          "source_path": "evals/record.py",
+          "upstream_blob_sha": "8e8ebe9ae62b4711817e08e668d4ac9a4b63cc23",
+          "destination_path": "skeleton/ai/research/external/OpenAI/evals/evals/record.py.txt"
+        }
+      ]
+    },
+    "model-spec": {
+      "repository": "openai/model_spec",
+      "commit_sha": "7f1cf79fcb656c07f77c8d95b6fbc78dc7fac5b6",
+      "license_spdx": "CC0-1.0",
+      "package_name": null,
+      "minimum_python": null,
+      "snapshot_root": "skeleton/ai/research/external/OpenAI/model_spec",
+      "files": [
+        {
+          "source_path": "LICENSE",
+          "upstream_blob_sha": "0e259d42c996742e9e3cba14c677129b2c1b6311",
+          "destination_path": "skeleton/ai/research/external/OpenAI/model_spec/LICENSE.upstream.txt"
+        },
+        {
+          "source_path": "model_spec.md",
+          "upstream_blob_sha": "e7925c4772a8857886295ee4bb2c7cc80861e121",
+          "destination_path": "skeleton/ai/research/external/OpenAI/model_spec/model_spec.md.txt"
+        },
+        {
+          "source_path": "CHANGELOG.md",
+          "upstream_blob_sha": "82d93fa616d1bf05aeefaad46784abb0fe2cff09",
+          "destination_path": "skeleton/ai/research/external/OpenAI/model_spec/CHANGELOG.md.txt"
+        }
+      ]
+    }
+  },
+  "executable_adapters": [
+    "skeleton/ai/integrations/openai_oss/registry.py",
+    "skeleton/ai/integrations/openai_oss/optional.py",
+    "skeleton/ai/integrations/openai_oss/tokenization.py",
+    "skeleton/ai/integrations/openai_oss/harmony.py",
+    "skeleton/ai/integrations/openai_oss/gpt_oss.py",
+    "skeleton/ai/integrations/openai_oss/whisper.py",
+    "skeleton/ai/integrations/openai_oss/agents.py",
+    "skeleton/ai/integrations/openai_oss/codex.py",
+    "skeleton/ai/integrations/openai_oss/evals.py",
+    "skeleton/ai/integrations/openai_oss/model_spec.py"
+  ],
+  "promotion_rule": "No upstream research snapshot is imported or executed directly. Runtime promotion requires a bounded adapter, tests, exact-head CI, and independent verification."
+}

@@ -1,0 +1,1 @@
+{"features":[{"file_shards":["core"],"files":1,"name":"core","zones":{"core-compat":1}},{"file_shards":["core"],"files":37,"name":"core/shift_supervisor","zones":{"core-compat":37}}],"schema":"skeleton.repository-navigation.v1"}

@@ -1,0 +1,9 @@
+{
+  "extends": "base",
+  "tier": "staging",
+  "replicas": 2,
+  "health": {"probes": [{"id": "readiness", "path": "/readyz", "max_latency_ms": 1000}]},
+  "rollout": {"strategy": "canary", "stages": [10, 50, 100], "bake_seconds": 120},
+  "database": {"url": "secret://skeleton/staging/db-url", "pool_size": 10},
+  "windows": ["mon 07:00-20:00", "tue 07:00-20:00", "wed 07:00-20:00", "thu 07:00-20:00", "fri 07:00-15:00"]
+}

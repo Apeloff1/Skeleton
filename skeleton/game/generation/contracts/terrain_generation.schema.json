@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:terrain_generation:v1",
+  "title": "FLGB-14 terrain generation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "world_id",
+    "chunk_x",
+    "chunk_y",
+    "resolution",
+    "seed_digest",
+    "biome_digest"
+  ],
+  "properties": {
+    "world_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "chunk_x": {
+      "type": "integer"
+    },
+    "chunk_y": {
+      "type": "integer"
+    },
+    "resolution": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 8192
+    },
+    "seed_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "biome_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

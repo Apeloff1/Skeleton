@@ -1,0 +1,422 @@
+{
+  "version": 1,
+  "suites": [
+    {
+      "id": "stage7-engine",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 540,
+      "required_files": [
+        "skeleton/testing/test_ai_golden_journeys.py",
+        "skeleton/testing/test_execution_runtime.py",
+        "skeleton/observability/redaction.py",
+        "skeleton/testing/test_engine_provider_status.py",
+        "skeleton/testing/test_engine_browser_cors.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-vv",
+        "-rA",
+        "--tb=long",
+        "--noconftest",
+        "-p",
+        "pytest_asyncio.plugin",
+        "skeleton/testing/test_ai_golden_journeys.py",
+        "skeleton/testing/test_execution_runtime.py::test_crash_after_provider_response_before_checkpoint_fails_closed_without_retry",
+        "skeleton/testing/test_engine_provider_status.py",
+        "skeleton/testing/test_engine_browser_cors.py"
+      ]
+    },
+    {
+      "id": "stage7-cross-service",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 540,
+      "required_files": [
+        "backend/tests/test_engine_cross_service_closure.py",
+        "backend/tests/test_ai_chat_engine_cutover.py",
+        "backend/tests/test_conversation_bson_timestamps.py",
+        "backend/tests/test_ai_chat_turn_persistence.py",
+        "backend/tests/test_graceful_drain_signals.py",
+        "backend/tests/test_storage_lazy_registry.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-vv",
+        "-rA",
+        "--tb=long",
+        "--noconftest",
+        "-p",
+        "pytest_asyncio.plugin",
+        "backend/tests/test_engine_cross_service_closure.py",
+        "backend/tests/test_ai_chat_engine_cutover.py",
+        "backend/tests/test_conversation_bson_timestamps.py",
+        "backend/tests/test_ai_chat_turn_persistence.py",
+        "backend/tests/test_graceful_drain_signals.py",
+        "backend/tests/test_storage_lazy_registry.py"
+      ]
+    },
+    {
+      "id": "stage7-browser",
+      "tier": "offline",
+      "cwd": "frontend",
+      "timeout_seconds": 240,
+      "required_files": [
+        "frontend/scripts/test-operation-stream-reducer.mjs",
+        "frontend/scripts/test-operation-stream-session.mjs"
+      ],
+      "command": [
+        "node",
+        "--test",
+        "scripts/test-operation-stream-reducer.mjs",
+        "scripts/test-operation-stream-session.mjs"
+      ]
+    },
+    {
+      "id": "frontend-product",
+      "tier": "offline",
+      "cwd": "frontend",
+      "timeout_seconds": 240,
+      "required_files": [
+        "frontend/scripts/test-product-journeys.mjs",
+        "frontend/scripts/run-e2e-contracts.mjs"
+      ],
+      "command": [
+        "node",
+        "scripts/run-e2e-contracts.mjs"
+      ]
+    },
+    {
+      "id": "backend-local-ai-chat",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 720,
+      "required_files": [
+        "backend/tests/test_ai_chat_local_engine_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-vv",
+        "-rA",
+        "--tb=long",
+        "--noconftest",
+        "-p",
+        "pytest_asyncio.plugin",
+        "backend/tests/test_ai_chat_local_engine_e2e.py"
+      ]
+    },
+    {
+      "id": "native-runtime",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 720,
+      "required_files": [
+        "tests/flgb",
+        "tests/test_e2e_inference_receipt.py",
+        "tests/test_app_offline_chat_cli.py",
+        "tests/test_app_offline_http.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "-p",
+        "pytest_asyncio.plugin",
+        "tests/flgb",
+        "tests/test_e2e_inference_receipt.py",
+        "tests/test_app_offline_chat_cli.py",
+        "tests/test_app_offline_http.py"
+      ]
+    },
+    {
+      "id": "app-cli-forge",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 720,
+      "required_files": [
+        "tests/test_autonomous_builder_e2e_contract.py",
+        "skeleton/testing/test_cli_e2e_matrix.py",
+        "skeleton/testing/test_cli_e2e_inprocess.py",
+        "skeleton/testing/test_cli_e2e_subprocess.py",
+        "skeleton/testing/test_gameforge_http_e2e.py",
+        "skeleton/testing/test_materialise_e2e_acceptance.py",
+        "skeleton/testing/test_cortex_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "-p",
+        "pytest_asyncio.plugin",
+        "tests/test_autonomous_builder_e2e_contract.py",
+        "skeleton/testing/test_cli_e2e_matrix.py",
+        "skeleton/testing/test_cli_e2e_inprocess.py",
+        "skeleton/testing/test_cli_e2e_subprocess.py",
+        "skeleton/testing/test_gameforge_http_e2e.py",
+        "skeleton/testing/test_materialise_e2e_acceptance.py",
+        "skeleton/testing/test_cortex_e2e.py"
+      ]
+    },
+    {
+      "id": "legacy-live-galaxy",
+      "tier": "live",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "backend/tests/test_iteration_79_galaxy_studio_full_e2e.py",
+        "backend/tests/live_service_tests.json"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-vv",
+        "backend/tests/test_iteration_79_galaxy_studio_full_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-dragon-game-observation",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 540,
+      "required_files": [
+        "tests/test_jeeves_game_e2e_observation.py",
+        "skeleton/ai/game_builder/studio_e2e_observation.py",
+        "skeleton/ai/game_builder/studio_execution_plane.py",
+        "backend/routes/game_studio_agent.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_jeeves_game_e2e_observation.py"
+      ]
+    },
+    {
+      "id": "jeeves-native-studio-art",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "tests/test_jeeves_native_studio_art_e2e.py",
+        "tests/test_jeeves_console_source_stage_e2e.py",
+        "skeleton/ai/game_builder/studio_asset_pipeline.py",
+        "skeleton/ai/game_builder/native_game_cli.py",
+        "skeleton/ai/game_builder/game_project_workspace.py",
+        "skeleton/ai/game_builder/jeeves_app_runtime.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_jeeves_native_studio_art_e2e.py",
+        "tests/test_jeeves_console_source_stage_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-production-campaign-assurance",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_campaign.py",
+        "skeleton/ai/game_builder/studio_campaign_lock.py",
+        "skeleton/ai/game_builder/studio_build_qualification.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance_cli.py",
+        "tests/test_studio_build_qualification.py",
+        "tests/test_studio_campaign_e2e.py",
+        "tests/test_studio_campaign_assurance_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_build_qualification.py",
+        "tests/test_studio_campaign_e2e.py",
+        "tests/test_studio_campaign_assurance_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-original-artist-sprite-production",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_sprite_authoring.py",
+        "skeleton/ai/game_builder/studio_asset_pipeline.py",
+        "skeleton/ai/game_builder/native_game_cli.py",
+        "skeleton/ai/game_builder/jeeves_app_runtime.py",
+        "tests/test_studio_artist_sprite_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_artist_sprite_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-cross-engine-executable-gameplay",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 1200,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_browser_probe.js",
+        "skeleton/ai/game_builder/studio_runtime_qualification.py",
+        "skeleton/ai/game_builder/studio_godot_qualification.py",
+        "skeleton/ai/game_builder/studio_pixel_parity.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance.py",
+        "tests/test_studio_browser_runtime_e2e.py",
+        "tests/test_studio_godot_runtime_e2e.py",
+        "tests/test_studio_pixel_parity_e2e.py",
+        "skeleton/ai/game_builder/studio_dragon_canvas_capture.py",
+        "tests/test_studio_dragon_canvas_capture.py",
+        "tests/test_studio_playable_media_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_browser_runtime_e2e.py",
+        "tests/test_studio_godot_runtime_e2e.py",
+        "tests/test_studio_pixel_parity_e2e.py",
+        "tests/test_studio_dragon_canvas_capture.py",
+        "tests/test_studio_playable_media_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-dragon-reviewed-knowledge-gates",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 900,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_dragon_learning_bridge.py",
+        "skeleton/ai/game_builder/studio_dragon_lessons_cli.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance.py",
+        "skeleton/ai/game_builder/studio_campaign_lock.py",
+        "tests/test_studio_dragon_learning_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_dragon_learning_e2e.py"
+      ]
+    },
+    {
+      "id": "jeeves-native-cartridge-emulator-full-e2e",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 1200,
+      "required_files": [
+        "skeleton/ai/game_builder/studio_build_qualification.py",
+        "skeleton/ai/game_builder/studio_game_boy_emulator.py",
+        "skeleton/ai/game_builder/studio_campaign_assurance.py",
+        "skeleton/ai/game_builder/studio_execution_campaign.py",
+        "skeleton/ai/game_builder/studio_execution_campaign_cli.py",
+        "tests/test_studio_build_qualification.py",
+        "tests/test_studio_game_boy_emulator_e2e.py",
+        "tests/test_studio_execution_campaign_e2e.py",
+        "tests/test_studio_campaign_assurance_e2e.py",
+        "skeleton/ai/game_builder/studio_nes_emulator.py",
+        "tests/test_studio_nes_emulator_e2e.py",
+        "tests/test_studio_nes_campaign_e2e.py",
+        "skeleton/ai/game_builder/studio_nes_chr_parity.py",
+        "skeleton/ai/game_builder/studio_execution_history.py",
+        "tests/test_studio_execution_history_e2e.py",
+        "skeleton/ai/game_builder/studio_native_replay_telemetry.py",
+        "tests/test_studio_native_replay_telemetry.py",
+        "tests/test_studio_native_score_parity.py",
+        "tests/test_studio_native_python_reference_e2e.py",
+        "skeleton/ai/game_builder/studio_native_correction_triage.py",
+        "tests/test_studio_native_correction_triage.py",
+        "skeleton/ai/game_builder/studio_game_boy_rom_art_parity.py",
+        "tests/test_studio_game_boy_rom_art_parity.py",
+        "skeleton/ai/game_builder/studio_production_blocker_taxonomy.py",
+        "tests/test_studio_production_blocker_taxonomy.py",
+        "tests/test_studio_native_console_animation_e2e.py",
+        "skeleton/ai/game_builder/game_boy_native_export.py",
+        "skeleton/ai/game_builder/nes_native_export.py",
+        "skeleton/ai/game_builder/studio_native_psg.py",
+        "tests/test_studio_native_psg.py",
+        "skeleton/ai/game_builder/studio_native_source_media_parity.py",
+        "tests/test_studio_native_source_media_parity.py",
+        "tests/test_studio_campaign_e2e.py",
+        "skeleton/ai/game_builder/studio_specialized_e2e_runner.py",
+        "tests/test_studio_specialized_e2e_runner.py",
+        "skeleton/ai/game_builder/studio_history_segments.py",
+        "tests/test_studio_execution_history_segments.py",
+        "skeleton/ai/game_builder/studio_compiled_psg_parity.py",
+        "tests/test_studio_compiled_psg_parity.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "tests/test_studio_build_qualification.py",
+        "tests/test_studio_game_boy_emulator_e2e.py",
+        "tests/test_studio_execution_campaign_e2e.py",
+        "tests/test_studio_campaign_assurance_e2e.py",
+        "tests/test_studio_nes_emulator_e2e.py",
+        "tests/test_studio_nes_campaign_e2e.py",
+        "tests/test_studio_execution_history_e2e.py",
+        "tests/test_studio_native_replay_telemetry.py",
+        "tests/test_studio_native_score_parity.py",
+        "tests/test_studio_native_python_reference_e2e.py",
+        "tests/test_studio_native_correction_triage.py",
+        "tests/test_studio_game_boy_rom_art_parity.py",
+        "tests/test_studio_production_blocker_taxonomy.py",
+        "tests/test_studio_native_console_animation_e2e.py",
+        "tests/test_studio_native_psg.py",
+        "tests/test_studio_native_source_media_parity.py",
+        "tests/test_studio_campaign_e2e.py",
+        "tests/test_studio_specialized_e2e_runner.py",
+        "tests/test_studio_execution_history_segments.py",
+        "tests/test_studio_compiled_psg_parity.py"
+      ]
+    }
+  ]
+}

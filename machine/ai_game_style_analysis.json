@@ -1,0 +1,14 @@
+{
+  "schema_version": "skeleton.ai.game_style_analysis.v1",
+  "status": "implementation_candidate",
+  "parent": "machine/ai_game_learning.json",
+  "canonical_owner": "skeleton/jeeves/game_style_analysis.py",
+  "mirrors": ["skeleton/ai/agents/jeeves/game_style_analysis.py"],
+  "scope": "Bounded original-game source profiles and descriptive feel metrics from actual recorded transitions under the existing Jeeves game owner",
+  "interfaces": ["SourceGameProfile.from_dict/as_dict/digest", "authored_game_profile", "profile_from_bundle", "analyze_play_traces"],
+  "evidence": "Every source mechanic distinguishes authored design, declared source claims and measured trace evidence. Cartridge metadata, lexical cues and authored analogs never become measured original-game behavior.",
+  "sources": "Exact origin, source and bundle digests plus rights/provenance references are retained. The application source owner performs current tenant/source/withdrawal admission; this pure analyzer does not issue authority.",
+  "bounds": {"profiles": 3, "profile_bytes": 131072, "traces": 64, "transitions_per_trace": 4096, "total_transitions": 131072, "analysis_bytes": 8388608},
+  "failure": "Nonfinite data, unsupported fields, inconsistent trace digests/chains/rewards, mismatched environments and unlabelled units reject. Metrics describe observed transitions; no inferred game mastery or commercial-game equivalence.",
+  "claims": {"production_promotion": false, "automated_tests_requested": false, "rom_behavior_inferred_from_headers": false, "source_asset_reuse": false}
+}

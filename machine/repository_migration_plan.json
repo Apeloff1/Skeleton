@@ -1,0 +1,391 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "canonical_source_only": true,
+    "compatibility_before_deletion": true,
+    "require_reference_audit": true,
+    "require_regression_validation": true,
+    "delete_legacy_only_after_zero_live_references": true
+  },
+  "batches": [
+    {
+      "id": "TREE-001",
+      "source": "skeleton/deployment/",
+      "destination": "skeleton/deploy/strategies/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/deployment/",
+      "notes": "Four deployment strategy implementations moved byte-identically; legacy module imports are shims."
+    },
+    {
+      "id": "TREE-002",
+      "source": "skeleton/contexts/",
+      "destination": "skeleton/context/domains/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/contexts/",
+      "notes": "Seven context-domain implementations moved byte-identically; plural namespace remains a shim."
+    },
+    {
+      "id": "TREE-003",
+      "source": "skeleton/application/",
+      "destination": "skeleton/app/runtime/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/application/",
+      "notes": "Fifty-one application modules moved to skeleton/app/runtime/; legacy skeleton/application modules are compatibility shims. Capability discovery/loading now resolves the canonical post-migration owners directly for application, swarm, pipelines, agents and content, eliminating runtime dependence on those compatibility roots."
+    },
+    {
+      "id": "TREE-004",
+      "source": "skeleton/persist/",
+      "destination": "skeleton/persistence/core/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/persist/",
+      "notes": "Seven persistence primitive modules moved byte-identically to skeleton/persistence/core/; skeleton/persist remains compatibility-only."
+    },
+    {
+      "id": "TREE-005",
+      "source": "core/shift_supervisor/",
+      "destination": "skeleton/automation/shift_supervisor/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "core/shift_supervisor/",
+      "notes": "Runtime Python moved under skeleton/automation, embedded assurance tests moved to tests/shift_supervisor, and human docs moved to docs/operations/shift-supervisor."
+    },
+    {
+      "id": "TREE-006",
+      "source": "core/activation_security.py",
+      "destination": "skeleton/security/activation_security.py",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "core/activation_security.py",
+      "notes": "Canonical implementation pre-existed under skeleton/security; the top-level core file is already a compatibility entrypoint."
+    },
+    {
+      "id": "TREE-007",
+      "source": "skeleton/architecture_index.py + skeleton/architecture_round*.py",
+      "destination": "skeleton/foundation/architecture/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/architecture_index.py + skeleton/architecture_round*.py",
+      "notes": "Architecture index and rounds 3-22 moved into a cohesive foundation/architecture namespace; legacy root modules remain compatibility shims, and the canonical index imports canonical round modules."
+    },
+    {
+      "id": "TREE-008",
+      "source": "skeleton/jvm_accelerators.py",
+      "destination": "skeleton/native/jvm_registry.py",
+      "mode": "move-with-shim",
+      "state": "canonicalized",
+      "compatibility": "skeleton/jvm_accelerators.py",
+      "notes": "The optional JVM accelerator registry moved byte-identically beside native runtime ownership. The root module is now a compatibility shim; the canonical AI runtime mirror remains byte-identical and its mapping source now follows skeleton/native/jvm_registry.py. The separate java-accelerators/ implementation root remains unchanged."
+    },
+    {
+      "id": "TREE-009",
+      "source": "skeleton/genesis.py",
+      "destination": "skeleton/bootstrap/genesis.py",
+      "mode": "move-with-shim",
+      "state": "canonicalized",
+      "compatibility": "skeleton/genesis.py",
+      "notes": "Genesis moved byte-identically into a dedicated canonical bootstrap namespace. The package root remains a compatibility shim, the governed AI runtime bootstrap mirror stays byte-identical, and AIFT-GENESIS now follows the canonical source path."
+    },
+    {
+      "id": "TREE-010",
+      "source": "skeleton/provider_contract.py",
+      "destination": "skeleton/providers/contract.py",
+      "mode": "move-with-shim",
+      "state": "canonicalized",
+      "compatibility": "skeleton/provider_contract.py",
+      "notes": "The provider-neutral contract moved byte-identically into a dedicated canonical providers namespace. The root module remains a compatibility shim; skeleton/provider_runtime.py remains owner-sensitive in place but now imports the canonical contract. The AI providers contract mirror remains byte-identical and its mapping source follows skeleton/providers/contract.py."
+    },
+    {
+      "id": "TREE-011",
+      "source": "skeleton/kv_cache.py",
+      "destination": "skeleton/kv/__init__.py",
+      "mode": "facade-convergence-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/kv_cache.py + skeleton/ai/runtime/inference/kv_cache.py",
+      "notes": "The duplicate KV-cache facade was collapsed onto the existing canonical skeleton.kv package surface. The root and legacy AI sibling remain compatibility shims; AIFT-KV-CACHE now binds identical canonical package __init__ files. This wave also removes the stale AIFT-NATIVE jvm_registry.py overlay exclusion after TREE-008 made that file part of both native trees."
+    },
+    {
+      "id": "TREE-012",
+      "source": "skeleton/frontier/ + skeleton/pipelines/ + skeleton/platform/",
+      "destination": ".machine/repository.toml canonical zones",
+      "mode": "taxonomy-classification",
+      "state": "classified",
+      "compatibility": null,
+      "notes": "Classified the final previously-unmentioned skeleton top-level runtime roots without moving code: frontier receives an explicit canonical frontier-runtime zone; pipelines joins build/Forge delivery ownership; platform joins simulation as the Godot adapter boundary."
+    },
+    {
+      "id": "TREE-013",
+      "source": "skeleton/platform/",
+      "destination": "skeleton/simulation/platform/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/platform/",
+      "notes": "The two-file Godot adapter package moved into canonical simulation ownership. godot_adapter.py moved byte-identically; the canonical package and AI simulation mirror are tree-identical. Legacy skeleton/platform remains compatibility-only, AIFT-PLATFORM follows the canonical path, and the parent AIFT-SIMULATION platform overlay was retired because platform is now present in both governed trees."
+    },
+    {
+      "id": "TREE-014",
+      "source": "skeleton/pipelines/",
+      "destination": "skeleton/forge/pipelines/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/pipelines/",
+      "notes": "Nineteen generation-pipeline modules moved under canonical Forge ownership. Eleven internal references were rewritten to skeleton.forge.pipelines; eight modules moved byte-identically. The canonical package is mirrored exactly at skeleton/ai/forge/pipelines, the legacy root remains compatibility-only, AIFT-PIPELINES follows the canonical path, and the parent AIFT-FORGE pipelines overlay was retired."
+    },
+    {
+      "id": "TREE-015",
+      "source": "skeleton/creator/",
+      "destination": "skeleton/forge/creator/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/creator/",
+      "notes": "The two-file engine-neutral creator intent compiler moved under canonical Forge ownership. intent_compiler.py moved byte-identically; package self-imports were rewritten to skeleton.forge.creator; the canonical creator subtree and AI Forge mirror are exact. AIFT-CREATOR follows the canonical path, and AIFT-FORGE no longer requires any overlay children."
+    },
+    {
+      "id": "TREE-016",
+      "source": "skeleton/frontier/{agent_runtime,capabilities,contracts,events,hyper_kv_cache,memory,memory_adapters,model_routing,model_runtime,operation_stream,operation_stream_store,operation_stream_store_mongo,orchestration,resilience,retrieval_context,runtime_events}.py",
+      "destination": "skeleton/frontier/runtime/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier runtime modules",
+      "notes": "Sixteen Frontier runtime/control-plane modules were extracted into skeleton/frontier/runtime/. Internal runtime imports and public frontier exports now target the nested canonical paths; flat module paths remain compatibility shims. The same transformation was applied to skeleton/ai/runtime/frontier, preserving exact whole-tree and runtime-subtree parity."
+    },
+    {
+      "id": "TREE-017",
+      "source": "skeleton/frontier/{achievement_adapters,achievements,encyclopedia,guild,logbook,lucky_wheel,quests,reputation,season_pass,tournament,vip,vip_daily}.py",
+      "destination": "skeleton/frontier/progression/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier progression/meta modules",
+      "notes": "Twelve Frontier progression/meta-game modules were extracted into skeleton/frontier/progression/. Internal progression/runtime references and public frontier exports now target canonical nested paths; flat module paths remain compatibility shims. The same transformation was applied to skeleton/ai/runtime/frontier, and biotope_achievement_adapters now imports canonical progression/runtime dependencies. Whole-tree source/AI parity remains exact."
+    },
+    {
+      "id": "TREE-018",
+      "source": "skeleton/frontier/{aquarium,aquarium_adapters,bait,biotope,biotope_achievement_adapters,biotope_adapters,breeding,breeding_adapters}.py",
+      "destination": "skeleton/frontier/ecology/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier ecology modules",
+      "notes": "Eight Frontier ecology/lifecycle modules were extracted into skeleton/frontier/ecology/. Internal ecology/runtime/progression references and public frontier exports now target canonical nested paths; flat module paths remain compatibility shims. The same transformation was applied to skeleton/ai/runtime/frontier, and cooking_adapters/gameplay now consume canonical ecology paths. Whole-tree source/AI parity remains exact."
+    },
+    {
+      "id": "TREE-019",
+      "source": "skeleton/frontier/{commerce,cooking,cooking_adapters,crafting,crafting_adapters,energy,energy_adapters,equipment}.py",
+      "destination": "skeleton/frontier/economy/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier economy modules",
+      "notes": "Eight Frontier economy/production modules were extracted into skeleton/frontier/economy/. Five modules had internal runtime/ecology/economy imports rewritten to canonical nested paths; crafting.py, energy.py, and equipment.py moved byte-identically. Public frontier exports now target the canonical economy modules, flat module paths remain compatibility shims, and the same transformation was applied to skeleton/ai/runtime/frontier with exact whole-tree parity."
+    },
+    {
+      "id": "TREE-020",
+      "source": "skeleton/frontier/{npc,npc_adapters,npc_profiles}.py",
+      "destination": "skeleton/frontier/characters/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier NPC modules",
+      "notes": "Three Frontier NPC/character modules were extracted into skeleton/frontier/characters/. npc.py and npc_profiles.py moved byte-identically; npc_adapters.py now imports the canonical character module. Public frontier exports target the nested paths, flat module paths remain compatibility shims, and the identical transformation was applied to skeleton/ai/runtime/frontier with exact whole-tree parity."
+    },
+    {
+      "id": "TREE-021",
+      "source": "skeleton/frontier/{gameplay,ship,world}.py",
+      "destination": "skeleton/frontier/game/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier game/world modules",
+      "notes": "The final three large Frontier gameplay/world modules were extracted into skeleton/frontier/game/. ship.py and world.py moved byte-identically; gameplay.py now consumes canonical ecology/economy paths. Public frontier exports target the nested ship/world modules, flat gameplay/ship/world paths remain compatibility shims, and the identical transformation was applied to skeleton/ai/runtime/frontier with exact whole-tree parity."
+    },
+    {
+      "id": "TREE-022",
+      "source": "skeleton/content/",
+      "destination": "skeleton/simulation/content/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/content/",
+      "notes": "The two-file Lorebuffa-derived domain-knowledge package moved byte-identically under canonical simulation ownership. The legacy root remains compatibility-only, AIFT-CONTENT follows skeleton/simulation/content, and the parent AIFT-SIMULATION content overlay was retired after exact governed-tree parity verification."
+    },
+    {
+      "id": "TREE-023",
+      "source": "skeleton/economy/",
+      "destination": "skeleton/simulation/economy/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/economy/",
+      "notes": "The six-file simulation economy package moved under canonical simulation ownership. Package-internal imports were rewritten to skeleton.simulation.economy while law.py, quota.py and treasury.py moved byte-identically. The legacy root remains compatibility-only, AIFT-ECONOMY follows the nested canonical path, and the parent AIFT-SIMULATION economy overlay was retired after exact governed-tree parity verification."
+    },
+    {
+      "id": "TREE-024",
+      "source": "skeleton/swarm/",
+      "destination": "skeleton/automation/swarm/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/swarm/",
+      "notes": "Twenty-one Swarm modules moved under canonical automation ownership. Nine modules with absolute self-imports were rewritten to canonical paths; remaining modules moved byte-identically. The legacy root is compatibility-only."
+    },
+    {
+      "id": "TREE-025",
+      "source": "skeleton/hive/",
+      "destination": "skeleton/automation/hive/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/hive/",
+      "notes": "Eight Hive modules moved under canonical automation ownership. Six modules with absolute self-imports were rewritten to canonical paths; remaining modules moved byte-identically. The legacy root is compatibility-only."
+    },
+    {
+      "id": "TREE-026",
+      "source": "skeleton/overseer/",
+      "destination": "skeleton/automation/overseer/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/overseer/",
+      "notes": "Sixteen Overseer modules moved under canonical automation ownership. Eight modules with absolute self-imports were rewritten to canonical paths; remaining modules moved byte-identically. The legacy root is compatibility-only."
+    },
+    {
+      "id": "TREE-027",
+      "source": "skeleton/world/",
+      "destination": "skeleton/simulation/world/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/world/",
+      "notes": "The two-file deterministic scene/world package moved byte-identically under canonical simulation ownership. The legacy root remains compatibility-only, AIFT-WORLD follows skeleton/simulation/world, and the parent AIFT-SIMULATION world overlay was retired after exact governed-tree parity verification, leaving only game as an overlay."
+    },
+    {
+      "id": "TREE-028",
+      "source": "skeleton/agents/",
+      "destination": "skeleton/automation/agents/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/agents/",
+      "notes": "Sixty-eight agent/swarm runtime modules moved under canonical automation ownership. Forty-one modules with absolute skeleton.agents self-imports were rewritten to skeleton.automation.agents; unchanged modules retained source blobs. The governed skeleton/ai/agents/core mirror received identical rewrites and remains exact tree-parity with the canonical package. The legacy skeleton.agents namespace is compatibility-only, and AIFT-AUTOMATION now treats agents as a governed overlay."
+    },
+    {
+      "id": "TREE-029",
+      "source": "skeleton/game/",
+      "destination": "skeleton/simulation/game/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/game/",
+      "notes": "The full 13-file game mechanics/replay package moved under canonical simulation ownership. Seven modules with absolute skeleton.game self-imports were rewritten to skeleton.simulation.game and mirrored identically into AI simulation; six modules moved byte-identically. The legacy root remains compatibility-only, AIFT-GAME follows the nested canonical path, and the final AIFT-SIMULATION game overlay was retired, making skeleton/simulation and skeleton/ai/simulation exact Git-tree mirrors."
+    },
+    {
+      "id": "TREE-030",
+      "source": "skeleton/school/",
+      "destination": "skeleton/learning/school/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/school/",
+      "notes": "Thirty-four School curriculum, assessment, learner-state, tutoring, code-intelligence and learning-control modules moved byte-identically under canonical skeleton/learning/school ownership. The legacy skeleton/school package is compatibility-only, while the governed skeleton/ai/learning/school mirror remains exact tree-parity. AIFT-LEARNING now retains only acquired.py as an overlay."
+    },
+    {
+      "id": "TREE-031",
+      "source": "skeleton/{circulation,hoag,motive,sheaf,spine,viscera}/",
+      "destination": ".machine/repository.toml research-lineage zone",
+      "mode": "taxonomy-classification",
+      "state": "classified",
+      "compatibility": null,
+      "notes": "Aligned repository taxonomy with the existing AI research map: circulation, HOAG, motive, sheaf, spine and viscera are historical/research-quarantine lineage with no production authority. Their source trees remain preserved for provenance and characterization; generic specialized-runtime support ownership now covers only unresolved cue, genos, parse and turn surfaces."
+    },
+    {
+      "id": "TREE-032",
+      "source": "apps/",
+      "destination": ".machine/repository.toml application-workspace zones",
+      "mode": "taxonomy-classification",
+      "state": "classified",
+      "compatibility": null,
+      "notes": "Classified the newly introduced top-level apps/ workspace. apps/jeeves receives specific Jeeves ownership as an operator-facing facade/CLI/plane layout, while the generic apps/ root is a support-layer application workspace. The classification explicitly prevents app facades from silently becoming source-of-truth runtime ownership."
+    },
+    {
+      "id": "TREE-033",
+      "source": "skeleton/era/",
+      "destination": "skeleton/simulation/era/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/era/",
+      "notes": "Six era-binding modules moved under canonical simulation ownership. Four modules with absolute skeleton.era self-imports were rewritten to skeleton.simulation.era; admit.py and law.py moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/simulation/era, the legacy root is compatibility-only, AIFT-ERA governs the nested owner, and full simulation/AI-simulation tree parity remains exact.",
+      "source_batch_id": "TREE-030"
+    },
+    {
+      "id": "TREE-034",
+      "source": "skeleton/social/",
+      "destination": "skeleton/research/social/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/social/",
+      "notes": "Eleven social/research evidence modules moved out of simulation ownership into canonical skeleton/research/social. Eight modules with absolute skeleton.social imports were rewritten to skeleton.research.social; all eleven canonical modules are mirrored exactly at skeleton/ai/research/social. The legacy root is compatibility-only, AIFT-SOCIAL now follows the canonical research source, and skeleton/research is no longer planned-but-absent.",
+      "source_batch_id": "TREE-031"
+    },
+    {
+      "id": "TREE-035",
+      "source": "skeleton/galaxy/",
+      "destination": "skeleton/distributed/galaxy/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/galaxy/",
+      "notes": "Twenty-seven Galaxy distributed-runtime modules moved out of simulation ownership into skeleton/distributed/galaxy. Sixteen modules with absolute skeleton.galaxy imports were rewritten to skeleton.distributed.galaxy; the remaining modules moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/galaxy, the legacy root is compatibility-only, AIFT-GALAXY follows the canonical distributed source, and skeleton/distributed is no longer planned-but-absent.",
+      "source_batch_id": "TREE-032"
+    },
+    {
+      "id": "TREE-036",
+      "source": "skeleton/network/",
+      "destination": "skeleton/distributed/network/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/network/",
+      "notes": "Four network/runtime modules moved from the generic platform bucket into canonical distributed ownership. __init__.py and model_placement.py were rewritten from skeleton.network to skeleton.distributed.network; remote_execution.py and replication.py moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/network and the legacy root is compatibility-only.",
+      "source_batch_id": "TREE-033"
+    },
+    {
+      "id": "TREE-037",
+      "source": "skeleton/mesh/",
+      "destination": "skeleton/distributed/mesh/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/mesh/",
+      "notes": "Ten mesh/distributed-runtime modules moved from the generic platform bucket into canonical skeleton/distributed/mesh ownership. capacity_qualification.py was rewritten from skeleton.mesh to skeleton.distributed.mesh; the other nine modules moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/mesh and the legacy root is compatibility-only.",
+      "source_batch_id": "TREE-034"
+    },
+    {
+      "id": "TREE-038",
+      "source": "skeleton/graphs/",
+      "destination": "skeleton/knowledge/graphs/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/graphs/",
+      "notes": "Thirteen graph/knowledge modules moved into canonical skeleton/knowledge/graphs. Eleven modules with absolute skeleton.graphs imports were rewritten to skeleton.knowledge.graphs; law.py and linalg.py moved semantically unchanged. The canonical child and full knowledge parent are mirrored exactly into skeleton/ai/runtime/knowledge, the legacy root is compatibility-only, AIFT-GRAPHS follows the canonical child, AIFT-KNOWLEDGE governs the parent, and skeleton/knowledge is no longer planned-but-absent.",
+      "source_batch_id": "TREE-035"
+    },
+    {
+      "id": "TREE-039",
+      "source": "skeleton/chronicle/",
+      "destination": "skeleton/provenance/chronicle/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/chronicle/",
+      "notes": "Seven Chronicle provenance modules moved out of the mixed knowledge bucket into canonical skeleton/provenance/chronicle. Five modules with absolute skeleton.chronicle imports were rewritten to skeleton.provenance.chronicle; helix.py and law.py moved semantically unchanged. The canonical child and full provenance parent are mirrored exactly into skeleton/ai/runtime/provenance, the legacy root is compatibility-only, AIFT-CHRONICLE follows the canonical child, AIFT-PROVENANCE governs the parent, and skeleton/provenance is no longer planned-but-absent.",
+      "source_batch_id": "TREE-036"
+    },
+    {
+      "id": "TREE-040",
+      "source": "skeleton/integrations/",
+      "destination": "skeleton/tools/integrations/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/integrations/",
+      "notes": "Four privileged integration-edge modules moved into canonical skeleton/tools/integrations. Only __init__.py required an absolute namespace rewrite; connector, GitHub and webhook implementations moved semantically unchanged. The canonical child and full tools parent are mirrored exactly into skeleton/ai/runtime/tools, the legacy root is compatibility-only, AIFT-INTEGRATIONS follows the canonical child, AIFT-TOOLS governs the parent, and skeleton/tools is no longer planned-but-absent.",
+      "source_batch_id": "TREE-037"
+    },
+    {
+      "id": "TREE-041",
+      "source": "skeleton/{era,galaxy,organism,social}/ + .machine/repository.toml",
+      "destination": ".machine/repository.toml refined runtime ownership zones",
+      "mode": "taxonomy-classification",
+      "state": "classified",
+      "compatibility": null,
+      "notes": "Refined the over-broad simulation owner without moving code. Galaxy follows its AIFT distributed/multi-agent runtime contract under ai-runtime; Social follows its AIFT research-evidence intake contract as transitional/no-serving-authority; Organism is isolated as owner-sensitive core support with security-owned secret exceptions preserved; Era is classified as historical GB-39 lineage. The simulation zone now owns only skeleton/simulation/ and the Godot pointer surface. Merge reconciliation: the original TREE-033 identifier collides with the integrated Era migration and is retained as source_batch_id. Existing TREE-033 through TREE-040 migrations remain authoritative: Galaxy, Social and Era legacy roots are compatibility surfaces, with canonical owners at skeleton/distributed/galaxy, skeleton/research/social and skeleton/simulation/era. Organism receives its separate core-support zone. No duplicate prefix owners or reverse migrations are introduced.",
+      "source_batch_id": "TREE-033",
+      "source_commit": "f5e19db27aceaa22224b9dce247eecd2cb30d0f6"
+    }
+  ]
+}

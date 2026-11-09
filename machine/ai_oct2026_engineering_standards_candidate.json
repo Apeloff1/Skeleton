@@ -1,0 +1,118 @@
+{
+  "schema_version": "skeleton.ai.oct2026_engineering_standards_candidate.v1",
+  "candidate_id": "P3-DEFERRED-OCT2026-STANDARDS-01",
+  "status": "implementation_candidate",
+  "source_frontier": "machine/ai_masterplan_continuation_frontier.json",
+  "master_plan": "machine/ai_master_plan.json",
+  "ai_file_tree": "machine/ai_file_tree.json",
+  "source_queue_state": "queued_unmodified",
+  "volume_refs": [
+    "VOL-221",
+    "VOL-222",
+    "VOL-223",
+    "VOL-224",
+    "VOL-225",
+    "VOL-226",
+    "VOL-227",
+    "VOL-228",
+    "VOL-229",
+    "VOL-230",
+    "VOL-231",
+    "VOL-232",
+    "VOL-233",
+    "VOL-234"
+  ],
+  "primary_implementation_by_volume": {
+    "VOL-221": "skeleton/ai/governance/cards.py",
+    "VOL-222": "skeleton/ai/governance/cards.py",
+    "VOL-223": "skeleton/ai/governance/cards.py",
+    "VOL-224": "skeleton/ai/governance/cards.py",
+    "VOL-225": "skeleton/ai/governance/health.py",
+    "VOL-226": "skeleton/ai/governance/health.py",
+    "VOL-227": "skeleton/ai/providers/provider_risk.py",
+    "VOL-228": "skeleton/ai/providers/failover.py",
+    "VOL-229": "skeleton/ai/providers/offline_mode.py",
+    "VOL-230": "skeleton/security/air_gap.py",
+    "VOL-231": "skeleton/ai/runtime/deployment_profiles.py",
+    "VOL-232": "skeleton/ai/runtime/deployment_profiles.py",
+    "VOL-233": "skeleton/security/identity_federation.py",
+    "VOL-234": "skeleton/ai/governance/administration.py"
+  },
+  "primary_test_by_volume": {
+    "VOL-221": "skeleton/testing/test_model_cards.py",
+    "VOL-222": "skeleton/testing/test_dataset_cards.py",
+    "VOL-223": "skeleton/testing/test_tool_cards.py",
+    "VOL-224": "skeleton/testing/test_agent_cards.py",
+    "VOL-225": "skeleton/testing/test_component_health_scorecard.py",
+    "VOL-226": "skeleton/testing/test_dependency_health.py",
+    "VOL-227": "skeleton/testing/test_provider_risk.py",
+    "VOL-228": "skeleton/testing/test_provider_failover.py",
+    "VOL-229": "skeleton/testing/test_offline_mode.py",
+    "VOL-230": "skeleton/testing/test_air_gapped_profile.py",
+    "VOL-231": "skeleton/testing/test_edge_deployment.py",
+    "VOL-232": "skeleton/testing/test_enterprise_deployment.py",
+    "VOL-233": "skeleton/testing/test_identity_federation.py",
+    "VOL-234": "skeleton/testing/test_administration_plane.py"
+  },
+  "shared_review_module": "skeleton/ai/governance/engineering_standards_review.py",
+  "shared_review_test": "skeleton/testing/test_engineering_standards_review.py",
+  "cross_plane_tests": [
+    "skeleton/testing/test_provider_contract.py",
+    "skeleton/testing/test_provider_context_binding.py",
+    "skeleton/testing/test_artifact_trust.py",
+    "skeleton/testing/test_sbom.py",
+    "skeleton/testing/test_security_boundaries.py"
+  ],
+  "security_mirror_pairs": [
+    [
+      "skeleton/security/air_gap.py",
+      "skeleton/ai/runtime/security/air_gap.py"
+    ],
+    [
+      "skeleton/security/identity_federation.py",
+      "skeleton/ai/runtime/security/identity_federation.py"
+    ]
+  ],
+  "owner_contract": {
+    "AIFT-NATIVE-GOVERNANCE-ROOT": [
+      "VOL-221",
+      "VOL-222",
+      "VOL-223",
+      "VOL-224",
+      "VOL-225",
+      "VOL-226",
+      "VOL-234"
+    ],
+    "AIFT-NATIVE-PROVIDERS-ROOT": [
+      "VOL-227",
+      "VOL-228",
+      "VOL-229"
+    ],
+    "AIFT-SECURITY": [
+      "VOL-230",
+      "VOL-233"
+    ],
+    "AIFT-NATIVE-RUNTIME-ROOT": [
+      "VOL-231",
+      "VOL-232"
+    ]
+  },
+  "evidence_policy": {
+    "exact_head_ci_required": true,
+    "independent_closure_required": true,
+    "queued_frontier_must_remain_unchanged": true,
+    "fail_closed_authority_required": true,
+    "content_addressed_evidence_required": true,
+    "least_privilege_admin_required": true,
+    "capability_safe_failover_required": true,
+    "network_explicitness_required": true,
+    "completion_may_not_be_self_granted": true
+  },
+  "promotion_state": {
+    "completion_checkbox": false,
+    "implementation_signed": false,
+    "verification_signed": false,
+    "may_self_close": false,
+    "production_authority": false
+  }
+}

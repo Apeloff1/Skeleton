@@ -1,0 +1,2989 @@
+{
+  "schema_version": "skeleton.definition_of_done.v1",
+  "policy_version": "0.1.0",
+  "status": "active",
+  "purpose": "Unify maturity/evidence DoD with change-impact triggers and signed atomic accountability.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-110",
+    "title": "Definition of Done",
+    "required_gap_texts": []
+  },
+  "sources": [
+    "machine/ai_build_queue.json",
+    "machine/ai_engineering_task_matrix.json",
+    "machine/ai_build_accountability.json",
+    "machine/master_traceability.json",
+    "machine/ai_edge_case_priority_queue.json"
+  ],
+  "tasks": [
+    {
+      "task_id": "AIQ-S0-STATE-01",
+      "accountability_id": "ACC-AIQ-S0-STATE-01",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "acceptance": [
+        "authoritative-versus-derived repository tests",
+        "RAG migration tests"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "migration",
+        "property",
+        "replay",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "schema rollback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-STATE-02",
+      "accountability_id": "ACC-AIQ-S0-STATE-02",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "acceptance": [
+        "operation state/event fault test",
+        "restart recovery"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "migration",
+        "property",
+        "replay",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "schema rollback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-STATE-03",
+      "accountability_id": "ACC-AIQ-S0-STATE-03",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "acceptance": [
+        "Mongo backup/restore drill",
+        "derived-store loss/rebuild",
+        "authoritative restore digest and index verification",
+        "derived rebuild ordering fail-closed",
+        "live isolated Mongo recovery workflow"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "migration",
+        "property",
+        "replay",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "schema rollback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-GOV-01",
+      "accountability_id": "ACC-AIQ-S0-GOV-01",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "acceptance": [
+        "registration/classification tests",
+        "cross-tenant denial"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "contract",
+        "crash recovery",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "retrieval eval",
+        "temporal eval",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "degraded lexical path",
+        "index rebuild",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
+        "schema rollback",
+        "tombstone-safe restore",
+        "version pin/fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-GOV-02",
+      "accountability_id": "ACC-AIQ-S0-GOV-02",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "acceptance": [
+        "delete propagation",
+        "export completeness",
+        "retention expiry"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "contract",
+        "crash recovery",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "retrieval eval",
+        "temporal eval",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "degraded lexical path",
+        "index rebuild",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
+        "schema rollback",
+        "tombstone-safe restore",
+        "version pin/fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-GOV-03",
+      "accountability_id": "ACC-AIQ-S0-GOV-03",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "acceptance": [
+        "audit receipt linkage",
+        "redaction tests"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "contract",
+        "crash recovery",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "retrieval eval",
+        "temporal eval",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "degraded lexical path",
+        "index rebuild",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
+        "schema rollback",
+        "tombstone-safe restore",
+        "version pin/fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-COST-01",
+      "accountability_id": "ACC-AIQ-S0-COST-01",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "acceptance": [
+        "durable quota restart",
+        "reservation race"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "load",
+        "long-horizon",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "circuit break",
+        "route fallback",
+        "safe default",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-COST-02",
+      "accountability_id": "ACC-AIQ-S0-COST-02",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "acceptance": [
+        "actual-vs-estimated usage",
+        "unknown-usage behavior"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "load",
+        "long-horizon",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "circuit break",
+        "route fallback",
+        "safe default",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-COST-03",
+      "accountability_id": "ACC-AIQ-S0-COST-03",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "acceptance": [
+        "multi-worker saturation",
+        "noisy-neighbor fairness"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "load",
+        "long-horizon",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "circuit break",
+        "route fallback",
+        "safe default",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-PROV-01",
+      "accountability_id": "ACC-AIQ-S0-PROV-01",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "acceptance": [
+        "provider-surface inventory",
+        "SDK isolation"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "contract",
+        "fault injection",
+        "integration",
+        "load",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "circuit break",
+        "fallback/abort",
+        "provider quarantine",
+        "route fallback",
+        "safe default",
+        "stream reconciliation"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-PROV-02",
+      "accountability_id": "ACC-AIQ-S0-PROV-02",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "acceptance": [
+        "shadow provider denial",
+        "text/image/speech regression"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "contract",
+        "fault injection",
+        "integration",
+        "load",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "circuit break",
+        "fallback/abort",
+        "provider quarantine",
+        "route fallback",
+        "safe default",
+        "stream reconciliation"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-PROV-03",
+      "accountability_id": "ACC-AIQ-S0-PROV-03",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "acceptance": [
+        "provider bootstrap gate",
+        "application credential-read isolation"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "contract",
+        "fault injection",
+        "integration",
+        "load",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "circuit break",
+        "fallback/abort",
+        "provider quarantine",
+        "route fallback",
+        "safe default",
+        "stream reconciliation"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-CONV-01",
+      "accountability_id": "ACC-AIQ-S1-CONV-01",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance": [
+        "client-history injection denial",
+        "message idempotency",
+        "concurrent append"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "long-horizon",
+        "migration",
+        "property",
+        "regression",
+        "replay",
+        "simulation",
+        "token-budget",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "checkpoint/abort",
+        "cursor resync",
+        "dead-letter/replay",
+        "evidence omission signal",
+        "poison-event isolation",
+        "safe minimal context fallback",
+        "safe terminal response",
+        "schema rollback",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-CONV-02",
+      "accountability_id": "ACC-AIQ-S1-CONV-02",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance": [
+        "operation/result binding",
+        "edit/regenerate branching"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "long-horizon",
+        "migration",
+        "property",
+        "regression",
+        "replay",
+        "simulation",
+        "token-budget",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "checkpoint/abort",
+        "cursor resync",
+        "dead-letter/replay",
+        "evidence omission signal",
+        "poison-event isolation",
+        "safe minimal context fallback",
+        "safe terminal response",
+        "schema rollback",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-CONV-03",
+      "accountability_id": "ACC-AIQ-S1-CONV-03",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance": [
+        "refresh reconstruction",
+        "delete/export"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "long-horizon",
+        "migration",
+        "property",
+        "regression",
+        "replay",
+        "simulation",
+        "token-budget",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "checkpoint/abort",
+        "cursor resync",
+        "dead-letter/replay",
+        "evidence omission signal",
+        "poison-event isolation",
+        "safe minimal context fallback",
+        "safe terminal response",
+        "schema rollback",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-MEM-01",
+      "accountability_id": "ACC-AIQ-S1-MEM-01",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "acceptance": [
+        "durable restart",
+        "namespace isolation"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "retrieval eval",
+        "temporal eval",
+        "token-budget"
+      ],
+      "recovery_requirements": [
+        "degraded lexical path",
+        "evidence omission signal",
+        "index rebuild",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "safe minimal context fallback",
+        "tombstone-safe restore",
+        "version pin/fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-MEM-02",
+      "accountability_id": "ACC-AIQ-S1-MEM-02",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "acceptance": [
+        "write policy/provenance",
+        "dedupe/version"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "retrieval eval",
+        "temporal eval",
+        "token-budget"
+      ],
+      "recovery_requirements": [
+        "degraded lexical path",
+        "evidence omission signal",
+        "index rebuild",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "safe minimal context fallback",
+        "tombstone-safe restore",
+        "version pin/fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-MEM-03",
+      "accountability_id": "ACC-AIQ-S1-MEM-03",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "acceptance": [
+        "vector loss/rebuild",
+        "process-memory loss",
+        "delete/export/expiry"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "retrieval eval",
+        "temporal eval",
+        "token-budget"
+      ],
+      "recovery_requirements": [
+        "degraded lexical path",
+        "evidence omission signal",
+        "index rebuild",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "safe minimal context fallback",
+        "tombstone-safe restore",
+        "version pin/fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-01",
+      "accountability_id": "ACC-AIQ-S1-TOOL-01",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "acceptance": [
+        "manifest/schema fuzz",
+        "receipt lineage"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "authorization matrix",
+        "budget",
+        "contract",
+        "fault",
+        "long-horizon",
+        "policy mutation",
+        "sandbox",
+        "side-effect replay",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "compensation",
+        "decision invalidation",
+        "fail closed",
+        "idempotency replay",
+        "policy rollback",
+        "revoke/disable tool",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-02",
+      "accountability_id": "ACC-AIQ-S1-TOOL-02",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "acceptance": [
+        "sandbox escape/resource",
+        "database scope",
+        "network egress/result bounds"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "authorization matrix",
+        "budget",
+        "contract",
+        "fault",
+        "long-horizon",
+        "policy mutation",
+        "sandbox",
+        "side-effect replay",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "compensation",
+        "decision invalidation",
+        "fail closed",
+        "idempotency replay",
+        "policy rollback",
+        "revoke/disable tool",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-03",
+      "accountability_id": "ACC-AIQ-S1-TOOL-03",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "acceptance": [
+        "authority/approval",
+        "idempotency/replay",
+        "compatibility delegation"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "authorization matrix",
+        "budget",
+        "contract",
+        "fault",
+        "long-horizon",
+        "policy mutation",
+        "sandbox",
+        "side-effect replay",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "compensation",
+        "decision invalidation",
+        "fail closed",
+        "idempotency replay",
+        "policy rollback",
+        "revoke/disable tool",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-CTX-01",
+      "accountability_id": "ACC-AIQ-S2-CTX-01",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "acceptance": [
+        "deterministic packing",
+        "tenant/data authorization",
+        "oversized evidence"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "property",
+        "regression",
+        "token-budget"
+      ],
+      "recovery_requirements": [
+        "evidence omission signal",
+        "safe minimal context fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-CTX-02",
+      "accountability_id": "ACC-AIQ-S2-CTX-02",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "acceptance": [
+        "instruction policy source ownership/parity",
+        "policy rollback/digest"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "property",
+        "regression",
+        "token-budget"
+      ],
+      "recovery_requirements": [
+        "evidence omission signal",
+        "safe minimal context fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-CTX-03",
+      "accountability_id": "ACC-AIQ-S2-CTX-03",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "acceptance": [
+        "context digest stability",
+        "legacy route delegation",
+        "prompt injection"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "property",
+        "regression",
+        "token-budget"
+      ],
+      "recovery_requirements": [
+        "evidence omission signal",
+        "safe minimal context fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-01",
+      "accountability_id": "ACC-AIQ-S2-PROTO-01",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "acceptance": [
+        "structured schema",
+        "native type isolation"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "compatibility",
+        "contract",
+        "fault injection",
+        "fuzz",
+        "integration",
+        "property",
+        "schema"
+      ],
+      "recovery_requirements": [
+        "fallback/abort",
+        "migration/rollback fixture",
+        "provider quarantine",
+        "stream reconciliation",
+        "versioned decoder fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-02",
+      "accountability_id": "ACC-AIQ-S2-PROTO-02",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "acceptance": [
+        "tool normalization",
+        "unoffered tool denial",
+        "usage/finish",
+        "cancel/deadline"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "compatibility",
+        "contract",
+        "fault injection",
+        "fuzz",
+        "integration",
+        "property",
+        "schema"
+      ],
+      "recovery_requirements": [
+        "fallback/abort",
+        "migration/rollback fixture",
+        "provider quarantine",
+        "stream reconciliation",
+        "versioned decoder fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-03",
+      "accountability_id": "ACC-AIQ-S2-PROTO-03",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "acceptance": [
+        "stream finalization",
+        "text/media compatibility"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "compatibility",
+        "contract",
+        "fault injection",
+        "fuzz",
+        "integration",
+        "property",
+        "schema"
+      ],
+      "recovery_requirements": [
+        "fallback/abort",
+        "migration/rollback fixture",
+        "provider quarantine",
+        "stream reconciliation",
+        "versioned decoder fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S3-VER-01",
+      "accountability_id": "ACC-AIQ-S3-VER-01",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "acceptance": [
+        "structural verification",
+        "policy level selection"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "deterministic checks",
+        "graph property",
+        "independent verifier",
+        "long-horizon",
+        "provenance",
+        "simulation",
+        "temporal eval"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "escalation",
+        "evidence refresh",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reject/redo",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S3-VER-02",
+      "accountability_id": "ACC-AIQ-S3-VER-02",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "acceptance": [
+        "claim grounding",
+        "citation integrity",
+        "tool postcondition"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "deterministic checks",
+        "graph property",
+        "independent verifier",
+        "long-horizon",
+        "provenance",
+        "simulation",
+        "temporal eval"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "escalation",
+        "evidence refresh",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reject/redo",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S3-VER-03",
+      "accountability_id": "ACC-AIQ-S3-VER-03",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "acceptance": [
+        "model verifier routing",
+        "repair lineage",
+        "high-impact block",
+        "self-confidence non-authority"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "deterministic checks",
+        "graph property",
+        "independent verifier",
+        "long-horizon",
+        "provenance",
+        "simulation",
+        "temporal eval"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "escalation",
+        "evidence refresh",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reject/redo",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-01",
+      "accountability_id": "ACC-AIQ-S4-EXEC-01",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "acceptance": [
+        "contract serialization",
+        "checkpoint compare-and-set"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "long-horizon",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-02",
+      "accountability_id": "ACC-AIQ-S4-EXEC-02",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "acceptance": [
+        "prompt-only loop",
+        "tool loop",
+        "approval wait/resume",
+        "budget/deadline/cancel"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "long-horizon",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-03",
+      "accountability_id": "ACC-AIQ-S4-EXEC-03",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "acceptance": [
+        "crash/replay",
+        "no duplicate side effect",
+        "full evidence binding"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "long-horizon",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S5-ENG-01",
+      "accountability_id": "ACC-AIQ-S5-ENG-01",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance": [
+        "service/delegated auth",
+        "submit idempotency"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation",
+        "state-machine"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "client backoff",
+        "cursor resync",
+        "dead-letter/replay",
+        "idempotent submit",
+        "orphan cleanup",
+        "poison-event isolation",
+        "safe restart",
+        "safe terminal response",
+        "startup rollback",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S5-ENG-02",
+      "accountability_id": "ACC-AIQ-S5-ENG-02",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance": [
+        "trace/deadline/budget propagation",
+        "engine outage",
+        "status/result"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation",
+        "state-machine"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "client backoff",
+        "cursor resync",
+        "dead-letter/replay",
+        "idempotent submit",
+        "orphan cleanup",
+        "poison-event isolation",
+        "safe restart",
+        "safe terminal response",
+        "startup rollback",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S5-ENG-03",
+      "accountability_id": "ACC-AIQ-S5-ENG-03",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance": [
+        "process credential isolation",
+        "no local fallback",
+        "cross-service golden trace"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation",
+        "state-machine"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "client backoff",
+        "cursor resync",
+        "dead-letter/replay",
+        "idempotent submit",
+        "orphan cleanup",
+        "poison-event isolation",
+        "safe restart",
+        "safe terminal response",
+        "startup rollback",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-01",
+      "accountability_id": "ACC-AIQ-S6-STREAM-01",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance": [
+        "ordered/duplicate/out-of-order reducer tests"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "client backoff",
+        "cursor resync",
+        "dead-letter/replay",
+        "idempotent submit",
+        "poison-event isolation",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-02",
+      "accountability_id": "ACC-AIQ-S6-STREAM-02",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance": [
+        "disconnect/reconnect",
+        "cursor compaction resync",
+        "multi-client cursors"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "client backoff",
+        "cursor resync",
+        "dead-letter/replay",
+        "idempotent submit",
+        "poison-event isolation",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-03",
+      "accountability_id": "ACC-AIQ-S6-STREAM-03",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance": [
+        "slow client",
+        "cancel race",
+        "terminal finality"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "client backoff",
+        "cursor resync",
+        "dead-letter/replay",
+        "idempotent submit",
+        "poison-event isolation",
+        "safe terminal response",
+        "strategy downgrade"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S7-E2E-01",
+      "accountability_id": "ACC-AIQ-S7-E2E-01",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance": [
+        "deterministic assembled topology smoke"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "budget",
+        "cancellation",
+        "compatibility",
+        "contract",
+        "crash recovery",
+        "fault",
+        "fault injection",
+        "fuzz",
+        "graph property",
+        "integration",
+        "lifecycle",
+        "load",
+        "long-horizon",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "replay",
+        "retrieval eval",
+        "schema",
+        "simulation",
+        "state-machine",
+        "temporal eval",
+        "token-budget",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "checkpoint/abort",
+        "circuit break",
+        "cursor resync",
+        "dead-letter/replay",
+        "degraded lexical path",
+        "evidence omission signal",
+        "fallback/abort",
+        "index rebuild",
+        "migration/rollback fixture",
+        "orphan cleanup",
+        "poison-event isolation",
+        "provider quarantine",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
+        "route fallback",
+        "safe default",
+        "safe minimal context fallback",
+        "safe restart",
+        "safe terminal response",
+        "schema rollback",
+        "startup rollback",
+        "strategy downgrade",
+        "stream reconciliation",
+        "tombstone-safe restore",
+        "version pin/fallback",
+        "versioned decoder fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S7-E2E-02",
+      "accountability_id": "ACC-AIQ-S7-E2E-02",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance": [
+        "browser E2E",
+        "API contract",
+        "trace/receipt assertions"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "budget",
+        "cancellation",
+        "compatibility",
+        "contract",
+        "crash recovery",
+        "fault",
+        "fault injection",
+        "fuzz",
+        "graph property",
+        "integration",
+        "lifecycle",
+        "load",
+        "long-horizon",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "replay",
+        "retrieval eval",
+        "schema",
+        "simulation",
+        "state-machine",
+        "temporal eval",
+        "token-budget",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "checkpoint/abort",
+        "circuit break",
+        "cursor resync",
+        "dead-letter/replay",
+        "degraded lexical path",
+        "evidence omission signal",
+        "fallback/abort",
+        "index rebuild",
+        "migration/rollback fixture",
+        "orphan cleanup",
+        "poison-event isolation",
+        "provider quarantine",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
+        "route fallback",
+        "safe default",
+        "safe minimal context fallback",
+        "safe restart",
+        "safe terminal response",
+        "schema rollback",
+        "startup rollback",
+        "strategy downgrade",
+        "stream reconciliation",
+        "tombstone-safe restore",
+        "version pin/fallback",
+        "versioned decoder fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    },
+    {
+      "task_id": "AIQ-S7-E2E-03",
+      "accountability_id": "ACC-AIQ-S7-E2E-03",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance": [
+        "fault injection",
+        "no duplicate side effect",
+        "release evidence completeness"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "budget",
+        "cancellation",
+        "compatibility",
+        "contract",
+        "crash recovery",
+        "fault",
+        "fault injection",
+        "fuzz",
+        "graph property",
+        "integration",
+        "lifecycle",
+        "load",
+        "long-horizon",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "replay",
+        "retrieval eval",
+        "schema",
+        "simulation",
+        "state-machine",
+        "temporal eval",
+        "token-budget",
+        "transaction"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "checkpoint/abort",
+        "circuit break",
+        "cursor resync",
+        "dead-letter/replay",
+        "degraded lexical path",
+        "evidence omission signal",
+        "fallback/abort",
+        "index rebuild",
+        "migration/rollback fixture",
+        "orphan cleanup",
+        "poison-event isolation",
+        "provider quarantine",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
+        "route fallback",
+        "safe default",
+        "safe minimal context fallback",
+        "safe restart",
+        "safe terminal response",
+        "schema rollback",
+        "startup rollback",
+        "strategy downgrade",
+        "stream reconciliation",
+        "tombstone-safe restore",
+        "version pin/fallback",
+        "versioned decoder fallback"
+      ],
+      "change_impact_triggers": [
+        "authoritative state or lifecycle change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
+        "retry/recovery/idempotency semantics change",
+        "security/trust/permission boundary change"
+      ],
+      "done_requires": [
+        "queue task behavior/acceptance satisfied",
+        "implementation signoff bound to exact Git SHA and evidence",
+        "independent verification signoff or explicit governed independence exception",
+        "required engineering evidence present for applicable dimensions",
+        "affected hard edge obligations passing or accepted risk",
+        "rollback/recovery behavior proven where applicable"
+      ]
+    }
+  ],
+  "maturity_rules": {
+    "unverified": [
+      "no strong completion claim"
+    ],
+    "implemented": [
+      "all task acceptance",
+      "implementation signoff",
+      "exact-head focused evidence",
+      "no unresolved applicable hard blocker"
+    ],
+    "verified": [
+      "implemented requirements",
+      "independent verification signoff",
+      "required recovery/compatibility evidence",
+      "trace impact revalidated"
+    ]
+  },
+  "change_impact_rule": "Changed trace authorities and task change_impact_triggers expand DoD obligations; a smaller local test set cannot erase inherited requirements.",
+  "non_compensable": [
+    "hard blockers",
+    "missing implementation signoff",
+    "missing independent verification",
+    "required recovery/rollback evidence",
+    "security/trust boundary evidence"
+  ]
+}

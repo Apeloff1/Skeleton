@@ -1,0 +1,70 @@
+name: Bug report
+description: Report a reproducible runtime, install, CLI, UI, or data integrity defect.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Provide an exact revision and a minimal reproduction. Do not paste credentials,
+        personal data, proprietary ROMs, or unsafe payloads into a public issue.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected surface
+      options:
+        - Jeeves / model runtime
+        - Dragon / training
+        - Game engines / emulation
+        - Galaxy Studio / Academy / UI
+        - CLI / shell
+        - Build / installation
+        - CI / repository
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Exact commit or version
+      placeholder: Full commit SHA, release, or unknown
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the command, inputs, environment, and minimal ordered steps.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Observed behavior and redacted evidence
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Regression proof and completion criteria
+      description: Describe the smallest exact-head test demonstrating the fix.
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      options:
+        - Installation or execution blocker
+        - Security, privacy, rights, or corruption risk
+        - Functional regression
+        - Usability or cosmetic defect
+        - Needs triage
+    validations:
+      required: true

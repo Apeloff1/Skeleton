@@ -1,0 +1,81 @@
+base_manifest_version: 11
+predecessor: docs/lineage/promotion-manifest-v11-supplement.yaml
+canonical_repository: Apeloff1/Skeleton
+strategy: selective-promotion
+status: post-v11-supplement-wave-17
+waves:
+  - wave: 16
+    surface: biotope-progression
+    decision: promote-once-exact-shared-lineage
+    source_blob: b79a167a3b568477e7db1fa95d64fc3949171a7e
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/biotope_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/biotope_routes.py
+    targets:
+      - skeleton/frontier/biotope.py
+      - skeleton/frontier/biotope_adapters.py
+    hardening:
+      - canonical-stage-catalog-binding
+      - duplicate-and-gapped-stage-topology-rejection
+      - explicit-boat-gating
+      - multi-threshold-mastery-rollover
+      - canonical-progress-digest
+      - fail-closed-event-rehydration
+    evidence:
+      - skeleton/testing/test_frontier_biotope_policy.py
+      - skeleton/testing/test_frontier_biotope_event_memory.py
+      - skeleton/testing/test_frontier_biotope_benchmark.py
+      - scripts/benchmark_frontier_biotope.py
+      - docs/lineage/BIOTOPE_PROMOTION_2026-09-15.md
+  - wave: 17
+    surface: guild-team-policy
+    decision: promote-once-exact-shared-lineage
+    source_blob: 02bfb09c1c1b57b919aa0128c3ecf5f2eb94e41f
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/guild_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/guild_routes.py
+    targets:
+      - skeleton/frontier/guild.py
+    hardening:
+      - exactly-one-leader-invariant
+      - derived-member-capacity
+      - contribution-threshold-rank-enforcement
+      - contribution-type-allowlist
+      - multi-threshold-guild-xp-rollover
+      - bounded-challenge-duration-and-types
+      - two-sided-stake-preflight
+      - explicit-escrow-funded-state
+      - max-semantics-for-biggest-fish
+      - wallet-neutral-payout-plans
+    evidence:
+      - skeleton/testing/test_frontier_guild_policy.py
+      - docs/lineage/GUILD_PROMOTION_2026-09-15.md
+rejected_from_kernel:
+  - source-catalogs
+  - fastapi-routes
+  - pydantic-request-models
+  - motor-mongodb-clients
+  - chat-persistence
+  - search-and-leaderboard-queries
+  - wallet-mutation
+  - provider-specific-persistence
+benchmark_policy:
+  timing: observational-only
+  correctness: gated
+next_candidate:
+  surface: biotope-achievements
+  disposition: compare-with-existing-generic-achievement-kernel-before-promotion
+  shared_blob: 5a06312eebf8bb21fef28b1010dfc3ccff6b6500
+  compared_sources:
+    - repository: Apeloff1/Lorebuffa
+      path: backend/biotope_achievements_routes.py
+    - repository: Apeloff1/Openworld
+      path: backend/biotope_achievements_routes.py
+  caution:
+    - do-not-duplicate-existing-skeleton-frontier-achievements.py
+    - source-record-catch-does-not-maintain-all-catalog-requirement-stats
+    - prefer-adapter-or-evidence-layer-over-second-achievement-engine

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:character_generation:v1",
+  "title": "FLGB-14 character generation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "character_id",
+    "archetype",
+    "seed_digest",
+    "canon_digest",
+    "trait_ids"
+  ],
+  "properties": {
+    "character_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "archetype": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "seed_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "canon_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "trait_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  }
+}

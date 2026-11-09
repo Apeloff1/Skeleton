@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:lod_system:v1",
+  "title": "FLGB-11 lod system",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "level",
+    "enter_distance_mm",
+    "asset_digest"
+  ],
+  "properties": {
+    "level": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 63
+    },
+    "enter_distance_mm": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "asset_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

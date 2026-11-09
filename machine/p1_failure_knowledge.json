@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "ledger_id": "p1-failure-knowledge",
+  "ledger_version": 1,
+  "task_id": "P1-LEARN-06",
+  "accountability_ref": "ACC-P1-LEARN-06",
+  "authority": "machine/p1_failure_knowledge.json",
+  "regression_authority": "machine/p1_regression_corpus.json",
+  "policy": {
+    "production_authority": false,
+    "direct_self_modify": false,
+    "immutable_record_identity": true,
+    "additive_history_only": true,
+    "required_source_kinds": [
+      "counterexample",
+      "failed_experiment",
+      "incident",
+      "rejected_design"
+    ]
+  },
+  "records": [
+    {
+      "record_id": "failure-spec-game-001",
+      "version": 1,
+      "sequence": 1,
+      "source_kind": "incident",
+      "source_ref": "incident:spec-game-001",
+      "source_digest": "1010101010101010101010101010101010101010101010101010101010101010",
+      "failure_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+      "summary": "Specification gaming incident is retained as permanent promotion-blocking knowledge.",
+      "root_cause_digest": "1212121212121212121212121212121212121212121212121212121212121212",
+      "disposition": "regression_covered",
+      "regression_case_id": "spec-game-001",
+      "regression_case_version": 1,
+      "evidence_refs": [
+        {
+          "source": "failure://incident/spec-game-001",
+          "digest": "1313131313131313131313131313131313131313131313131313131313131313",
+          "category": "failure_knowledge"
+        }
+      ]
+    },
+    {
+      "record_id": "failure-reasoning-001",
+      "version": 1,
+      "sequence": 2,
+      "source_kind": "failed_experiment",
+      "source_ref": "experiment:reasoning-001",
+      "source_digest": "2020202020202020202020202020202020202020202020202020202020202020",
+      "failure_fingerprint": "2121212121212121212121212121212121212121212121212121212121212121",
+      "summary": "Failed reasoning experiment is linked to its permanent regression case.",
+      "root_cause_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "disposition": "regression_covered",
+      "regression_case_id": "reasoning-001",
+      "regression_case_version": 1,
+      "evidence_refs": [
+        {
+          "source": "failure://experiment/reasoning-001",
+          "digest": "2323232323232323232323232323232323232323232323232323232323232323",
+          "category": "failure_knowledge"
+        }
+      ]
+    },
+    {
+      "record_id": "failure-evidence-substitution-001",
+      "version": 1,
+      "sequence": 3,
+      "source_kind": "rejected_design",
+      "source_ref": "design:evidence-substitution-001",
+      "source_digest": "3030303030303030303030303030303030303030303030303030303030303030",
+      "failure_fingerprint": "3131313131313131313131313131313131313131313131313131313131313131",
+      "summary": "Rejected evidence-substitution design is retained with exact regression lineage.",
+      "root_cause_digest": "3232323232323232323232323232323232323232323232323232323232323232",
+      "disposition": "regression_covered",
+      "regression_case_id": "evidence-substitution-001",
+      "regression_case_version": 1,
+      "evidence_refs": [
+        {
+          "source": "failure://design/evidence-substitution-001",
+          "digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "category": "failure_knowledge"
+        }
+      ]
+    },
+    {
+      "record_id": "failure-side-effect-001",
+      "version": 1,
+      "sequence": 4,
+      "source_kind": "counterexample",
+      "source_ref": "counterexample:side-effect-001",
+      "source_digest": "4040404040404040404040404040404040404040404040404040404040404040",
+      "failure_fingerprint": "4141414141414141414141414141414141414141414141414141414141414141",
+      "summary": "Side-effect escape counterexample is retained as immutable isolation knowledge.",
+      "root_cause_digest": "4242424242424242424242424242424242424242424242424242424242424242",
+      "disposition": "regression_covered",
+      "regression_case_id": "side-effect-001",
+      "regression_case_version": 1,
+      "evidence_refs": [
+        {
+          "source": "failure://counterexample/side-effect-001",
+          "digest": "4343434343434343434343434343434343434343434343434343434343434343",
+          "category": "failure_knowledge"
+        }
+      ]
+    }
+  ]
+}

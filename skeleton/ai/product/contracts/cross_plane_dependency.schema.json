@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-18:cross_plane_dependency:v1",
+  "title": "FLGB-18 cross plane dependency",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plane_id",
+    "dependencies",
+    "evidence_digest"
+  ],
+  "properties": {
+    "plane_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "dependencies": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

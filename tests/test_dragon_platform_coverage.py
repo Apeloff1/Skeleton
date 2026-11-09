@@ -1,0 +1,124 @@
+"""Hardware/era discovery coverage remains an auditable, non-authorizing signal."""
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from skeleton.ai.game_builder.dragon_almanacs import read_source_registry
+from skeleton.ai.game_builder.dragon_discovery_reconciled import EXPECTED_RAW_TOTAL
+from skeleton.ai.game_builder.dragon_platform_coverage import (
+    PLATFORM_ALIASES, _matches, _tokens, platform_discovery_matrix,
+)
+
+REGISTRY = (Path(__file__).resolve().parents[1] /
+            "skeleton/ai/game_builder/catalogs/dragon_sources_20261010")
+
+
+@pytest.fixture(scope="module")
+def coverage():
+    return platform_discovery_matrix(read_source_registry(REGISTRY),
+                                     samples_per_platform=2)
+
+
+def test_platform_aliases_are_distinct_bounded_and_word_boundary_aware():
+    assert len(PLATFORM_ALIASES) >= 35
+    assert len({key for key, _, _ in PLATFORM_ALIASES}) == len(PLATFORM_ALIASES)
+    for key, group, aliases in PLATFORM_ALIASES:
+        assert key and group
+        assert aliases and len(set(aliases)) == len(aliases)
+        assert all(isinstance(alias, str) and len(alias) >= 3 for alias in aliases)
+    assert _matches(_tokens("An original Game Boy homebrew platformer"),
+                    ("game boy",))
+    assert not _matches(_tokens("game boycott"), ("game boy",))
+    assert not _matches(_tokens("play style tool"), ("playstation 1",))
+    assert _matches(_tokens("N64Dev libdragon SDK"), ("n64dev",))
+
+
+def test_full_reconciled_platform_inventory_has_canonical_denominator(coverage):
+    assert coverage["raw_link_leads"] == EXPECTED_RAW_TOTAL
+    assert coverage["canonical_distinct_urls_global"] > 4405
+    assert coverage["canonical_distinct_urls_global"] <= EXPECTED_RAW_TOTAL
+    assert coverage["platforms_in_heuristic_catalog"] == len(PLATFORM_ALIASES)
+    assert len(coverage["platforms"]) == len(PLATFORM_ALIASES)
+    assert 0 < coverage["platforms_with_keyword_matches"] <= len(PLATFORM_ALIASES)
+    assert 0 <= coverage["multi_platform_raw_link_mentions"] <= EXPECTED_RAW_TOTAL
+    assert 0 <= coverage["unclassified_raw_link_mentions"] <= EXPECTED_RAW_TOTAL
+    assert coverage["source_content_or_hardware_verified"] is False
+    assert coverage["crawler_authorized"] is False
+    assert coverage["training_authorized"] is False
+    assert coverage["memory_promotion_authorized"] is False
+
+
+def test_each_platform_reports_raw_links_deduplicated_urls_and_host_coverage(coverage):
+    for item in coverage["platforms"]:
+        assert item["raw_link_mentions"] >= item["canonical_candidate_urls"]
+        assert item["canonical_candidate_urls"] >= item["distinct_hosts"]
+        assert item["canonical_candidate_urls"] <= coverage[
+            "canonical_distinct_urls_global"]
+        assert item["rights_risk_keyword_link_mentions"] <= item[
+            "raw_link_mentions"]
+        assert len(item["metadata_examples"]) <= 2
+        assert item["metadata_examples"] == sorted(item["metadata_examples"])
+        assert item["training_authorized"] is False
+        assert item["rights_approved"] is False
+        assert item["coverage_status"] in (
+            "keyword_discovered_not_verified", "no_matching_metadata_observed")
+
+
+def test_platform_census_cannot_claim_independence_legality_or_missing_support(coverage):
+    assert coverage["metadata_keyword_overlap_is_not_independent_evidence"]
+    assert coverage["lack_of_metadata_match_is_not_proof_of_no_support"]
+    assert coverage["legal_rights_review_required"]
+    assert coverage["unclassified"]["potentially_unlabeled_platforms"]
+    assert coverage["unclassified"]["training_authorized"] is False
+
+
+def test_platform_scan_rejects_unbounded_sampling_or_non_boolean_option():
+    registry = read_source_registry(REGISTRY)
+    for limit in (-1, True, 11, 1.5, "5"):
+        with pytest.raises(ValueError, match="samples per platform"):
+            platform_discovery_matrix(registry, samples_per_platform=limit)
+    with pytest.raises(ValueError, match="include_unclassified"):
+        platform_discovery_matrix(registry, include_unclassified=1)
+
+
+def test_incomplete_or_reordered_source_chain_cannot_be_reported(coverage, monkeypatch):
+    import skeleton.ai.game_builder.dragon_platform_coverage as module
+    from skeleton.ai.game_builder.dragon_discovery_reconciled import _chain
+    documents = _chain()
+    monkeypatch.setattr(module, "_chain", lambda: documents[:-1])
+    with pytest.raises(ValueError):
+        platform_discovery_matrix(read_source_registry(REGISTRY))
+
+
+def test_generation_coverage_deduplicates_shared_source_refs(coverage):
+    groups = coverage["generation_coverage"]
+    assert groups and [x["group"] for x in groups] == sorted(
+        x["group"] for x in groups)
+    platform_groups = {}
+    for item in coverage["platforms"]:
+        platform_groups.setdefault(item["platform_group"], []).append(item)
+    assert {x["group"] for x in groups} == set(platform_groups)
+    for group in groups:
+        peers = platform_groups[group["group"]]
+        assert group["platform_count"] == len(peers)
+        assert group["platforms_with_metadata_matches"] == sum(
+            item["canonical_candidate_urls"] > 0 for item in peers)
+        assert group["canonical_distinct_candidate_urls"] >= max(
+            item["canonical_candidate_urls"] for item in peers)
+        assert group["canonical_distinct_candidate_urls"] <= sum(
+            item["canonical_candidate_urls"] for item in peers)
+        assert group["distinct_hosts"] <= group["canonical_distinct_candidate_urls"]
+        assert group["coverage_is_unreviewed"] is True
+        assert set(group["unmatched_platforms"]) == {
+            item["platform"] for item in peers
+            if item["canonical_candidate_urls"] == 0}
+    assert coverage["generation_coverage_urls_may_overlap_between_groups"]
+    rankings = coverage["discovery_attention_queue"]
+    assert len(rankings) == len(PLATFORM_ALIASES)
+    assert set(rankings) == {row["platform"] for row in coverage["platforms"]}
+    measures = {row["platform"]: (row["canonical_candidate_urls"],
+                                  row["distinct_hosts"], row["platform"])
+                for row in coverage["platforms"]}
+    assert rankings == sorted(rankings, key=measures.__getitem__)

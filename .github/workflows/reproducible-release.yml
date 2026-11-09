@@ -1,0 +1,268 @@
+name: Reproducible Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reproducible-release-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11.11"
+  PYTHONHASHSEED: "0"
+  TZ: "UTC"
+  LANG: "C.UTF-8"
+  LC_ALL: "C.UTF-8"
+
+jobs:
+  reproducible-release:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    name: Reproducible Release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+    steps:
+      - name: Checkout build A
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: source-a
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout clean build B
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: source-b
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Reject release-evidence claims without protected exact-head CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONPATH: source-a
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s source-a/tests -p 'test_release_governance_verdict.py' -q
+          python source-a/scripts/release_governance_verdict.py \
+            --repo "$GITHUB_REPOSITORY" --sha "$(git rev-parse HEAD)" --branch main
+
+      - name: Set up pinned Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: source-a/requirements-build.txt
+
+      - name: Install pinned build toolchain
+        run: python -m pip install --disable-pip-version-check -r source-a/requirements-build.txt
+
+      - name: Run release evidence regression tests
+        env:
+          PYTHONPATH: source-a
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            "pytest==8.4.2" \
+            "pydantic==2.13.5" \
+            "pydantic-settings==2.15.0"
+          mkdir -p source-a/release-meta
+          python -m pytest -q \
+            source-a/scripts/testing/test_release_provenance.py \
+            source-a/skeleton/testing/test_release_evidence.py \
+            --junitxml=source-a/release-meta/release-tests.xml
+
+      - name: Build release A
+        working-directory: source-a
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          python -m build --no-isolation --outdir dist
+          shopt -s nullglob
+          sdists=(dist/*.tar.gz)
+          if [[ ${#sdists[@]} -ne 1 ]]; then
+            echo "expected exactly one source distribution, found ${#sdists[@]}" >&2
+            exit 1
+          fi
+          python scripts/release_provenance.py normalize-sdist \
+            --path "${sdists[0]}" \
+            --source-date-epoch "$SOURCE_DATE_EPOCH"
+          python scripts/release_provenance.py sbom \
+            --pyproject pyproject.toml \
+            --output dist/release-sbom.cdx.json \
+            --source-commit "$GITHUB_SHA"
+          mkdir -p release-meta
+          python scripts/release_provenance.py emit \
+            --artifacts-dir dist \
+            --output release-meta/release-provenance.json \
+            --checksums release-meta/SHA256SUMS \
+            --source-commit "$GITHUB_SHA" \
+            --source-date-epoch "$SOURCE_DATE_EPOCH" \
+            --input pyproject.toml \
+            --input requirements-build.txt \
+            --input requirements.txt \
+            --sbom-ref dist/release-sbom.cdx.json
+
+      - name: Verify native Assembly payload in wheel
+        working-directory: source-a
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheels = sorted(Path("dist").glob("*.whl"))
+          if len(wheels) != 1:
+              raise SystemExit("release must produce exactly one wheel")
+          required = {
+              "skeleton/native/asm/skeleton_asm.h",
+              "skeleton/native/asm/aarch64.S",
+              "skeleton/native/asm/x86_64.S",
+              "skeleton/native/asm/README.md",
+          }
+          with ZipFile(wheels[0]) as artifact:
+              entries = set(artifact.namelist())
+              missing = required - entries
+              if missing:
+                  raise SystemExit(f"native Assembly wheel payload missing: {sorted(missing)}")
+              for name in sorted(required):
+                  if not artifact.getinfo(name).file_size:
+                      raise SystemExit(f"native Assembly wheel payload empty: {name}")
+          PY
+
+      - name: Build release B from clean checkout
+        working-directory: source-b
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          python -m build --no-isolation --outdir dist
+          shopt -s nullglob
+          sdists=(dist/*.tar.gz)
+          if [[ ${#sdists[@]} -ne 1 ]]; then
+            echo "expected exactly one source distribution, found ${#sdists[@]}" >&2
+            exit 1
+          fi
+          python scripts/release_provenance.py normalize-sdist \
+            --path "${sdists[0]}" \
+            --source-date-epoch "$SOURCE_DATE_EPOCH"
+          python scripts/release_provenance.py sbom \
+            --pyproject pyproject.toml \
+            --output dist/release-sbom.cdx.json \
+            --source-commit "$GITHUB_SHA"
+          mkdir -p release-meta
+          python scripts/release_provenance.py emit \
+            --artifacts-dir dist \
+            --output release-meta/release-provenance.json \
+            --checksums release-meta/SHA256SUMS \
+            --source-commit "$GITHUB_SHA" \
+            --source-date-epoch "$SOURCE_DATE_EPOCH" \
+            --input pyproject.toml \
+            --input requirements-build.txt \
+            --input requirements.txt \
+            --sbom-ref dist/release-sbom.cdx.json
+
+      - name: Verify byte-for-byte reproducibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          python source-a/scripts/release_provenance.py compare \
+            source-a/release-meta/release-provenance.json \
+            source-b/release-meta/release-provenance.json
+          diff -u source-a/release-meta/SHA256SUMS source-b/release-meta/SHA256SUMS
+          printf '{"source_commit":"%s","result":"pass","check":"byte-for-byte-reproducibility"}\n' \
+            "$GITHUB_SHA" > source-a/release-meta/reproducibility-eval.json
+
+      - name: Bind tests, evaluation and artifact bytes into release evidence
+        working-directory: source-a
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("release-meta")
+
+          def evidence_record(evidence_id: str, name: str) -> dict[str, str]:
+              path = root / name
+              payload = path.read_bytes()
+              return {
+                  "evidence_id": evidence_id,
+                  "name": name,
+                  "sha256": hashlib.sha256(payload).hexdigest(),
+                  "result": "pass",
+              }
+
+          (root / "test-evidence.json").write_text(
+              json.dumps(
+                  [evidence_record("release-tests", "release-tests.xml")],
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          (root / "eval-evidence.json").write_text(
+              json.dumps(
+                  [
+                      evidence_record(
+                          "reproducibility-eval",
+                          "reproducibility-eval.json",
+                      )
+                  ],
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          mapfile -t artifact_names < <(
+            find dist -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort
+          )
+          if (( ${#artifact_names[@]} == 0 )); then
+            echo "release artifact inventory is empty" >&2
+            exit 1
+          fi
+          observed=()
+          for name in "${artifact_names[@]}"; do
+            observed+=(--observed "${name}=dist/${name}")
+          done
+
+          python scripts/release_provenance.py evidence \
+            --provenance release-meta/release-provenance.json \
+            --output release-meta/release-evidence.json \
+            --source-commit "$GITHUB_SHA" \
+            --test-evidence release-meta/test-evidence.json \
+            --eval-evidence release-meta/eval-evidence.json \
+            --gate \
+            "${observed[@]}"
+
+          python scripts/release_provenance.py gate \
+            --evidence release-meta/release-evidence.json \
+            --source-commit "$GITHUB_SHA" \
+            "${observed[@]}"
+
+      - name: Publish verified release evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reproducible-release-${{ github.sha }}
+          path: |
+            source-a/dist/
+            source-a/release-meta/
+          if-no-files-found: error
+          retention-days: 30

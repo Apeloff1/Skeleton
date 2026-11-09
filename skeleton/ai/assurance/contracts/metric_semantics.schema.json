@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-06:metric_semantics:v1",
+  "title": "FLGB-06 metric semantics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metric_id",
+    "unit",
+    "direction",
+    "aggregation",
+    "minimum",
+    "maximum"
+  ],
+  "properties": {
+    "metric_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "direction": {
+      "enum": [
+        "higher-better",
+        "lower-better",
+        "target"
+      ]
+    },
+    "aggregation": {
+      "enum": [
+        "sum",
+        "mean",
+        "max",
+        "min",
+        "p95",
+        "p99",
+        "last"
+      ]
+    },
+    "minimum": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "maximum": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    }
+  }
+}

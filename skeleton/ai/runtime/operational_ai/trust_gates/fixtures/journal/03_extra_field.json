@@ -1,0 +1,16 @@
+{
+  "case": "03_extra_field",
+  "gate": "journal",
+  "expect": "reject",
+  "reason": "Unrecognized authority fields denied",
+  "payload": {
+    "stream": "chat_001",
+    "sequence": 1,
+    "prev_sha": "0000000000000000000000000000000000000000000000000000000000000000",
+    "event_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "kind": "inference.completed",
+    "payload_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "epoch": 1,
+    "untrusted_override": "allow"
+  }
+}

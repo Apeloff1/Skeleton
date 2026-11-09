@@ -1,0 +1,125 @@
+title = "Skeleton secret scanning policy"
+
+# Keep Gitleaks' maintained default detector set while making the repository's
+# scanner policy explicit and reviewable. Add narrow repository-specific rules
+# or allowlists here only when they are backed by tests and review evidence.
+[extend]
+useDefault = true
+
+# Catch provider-agnostic credentials that use a secret-bearing assignment name
+# but do not match a provider's branded token prefix. Restrict the candidate to
+# common opaque-token alphabets, require a meaningful minimum length, and then
+# require high Shannon entropy so documentation placeholders and ordinary words
+# do not become noisy findings.
+[[rules]]
+id = "skeleton-high-entropy-secret-assignment"
+description = "High-entropy value assigned to a secret-bearing identifier"
+regex = '''(?i)(?:api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|secret[_-]?key|password|passwd|credential)\s*[:=]\s*["']?([A-Za-z0-9+/=.\-]{28,})["']?'''
+secretGroup = 1
+entropy = 4.2
+
+
+[allowlist]
+description = "Deterministic GameForge replay token used only in artifact tests"
+stopwords = ["operation-123"]
+
+
+# Narrow false-positive exception for one historical architecture sentence in
+# docs/BUILD_PLAN.md. The default generic-api-key rule mistakes the prose phrase
+# around distributed fencing/causation metadata for an opaque credential.
+[[rules]]
+id = "generic-api-key"
+description = "Inherited generic API key rule with Skeleton documentation false-positive allowlist"
+
+  [[rules.allowlists]]
+  description = "Four reviewed public tokenizer-profile enum lines, never credential values"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = [
+    '''^\s*tokenizer_kind = "utf8_bytes_upper_bound"$''',
+    '''^\s*"tokenizer": getattr\(model, "tokenizer_kind", "utf8_bytes_upper_bound"\),$''',
+    '''^\s*tokenizer = "utf8_bytes_upper_bound"$''',
+    '''^\s*tokenizer = supplied\.get\("tokenizer", "utf8_bytes_upper_bound"\)$'''
+  ]
+  paths = [
+    '''^skeleton/ai/runtime/inference/llama_cpp\.py$''',
+    '''^skeleton/ai/runtime/inference/local\.py$''',
+    '''^skeleton/provider_runtime\.py$'''
+  ]
+
+  [[rules.allowlists]]
+  description = "Architecture prose about fencing and causation metadata is not a credential"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''fencing tokens, sequence/correlation/causation IDs and explicit dedupe windows''']
+  paths = ['''^docs/BUILD_PLAN\.md$''']
+
+  [[rules.allowlists]]
+  description = "AC-17 cache-key collision evidence URI carries a git SHA, not a credential"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''p1:adversarial-wave3-evidence:AC-17:cache_key_collision:[0-9a-f]{40}''']
+  paths = ['''^machine/p1_risk_evidence_bindings\.json$''']
+
+  [[rules.allowlists]]
+  description = "Credential lifecycle adversarial evidence URIs carry git SHAs, not credentials"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = [
+    '''p1:adversarial-wave4-evidence:AC-08:credential_revalidation:[0-9a-f]{40}''',
+    '''p1:adversarial-ac10-ac21-evidence:AC-10:credential_rotation:[0-9a-f]{40}'''
+  ]
+  paths = ['''^machine/p1_risk_evidence_bindings\.json$''']
+
+  [[rules.allowlists]]
+  description = "CS-300 layer TITLE_KEY constants are snake_case layer titles, not credentials"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''^TITLE_KEY = "[a-z0-9]+(?:_[a-z0-9]+)*"$''']
+  paths = ['''^skeleton/cs300/layers/l[0-9]{3}\.py$''']
+
+  [[rules.allowlists]]
+  description = "AI inference documentation sentence about minimum token generation is ordinary prose, not an API key"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''^\s*- Native generation supports minimum token count, repetition/presence/frequency$''']
+  paths = ['''^docs/plan/AI_INFERENCE_TRANSFORMER_2026-10-13\.md$''']
+
+  [[rules.allowlists]]
+  description = "Public Standard Webhooks deterministic msg-ID in known-vector test, not a credential"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''^\s*hdrs = WebhookSigner\(\)\.headers\(secrets, "msg_p5jXN8AQM9LWM0D4loKWxJek", body, timestamp=1614265330\)$''']
+  paths = ['''^skeleton/testing/test_gate_plane_pack_f_egress\.py$''']
+
+  [[rules.allowlists]]
+  description = "Two issued authentication receipt file digests, verified as SHA-256; no bearer values"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['^\s*"(?:actual-50b1b9f7-v1|native-50b1b9f7-v1)/authentication\.json": "a99f81913f7d4219e345289c46d611aed6ce0230c1f7dae6c087e1edf2f1e01c",?$']
+  paths = ['^machine/ai_studio_creation_session_evidence_2026-10-15\.json$']
+
+  [[rules.allowlists]]
+  description = "Immutable historical first-install file hashes; current representation is a SHA-256 object"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = [
+    '^\s*"auth-me\.json": "533a58c4806ffbf40ea20f8385812a52ee9b7d1469e0f262770fbad6dd73d1e5",?$',
+    '^\s*"normal-api-requests\.json": "2e93eb5e78e85813323f81125fb256c979b678469acb73cd1cabf0703474f829",?$'
+  ]
+  paths = ['^machine/ai_first_install_session_evidence_2026-10-15\.json$']
+
+  [[rules.allowlists]]
+  description = "Historical fixed local tokenizer enum branch; reviewed non-credential"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''^\s*elif tokenizer == "utf8_bytes_upper_bound" or not counter:$''']
+  paths = ['''^skeleton/ai/runtime/inference/local\.py$''']
+
+  [[rules.allowlists]]
+  description = "Historical public input-accounting enum check; exact commit, path and line only"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''^\s*demand\(\['native_tokenizer', 'utf8_byte_tokens', 'reference_tokens', 'conservative_utf8_bytes', 'backend_token_counter'\]\.includes\(basis\) && \(accounting\.exact === null \|\| typeof accounting\.exact === 'boolean'\) && typeof accounting\.prepared_input === 'boolean'\);\s*$''']
+  paths = ['''^frontend/src/features/Jeeves/RuntimeFoundationDetails\.tsx$''']
+  commits = ["411d0f1ded21fc7b5629e0073df2dbd85b6b2db9"]

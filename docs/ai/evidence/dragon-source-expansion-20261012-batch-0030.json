@@ -1,0 +1,5109 @@
+{
+  "schema": "skeleton.dragon.source_discovery_supplement.v1",
+  "recorded_on": "2026-10-12",
+  "baseline_registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "requested_total_urls": 44050,
+  "target_interpretation": "Unreviewed source discovery leads from SHA-pinned README hyperlinks; not independent original works, rights grants or training samples.",
+  "status": "raw_discovery_only_not_ingested_into_canonical_queue",
+  "parents": [
+    "docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0021.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0022.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0024.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0025.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0026.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0027.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0028.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0029.json"
+  ],
+  "catalogs": [
+    {
+      "repository": "FronkonGames/Awesome-Gamedev",
+      "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+      "requested_ref": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+      "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "stevinz/awesome-game-engine-dev",
+      "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+      "requested_ref": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+      "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "dawdle-deer/awesome-learn-gamedev",
+      "commit_sha": "28e61535a7180f0174242ce0980d9337a7328a02",
+      "requested_ref": "28e61535a7180f0174242ce0980d9337a7328a02",
+      "readme_blob_sha": "ea02900f953b417abd2e71286e7f51cf640baf02",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "Caerind/AwesomeCppGameDev",
+      "commit_sha": "0426419acfd7508c5c14e658660ac9a6445aea6e",
+      "requested_ref": "0426419acfd7508c5c14e658660ac9a6445aea6e",
+      "readme_blob_sha": "d0e6a89c4af62d697c97d1fd8950d07daf0075be",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "hzoo/awesome-gametalks",
+      "commit_sha": "733d0328293686894a2025a1d321778e7322b468",
+      "requested_ref": "733d0328293686894a2025a1d321778e7322b468",
+      "readme_blob_sha": "4270593f0271ba1b5725bfdd90b76f02bb37c6f9",
+      "readme_path": "README.md"
+    }
+  ],
+  "counts": {
+    "previous_raw_provisional_urls": 10238,
+    "new_raw_candidate_urls": 238,
+    "raw_provisional_urls": 10476,
+    "canonical_discovered_urls": null,
+    "requested_raw_url_target": 44050
+  },
+  "candidates": [
+    {
+      "url": "https://www.youtube.com/watch?v=SqFu5O-oPmU",
+      "source_id": "source-15e8c1d902cf4630b64c0fe24bf0f5a94316520f992c0f26d9549960f75331ac",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "hzoo/awesome-gametalks",
+          "commit_sha": "733d0328293686894a2025a1d321778e7322b468",
+          "readme_blob_sha": "4270593f0271ba1b5725bfdd90b76f02bb37c6f9",
+          "exact_url": "https://www.youtube.com/watch?v=SqFu5O-oPmU",
+          "line": 121,
+          "headers": [
+            "Awesome Game Talks ! Awesome (https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg",
+            "Other Talks"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=sTAqWRsEiy0",
+      "source_id": "source-84e12c949b8b64d47e30d0b780a53d8f4a15ed10f7d79d33508699ab7c04015d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=sTAqWRsEiy0",
+          "line": 259,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=stJ4SESQwJQ",
+      "source_id": "source-2cea54dde2078aa7aa180daab0c4c9e93b7190170d24fbd9f655b6d92d90e78f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=stJ4SESQwJQ",
+          "line": 391,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=sumZLwFXJqE",
+      "source_id": "source-792f27701c0f0a69ba776aea3838838d14a36eb8c722355ec6f57f9b1d921f9e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=sumZLwFXJqE",
+          "line": 116,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=swIM2z6Foxk",
+      "source_id": "source-82d429efe4b67fe57025fd15df4ada2bc2c82747246946b746f05015a209cae2",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=swIM2z6Foxk",
+          "line": 408,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=Sxjs0XcnyVQ&list=PLS9G7A6kaaHOOXLVNoc7cEE6ytk9tFJql&index=1",
+      "source_id": "source-3e63d87784571feb379ab950a39e16580850372477b96d7a33d3496d5d8a591b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=Sxjs0XcnyVQ&list=PLS9G7A6kaaHOOXLVNoc7cEE6ytk9tFJql&index=1",
+          "line": 392,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=TbcZyAO6K7c",
+      "source_id": "source-ae251e713d82ddf4970210acc4922f366c363457292572af93058fca19e530d1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=TbcZyAO6K7c",
+          "line": 215,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=tdwzvdZFxVM",
+      "source_id": "source-c2b37a25cff37a672bce6fd258988e4af8f1d8a987bef8a6c850f5d8766f944e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "hzoo/awesome-gametalks",
+          "commit_sha": "733d0328293686894a2025a1d321778e7322b468",
+          "readme_blob_sha": "4270593f0271ba1b5725bfdd90b76f02bb37c6f9",
+          "exact_url": "https://www.youtube.com/watch?v=tdwzvdZFxVM",
+          "line": 111,
+          "headers": [
+            "Awesome Game Talks ! Awesome (https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg",
+            "Other Talks"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=tE1qH8OxO2Y",
+      "source_id": "source-ddb57e9c57ace43c3455178669657ad20527bbe0176c4b465424ce06af536ddc",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=tE1qH8OxO2Y",
+          "line": 385,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=tG-jepNrz3I",
+      "source_id": "source-22e394fa40c441b9af0d257c11b65a45475eb92e1ba5c7f30000a3a166f0bed4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=tG-jepNrz3I",
+          "line": 265,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=TL_8k1nkuD8",
+      "source_id": "source-c29f6946b3833dbaabb04199bec5976da1f2d1216695e8028bfb432af5eae038",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=TL_8k1nkuD8",
+          "line": 79,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=tNhIh3NzANc&feature=youtu.be",
+      "source_id": "source-9ee1f4d2b0f4d975c76a5ad0ae9cf15f870d8c095382e49ac52acad076674512",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=tNhIh3NzANc&feature=youtu.be",
+          "line": 361,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=TO0Tx3w5abQ",
+      "source_id": "source-1cbfef2985aac8e96b6f977d5c2558ebe335eb60fb583c7cfa9504b8a30c3b6e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=TO0Tx3w5abQ",
+          "line": 250,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=Tsv8UGqDibc&list=PLhyeWJ40aDkUDHDOhZQ2UkCfNiQj7hS5W&index=5",
+      "source_id": "source-d1dab74e7436bc3193d166cf2cdf816c0b5608dd9c6d874aae07953f4b265d63",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dawdle-deer/awesome-learn-gamedev",
+          "commit_sha": "28e61535a7180f0174242ce0980d9337a7328a02",
+          "readme_blob_sha": "ea02900f953b417abd2e71286e7f51cf640baf02",
+          "exact_url": "https://www.youtube.com/watch?v=Tsv8UGqDibc&list=PLhyeWJ40aDkUDHDOhZQ2UkCfNiQj7hS5W&index=5",
+          "line": 462,
+          "headers": [
+            "Awesome Learn Gamedev ! Awesome (https://awesome.re/badge.svg) (https://awesome.re)",
+            "Technical Art",
+            "VFX"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=Tt3ZLHKcP2U",
+      "source_id": "source-3c7414cabba44335813e527d38d09b249cf52aa26caf9bdd7fa30d233dcc3fc2",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=Tt3ZLHKcP2U",
+          "line": 414,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=tWPEY1Kzndw",
+      "source_id": "source-4b1ef405ca8623af93c02498cd6c41d2401d07ced50a45b9a19eaf2cddeec7ba",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=tWPEY1Kzndw",
+          "line": 628,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=tysuunwI3oM",
+      "source_id": "source-de0771a815b42a19985690c99e168c8457a00da142890e75831b45b83012bdc6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=tysuunwI3oM",
+          "line": 370,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=U-PllK2C5mw",
+      "source_id": "source-3344425371aea542d85db37e0ab981a48c1e01f4182ff9c9e256bfffdc06eb46",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=U-PllK2C5mw",
+          "line": 289,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=ua-f0ypVbPA",
+      "source_id": "source-9a10caa7bd99623c68bf0dcadc7c7d8331ecf02dcbc317fbe40d6a28200fc3cc",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=ua-f0ypVbPA",
+          "line": 278,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=uBxYGFRi-S4",
+      "source_id": "source-40750d322c4a4396ab5f38ee825fc2fbeaa75d71701b8708ec10fa5ce86af3f8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=uBxYGFRi-S4",
+          "line": 173,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=Ud7RNhO_VRU",
+      "source_id": "source-f507a9b8ea09d687427100b9d32302a3cfc2c3eee4063b0e68cc8a55fb3c7ee1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=Ud7RNhO_VRU",
+          "line": 349,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=uHDmqfdVkak",
+      "source_id": "source-6ed0484afb762da14e0f028aa9c3b6c382aa0af5f5cc36e3b00d7abebe1ae873",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=uHDmqfdVkak",
+          "line": 405,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=uj8841GQuyc",
+      "source_id": "source-99dcb1c58231db199ac09ab794bc821ff084a81249de73e7eea717bfddbd06c8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=uj8841GQuyc",
+          "line": 161,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=UJiv14uPOac",
+      "source_id": "source-cbdf458512a1ac0a3a66430782fcb994cc49095af45cacb6ea3fccff6fada82c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=UJiv14uPOac",
+          "line": 644,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=uPtJMke4LRE",
+      "source_id": "source-5a61eaeeee4bd4930ebe022001b3a7f7d92d07272d0a3ce97ea3b19b9029cbfc",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=uPtJMke4LRE",
+          "line": 73,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=UPU_yi9Nv3M",
+      "source_id": "source-43988894bb8bcb2e15bf25c36366065909c77f9fd333b4f0aa6260085362da74",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "hzoo/awesome-gametalks",
+          "commit_sha": "733d0328293686894a2025a1d321778e7322b468",
+          "readme_blob_sha": "4270593f0271ba1b5725bfdd90b76f02bb37c6f9",
+          "exact_url": "https://www.youtube.com/watch?v=UPU_yi9Nv3M",
+          "line": 108,
+          "headers": [
+            "Awesome Game Talks ! Awesome (https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg",
+            "Other Talks"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=UVP2iycqisk",
+      "source_id": "source-25d1b6ecdca9629606ee4d7c9d8701c9396c2e52d81766f982bc927db859ca9e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=UVP2iycqisk",
+          "line": 360,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=UwXCss12Akc",
+      "source_id": "source-41c52b957b33cda141796e75a5e2fa303c11dc7a915db5e41eea82895d9d4385",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=UwXCss12Akc",
+          "line": 631,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=UZEvwJCoWho",
+      "source_id": "source-49be7851791c6712df7b8be203aa336c72b6480c94a941dcbff812a603a780fa",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=UZEvwJCoWho",
+          "line": 79,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=v-3TN1dEw4M&list=PL22CMuqloY0qiYlv1Lm_QtfwuFz9OB0NE",
+      "source_id": "source-a3e63bf2f4021632e053e64fd605a07fbe0d6563127f7266028c5dbba188aec2",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=v-3TN1dEw4M&list=PL22CMuqloY0qiYlv1Lm_QtfwuFz9OB0NE",
+          "line": 234,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=v5_RN8o1b3g",
+      "source_id": "source-6fa7988e7314f09d1d3a0e4716cfef54b45a3af38f71c5318d3e8fdc164f259c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=v5_RN8o1b3g",
+          "line": 388,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=V5jpY0ArRFY",
+      "source_id": "source-fe4c32151f88aae49c38219c7b7e8733e58ea2678f262b5f343ca3200c5d31f0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=V5jpY0ArRFY",
+          "line": 602,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=VJ2nMJRtIwQ",
+      "source_id": "source-cb65439c4c4cfcd025125ce254bfa0e02039c45dd9d45267e3a4b6c5a81a248d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=VJ2nMJRtIwQ",
+          "line": 71,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=vK4pLJZfo_E",
+      "source_id": "source-2c427183de1e8732a60191dda0a85b3135dffc5cf313c29ffcddb7b8345ff80c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=vK4pLJZfo_E",
+          "line": 32,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=vk94HoI_tCo",
+      "source_id": "source-4eb8523667d85dbf9b3dedc9b2739b38f651bc09a7819a1babeb7f43083561cf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "hzoo/awesome-gametalks",
+          "commit_sha": "733d0328293686894a2025a1d321778e7322b468",
+          "readme_blob_sha": "4270593f0271ba1b5725bfdd90b76f02bb37c6f9",
+          "exact_url": "https://www.youtube.com/watch?v=vk94HoI_tCo",
+          "line": 113,
+          "headers": [
+            "Awesome Game Talks ! Awesome (https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg",
+            "Other Talks"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=VM3cnMU4A-M",
+      "source_id": "source-3f68495c02cbd6dd0d13a90f32f966a346bd2bbe2dbb7d11a89fadf4567784a3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=VM3cnMU4A-M",
+          "line": 595,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=VMFOd_pbrE0",
+      "source_id": "source-dae5fb247e78fec3fe29a838677dd696027b833dce5b4c09821f7d341acbc199",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=VMFOd_pbrE0",
+          "line": 375,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=VscdPA6sUkc",
+      "source_id": "source-db1dccad3d07e78dbad736a42113c054f4a90d589f3ae3d8c16ed1d9ba768bef",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=VscdPA6sUkc",
+          "line": 110,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=vWidan8ggGo",
+      "source_id": "source-8505b7ad80641ac7ea22e211b6e65ac35f09d50f33b7287c96f4e7567710f6b7",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=vWidan8ggGo",
+          "line": 614,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=vWU8EltWTfM&list=PLlrATfBNZ98fqE45g3jZA_hLGUrD4bo6_",
+      "source_id": "source-0ca1c91918adce26326ddcd8c644c76f2be482816386f0be0af373e86c34de2f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=vWU8EltWTfM&list=PLlrATfBNZ98fqE45g3jZA_hLGUrD4bo6_",
+          "line": 243,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=W6-lwxQ1tTg",
+      "source_id": "source-0428d38eb4630fe09d7dbdc28318d8cda9bd5c607460a651518656a5000db45c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=W6-lwxQ1tTg",
+          "line": 156,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=whPWKecazgM",
+      "source_id": "source-baea72846813ff6d2d8b9fecbe082b7946f454bba2182b259def4d066b55ce58",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dawdle-deer/awesome-learn-gamedev",
+          "commit_sha": "28e61535a7180f0174242ce0980d9337a7328a02",
+          "readme_blob_sha": "ea02900f953b417abd2e71286e7f51cf640baf02",
+          "exact_url": "https://www.youtube.com/watch?v=whPWKecazgM",
+          "line": 552,
+          "headers": [
+            "Awesome Learn Gamedev ! Awesome (https://awesome.re/badge.svg) (https://awesome.re)",
+            "Art",
+            "3D"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=WIl6ysorTE0",
+      "source_id": "source-c10dfc8a1ea774053ca93f445d40a4dae32f07037b68e3b98221ca2c681a460f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=WIl6ysorTE0",
+          "line": 382,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=wnKI3BsSmUE",
+      "source_id": "source-2f7daa7f2e3c9bf691778b0274d2afd236991abdd27b6c3af706e6ee5cc3d5bb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=wnKI3BsSmUE",
+          "line": 169,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=WY-mk-ZGAq8",
+      "source_id": "source-4e52d8bd2209a5cf3c9f9e21aebbd448f7a94b998d65fb228f139f1993be1adb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=WY-mk-ZGAq8",
+          "line": 382,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=wzPputN4Ts4",
+      "source_id": "source-fea846494f64c06b80f76566b3f58e1be9c87996f35b6aa9ed555523a887fee6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=wzPputN4Ts4",
+          "line": 419,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=x-sPHy5PJxI",
+      "source_id": "source-f98a7da60b991581e72deec97a5fd667ac4aa16822550a59bd3f867b8ef2a917",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=x-sPHy5PJxI",
+          "line": 149,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=x-YHsSvO_lU",
+      "source_id": "source-28efb289efbaef3ef6624a9b4f2dc3cc2318204e3de3d5c3ffa0d1e56ce92240",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=x-YHsSvO_lU",
+          "line": 648,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=x40HEj4kHYU&list=PLS9G7A6kaaHM_tqbFAThFH5JZLPpDWIiu",
+      "source_id": "source-97ba63f1357bd2e77dfb0a05d5007794627fa4431d71d891664b1049c568d7c8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=x40HEj4kHYU&list=PLS9G7A6kaaHM_tqbFAThFH5JZLPpDWIiu",
+          "line": 246,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=XCrrjBCgxGQ",
+      "source_id": "source-4247b9d6b0e131e1b185f9619097ec194cea23672890c7c3441a2fc3d0720b54",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=XCrrjBCgxGQ",
+          "line": 599,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=xjsqv8nj0cw",
+      "source_id": "source-7a00096ef787ed7170de4d5df587624de56012731e9cb037e51d0050360428bb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=xjsqv8nj0cw",
+          "line": 418,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=xl5fqr-CpTY",
+      "source_id": "source-9b4528f2c0edec4c8d4cfab575647e3809f5a7269f3e836f05d197506648461c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=xl5fqr-CpTY",
+          "line": 443,
+          "headers": [
+            "Unreal"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=xpBfgexOhxM",
+      "source_id": "source-725a25f3d2a7bb408b5bf66956fe0a8318cbdef20fe4321193c4b015827c5e25",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=xpBfgexOhxM",
+          "line": 641,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=xPu_oftSo2I&list=PLm1dtWebLYwWK2zb6lmgdonm3Z5BE5su0",
+      "source_id": "source-1976982e8b6410d3783b5d387ed7c0cc8d0120ee9c6a03f3bc6c09c039e9936d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=xPu_oftSo2I&list=PLm1dtWebLYwWK2zb6lmgdonm3Z5BE5su0",
+          "line": 242,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=xy2J-KnuzQs",
+      "source_id": "source-a97a347667d984a5bb8264e6b23170ba542a77a5b7392a9fcbdfbca3164f8a20",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=xy2J-KnuzQs",
+          "line": 444,
+          "headers": [
+            "Unreal"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=XYKL3uozCfQ",
+      "source_id": "source-3204d8c8842fedbe7ece16e8551a8dbc6cfa9e49af46be63ebff48150141fe9e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=XYKL3uozCfQ",
+          "line": 281,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=Y2EUfQu20lg",
+      "source_id": "source-9d7ec5d9dd49fbb97d1babe583b972374094127268241da0751b9214b1f537b4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=Y2EUfQu20lg",
+          "line": 168,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=Y3zK9MsQ9NI",
+      "source_id": "source-7f827a23b2cdd2d4ad03a9b94bce0af8a4a952d806e44e0d4bea4b3839db3306",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "hzoo/awesome-gametalks",
+          "commit_sha": "733d0328293686894a2025a1d321778e7322b468",
+          "readme_blob_sha": "4270593f0271ba1b5725bfdd90b76f02bb37c6f9",
+          "exact_url": "https://www.youtube.com/watch?v=Y3zK9MsQ9NI",
+          "line": 130,
+          "headers": [
+            "Awesome Game Talks ! Awesome (https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg",
+            "Panels"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=y7DSWCnGInA",
+      "source_id": "source-51d2288bb9e4d2109058d4e3c3fa205fb114c2425ba5f480438930557010b9c6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=y7DSWCnGInA",
+          "line": 294,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=YaUdstkv1RE",
+      "source_id": "source-58715327052eaf99b7dfb97b399f15dde15bbe77eb1ba604d57ef99a82e10d1b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=YaUdstkv1RE",
+          "line": 324,
+          "headers": [
+            "Organization"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=ye7eEOFCidM",
+      "source_id": "source-ac42dd0ccb8fdfbf9a952bd19a0e96d1ace08beda1066087df731c6d649d756f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=ye7eEOFCidM",
+          "line": 118,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=yFcI6pFEgjk",
+      "source_id": "source-1b14c62648fc3f32aa2444cf8f06453371a30422312482ae2d7b564d6d7d529e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=yFcI6pFEgjk",
+          "line": 345,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=YgaLKrSApWM",
+      "source_id": "source-693681b9bedcbd4ad55e3b6bc518866950000f5b897e3f521c72b998c7b0c732",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=YgaLKrSApWM",
+          "line": 359,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=yNdjdmepMMQ",
+      "source_id": "source-27e72c5a0a35f9d5c436400256a25cfa71f9b92b875a912af2686185625f01cb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=yNdjdmepMMQ",
+          "line": 229,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=YPSgTY9IkIQ",
+      "source_id": "source-c3a0e63293c87a17b4d4c979184376aaddbf78ba8a4eed51e3b14795b6ce90b0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=YPSgTY9IkIQ",
+          "line": 444,
+          "headers": [
+            "Unreal"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=YPy2hytwDLM&list=PLdiateg_U8PFnlScGDJDQeHUX9qmYvsxv",
+      "source_id": "source-33ef6bb91e1f0d4cd3b8942f3978515c6bc1c94a46e306f919f8bcface8f8cd0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dawdle-deer/awesome-learn-gamedev",
+          "commit_sha": "28e61535a7180f0174242ce0980d9337a7328a02",
+          "readme_blob_sha": "ea02900f953b417abd2e71286e7f51cf640baf02",
+          "exact_url": "https://www.youtube.com/watch?v=YPy2hytwDLM&list=PLdiateg_U8PFnlScGDJDQeHUX9qmYvsxv",
+          "line": 456,
+          "headers": [
+            "Awesome Learn Gamedev ! Awesome (https://awesome.re/badge.svg) (https://awesome.re)",
+            "Technical Art",
+            "VFX"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=yqAKONQxx4s",
+      "source_id": "source-12caf13c3d65d35e67bfd9041b6eb794dba331a440f36d5ea1ae4dfcdc3b3c59",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=yqAKONQxx4s",
+          "line": 612,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=yrXrRLs1vec&list=PLpPd_BKEUoYi1ha6w28SUq7iYa1NC719E",
+      "source_id": "source-f5e36e12152dad07b9a817acef1992e32b3ddd4ddf5787553cf137b30470b2c0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=yrXrRLs1vec&list=PLpPd_BKEUoYi1ha6w28SUq7iYa1NC719E",
+          "line": 45,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=YSOAKnnS8iw",
+      "source_id": "source-b07f3399ea9890af256f7d0003cf056d4134134fe18129f6d93b87614b269757",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=YSOAKnnS8iw",
+          "line": 443,
+          "headers": [
+            "Unreal"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=Z1Fx18cppZk",
+      "source_id": "source-f8656aa0583e86d881ac12a68ba37462e3968e891884eda41ca36f45941157c4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=Z1Fx18cppZk",
+          "line": 497,
+          "headers": [
+            "Postmortems"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=Z6Gb7tQRIQw",
+      "source_id": "source-2b0a81a9dce5ad93c7db84312d6b740545eb3bd75aad9d63e55e221d2e8dbe9d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=Z6Gb7tQRIQw",
+          "line": 601,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=zF_jcrTCMsA",
+      "source_id": "source-969c821c73830f0c8ced055aba0c7e321bbe7985cf9207ddaa4d258c80ea6ae2",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "hzoo/awesome-gametalks",
+          "commit_sha": "733d0328293686894a2025a1d321778e7322b468",
+          "readme_blob_sha": "4270593f0271ba1b5725bfdd90b76f02bb37c6f9",
+          "exact_url": "https://www.youtube.com/watch?v=zF_jcrTCMsA",
+          "line": 22,
+          "headers": [
+            "Awesome Game Talks ! Awesome (https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg",
+            "GDC Talks"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=zN7XOSlxAJA",
+      "source_id": "source-ddc02caccc42c49bd0beb18872f815760b326a410a48cce9dbe8a210a2824e58",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=zN7XOSlxAJA",
+          "line": 441,
+          "headers": [
+            "Unreal"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=zP9GjLnRF8I",
+      "source_id": "source-c600503ff25098a17b22146348c2a4a618b2187f4df071f3ad570d99463c710d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=zP9GjLnRF8I",
+          "line": 398,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=zpP9_i9TpbY",
+      "source_id": "source-ec0391988ca9c85bde8e44ff6a5b60c800061f1cfe85a4635a57c821d52aaef6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=zpP9_i9TpbY",
+          "line": 61,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=ZqQtFbOnK0Y",
+      "source_id": "source-4495556259b6b545dd0e803e6c7a71f6b68ba191cf4336a2a2723b9f29b806d9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=ZqQtFbOnK0Y",
+          "line": 131,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=zQvWMdWhFCc",
+      "source_id": "source-77c4a5559900388ddc7b84ac3331ef9a19d61d0c1546bcc2d5f083c109d68b29",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dawdle-deer/awesome-learn-gamedev",
+          "commit_sha": "28e61535a7180f0174242ce0980d9337a7328a02",
+          "readme_blob_sha": "ea02900f953b417abd2e71286e7f51cf640baf02",
+          "exact_url": "https://www.youtube.com/watch?v=zQvWMdWhFCc",
+          "line": 632,
+          "headers": [
+            "Awesome Learn Gamedev ! Awesome (https://awesome.re/badge.svg) (https://awesome.re)",
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=Zrf1cou_yVo",
+      "source_id": "source-6eaaaf531fe312c5482840b07ed4ec6f502978e9a0b843128d630f795a572eec",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=Zrf1cou_yVo",
+          "line": 155,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=ZwLekxsSY3Y",
+      "source_id": "source-8e3254b32cc465835d89008b1fc6cd993c2238c29985455c6479f9265a73bb9c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://www.youtube.com/watch?v=ZwLekxsSY3Y",
+          "line": 392,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.yoyogames.com/en/gamemaker",
+      "source_id": "source-2f30005665c3ece6d26f943698a01875dba831c2b3a128e28c22b17a1768de88",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "stevinz/awesome-game-engine-dev",
+          "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+          "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+          "exact_url": "https://www.yoyogames.com/en/gamemaker",
+          "line": 130,
+          "headers": [
+            "Awesome Game Engine Development ! Awesome (https://awesome.re/badge-flat.svg) (https://github.com/sindresorhus/awesome#readme)",
+            "Game Engines",
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www2.math.upenn.edu/~wilf/DownldGF.html",
+      "source_id": "source-025bd57f5ca18e52150951ae1e72536748ec0a8f0ec6590dbb9a44861619e6a4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dawdle-deer/awesome-learn-gamedev",
+          "commit_sha": "28e61535a7180f0174242ce0980d9337a7328a02",
+          "readme_blob_sha": "ea02900f953b417abd2e71286e7f51cf640baf02",
+          "exact_url": "https://www2.math.upenn.edu/~wilf/DownldGF.html",
+          "line": 187,
+          "headers": [
+            "Awesome Learn Gamedev ! Awesome (https://awesome.re/badge.svg) (https://awesome.re)",
+            "Programming"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://wxwidgets.org",
+      "source_id": "source-99559c40bf679c3687d016997fb9f3196be5c5213c7c04c7ddeb47a7c2d016a6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "stevinz/awesome-game-engine-dev",
+          "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+          "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+          "exact_url": "https://wxwidgets.org",
+          "line": 535,
+          "headers": [
+            "Awesome Game Engine Development ! Awesome (https://awesome.re/badge-flat.svg) (https://github.com/sindresorhus/awesome#readme)",
+            "Libraries",
+            "C++"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://xenoprimate.wordpress.com/2016/04/08/three-garbage-examples/",
+      "source_id": "source-169ae573fe71c8ff52d2a347b0c14b79ac7ab87b51f10e95b984fe28d46f69fa",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://xenoprimate.wordpress.com/2016/04/08/three-garbage-examples/",
+          "line": 196,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://yal.cc/preparing-your-game-for-deterministic-netcode/",
+      "source_id": "source-78011ee6f16607892c2ce6d11176e81135164f6c23ceaa9f5911ee526ed32906",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://yal.cc/preparing-your-game-for-deterministic-netcode/",
+          "line": 232,
+          "headers": [
+            "Code"
+          ]
+        },
+        {
+          "repository": "dawdle-deer/awesome-learn-gamedev",
+          "commit_sha": "28e61535a7180f0174242ce0980d9337a7328a02",
+          "readme_blob_sha": "ea02900f953b417abd2e71286e7f51cf640baf02",
+          "exact_url": "https://yal.cc/preparing-your-game-for-deterministic-netcode/",
+          "line": 346,
+          "headers": [
+            "Awesome Learn Gamedev ! Awesome (https://awesome.re/badge.svg) (https://awesome.re)",
+            "Programming",
+            "Networking"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://yellowlensgames.wordpress.com/2016/10/26/costs-a-year-of-game-development/",
+      "source_id": "source-56bb02417281e403e295245894fff4df3d1c2a10afe8dfd7d4e5a7f82ff43ad6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://yellowlensgames.wordpress.com/2016/10/26/costs-a-year-of-game-development/",
+          "line": 482,
+          "headers": [
+            "Postmortems"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://yogalayout.com/",
+      "source_id": "source-69ba0ec533f30a9574366fc4e8eb0f2e4fd46178dda8ccd6e96c4028282bdd17",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "stevinz/awesome-game-engine-dev",
+          "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+          "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+          "exact_url": "https://yogalayout.com/",
+          "line": 541,
+          "headers": [
+            "Awesome Game Engine Development ! Awesome (https://awesome.re/badge-flat.svg) (https://github.com/sindresorhus/awesome#readme)",
+            "Libraries",
+            "C++"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/_J8RPIaO2Lc",
+      "source_id": "source-d8f52a836ec224a22bf179b7d4a9ad81f48b764637c3797446bb98ea460b8809",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/_J8RPIaO2Lc",
+          "line": 367,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/_Wte3iJYGNM",
+      "source_id": "source-9f42086515dca5309c87170ed82a14e24604057eb08ac97d583407d1c8f11904",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/_Wte3iJYGNM",
+          "line": 72,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/-EEwd7YNf8c",
+      "source_id": "source-e6f01b8f5f6c956a35a20b6bb1f8a3bb7b815e9ae160d763db1fa66afb4d970b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/-EEwd7YNf8c",
+          "line": 492,
+          "headers": [
+            "Postmortems"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/-l2g4adWWwo",
+      "source_id": "source-d3f9120831e27c6c051f029b5e589c4e9656d024684b61b690c17e2bf5fa1ea9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/-l2g4adWWwo",
+          "line": 221,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/0BZwEoj50uw",
+      "source_id": "source-45aa3d364aa154502dd3a3a35a7852c6d38b5660360a700a18a86ec763cca431",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/0BZwEoj50uw",
+          "line": 65,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/0IUaGQhlPwo",
+      "source_id": "source-43c1814b0cf6e4f300a2cbb4b1d2094a4f7a4bde704db1d1cfd9f85a857967ea",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/0IUaGQhlPwo",
+          "line": 484,
+          "headers": [
+            "Postmortems"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/15PAsik0PZE",
+      "source_id": "source-cf51afeb74023b134af992304eba8003fa422bbbdb689f96c03045c400751ec5",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/15PAsik0PZE",
+          "line": 313,
+          "headers": [
+            "Organization"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/1ypOUn6rThM",
+      "source_id": "source-d58b3bf84ea470e7da9850c94994c54488c15d2542a8beb90a1f1ef1da54f129",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/1ypOUn6rThM",
+          "line": 153,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/2hNdkYInj4g",
+      "source_id": "source-83affbf43582d0d83188d8edb348f5fb516cdac00a7d4b7ce3de04ae4a162f81",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/2hNdkYInj4g",
+          "line": 228,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/2TLRjV137hw",
+      "source_id": "source-04d2d5f1adfb8a2e427f9da4d4dce58fa42e1e47fdc45d67eeb2779554f30dd1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/2TLRjV137hw",
+          "line": 120,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/2xjIfFOTtBc",
+      "source_id": "source-c5a48f1aec7115c7c2aab5f131b3f50b242edb17897035f1cff8b2a2ef4fcf2c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/2xjIfFOTtBc",
+          "line": 364,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/3s5UUUFKq20",
+      "source_id": "source-d16a028708adc2fa5e4785ffe4cf0bb0b57cd58b77c6eda2ca0fa678fc80eaf1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/3s5UUUFKq20",
+          "line": 489,
+          "headers": [
+            "Postmortems"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/3yuBOB3VrCk",
+      "source_id": "source-6c0241277b03f9d0d3d30e0cc20caba3cd6656c677acf37804830d5f8b93d831",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/3yuBOB3VrCk",
+          "line": 396,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/4AEKbBF3URE",
+      "source_id": "source-7930194afe8a437eb8f98d4b05e6da3fcd2a3e6f2680bc1fb8c4d15376882d26",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/4AEKbBF3URE",
+          "line": 110,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/4CSYA9R70R8",
+      "source_id": "source-d775c36aabb5d45a490b388944da61fc5dfb4c29dd0a4c8505687f22114d88e3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/4CSYA9R70R8",
+          "line": 589,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/4mgK2hL33Vw",
+      "source_id": "source-337174a76d2d7987ba5b849218b4fd4791a452d5d79cedfd3df43161dc1a2fa4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/4mgK2hL33Vw",
+          "line": 132,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/5ZGE_awGGik",
+      "source_id": "source-d5bd0f550112a8b39547eb8b9eb150da77adc88d335cc09f83bbc85b26a3f59e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/5ZGE_awGGik",
+          "line": 323,
+          "headers": [
+            "Organization"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/6hHbTVloizU",
+      "source_id": "source-39cfa5fe9ff24d61a7e4fe0a9c48b5708893e6f54f79a869992092bce9a0cd41",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/6hHbTVloizU",
+          "line": 285,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/6WmK9qa2KIg",
+      "source_id": "source-d8b0de38361220a800f1550535f8bb4d21e822dd351db620dd0d2a131f96296f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/6WmK9qa2KIg",
+          "line": 225,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/73KRH0x5e9A",
+      "source_id": "source-d235c31db7f7f2757a5c1ee78a52b68112eca48fd21ef97f946a2374b196d25e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/73KRH0x5e9A",
+          "line": 638,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/78rPt0RsosQ",
+      "source_id": "source-6c51f576c095092e978240184ceeedd7d847daeed65145a7f1c2104b63fb0298",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/78rPt0RsosQ",
+          "line": 118,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/7Equ1dVbfgo",
+      "source_id": "source-ccef760a97209f8c7a24cd176272084436d06c0a19301ed85d3750a5e395f6c0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/7Equ1dVbfgo",
+          "line": 437,
+          "headers": [
+            "Unreal"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/7L8vAGGitr8",
+      "source_id": "source-a12bb5a82d705ea03c0840a48d36567ba97d35839cdabc28a7acfa2d0a4dbcb3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/7L8vAGGitr8",
+          "line": 129,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/7TYNLe8qjMc",
+      "source_id": "source-c436af4d46b5fbb211630d83c5c1c65cb3de359e43ae55c9247306ffc50d39c3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/7TYNLe8qjMc",
+          "line": 280,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/7v4EcanyRws",
+      "source_id": "source-4b93688d6edacab62b6cfae14d0468d9c38fcda6fe5ff073eafe362dbdbc70d7",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/7v4EcanyRws",
+          "line": 67,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/84A1FcQt9v4",
+      "source_id": "source-0179bc5a7f4018ea7e6d4c882f29760f5e527e41d23aeac7f7a65925de6a679d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/84A1FcQt9v4",
+          "line": 374,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/8X4fx-YncqA",
+      "source_id": "source-33aa97aef1c36565efedde812abb9f67714eb07ab135172d9e95c4230c73d390",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/8X4fx-YncqA",
+          "line": 133,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/9MIwIaRUUhc?t=203",
+      "source_id": "source-22a8657ec9dce17f66d90c4b90c78987e38284e1e3ea2c5c59ada872a61ad1bb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/9MIwIaRUUhc?t=203",
+          "line": 384,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/a1MjIWGYvy8",
+      "source_id": "source-b455823a514e35365e2924ee99f73c03b05ce2868790efa196e0929673c90a17",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/a1MjIWGYvy8",
+          "line": 313,
+          "headers": [
+            "Organization"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/AheuOqlAMvA",
+      "source_id": "source-4ba85e0f613342c4a307d8eec802ad6c1b1d0e357c672f24542281425a70ae7b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/AheuOqlAMvA",
+          "line": 285,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/apfNODay1_s",
+      "source_id": "source-3487a655ea09e320494e37c1a45b525476c844e8aa4328bcacedc02a2e5dd194",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/apfNODay1_s",
+          "line": 490,
+          "headers": [
+            "Postmortems"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/aT_gghruWAg",
+      "source_id": "source-5398b5d23e1a518485313013d2c82406d53440eec076075e96eb58dd2d097036",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/aT_gghruWAg",
+          "line": 63,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/bHdi5Ar8GXw",
+      "source_id": "source-ffcf0ce70d150e558b64e21dbd02b1d7631c0035c4c8e4968784928a65df49fb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/bHdi5Ar8GXw",
+          "line": 136,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/bIgnwKZj1fA",
+      "source_id": "source-d1288524c7881f2f005260ee09a27de56c204fd67f03234932156a96cb68f5f3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/bIgnwKZj1fA",
+          "line": 316,
+          "headers": [
+            "Organization"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/cx2-aN6e69o",
+      "source_id": "source-594c71fee7cb96c25877acce4cb5bda11e1acdc7eaf15ba031512da5ff65566f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/cx2-aN6e69o",
+          "line": 705,
+          "headers": [
+            "Misc"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/DKVzLkT1mrY",
+      "source_id": "source-7583b087e60ea69842da0b2224b8f3adc424be8ae69ce1380520a87c265742de",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/DKVzLkT1mrY",
+          "line": 588,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/dVgKpOYo-4Q",
+      "source_id": "source-0bd7f8cf96a1164ed0ab92f306e64a194b644f925d5e48e66a5fef124945cd1c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/dVgKpOYo-4Q",
+          "line": 67,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/dwV7eSBSRvM",
+      "source_id": "source-df27f698ed72b5619f046c23965980e9eb8596354469462223de594f86216e7b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/dwV7eSBSRvM",
+          "line": 439,
+          "headers": [
+            "Unreal"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/Edcr73EeAdk",
+      "source_id": "source-0e61100a13d878be7fae64abdf5bafabbc0ec50d4c3772f88e29a34c04b2a9fa",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/Edcr73EeAdk",
+          "line": 367,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/EMGTcgsEN68",
+      "source_id": "source-3ddd67d3cfc77a11b0cb199adae682c7b02cf24891a2539c2b426a235921ec4a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/EMGTcgsEN68",
+          "line": 637,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/ePQcAjuiSEo",
+      "source_id": "source-75ae5dc1280b5782b0aee8b89fd8fa1a2a792aa1c54c4c38b7a8f8d004ae4a44",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/ePQcAjuiSEo",
+          "line": 672,
+          "headers": [
+            "Bureaucracy"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/F1eyzCDvV7Y",
+      "source_id": "source-7aa79b07dc80876ef69b3371133f98a8d74b6e0a3f6dc73362eb743f263df984",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/F1eyzCDvV7Y",
+          "line": 66,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/FCZ4dOEcBp0",
+      "source_id": "source-13100854675986a2c928979c138a75f3bf4b5d8a0690c5c7bf1b24ed2d386cfe",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/FCZ4dOEcBp0",
+          "line": 368,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/fjOdtSu4Lm4?t=254",
+      "source_id": "source-c3f1ae8f6dbece8f9c4e745f8038d4dfb08d0575b7c99198418aeab4de67463c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/fjOdtSu4Lm4?t=254",
+          "line": 251,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/G4xTKnBsWro",
+      "source_id": "source-1b18d67f75d26501afb48dd9b0551a9331410c34cc190bc1e3f6c8b0556ac044",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/G4xTKnBsWro",
+          "line": 68,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/GMCPARUKja0",
+      "source_id": "source-4c22dae042a53a4649341842c9ea67e7e1f12481eaa3406a92b9536f92152f08",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/GMCPARUKja0",
+          "line": 438,
+          "headers": [
+            "Unreal"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/Go7qOzFnOsg",
+      "source_id": "source-51bc2e6d6c15808858268852bffc7937c9e7f0abfe4c8396a96e919a42fd2e1e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/Go7qOzFnOsg",
+          "line": 286,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/gwV_mA2cv_0",
+      "source_id": "source-f578a241914a9bbe4829b6dfd1efd66e290dd6fa00bc087ba7cd2c6a4cb2a932",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/gwV_mA2cv_0",
+          "line": 127,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/H1oNuKChsdU",
+      "source_id": "source-58fe7b9691272600eb5e2fa62e34d4584a2a2543321b3e07472022fd13f0ce67",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/H1oNuKChsdU",
+          "line": 47,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/H9Y2KJl2dmI",
+      "source_id": "source-e20cf59f2405d3a3dc1cb2cea5cbe46db900294fa067f70d94d82afe90f1fb14",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/H9Y2KJl2dmI",
+          "line": 440,
+          "headers": [
+            "Unreal"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/HH4Y9ghqRr4",
+      "source_id": "source-7ca183152bf2628024f1664efc5470c7fc8fbbb3162fd8aee60f48d2afbd4d8a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/HH4Y9ghqRr4",
+          "line": 35,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/HwZ9Sj03cBQ",
+      "source_id": "source-a95c6baff991a22723028ce331071741bd4cb65c22a9394f91d16bc3d0cc4fbf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/HwZ9Sj03cBQ",
+          "line": 66,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/hzgSzbMryFY",
+      "source_id": "source-265ad437bbc15112a93bd1aa2178967ce5bb89674ff403a819ae8f66ae1f53cc",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/hzgSzbMryFY",
+          "line": 116,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/HzHbcS1zN78",
+      "source_id": "source-b0cd1aa245203d1916b915ee01498370d1fa78b022063bf49c23b0ca15924d70",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/HzHbcS1zN78",
+          "line": 438,
+          "headers": [
+            "Unreal"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/iDaNs3AMWIg",
+      "source_id": "source-9c4e3b10f1d04300cb8fd5ed60e26f955387ca1358b3f7976e3e52342449b668",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/iDaNs3AMWIg",
+          "line": 283,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/iEonPcoqEFQ",
+      "source_id": "source-5df4c2c34a6eb892a4cc4cb99778e8e0d5e57b50dc18977202fc0a168dc066fe",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/iEonPcoqEFQ",
+          "line": 63,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/if_hvgLC5cM",
+      "source_id": "source-17665c689addf7d1df814c8b7f0523266a9c3318a1aeef73cf975d1910e155db",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/if_hvgLC5cM",
+          "line": 137,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/IGluIMhB73Y",
+      "source_id": "source-b98fbd90cfd177bce70139635716034b5f1c45f2fd0c18322236fceb2d257952",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/IGluIMhB73Y",
+          "line": 134,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/igRBWT6TDy4",
+      "source_id": "source-e175d5c304d011a899c8e5cb810cf30210a714e571ab06561e90cab4a3fe7e1f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/igRBWT6TDy4",
+          "line": 638,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/IHaTbJPdB-s",
+      "source_id": "source-1d19c79ce4844287d06416170369d7041dc02e445194a20af7ed816f18a2c6ff",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/IHaTbJPdB-s",
+          "line": 314,
+          "headers": [
+            "Organization"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/iNbLMOmxSO0",
+      "source_id": "source-e4f0f3c05938e3d9ef9d6f762a4a1cfc6e3454751bce328510cc8abc12198cf5",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/iNbLMOmxSO0",
+          "line": 286,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/Iyqo-hjLg20",
+      "source_id": "source-5239579b42797e7aead0aa8d6cb636319741c417c21917261888bde745bab1bd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/Iyqo-hjLg20",
+          "line": 390,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/jCuS9pImle0",
+      "source_id": "source-66b17ec6b752506c5d42935e672362c0eb01bdce070276505e9da3ed7566d638",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/jCuS9pImle0",
+          "line": 635,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/JDVuTBHnGWw",
+      "source_id": "source-02936f6e6df110da92a86b81a9011180d462ac5ccb581a9160a55313dcef80ce",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/JDVuTBHnGWw",
+          "line": 360,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/jh7DtNXqnlM",
+      "source_id": "source-6de03122943444112ee184804c00136e2c933cce95d1a02dd9318830a678480f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/jh7DtNXqnlM",
+          "line": 70,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/jUH3Ms_7Heg",
+      "source_id": "source-6cc01693d6ae158408524f8b34de1637cdc263bc5dc8050bd4cdef4d0f9db6a8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/jUH3Ms_7Heg",
+          "line": 71,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/JVrft9cqduQ",
+      "source_id": "source-d446d02c089cc735515e0231937ecd0f4e5604393ec795c44be6f696d9619284",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/JVrft9cqduQ",
+          "line": 279,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/k1b9xKRC74E",
+      "source_id": "source-743fb0c3ab565503a8e2ee32e23e5e53a539c49281c430bcd6f6fa7913f99309",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/k1b9xKRC74E",
+          "line": 283,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/KbFs9ghIIEI",
+      "source_id": "source-300b23bacb6f1ce234c42863106fc87c4b564afeca3259e9f0a68137d8477520",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/KbFs9ghIIEI",
+          "line": 137,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/KcE_7bKxlyU",
+      "source_id": "source-ca418b2bd90e074e95fe2e6f2e14c362e260e198ef180e3892565dc08c0b75dd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/KcE_7bKxlyU",
+          "line": 160,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/kxw559A6XFk",
+      "source_id": "source-9c992ab03eae6595d1b5bf16e823af91f8bcb4e9bb716b74c47cd37f6d059308",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/kxw559A6XFk",
+          "line": 68,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/kzfKnI8x5SE",
+      "source_id": "source-e3c362905580b33b4650c2e6994cb7598d70b3db4c7293c31e10205157ba51c1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/kzfKnI8x5SE",
+          "line": 117,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/lAYIF0lwy60",
+      "source_id": "source-7c6f3bba1f383d3a7fdf3810502e3a484afa73694c0c73244dc4dc71f9a4d6a6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/lAYIF0lwy60",
+          "line": 48,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/LgxOcZDor8U",
+      "source_id": "source-a11696f1088192d35a3092f1a62187a136b7fb86ea6e50e901532fa9d3403306",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/LgxOcZDor8U",
+          "line": 289,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/LleJbZ3FOPU",
+      "source_id": "source-6a699d33d51c4a6331186c67b5a7fef8ab539493ab63aaaf10bfc5fbbcc53eb4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/LleJbZ3FOPU",
+          "line": 227,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/LMXvLLlIWlY",
+      "source_id": "source-38cbfc42f92efc6de52bb198bbb3fb43700a8ffd0c4a0db9135efa24461c0ad0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/LMXvLLlIWlY",
+          "line": 142,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/lZoQ9a7oPvo",
+      "source_id": "source-ddc3757f815f57bc6d8fab02378cd02d6eb90fff4769c34e1e45899f76c84b76",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/lZoQ9a7oPvo",
+          "line": 132,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/m4p7T9O_tqg",
+      "source_id": "source-e189a05df65729176b5cb81f38d0870a985d92d5d06890bf178d94bfa6cfc543",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/m4p7T9O_tqg",
+          "line": 704,
+          "headers": [
+            "Misc"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/MDYh2mnDCIM",
+      "source_id": "source-5436314aab81a4189171da5b600dd0f0123399df600fde2dfbd0b899d81b3361",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/MDYh2mnDCIM",
+          "line": 314,
+          "headers": [
+            "Organization"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/mkkJty-fNY4",
+      "source_id": "source-3b60bebfa406ea190492cb83f101f5252c0655bef7a03046904e44a70d5e10e7",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/mkkJty-fNY4",
+          "line": 639,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/MP-nmrMb9FQ",
+      "source_id": "source-a05f5590ac5e4fd3cbd9d4d223322af5d8bdb8adb1c278e1dbff1b286cca1ba5",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/MP-nmrMb9FQ",
+          "line": 636,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/mQ2KTRn4BMI",
+      "source_id": "source-350fa8dfd110376c7be514a341cfd344a662b8631a19fab637813ca68ad0c6e4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/mQ2KTRn4BMI",
+          "line": 216,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/mVaxO05toJg",
+      "source_id": "source-e9ac0545f888057150d4b3058c7aaa8ad2ebc9718b55b7b986e6f1b9f69fc9a7",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/mVaxO05toJg",
+          "line": 60,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/nBkiSJ5z-hE",
+      "source_id": "source-858cb40babaa926173867ca66557d1e220f69ec675ba507207d396700a50b6f5",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/nBkiSJ5z-hE",
+          "line": 367,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/nM-IcWuNCd4",
+      "source_id": "source-627f2676a8026ae9f1fcbef667d09a0e841c7bc2b41cdfe7adf785aa261fa92b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/nM-IcWuNCd4",
+          "line": 139,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/NtUNI59UzMU",
+      "source_id": "source-70b3583fafe0ceb5fa5e33296f85905c989befd5f57ccd00926f7eea81c54c3b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/NtUNI59UzMU",
+          "line": 128,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/nVeihUFtEkg",
+      "source_id": "source-eb4998203aafd50b8be6702e1c2f114d908afc2fd719f0cc956ee65e2c1e088f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/nVeihUFtEkg",
+          "line": 593,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/o0epA2d2t_c",
+      "source_id": "source-94e9260e6f43b6926a656dc4282cd9a418b84459001ca27bfafe9f434c92ab5a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/o0epA2d2t_c",
+          "line": 286,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/ogz-3r0EHKM",
+      "source_id": "source-c9a21ffbddf4feffd3f0cb88e0b8b0ff1b657dd626f998da5357095760db3fc0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/ogz-3r0EHKM",
+          "line": 68,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/oovAPuckQjs",
+      "source_id": "source-60f96caf9b8259a50b357db3920863f834490109c8586f18ac0ccb8192e9e167",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/oovAPuckQjs",
+          "line": 386,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/oSS5T4od-GQ",
+      "source_id": "source-96786a2edcef48fdf01c6392567c314923472198bbdbf44dfc1e8d0f75e1bc57",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/oSS5T4od-GQ",
+          "line": 129,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/OTgvqfHWMGM",
+      "source_id": "source-7d16d9c251abde8982c537b2d8198ef66f6cd96d529107f1f5872e051abb6e5f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/OTgvqfHWMGM",
+          "line": 123,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/OXAcWMVzHfE",
+      "source_id": "source-d392716a1e302a677651767d2b211742147a5bd5c0161ab3fd8f16a4f8642b34",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/OXAcWMVzHfE",
+          "line": 140,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/PTgcUIudRY8",
+      "source_id": "source-e0981fca15dfe18580910efb2d4c27fadbb665cd4a9ea77d7ebcb9cd1b642df7",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/PTgcUIudRY8",
+          "line": 131,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/pyKDC-ptFIg",
+      "source_id": "source-53e28be82859fc09ab1a27c1256c25dd0236f2e2765ffa5d34f9a139411487cd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/pyKDC-ptFIg",
+          "line": 55,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/R7AJwlFHZ70",
+      "source_id": "source-0befaffc6211ba0129608d861b3d4f6bee2b0a4adc2d0258c77c392d3795fe77",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/R7AJwlFHZ70",
+          "line": 128,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/rfBp9YhkoWo",
+      "source_id": "source-2858726215d68b3b50bc7c87d214bad1c5dc12e84454d59e4302a077420ff504",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/rfBp9YhkoWo",
+          "line": 64,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/rgEYv5c6CNc",
+      "source_id": "source-41b0adb50c8f77540b07f59a629e632753a98ca5fe9830672bdd95f3fda02ad0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/rgEYv5c6CNc",
+          "line": 489,
+          "headers": [
+            "Postmortems"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/S7lXSihz0ac?t=319",
+      "source_id": "source-32b2618bbb3294e3d667ab11ba90e622c3a05afe79376c2692a45935ce28ae95",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/S7lXSihz0ac?t=319",
+          "line": 250,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/SIAmi88akl0",
+      "source_id": "source-82b9b0bee36b7a532d8c626ca180f10d338e417c4d93cb11e33867616afc69dd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/SIAmi88akl0",
+          "line": 283,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/SiueBTuwS_4",
+      "source_id": "source-4affbce56cb3f344b8ad0a643c9f2c24b0759a3c7ee80f88393465591af7db64",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/SiueBTuwS_4",
+          "line": 54,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/SqdqgSZUPes",
+      "source_id": "source-db3c42446a175d191fa810d223bf68336efa481121027239e18459a6b716c763",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/SqdqgSZUPes",
+          "line": 133,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/SvNCTdTRr1c",
+      "source_id": "source-804d8b75fa6083b51bfe9697f11d93a181b790fb27b823b4a47f950dbe46cb72",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/SvNCTdTRr1c",
+          "line": 368,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/SW0J0bEa6x4",
+      "source_id": "source-39291e13d232616c924f4956eeaf5c5429009ec6c1613659f14cde54bcf4873f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/SW0J0bEa6x4",
+          "line": 78,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/TawhcWao9ls",
+      "source_id": "source-621c58bbf177157509c41a9576d6d0f1e92fd30160a80d61f6d0e0fcb189ec10",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/TawhcWao9ls",
+          "line": 485,
+          "headers": [
+            "Postmortems"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/Tfw21ciEyZE",
+      "source_id": "source-0f89b0b2873cc80dd4a2ec398582e971f25a95ab234778c093af378ec112d84f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/Tfw21ciEyZE",
+          "line": 57,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/tu-Qe66AvtY",
+      "source_id": "source-0c58770d68d1665c8561e7c386e922f1d8f88b7d6eb9883c577e503c62e10de1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/tu-Qe66AvtY",
+          "line": 56,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/TyxDg70hc3g",
+      "source_id": "source-36df99e674c0aa0aa6abe7be4050f01620fa2fe3fcf53d16da929c23f2f49d09",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/TyxDg70hc3g",
+          "line": 214,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/uGFzWM1sJjU",
+      "source_id": "source-c1adbf86d909e22936ddaef30184d5d7e717678a547566e3690e4ea6c1f496ce",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/uGFzWM1sJjU",
+          "line": 388,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/UwjbLFImXOg",
+      "source_id": "source-f1241ccffb66d8acb857e78d5cff6238b81a55f16fb99c1f4a14b0fc2077a820",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/UwjbLFImXOg",
+          "line": 589,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/vEkstWB2H_Q",
+      "source_id": "source-bcaa99ffde3dfca44725b2788327c5640c56894b0cf2b431bef73050df01d81a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/vEkstWB2H_Q",
+          "line": 69,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/VIFJWi4u6Ls",
+      "source_id": "source-bdaee12c89fbfd7feab1a951870798143d25b9e6b543eb0fad6de734a546fc14",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/VIFJWi4u6Ls",
+          "line": 63,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/VO4FNf-Xc58",
+      "source_id": "source-0673a81df3c925ab647f049e3721fc03d33907c7fa9f4926bfba2846e7e45f33",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/VO4FNf-Xc58",
+          "line": 134,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/voz6S7ryWC0",
+      "source_id": "source-232c387dd9d92ea39243fc0e400e82ce8e9356ae82125b5f100d7e9b194bfda2",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/voz6S7ryWC0",
+          "line": 139,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/VUl0SFMZbEA",
+      "source_id": "source-5b97527bfcde1010b301fcf0621e8f1f37b99a1ba06bc15b56793c9fc59b9aff",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/VUl0SFMZbEA",
+          "line": 438,
+          "headers": [
+            "Unreal"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/vVwu4RDChsY",
+      "source_id": "source-07bf33f06835637d601506a9fa3821730a76401407b3f7c1eea6077150a355e0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/vVwu4RDChsY",
+          "line": 138,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/Wk8eMdMqEzo",
+      "source_id": "source-22f68e3a22d7e1e7089361b22948d72ef6b1d2cf6f362a4ba5e2e03ab0b359a2",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/Wk8eMdMqEzo",
+          "line": 589,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/WPimiBP8d6o",
+      "source_id": "source-cb67d28c1324fb1558d3e7cf462fa856b46457af7ae03e0d781def7a73910a29",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/WPimiBP8d6o",
+          "line": 138,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/WWI07UQbJ9E",
+      "source_id": "source-19417842b7896a251d0a8a831ec0d35358741f0e8e9215a04d4253e27b095f67",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/WWI07UQbJ9E",
+          "line": 368,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/WycVOCbeKqQ",
+      "source_id": "source-1cd247ec4af5f5363362d67ab4da3b98b12a6994a904f36212b2c1dbcdb308ab",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/WycVOCbeKqQ",
+          "line": 635,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/X3FPHVBOuks",
+      "source_id": "source-6884e5471c86e71a88653a0606d26da6a7841fdab16c1ab655dcad2f5f35e753",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/X3FPHVBOuks",
+          "line": 596,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/X6ZuBpGzvME",
+      "source_id": "source-6f836d04ea3ba03e3fe06e9d9a195f2d64865e5b5e74d14470bf5a9e4b5d9f32",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/X6ZuBpGzvME",
+          "line": 135,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/XfRiNr7eSms",
+      "source_id": "source-1c6c9cf3c14e071d0ec1c02750e04ca11c3fbbe6d0743bac347f06ff5c34049c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/XfRiNr7eSms",
+          "line": 154,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/xFSnBs0ZgE0",
+      "source_id": "source-b3cb0be801e0a801eb21deda34b70461bee8330f10837ea8276daecc03c466de",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/xFSnBs0ZgE0",
+          "line": 636,
+          "headers": [
+            "Commercial"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/XUcp2bNTwBg",
+      "source_id": "source-ab718b6c55a0034a506665ae8a974cef99e5da604f635912a039ed6293aa05c7",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/XUcp2bNTwBg",
+          "line": 310,
+          "headers": [
+            "Organization"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/yC-r-P_0Ze0",
+      "source_id": "source-b80855dab721c803a89934f8c694abb16c80d258ae99e3abfedd1218b1053020",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/yC-r-P_0Ze0",
+          "line": 67,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/yEP9KWeHwXQ",
+      "source_id": "source-088ab250e99f43db8a6f6511de631799ae94b25754fcf7446f00ae0cd2e3df7d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/yEP9KWeHwXQ",
+          "line": 138,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/yJsQJ6gwnn0",
+      "source_id": "source-2ee6bcfb8d9b86f78422afcd41d657ca469d94858420748136634fdbe7ccf8b4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/yJsQJ6gwnn0",
+          "line": 314,
+          "headers": [
+            "Organization"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/YMDGPSWWA18",
+      "source_id": "source-b8d8d76ce285065dbfbf0a6ff00b28b5d5981a51768e4ae04753accbdece1f79",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/YMDGPSWWA18",
+          "line": 129,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/yOfgUFx9RkU",
+      "source_id": "source-65109d11a12f8b579434fc501f7f4a0ea5fb9d73f3082dbcaad4d1bcf902126f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/yOfgUFx9RkU",
+          "line": 136,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/yorTG9at90g",
+      "source_id": "source-bfc27488f3dfc1060c534f1120824e3b407099d8947841260e2cba4a544cc61c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/yorTG9at90g",
+          "line": 137,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/z_KVEjhT4wQ",
+      "source_id": "source-3b6903d5cfcb16b11bc4d5fbb047ecd2b386af2af868f7f731e7ddbfb9ae32b8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/z_KVEjhT4wQ",
+          "line": 130,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/Zd3507sC7GY",
+      "source_id": "source-eca551be28dae733ab89b96d9657c12eb8cc483c4f3ff6148c8e662e33e9c52b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/Zd3507sC7GY",
+          "line": 284,
+          "headers": [
+            "Audio"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/Zj3edYYaOCo",
+      "source_id": "source-89c1b89a380b6ce308fd1f1faf9f6eba401bea6912e2b3645650664b945acfae",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/Zj3edYYaOCo",
+          "line": 69,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/Zk89lFOkTqI",
+      "source_id": "source-fa309eac55d163808dedbf448f2c66dd09c6f9c7f6208c46462c2e2b494ee8b4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/Zk89lFOkTqI",
+          "line": 592,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/zkIfCo2JxJY",
+      "source_id": "source-32c02143c33265de7d0e207a6f4d62bbc55f69c8c5effa99851e626f4bdcd654",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/zkIfCo2JxJY",
+          "line": 590,
+          "headers": [
+            "Marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/Zn9rUQ2BCBs",
+      "source_id": "source-22aefbd3f183b8ec1b442b2dcbaf1bf671c100744a4c4216add35cf8e2d1276b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/Zn9rUQ2BCBs",
+          "line": 69,
+          "headers": [
+            "Art"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/ZW8gWgpptI8",
+      "source_id": "source-6544d3a0e19d5cb193d9cf98c0fa9155dd550abc478eeeac2af35f4335428cf6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtu.be/ZW8gWgpptI8",
+          "line": 490,
+          "headers": [
+            "Postmortems"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/playlist?list=PLImQaTpSAdsCnJon-Eir92SZMl7tPBS4Z",
+      "source_id": "source-31408e51d73a8f57f169a9d4ef707aa1e92b58a7ba31586054f3cad4ae5e0ee6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/playlist?list=PLImQaTpSAdsCnJon-Eir92SZMl7tPBS4Z",
+          "line": 230,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=_f-CBxcY8Bk&list=PLS9G7A6kaaHNTbz4bsmrhpAvzljf_ZvRg",
+      "source_id": "source-72c2c398511209237d7b3faf1ec7413eb1055932fd16fdb97d39d46da0dab4c8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=_f-CBxcY8Bk&list=PLS9G7A6kaaHNTbz4bsmrhpAvzljf_ZvRg",
+          "line": 247,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=7YPPFIqUN84",
+      "source_id": "source-7e66556b6af734d57bc0e898d9b7ab0eb06487544e9767b76a18ab927e7a78f0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=7YPPFIqUN84",
+          "line": 239,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=8w0qvO4Vumc",
+      "source_id": "source-60815b2b15eb9e26486582f9605ce8d3bed84c9c2db7ba52e20669eda23d1e69",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=8w0qvO4Vumc",
+          "line": 392,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=bZEJ3nZe9J4",
+      "source_id": "source-5e41d565368f6b53ab6b7160cf66929bda1ecdd33967c2967283ecc06fb6d071",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=bZEJ3nZe9J4",
+          "line": 155,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=hRL56gXqj-4&list=PLU2nPsAdxKWQYxkmQ3TdbLsyc1l2j25XM",
+      "source_id": "source-ff14524c53f2be0aad422e37654bc906ed40b963ab02c72c535a65d7996e1d36",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=hRL56gXqj-4&list=PLU2nPsAdxKWQYxkmQ3TdbLsyc1l2j25XM",
+          "line": 228,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=IE2siVRMXCw",
+      "source_id": "source-fa199d4695648de9ea2ee5ad5f9fe15781818f64dcd031b57663f2c7de8065eb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=IE2siVRMXCw",
+          "line": 328,
+          "headers": [
+            "Organization"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=u0yksFw9PSs",
+      "source_id": "source-a72c2bf46980108c673908ab40855f9acaa8f06cdbc0f4ebe8027ff6b52b6ccc",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=u0yksFw9PSs",
+          "line": 369,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=zyVTxGpEO30",
+      "source_id": "source-fee77c6a0ea905fc2f3fe44e5dce2c091914d313ed94060883904316b1939328",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=zyVTxGpEO30",
+          "line": 151,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zenorogue.medium.com/what-roguelike-meant-fb8b0e1601a",
+      "source_id": "source-31a40054e90065b311501d5bf358c4b6269f4f77bc2493290edb72e278f97c47",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://zenorogue.medium.com/what-roguelike-meant-fb8b0e1601a",
+          "line": 142,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zeux.io/",
+      "source_id": "source-23ceb0273c2f6ff8d07bb122c61b6ca4e1e7e8b9819ad3dc750e4202473732f4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "stevinz/awesome-game-engine-dev",
+          "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+          "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+          "exact_url": "https://zeux.io/",
+          "line": 233,
+          "headers": [
+            "Awesome Game Engine Development ! Awesome (https://awesome.re/badge-flat.svg) (https://github.com/sindresorhus/awesome#readme)",
+            "Learning",
+            "Engine Development"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://ziglang.org/",
+      "source_id": "source-31fb4c7d9ab7e6eff8199f6b62bb1677f7b2cd1a4f5b73d23479e32abfa3e2fb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "stevinz/awesome-game-engine-dev",
+          "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+          "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+          "exact_url": "https://ziglang.org/",
+          "line": 1129,
+          "headers": [
+            "Awesome Game Engine Development ! Awesome (https://awesome.re/badge-flat.svg) (https://github.com/sindresorhus/awesome#readme)",
+            "Libraries",
+            "Zig"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://ziglang.org/documentation/master/",
+      "source_id": "source-1f865b2594b212c1af6bfdc23ec5ed8b55d5c0d1f7f20e28dd14035777828f89",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "stevinz/awesome-game-engine-dev",
+          "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+          "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+          "exact_url": "https://ziglang.org/documentation/master/",
+          "line": 1129,
+          "headers": [
+            "Awesome Game Engine Development ! Awesome (https://awesome.re/badge-flat.svg) (https://github.com/sindresorhus/awesome#readme)",
+            "Libraries",
+            "Zig"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zimjs.com/",
+      "source_id": "source-61d1e1f1155fab7d61f8fb61cfd17d06085973dbfadc395a9c8be1aa8feef8e4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "stevinz/awesome-game-engine-dev",
+          "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+          "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+          "exact_url": "https://zimjs.com/",
+          "line": 901,
+          "headers": [
+            "Awesome Game Engine Development ! Awesome (https://awesome.re/badge-flat.svg) (https://github.com/sindresorhus/awesome#readme)",
+            "Libraries",
+            "JavaScript"
+          ]
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "All linked destinations and their current rights remain unverified.",
+    "No media, game asset, transcript or article text has been ingested.",
+    "Git commit/blob identity is a catalog extraction pin only, never a legal or knowledge approval."
+  ]
+}

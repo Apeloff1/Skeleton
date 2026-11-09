@@ -1,0 +1,5 @@
+{"b":889,"f":"skeleton/multimodal","g":"e984ccf444c60e4cf951edc628ccd44a1c2e62ba","m":"100644","p":"skeleton/multimodal/__init__.py","t":"blob","z":"unclassified"}
+{"b":5080,"f":"skeleton/multimodal","g":"634c52c0ae935dac9ba25a0920effaedeeec0800","m":"100644","p":"skeleton/multimodal/contracts.py","t":"blob","z":"unclassified"}
+{"b":1889,"f":"skeleton/multimodal","g":"fd96fc47292160199b7a939229a4d4bdc39f8921","m":"100644","p":"skeleton/multimodal/ingest.py","t":"blob","z":"unclassified"}
+{"b":9137,"f":"skeleton/multimodal","g":"29133761075da67b18f8350b8a8d6e6999a154fb","m":"100644","p":"skeleton/multimodal/intake.py","t":"blob","z":"unclassified"}
+{"b":2142,"f":"skeleton/multimodal","g":"929126d0724ab61493607fbacca537ff21f91ede","m":"100644","p":"skeleton/multimodal/sanitize.py","t":"blob","z":"unclassified"}

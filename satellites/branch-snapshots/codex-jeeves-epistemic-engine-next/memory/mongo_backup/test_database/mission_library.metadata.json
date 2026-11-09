@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"da3bccff8fb846a7bd63ca2a8ed23954","collectionName":"mission_library","type":"collection"}

@@ -1,0 +1,27 @@
+name: PR Lifecycle Signal
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+# Closed-PR lifecycle signals wake the default-branch drainer immediately.
+# Superseded PR-head updates are already reclaimed by queue-drain's bounded
+# five-minute sweep, so duplicating every push here only creates control-plane
+# run records. The signal job itself never needs runner capacity.
+concurrency:
+  group: pr-lifecycle-signal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# This workflow is only a read-only event envelope. It never checks out or
+# executes repository code and does not need a token capability of its own.
+permissions: {}
+
+jobs:
+  signal:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Runnerless lifecycle signal sentinel
+        run: ':'

@@ -1,0 +1,13 @@
+{
+  "name": "godot",
+  "kind": "engine-binary",
+  "law": "GB-9",
+  "platform": "linux-x86_64",
+  "bytes": 103604344,
+  "sha256": null,
+  "source": "https://github.com/godotengine/godot/releases",
+  "acquire": "env:SKELETON_GODOT_BIN|env:GODOT_BINARY|path:godot|local:backend/godot",
+  "hint": "pointer:https://github.com/godotengine/godot/releases",
+  "local_path": "backend/godot",
+  "stored_prose": 0
+}

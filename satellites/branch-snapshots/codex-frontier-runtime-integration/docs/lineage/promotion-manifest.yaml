@@ -1,0 +1,58 @@
+version: 1
+canonical_repository: Apeloff1/Skeleton
+strategy: selective-promotion
+rules:
+  - preserve-provenance
+  - prefer-working-behavior
+  - no-secrets-or-generated-caches
+  - adapters-at-boundaries
+  - tests-before-promotion
+sources:
+  - repository: Apeloff1/Prood
+    capabilities: [jeeves, rag, learning, text-to-npc, text-to-game-logic, text-to-animation]
+    disposition: promote
+    destinations:
+      jeeves: skeleton/ai
+      rag: skeleton/frontier/memory.py
+      text-to-npc: skeleton/frontier/npc.py
+      learning: skeleton/learning
+      game-pipelines: skeleton/game
+  - repository: Apeloff1/Tutolage
+    capabilities: [tutoring, rag, gamification, npc-pipeline, game-logic-pipeline, animation-pipeline]
+    disposition: promote
+    destinations:
+      tutoring: skeleton/learning
+      rag: skeleton/frontier/memory.py
+      pipelines: skeleton/game
+  - repository: Apeloff1/gameforge-rs
+    capabilities: [gameforge, simulation, generation]
+    disposition: promote
+    destinations:
+      engine: skeleton/game
+      rust: packages/rust
+  - repository: Apeloff1/gameforge-middleware
+    capabilities: [middleware, orchestration]
+    disposition: promote
+    destinations:
+      services: services/gameforge
+  - repository: Apeloff1/hyperforge-cockpit-sota
+    capabilities: [cockpit, visualization, telemetry]
+    disposition: promote
+    destinations:
+      web: cockpit/web
+  - repository: Apeloff1/Lorebuffa
+    capabilities: [lore, world-building, narrative]
+    disposition: promote
+    destinations:
+      domain_pack: domain-packs/lorebuffa
+  - repository: Apeloff1/Openworld4
+    capabilities: [world, exploration, procedural-content]
+    disposition: characterize
+    destinations:
+      world: skeleton/game/world
+promotion_gates:
+  - contract-tests
+  - integration-tests
+  - provenance-check
+  - security-check
+  - benchmark

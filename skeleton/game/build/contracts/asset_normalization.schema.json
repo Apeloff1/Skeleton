@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-16:asset_normalization:v1",
+  "title": "FLGB-16 asset normalization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "asset_id",
+    "input_digest",
+    "canonical_format",
+    "normalized_digest",
+    "normalization_version"
+  ],
+  "properties": {
+    "asset_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "input_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "canonical_format": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "normalized_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "normalization_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": "skeleton.ai.chat_streaming.v1",
+  "status": "implemented_unverified_no_tests",
+  "owners": {
+    "application_chat": "backend/routes/ai.py",
+    "product_facade": "backend/core/engine_chat.py",
+    "engine_transport": "backend/core/engine_client.py",
+    "conversation_authority": "backend/core/conversations.py",
+    "canonical_engine_execution": "skeleton/api/engine_service.py"
+  },
+  "provider_boundary": "Backend never constructs provider transports or credentials. All actual model execution, cancellation, status and event reads use the authenticated canonical EngineClient.",
+  "routes": {
+    "send": "POST /api/ai/chat: canonical conversation and user idempotency key; response_mode wait/deferred/stream",
+    "follow": "GET /api/ai/chat/turns/{thread_id}/events?idempotency_key=...&after_sequence=...; authenticated resumable SSE",
+    "probe": "GET /api/ai/chat/turns/{thread_id}?idempotency_key=...; commits terminal engine result to canonical conversation",
+    "cancel": "POST /api/ai/chat/turns/{thread_id}/cancel: explicit canonical cancellation; terminal truth wins",
+    "models": "GET /api/ai/models: authenticated canonical engine inventory projection",
+    "resume": "POST /api/ai/chat/turns/{thread_id}/resume {idempotency_key,response_mode?}: reuse original server-prepared command and deadline, no caller reconstruction"
+  },
+  "request": "provider_id/model_id are optional exact registered engine catalog identities, attachment_refs are authorized canonical references, max_output_tokens is bounded and temperature finite. Selection and attachment identities bind durable user-message retry provenance. Browser-supplied conversation history is rejected.",
+  "context": "Canonical active transcript is authoritative; the instruction policy stays trusted_control/mandatory. Latest user message, requested attachments and explicit code context keep their data trust levels and must survive compilation with exact ID/hash, or admission rejects before a fresh user commit. Recent history is bounded100 messages/512KiB, selected runtime budgets and complete rendered local input are checked, and no unbounded parallel history is sent.",
+  "sse": {
+    "source": "Durable engine execution events, with original event_id/sequence and execution lineage validated before forwarding",
+    "resume": "Nonnegative canonical engine sequence cursor, explicit after_sequence or numeric Last-Event-ID; gaps require resynchronization rather than fabricated deltas",
+    "engine_events": "event: engine.<canonical type>; data: safe canonical event record; id: original sequence",
+    "final": "event: chat.final; canonical turn payload only after assistant or terminal conversation receipt commits; final projection is idempotent and may repeat after reconnect",
+    "failure": "event: chat.error or chat.resync_required with stable safe code/retryability and polling recovery hint",
+    "detach": "Client disconnection detaches delivery and preserves canonical work; explicit cancellation is a separate command",
+    "bounds": {
+      "batch_events": 16,
+      "event_bytes": 262144,
+      "final_bytes": 2097152,
+      "connection_delivery_bytes": 8388608,
+      "connection_seconds": 300,
+      "heartbeat_seconds": 15,
+      "poll_seconds": 0.25,
+      "status_probe_minimum_seconds": 1
+    }
+  },
+  "finalization": "Durable engine result, recovered context handoff and exact canonical turn identity must agree before idempotent assistant commit. Failed/cancelled execution produces a system-derived terminal marker and never fabricated assistant success.",
+  "errors": "Safe stable application errors distinguish authorization, conversation/version conflict, admission/capacity, engine unavailable, execution failure, provider protocol and finalization unavailable; raw prompts, credentials and transport exceptions are not returned.",
+  "verification_policy_this_session": "User explicitly requested implementation only and NO TESTS; no tests are written or run for this wave. This contract records implementation intent and does not manufacture acceptance or closure evidence.",
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "prepared_admission": "Fresh server-assigned user UUID/time, exact compiled EngineExecutionCommand and source/request identities are admitted and committed together in the existing recoverable prepared Mongo message row. First committed writer wins; backend re-reads the frozen command before submission. Edited and older unprepared USER tips can bind command metadata once. GET missingengine reports awaiting_admission/acceptedfalse/server_resume_available. Expired command cannot receive a new deadline; backend reprobes canonical admission and returns explicit expired/unconfirmed if still absent. A point-in-time404 never manufactures a durable failed/cancelled receipt. Original command remains for canonical status reconciliation.",
+  "classification": "Each new user and prepared command preserves the maximum source/policy/ancestor classification. Engine handoff cannot fall below thread/user/internal policy floor; assistant message commits at actual engine binding class. Higher-class source data is never downgraded to a lower thread label.",
+  "source_withdrawal": "Current attachment rights/bytes are rechecked before fresh dispatch, incomplete resumption and every streaming heartbeat; deadlines cannot exceed sourceexpiry. Unavailable sources trigger best-effort canonical cancellation and safe delivery denial. Already-transferred data and historical engine context/result copies cannot be unsent or claimed erased by attachment-only removal.",
+  "product_facade": "EngineChat/EngineText propagate exact registered provider/model and optional supported temperature, reject silently ignored parameters, bound history/evidence/prompt bytes and serialize turns. Explicit turn retries use one bounded completed projection and exact request semantics; new prompt source identity binds options/context through canonical handoff.",
+  "validation_performed": "Source-only review, Python AST parsing, Black formatting and Ruff checking. No tests were written or run, as expressly instructed; no behavior/closure evidence is claimed."
+}

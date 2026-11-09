@@ -1,0 +1,82 @@
+[tool.black]
+line-length = 110
+target-version = ["py311"]
+
+[tool.pytest.ini_options]
+testpaths = ["skeleton/testing"]
+pythonpath = [".", "backend"]
+python_files = ["test_*.py"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[tool.uv]
+required-version = "==0.12.15"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["skeleton*"]
+
+[tool.setuptools.package-data]
+"skeleton.acquired.gaming" = ["*.json", "*.jsonl"]
+"skeleton.ai.game_builder" = ["platform_catalog.json", "evolution_lineages.json", "legal_authorities.json"]
+"skeleton.native" = ["asm/*.S", "asm/*.md", "asm/*.h"]
+"skeleton.app" = ["manifest.json"]
+"skeleton.game.gameplay" = ["fixtures/*.json"]
+
+[build-system]
+requires = ["setuptools==84.2.1", "wheel==0.48.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skeleton"
+version = "16.0.0"
+description = "Local-first game studio with Jeeves AI chat, Dragon source review and bounded game learning"
+requires-python = ">=3.11"
+dependencies = [
+  "bcrypt>=4,<5",
+  "cryptography>=50.0.2",
+  "fastapi>=0.142.2",
+  "httpx>=0.28.1,<1",
+  "motor==3.7.1",
+  "pymongo==4.19.0",
+  "pydantic[email]>=2.14.1",
+  "pydantic-settings>=2.15.0",
+  "regex>=2026.9.29,<2027",
+  "uvicorn[standard]>=0.54.0",
+]
+
+[project.optional-dependencies]
+dev = ["PyYAML>=6,<7", "pytest>=7.0.0", "pytest-asyncio>=1.4.0", "httpx>=0.28.1,<1", "black>=26.5.1", "mypy>=2.4.0", "ruff>=0.17.2,<0.18"]
+local-inference = ["numpy==2.4.6", "Pillow>=13.0.0,<14"]
+jeeves-production-training = ["torch>=2.5,<3"]
+hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
+
+[project.scripts]
+skeleton-harbor-crafting = "skeleton.game.gameplay.harbor_crafting_cli:main"
+skeleton-harbor-beacon-rescue = "skeleton.game.gameplay.harbor_crafting_beacon_cli:main"
+skeleton = "skeleton.__main__:main"
+skeleton-game-craft = "skeleton.game.gameplay.crafting_cli:main"
+skeleton-dev = "skeleton.developer.cli:main"
+skeleton-bootstrap = "skeleton.developer.bootstrap:main"
+skeleton-repo-machine = "skeleton.repo_machine.cli:main"
+skeleton-train-local-model = "skeleton.ai.runtime.inference.train:main"
+skeleton-local-model-inventory = "skeleton.ai.model_runtime.offline_inventory:main"
+skeleton-game-learning = "skeleton.jeeves.game_learning_cli:main"
+skeleton-game-pareto-train = "skeleton.ai.runtime.inference.game_pareto_train:main"
+skeleton-game-pareto-export = "skeleton.ai.runtime.inference.game_pareto_dataset:main"
+skeleton-jeeves-production-preflight = "skeleton.ai.training.jeeves_production_readiness:main"
+skeleton-jeeves-game-session = "skeleton.ai.training.jeeves_production_game_session:main"
+skeleton-jeeves-game-review = "skeleton.ai.training.jeeves_game_design_review_cli:main"
+skeleton-jeeves-game-corpus = "skeleton.ai.training.jeeves_game_corpus:main"
+skeleton-jeeves-corpus-build = "skeleton.ai.training.jeeves_game_corpus_builder:main"
+skeleton-jeeves-session-recover = "skeleton.ai.training.jeeves_production_game_recovery:main"
+skeleton-jeeves-production-train = "skeleton.ai.training.jeeves_production_game_train:main"
+skeleton-jeeves-book-intake = "skeleton.ai.training.book_learning_bridge:main"
+skeleton-jeeves-book-weights = "skeleton.ai.training.book_weight_candidate:main"
+skeleton-jeeves-training-modules = "skeleton.ai.training.jeeves_parallel_mirrors:main"
+skeleton-jeeves-cinematic-sim = "skeleton.ai.training.jeeves_cinematic_simulation:main"
+skeleton-jeeves-adaptive-sim = "skeleton.ai.training.jeeves_adaptive_sim_training:main"
+skeleton-jeeves-boomerang-queue = "skeleton.ai.training.jeeves_boomerang_queue:main"

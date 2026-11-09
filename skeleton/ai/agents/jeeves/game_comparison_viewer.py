@@ -1,0 +1,362 @@
+"""Offline, self-contained side-by-side game-study viewer for user and Jeeves.
+
+Renders only actual emulator screenshots supplied by the native study runner.
+The viewer never loads or transfers ROM data. User notes are exported to JSON
+and must be re-imported through the reviewed manifest/CLI; the HTML is not a
+database or a direct write path into Dragon's verified almanac.
+"""
+from __future__ import annotations
+
+import json
+from collections.abc import Mapping
+
+MAX_HTML = 28 * 1024 * 1024
+
+
+def render_comparison_html(report: Mapping[str, object]) -> str:
+    if not isinstance(report, dict) or report.get("schema_version") != "skeleton.game.comparative_study_result.v1":
+        raise ValueError("Viewer requires an actual comparative study result")
+    data = json.dumps(report, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+    if len(data) > 24 * 1024 * 1024:
+        raise ValueError("Viewable comparative report exceeds bounded HTML evidence budget")
+    # Script bodies must not treat untrusted game/note text as HTML or a closing
+    # script tag. JSON content is parsed and inserted solely using textContent.
+    safe = data.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    html = r"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jeeves • Comparative Game Studio</title>
+<style>
+:root{color-scheme:dark;background:#111827;color:#edf2f7;font:15px system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;max-width:1600px;margin-inline:auto;padding:24px}
+h1{font-size:25px;letter-spacing:-.5px;margin-bottom:6px}h2{font-size:18px}p{line-height:1.55}
+small,.muted{color:#aab5c7}header{display:flex;flex-wrap:wrap;gap:16px;align-items:end;justify-content:space-between;margin-bottom:20px}
+main{display:grid;grid-template-columns:minmax(0,1fr) 325px;gap:20px}
+.panel{background:#192332;border:1px solid #354155;border-radius:12px;padding:18px;min-width:0}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px}
+label{font-size:13px;color:#d8e2f0}select,input,textarea,button{background:#101827;color:#fff;border:1px solid #4b5a70;border-radius:8px;padding:9px;font:inherit;max-width:100%}
+button{cursor:pointer;background:#294969;border-color:#386488}button:hover{background:#345b80}
+textarea{width:100%;min-height:100px;resize:vertical}select{max-width:100%;min-width:130px}
+.compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.scene{background:#111827;border:1px solid #364455;border-radius:10px;padding:12px}
+.scene img{display:block;width:100%;height:auto;max-height:360px;object-fit:contain;image-rendering:auto;background:#000;border-radius:7px;margin:12px auto}
+.controller-bolt{margin-top:12px;border:1px solid #4a607b;background:#182537;border-radius:10px;padding:10px;clear:both}
+.controller-deck{height:156px;width:100%;position:relative;background:#202d3f;border-radius:16px;margin-top:9px}
+.controller-key{position:absolute;transform:translate(-50%,-50%);min-width:38px;max-width:70px;font:11px system-ui;border-radius:20px;touch-action:manipulation;cursor:pointer}
+.controller-key.active{background:#d5edc8;color:#102117;border-color:#6fb899}
+.controller-key:focus-visible{outline:3px solid #fbdd89}
+.controller-tools{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px;align-items:center}
+.controller-tools button{font-size:12px}
+.chart-panel{margin-top:14px;border:1px solid #3a4b60;border-radius:9px;padding:9px}
+.chart-panel canvas{width:100%;height:156px;background:#101827;border-radius:6px;display:block}
+.event-table{width:100%;border-collapse:collapse;font-size:11px}
+.event-table td,.event-table th{border-bottom:1px solid #34435a;padding:5px;text-align:left}
+.event-log{max-height:230px;overflow:auto;margin-top:9px}
+.scene h3{margin:0;font-size:17px;overflow-wrap:anywhere}.meta{font-size:12px;color:#bfcede;overflow-wrap:anywhere;line-height:1.6}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.stat{padding:10px;background:#111827;border-radius:8px}.stat strong{display:block}
+ol{padding-left:20px}li{margin-bottom:7px;overflow-wrap:anywhere}
+.note{padding:10px;border-bottom:1px solid #374154;font-size:13px;overflow-wrap:anywhere}
+.note strong{display:block;margin-bottom:5px}
+.success{color:#8be2c3}.warning{color:#ffd29c}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
+footer{margin-top:20px;color:#bbc6d5;font-size:12px}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+@media(max-width:580px){.compare{grid-template-columns:1fr};body{padding:12px}}
+</style>
+</head>
+<body>
+<header>
+<div><h1>Comparative Game Studio</h1><div class="muted">Jeeves + Dragon • observed native evidence / reviewable hypotheses</div></div>
+<div id="overview" class="muted"></div>
+</header>
+<main>
+<section class="panel">
+<div class="controls">
+<label>Compare games <select id="pair"></select></label>
+<label>Checkpoint <select id="phase"><option>earlier</option><option>middle</option><option>after</option></select></label>
+<label>Series <select id="series"><option value="all">All series</option></select></label>
+</div>
+<div id="question" class="muted"></div>
+<div class="compare" id="comparison"></div>
+<h2>Native session graphs, logs and evidence</h2>
+<div id="telemetry"></div>
+<h2>Objective observations, not quality rankings</h2>
+<div class="stats" id="stats"></div>
+<h2>Series / evolution</h2><div id="timeline"></div>
+<h2>Research synthesis &amp; ten-game curriculum proposals</h2>
+<div id="synthesis"></div>
+<h2>Verified knowledge &amp; parameter uptake</h2>
+<div id="uptake"></div>
+</section>
+<aside class="panel">
+<h2>Viewer & Dragon notes</h2>
+<p class="muted">Notes remain attributed and linked to game-stage evidence. They do not change weights or approve legal reuse.</p>
+<div id="notes"></div>
+<h2>Write an observation</h2>
+<label>Category <select id="dimension"></select></label>
+<label>Claim type <select id="claim"><option>observation</option><option>interpretation</option><option>hypothesis</option></select></label>
+<label>Apply to <select id="apply"><option value="pair">Both compared games</option><option value="left">Left game</option><option value="right">Right game</option></select></label>
+<label>Note <textarea id="comment" maxlength="1000" placeholder="Evidence-based comparison, camera/movement/ambience observation, or a design hypothesis..."></textarea></label>
+<div class="controls"><button id="add">Add to local draft</button><button id="export">Export notes JSON</button></div>
+<div class="muted" id="noteStatus">Drafts remain in this page until exported; they are not submitted to Dragon automatically.</div>
+</aside>
+</main>
+<footer>Image panels display only bounded previews from real approved native emulator runs; missing preview or failed core is shown as unavailable. No original ROM, BIOS, secret, model weights, or copied game data is distributed in this report.</footer>
+<script type="application/json" id="report-data">__JSON_DATA__</script>
+<script>
+"use strict";
+const report=JSON.parse(document.getElementById("report-data").textContent);
+const gameMap=report.games||{};
+const pairList=report.pairs||[];
+const $=id=>document.getElementById(id);
+const txt=(tag,content,cls)=>{const e=document.createElement(tag);e.textContent=String(content==null?"":content);if(cls)e.className=cls;return e};
+const localNotes=[];
+const controllerDrafts=new Map();
+const activeControlSelections=new Map();
+const defaultControl=()=>({buttons:0,axes:[0,0,0,0],keys:[],mouse:[0,0,0,0,0,0],pointer:[0,0,0]});
+function draftFor(id){if(!controllerDrafts.has(id))controllerDrafts.set(id,[]);return controllerDrafts.get(id)}
+function controlsFor(id,port){const key=id+":"+port;if(!activeControlSelections.has(key))activeControlSelections.set(key,new Map());return activeControlSelections.get(key)}
+function exportOfflineJSON(name,data){
+ const uri=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+ const a=document.createElement("a");a.href=uri;a.download=name.replace(/[^a-z0-9_-]/gi,"_")+".json";
+ document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(uri),5000)
+}
+function buildControllerBolt(game){
+ const layout=game.controller_layout;
+ if(!layout)return txt("p","Controller metadata unavailable; physical layout unverified.","muted");
+ const wrap=txt("section","", "controller-bolt");
+ wrap.append(txt("strong",layout.profile_name+" • "+(layout.generic_fallback?"generic RetroPad mapping":"hardware-style legend, core not certified")));
+ wrap.append(txt("div","Input panel is bolted under the view. Click/tap keys to compose an offline raw controller replay frame; this report cannot control a running emulator.","meta"));
+ const tools=txt("div","", "controller-tools");
+ const portSelect=document.createElement("select");
+ layout.ports.forEach(port=>{const o=option("Port "+(port.port+1)+" • "+port.device,String(port.port));portSelect.append(o)});
+ tools.append(txt("label","Port "),portSelect);
+ const record=txt("button","Record input frame"),clear=txt("button","Clear selection");
+ const save=txt("button","Export replay JSON"),status=txt("small","No frames drafted","muted");
+ [record,clear,save].forEach(b=>{b.type="button";tools.append(b)});tools.append(status);
+ const deck=txt("div","", "controller-deck");
+ function renderDeck(){
+  deck.replaceChildren();
+  const port=layout.ports[Number(portSelect.value)||0],selection=controlsFor(game.id,port.port);
+  if(port.device==="none"){deck.append(txt("p","Disconnected port — no controls","muted"));return}
+  (port.controls||[]).forEach(input=>{
+   const b=txt("button",input.legend,"controller-key"+(selection.has(input.id)?" active":""));
+   b.type="button";b.title=input.id+" • "+input.input_kind;
+   b.style.left=String(input.x)+"%";b.style.top=String(input.y)+"%";
+   b.setAttribute("aria-pressed",String(selection.has(input.id)));
+   b.onclick=()=>{selection.has(input.id)?selection.delete(input.id):selection.set(input.id,input);renderDeck()};
+   deck.append(b)
+  });
+  if(port.device==="analog")deck.append(txt("small","Analog axis defaults to neutral; typed axis vectors may be authored in exported JSON.","muted"));
+  if(port.device==="mouse"||port.device==="pointer")deck.append(txt("small","Coordinates default to zero; move values can be edited in exported JSON.","muted"))
+ }
+ portSelect.onchange=renderDeck;
+ record.onclick=()=>{
+  const tape=draftFor(game.id);
+  if(tape.length>=64){status.textContent="64-frame native tape limit reached";return}
+  const frame=layout.ports.map(()=>defaultControl());
+  layout.ports.forEach(port=>{
+   const chosen=controlsFor(game.id,port.port);
+   for(const entry of chosen.values()){
+    if(entry.input_kind==="bitmask")frame[port.port].buttons|=entry.mask;
+    else if(entry.input_kind==="keycode")frame[port.port].keys.push(entry.key_code);
+    else if(entry.input_kind==="mouse_button")frame[port.port].mouse[entry.mouse_index]=1;
+    else if(entry.input_kind==="pointer_button")frame[port.port].pointer[entry.pointer_index]=1;
+   }
+  });
+  tape.push(frame);
+  layout.ports.forEach(p=>controlsFor(game.id,p.port).clear());
+  status.textContent=tape.length+" captured local replay frames, not executed";
+  renderDeck()
+ };
+ clear.onclick=()=>{layout.ports.forEach(p=>controlsFor(game.id,p.port).clear());renderDeck()};
+ save.onclick=()=>{const tape=draftFor(game.id);if(!tape.length){status.textContent="Record an input frame first";return}
+  exportOfflineJSON(game.id+"_controller_tape",tape);status.textContent="JSON exported. Execute only with separately approved native qualifier."
+ };
+ wrap.append(deck,tools);renderDeck();return wrap
+}
+let activePairs=pairList;
+const categories=["movement","input","combat","navigation","story","dialogue","camera","cutscene","character","npc","environment","pacing","challenge","reward","audio","music","ambience","visuals","interface","accessibility","emergence","economy","physics","mission","level_design","consequence","world_design","other"];
+for(const category of categories){const o=txt("option",category);o.value=category;$("dimension").append(o)}
+function option(label,value){const o=txt("option",label);o.value=value;return o}
+function updatePairs(){
+ const series=$("series").value;
+ activePairs=pairList.filter(p=>series==="all"||[p.left_id,p.right_id].some(id=>gameMap[id]&&gameMap[id].series_id===series));
+ const drop=$("pair");drop.replaceChildren();
+ activePairs.forEach((p,i)=>{const a=gameMap[p.left_id],b=gameMap[p.right_id];drop.append(option((a?a.title:p.left_id)+" ↔ "+(b?b.title:p.right_id),String(i)))});
+ render()
+}
+function stageFor(game,phase){return game&&game.status==="actual_native_observations_captured"&&game.phases?game.phases[phase]:null}
+function card(id,phase){
+ const g=gameMap[id],p=stageFor(g,phase),c=txt("article","", "scene");
+ c.append(txt("h3",g?g.title:id),txt("div",g?(g.series_id+" • series #"+g.release_order+" • "+g.series_phase+" installment • "+g.core_id+" • "+g.target_id):"Not executed","meta"));
+ if(!p){c.append(txt("p",g?g.status:"Unavailable or batch not selected","warning"));return c}
+ if(typeof p.image_data_uri==="string"&&/^data:image\/png;base64,[a-zA-Z0-9+/=]+$/.test(p.image_data_uri)){
+  const image=document.createElement("img");image.src=p.image_data_uri;image.alt="Actual bounded native screenshot for "+g.title+" at "+phase+" checkpoint";c.append(image);
+ }else{c.append(txt("p","No native preview stored; raw frame SHA-256 remains available.","muted"))}
+ c.append(buildControllerBolt(g));
+ c.append(txt("div","Step "+p.step+" • "+p.width+"×"+p.height+" • audio frames "+p.audio_frames,"meta"));
+ if(g.study_local_tabular_training){c.append(txt("div","Study-local Q updates: "+g.study_local_tabular_training.updates_applied+" • policy "+g.study_local_tabular_training.trained_policy_sha256+" • NOT production LLM weights","meta"))}
+ c.append(txt("div","Frame "+p.frame_sha256+" • evidence "+p.evidence_sha256,"meta"));
+ c.append(txt("div","Mean pixel brightness "+Number(p.observations.screen_mean).toFixed(4)+" • Audio RMS "+Number(p.observations.audio_rms).toFixed(4),"meta"));
+ if(p.signal_features){
+  const v=p.signal_features.video||{},a=p.signal_features.audio||{};
+  c.append(txt("div","Visual structure: luminance entropy "+Number(v.luminance_entropy_bits||0).toFixed(3)+" bits • edge ratio "+Number(v.scan_edge_ratio||0).toFixed(4)+" • mean color spread "+Number(v.mean_channel_range||0).toFixed(4),"meta"));
+  c.append(txt("div","Audio texture: silence fraction "+Number(a.silence_fraction||0).toFixed(4)+" • zero crossings "+Number(a.zero_crossing_fraction||0).toFixed(4)+" • stereo difference "+Number(a.stereo_energy_imbalance||0).toFixed(4),"meta"));
+ }
+ return c
+}
+function renderSynthesis(){
+ const dest=$("synthesis"),s=report.synthesis||{};
+ dest.replaceChildren();
+ dest.append(txt("p","Only independently captured video/audio metrics and attributed notes are surfaced. Proposed parameters are not actual trained weights.","muted"));
+ (s.training_cohorts||[]).forEach(c=>{
+  const p=txt("div","Cohort "+(c.cohort_index+1)+" • "+c.game_count+" observed games • "+c.game_ids.join(", ")+" • training pending rights + held-out evaluation","note");dest.append(p)
+ });
+ (s.build_parameter_hypotheses||[]).slice(0,30).forEach(p=>{
+  dest.append(txt("div","Parameter hypothesis: "+p.parameter_name+" • "+p.proposal_count+" proposals • "+(p.conflicting_values_or_units?"conflicting values; independent review required":"not experimentally verified"),"note"))
+ });
+}
+function renderTelemetry(pair){
+ const target=$("telemetry");target.replaceChildren();
+ for(const id of [pair.left_id,pair.right_id]){
+  const g=gameMap[id];
+  if(!g||!Array.isArray(g.native_session_event_receipts)||!g.native_session_event_receipts.length){
+   target.append(txt("p",id+": no live native event receipts captured","muted"));continue
+  }
+  const root=txt("section","","chart-panel");
+  root.append(txt("strong",g.title+" • "+g.native_session_event_receipts.length+" verified native-step receipts"));
+  const canvas=document.createElement("canvas");canvas.width=640;canvas.height=156;canvas.setAttribute("aria-label","Objective visual change and audio RMS values over executed frame steps");
+  root.append(canvas);
+  const ctx=canvas.getContext("2d");
+  if(ctx){
+   ctx.fillStyle="#101827";ctx.fillRect(0,0,640,156);
+   const colors=["#80c1e5","#d6bc91"];
+   ["visual_change","audio_rms"].forEach((key,ix)=>{
+    const data=g.native_session_event_receipts.map(x=>Number(x.objective_observations[key]||0));
+    const maximum=Math.max(1e-6,...data.map(Math.abs));
+    ctx.strokeStyle=colors[ix];ctx.lineWidth=2;ctx.beginPath();
+    data.forEach((v,n)=>{const x=12+616*n/Math.max(1,data.length-1);const y=145-120*Math.min(1,Math.abs(v)/maximum);
+      if(n===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)
+    });ctx.stroke()
+   })
+  }
+  root.append(txt("small","Blue: relative visual-change magnitude • Gold: relative PCM RMS • independent scales; not a quality score","muted"));
+  const details=document.createElement("details");const summary=txt("summary","Open event log and hash receipts");details.append(summary);
+  const events=txt("div","", "event-log"),table=document.createElement("table");table.className="event-table";
+  const headers=document.createElement("tr");
+  ["Step","Action","Visual Δ","Audio RMS","Receipt SHA-256"].forEach(h=>headers.append(txt("th",h)));
+  table.append(headers);
+  g.native_session_event_receipts.forEach(e=>{
+   const tr=document.createElement("tr");
+   [e.step,e.action,Number(e.objective_observations.visual_change).toFixed(5),
+    Number(e.objective_observations.audio_rms).toFixed(5),e.receipt_chain_sha256].forEach(v=>tr.append(txt("td",v)));
+   table.append(tr)
+  });
+  events.append(table);details.append(events);root.append(details);target.append(root)
+ }
+}
+function renderUptake(){
+ const u=report.learning_uptake_audit||{},target=$("uptake"),m=u.measured_summary||{};
+ target.replaceChildren();
+ const rows=[
+  ["Chained native actions verified",m.native_steps_reverified||0],
+  ["Completed native game receipt chains",m.native_receipt_chains_reverified||0],
+  ["Locally reviewed note candidates",m.reviewed_source_linked_note_count||0],
+  ["Actual isolated Q-table updates",m.locally_applied_q_table_updates||0],
+  ["Verified held-out learning improvements",m.heldout_comparative_gameplay_improvements_verified||0],
+  ["Production model weight updates",m.production_llm_parameter_updates||0]
+ ];
+ const cards=txt("div","","stats");
+ rows.forEach(([label,value])=>{const box=txt("div","","stat");box.append(txt("small",label),txt("strong",value));cards.append(box)});
+ target.append(cards,txt("p","Source rights, independent cross-game review, held-out evaluation and production weight promotion remain separate gates.","muted"));
+ const digestBox=txt("small","Native receipt audit: "+(u.uptake_digest||"not yet completed"),"meta");
+ target.append(digestBox)
+}
+function currentPair(){return activePairs[Number($("pair").value)||0]||null}
+function render(){
+ const p=currentPair(),phase=$("phase").value;
+ $("comparison").replaceChildren();$("stats").replaceChildren();$("question").replaceChildren();$("timeline").replaceChildren();$("notes").replaceChildren();
+ if(!p){$("comparison").append(txt("p","No comparison matches this series. Select another series."));return}
+ $("comparison").append(card(p.left_id,phase),card(p.right_id,phase));
+ renderTelemetry(p);
+ $("question").append(txt("p",(p.questions&&p.questions.length?p.questions.join(" • "):"Choose a stage to compare native observations and write your own evidence-grounded notes.")));
+ const phaseMatch=(p.phase_comparisons||[]).find(x=>x.phase===phase);
+ if(phaseMatch){
+  for(const [label,value] of [
+    ["Exact frame hashes equal",phaseMatch.same_exact_frame_sha256],
+    ["Exact PCM hashes equal",phaseMatch.same_exact_audio_sha256],
+    ["Brightness absolute difference",Number(phaseMatch.screen_mean_absolute_difference).toFixed(6)],
+    ["Audio RMS absolute difference",Number(phaseMatch.audio_rms_absolute_difference).toFixed(6)]
+  ]){const box=txt("div","", "stat");box.append(txt("small",label),txt("strong",value));$("stats").append(box)}
+  const texture=phaseMatch.non_reconstructive_signal_texture_differences||{};
+  for(const [name,label] of [
+   ["video_luminance_entropy_bits_absolute_difference","Luminance entropy difference"],
+   ["video_scan_edge_ratio_absolute_difference","Visual edge difference"],
+   ["audio_zero_crossing_fraction_absolute_difference","Audio texture zero-crossing difference"],
+   ["audio_silence_fraction_absolute_difference","Audio silence difference"]
+  ]){
+   if(Number.isFinite(texture[name])){
+    const box=txt("div","", "stat");
+    box.append(txt("small",label),txt("strong",Number(texture[name]).toFixed(6)));
+    $("stats").append(box);
+   }
+  }
+ }else{$("stats").append(txt("p","One or both games have no qualified native observations in this report.","warning"))}
+ const ids=new Set([p.left_id,p.right_id]);
+ const relevant=(report.series||[]).filter(row=>row.ordered_installments.some(item=>ids.has(item.game_id)));
+ for(const s of relevant){
+  const box=txt("section","");box.append(txt("h3",s.series_id));
+  const list=document.createElement("ol");
+  s.ordered_installments.forEach(g=>list.append(txt("li",(gameMap[g.game_id]?.title||g.game_id)+" • "+g.era+" • "+(g.release_year??"undated")+" • "+g.native_evidence_status)));
+  box.append(list);$("timeline").append(box)
+ }
+ const notes=[...(report.observer_notes||[]),...localNotes].filter(n=>n.game_ids.some(id=>ids.has(id)));
+ notes.forEach(n=>{const box=txt("div","", "note");box.append(txt("strong",n.author+" • "+n.dimension+" • "+n.claim_type+" • "+n.review_status),txt("div",n.text),txt("small","Referenced: "+n.game_ids.join(", ")+" / "+n.checkpoint+" • "+(n.knowledge_status||"viewer draft pending review")));if(n.build_parameter_candidate){box.append(txt("small"," Build parameter: "+n.build_parameter_candidate.name+"="+n.build_parameter_candidate.value+" "+n.build_parameter_candidate.units+" (unverified hypothesis)"))};$("notes").append(box)});
+ if(!notes.length)$("notes").append(txt("p","No viewer/Dragon notes recorded for this pair yet.","muted"))
+}
+function addNote(){
+ const p=currentPair();if(!p)return;
+ const text=$("comment").value.trim(),apply=$("apply").value;
+ if(!text||text.length>1000){$("noteStatus").textContent="Enter a 1–1000 character observation.";return}
+ const id=apply==="left"?[p.left_id]:apply==="right"?[p.right_id]:[p.left_id,p.right_id];
+ const n={
+  note_id:"viewer_"+Date.now().toString(36)+"_"+String(localNotes.length),
+  author:"viewer",game_ids:id,checkpoint:$("phase").value,
+  dimension:$("dimension").value,claim_type:$("claim").value,
+  text,review_status:"pending",build_parameter:null
+ };
+ localNotes.push(n);$("comment").value="";$("noteStatus").textContent=localNotes.length+" local notes drafted. Export JSON to preserve them.";render()
+}
+function exportNotes(){
+ const all=(report.observer_notes||[]).map(n=>({
+  note_id:n.note_id,author:n.author,game_ids:n.game_ids,checkpoint:n.checkpoint,
+  dimension:n.dimension,claim_type:n.claim_type,text:n.text,
+  review_status:n.review_status,build_parameter:n.build_parameter
+ })).concat(localNotes);
+ const payload={schema_version:"skeleton.game.comparison_notes.v1",study_id:report.study_id,notes:all};
+ const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
+ const a=document.createElement("a");a.href=url;a.download=report.study_id+"_viewer_notes.json";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);
+ $("noteStatus").textContent="Notes JSON exported. Re-import through the operator CLI for review; nothing was sent over the network."
+}
+const seen=new Set();
+(report.series||[]).forEach(s=>{if(!seen.has(s.series_id)){seen.add(s.series_id);$("series").append(option(s.series_id,s.series_id))}});
+$("overview").textContent=report.game_observations_completed+" / "+report.planned_total_game_count+" game observations • "+pairList.length+" pairs • ≤"+report.maximum_parallel_native_game_sessions+" native sessions • "+(report.games_with_study_local_q_updates||0)+" locally trained game Q-policies";
+$("series").addEventListener("change",updatePairs);
+$("phase").addEventListener("change",render);
+$("pair").addEventListener("change",render);
+$("add").addEventListener("click",addNote);
+$("export").addEventListener("click",exportNotes);
+renderSynthesis();
+renderUptake();
+updatePairs();
+</script>
+</body>
+</html>
+""".replace("__JSON_DATA__", safe)
+    if len(html.encode("utf-8")) > MAX_HTML:
+        raise ValueError("Comparative viewer exceeds 28 MiB; omit native screenshots or render one batch")
+    return html

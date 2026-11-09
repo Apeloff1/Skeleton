@@ -1,0 +1,54 @@
+name: P2 Architecture Rule Registry
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-architecture-rules-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-architecture-rules:
+    name: Validate P2 architecture controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: "."
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install pinned wheel-build tooling
+        run: >-
+          python -m pip install
+          --disable-pip-version-check
+          --no-input
+          "setuptools==83.0.0"
+          "wheel==0.48.0"
+
+      - name: Validate and execute architecture registry
+        run: python scripts/check_architecture_rule_registry.py --execute --json
+
+      - name: Run architecture-control regressions
+        run: >-
+          python -m unittest -v
+          tests.test_architecture_rule_registry
+          tests.test_architecture_package_layers
+          tests.test_architecture_adr_index
+          tests.test_architecture_manifest_references
+          tests.test_architecture_ownership
+          tests.test_architecture_packaged_wheel
+          tests.test_architecture_contract_conformance
+          tests.test_architecture_runtime_supervision

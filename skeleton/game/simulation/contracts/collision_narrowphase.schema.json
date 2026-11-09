@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:collision_narrowphase:v1",
+  "title": "FLGB-10 collision narrowphase",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "left_id",
+    "right_id",
+    "penetration_xyz"
+  ],
+  "properties": {
+    "left_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "right_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "penetration_xyz": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "schema_version": "skeleton.ai.dragon_crawler_operations.v1",
+  "status": "implementation_candidate",
+  "canonical_owner": "skeleton/ai/webcrawler",
+  "implementation": [
+    "skeleton/ai/webcrawler/operations.py",
+    "skeleton/ai/webcrawler/core.py",
+    "skeleton/ai/webcrawler/redirects.py",
+    "skeleton/ai/webcrawler/bound_http.py",
+    "skeleton/ai/webcrawler/http.py",
+    "skeleton/ai/webcrawler/dns_binding.py"
+  ],
+  "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
+  "public_api": {
+    "request": "CrawlRequest.from_dict/as_dict",
+    "run": "CrawlRun.create/from_snapshot/run_slice/snapshot/status/pause/resume/cancel/sources/source_read",
+    "checkpoint": "Synchronous on_checkpoint(snapshot,event), including dispatch_reserved BEFORE IO and outcome AFTER IO. Rejected final checkpoint restores last committed reservation; no uncharged network retry. Callback must resolve ambiguous storage outcomes before releasing physical worker.",
+    "scope": "Exact tenant_id/owner_id immutable binding; application authenticates, authorizes and fences unexpired lease/version/source authority",
+    "evidence": "CrawlRun.search(query,limit<=8): exact offset-anchored preserved-text passages, lexical ranking and untrusted-instruction review signals; no provider call or factual verification"
+  },
+  "limits": {
+    "seed_urls": 16,
+    "allowed_hosts": 16,
+    "requests": 128,
+    "documents": 64,
+    "response_bytes": 2097152,
+    "total_bytes": 33554432,
+    "depth": 3,
+    "snapshot_bytes": 4194304,
+    "preserved_text_utf8_bytes_per_source": 24000,
+    "frontier_urls": 512,
+    "robots_bytes_per_origin": 65536,
+    "slice_steps": 4,
+    "slice_seconds": 45,
+    "connect_read_timeout_seconds": 10
+  },
+  "semantics": {
+    "robots": "Fail closed on unavailable robots; revalidation, TTL and every redirect target; delays checkpointed",
+    "dedupe": "Canonical URL and full normalized content SHA256; same-content URL aliases retained",
+    "provenance": "Actual requested/final URL, status, timestamps, raw body SHA256, full normalized text SHA256, preserved text SHA256/truncation and consent binding; no raw response bytes retained",
+    "learning": "Bounded lexical evidence observations and exact-span retrieval under existing mission-quality functions, explicitly unreviewed external content. No verified knowledge, calibration, XP, model updates or training rights.",
+    "durability": "Request slot and maximum possible response bytes are checkpointed BEFORE network as pending_dispatch; outcome atomically settles known bytes and content. Uncertain outcome retains reservation across recovery; committed source IDs dedupe. Full frontier, robots, retry timers and source text in same application snapshot.",
+    "recovery": "Backend fences old worker before restore. Pending dispatch becomes unknown outcome with full cap retained and bounded retry; external IO is at-least-once, not exactly-once.",
+    "control": "Explicit pause/resume/cancel; no OS idle/activity inference; consent must remain current before network and commit",
+    "accounting": "usage.bytes is measured accepted transport-body bytes; usage.reserved_bytes is conservative allowance for in-flight or unknown failed response bytes. Both consume total byte budget. Request count is reserved dispatch attempts, not independently attested remote server requests.",
+    "autonomous_application": "Application may consume explicit finite CORE_DB grants through the existing backend scheduler. Pure run_slice remains at most4steps/45seconds; no independent pure background loop, storage, scheduler or authority. Canonical code binding and pre-IO reservation remain unchanged."
+  },
+  "network": {
+    "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",
+    "configured_proxy": "Inherited explicit HTTP(S)_PROXY settings with HTTP proxy endpoints; preserve original origin hostname in absolute URI/CONNECT and TLS SNI, public-origin DNS admission. Proxy resolves origin connection; do not claim origin-peer pinning. HTTPS proxy endpoints unsupported fail-closed. No proxy endpoint/credentials exported.",
+    "credentials": "No caller headers, cookies, authorization, source URL userinfo or custom origin ports; no provider SDK/model call",
+    "resolver": {
+      "owner": "existing canonical crawler transport",
+      "implementation": "bounded isolated stdlib Python DNS helper; minimal noncredential environment; maximum eight helpers; bounded response; deadline termination and wait; retain capacity for any unconfirmed process until reaped",
+      "authority": "No new service/store/scheduler/runtime owner; configured proxy hostname may resolve privately as deployment trusted endpoint, origin DNS must resolve exclusively publicly"
+    }
+  },
+  "verification": "No tests per user instruction. Static checks plus actual authorized bounded public URL acquisition only. Candidate does not change closure/signoff."
+}

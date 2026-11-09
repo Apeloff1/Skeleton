@@ -1,0 +1,21 @@
+{
+  "accountability_id": "ACC-WP-W30",
+  "event_type": "evidence_added",
+  "actor_id": "chatgpt:gpt-5.6-sol",
+  "actor_type": "agent",
+  "role": "implementation-agent",
+  "at_utc": "2026-09-21T17:41:33Z",
+  "git_sha": "fb5770c5daedd4676179689767d343e0a801602b",
+  "signature_method": "github_identity",
+  "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/fb5770c5daedd4676179689767d343e0a801602b",
+  "statement": "Fix Docker/wheel packaging failure by restricting setuptools package discovery to skeleton* and add regression coverage.",
+  "from_status": "in_progress",
+  "to_status": "in_progress",
+  "evidence_refs": [
+    "https://github.com/Apeloff1/Skeleton/commit/225c280b119c9f7ec474c2c97cd25931f75d326d",
+    "https://github.com/Apeloff1/Skeleton/commit/fb5770c5daedd4676179689767d343e0a801602b",
+    "pyproject.toml",
+    "skeleton/testing/test_packaging_discovery.py"
+  ],
+  "human_signature": false
+}

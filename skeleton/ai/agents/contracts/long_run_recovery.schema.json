@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-04:long_run_recovery:v1",
+  "title": "FLGB-04 long run recovery",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "failed_generation",
+    "recovery_generation",
+    "checkpoint_digest",
+    "replay_cursor",
+    "pending_effects_digest",
+    "authority_digest"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "failed_generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "recovery_generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "checkpoint_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "replay_cursor": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "pending_effects_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "authority_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

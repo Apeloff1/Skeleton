@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-05:pii_handling:v1",
+  "title": "FLGB-05 pii handling",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "redacted_text",
+    "findings"
+  ],
+  "properties": {
+    "redacted_text": {
+      "type": "string",
+      "maxLength": 2000000
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 10000
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "schema_version": "skeleton.ai.chat_product_client.v1",
+  "status": "implementation_candidate",
+  "owner": "frontend",
+  "capability_plane": "product-experience",
+  "canonical_client": "frontend/src/product/conversationClient.ts",
+  "implementation": [
+    "frontend/src/product/aiChatClient.ts",
+    "frontend/src/product/chatController.ts",
+    "frontend/src/product/useChatController.ts",
+    "frontend/src/product/chatErrors.ts"
+  ],
+  "existing_authorities": {
+    "endpoint_resolution": "frontend/utils/apiBase.ts",
+    "authentication": "frontend/src/auth/gameforgeAuth.ts",
+    "conversation": "backend/core/conversations.py",
+    "chat_ingress": "backend/routes/ai.py",
+    "stream_contract": "machine/ai_chat_streaming.json",
+    "model_catalog": "backend/core/model_catalog.py",
+    "conversation_management_contract": "machine/ai_chat_conversation_management.json"
+  },
+  "behavior": [
+    "List, open, create, rename, archive and delete canonical conversations through authenticated backend APIs.",
+    "Reconstruct all bounded active transcript pages with version fencing; browser transcript is never sent as model history.",
+    "Submit new turns using stable idempotency keys and exact registered provider/model selection; follow accepted work without resubmitting it.",
+    "Parse SSE incrementally across UTF-8, newline and event boundaries; reconnect using the last accepted engine sequence in Last-Event-ID.",
+    "Treat engine output as provisional; replace it with the canonical assistant message only after chat.final or authoritative terminal probe.",
+    "Transport abort detaches observation. Explicit cancellation invokes the durable backend cancel API and follows terminal settlement.",
+    "Reject malformed, foreign-thread, conflicting duplicate or out-of-order event identities; recover through canonical turn status and conversation snapshots.",
+    "Keep only tenant-scoped conversation, pending-turn and cursor metadata on device; transcripts and attachment bytes are not persisted by this client.",
+    "Expose loading, reconnecting, cancellation, structured error and retry states through one observable conversation controller.",
+    "Edits resend the exact canonical edited user message using its stable edit key; no duplicate user message is appended.",
+    "Regeneration uses a frozen server request, deferred admission, actual status, explicit cancellation and exact stored-command resume; another device discovers bounded canonical request references.",
+    "Authorized JSON and Markdown exports are rendered by the server after live governance admission. The client verifies exact thread/version/scope and SHA256 before download; it never synthesizes an offline export.",
+    "Account changes abort observation and clear displayed private data. Additional headers cannot substitute an unverified identity, and sensitive export returns are fenced against account changes.",
+    "Provider attempt reset/started events discard previous provisional output. Normal stream expiration reconnects without resending accepted work.",
+    "App restart replays from cursor zero to reconstruct actual provisional deltas; device storage contains no transcript bytes. High-frequency cursor writes are coalesced into one in-flight write and one latest metadata value."
+  ],
+  "limits": {
+    "message_characters": 100000,
+    "context_characters": 100000,
+    "attachment_references": 256,
+    "sse_frame_characters": 1048576,
+    "provisional_response_characters": 1000000,
+    "retained_event_fingerprints": 256,
+    "reconnect_attempts": 6,
+    "conversation_projection_messages": 10000,
+    "device_pending_turn_references": 32,
+    "export_utf8_bytes": 8388608,
+    "sse_batch_events": 256,
+    "event_nesting_depth": 48
+  },
+  "failure_behavior": "Fail closed with typed authorization, conflict, unavailable, protocol, cancelled or network error. Recovery reads canonical state; no mock response or local provider fallback.",
+  "validation_policy": "User explicitly requested this implementation window contain no added or executed tests. Static type and source checks may be used; runtime qualification remains pending.",
+  "production_activation_claim": false,
+  "completion_signoff": false
+}

@@ -1,0 +1,63 @@
+{
+  "schema_version": "skeleton.ai.training_observability.v1",
+  "status": "implemented_unpromoted",
+  "task": "P3T2-TRAINING-01",
+  "volume_refs": [
+    "VOL-147"
+  ],
+  "owner": "skeleton/ai/runtime/training/observability.py",
+  "state_authority": "existing TrainingRepository SQLite database and DatasetRegistry source admission",
+  "api": "TrainingObserver(runs,datasets).snapshot(run_id,now=...,stall_seconds=300,max_points=128,expected_code_digest=None,expected_environment_digest=None) -> TrainingObservationReport; as_dict()/digest",
+  "output": "TrainingObservationReport.as_dict() exposes JSON-safe identities, bounded committed checkpoint/telemetry series, real checkpoint loss, budget usage, lease activity and explicit availability; digest binds the selected committed evidence and injected observation time",
+  "read_only": "Dataset lock then training repository lock, matching trainer publication order. One existing repository read transaction provides a consistent committed snapshot; no SGD, generated model outputs, schema creation, checkpoints, recovery, retention or telemetry writes. Preference restore can recompute bounded log likelihood to validate already committed DPO observations.",
+  "semantic_validation": "Manifest and binding digests, checkpoint cursor/model/optimizer/seed/usage/terminal invariants use the corresponding existing trainer restore validator with exact admitted materialized corpus; old digest-only compatibility checkpoints expose metadata with unavailable model progress",
+  "measurements": {
+    "loss": "Initial/final byte corpus cross entropy already persisted by canonical neural/parallel/elastic trainers; DPO logistic preference loss and chosen-vs-rejected log-likelihood margin are separately named and recomputed by the canonical preference restore validator. Reference loss and per-update loss are unavailable; legacy corpora without bytes do not publish caller-declared usage or loss as verified evidence.",
+    "numerical_health": "actual committed model payload parsing rejects nonfinite or malformed learned parameters; observed finite loss is checked, no future convergence or model quality claim",
+    "throughput": "unavailable until a canonical writer persists actual measured elapsed intervals; injected run/checkpoint timestamps are never used to invent elapsed training time or throughput",
+    "telemetry": "Recorded events bind exact digest/run/step/timestamp. Known counters associated with selected, semantically verified checkpoints must agree; unknown metrics and counters outside selected checkpoint evidence remain explicitly unverified. Telemetry has no durable worker epoch, so none is invented."
+  },
+  "timeline": "UTC timestamps cannot precede run registration, regress through selected committed checkpoint/event order (including one immediate window predecessor) or lie after injected observation time. Events cannot reference future steps; missing old live checkpoint association is permitted only when the run has archive receipts and is explicitly unverified rather than claimed restored or archived evidence.",
+  "leases": "existing WorkerLease stores epoch and issue time, not expiry/heartbeat. Reports distinguish current/stale epoch and activity age; stall alerts are operational suspicions, never proof a worker died or an automatic recovery grant",
+  "recovery": "existing recovering/failed states, worker epoch changes and latest checkpoint epoch identify recovery windows; exact recovery transition timestamps/counts remain unavailable when not durably recorded",
+  "limits": {
+    "max_points": 4096,
+    "default_points": 128,
+    "max_workers": 64,
+    "max_metadata_record_bytes": 262144,
+    "max_event_record_bytes": 65536,
+    "max_checkpoint_payload_bytes": 16777216,
+    "max_selected_payload_bytes": 67108864,
+    "timeline_predecessor_metadata_records": 1,
+    "max_event_metric_names": 128
+  },
+  "alerts": {
+    "training_stalled": "runbook:training-observability/training_stalled: inspect current worker/process, last durable cursor and dataset admission before explicitly requesting governed recovery",
+    "worker_epoch_stale": "runbook:training-observability/worker_epoch_stale: withdraw the obsolete worker; never accept stale writes",
+    "recovery_pending": "runbook:training-observability/recovery_pending: resume only through existing fenced trainer and checkpoint authority",
+    "training_failed": "runbook:training-observability/training_failed: inspect failure evidence and immutable configuration before retry",
+    "loss_increased": "runbook:training-observability/loss_increased: evaluate held-out quality and optimization configuration; loss change alone grants no promotion or rollback"
+  },
+  "retention": "Reports declare total committed live checkpoint/event counts and selected recent windows. Retained archive gaps expose unavailable_missing_live_checkpoint with no verified counters; the observer neither reads CAS archives nor claims full pruned history.",
+  "failure": "TrainingObservationError on source/config/manifest/checkpoint/model/timeline/telemetry/budget tamper or resource bounds; no authoritative state changes on rejection",
+  "tests": [
+    "skeleton/testing/test_training_observability.py",
+    "skeleton/testing/test_training_observability_lock_order.py"
+  ],
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "backends": [
+    "reference_ngram",
+    "native_neural",
+    "local_data_parallel",
+    "local_elastic",
+    "local_dpo_preference"
+  ],
+  "verification": {
+    "focused_observation_and_lock_order": "38 passed in independent final combined suite",
+    "observation_rollout_fences_final": "76 passed",
+    "observation_neural_parallel_archive_regressions": "155 passed before final numeric-input-only hardening",
+    "ruff_black": "passed"
+  },
+  "semantic_compute_limit": "Validation work scales with the bounded selected checkpoint count and each existing trainer corpus/model ceiling. Preference restore recomputes the complete bounded pair objective for each selected checkpoint while dataset and run locks are held. Read-only does not imply inexpensive or a latency guarantee; operators can reduce max_points for large histories. This API measures no validation wall time and does not invent a throughput result."
+}

@@ -1,0 +1,502 @@
+"""Durable Dragon Family idle scheduler: fair specialist work, leases, budgets."""
+from __future__ import annotations
+
+import sqlite3
+from dataclasses import replace
+import pytest
+
+from skeleton.ai.webcrawler.dragon_family import (
+    DragonFamily, IdleWindow, SourceSeed, SourceReceipt,
+)
+from skeleton.ai.webcrawler.dragon_family_idle_coordinator import (
+    DragonIdleCoordinator, IdleCoordinatorPolicy, read_idle_family_health, read_idle_family_history,
+)
+from skeleton.ai.webcrawler.dragon_family_idle_failures import (
+    IdleResearchFailure,source_policy_denied,source_rate_limited,source_transport_failed,
+)
+
+OWNER="accepted-owner"
+NOW=1800000000.0
+REVIEW="a"*64
+ORIGINAL="1"*64
+ART="b"*64
+VID="c"*64
+UPDATE="d"*64
+
+
+def seed(source_id: str, media="article", topics=("game_engine",)):
+    return SourceSeed(source_id,f"https://example.org/games/{source_id}",media,topics)
+
+
+def receipt(source_id: str, digest: str, at: float):
+    return SourceReceipt(source_id,digest,REVIEW,at)
+
+
+def make(*, complete=True, min_idle_seconds=300):
+    db=sqlite3.connect(":memory:")
+    family=DragonFamily(db,owner_scope=OWNER,min_idle_seconds=min_idle_seconds,
+                        approval=lambda r:r.review_digest==REVIEW)
+    sources=(seed("article-1"),seed("article-2",topics=("physics",)),
+             seed("video-1","video"))
+    family.enroll(OWNER,sources,authorized=True,now=NOW)
+    if complete:
+        family.seal_inventory(OWNER,authorized=True,now=NOW+1)
+        for i,item in enumerate(sources):
+            family.consume(OWNER,receipt(item.source_id,ORIGINAL,NOW+i+2),
+                           authorized=True)
+    return db,family,DragonIdleCoordinator(family,policy=IdleCoordinatorPolicy(min_idle_seconds=min_idle_seconds))
+
+
+def idle(at=NOW+720, *, busy=0, foreground=False, consent=True, resources=True):
+    return IdleWindow(at,NOW+10,busy,foreground,consent,resources)
+
+
+def gather(task):
+    tags={"article":ART,"video":VID,"monitor":UPDATE}
+    return receipt(task.source_id,tags[task.dragon],NOW+719)
+
+
+def test_read_only_ui_health_never_creates_or_authorizes_scheduler():
+    db=sqlite3.connect(":memory:")
+    early=read_idle_family_health(db,OWNER,authorized=True)
+    assert early["configured"] is False
+    assert early["host_state"]=="not_connected"
+    assert not db.execute("""SELECT 1 FROM sqlite_master WHERE
+        name='dragon_family_idle_leases'""").fetchone()
+    with pytest.raises(PermissionError):
+        read_idle_family_health(db,OWNER,authorized=False)
+    db.close()
+
+def test_three_specialists_evolve_only_on_new_approved_content():
+    db,family,worker=make()
+    calls=[]
+    def record(task):
+        calls.append((task.dragon,task.source_id,task.media,task.attempt))
+        return gather(task)
+    observed=worker.run_once(OWNER,authorized=True,idle_state=idle,
+                             gatherers={role:record for role in ("article","video","monitor")},
+                             task_topics=("game_engine",),adjacent_topics=("physics",))
+    assert observed["attempted"]==3
+    assert observed["changed"]==3
+    assert observed["failed"]==0
+    assert len({s for _,s,_,_ in calls})==3, "one source cannot occupy two sibling slots"
+    assert len({r for r,_,_,_ in calls})==3
+    assert next(r for r in calls if r[0]=="video")[2]=="video"
+    snapshot=family.snapshot(OWNER,authorized=True)
+    assert [c["discoveries"] for c in snapshot["children"]]==[1,1,1]
+    assert [c["stage"] for c in snapshot["children"]]==["hatchling"]*3
+    assert [x["action"] for x in snapshot["history"]].count("hatched")==3
+    assert worker.health(OWNER,authorized=True)["max_tasks_per_tick"]==3
+    readonly=read_idle_family_health(db,OWNER,authorized=True)
+    assert readonly["configured"] is True
+    assert readonly["host_state"]=="not_observed"
+    assert readonly["workers"]["article"]["last_changes"]==1
+    assert readonly["workers"]["monitor"]["last_changes"]==1
+    db.close()
+
+
+def test_idle_is_required_before_network_dispatch_and_when_user_returns():
+    db,family,worker=make()
+    invoked=[]
+    for forbidden in (idle(at=NOW+250),idle(busy=1),idle(foreground=True),
+                      idle(consent=False),idle(resources=False)):
+        with pytest.raises(PermissionError):
+            worker.run_once(OWNER,authorized=True,idle_state=lambda:forbidden,
+                            gatherers={"article":lambda task:invoked.append(task)},
+                            task_topics=("game_engine",))
+    assert invoked==[]
+    state={"poll":0}
+
+    def idler():
+        state["poll"]+=1
+        return idle(foreground=state["poll"]>=3)
+    result=worker.run_once(OWNER,authorized=True,idle_state=idler,
+                           gatherers={"article":lambda task: receipt(task.source_id,ART,NOW+719)},
+                           task_topics=("game_engine",))
+    assert result["paused"] and result["changed"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    db.close()
+
+
+def test_no_children_until_complete_parent_and_owner_locked():
+    db,family,worker=make(complete=False)
+    assert worker.run_once(OWNER,authorized=True,idle_state=idle,
+                           gatherers={},task_topics=("game_engine",))["reason"]=="parent_source_quest_incomplete"
+    with pytest.raises(PermissionError,match="another owner"):
+        worker.run_once("intruder",authorized=True,idle_state=idle,
+                        gatherers={},task_topics=("game_engine",))
+    with pytest.raises(PermissionError):
+        worker.run_once(OWNER,authorized=False,idle_state=idle,
+                        gatherers={},task_topics=("game_engine",))
+    with pytest.raises(PermissionError):
+        worker.health(OWNER,authorized=False)
+    with pytest.raises(PermissionError):
+        DragonIdleCoordinator(DragonFamily(db,approval=lambda r:True))
+    db.close()
+
+
+def test_source_revision_commit_fails_closed_without_current_lease():
+    db,family,worker=make()
+    with pytest.raises(PermissionError,match="source lease lost"):
+        family.digest_idle(OWNER,"article",receipt("article-1",ART,NOW+719),
+            authorized=True,window=idle(),task_topics=("game_engine",),
+            lease_guard=lambda:False)
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    admitted=worker.run_once(OWNER,authorized=True,idle_state=idle,
+         gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+         task_topics=("game_engine",))
+    assert admitted["changed"]==1
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    db.close()
+
+
+def test_cross_specialist_leases_cannot_race_for_same_source():
+    db,family,worker=make()
+    token=worker._reserve(OWNER,"article","article-1",NOW+720)
+    assert token
+    assert worker._reserve(OWNER,"monitor","article-1",NOW+721) is None
+    assert worker._owned(OWNER,"article","article-1",token,NOW+721)
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    db.close()
+
+
+def test_reviewed_dispute_brief_gives_scout_first_known_source_only():
+    db,family,worker=make()
+    seen=[]
+    def capture(task):
+        seen.append((task.dragon,task.source_id))
+        return gather(task)
+    result=worker.run_once(
+        OWNER,authorized=True,idle_state=idle,
+        gatherers={role:capture for role in ("article","video","monitor")},
+        task_topics=("game_engine",),adjacent_topics=("physics",),
+        revisit_source_ids=("article-1",))
+    assert result["changed"]==3
+    assert seen[0]==("monitor","article-1")
+    assert len({sid for _,sid in seen})==3
+    assert set(role for role,_ in seen)=={"monitor","article","video"}
+    # A source outside the authenticated catalog can never be dispatched
+    # just because a reviewer included it in a priority hint.
+    assert worker.run_once(
+        OWNER,authorized=True,idle_state=lambda:idle(NOW+800),
+        gatherers={"monitor":capture},task_topics=("game_engine",),
+        revisit_source_ids=("unknown-outside-catalog",))["attempted"]==0
+    with pytest.raises(ValueError):
+        worker.run_once(OWNER,authorized=True,idle_state=idle,
+            gatherers={},task_topics=("game_engine",),
+            revisit_source_ids=("broken space id",))
+    db.close()
+
+
+def test_source_global_cooldown_prevents_duplicate_sibling_recrawls():
+    db,family,worker=make()
+    first=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+        task_topics=("game_engine",))
+    assert first["changed"]==1
+    # Scout's separate monitor role cannot immediately consume another
+    # bandwidth slot to re-fetch the just-verified same URL.
+    redundant=worker._reserve(OWNER,"monitor","article-1",NOW+900)
+    assert redundant is None
+    # After the *source-level* cooldown, Scout may legitimately check again.
+    later=worker._reserve(OWNER,"monitor","article-1",NOW+720+6*3600+1)
+    assert isinstance(later,str) and later
+    db.close()
+
+
+def test_crash_recovery_reclaims_old_leases_without_replaying_knowledge():
+    db,family,worker=make()
+    key=worker._reserve(OWNER,"article","article-1",NOW+720)
+    assert key
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+740)==0
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+850)==1
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+851)==0
+    assert not worker._owned(OWNER,"article","article-1",key,NOW+851)
+    assert worker._reserve(OWNER,"article","article-1",NOW+900) is None
+    events=read_idle_family_history(db,OWNER,authorized=True)
+    assert len(events)==1 and events[0]["outcome"]=="recovered"
+    assert events[0]["change"].startswith("(recovered:")
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    # Once the recovery backoff expires, genuinely new reviewed evidence
+    # may be acquired on the NEXT independently idle host tick.
+    result=worker.run_once(OWNER,authorized=True,
+         idle_state=lambda:idle(NOW+1200),
+         gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+1199)},
+         task_topics=("game_engine",))
+    assert result["changed"]==1 and result["recovered"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    db.close()
+
+
+def test_idle_recovery_is_bounded_and_never_runs_while_foreground():
+    db,family,worker=make()
+    worker._reserve(OWNER,"video","video-1",NOW+720)
+    with pytest.raises(PermissionError):
+        worker.reconcile_expired_leases(OWNER,authorized=False,at=NOW+850)
+    with pytest.raises(ValueError):
+        worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+850,max_recover=0)
+    with pytest.raises(PermissionError):
+        worker.run_once(OWNER,authorized=True,idle_state=lambda:idle(foreground=True),
+                        gatherers={},task_topics=("game_engine",))
+    assert not read_idle_family_history(db,OWNER,authorized=True)
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+850)==1
+    db.close()
+
+
+def test_commit_guard_blocks_new_knowledge_without_affecting_other_sources():
+    db,family,worker=make()
+    report=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+        task_topics=("game_engine",),commit_gate=lambda at:False)
+    assert report["changed"]==0 and report["paused"]
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="paused"
+    db.close()
+
+
+def test_atomic_growth_lease_and_audit_commit_or_roll_back_together(monkeypatch):
+    db,family,worker=make()
+    accepted=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+        task_topics=("game_engine",))
+    assert accepted["changed"]==1
+    row=db.execute("""SELECT last_outcome,lease_token FROM dragon_family_idle_leases
+        WHERE owner=? AND role='article' AND source_id='article-1'""",
+        (OWNER,)).fetchone()
+    assert row==("changed","")
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="changed"
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+1000)==0
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    db.close()
+
+
+def test_atomic_failure_rolls_back_new_knowledge_and_records_retry(monkeypatch):
+    db,family,worker=make()
+    original=worker._record_attempt
+    def crash_before_audit(owner,role,sid,at,outcome):
+        if outcome=="changed":
+            raise RuntimeError("injected SQLite audit failure")
+        return original(owner,role,sid,at,outcome)
+    monkeypatch.setattr(worker,"_record_attempt",crash_before_audit)
+    result=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+        task_topics=("game_engine",))
+    assert result["failed"]==1 and result["changed"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="failed"
+    assert not db.execute("""SELECT 1 FROM dragon_family_readings
+        WHERE owner=? AND dragon='article' AND content_digest=?""",
+        (OWNER,ART)).fetchone()
+    db.close()
+
+
+def test_duplicate_reviewed_version_finalizes_unchanged_lease_atomically():
+    db,family,worker=make()
+    result=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"video":lambda task:receipt(task.source_id,ORIGINAL,NOW+719)},
+        task_topics=("game_engine",))
+    assert result["unchanged"]==1 and result["changed"]==0
+    row=db.execute("""SELECT last_outcome,lease_token FROM dragon_family_idle_leases
+        WHERE owner=? AND role='video' AND source_id='video-1'""",(OWNER,)).fetchone()
+    assert row==("unchanged","")
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="unchanged"
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+2000)==0
+    db.close()
+
+
+def test_rights_denial_quarantines_source_across_all_specialists_until_reapproved():
+    db,family,worker=make()
+    def denied(_task):
+        raise source_policy_denied()
+    outcome=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"article":denied},task_topics=("game_engine",))
+    assert outcome["policy_blocked"]==1
+    assert outcome["changed"]==0 and outcome["failed"]==0
+    assert worker._reserve(OWNER,"monitor","article-1",NOW+5000) is None
+    assert worker._reserve(OWNER,"article","article-1",NOW+5000) is None
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="policy_blocked"
+    with pytest.raises(PermissionError,match="reviewer"):
+        worker.clear_source_policy_block(OWNER,"article-1",authorized=True,
+            at=NOW+800,review=lambda *_:False)
+    with pytest.raises(PermissionError):
+        worker.clear_source_policy_block(OWNER,"article-1",authorized=False,
+            at=NOW+800,review=lambda *_:True)
+    assert worker.clear_source_policy_block(OWNER,"article-1",authorized=True,
+        at=NOW+800,review=lambda owner,sid:owner==OWNER and sid=="article-1")==1
+    assert worker.clear_source_policy_block(OWNER,"article-1",authorized=True,
+        at=NOW+801,review=lambda *_:True)==0
+    result=worker.run_once(OWNER,authorized=True,idle_state=lambda:idle(NOW+900),
+        gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+899)},
+        task_topics=("game_engine",))
+    assert result["changed"]==1
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    assert read_idle_family_history(db,OWNER,authorized=True)[1]["outcome"]=="review_cleared"
+    db.close()
+
+
+def test_http_429_uses_bounded_retry_after_without_duplicate_xp():
+    db,family,worker=make()
+    def limited(task):
+        raise source_rate_limited(3600)
+    first=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"video":limited},task_topics=("game_engine",))
+    assert first["rate_limited"]==1 and first["changed"]==0
+    row=db.execute("""SELECT next_due,last_outcome FROM dragon_family_idle_leases
+        WHERE owner=? AND role='video' AND source_id='video-1'""",(OWNER,)).fetchone()
+    assert row[1]=="rate_limited" and row[0]>=NOW+720+3600
+    repeated=worker.run_once(OWNER,authorized=True,idle_state=lambda:idle(NOW+1800),
+        gatherers={"video":limited},task_topics=("game_engine",))
+    assert repeated["attempted"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][1]["discoveries"]==0
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="rate_limited"
+    db.close()
+
+
+def test_typed_source_retries_never_accept_unbounded_or_forged_delays():
+    for forbidden in (float("inf"),float("nan"),-10,1,86401,True,"300"):
+        with pytest.raises(ValueError):
+            source_rate_limited(forbidden)
+    for code in ("fictional","rights_approved","admin_override"):
+        with pytest.raises(ValueError):
+            IdleResearchFailure(code)
+    assert source_transport_failed().category=="transient"
+    assert source_policy_denied().category=="policy_blocked"
+
+
+def test_idle_attempt_journal_is_utc_timestamped_and_tamper_evident():
+    db,family,worker=make()
+    outcome=worker.run_once(OWNER,authorized=True,idle_state=idle,
+         gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+         task_topics=("game_engine",))
+    assert outcome["changed"]==1
+    events=read_idle_family_history(db,OWNER,authorized=True)
+    assert len(events)==1
+    assert events[0]["at"].endswith("Z")
+    assert events[0]["change"].startswith("(improved:")
+    assert events[0]["outcome"]=="changed"
+    assert len(events[0]["digest"])==64
+    status=read_idle_family_health(db,OWNER,authorized=True)
+    assert status["history"]==events
+    with pytest.raises(PermissionError):
+        read_idle_family_history(db,OWNER,authorized=False)
+    db.execute("""UPDATE dragon_family_idle_attempt_events
+        SET details='counterfeit research' WHERE owner=? AND sequence=1""",(OWNER,))
+    db.commit()
+    with pytest.raises(ValueError,match="integrity"):
+        read_idle_family_history(db,OWNER,authorized=True)
+    with pytest.raises(ValueError,match="integrity"):
+        read_idle_family_health(db,OWNER,authorized=True)
+    db.close()
+
+
+def test_missing_consent_and_unknown_topic_never_create_tasks():
+    db,family,worker=make()
+    assert worker.run_once(OWNER,authorized=True,idle_state=idle,
+                           gatherers={"article":gather},task_topics=("spacecraft",))["attempted"]==0
+    with pytest.raises(ValueError,match="task context"):
+        worker.run_once(OWNER,authorized=True,idle_state=idle,
+                        gatherers={"article":gather},task_topics=())
+    assert worker.run_once(OWNER,authorized=True,idle_state=idle,
+                           gatherers={},task_topics=("game_engine",))["attempted"]==0
+    db.close()
+
+
+def test_backoff_after_error_does_not_award_xp_and_recovers_on_due():
+    db,family,worker=make()
+    attempts=[]
+    def broken(task):
+        attempts.append(task.source_id)
+        raise RuntimeError("network unavailable")
+    fail=worker.run_once(OWNER,authorized=True,idle_state=idle,
+                         gatherers={"video":broken},task_topics=("game_engine",))
+    assert fail["attempted"]==1 and fail["failed"]==1
+    assert worker.health(OWNER,authorized=True)["workers"]["video"]["failed"]==1
+    soon=worker.run_once(OWNER,authorized=True,idle_state=lambda:idle(NOW+800),
+                         gatherers={"video":broken},task_topics=("game_engine",))
+    assert soon["attempted"]==0 and len(attempts)==1
+    after=worker.run_once(OWNER,authorized=True,idle_state=lambda:idle(NOW+1100),
+                          gatherers={"video":lambda task:None},task_topics=("game_engine",))
+    assert after["unchanged"]==1 and after["changed"]==0
+    assert worker.health(OWNER,authorized=True)["workers"]["video"]["failed"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][1]["discoveries"]==0
+    db.close()
+
+
+def test_retries_not_eligible_during_same_source_lease_and_expired_lease_reclaimed():
+    db,family,worker=make()
+    second=DragonIdleCoordinator(family)
+    observed=[]
+    def first(task):
+        other=second.run_once(OWNER,authorized=True,idle_state=idle,
+                              gatherers={"article":lambda _:observed.append("double")},
+                              task_topics=("game_engine",))
+        # A different *eligible* article may still be worked by another
+        # dispatcher; ensure the leased same source isn't duplicated.
+        assert "double" not in observed
+        return receipt(task.source_id,ART,NOW+719)
+    worker.run_once(OWNER,authorized=True,idle_state=idle,
+                    gatherers={"article":first},task_topics=("game_engine",))
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    db.close()
+
+
+def test_repeated_unchanged_receipt_is_cooldown_only():
+    db,family,worker=make()
+    first=worker.run_once(OWNER,authorized=True,idle_state=idle,
+                          gatherers={"video":lambda task:receipt(task.source_id,ORIGINAL,NOW+719)},
+                          task_topics=("game_engine",))
+    assert first["unchanged"]==1
+    later=worker.run_once(OWNER,authorized=True,idle_state=lambda:idle(NOW+900),
+                          gatherers={"video":gather},task_topics=("game_engine",))
+    assert later["attempted"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][1]["discoveries"]==0
+    db.close()
+
+
+def test_keyset_rotation_reaches_sources_beyond_initial_window():
+    db=sqlite3.connect(":memory:")
+    family=DragonFamily(db,owner_scope=OWNER,approval=lambda r:r.review_digest==REVIEW)
+    family.enroll(OWNER,(seed("parent-source",topics=("misc",)),),authorized=True,now=NOW)
+    family.seal_inventory(OWNER,authorized=True,now=NOW+1)
+    family.consume(OWNER,receipt("parent-source",ORIGINAL,NOW+2),authorized=True)
+    additions=tuple(seed(f"source-{i:03d}",topics=("misc",) if i<24 else ("game_engine",))
+                    for i in range(25))
+    family.enroll(OWNER,additions,authorized=True,now=NOW+10)
+    worker=DragonIdleCoordinator(family,policy=IdleCoordinatorPolicy(max_eligible_scan=10))
+    calls=[]
+    for tick in range(4):
+        result=worker.run_once(OWNER,authorized=True,idle_state=lambda tick=tick:idle(NOW+720+tick*20),
+              gatherers={"article":lambda task:(calls.append(task.source_id) or
+                  receipt(task.source_id,ART,NOW+719+tick*20))},
+              task_topics=("game_engine",))
+        if calls:
+            break
+    assert calls==["source-024"]
+    assert result["changed"]==1
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    db.close()
+
+
+def test_budget_refuses_policy_bypass_and_unscoped_family():
+    for values in ({"max_tasks":4},{"min_idle_seconds":1},
+                   {"lease_seconds":5000},{"max_eligible_scan":2},
+                   {"transient_backoff_seconds":600,"maximum_backoff_seconds":300}):
+        with pytest.raises(ValueError):
+            IdleCoordinatorPolicy(**values).validate()
+    db,family,_=make(min_idle_seconds=400)
+    with pytest.raises(ValueError,match="weaken"):
+        DragonIdleCoordinator(family,policy=IdleCoordinatorPolicy(min_idle_seconds=300))
+    db.close()
+
+
+def test_wrong_source_returned_cannot_evolve_and_fails_safely():
+    db,family,worker=make()
+    result=worker.run_once(OWNER,authorized=True,idle_state=idle,
+                           gatherers={"video":lambda task:receipt("article-1",ART,NOW+719)},
+                           task_topics=("game_engine",))
+    assert result["failed"]==1
+    assert result["changed"]==0
+    assert worker.health(OWNER,authorized=True)["workers"]["video"]["failed"]==1
+    assert family.snapshot(OWNER,authorized=True)["children"][1]["discoveries"]==0
+    db.close()

@@ -1,0 +1,16 @@
+{
+  "name": "@xai/grok-build-plugin-cc",
+  "version": "0.2.1",
+  "private": true,
+  "type": "module",
+  "description": "Grok Build ↔ Claude Code bridge for review, critique, and delegation.",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "scripts": {
+    "bump-version": "node scripts/bump-version.mjs",
+    "check-version": "node scripts/bump-version.mjs --check",
+    "test": "node --test tests/*.test.mjs"
+  }
+}

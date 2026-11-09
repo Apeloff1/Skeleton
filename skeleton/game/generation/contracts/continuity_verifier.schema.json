@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:continuity_verifier:v1",
+  "title": "FLGB-14 continuity verifier",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observation_id",
+    "canon_violations",
+    "timeline_violations",
+    "style_violations",
+    "evidence_digest"
+  ],
+  "properties": {
+    "observation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "canon_violations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "timeline_violations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "style_violations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

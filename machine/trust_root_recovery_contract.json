@@ -1,0 +1,28 @@
+{
+  "schema_version": "skeleton.ai.trust_root_recovery.v1",
+  "gap_id": "G084",
+  "title": "root signing/trust key compromise lacks explicit revoke, re-root and re-sign recovery",
+  "canonical_runtime": "skeleton/security/trust_root_recovery.py",
+  "ai_mirror": "skeleton/ai/runtime/security/trust_root_recovery.py",
+  "mirror_mode": "compatibility_facade",
+  "composes": [
+    "skeleton/security/artifact_trust.py"
+  ],
+  "invariants": [
+    "a compromised root cannot appoint or replace its successor",
+    "revocation is authorized only by the precommitted successor",
+    "revoked keys cannot admit artifacts",
+    "re-sign requires one admission at or before the successor-signed trust cut",
+    "admissions after the trust cut are not re-signed",
+    "revocation is one-way",
+    "implementation state cannot self-grant verification or completion"
+  ],
+  "acceptance_tests": [
+    "skeleton/testing/test_trust_root_recovery.py"
+  ],
+  "closure": {
+    "implementation_is_not_verification": true,
+    "independent_exact_head_evidence_required": true,
+    "self_signing_forbidden": true
+  }
+}

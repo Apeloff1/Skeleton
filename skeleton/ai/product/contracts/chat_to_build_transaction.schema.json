@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-18:chat_to_build_transaction:v1",
+  "title": "FLGB-18 chat to build transaction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "transaction_id",
+    "conversation_digest",
+    "request_digest",
+    "project_digest_before",
+    "project_digest_after",
+    "operations",
+    "idempotency_key"
+  ],
+  "properties": {
+    "transaction_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "conversation_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "request_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "project_digest_before": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "project_digest_after": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "repo": "Apeloff1/Skeleton",
+  "branch": "main",
+  "funcs_per_shard": 850000,
+  "shards_planned": 200,
+  "shards_measured": 1,
+  "lines_measured": 7650009,
+  "bytes_measured": 303339093,
+  "projection_200": 1530001800,
+  "prior_lines": 153003200,
+  "sample_mass": 1.0392,
+  "stored_prose": 0,
+  "clip": 1.1,
+  "tree_in_git": false
+}

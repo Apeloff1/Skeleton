@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-06:evaluation_harness:v1",
+  "title": "FLGB-06 evaluation harness",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "candidate_digest",
+    "benchmark_digest",
+    "seed_manifest_digest",
+    "case_results"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "candidate_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "benchmark_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "seed_manifest_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "case_results": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000
+    }
+  }
+}

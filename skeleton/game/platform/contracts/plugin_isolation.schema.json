@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-15:plugin_isolation:v1",
+  "title": "FLGB-15 plugin isolation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plugin_id",
+    "allowed_capabilities",
+    "writable_roots",
+    "network_mode"
+  ],
+  "properties": {
+    "plugin_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "allowed_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "writable_roots": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "network_mode": {
+      "enum": [
+        "deny",
+        "allowlisted-read",
+        "allowlisted"
+      ]
+    }
+  }
+}

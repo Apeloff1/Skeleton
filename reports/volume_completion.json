@@ -1,0 +1,14 @@
+{
+  "plane": "volume",
+  "branch": "main",
+  "tests": "volume-ok",
+  "shard_lines": 7650009,
+  "shard_bytes": 303339093,
+  "sample_mass": 1.0392,
+  "projected_200": 1530001800,
+  "header_gap": 30200,
+  "stored_prose": 0,
+  "clip": 1.1,
+  "tree_in_git": false,
+  "deck_touched": false
+}

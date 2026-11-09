@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-08:video_sampling:v1",
+  "title": "FLGB-08 video sampling",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_id",
+    "content_digest",
+    "duration_ms",
+    "frame_count",
+    "provenance_digest",
+    "rights_digest"
+  ],
+  "properties": {
+    "artifact_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "content_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "frame_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "provenance_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rights_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

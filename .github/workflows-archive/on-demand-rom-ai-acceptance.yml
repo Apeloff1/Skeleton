@@ -1,0 +1,102 @@
+name: On-demand original ROM AI acceptance
+
+# Intentionally never trigger on pushes, PRs, schedules, merges or tags:
+# the repository has a deliberately constrained CI queue.
+on:
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Deterministic original-homebrew ROM seed"
+        required: true
+        default: "42"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: original-rom-ai-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-rom-ai-proof:
+    name: "Original-ROM CPU + Q + neural + goal acceptance"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      PYTHONHASHSEED: "0"
+    steps:
+      - name: Checkout exact requested source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Python runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify focused source parses before execution
+        run: |
+          python -m py_compile \
+            scripts/accept_original_rom_ai_pipeline.py \
+            scripts/run_game_rom_acceptance_suite.py \
+            scripts/audit_original_gameboy_mapper_matrix.py \
+            scripts/audit_original_gameboy_cpu_opcodes.py \
+            scripts/audit_original_gameboy_interrupts.py \
+            scripts/audit_original_gameboy_bus_arbitration.py \
+            scripts/audit_original_gameboy_serial_port.py \
+            scripts/audit_original_gameboy_alu_flags.py \
+            scripts/audit_original_rom_instruction_divergence.py \
+            scripts/audit_game_emulator_first_boot.py \
+            scripts/audit_game_emulator_disc_first_boot.py \
+            scripts/audit_rom_cross_game_comparison.py \
+            skeleton/jeeves/game_emulator_cross_game_lab.py \
+            skeleton/jeeves/game_rom_instruction_divergence.py \
+            skeleton/jeeves/game_emulator_training_lab.py \
+            skeleton/jeeves/game_emulator_neural_world.py \
+            skeleton/jeeves/game_original_rom_goal_training.py
+
+      - name: Confirm pinned independent SM83 opcode reference is present
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path("machine/gbdev_sm83_opcode_reference.json").read_text())
+          assert p["provenance"]["upstream_commit_sha"] == "376f61c86fdac2048f7ce5fe838ae756b306017e"
+          assert len(p["unprefixed"]) == 256 and len(p["cbprefixed"]) == 256
+          assert p["provenance"]["license"] == "CC0-1.0"
+          print("Pinned source reference present; actual instruction checks run in next step")
+          PY
+
+      - name: Execute owned original ROM and verify exact evidence receipts
+        env:
+          INPUT_SEED: ${{ inputs.seed }}
+        run: |
+          case "$INPUT_SEED" in
+            *[!0-9]*|'')
+              echo "Seed must be a decimal nonnegative integer" >&2
+              exit 2
+              ;;
+          esac
+          if [ "${#INPUT_SEED}" -gt 19 ]; then
+            echo "Seed exceeds 63-bit bound" >&2
+            exit 2
+          fi
+          mkdir -p "$RUNNER_TEMP/original-rom-evidence"
+          python scripts/run_game_rom_acceptance_suite.py \
+            --output-directory "$RUNNER_TEMP/original-rom-evidence/acceptance-$GITHUB_RUN_ID" \
+            --seed "$INPUT_SEED" \
+            --process-timeout-seconds 600
+
+      - name: Retain small source receipts including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-rom-ai-receipts-${{ github.run_id }}
+          path: ${{ runner.temp }}/original-rom-evidence/
+          if-no-files-found: ignore
+          retention-days: 3
+          compression-level: 6

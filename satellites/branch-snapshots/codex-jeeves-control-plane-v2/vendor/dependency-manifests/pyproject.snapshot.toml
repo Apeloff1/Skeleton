@@ -1,0 +1,33 @@
+[tool.black]
+line-length = 110
+target-version = ["py311"]
+
+[tool.pytest.ini_options]
+testpaths = ["skeleton/testing"]
+python_files = ["test_*.py"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skeleton"
+version = "16.0.0"
+description = "AI game engine and agent orchestration framework"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.100.0",
+  "uvicorn[standard]>=0.23.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0.0", "pytest-asyncio>=0.21.0", "black>=23.0.0", "mypy>=1.0.0"]
+
+[project.scripts]
+skeleton = "skeleton.__main__:main"
+skeleton-dev = "skeleton.developer.cli:run_dev_cli"

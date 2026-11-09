@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Apeloff1/Skeleton/blob/main/docs/schemas/jeeves-original-mesh-physics-2026.schema.json",
+  "title": "Jeeves source-authorized 3D original mesh collision and physics",
+  "description": "A physics-facet record with a required depends_on edge to an existing original procedural_mesh. Python compilation independently proves geometry, mass and source hashes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "base_record_id",
+    "asset_id",
+    "body_type",
+    "density_kg_m3",
+    "friction_per_mille",
+    "restitution_per_mille",
+    "collision_layer",
+    "collision_mask"
+  ],
+  "properties": {
+    "kind": {
+      "const": "procedural_mesh_physics"
+    },
+    "base_record_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "asset_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "body_type": {
+      "enum": [
+        "static",
+        "rigid",
+        "area"
+      ]
+    },
+    "density_kg_m3": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 30000
+    },
+    "friction_per_mille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "restitution_per_mille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "collision_layer": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1048575
+    },
+    "collision_mask": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1048575
+    }
+  }
+}

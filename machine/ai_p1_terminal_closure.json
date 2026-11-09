@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "closure_id": "P1-TERMINAL-CLOSURE",
+  "status": "closed",
+  "claim_scope": "bounded_trustworthy_production_frontier",
+  "claim": "The bounded 107-volume P1 trustworthy-production frontier is terminally closed by evidence. This does not claim completion of the 421-volume masterplan or the 314 volumes deferred into P2.",
+  "authority": {
+    "execution_map": "machine/ai_p1_execution_map.json",
+    "task_backlog": "machine/ai_p1_task_backlog.json",
+    "risk_evidence_registry": "machine/p1_risk_evidence_bindings.json",
+    "terminal_gap_verifier": "scripts/verify_p1_terminal_closure.py",
+    "closure_manifest_verifier": "scripts/check_p1_terminal_closure_manifest.py"
+  },
+  "frontier": {
+    "masterplan_volume_count": 421,
+    "primary_p1_frontier_volume_count": 107,
+    "deferred_to_p2_volume_count": 314
+  },
+  "risk_evidence": {
+    "required_obligation_count": 513,
+    "required_disposition": "evidence",
+    "required_blocking_count": 0,
+    "required_unclassified_count": 0,
+    "accepted_risk_allowed": false
+  },
+  "planning_ledger_semantics": {
+    "execution_map_status": "active",
+    "task_backlog_status": "active",
+    "meaning": "The P1 execution map and task backlog remain active planning/provenance ledgers by schema contract. They are not terminal-closure authority. Terminal closure is established by this manifest plus the risk-evidence and terminal-gap verifiers."
+  },
+  "handoff": {
+    "next_phase": "P2",
+    "source_scope": "machine/ai_p1_execution_map.json#/scope_summary/deferred_volume_refs",
+    "expected_volume_count": 314
+  }
+}

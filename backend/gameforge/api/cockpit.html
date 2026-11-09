@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GameForge Cockpit</title>
+  <style>
+    :root {
+      --bg: #1b1b1f;
+      --card: #2a2a30;
+      --text: #f2f2f5;
+      --muted: #9a9aa3;
+      --accent: #6ea8fe;
+      --ok: #3dd68c;
+      --warn: #ffc857;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+    header {
+      padding: 14px 18px; border-bottom: 1px solid #3a3a42;
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    }
+    header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+    .tag { color: var(--muted); font-size: 12px; }
+    main {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 12px; padding: 12px;
+    }
+    .card {
+      background: var(--card); border-radius: 10px; padding: 12px;
+      border: 1px solid #3a3a42;
+    }
+    .card h2 { margin: 0 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+    input, select, textarea, button {
+      background: #17171b; color: var(--text); border: 1px solid #444;
+      border-radius: 6px; padding: 7px 9px; font-size: 13px;
+    }
+    textarea { width: 100%; min-height: 70px; }
+    button { cursor: pointer; background: #34343c; }
+    button:hover { border-color: var(--accent); }
+    pre {
+      background: #121216; border-radius: 6px; padding: 8px;
+      overflow: auto; max-height: 240px; font-size: 11px; color: #d7d7de;
+    }
+    .err { color: #ff7b72; font-size: 12px; }
+    .ok { color: var(--ok); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>GameForge Cockpit</h1>
+    <span class="tag" id="version">v—</span>
+    <input id="token" placeholder="Bearer token" value="dev" style="min-width:160px" />
+    <input id="base" placeholder="API base" value="" style="min-width:180px" />
+    <button onclick="refreshAll()">Refresh All</button>
+  </header>
+  <main>
+    <div class="card">
+      <h2>Work</h2>
+      <div class="row">
+        <input id="agent_id" value="agent_alpha" placeholder="agent_id" />
+        <input id="room_id" value="game_engine" placeholder="room_id" />
+      </div>
+      <textarea id="prompt">Design a deterministic job system</textarea>
+      <div class="row">
+        <button onclick="spawnAgent()">Spawn</button>
+        <button onclick="submitWork()">Submit Work</button>
+        <button onclick="agentStatus()">Status</button>
+      </div>
+      <pre id="work_out">-</pre>
+    </div>
+
+    <div class="card">
+      <h2>Diaries</h2>
+      <div class="row">
+        <select id="diary_kind">
+          <option value="memory">memory</option>
+          <option value="introspect">introspect</option>
+          <option value="outrospect">outrospect</option>
+          <option value="retrospect">retrospect</option>
+        </select>
+        <input id="diary_title" placeholder="title" />
+      </div>
+      <textarea id="diary_body" placeholder="Write a line..."></textarea>
+      <div class="row">
+        <input id="diary_mood" type="number" step="0.1" min="-1" max="1" placeholder="mood" style="width:90px" />
+        <button onclick="writeDiary()">Save</button>
+        <button onclick="listDiaries()">List</button>
+        <button onclick="diaryContext()">Context</button>
+      </div>
+      <pre id="diary_out">-</pre>
+    </div>
+
+    <div class="card">
+      <h2>Ops</h2>
+      <div class="row">
+        <button onclick="opsOverview()">Overview</button>
+        <button onclick="loadSlos()">SLOs</button>
+        <button onclick="loadAlerts()">Alerts</button>
+        <button onclick="loadFailover()">Failover</button>
+      </div>
+      <pre id="ops_out">-</pre>
+    </div>
+
+    <div class="card">
+      <h2>Rooms</h2>
+      <button onclick="listRooms()">List Rooms</button>
+      <pre id="rooms_out">-</pre>
+    </div>
+  </main>
+  <div class="row" style="padding:0 12px 12px"><span class="err" id="err"></span></div>
+
+<script>
+const API = () => (document.getElementById('base').value || window.location.origin);
+const token = () => document.getElementById('token').value.trim();
+function authHeaders() {
+  return {
+    'Authorization': 'Bearer ' + token(),
+    'Content-Type': 'application/json'
+  };
+}
+function showError(e) {
+  document.getElementById('err').textContent = e || '';
+}
+async function safeFetch(url, opts={}) {
+  showError('');
+  const r = await fetch(url, opts);
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error(r.status + ' ' + t);
+  }
+  return r.json();
+}
+async function refreshVersion() {
+  try {
+    const v = await safeFetch(API() + '/system/version');
+    document.getElementById('version').textContent = v.version + ' · ' + v.codename;
+  } catch (e) { showError(e.message); }
+}
+async function spawnAgent() {
+  try {
+    const agent_id = document.getElementById('agent_id').value;
+    const data = await safeFetch(API() + '/agents/spawn', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ agent_id })
+    });
+    document.getElementById('work_out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { showError(e.message); }
+}
+async function submitWork() {
+  try {
+    const body = {
+      agent_id: document.getElementById('agent_id').value,
+      room_id: document.getElementById('room_id').value,
+      prompt: document.getElementById('prompt').value
+    };
+    const data = await safeFetch(API() + '/work', {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify(body)
+    });
+    document.getElementById('work_out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { showError(e.message); }
+}
+async function agentStatus() {
+  try {
+    const id = document.getElementById('agent_id').value;
+    const data = await safeFetch(API() + '/agents/' + encodeURIComponent(id) + '/status', {
+      headers: authHeaders()
+    });
+    document.getElementById('work_out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { showError(e.message); }
+}
+async function writeDiary() {
+  try {
+    const body = {
+      kind: document.getElementById('diary_kind').value,
+      title: document.getElementById('diary_title').value || 'note',
+      body: document.getElementById('diary_body').value,
+      mood: document.getElementById('diary_mood').value === '' ? null : Number(document.getElementById('diary_mood').value)
+    };
+    const data = await safeFetch(API() + '/diaries/entries', {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify(body)
+    });
+    document.getElementById('diary_out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { showError(e.message); }
+}
+async function listDiaries() {
+  try {
+    const kind = document.getElementById('diary_kind').value;
+    const data = await safeFetch(API() + '/diaries/entries?kind=' + kind + '&limit=20', { headers: authHeaders() });
+    document.getElementById('diary_out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { showError(e.message); }
+}
+async function diaryContext() {
+  try {
+    const data = await safeFetch(API() + '/diaries/context?n=5', { headers: authHeaders() });
+    document.getElementById('diary_out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { showError(e.message); }
+}
+async function opsOverview() {
+  try {
+    const data = await safeFetch(API() + '/system/ops_overview', { headers: authHeaders() });
+    document.getElementById('ops_out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { showError(e.message); }
+}
+async function loadSlos() {
+  try {
+    const data = await safeFetch(API() + '/system/slos', { headers: authHeaders() });
+    document.getElementById('ops_out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { showError(e.message); }
+}
+async function loadAlerts() {
+  try {
+    const data = await safeFetch(API() + '/system/alerts', { headers: authHeaders() });
+    document.getElementById('ops_out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { showError(e.message); }
+}
+async function loadFailover() {
+  try {
+    const data = await safeFetch(API() + '/system/failover/runbook', { headers: authHeaders() });
+    document.getElementById('ops_out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { showError(e.message); }
+}
+async function listRooms() {
+  try {
+    const data = await safeFetch(API() + '/rooms', { headers: authHeaders() });
+    document.getElementById('rooms_out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) { showError(e.message); }
+}
+async function refreshAll() {
+  await refreshVersion();
+  await opsOverview();
+  await listRooms();
+}
+refreshVersion();
+</script>
+</body>
+</html>

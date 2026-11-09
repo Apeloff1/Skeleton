@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:texture_streaming:v1",
+  "title": "FLGB-11 texture streaming",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "texture_id",
+    "content_digest",
+    "bytes",
+    "priority",
+    "min_mip",
+    "max_mip"
+  ],
+  "properties": {
+    "texture_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "content_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "bytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000000000
+    },
+    "priority": {
+      "type": "integer"
+    },
+    "min_mip": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 64
+    },
+    "max_mip": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 64
+    }
+  }
+}

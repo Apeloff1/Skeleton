@@ -1,0 +1,784 @@
+"""Durable host-executed idle-learning work with no automatic replay.
+
+The scheduler proposes workloads using host telemetry. This adapter gives the
+application one explicit worker invocation at a time and records the assignment
+intent *before* executing an injected, independently authorized worker handler.
+
+Model-supplied work proposals do not authorize crawler network access,
+dataset writes, model training, weight promotion, or background CPU/GPU use.
+Handlers remain owned by the application; each invocation requires live idle
+telemetry, the host's exact scope authorization and external result proof.
+"""
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from enum import Enum
+from hashlib import sha256
+import json
+from pathlib import Path
+import sqlite3
+from threading import Condition, RLock
+from time import monotonic_ns, thread_time_ns
+from typing import Any
+
+from .idle_learning_scheduler import (
+    HostIdleTelemetry, IdleLearningPolicy, IdleWorkAssignment,
+    IdleWorkCandidate, IdleWorkKind, IdleWorkPlan, JeevesIdleLearningScheduler,
+)
+
+
+class IdleRuntimeError(ValueError):
+    """Idle-work admission, durable lease or effect proof failed."""
+
+
+class IdleWorkPreempted(IdleRuntimeError):
+    """Trusted host telemetry no longer permits background work."""
+
+
+@dataclass(frozen=True, slots=True)
+class IdleWorkBudget:
+    """Cooperative bounds for one local work chunk, never execution authority.
+
+    Handlers must split expensive operations into bounded items and poll the
+    checkpoint between them. The host still owns any native worker timeout.
+    """
+
+    maximum_wall_ns: int = 1_000_000_000
+    maximum_cpu_ns: int = 500_000_000
+    maximum_polls: int = 512
+    maximum_memory_drop_ppm: int = 100_000
+
+    def __post_init__(self) -> None:
+        for key in ("maximum_wall_ns", "maximum_cpu_ns"):
+            value = getattr(self, key)
+            if type(value) is not int or not 1 <= value <= 5_000_000_000:
+                raise IdleRuntimeError("idle chunk time budget must be 1ns..5s")
+        if type(self.maximum_polls) is not int or not 3 <= self.maximum_polls <= 65_536:
+            raise IdleRuntimeError("idle chunk checkpoint budget must be 3..65536")
+        if (type(self.maximum_memory_drop_ppm) is not int
+                or not 0 <= self.maximum_memory_drop_ppm <= 1_000_000):
+            raise IdleRuntimeError("idle chunk memory headroom budget is invalid")
+
+
+class IdleWorkCheckpoint:
+    """Cooperative worker preemption: call before each bounded source operation.
+
+    Host worker handlers MUST use this checkpoint between external operations,
+    batch items and expensive phases. The runner additionally samples before
+    and after invoking a handler, but cannot preempt a noncooperative blocking
+    handler already inside external code.
+    """
+
+    def __init__(
+        self, *, policy: IdleLearningPolicy, candidate: IdleWorkCandidate,
+        telemetry_probe: Callable[[], tuple[HostIdleTelemetry, int]],
+        budget: IdleWorkBudget | None = None,
+        stop_requested: Callable[[], bool] | None = None,
+    ) -> None:
+        if not callable(telemetry_probe):
+            raise IdleRuntimeError("host idle telemetry probe required")
+        self._policy = policy
+        self._candidate = candidate
+        self._probe = telemetry_probe
+        if budget is not None and not isinstance(budget, IdleWorkBudget):
+            raise IdleRuntimeError("idle work budget must be typed")
+        if stop_requested is not None and not callable(stop_requested):
+            raise IdleRuntimeError("idle preemption predicate must be callable")
+        self._budget = budget
+        self._stop_requested = stop_requested
+        self._started_wall_ns = monotonic_ns()
+        self._started_cpu_ns = thread_time_ns()
+        self._initial_memory_free_ppm: int | None = None
+        self.last_reason = "not_polled"
+        self.poll_count = 0
+
+    def _budget_available(self) -> bool:
+        if self._budget is not None:
+            if monotonic_ns() - self._started_wall_ns > self._budget.maximum_wall_ns:
+                self.last_reason = "chunk_wall_budget"
+                return False
+            if thread_time_ns() - self._started_cpu_ns > self._budget.maximum_cpu_ns:
+                self.last_reason = "chunk_cpu_budget"
+                return False
+            if self.poll_count > self._budget.maximum_polls:
+                self.last_reason = "chunk_checkpoint_budget"
+                return False
+        return True
+
+    def permitted(self) -> bool:
+        self.poll_count += 1
+        if self._stop_requested is not None and self._stop_requested() is not False:
+            self.last_reason = "foreground_preemption"
+            return False
+        if not self._budget_available():
+            return False
+        try:
+            observed = self._probe()
+        except Exception as exc:
+            self.last_reason = "host_telemetry_unavailable"
+            raise IdleWorkPreempted(self.last_reason) from exc
+        # A host probe can itself wait on local OS/serving observations. Its
+        # elapsed work is part of this chunk, not free work before admission.
+        if not self._budget_available():
+            return False
+        if (not isinstance(observed, tuple) or len(observed) != 2
+                or not isinstance(observed[0], HostIdleTelemetry)
+                or type(observed[1]) is not int):
+            raise IdleWorkPreempted("host telemetry probe returned invalid observation")
+        telemetry, now_ns = observed
+        if (now_ns < telemetry.observed_at_ns
+                or now_ns - telemetry.observed_at_ns > self._policy.maximum_telemetry_age_ns):
+            self.last_reason = "telemetry_stale"
+            return False
+        if telemetry.pending_interactive_requests or telemetry.power_saving:
+            self.last_reason = "interactive_or_power_policy"
+            return False
+        if telemetry.quiet_ns < self._policy.minimum_idle_ns:
+            self.last_reason = "machine_not_idle"
+            return False
+        if telemetry.serving_pressure_ppm >= self._policy.maximum_serving_pressure_ppm:
+            self.last_reason = "serving_pressure"
+            return False
+        if (telemetry.cpu_free_ppm < self._policy.minimum_cpu_free_ppm
+                or telemetry.memory_free_ppm < self._policy.minimum_memory_free_ppm):
+            self.last_reason = "host_resource_pressure"
+            return False
+        if self._initial_memory_free_ppm is None:
+            self._initial_memory_free_ppm = telemetry.memory_free_ppm
+        if (self._budget is not None
+                and self._initial_memory_free_ppm - telemetry.memory_free_ppm
+                > self._budget.maximum_memory_drop_ppm):
+            self.last_reason = "chunk_memory_headroom"
+            return False
+        if self._candidate.requires_network and not telemetry.online:
+            self.last_reason = "network_offline"
+            return False
+        if (self._candidate.requires_accelerator
+                and telemetry.gpu_free_ppm < self._policy.minimum_gpu_free_ppm):
+            self.last_reason = "accelerator_pressure"
+            return False
+        # Current job counts as active during cooperative work, so do not
+        # reject it solely because total worker concurrency is saturated.
+        self.last_reason = "admitted_idle"
+        return True
+
+    def __call__(self) -> None:
+        if not self.permitted():
+            raise IdleWorkPreempted(self.last_reason)
+
+
+class IdleExecutionState(str, Enum):
+    IN_FLIGHT = "in_flight"
+    VERIFIED = "verified"
+    IN_DOUBT = "in_doubt"
+    REJECTED = "rejected"
+
+
+def _sha(value: str) -> str:
+    if not isinstance(value, str) or len(value) != 64 or any(
+        char not in "0123456789abcdef" for char in value
+    ):
+        raise IdleRuntimeError("idle evidence identity must be SHA-256")
+    return value
+
+
+def _digest(value: object) -> str:
+    try:
+        raw = json.dumps(
+            value, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=True, allow_nan=False,
+        ).encode("utf-8")
+    except (ValueError, TypeError) as exc:
+        raise IdleRuntimeError("idle receipt cannot be canonically serialized") from exc
+    if len(raw) > 64 * 1024:
+        raise IdleRuntimeError("idle work metadata exceeds byte budget")
+    return sha256(raw).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class HostIdleWorkReceipt:
+    work_id: str
+    scope_id: str
+    kind: IdleWorkKind
+    source_digest: str
+    output_digest: str
+    external_event_digest: str
+    host_worker_id: str
+    completed: bool
+
+    def __post_init__(self) -> None:
+        for name in ("source_digest", "output_digest", "external_event_digest"):
+            _sha(getattr(self, name))
+        for name in ("work_id", "scope_id", "host_worker_id"):
+            val = getattr(self, name)
+            if not isinstance(val, str) or not val or len(val) > 192:
+                raise IdleRuntimeError("invalid host worker receipt identity")
+        if not isinstance(self.kind, IdleWorkKind) or type(self.completed) is not bool:
+            raise IdleRuntimeError("idle work receipt has invalid state")
+
+    @property
+    def digest(self) -> str:
+        return _digest({
+            "work_id": self.work_id, "scope_id": self.scope_id,
+            "kind": self.kind.value, "source_digest": self.source_digest,
+            "output_digest": self.output_digest,
+            "external_event_digest": self.external_event_digest,
+            "host_worker_id": self.host_worker_id,
+            "completed": self.completed,
+        })
+
+
+_SCHEMA = """
+PRAGMA journal_mode=WAL;
+CREATE TABLE IF NOT EXISTS jeeves_idle_event (
+    sequence INTEGER PRIMARY KEY,
+    prior_digest TEXT NOT NULL,
+    event_digest TEXT NOT NULL UNIQUE,
+    event_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS jeeves_idle_meta (
+    singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+    head_digest TEXT NOT NULL,
+    event_count INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS jeeves_idle_effect (
+    intent_digest TEXT PRIMARY KEY,
+    work_id TEXT NOT NULL UNIQUE,
+    scope_id TEXT NOT NULL,
+    source_digest TEXT NOT NULL,
+    plan_digest TEXT NOT NULL,
+    state TEXT NOT NULL,
+    receipt_digest TEXT,
+    host_event_digest TEXT
+);
+CREATE INDEX IF NOT EXISTS jeeves_idle_effect_state ON jeeves_idle_effect(state);
+"""
+
+
+class JeevesIdleWorkExecutor:
+    """One-shot task execution with durable idempotency and idle re-admission."""
+
+    def __init__(
+        self, *, store_path: str | Path,
+        policy: IdleLearningPolicy,
+        host_authorize: Callable[[IdleWorkAssignment, str, Any], bool],
+        handlers: Mapping[IdleWorkKind, Callable[..., HostIdleWorkReceipt]],
+        verify_result: Callable[[IdleWorkAssignment, HostIdleWorkReceipt, Any], bool],
+        telemetry_probe: Callable[[], tuple[HostIdleTelemetry, int]],
+        maximum_history_events: int = 200_000,
+    ) -> None:
+        self.path = Path(store_path)
+        if not self.path.is_absolute():
+            raise IdleRuntimeError("idle-effect database requires host absolute path")
+        if not isinstance(policy, IdleLearningPolicy):
+            raise IdleRuntimeError("typed idle admission policy required")
+        if (type(maximum_history_events) is not int
+                or not 3 <= maximum_history_events <= 20_000_000):
+            raise IdleRuntimeError("idle history capacity must be 3..20000000 events")
+        self.maximum_history_events = maximum_history_events
+        if not callable(host_authorize) or not callable(verify_result):
+            raise IdleRuntimeError("independent idle work authorization and verifier required")
+        if (not isinstance(handlers, Mapping) or not handlers
+                or len(handlers) > len(IdleWorkKind)
+                or any(not isinstance(key, IdleWorkKind) or not callable(callback)
+                       for key, callback in handlers.items())):
+            raise IdleRuntimeError("idle work handlers must be explicit typed host functions")
+        self.policy = policy
+        self._authorize = host_authorize
+        self._handlers = dict(handlers)
+        self._verify = verify_result
+        if not callable(telemetry_probe):
+            raise IdleRuntimeError("host polling probe required for cooperative preemption")
+        self._telemetry_probe = telemetry_probe
+        self._lock = RLock()
+        self._worker_condition = Condition(self._lock)
+        self._active_workers = 0
+        self._closing = False
+        self._closed = False
+        self._db = sqlite3.connect(
+            str(self.path), timeout=10, isolation_level=None, check_same_thread=False,
+        )
+        try:
+            self._db.execute("PRAGMA busy_timeout=10000")
+            self._db.executescript(_SCHEMA)
+            self._bootstrap_history()
+        except BaseException:
+            self._db.close()
+            raise
+
+    GENESIS = "0" * 64
+
+    def _bootstrap_history(self) -> None:
+        # Only genesis creation needs the writer lock. Full verification uses
+        # a WAL read snapshot, so another engine's ordinary writes can proceed.
+        try:
+            self._db.execute("BEGIN IMMEDIATE")
+            meta = self._db.execute(
+                "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
+            ).fetchone()
+            if meta is None:
+                if self._db.execute(
+                    "SELECT COUNT(*) FROM jeeves_idle_effect"
+                ).fetchone()[0] or self._db.execute(
+                    "SELECT COUNT(*) FROM jeeves_idle_event"
+                ).fetchone()[0]:
+                    raise IdleRuntimeError("idle effects exist without authoritative evidence history")
+                self._db.execute(
+                    "INSERT INTO jeeves_idle_meta VALUES (1, ?, 0)", (self.GENESIS,),
+                )
+            self._db.execute("COMMIT")
+        except BaseException:
+            if self._db.in_transaction:
+                self._db.execute("ROLLBACK")
+            raise
+        self._verify_history()
+
+    def _verify_history(self) -> None:
+        own_snapshot = not self._db.in_transaction
+        try:
+            if own_snapshot:
+                self._db.execute("BEGIN")
+            self._verify_history_rows()
+            if own_snapshot:
+                self._db.execute("COMMIT")
+        except BaseException:
+            if own_snapshot and self._db.in_transaction:
+                self._db.execute("ROLLBACK")
+            raise
+
+    def _verify_history_rows(self) -> None:
+        prior = self.GENESIS
+        count = 0
+        materialized: dict[str, dict[str, Any]] = {}
+        for sequence, stored_prior, digest, event_json in self._db.execute(
+            "SELECT sequence,prior_digest,event_digest,event_json "
+            "FROM jeeves_idle_event ORDER BY sequence"
+        ):
+            if count >= self.maximum_history_events or sequence != count or stored_prior != prior:
+                raise IdleRuntimeError("idle event history is not sequential")
+            if not isinstance(event_json, str) or len(event_json) > 65536:
+                raise IdleRuntimeError("idle evidence entry exceeds byte budget")
+            try:
+                event = json.loads(event_json)
+            except (TypeError, ValueError) as exc:
+                raise IdleRuntimeError("idle evidence event is malformed") from exc
+            if (not isinstance(event, dict)
+                    or set(event) != {
+                        "schema", "sequence", "prior_digest", "operation",
+                        "at_ns", "effect",
+                    }
+                    or event["schema"] != "jeeves.idle_effect_event.v1"
+                    or event["sequence"] != count
+                    or event["prior_digest"] != prior
+                    or _digest(event) != digest):
+                raise IdleRuntimeError("idle effect journal digest mismatch")
+            if type(event["at_ns"]) is not int or event["at_ns"] < 0:
+                raise IdleRuntimeError("idle event timestamp invalid")
+            effect = event["effect"]
+            expected_keys = {
+                "intent_digest", "work_id", "scope_id", "source_digest",
+                "plan_digest", "state", "receipt_digest", "host_event_digest",
+            }
+            if not isinstance(effect, dict) or set(effect) != expected_keys:
+                raise IdleRuntimeError("idle effect snapshot contract mismatch")
+            intent = _sha(effect["intent_digest"])
+            _sha(effect["source_digest"])
+            _sha(effect["plan_digest"])
+            for key in ("receipt_digest", "host_event_digest"):
+                if effect[key] is not None:
+                    _sha(effect[key])
+            try:
+                state = IdleExecutionState(effect["state"])
+            except (ValueError, TypeError) as exc:
+                raise IdleRuntimeError("invalid idle effect lifecycle state") from exc
+            old = materialized.get(intent)
+            if old is None:
+                if state is not IdleExecutionState.IN_FLIGHT or event["operation"] != "claimed":
+                    raise IdleRuntimeError("idle effect has no claimed genesis")
+            else:
+                if old["state"] == IdleExecutionState.IN_FLIGHT.value:
+                    allowed = {
+                        IdleExecutionState.VERIFIED, IdleExecutionState.IN_DOUBT,
+                        IdleExecutionState.REJECTED,
+                    }
+                elif old["state"] == IdleExecutionState.IN_DOUBT.value:
+                    allowed = {IdleExecutionState.VERIFIED, IdleExecutionState.REJECTED}
+                else:
+                    allowed = set()
+                if state not in allowed:
+                    raise IdleRuntimeError("idle effect history contains invalid transition")
+                if any(old[key] != effect[key] for key in (
+                    "intent_digest", "work_id", "scope_id", "source_digest", "plan_digest",
+                )):
+                    raise IdleRuntimeError("idle work identity changed after claiming")
+            materialized[intent] = effect
+            prior = digest
+            count += 1
+        meta = self._db.execute(
+            "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
+        ).fetchone()
+        if meta != (prior, count):
+            raise IdleRuntimeError("idle effect journal head is inconsistent")
+        rows = self._db.execute(
+            "SELECT intent_digest,work_id,scope_id,source_digest,"
+            "plan_digest,state,receipt_digest,host_event_digest FROM jeeves_idle_effect"
+        ).fetchall()
+        if len(rows) != len(materialized):
+            raise IdleRuntimeError("idle effects diverge from their evidence journal")
+        keys = (
+            "intent_digest", "work_id", "scope_id", "source_digest",
+            "plan_digest", "state", "receipt_digest", "host_event_digest",
+        )
+        for row in rows:
+            item = dict(zip(keys, row))
+            if materialized.get(item["intent_digest"]) != item:
+                raise IdleRuntimeError("idle materialized effect record was modified")
+
+    def _append_event(self, intent: str, operation: str, *, at_ns: int) -> str:
+        if type(at_ns) is not int or at_ns < 0:
+            raise IdleRuntimeError("trusted host timestamp required for journal entry")
+        current = self._db.execute(
+            "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
+        ).fetchone()
+        if current is None or current[1] >= self.maximum_history_events:
+            raise IdleRuntimeError("idle journal metadata missing or capacity exhausted")
+        head, number = current
+        row = self._db.execute(
+            "SELECT intent_digest,work_id,scope_id,source_digest,"
+            "plan_digest,state,receipt_digest,host_event_digest "
+            "FROM jeeves_idle_effect WHERE intent_digest=?", (intent,),
+        ).fetchone()
+        if row is None:
+            raise IdleRuntimeError("idle journal cannot attest missing effect")
+        keys = (
+            "intent_digest", "work_id", "scope_id", "source_digest",
+            "plan_digest", "state", "receipt_digest", "host_event_digest",
+        )
+        event = {
+            "schema": "jeeves.idle_effect_event.v1",
+            "sequence": number, "prior_digest": head,
+            "operation": operation, "at_ns": at_ns,
+            "effect": dict(zip(keys, row)),
+        }
+        digest = _digest(event)
+        self._db.execute(
+            "INSERT INTO jeeves_idle_event VALUES (?,?,?,?)",
+            (number, head, digest, json.dumps(
+                event, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=True, allow_nan=False,
+            )),
+        )
+        self._db.execute(
+            "UPDATE jeeves_idle_meta SET head_digest=?, event_count=? WHERE singleton=1",
+            (digest, number + 1),
+        )
+        return digest
+
+    def history_head(self, *, verify: bool = False) -> dict[str, Any]:
+        """Expose constant-time custody metadata; optionally replay evidence."""
+        if type(verify) is not bool:
+            raise IdleRuntimeError("history verification selection must be boolean")
+        with self._lock:
+            if verify:
+                self._verify_history()
+            head, count = self._db.execute(
+                "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
+            ).fetchone()
+            return {
+                "schema": "jeeves.idle_effect_history.v1",
+                "head_digest": head, "event_count": count,
+                "maximum_history_events": self.maximum_history_events,
+                "remaining_events": max(0, self.maximum_history_events - count),
+                "authority": "host-worker-only",
+            }
+
+    @staticmethod
+    def _intent(plan: IdleWorkPlan, assignment: IdleWorkAssignment) -> str:
+        return _digest({
+            "schema": "jeeves.idle_work_intent.v1",
+            "plan_digest": plan.digest,
+            "work_id": assignment.work_id,
+            "scope_id": assignment.scope_id,
+            "kind": assignment.kind.value,
+            "source_digest": assignment.source_digest,
+            "cost_units": assignment.cost_units,
+        })
+
+    def _admit(
+        self, plan: IdleWorkPlan, assignment: IdleWorkAssignment,
+        candidate: IdleWorkCandidate, telemetry: HostIdleTelemetry,
+        host_now_ns: int,
+    ) -> None:
+        if not all((
+            isinstance(plan, IdleWorkPlan),
+            isinstance(assignment, IdleWorkAssignment),
+            isinstance(candidate, IdleWorkCandidate),
+            isinstance(telemetry, HostIdleTelemetry),
+        )):
+            raise IdleRuntimeError("idle dispatch requires typed scheduling evidence")
+        if (plan.plan_reason != "admitted_idle"
+                or plan.required_host_reauthorization is not True
+                or plan.observed_at_ns != telemetry.observed_at_ns
+                or plan.telemetry_digest != telemetry.host_observation_digest
+                or assignment not in plan.assignments):
+            raise IdleRuntimeError("idle plan is not bound to current telemetry/assignment")
+        if (assignment.work_id != candidate.work_id
+                or assignment.scope_id != candidate.scope_id
+                or assignment.kind is not candidate.kind
+                or assignment.source_digest != candidate.source_digest
+                or assignment.cost_units != candidate.cost_units):
+            raise IdleRuntimeError("idle work candidate diverged after planning")
+        if type(host_now_ns) is not int or host_now_ns < 0:
+            raise IdleRuntimeError("host idle time invalid")
+        if telemetry.pending_interactive_requests or telemetry.power_saving:
+            raise IdleRuntimeError("idle work blocked by interactive or power policy")
+        # Re-run the same admission logic with the chosen candidate and
+        # current host-observed clock. No self-reported pressure is trusted.
+        probe = JeevesIdleLearningScheduler(policy=self.policy).propose(
+            (candidate,), telemetry, host_now_ns=host_now_ns,
+        )
+        if not probe.assignments or probe.assignments[0].work_id != assignment.work_id:
+            raise IdleRuntimeError("host machine no longer admits idle work")
+
+    def invoke_one(
+        self, *, plan: IdleWorkPlan,
+        assignment: IdleWorkAssignment, candidate: IdleWorkCandidate,
+        telemetry: HostIdleTelemetry, host_now_ns: int,
+        context: Any,
+        budget: IdleWorkBudget | None = None,
+        stop_requested: Callable[[], bool] | None = None,
+    ) -> tuple[IdleExecutionState, str]:
+        if stop_requested is not None and not callable(stop_requested):
+            raise IdleRuntimeError("idle preemption predicate must be callable")
+        with self._lock:
+            if self._closing or self._closed:
+                raise IdleRuntimeError("idle work executor is closing")
+            self._admit(plan, assignment, candidate, telemetry, host_now_ns)
+            handler = self._handlers.get(assignment.kind)
+            if handler is None:
+                raise IdleRuntimeError("host has no handler for this idle work kind")
+            checkpoint = IdleWorkCheckpoint(
+                policy=self.policy, candidate=candidate,
+                telemetry_probe=self._telemetry_probe,
+                budget=budget,
+                stop_requested=lambda: self._closing or (
+                    stop_requested is not None and stop_requested() is not False
+                ),
+            )
+        # Host callbacks can take controller/telemetry locks and may renew
+        # durable leases. Never invoke them while holding the persistence lock:
+        # foreground accounting takes its state lock before committing presence.
+        checkpoint()
+        intent = self._intent(plan, assignment)
+        if self._authorize(assignment, intent, context) is not True:
+            raise IdleRuntimeError("host did not authorize exact idle work")
+        with self._lock:
+            if self._closing or self._closed:
+                raise IdleRuntimeError("idle work executor is closing")
+            try:
+                self._db.execute("BEGIN IMMEDIATE")
+                if self._db.execute(
+                    "SELECT 1 FROM jeeves_idle_effect "
+                    "WHERE intent_digest=? OR work_id=?",
+                    (intent, assignment.work_id),
+                ).fetchone():
+                    raise IdleRuntimeError("idle work was already claimed or attempted")
+                head = self._db.execute(
+                    "SELECT event_count FROM jeeves_idle_meta WHERE singleton=1",
+                ).fetchone()
+                reserved = self._db.execute(
+                    "SELECT COALESCE(SUM(CASE WHEN state=? THEN 2 "
+                    "WHEN state=? THEN 1 ELSE 0 END),0) FROM jeeves_idle_effect "
+                    "WHERE state IN (?,?)",
+                    (IdleExecutionState.IN_FLIGHT.value, IdleExecutionState.IN_DOUBT.value,
+                     IdleExecutionState.IN_FLIGHT.value, IdleExecutionState.IN_DOUBT.value),
+                ).fetchone()[0]
+                # Keep capacity for this claim, an ambiguous outcome and its
+                # host reconciliation, including concurrent existing workers.
+                if head is None or head[0] + reserved + 3 > self.maximum_history_events:
+                    raise IdleRuntimeError("idle journal capacity reserved for effect recovery")
+                self._db.execute(
+                    "INSERT INTO jeeves_idle_effect VALUES (?,?,?,?,?,?,?,?)",
+                    (intent, assignment.work_id, assignment.scope_id,
+                     assignment.source_digest, plan.digest,
+                     IdleExecutionState.IN_FLIGHT.value, None, None),
+                )
+                self._append_event(intent, "claimed", at_ns=host_now_ns)
+                self._db.execute("COMMIT")
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                raise
+            self._active_workers += 1
+        # A worker never holds the persistence lock while computing. Foreground
+        # preemption and status readers must remain responsive during chunks.
+        try:
+            try:
+                result = handler(assignment, context, checkpoint)
+            except BaseException:
+                self._interrupt_claim(intent, at_ns=host_now_ns)
+                raise
+            # The handler has completed; renewed interactive demand prevents
+            # confirmation of idle compliance, not custody of its receipt.
+            if not isinstance(result, HostIdleWorkReceipt):
+                self._interrupt_claim(intent, at_ns=host_now_ns)
+                raise IdleRuntimeError("host idle handler returned untyped receipt")
+            try:
+                completed_while_idle = checkpoint.permitted()
+                verified = (
+                    result.work_id == assignment.work_id
+                    and result.scope_id == assignment.scope_id
+                    and result.kind is assignment.kind
+                    and result.source_digest == assignment.source_digest
+                    and result.completed and completed_while_idle
+                    and checkpoint.poll_count >= 3
+                    and self._verify(assignment, result, context) is True
+                )
+            except BaseException:
+                self._interrupt_claim(intent, at_ns=host_now_ns)
+                raise
+            state = (IdleExecutionState.VERIFIED if verified
+                     else IdleExecutionState.IN_DOUBT)
+            with self._lock:
+                try:
+                    self._db.execute("BEGIN IMMEDIATE")
+                    updated = self._db.execute(
+                        "UPDATE jeeves_idle_effect SET state=?,receipt_digest=?,"
+                        "host_event_digest=? WHERE intent_digest=? AND state=?",
+                        (state.value, result.digest, result.external_event_digest,
+                         intent, IdleExecutionState.IN_FLIGHT.value),
+                    )
+                    if updated.rowcount != 1:
+                        raise IdleRuntimeError("idle effect outcome was settled by another owner")
+                    self._append_event(intent, "worker_result", at_ns=host_now_ns)
+                    self._db.execute("COMMIT")
+                except BaseException:
+                    if self._db.in_transaction:
+                        self._db.execute("ROLLBACK")
+                    raise
+            return state, intent
+        finally:
+            with self._worker_condition:
+                self._active_workers -= 1
+                self._worker_condition.notify_all()
+
+    def _interrupt_claim(self, intent: str, *, at_ns: int) -> None:
+        """Retain ambiguous custody; this method never invokes a worker again."""
+        with self._lock:
+            try:
+                self._db.execute("BEGIN IMMEDIATE")
+                updated = self._db.execute(
+                    "UPDATE jeeves_idle_effect SET state=? "
+                    "WHERE intent_digest=? AND state=?",
+                    (IdleExecutionState.IN_DOUBT.value, intent,
+                     IdleExecutionState.IN_FLIGHT.value),
+                )
+                if updated.rowcount == 1:
+                    self._append_event(intent, "worker_interrupted", at_ns=at_ns)
+                self._db.execute("COMMIT")
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                # The durable IN_FLIGHT claim already prevents unsafe replay.
+
+    def pending(self, *, limit: int = 100) -> tuple[dict[str, str], ...]:
+        if type(limit) is not int or not 1 <= limit <= 1000:
+            raise IdleRuntimeError("invalid pending idle work page size")
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT intent_digest,work_id,scope_id,source_digest,state "
+                "FROM jeeves_idle_effect WHERE state IN (?,?) "
+                "ORDER BY work_id LIMIT ?",
+                (IdleExecutionState.IN_FLIGHT.value,
+                 IdleExecutionState.IN_DOUBT.value, limit),
+            )
+            return tuple({
+                "intent_digest": intent, "work_id": work,
+                "scope_id": scope, "source_digest": source,
+                "state": state,
+            } for intent, work, scope, source, state in rows)
+
+    def reconcile(
+        self, intent_digest: str, *,
+        external_event_digest: str,
+        verify_external: Callable[[str, str], bool],
+        confirmed_completed: bool,
+        observed_at_ns: int,
+    ) -> IdleExecutionState:
+        """Host-only reconciliation; never calls the original worker again."""
+        _sha(intent_digest)
+        _sha(external_event_digest)
+        if type(confirmed_completed) is not bool or not callable(verify_external):
+            raise IdleRuntimeError("independent recovery proof required")
+        if type(observed_at_ns) is not int or observed_at_ns < 0:
+            raise IdleRuntimeError("host recovery observation timestamp required")
+        with self._lock:
+            if self._closing or self._closed:
+                raise IdleRuntimeError("idle work executor is closing")
+            pending = self._db.execute(
+                "SELECT state FROM jeeves_idle_effect WHERE intent_digest=?", (intent_digest,),
+            ).fetchone()
+            if pending is None or pending[0] not in (
+                IdleExecutionState.IN_FLIGHT.value, IdleExecutionState.IN_DOUBT.value,
+            ):
+                raise IdleRuntimeError("no unresolved host idle effect")
+        # The host proof may read other owned state. Keep it outside our
+        # persistence lock and recheck unresolved custody in the transaction.
+        if verify_external(intent_digest, external_event_digest) is not True:
+            raise IdleRuntimeError("external idle effect was not verified")
+        with self._lock:
+            if self._closing or self._closed:
+                raise IdleRuntimeError("idle work executor is closing")
+            try:
+                self._db.execute("BEGIN IMMEDIATE")
+                row = self._db.execute(
+                    "SELECT state FROM jeeves_idle_effect WHERE intent_digest=?",
+                    (intent_digest,),
+                ).fetchone()
+                if row is None or row[0] not in (
+                    IdleExecutionState.IN_FLIGHT.value,
+                    IdleExecutionState.IN_DOUBT.value,
+                ):
+                    raise IdleRuntimeError("no unresolved host idle effect")
+                state = (IdleExecutionState.VERIFIED if confirmed_completed
+                         else IdleExecutionState.REJECTED)
+                updated = self._db.execute(
+                    "UPDATE jeeves_idle_effect SET state=?,host_event_digest=? "
+                    "WHERE intent_digest=? AND state IN (?,?)",
+                    (state.value, external_event_digest, intent_digest,
+                     IdleExecutionState.IN_FLIGHT.value,
+                     IdleExecutionState.IN_DOUBT.value),
+                )
+                if updated.rowcount != 1:
+                    raise IdleRuntimeError("idle effect reconciliation lost its lease")
+                self._append_event(intent_digest, "external_reconciliation",
+                                   at_ns=observed_at_ns)
+                self._db.execute("COMMIT")
+                return state
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                raise
+
+    def close(self) -> None:
+        with self._worker_condition:
+            if self._closed:
+                return
+            self._closing = True
+            while self._active_workers:
+                self._worker_condition.wait(timeout=0.1)
+            self._db.close()
+            self._closed = True
+
+    def __enter__(self) -> "JeevesIdleWorkExecutor":
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
+
+
+__all__ = [
+    "IdleRuntimeError", "IdleWorkPreempted", "IdleWorkBudget", "IdleWorkCheckpoint", "IdleExecutionState",
+    "HostIdleWorkReceipt", "JeevesIdleWorkExecutor",
+]

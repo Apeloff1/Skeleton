@@ -1,0 +1,56 @@
+"""
+╔══════════════════════════════════════════════════════════════════════════╗
+║  ROSETTA WAVE 15 — HYPERSCALE EXPANSION                                  ║
+║  metadata_attributes | tail_call_optimization | module_exports |        ║
+║  multithreading_primitives                                               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+"""
+
+EXPANDED_V15 = {}
+
+EXPANDED_V15["metadata_attributes"] = {
+    "C#": "// Attributes\n[Serializable]\n[Obsolete(\"Use NewMethod instead.\")]\npublic class MyClass {\n    [JsonProperty(\"user_id\")]\n    public int Id { get; set; }\n}\n\n// Reflection to read attributes\nvar attrs = typeof(MyClass).GetCustomAttributes(false);",
+    "Java": "// Annotations\n@Deprecated(since = \"2.0\")\n@SuppressWarnings(\"unchecked\")\npublic class MyClass {\n    @Override\n    public String toString() { return \"MyClass\"; }\n}\n\n// Custom annotation\n@Retention(RetentionPolicy.RUNTIME)\n@Target(ElementType.METHOD)\npublic @interface MyAnnotation {\n    String value() default \"\";\n}",
+    "Python": "# Decorators function similarly to metadata annotations\nimport functools\n\ndef deprecated(func):\n    @functools.wraps(func)\n    def wrapper(*args, **kwargs):\n        print(f\"Warning: {func.__name__} is deprecated\")\n        return func(*args, **kwargs)\n    return wrapper\n\n@deprecated\ndef old_function():\n    pass\n\n# Python 3.9+ typing.Annotated for type metadata\nfrom typing import Annotated\nUserId = Annotated[int, \"primary_key\"]",
+    "Rust": "// Attributes applied to items\n#[derive(Debug, Clone)]\n#[allow(dead_code)]\n#[cfg(target_os = \"linux\")]\nstruct MyStruct {\n    #[serde(rename = \"user_id\")]\n    id: i32,\n}\n\n// Inner attributes apply to the enclosing item\n#![warn(missing_docs)]",
+    "TypeScript": "// Decorators (Requires experimentalDecorators compiler option)\nfunction deprecated(target: any, propertyKey: string, descriptor: PropertyDescriptor) {\n  console.log(`${propertyKey} is deprecated`);\n}\n\nclass MyClass {\n  @deprecated\n  oldMethod() {}\n}\n\n// Metadata reflection API\nimport 'reflect-metadata';\nReflect.defineMetadata('role', 'admin', MyClass);",
+    "Go": "// Struct tags (used heavily for JSON/XML/DB mapping)\ntype User struct {\n    Id        int    `json:\"user_id\" db:\"primary_key\"`\n    FirstName string `json:\"first_name\" binding:\"required\"`\n    Password  string `json:\"-\"` // Ignored by JSON\n}\n\n// Reflection to read tags\nt := reflect.TypeOf(User{})\nfield, _ := t.FieldByName(\"Id\")\nfmt.Println(field.Tag.Get(\"json\")) // \"user_id\"",
+    "PHP": "// PHP 8.0+ Attributes\n#[Attribute]\nclass Route {\n    public function __construct(public string $path) {}\n}\n\n#[Route(\"/api/users\")]\nclass UserController {\n    #[Deprecated]\n    public function oldMethod() {}\n}\n\n// Reflection\n$ref = new ReflectionClass(UserController::class);\n$attrs = $ref->getAttributes(Route::class);",
+    "C++": "// C++11 Attributes\n[[deprecated(\"Use new_func() instead\")]]\nvoid old_func() {}\n\n[[nodiscard]]\nint get_value() { return 42; }\n\n// C++17 and C++20 additions\n[[maybe_unused]] int x = 5;\n[[noreturn]] void fatal_error() { throw 1; }",
+    "Swift": "// Attributes start with @\n@available(*, deprecated, message: \"Use newFunction()\")\nfunc oldFunction() {}\n\n@objc // Expose to Objective-C\nclass MyClass: NSObject {}\n\n// Property Wrappers (Swift 5.1)\n@propertyWrapper\nstruct Capitalized {\n    var wrappedValue: String {\n        didSet { wrappedValue = wrappedValue.uppercased() }\n    }\n}"
+}
+
+EXPANDED_V15["tail_call_optimization"] = {
+    "Scheme": ";; Scheme strictly guarantees TCO (Proper Tail Recursion)\n(define (factorial n acc)\n  (if (= n 0)\n      acc\n      (factorial (- n 1) (* n acc))))\n\n(display (factorial 10000 1)) ;; Won't overflow stack",
+    "Elixir": "# Erlang/Elixir guarantees TCO\ndefmodule Math do\n  def factorial(n, acc \\\\ 1)\n  def factorial(0, acc), do: acc\n  def factorial(n, acc), do: factorial(n - 1, n * acc) # Tail call\nend\n\nMath.factorial(10000)",
+    "Haskell": "-- Haskell relies on lazy evaluation and guarded recursion\n-- TCO is somewhat implicit but tail-recursive functions with strict accumulators are used\nfactorial :: Integer -> Integer -> Integer\nfactorial 0 acc = acc\nfactorial n acc = factorial (n - 1) $! (n * acc) -- Strict application\n\nmain = print (factorial 10000 1)",
+    "Scala": "// Scala runs on JVM (no native TCO), but compiler optimizes self-tail-calls\n// @tailrec enforces compile-time verification\nimport scala.annotation.tailrec\n\n@tailrec\ndef factorial(n: BigInt, acc: BigInt = 1): BigInt = {\n  if (n == 0) acc\n  else factorial(n - 1, n * acc)\n}\n\nprintln(factorial(10000))",
+    "C++": "// Compilers (GCC/Clang/MSVC) optimize tail calls with -O2 or -O3\n// No language guarantee, purely an optimization pass\nunsigned long long factorial(unsigned int n, unsigned long long acc = 1) {\n    if (n == 0) return acc;\n    return factorial(n - 1, n * acc); // Optimized to a loop in assembly\n}",
+    "JavaScript": "// ES6 specified Proper Tail Calls (PTC) in strict mode.\n// Currently, ONLY Safari (WebKit) implements it. V8/V8/SpiderMonkey dropped it.\n\"use strict\";\nfunction factorial(n, acc = 1) {\n  if (n === 0) return acc;\n  return factorial(n - 1, n * acc); // Might throw Maximum call stack size exceeded\n}",
+    "Python": "# Python intentionally does NOT implement TCO.\n# Guido van Rossum preferred explicit loops and stack trace readability.\n# Workaround: Trampoline pattern or loops.\ndef factorial(n):\n    acc = 1\n    for i in range(1, n + 1):\n        acc *= i\n    return acc",
+    "Rust": "// Rust does NOT guarantee TCO currently.\n// LLVM often optimizes tail calls in release mode, but you shouldn't rely on it.\n// Better to use loops.\nfn factorial(mut n: u64, mut acc: u64) -> u64 {\n    while n > 0 {\n        acc *= n;\n        n -= 1;\n    }\n    acc\n}",
+    "Kotlin": "// Kotlin on JVM has `tailrec` keyword (like Scala)\ntailrec fun factorial(n: Long, acc: Long = 1): Long {\n    if (n == 0L) return acc\n    return factorial(n - 1, n * acc)\n}"
+}
+
+EXPANDED_V15["module_exports"] = {
+    "JavaScript": "// ES Modules (ESM)\nexport const PI = 3.14;\nexport function add(a, b) { return a + b; }\nexport default class User {} // Default export\n\n// CommonJS (Node.js legacy)\n// const PI = 3.14;\n// module.exports = { PI, add };",
+    "Python": "# Everything in a file is accessible if imported\nPI = 3.14\ndef add(a, b): return a + b\n\n# Restrict wildcard imports (from module import *)\n__all__ = ['add'] # PI will not be imported by wildcard",
+    "Go": "// Exported names MUST start with a Capital letter\npackage mathlib\n\nconst PI = 3.14       // Exported\nconst secret = 42     // Not exported\n\nfunc Add(a, b int) int { return a + b } // Exported\nfunc helper() {}                        // Not exported",
+    "Rust": "// Use 'pub' to export items\npub const PI: f64 = 3.14;\n\npub fn add(a: i32, b: i32) -> i32 { a + b }\n\n// Structs and their fields\npub struct User {\n    pub id: i32,\n    name: String, // Private field\n}\n\n// Re-exporting\n// pub use crate::internal::Helper;",
+    "C#": "// Access modifiers control visibility\npublic class MathLib { // Accessible anywhere\n    public const double PI = 3.14;\n    internal static int helper() => 42; // Accessible only within the same assembly (.dll)\n    private int secret = 1;             // Accessible only within class\n}",
+    "Java": "// Access modifiers\npublic class MathLib { // Accessible to all packages\n    public static final double PI = 3.14;\n    static int helper() { return 42; } // Package-private (default)\n    private int secret = 1;\n}\n\n// Java 9+ Modules (module-info.java)\n// module com.example.math {\n//     exports com.example.math.api;\n// }",
+    "Ruby": "# Modules and classes are globally accessible once required\nmodule MathLib\n  PI = 3.14\n  \n  def self.add(a, b)\n    a + b\n  end\n  \n  # Make methods private\n  private_class_method def self.helper\n    42\n  end\nend",
+    "PHP": "// PHP uses namespaces for organization, not strict access control between files\nnamespace App\\Math;\n\nclass MathLib {\n    public const PI = 3.14;\n    public static function add($a, $b) { return $a + $b; }\n    private static function helper() { return 42; }\n}",
+    "Elixir": "# Modules are global. Def vs Defp\ndefmodule MathLib do\n  @pi 3.14\n  \n  def add(a, b), do: a + b\n  \n  # Private function, only accessible within MathLib\n  defp helper(), do: 42\nend"
+}
+
+EXPANDED_V15["multithreading_primitives"] = {
+    "C++": "#include <thread>\n#include <mutex>\n#include <condition_variable>\n\nstd::mutex mtx;\nstd::condition_variable cv;\nint data = 0;\n\nvoid worker() {\n    std::unique_lock<std::mutex> lock(mtx);\n    data = 42;\n    cv.notify_one();\n}\n\nint main() {\n    std::thread t(worker);\n    std::unique_lock<std::mutex> lock(mtx);\n    cv.wait(lock, []{ return data == 42; });\n    t.join();\n}",
+    "Rust": "use std::sync::{Arc, Mutex, Condvar};\nuse std::thread;\n\nlet pair = Arc::new((Mutex::new(0), Condvar::new()));\nlet pair2 = Arc::clone(&pair);\n\nthread::spawn(move || {\n    let (lock, cvar) = &*pair2;\n    let mut data = lock.lock().unwrap();\n    *data = 42;\n    cvar.notify_one();\n});\n\nlet (lock, cvar) = &*pair;\nlet mut data = lock.lock().unwrap();\nwhile *data != 42 {\n    data = cvar.wait(data).unwrap();\n}",
+    "Java": "Object lock = new Object();\nint[] data = {0};\n\nThread t = new Thread(() -> {\n    synchronized (lock) {\n        data[0] = 42;\n        lock.notify();\n    }\n});\nt.start();\n\nsynchronized (lock) {\n    while (data[0] != 42) {\n        lock.wait();\n    }\n}\n// Java also has java.util.concurrent (ReentrantLock, CountDownLatch, etc.)",
+    "C#": "object lockObj = new object();\nint data = 0;\n\nThread t = new Thread(() => {\n    lock (lockObj) {\n        data = 42;\n        Monitor.Pulse(lockObj);\n    }\n});\nt.Start();\n\nlock (lockObj) {\n    while (data != 42) {\n        Monitor.Wait(lockObj);\n    }\n}",
+    "Python": "import threading\n\ncond = threading.Condition()\ndata = 0\n\ndef worker():\n    global data\n    with cond:\n        data = 42\n        cond.notify()\n\nt = threading.Thread(target=worker)\nt.start()\n\nwith cond:\n    cond.wait_for(lambda: data == 42)",
+    "Go": "// Go prefers channels, but has sync primitives\nimport \"sync\"\n\nvar mu sync.Mutex\nvar cond = sync.NewCond(&mu)\nvar data int\n\ngo func() {\n    mu.Lock()\n    data = 42\n    cond.Signal()\n    mu.Unlock()\n}()\n\nmu.Lock()\nfor data != 42 {\n    cond.Wait()\n}\nmu.Unlock()",
+    "Ruby": "require 'thread'\n\nmutex = Mutex.new\ncv = ConditionVariable.new\ndata = 0\n\nThread.new do\n  mutex.synchronize do\n    data = 42\n    cv.signal\n  end\nend\n\nmutex.synchronize do\n  cv.wait(mutex) while data != 42\nend",
+    "Swift": "// Grand Central Dispatch (GCD) and Actor model\nlet queue = DispatchQueue(label: \"worker\")\nlet group = DispatchGroup()\nvar data = 0\n\ngroup.enter()\nqueue.async {\n    data = 42\n    group.leave()\n}\n\ngroup.wait() // Wait for completion\n\n// Swift 5.5+ Actor Model\nactor DataStore {\n    var data = 0\n    func update() { data = 42 }\n}"
+}

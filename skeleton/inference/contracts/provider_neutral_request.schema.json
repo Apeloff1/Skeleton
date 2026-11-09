@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-01:provider_neutral_request:v1",
+  "title": "FLGB-01 Provider-Neutral Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "envelope_digest",
+    "provider",
+    "model",
+    "conversation_digest",
+    "input_digest",
+    "temperature_milli",
+    "metadata"
+  ],
+  "properties": {
+    "envelope_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "conversation_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "input_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "temperature_milli": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2000
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+[package]
+name = "gf-gameforge"
+version = "0.3.0"
+edition = "2021"
+
+[dependencies]
+gf-core = { path = "../gf-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tokio = { version = "1", features = ["full"] }
+mongodb = "3"
+sha2 = "0.10"
+hex = "0.4"

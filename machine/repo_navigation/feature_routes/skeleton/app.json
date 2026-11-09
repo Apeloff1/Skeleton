@@ -1,0 +1,1 @@
+{"features":[{"file_shards":["skeleton/app"],"files":31,"name":"skeleton/app","zones":{"application":31}},{"file_shards":["skeleton/app"],"files":51,"name":"skeleton/app/runtime","zones":{"application":51}}],"schema":"skeleton.repository-navigation.v1"}

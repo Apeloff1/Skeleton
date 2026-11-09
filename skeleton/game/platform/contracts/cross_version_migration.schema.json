@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-15:cross_version_migration:v1",
+  "title": "FLGB-15 cross version migration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "migration_id",
+    "from_version",
+    "to_version",
+    "transform_digest",
+    "rollback_digest"
+  ],
+  "properties": {
+    "migration_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "from_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "to_version": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "transform_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rollback_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

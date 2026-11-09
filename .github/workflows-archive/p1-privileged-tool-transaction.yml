@@ -1,0 +1,328 @@
+# Evidence refresh trigger: VOL-015 current-main implementation verification.
+name: P1 Privileged Tool Transaction Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/skills/privileged_transaction.py"
+      - "skeleton/ai/runtime/skills/privileged_transaction.py"
+      - "skeleton/skills/__init__.py"
+      - "skeleton/ai/runtime/skills/__init__.py"
+      - "skeleton/skills/tool_contract.py"
+      - "skeleton/skills/tool_runtime.py"
+      - "skeleton/skills/tool_saga.py"
+      - "skeleton/ai/runtime/skills/tool_saga.py"
+      - "skeleton/skills/tool_receipt_store.py"
+      - "skeleton/shells/isolation.py"
+      - "skeleton/testing/test_privileged_tool_transaction.py"
+      - "skeleton/testing/test_tool_runtime.py"
+      - "skeleton/testing/test_tool_saga.py"
+      - "skeleton/testing/test_tool_receipt_store.py"
+      - "skeleton/testing/test_shell_ai_isolation_sandbox.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/p1_required_gate_authority.json"
+      - "machine/ai_master_plan.json"
+      - ".github/workflows/p1-privileged-tool-transaction.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/skills/privileged_transaction.py"
+      - "skeleton/ai/runtime/skills/privileged_transaction.py"
+      - "skeleton/skills/__init__.py"
+      - "skeleton/ai/runtime/skills/__init__.py"
+      - "skeleton/skills/tool_contract.py"
+      - "skeleton/skills/tool_runtime.py"
+      - "skeleton/skills/tool_saga.py"
+      - "skeleton/ai/runtime/skills/tool_saga.py"
+      - "skeleton/skills/tool_receipt_store.py"
+      - "skeleton/shells/isolation.py"
+      - "skeleton/testing/test_privileged_tool_transaction.py"
+      - "skeleton/testing/test_tool_runtime.py"
+      - "skeleton/testing/test_tool_saga.py"
+      - "skeleton/testing/test_tool_receipt_store.py"
+      - "skeleton/testing/test_shell_ai_isolation_sandbox.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/p1_required_gate_authority.json"
+      - "machine/ai_master_plan.json"
+      - ".github/workflows/p1-privileged-tool-transaction.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-privileged-tool-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate privileged tool transaction
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pytest-asyncio>=0.24,<2"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Run privileged transaction regressions
+        run: >-
+          python -m pytest -q --noconftest
+          -p pytest_asyncio.plugin
+          skeleton/testing/test_privileged_tool_transaction.py
+          skeleton/testing/test_tool_runtime.py
+          skeleton/testing/test_tool_saga.py
+          skeleton/testing/test_tool_receipt_store.py
+          skeleton/testing/test_shell_ai_isolation_sandbox.py
+
+      - name: Validate P1 task and terminal gate authority
+        run: |
+          python scripts/check_ai_p1_execution_map.py --print-summary
+          python scripts/check_p1_required_gate_authority.py --print-summary
+
+      - name: Build canonical AUTO-01 decision
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-auto-01
+          python - <<'PY'
+          import json
+          from dataclasses import replace
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from uuid import UUID
+
+          from skeleton.shells.isolation import (
+              IsolationLevel,
+              IsolationObservation,
+              IsolationRequirement,
+          )
+          from skeleton.skills.privileged_transaction import (
+              qualify_privileged_tool_transaction,
+          )
+          from skeleton.skills.tool_contract import (
+              ToolApprovalPolicy,
+              ToolAuthorityClass,
+              ToolEffect,
+              ToolExecutionRequest,
+              ToolExecutionReceipt,
+              ToolExecutionStatus,
+              ToolIdempotencyMode,
+              ToolManifest,
+              ToolRiskClass,
+              ToolSideEffectClass,
+              approval_ref_for_request,
+          )
+
+          def uid(value):
+              return str(UUID(int=value))
+
+          now = datetime.now(timezone.utc)
+          manifest = ToolManifest(
+              tool_id="repo.write",
+              version="1.0.0",
+              description="bounded repository write qualification fixture",
+              input_schema={
+                  "type": "object",
+                  "properties": {"path": {"type": "string", "minLength": 1}},
+                  "required": ["path"],
+                  "additionalProperties": False,
+              },
+              authority_class=ToolAuthorityClass.PRIVILEGED,
+              risk_class=ToolRiskClass.HIGH,
+              side_effect_class=ToolSideEffectClass.LOCAL_REVERSIBLE,
+              idempotency_mode=ToolIdempotencyMode.IDEMPOTENCY_KEY,
+              approval_policy=ToolApprovalPolicy.ALWAYS,
+              network_policy="none",
+              data_policy="internal",
+              effect=ToolEffect.REVERSIBLE,
+              approval_required=True,
+          )
+          base = ToolExecutionRequest(
+              request_id=uid(1),
+              operation_id=uid(2),
+              execution_id="exec-ci",
+              turn_id="turn-ci",
+              call_id="call-ci",
+              tenant_id="ci",
+              tool_id=manifest.tool_id,
+              idempotency_key="ci-idempotency-key",
+              arguments={"path": "docs/ci-proof.txt"},
+              requested_at=now,
+          )
+          request = replace(base, approval_ref=approval_ref_for_request(base))
+          receipt = ToolExecutionReceipt(
+              receipt_id=uid(3),
+              request_id=request.request_id,
+              operation_id=request.operation_id,
+              execution_id=request.execution_id,
+              turn_id=request.turn_id,
+              call_id=request.call_id,
+              tenant_id=request.tenant_id,
+              tool_id=request.tool_id,
+              idempotency_key=request.idempotency_key,
+              arguments_digest=request.arguments_digest,
+              status=ToolExecutionStatus.SUCCEEDED,
+              started_at=now,
+              finished_at=now,
+              result_ref="artifact://ci-proof",
+              approval_ref=request.approval_ref,
+              governance_decision_ref="governance:ci:allow",
+              postcondition_verified=True,
+              metered_tool_calls=1,
+          )
+          requirement = IsolationRequirement(
+              level=IsolationLevel.SANDBOXED,
+              require_private_tmp=True,
+              require_clean_environment=True,
+              require_readonly_source=True,
+              allow_network=False,
+              allow_home=False,
+              allowed_write_roots=("/tmp/skeleton-auto-01",),
+          )
+          observation = IsolationObservation(
+              private_tmp=True,
+              clean_environment=True,
+              readonly_source=True,
+              network_enabled=False,
+              home_visible=False,
+              write_roots=("/tmp/skeleton-auto-01",),
+          )
+          decision = qualify_privileged_tool_transaction(
+              manifest=manifest,
+              request=request,
+              receipt=receipt,
+              isolation_requirement=requirement,
+              isolation_observation=observation,
+              receipt_persisted=True,
+          )
+          if not decision.accepted:
+              raise SystemExit(f"AUTO-01 fixture rejected: {decision.reasons}")
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-auto-01/decision.json").write_text(
+              json.dumps(
+                  {
+                      **decision.payload(),
+                      "decision_digest": decision.decision_digest,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-auto-01/refs.json").write_text(
+              json.dumps(
+                  [
+                      {
+                          "source": evidence.source,
+                          "digest": evidence.digest,
+                          "category": evidence.category,
+                      }
+                  ],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head AUTO-01 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-auto-01/config.digest").write_text(
+              digest(
+                  [
+                      "machine/ai_p1_task_backlog.json",
+                      "machine/p1_required_gate_authority.json",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-auto-01/environment.digest").write_text(
+              hashlib.sha256(b"ubuntu-24.04|python-3.11.16|auto-01").hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-auto-01/verifier.digest").write_text(
+              digest(
+                  [
+                      "skeleton/skills/privileged_transaction.py",
+                      "skeleton/skills/tool_saga.py",
+                      "skeleton/ai/runtime/skills/tool_saga.py",
+                      ".github/workflows/p1-privileged-tool-transaction.yml",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-auto-01/tests.digest").write_text(
+              digest(
+                  [
+                      "skeleton/testing/test_privileged_tool_transaction.py",
+                      "skeleton/testing/test_tool_runtime.py",
+                      "skeleton/testing/test_tool_saga.py",
+                      "skeleton/testing/test_tool_receipt_store.py",
+                      "skeleton/testing/test_shell_ai_isolation_sandbox.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          PY
+          python scripts/emit_p1_promotion_evidence.py             --repository Apeloff1/Skeleton             --commit-sha "$EXPECTED_SHA"             --expected-head "$EXPECTED_SHA"             --task-id P1-AUTO-01             --accountability-id ACC-P1-AUTO-01             --configuration-digest "$(cat .p1-auto-01/config.digest)"             --environment-digest "$(cat .p1-auto-01/environment.digest)"             --verifier-id github-actions:p1-privileged-tool-transaction             --verifier-digest "$(cat .p1-auto-01/verifier.digest)"             --test-manifest-digest "$(cat .p1-auto-01/tests.digest)"             --run-id "$RUN_IDENTITY"             --run-attempt "$RUN_ATTEMPT"             --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"             --evidence-file .p1-auto-01/refs.json             --out .p1-auto-01/receipt.json             > .p1-auto-01/stdout.json
+
+      - name: Assert exact-head receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-auto-01/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("AUTO-01 receipt head mismatch")
+          if receipt["task_id"] != "P1-AUTO-01":
+              raise SystemExit("AUTO-01 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-AUTO-01":
+              raise SystemExit("AUTO-01 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("AUTO-01 exact-head receipt OK", receipt["receipt_digest"])
+          PY

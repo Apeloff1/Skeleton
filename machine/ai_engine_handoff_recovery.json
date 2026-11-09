@@ -1,0 +1,20 @@
+{
+  "schema_version": "skeleton.ai.engine_handoff_recovery.v1",
+  "status": "implementation_candidate",
+  "canonical_owner": "skeleton/api/engine_routes.py",
+  "authority": "existing EngineExecutionService read authorization, SQLiteEngineSubmissionStore accepted command and SQLiteExecutionRepository canonical execution",
+  "consumer": "backend/core/engine_client.py:EngineClient.handoff_binding",
+  "interface": {
+    "method": "GET",
+    "path": "/api/v1/engine/executions/{execution_id}/handoff",
+    "query": "required actor_id and tenant_id, each 1..512 characters",
+    "authorization": "sealed service token, verified service principal matching the durable submission, existing server-side engine:read grant allowing original tenant and capability, exact original actor and tenant",
+    "response": "bounded non-content identity projection of the original durable accepted compiled context: operation/execution/turn, actor/tenant, context and handoff digests, compiler, source snapshot, data class, purpose, capability, idempotency key and trace",
+    "integrity": "revalidate accepted command constructors, original acknowledgement identity and idempotency digest, full canonical execution request identity and any existing checkpoint context/tenant identity before returning",
+    "historical_read": "expired execution delegation permits authorized historical reads under the current server-side service grant, consistent with existing status and events",
+    "failure": "401 invalid token/principal header; 403 principal/grant/actor/tenant denial; 404 unknown execution; 422 malformed query or corrupt durable identity",
+    "bounds": "one accepted submission, one canonical execution and latest checkpoint; no context compilation, model dispatch, credentials, instructions, prompts, history, tool schemas or authority mutation"
+  },
+  "acceptance": ["skeleton/testing/test_engine_handoff_recovery.py", "skeleton/testing/test_engine_cross_service_boundary.py"],
+  "scope_limitations": ["read-only candidate interface in existing engine-api plane", "does not alter signed gap closure evidence or authorize production model promotion"]
+}

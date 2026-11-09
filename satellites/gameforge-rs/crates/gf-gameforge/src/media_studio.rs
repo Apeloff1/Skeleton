@@ -1,0 +1,10 @@
+use chrono::{DateTime,Utc};use serde::{Deserialize,Serialize};use std::collections::HashMap;use tokio::sync::RwLock;use uuid::Uuid;use crate::saga::SagaRegistry;
+#[derive(Debug,Clone,Copy,PartialEq,Eq,Serialize,Deserialize)]pub enum JobStatus{Staged,Running,Done,Failed,Compensated}
+#[derive(Debug,Clone,Serialize,Deserialize)]pub struct StudioJob{pub id:String,pub asset:String,pub pipeline:Vec<String>,pub saga_id:String,pub status:JobStatus,pub created:DateTime<Utc>,pub output:Option<String>}
+pub struct Studio{jobs:RwLock<HashMap<String,StudioJob>>}impl Default for Studio{fn default()->Self{Self::new()}}
+impl Studio{pub fn new()->Self{Self{jobs:RwLock::new(HashMap::new())}}
+ pub async fn submit(&self,sagas:&SagaRegistry,asset:&str,pipeline:Vec<&str>)->StudioJob{let saga_id=sagas.begin(&format!("studio:{asset}"),pipeline.clone()).await;let j=StudioJob{id:Uuid::new_v4().to_string(),asset:asset.to_string(),pipeline:pipeline.into_iter().map(|s|s.to_string()).collect(),saga_id,status:JobStatus::Staged,created:Utc::now(),output:None};self.jobs.write().await.insert(j.id.clone(),j.clone());j}
+ pub async fn advance(&self,sagas:&SagaRegistry,id:&str)->Option<StudioJob>{let finished=sagas.complete_step(self.jobs.read().await.get(id)?.saga_id.as_str()).await?;let mut js=self.jobs.write().await;let j=js.get_mut(id)?;j.status=if finished{JobStatus::Done}else{JobStatus::Running};Some(j.clone())}
+ pub async fn fail(&self,sagas:&SagaRegistry,id:&str)->Option<StudioJob>{let sid=self.jobs.read().await.get(id)?.saga_id.clone();sagas.fail(&sid).await?;let mut js=self.jobs.write().await;let j=js.get_mut(id)?;j.status=JobStatus::Compensated;Some(j.clone())}
+ pub async fn publish(&self,id:&str,out:&str)->Option<StudioJob>{let mut js=self.jobs.write().await;let j=js.get_mut(id)?;if j.status!=JobStatus::Done{return None}j.output=Some(out.to_string());Some(j.clone())}
+ pub async fn get(&self,id:&str)->Option<StudioJob>{self.jobs.read().await.get(id).cloned()}pub async fn list(&self)->Vec<StudioJob>{self.jobs.read().await.values().cloned().collect()}}

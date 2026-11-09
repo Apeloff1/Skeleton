@@ -1,0 +1,1 @@
+{"features":[{"file_shards":["skeleton/forge"],"files":32,"name":"skeleton/forge","zones":{"build-delivery":32}},{"file_shards":["skeleton/forge"],"files":9,"name":"skeleton/forge/creator","zones":{"build-delivery":9}},{"file_shards":["skeleton/forge"],"files":19,"name":"skeleton/forge/pipelines","zones":{"build-delivery":19}}],"schema":"skeleton.repository-navigation.v1"}

@@ -1,0 +1,1138 @@
+{
+  "schema": "skeleton.dragon.acquisition_topics.v1",
+  "checked_at": "2026-10-12T00:14:15Z",
+  "source_range": {
+    "start_inclusive": 672,
+    "end_exclusive": 704
+  },
+  "authority": "acquisition_side_unreviewed_only",
+  "topics": [
+    {
+      "topic_id": "acquisition-topic-3b640b1e54fee752ff3e15fc42310f39a8ac86b92ef93af98d49220008021447",
+      "catalog_id": "catalog-0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "knowledge_header": "Legend",
+      "header_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Legend"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-25724a271042f51cac77ddf539088ac6e5c76eec65e8df5140863ddfadc91d5b",
+          "source_offset": 675,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view3"
+        },
+        {
+          "source_id": "source-26902d762375338d7fd1b48f6d6200e5fd6746c198ef13de0eea95bc8a10d9c5",
+          "source_offset": 696,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view0"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-0a6c063ca26071da26bbebb83dcf97c1cbffff1b7b9f26051982cbe0cccc8ce3",
+      "catalog_id": "catalog-0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "knowledge_header": "C",
+      "header_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "C"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-2571553ddb110cecdefdeb21f8782dd0ffca76e8c3bd8be75b72d500f956f2e3",
+          "source_offset": 674,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view2"
+        },
+        {
+          "source_id": "source-26ec44897b631be23980e20bc29e4d6c3c1afb0975ff8ce6b1bb44138466e51f",
+          "source_offset": 702,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view6"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-b496fe7f180465ce417e0f216322e6898f2c61e0fcee19d2a2b1cefdd44874eb",
+      "catalog_id": "catalog-0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "knowledge_header": "C++",
+      "header_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "C++"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-25a7dde36b1c013bc4338bc529750a2eee8bf90460f4d177d8f0e08fb06a0ca0",
+          "source_offset": 679,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view7"
+        },
+        {
+          "source_id": "source-25fb3393f5be6d0d75f40f20d1ef2391d49b6859ac37eb12985a0dff7ae3f33a",
+          "source_offset": 685,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view5"
+        },
+        {
+          "source_id": "source-2674bd39144f29050457fd0b0fa1171c2d1ae5a8fd8e36db0a82588c866168a5",
+          "source_offset": 694,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view6"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-980e9fa005b6e4705626c01bb88f8b988271738f2de89b8bbb3c05db2328da7f",
+      "catalog_id": "catalog-0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "knowledge_header": "JavaScript",
+      "header_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "JavaScript"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-25dec028287078b3c4279d42d52f1eff6f59ab0a7563970306c71af10555f4e1",
+          "source_offset": 683,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view3"
+        },
+        {
+          "source_id": "source-266bb1bb6434468a1c2a9cea1e06842148b9ead4f79507d0f0bb2926a96f848e",
+          "source_offset": 693,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view5"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-10fa89db4d14d1565d15a6e583e422f276998f0dfc1bc488c984b246a92971b4",
+      "catalog_id": "catalog-0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "knowledge_header": "Python",
+      "header_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "Python"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-264c7a9859e6cd05b1e3eecc465267ca4f7bbaf39717f5bf688deb4c25108626",
+          "source_offset": 688,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view0"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-b9c3513a56144e7d01dec818911cf879db43bd54088446c4cf3ab7d5206f6679",
+      "catalog_id": "catalog-0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "knowledge_header": "Libraries",
+      "header_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-2571553ddb110cecdefdeb21f8782dd0ffca76e8c3bd8be75b72d500f956f2e3",
+          "source_offset": 674,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view2"
+        },
+        {
+          "source_id": "source-25a7dde36b1c013bc4338bc529750a2eee8bf90460f4d177d8f0e08fb06a0ca0",
+          "source_offset": 679,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view7"
+        },
+        {
+          "source_id": "source-25dec028287078b3c4279d42d52f1eff6f59ab0a7563970306c71af10555f4e1",
+          "source_offset": 683,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view3"
+        },
+        {
+          "source_id": "source-25fb3393f5be6d0d75f40f20d1ef2391d49b6859ac37eb12985a0dff7ae3f33a",
+          "source_offset": 685,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view5"
+        },
+        {
+          "source_id": "source-264c7a9859e6cd05b1e3eecc465267ca4f7bbaf39717f5bf688deb4c25108626",
+          "source_offset": 688,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view0"
+        },
+        {
+          "source_id": "source-266bb1bb6434468a1c2a9cea1e06842148b9ead4f79507d0f0bb2926a96f848e",
+          "source_offset": 693,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view5"
+        },
+        {
+          "source_id": "source-2674bd39144f29050457fd0b0fa1171c2d1ae5a8fd8e36db0a82588c866168a5",
+          "source_offset": 694,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view6"
+        },
+        {
+          "source_id": "source-26ec44897b631be23980e20bc29e4d6c3c1afb0975ff8ce6b1bb44138466e51f",
+          "source_offset": 702,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view6"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-c620b98c429e4aa37775cb784b735350baaaaa0e2a55c56a33badd10cabe6942",
+      "catalog_id": "catalog-0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "knowledge_header": "Enemies / Pathfinding",
+      "header_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Specialty Topics",
+        "Enemies / Pathfinding"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-25dc0d0cf0613abda67f7d26e381f02f89dfa09c4d75c8c359b032938f00949f",
+          "source_offset": 682,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view2"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-253e4b61da96bbdd711fe81b39155ef40fa36ad17f08673f0f46af7c32e1c05f",
+      "catalog_id": "catalog-0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "knowledge_header": "Shaders",
+      "header_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Specialty Topics",
+        "Shaders"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-269b80418e8e4e11fa55bff13962d67b22a0e06edc960852de333ba85d9006d1",
+          "source_offset": 698,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view2"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-ebdc2516cfcebcaed57f463a7caa9998833e7ae987150c2abf9b34871c1f4792",
+      "catalog_id": "catalog-0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "knowledge_header": "Specialty Topics",
+      "header_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Specialty Topics"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-25dc0d0cf0613abda67f7d26e381f02f89dfa09c4d75c8c359b032938f00949f",
+          "source_offset": 682,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view2"
+        },
+        {
+          "source_id": "source-269b80418e8e4e11fa55bff13962d67b22a0e06edc960852de333ba85d9006d1",
+          "source_offset": 698,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view2"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-8634879ec8aca920679bef7e61ecb2c430a2f12c46dbd3628b11c1497eeeb62f",
+      "catalog_id": "catalog-0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "knowledge_header": "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+      "header_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-2571553ddb110cecdefdeb21f8782dd0ffca76e8c3bd8be75b72d500f956f2e3",
+          "source_offset": 674,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view2"
+        },
+        {
+          "source_id": "source-25724a271042f51cac77ddf539088ac6e5c76eec65e8df5140863ddfadc91d5b",
+          "source_offset": 675,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view3"
+        },
+        {
+          "source_id": "source-25a7dde36b1c013bc4338bc529750a2eee8bf90460f4d177d8f0e08fb06a0ca0",
+          "source_offset": 679,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view7"
+        },
+        {
+          "source_id": "source-25dc0d0cf0613abda67f7d26e381f02f89dfa09c4d75c8c359b032938f00949f",
+          "source_offset": 682,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view2"
+        },
+        {
+          "source_id": "source-25dec028287078b3c4279d42d52f1eff6f59ab0a7563970306c71af10555f4e1",
+          "source_offset": 683,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view3"
+        },
+        {
+          "source_id": "source-25fb3393f5be6d0d75f40f20d1ef2391d49b6859ac37eb12985a0dff7ae3f33a",
+          "source_offset": 685,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view5"
+        },
+        {
+          "source_id": "source-264c7a9859e6cd05b1e3eecc465267ca4f7bbaf39717f5bf688deb4c25108626",
+          "source_offset": 688,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view0"
+        },
+        {
+          "source_id": "source-266bb1bb6434468a1c2a9cea1e06842148b9ead4f79507d0f0bb2926a96f848e",
+          "source_offset": 693,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view5"
+        },
+        {
+          "source_id": "source-2674bd39144f29050457fd0b0fa1171c2d1ae5a8fd8e36db0a82588c866168a5",
+          "source_offset": 694,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view6"
+        },
+        {
+          "source_id": "source-26902d762375338d7fd1b48f6d6200e5fd6746c198ef13de0eea95bc8a10d9c5",
+          "source_offset": 696,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view0"
+        },
+        {
+          "source_id": "source-269b80418e8e4e11fa55bff13962d67b22a0e06edc960852de333ba85d9006d1",
+          "source_offset": 698,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view2"
+        },
+        {
+          "source_id": "source-26ec44897b631be23980e20bc29e4d6c3c1afb0975ff8ce6b1bb44138466e51f",
+          "source_offset": 702,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view6"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-221b02b70b30b00440fd907f19c5d02560641d9c4c016cbf2654d126464429b9",
+      "catalog_id": "catalog-22d1ea9ee7692d8bde120a568c842730b57f08e0",
+      "knowledge_header": "**Art**",
+      "header_path": [
+        "**Art**"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-2639ea272a00125b19101cc4090c4da5fadaa3c6177da2fe9bd26b8c66af4db1",
+          "source_offset": 687,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view7"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-2c277d8d9d253c7e49b19533976d4c53efe435c708b9fb4034adb3eeac448f6f",
+      "catalog_id": "catalog-22d1ea9ee7692d8bde120a568c842730b57f08e0",
+      "knowledge_header": "**Design**",
+      "header_path": [
+        "**Design**"
+      ],
+      "source_evidence": [],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-265ad437bbc15112a93bd1aa2178967ce5bb89674ff403a819ae8f66ae1f53cc",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-58268c4c91991c42a3ef18846c62af791c9fe1f5d3b94790cc5bca0716254583",
+      "catalog_id": "catalog-22d1ea9ee7692d8bde120a568c842730b57f08e0",
+      "knowledge_header": "**Marketing**",
+      "header_path": [
+        "**Marketing**"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-2562e3e7e3fae8c8537e025c9ebe55cb5c1f3fb1a5d79a0ea1405c452859f62d",
+          "source_offset": 672,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view0"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-259d068da245a12ca26d59d61a009f923b1d50cfbf23ca1c35a7174c1972fc61",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        },
+        {
+          "source_id": "source-264ee279aacfb1a4cb206b5be5dc5eb1538e823a1bde20345dcf347cf8d79e37",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-16accde0bdc7579fd58514225b5db61bd70beeeb2b9bbfd5f9d78f4a72b19f5c",
+      "catalog_id": "catalog-22d1ea9ee7692d8bde120a568c842730b57f08e0",
+      "knowledge_header": "**Resources**",
+      "header_path": [
+        "**Resources**"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-26e883ff4c63b657fca2999d4c9a4445bdce9e43bbd7dc6e828f1f72bfa15e6f",
+          "source_offset": 701,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view5"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-66372bae33fe5acc6d8166e06d1638b804717d74170b2e1b39f1109026169380",
+      "catalog_id": "catalog-22d1ea9ee7692d8bde120a568c842730b57f08e0",
+      "knowledge_header": "**Unity**",
+      "header_path": [
+        "**Unity**"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-26856797342fd1937e51bcb27c730595d559cdb21fa48ec801b361492e899712",
+          "source_offset": 695,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view7"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-25d1b6ecdca9629606ee4d7c9d8701c9396c2e52d81766f982bc927db859ca9e",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        },
+        {
+          "source_id": "source-26856797342fd1937e51bcb27c730595d559cdb21fa48ec801b361492e899712",
+          "availability": "metadata_shell_returned",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-3edecadc8d89de1b9a19b4bcab9422f8c3c4b169e6ccea2dee7afda5a88ab605",
+      "catalog_id": "catalog-5e6cf21b765dbe1cfacfdd323ba10e49a6e4b0c8",
+      "knowledge_header": "Blogs and Portals",
+      "header_path": [
+        "Table of Contents",
+        "Blogs and Portals"
+      ],
+      "source_evidence": [],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-26633372feb08d518f34cae44e7cf4f652e2fcebb2d006498e10bbb918c794a1",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-74a336c194c5700cbbd52d5a0205fbbf3bd466651c05049adcbc330a235a037c",
+      "catalog_id": "catalog-5e6cf21b765dbe1cfacfdd323ba10e49a6e4b0c8",
+      "knowledge_header": "Books",
+      "header_path": [
+        "Table of Contents",
+        "Books"
+      ],
+      "source_evidence": [],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-258faccd082d733c48b4d4fbd9846b808ca137b02ed957e86e51508cbc9f09cc",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-f2d1597054e177386117544da67844889442b0c804e6df026ca39fe0e241859c",
+      "catalog_id": "catalog-5e6cf21b765dbe1cfacfdd323ba10e49a6e4b0c8",
+      "knowledge_header": "Engines and Frameworks",
+      "header_path": [
+        "Table of Contents",
+        "Engines and Frameworks"
+      ],
+      "source_evidence": [],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-25dbc0b4cb3b104efea56b3b72ba199d05e029fad8dba9c4fcf1e263871ff058",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-e9d759f2cb758af0f651aca61adce7912220b9c826ce1947335a26b22cf24108",
+      "catalog_id": "catalog-5e6cf21b765dbe1cfacfdd323ba10e49a6e4b0c8",
+      "knowledge_header": "Table of Contents",
+      "header_path": [
+        "Table of Contents"
+      ],
+      "source_evidence": [],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-258faccd082d733c48b4d4fbd9846b808ca137b02ed957e86e51508cbc9f09cc",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        },
+        {
+          "source_id": "source-25dbc0b4cb3b104efea56b3b72ba199d05e029fad8dba9c4fcf1e263871ff058",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        },
+        {
+          "source_id": "source-26633372feb08d518f34cae44e7cf4f652e2fcebb2d006498e10bbb918c794a1",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-c01830191d01a7865c2985bc5818436d3cdb77d5c94529713ee5a14ad377b610",
+      "catalog_id": "catalog-6c1dd472d6c789fcf8cfc0d721f7538c2ead1158",
+      "knowledge_header": "Others",
+      "header_path": [
+        "Browser-Based",
+        "Others"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-2698dd01b453bf1cdcf16e463a3482d6e85e4f464b80c7b6208067a5ca4d2d50",
+          "source_offset": 697,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view1"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-43129d4a3ef037a24578bdca2789bae36884a75b8ad02c8ad9b7b196690cafa7",
+      "catalog_id": "catalog-6c1dd472d6c789fcf8cfc0d721f7538c2ead1158",
+      "knowledge_header": "Browser-Based",
+      "header_path": [
+        "Browser-Based"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-2698dd01b453bf1cdcf16e463a3482d6e85e4f464b80c7b6208067a5ca4d2d50",
+          "source_offset": 697,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view1"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-724bf50714d4dd9810e04c06c015c7dd723769380be2c24e66b8e3c6e16b8f36",
+      "catalog_id": "catalog-6c1dd472d6c789fcf8cfc0d721f7538c2ead1158",
+      "knowledge_header": "Frameworks/Engines/Libraries",
+      "header_path": [
+        "Frameworks/Engines/Libraries"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-25a1d16b6f258ad9e33c42034ea3f80d006b30b5283cb8b41091d15b7954b8d9",
+          "source_offset": 678,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view6"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-c1f780d9e10c2f7fa76ba04e20c92d431ecae0495c859adb363b5c2b4b38504a",
+      "catalog_id": "catalog-6c1dd472d6c789fcf8cfc0d721f7538c2ead1158",
+      "knowledge_header": "Maps/Hacks/Plugins/Utilities/All of the Things™",
+      "header_path": [
+        "Maps/Hacks/Plugins/Utilities/All of the Things™"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-261300a1cf182e858bdc10316abec2dbfb2cf9d2b70073d41b493c7ec96fa81e",
+          "source_offset": 686,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view6"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-e0bc9503a735c0b63da8eabdd44ec2197af2caca3739b65ee7259e9af4f52991",
+      "catalog_id": "catalog-6c1dd472d6c789fcf8cfc0d721f7538c2ead1158",
+      "knowledge_header": "Strategy",
+      "header_path": [
+        "Native",
+        "Strategy"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-26ed77ddf1e6e2ba1b60c9c22ec6a18c89846d1b130e529a9cabde8640d4a89a",
+          "source_offset": 703,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view7"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-33a668819785df1fd2205160fbc795e982cfd61b959d256ee85585458f67cf96",
+      "catalog_id": "catalog-6c1dd472d6c789fcf8cfc0d721f7538c2ead1158",
+      "knowledge_header": "Native",
+      "header_path": [
+        "Native"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-26ed77ddf1e6e2ba1b60c9c22ec6a18c89846d1b130e529a9cabde8640d4a89a",
+          "source_offset": 703,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn234view7"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-3a32dd7683db5ccbad72c5503a74bc4dc9f6bfe648d1aab9ccfc5eeae5d1055a",
+      "catalog_id": "catalog-e07646729442a33df33d9ab3072ecb77fd7e8f75",
+      "knowledge_header": "Godot 2",
+      "header_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Games",
+        "2D",
+        "Godot 2"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-25fa24e6985340142c89b6f8f501f7533dcafe80fc24ab4d3803eb35663d1772",
+          "source_offset": 684,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view4"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-5b34489cd15d6890d9a8062077d27bfa2c17f60c1e37cb03015c1959c62dff50",
+      "catalog_id": "catalog-e07646729442a33df33d9ab3072ecb77fd7e8f75",
+      "knowledge_header": "2D",
+      "header_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Games",
+        "2D"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-25fa24e6985340142c89b6f8f501f7533dcafe80fc24ab4d3803eb35663d1772",
+          "source_offset": 684,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view4"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-99960b04f4679b3e9c2826be91931c8a17bd71ae8d1cbd45cf9811614ca3c226",
+      "catalog_id": "catalog-e07646729442a33df33d9ab3072ecb77fd7e8f75",
+      "knowledge_header": "Games",
+      "header_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Games"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-25fa24e6985340142c89b6f8f501f7533dcafe80fc24ab4d3803eb35663d1772",
+          "source_offset": 684,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view4"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-da0c7998b86cd0e2c09ac175ff85c49b8493794b7fa9611992d777c713ab1378",
+      "catalog_id": "catalog-e07646729442a33df33d9ab3072ecb77fd7e8f75",
+      "knowledge_header": "Godot 4",
+      "header_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Plugins and scripts",
+        "Godot 4"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-2571553ddb110cecdefdeb21f8782dd0ffca76e8c3bd8be75b72d500f956f2e3",
+          "source_offset": 674,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view2"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-332621f50f415d09ee7381086b3edec42f44196e4d3b57f82d07a523a512d10e",
+      "catalog_id": "catalog-e07646729442a33df33d9ab3072ecb77fd7e8f75",
+      "knowledge_header": "Plugins and scripts",
+      "header_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Plugins and scripts"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-2571553ddb110cecdefdeb21f8782dd0ffca76e8c3bd8be75b72d500f956f2e3",
+          "source_offset": 674,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view2"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-8a0c4fad6f18cb4eacabe9c2df4f1b8f6f1662164b26437d002c56e475b55ef7",
+      "catalog_id": "catalog-e07646729442a33df33d9ab3072ecb77fd7e8f75",
+      "knowledge_header": "Godot 4",
+      "header_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Templates",
+        "Godot 4"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-256c8991d7f8c8a17e7ab5257bcb240a7fd5b1630c8ded8ff62a373eb1cb00bf",
+          "source_offset": 673,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view1"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-a2defc25dd08533e67892c036cb67a1bfec7e29302fa9eeacd992aa6bd99b69d",
+      "catalog_id": "catalog-e07646729442a33df33d9ab3072ecb77fd7e8f75",
+      "knowledge_header": "Templates",
+      "header_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Templates"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-256c8991d7f8c8a17e7ab5257bcb240a7fd5b1630c8ded8ff62a373eb1cb00bf",
+          "source_offset": 673,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view1"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-60bece6f792f533a586b2b561199481fdbbb60a22a191bf8338acd1745a31e2f",
+      "catalog_id": "catalog-e07646729442a33df33d9ab3072ecb77fd7e8f75",
+      "knowledge_header": "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+      "header_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-256c8991d7f8c8a17e7ab5257bcb240a7fd5b1630c8ded8ff62a373eb1cb00bf",
+          "source_offset": 673,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view1"
+        },
+        {
+          "source_id": "source-2571553ddb110cecdefdeb21f8782dd0ffca76e8c3bd8be75b72d500f956f2e3",
+          "source_offset": 674,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn231view2"
+        },
+        {
+          "source_id": "source-25fa24e6985340142c89b6f8f501f7533dcafe80fc24ab4d3803eb35663d1772",
+          "source_offset": 684,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn232view4"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-5c10a28daae6a2aa4c67e05cb2bc9ff744b1e1d006ee51b7d47bdebdc8fab231",
+      "catalog_id": "catalog-ea02900f953b417abd2e71286e7f51cf640baf02",
+      "knowledge_header": "2D/Illustration",
+      "header_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Art",
+        "2D/Illustration"
+      ],
+      "source_evidence": [],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-26e1874e64238501e75f509593655081a3d84668f60dd6d796f798fecec7c6dc",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-9866618174ab551b3fadbaf6a380c1f2e8d31621a054c7416ddbc7fb1f7585bf",
+      "catalog_id": "catalog-ea02900f953b417abd2e71286e7f51cf640baf02",
+      "knowledge_header": "Art",
+      "header_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Art"
+      ],
+      "source_evidence": [],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-26e1874e64238501e75f509593655081a3d84668f60dd6d796f798fecec7c6dc",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-4ed556d0b455eff1f564163811f505fc72bed9ce5f0c7e5044a3fab7e9c47475",
+      "catalog_id": "catalog-ea02900f953b417abd2e71286e7f51cf640baf02",
+      "knowledge_header": "Audio",
+      "header_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Audio"
+      ],
+      "source_evidence": [],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-26cdde84f7443cc649f4bb8c6ef877da0cb94beb75df212e101e83776cd2778c",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-b74fa6d942acde8373a2d9de012851adc6886eb387267755627f204c07d3feff",
+      "catalog_id": "catalog-ea02900f953b417abd2e71286e7f51cf640baf02",
+      "knowledge_header": "[New to game development? Start here](https://allurious.itch.io/cheatsheets2018) 💠🟪",
+      "header_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "General",
+        "[New to game development? Start here](https://allurious.itch.io/cheatsheets2018) 💠🟪"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-265f72ad462752f050978cc7029a8ae4562caa367c9d09692631b7a2724ffc82",
+          "source_offset": 691,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view3"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-c304e8eb7197da93a661f0ef0afd077ee31b5be5c3082dbc008582dc843b9bc5",
+      "catalog_id": "catalog-ea02900f953b417abd2e71286e7f51cf640baf02",
+      "knowledge_header": "General",
+      "header_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "General"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-265f72ad462752f050978cc7029a8ae4562caa367c9d09692631b7a2724ffc82",
+          "source_offset": 691,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view3"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    },
+    {
+      "topic_id": "acquisition-topic-26fd38639f7ef493d7c5461508cba4f2de130987345049fc9c1c3af37ec9b043",
+      "catalog_id": "catalog-ea02900f953b417abd2e71286e7f51cf640baf02",
+      "knowledge_header": "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+      "header_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)"
+      ],
+      "source_evidence": [
+        {
+          "source_id": "source-265f72ad462752f050978cc7029a8ae4562caa367c9d09692631b7a2724ffc82",
+          "source_offset": 691,
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+          "citation_ref": "turn233view3"
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-26cdde84f7443cc649f4bb8c6ef877da0cb94beb75df212e101e83776cd2778c",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        },
+        {
+          "source_id": "source-26e1874e64238501e75f509593655081a3d84668f60dd6d796f798fecec7c6dc",
+          "availability": "retrieval_failed",
+          "receipt_path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false,
+      "generated_descendants_independent_support": 0
+    }
+  ]
+}

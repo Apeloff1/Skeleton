@@ -1,0 +1,495 @@
+"""
+HYPERSCALE DOMAIN SEED GENERATOR v25.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Generates 277 additional domains to bring the total to 300.
+Each domain gets 8 auto-generated specialists with contextual expertise.
+"""
+
+# ═══════════════════════════════════════════════════════════════════════
+# ROLE TEMPLATES PER CATEGORY
+# Each category defines 8 specialist role patterns.
+# {N} = domain display name
+# ═══════════════════════════════════════════════════════════════════════
+
+_ROLE_TEMPLATES = {
+    "core_design": [
+        ("{N} Architect", "Systems architecture & high-level design"),
+        ("{N} Systems Designer", "Core mechanics & system interplay"),
+        ("{N} Balance Specialist", "Tuning, fairness & mathematical modeling"),
+        ("{N} UX Designer", "Player-facing experience & usability"),
+        ("{N} Data Analyst", "Metrics-driven design & A/B testing"),
+        ("{N} Prototyper", "Rapid iteration & proof-of-concept builds"),
+        ("{N} Integration Lead", "Cross-system integration & synergy"),
+        ("{N} QA Specialist", "Quality validation & edge-case coverage"),
+    ],
+    "art_visual": [
+        ("{N} Art Director", "Visual direction & style consistency"),
+        ("Senior {N} Artist", "Advanced asset creation & mentoring"),
+        ("{N} Technical Artist", "Shader authoring & pipeline tools"),
+        ("{N} Concept Designer", "Concept exploration & ideation"),
+        ("{N} Texture Specialist", "Surface detail, PBR & material work"),
+        ("{N} Lighting Artist", "Illumination, mood & color grading"),
+        ("{N} Pipeline Engineer", "Asset pipeline & automation"),
+        ("{N} Quality Reviewer", "Art QA, standards & review gates"),
+    ],
+    "audio_music": [
+        ("{N} Audio Director", "Audio vision & creative leadership"),
+        ("{N} Sound Designer", "Sound creation & layering"),
+        ("{N} Implementation Engineer", "In-engine audio integration"),
+        ("{N} Mix Specialist", "Mixing, ducking & loudness management"),
+        ("{N} Recording Engineer", "Capture, editing & post-production"),
+        ("{N} Technical Designer", "Middleware, DSP & runtime systems"),
+        ("{N} Quality Analyst", "Audio QA & perceptual testing"),
+        ("{N} Integration Specialist", "Cross-system audio hooks"),
+    ],
+    "programming_eng": [
+        ("{N} Lead Engineer", "Architecture & technical leadership"),
+        ("Senior {N} Developer", "Core implementation & code review"),
+        ("{N} Systems Architect", "High-level system design & patterns"),
+        ("{N} Optimization Specialist", "Performance tuning & profiling"),
+        ("{N} Tools Developer", "Internal tooling & editor extensions"),
+        ("{N} Debug Specialist", "Debugging, tracing & diagnostics"),
+        ("{N} Integration Engineer", "Third-party & cross-module integration"),
+        ("{N} Performance Analyst", "Benchmarking & regression tracking"),
+    ],
+    "production_mgmt": [
+        ("{N} Director", "Strategic oversight & vision alignment"),
+        ("{N} Producer", "Execution planning & delivery"),
+        ("{N} Coordinator", "Task tracking & team synchronization"),
+        ("{N} Analyst", "Data analysis & reporting"),
+        ("{N} Planner", "Roadmap creation & resource forecasting"),
+        ("{N} Facilitator", "Meeting facilitation & process design"),
+        ("{N} Communicator", "Stakeholder updates & documentation"),
+        ("{N} Strategist", "Long-term planning & risk mitigation"),
+    ],
+    "qa_testing": [
+        ("{N} Test Lead", "Test strategy & team coordination"),
+        ("{N} Automation Engineer", "Automated test frameworks & scripts"),
+        ("{N} Manual Tester", "Hands-on exploratory testing"),
+        ("{N} Performance Tester", "Load, stress & frame-rate testing"),
+        ("{N} Standards Specialist", "Certification & compliance checks"),
+        ("{N} Environment Manager", "Test environment & device farms"),
+        ("{N} Report Analyst", "Bug metrics, trends & dashboards"),
+        ("{N} Regression Specialist", "Regression suites & stability gates"),
+    ],
+    "marketing_community": [
+        ("{N} Director", "Campaign vision & brand alignment"),
+        ("{N} Strategist", "Market positioning & go-to-market"),
+        ("{N} Content Creator", "Assets, copy & multimedia"),
+        ("{N} Analyst", "ROI tracking & funnel analytics"),
+        ("{N} Community Manager", "Player engagement & feedback loops"),
+        ("{N} Campaign Specialist", "Ad execution & A/B optimization"),
+        ("{N} Creative Director", "Visual identity & messaging tone"),
+        ("{N} Coordinator", "Timeline management & cross-team sync"),
+    ],
+    "narrative_writing": [
+        ("{N} Lead Writer", "Narrative vision & story architecture"),
+        ("{N} Story Designer", "Plot structure & pacing design"),
+        ("{N} Dialogue Writer", "Character voice & conversation flow"),
+        ("{N} Editor", "Copy editing, consistency & style guide"),
+        ("{N} Narrative Designer", "Interactive narrative mechanics"),
+        ("{N} Content Writer", "World details, items & flavor text"),
+        ("{N} Quality Reviewer", "Narrative QA & continuity checks"),
+        ("{N} Localization Writer", "Translation-ready writing & adaptation"),
+    ],
+    "multiplayer_social": [
+        ("{N} Systems Architect", "Backend architecture & scalability"),
+        ("{N} Backend Engineer", "Server logic & data flow"),
+        ("{N} Frontend Designer", "Client-side UX & interface"),
+        ("{N} Balance Designer", "Fair play & reward calibration"),
+        ("{N} UX Specialist", "Social friction reduction & flow"),
+        ("{N} Security Engineer", "Anti-abuse & exploit prevention"),
+        ("{N} Analytics Specialist", "Social metrics & health scoring"),
+        ("{N} QA Engineer", "Multiplayer edge-case testing"),
+    ],
+    "platform_distrib": [
+        ("{N} Platform Specialist", "Platform-specific requirements"),
+        ("{N} Integration Engineer", "SDK & API integration"),
+        ("{N} Compliance Analyst", "Policy, legal & regulatory checks"),
+        ("{N} Operations Manager", "Deployment & incident response"),
+        ("{N} Technical Specialist", "Build configuration & optimization"),
+        ("{N} Quality Analyst", "Submission QA & certification"),
+        ("{N} Release Manager", "Release cadence & rollback plans"),
+        ("{N} Support Specialist", "User support & issue escalation"),
+    ],
+}
+
+# ═══════════════════════════════════════════════════════════════════════
+# EXPERTISE GENERATOR
+# ═══════════════════════════════════════════════════════════════════════
+
+def _make_expertise(spec_title: str, domain_desc: str) -> list:
+    """Generate 8 contextual expertise strings from specialist title + domain description."""
+    skip = {"and", "the", "for", "of", "in", "with", "&", "a", "an"}
+    words = [w for w in spec_title.lower().split() if w not in skip and len(w) > 2]
+    core = " ".join(words[:2]) if len(words) >= 2 else spec_title.lower()
+    d_words = [w.strip(",.&()") for w in domain_desc.lower().split() if len(w) > 3 and w.strip(",.&()") not in skip]
+    ctx = d_words[0] if d_words else core.split()[0]
+    return [
+        f"{core.title()} system architecture",
+        f"Advanced {ctx} methodology",
+        f"{core.title()} pipeline optimization",
+        f"Cross-domain {ctx} integration",
+        f"{ctx.title()} quality benchmarks",
+        f"Scalable {core} frameworks",
+        f"Real-time {ctx} analytics",
+        f"Industry-standard {core} practices",
+    ]
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# DOMAIN SEEDS — 277 ADDITIONAL DOMAINS
+# Format: (domain_id, display_name, hex_color, description, [synergy_ids])
+# ═══════════════════════════════════════════════════════════════════════
+
+SEEDS = {
+    # ─── CORE GAME DESIGN (19 more → total 30) ───
+    "core_design": [
+        ("tutorial_architect", "Tutorial Architect", "#9F7AEA", "Tutorial flow, onboarding, contextual guidance, progressive disclosure, help systems", ["difficulty_design", "emotion_engine"]),
+        ("accessibility_core", "Accessibility Core", "#A78BFA", "Motor, visual, cognitive accommodations, remapping, colorblind modes, subtitle systems", ["input_matrix", "ui_flow_design"]),
+        ("economy_engine", "Economy Engine", "#7C3AED", "Currency loops, inflation sinks, trade systems, auction houses, vendor pricing", ["progression_systems", "monetization_design"]),
+        ("scoring_systems", "Scoring Systems", "#6D28D9", "Point systems, combo scoring, style meters, leaderboards, rank calculations", ["competitive_design", "analytics_integration"]),
+        ("save_design", "Save Design", "#5B21B6", "Checkpoint placement, autosave, cloud saves, save migration, corruption recovery", ["ui_flow_design", "analytics_integration"]),
+        ("camera_design", "Camera Design", "#4C1D95", "Third-person orbits, first-person, lock-on, cinematic cameras, collision avoidance", ["input_matrix", "game_feel"]),
+        ("input_matrix", "Input Matrix", "#7E22CE", "Controller mapping, touch controls, gesture systems, accessibility input, rebinding", ["game_feel", "accessibility_core"]),
+        ("failure_design", "Failure Design", "#9333EA", "Death penalties, respawn, retry loops, corpse runs, soul recovery, permadeath modes", ["difficulty_design", "emotion_engine"]),
+        ("choice_architecture", "Choice Architecture", "#8B5CF6", "Branching paths, consequence systems, moral dilemmas, faction alignment, point of no return", ["narrative_integration", "reward_psychology"]),
+        ("ui_flow_design", "UI Flow Design", "#A855F7", "Menu hierarchy, HUD layout, information density, radial menus, contextual UI", ["accessibility_core", "input_matrix"]),
+        ("audio_integration", "Audio Integration", "#C084FC", "Audio state machines, music triggers, ambient transitions, 3D sound positioning", ["game_feel", "emotion_engine"]),
+        ("vfx_systems", "VFX Systems", "#D8B4FE", "Particle systems, screen effects, weather VFX, destruction VFX, magic effects", ["game_feel", "physics_interaction"]),
+        ("physics_interaction", "Physics Interaction", "#E9D5FF", "Ragdoll, destruction, fluid sim, cloth physics, soft body, physics puzzles", ["emergent_gameplay", "sandbox_design"]),
+        ("quest_engine", "Quest Engine", "#6366F1", "Quest graphs, objectives, tracking, branching quests, procedural quests, quest logs", ["narrative_integration", "progression_systems"]),
+        ("narrative_integration", "Narrative Integration", "#818CF8", "Story delivery, dialogue triggers, environmental storytelling, cutscene integration", ["choice_architecture", "quest_engine"]),
+        ("social_integration", "Social Integration", "#A5B4FC", "Friend systems, guilds, chat, emotes, social spaces, player interaction", ["cooperative_design", "competitive_design"]),
+        ("live_ops_design", "Live Ops Design", "#C7D2FE", "Seasonal content, live events, hotfix systems, content calendars, feature flags", ["meta_game_design", "analytics_integration"]),
+        ("monetization_design", "Monetization Design", "#93C5FD", "Ethical monetization, battle passes, cosmetic shops, loot box alternatives, pricing", ["economy_engine", "reward_psychology"]),
+        ("analytics_integration", "Analytics Integration", "#60A5FA", "Telemetry, funnels, cohort analysis, A/B testing, retention metrics, heatmaps", ["live_ops_design", "scoring_systems"]),
+    ],
+    # ─── ART & VISUAL (27 more → total 30) ───
+    "art_visual": [
+        ("pixel_art", "Pixel Art", "#EC4899", "Pixel art, retro aesthetics, sprite animation, tile design, palette constraints", ["animation_2d", "stylization_art"]),
+        ("vfx_particles", "VFX Particles", "#DB2777", "Particle systems, GPU particles, flipbook VFX, beam effects, trail rendering", ["technical_art", "shader_art"]),
+        ("technical_art", "Technical Art", "#BE185D", "Shader authoring, material functions, vertex animation, LOD setup, render features", ["shader_art", "art_tools_dev"]),
+        ("motion_graphics", "Motion Graphics", "#9D174D", "Kinetic typography, animated infographics, UI motion, title sequences", ["ui_art", "cinematic_direction"]),
+        ("ui_art", "UI Art", "#F472B6", "HUD design, menu art, icon sets, button states, minimap art, health bars", ["icon_design", "motion_graphics"]),
+        ("icon_design", "Icon Design", "#F9A8D4", "Iconography, symbol systems, skill icons, buff icons, map markers, waypoints", ["ui_art", "concept_art"]),
+        ("modeling_3d", "3D Modeling", "#FBCFE8", "Hard-surface, organic, topology, UV layout, retopology, mesh optimization", ["sculpting_art", "character_art_3d"]),
+        ("sculpting_art", "Digital Sculpting", "#D946EF", "ZBrush, Mudbox, organic sculpting, hard-surface sculpting, detail passes", ["modeling_3d", "character_art_3d"]),
+        ("texture_material", "Texture & Material", "#C026D3", "PBR authoring, Substance workflows, trim sheets, atlasing, material layering", ["technical_art", "environment_art"]),
+        ("color_science", "Color Science", "#A21CAF", "Color theory, grading LUTs, HDR color, palette generation, color accessibility", ["lighting_art", "cinematic_direction"]),
+        ("animation_2d", "2D Animation", "#86198F", "Spine, DragonBones, sprite sheets, frame-by-frame, tweening, 2D rigging", ["pixel_art", "storyboard_art"]),
+        ("animation_3d", "3D Animation", "#701A75", "Keyframe, motion capture, blend trees, IK, ragdoll, procedural animation", ["character_art_3d", "cinematic_direction"]),
+        ("storyboard_art", "Storyboard Art", "#FF6B9D", "Shot planning, camera angles, action flow, timing notation, beat mapping", ["cinematic_direction", "concept_art"]),
+        ("cinematic_direction", "Cinematic Direction", "#FF4081", "Virtual cinematography, shot composition, color grading, lens simulation", ["storyboard_art", "color_science"]),
+        ("procedural_art", "Procedural Art", "#E040FB", "Houdini workflows, substance procedurals, generative patterns, noise-based art", ["technical_art", "texture_material"]),
+        ("photogrammetry", "Photogrammetry", "#CE93D8", "3D scanning, point cloud processing, mesh reconstruction, texture projection", ["modeling_3d", "environment_art"]),
+        ("level_art", "Level Art", "#BA68C8", "Level composition, landmark design, sightline management, set dressing density", ["environment_art", "world_art"]),
+        ("world_art", "World Art", "#AB47BC", "Biome art direction, world color palette, visual language, distance rendering", ["level_art", "environment_art"]),
+        ("stylization_art", "Art Stylization", "#9C27B0", "Cel-shading, watercolor, sketch styles, low-poly, voxel, abstract aesthetics", ["technical_art", "concept_art"]),
+        ("outsource_art", "Art Outsource", "#8E24AA", "Brief creation, quality gates, feedback loops, vendor management, batch production", ["world_art", "character_art_3d"]),
+        ("art_tools_dev", "Art Tools Dev", "#7B1FA2", "Blender plugins, Maya scripts, Photoshop actions, batch processors, pipeline tools", ["technical_art", "procedural_art"]),
+        ("shader_art", "Shader Art", "#6A1B9A", "Custom shaders, post-processing, screen effects, toon shading, dissolve effects", ["technical_art", "vfx_particles"]),
+        ("architectural_art", "Architectural Art", "#4A148C", "Building design, interior architecture, structural detail, period accuracy", ["environment_art", "world_art"]),
+        ("vehicle_art", "Vehicle Art", "#EA80FC", "Vehicle modeling, damage states, cockpit interiors, customization variants", ["modeling_3d", "technical_art"]),
+        ("weapon_prop_art", "Weapon & Prop Art", "#E1BEE7", "Weapon modeling, prop detail, equipment tiers, visual upgrades, attachment art", ["modeling_3d", "concept_art"]),
+        ("matte_painting", "Matte Painting", "#F3E5F5", "Digital matte painting, sky replacements, vista backdrops, parallax layers", ["environment_art", "cinematic_direction"]),
+        ("char_design_theory", "Character Design", "#FCE4EC", "Character silhouettes, color coding, personality expression, readability at distance", ["concept_art", "character_art_3d"]),
+    ],
+    # ─── AUDIO & MUSIC (28 more → total 30) ───
+    "audio_music": [
+        ("audio_engineering", "Audio Engineering", "#F59E0B", "Signal processing, DSP chains, compression, EQ, reverb design, noise reduction", ["mixing_mastering", "recording_studio"]),
+        ("voice_acting", "Voice Acting", "#D97706", "Performance direction, casting, session management, ADR, pickup sessions", ["dialogue_audio", "cinematic_audio"]),
+        ("dialogue_audio", "Dialogue Systems", "#B45309", "Dialogue trees, bark systems, VO triggers, lip-sync, priority queuing", ["voice_acting", "sound_design"]),
+        ("dynamic_audio", "Dynamic Audio", "#92400E", "Adaptive systems, state-based audio, parameter-driven mixing, real-time DSP", ["interactive_music", "audio_middleware"]),
+        ("spatial_audio_design", "Spatial Audio", "#78350F", "HRTF, ambisonics, binaural, attenuation curves, occlusion, reverb zones", ["sound_design", "audio_engineering"]),
+        ("audio_tools", "Audio Tools", "#FDE68A", "Wwise tools, FMOD scripting, custom editors, batch processing, debug overlays", ["audio_middleware", "audio_engineering"]),
+        ("foley_production", "Foley Production", "#FCD34D", "Footstep recording, cloth foley, impact foley, prop sounds, surface variety", ["sound_design", "recording_studio"]),
+        ("ambient_soundscape", "Ambient Soundscape", "#FBBF24", "Environmental beds, nature layers, urban ambience, underwater audio, cave reverb", ["sound_design", "spatial_audio_design"]),
+        ("interactive_music", "Interactive Music", "#F59E0B", "Horizontal sequencing, vertical layering, stinger systems, transition smoothing", ["music_composition", "dynamic_audio"]),
+        ("audio_middleware", "Audio Middleware", "#EAB308", "Wwise, FMOD, Fabric, audio buses, real-time parameter control, profiling", ["audio_tools", "dynamic_audio"]),
+        ("mixing_mastering", "Mixing & Mastering", "#CA8A04", "Dialog-music-SFX balance, loudness, dynamic range, platform mastering", ["audio_engineering", "music_composition"]),
+        ("chiptune_retro", "Chiptune & Retro", "#A16207", "8-bit synthesis, tracker music, retro sound palettes, chip limitation design", ["music_composition", "interactive_music"]),
+        ("voice_synthesis", "Voice Synthesis", "#854D0E", "TTS integration, AI voice cloning, NPC voice generation, procedural dialogue", ["dialogue_audio", "audio_tools"]),
+        ("crowd_audio", "Crowd Audio", "#713F12", "Crowd simulation audio, stadium sounds, NPC chatter, market ambience, battle cries", ["ambient_soundscape", "spatial_audio_design"]),
+        ("vehicle_audio", "Vehicle Audio", "#FEF3C7", "Engine loops, tire sounds, transmission, exhaust, horn, collision audio", ["sound_design", "dynamic_audio"]),
+        ("weapon_audio", "Weapon Audio", "#FEF9C3", "Gunshots, sword clashes, reload sounds, projectile whizz, weapon foley", ["sound_design", "foley_production"]),
+        ("nature_audio", "Nature Audio", "#FDE047", "Wind, rain, thunder, birds, insects, water streams, forest ambience", ["ambient_soundscape", "foley_production"]),
+        ("horror_audio", "Horror Audio", "#FACC15", "Tension drones, jump scare stingers, creaking, whispers, silence design", ["sound_design", "dynamic_audio"]),
+        ("scifi_audio", "Sci-Fi Audio", "#EAB308", "Laser blasts, energy hums, spaceship engines, alien vocalizations, UI bleeps", ["sound_design", "voice_synthesis"]),
+        ("fantasy_audio", "Fantasy Audio", "#CA8A04", "Magic spells, dragon roars, enchantment sounds, mystical ambience, fairy chimes", ["sound_design", "music_composition"]),
+        ("ui_audio_design", "UI Audio", "#A16207", "Button clicks, menu swooshes, notification chimes, error sounds, reward fanfares", ["sound_design", "dynamic_audio"]),
+        ("cutscene_audio", "Cutscene Audio", "#854D0E", "Cinematic mix, Atmos/surround, music spotting, dialog premix, SFX editorial", ["mixing_mastering", "voice_acting"]),
+        ("accessibility_audio", "Audio Accessibility", "#78350F", "Audio descriptions, visual-to-audio cues, mono downmix, captioning integration", ["spatial_audio_design", "dialogue_audio"]),
+        ("procedural_audio", "Procedural Audio", "#92400E", "Synthesized SFX, granular synthesis, physics-driven sound, generative ambience", ["dynamic_audio", "audio_tools"]),
+        ("audio_qa", "Audio QA", "#B45309", "Listening tests, A/B comparisons, platform compliance, loudness metering, bug tracking", ["mixing_mastering", "audio_engineering"]),
+        ("audio_optimization", "Audio Optimization", "#D97706", "Voice count management, streaming, memory budgets, DSP cost, LOD audio", ["audio_middleware", "audio_engineering"]),
+        ("recording_studio", "Recording Studio", "#F59E0B", "Microphone selection, room treatment, session workflow, slate management", ["foley_production", "voice_acting"]),
+        ("sound_library", "Sound Library", "#FBBF24", "Asset cataloging, metadata tagging, search systems, licensing management", ["foley_production", "audio_tools"]),
+    ],
+    # ─── PROGRAMMING & ENGINEERING (29 more → total 30) ───
+    "programming_eng": [
+        ("gameplay_programming", "Gameplay Programming", "#3B82F6", "Game logic, state machines, ability systems, interaction code, rule enforcement", ["engine_architecture", "physics_engine_dev"]),
+        ("physics_engine_dev", "Physics Engine", "#2563EB", "Rigid body, collision detection, constraints, raycasting, physics stepping", ["engine_architecture", "gameplay_programming"]),
+        ("rendering_prog", "Rendering Engineering", "#1D4ED8", "Render pipelines, shader compilation, draw call optimization, GPU compute", ["engine_architecture", "shader_programming"]),
+        ("ai_programming", "AI Programming", "#1E40AF", "Behavior trees, GOAP, utility AI, pathfinding, perception, decision making", ["gameplay_programming", "engine_architecture"]),
+        ("network_programming", "Network Programming", "#1E3A8A", "Client-server, P2P, state sync, rollback netcode, bandwidth optimization", ["gameplay_programming", "engine_architecture"]),
+        ("tools_programming", "Tools Programming", "#172554", "Editor extensions, custom inspectors, debug tools, profiling overlays", ["engine_architecture", "debugging_tools"]),
+        ("ui_programming", "UI Programming", "#60A5FA", "UI frameworks, data binding, layout systems, animation, localization hooks", ["gameplay_programming", "tools_programming"]),
+        ("audio_programming", "Audio Programming", "#93C5FD", "Audio engines, DSP, spatial audio code, streaming, voice management", ["engine_architecture", "gameplay_programming"]),
+        ("animation_programming", "Animation Programming", "#BFDBFE", "Animation graphs, blend trees, IK solvers, motion matching, retargeting", ["gameplay_programming", "physics_engine_dev"]),
+        ("memory_management", "Memory Management", "#DBEAFE", "Pool allocators, garbage collection, memory profiling, leak detection", ["engine_architecture", "threading_concurrency"]),
+        ("threading_concurrency", "Threading & Concurrency", "#2563EB", "Job systems, task graphs, lock-free structures, thread pools, async I/O", ["engine_architecture", "memory_management"]),
+        ("platform_programming", "Platform Programming", "#1D4ED8", "Console APIs, mobile APIs, platform abstraction, certification compliance", ["engine_architecture", "build_systems"]),
+        ("build_systems", "Build Systems", "#1E40AF", "CMake, premake, incremental builds, CI/CD, cross-compilation, asset cooking", ["engine_architecture", "platform_programming"]),
+        ("debugging_tools", "Debugging Tools", "#1E3A8A", "In-game console, visual debugger, replay systems, logging frameworks, crash dumps", ["tools_programming", "engine_architecture"]),
+        ("scripting_systems", "Scripting Systems", "#172554", "Lua, Python bindings, visual scripting, hot-reload, sandboxing, API exposure", ["engine_architecture", "tools_programming"]),
+        ("data_structures_algo", "Data Structures", "#3B82F6", "Spatial partitioning, hash maps, graphs, priority queues, cache-friendly layout", ["engine_architecture", "memory_management"]),
+        ("shader_programming", "Shader Programming", "#60A5FA", "HLSL, GLSL, compute shaders, ray tracing shaders, material expressions", ["rendering_prog", "engine_architecture"]),
+        ("input_systems_dev", "Input Systems Dev", "#93C5FD", "Input abstraction, action mapping, combo detection, gesture recognition", ["gameplay_programming", "platform_programming"]),
+        ("save_systems_dev", "Save & Serialization", "#BFDBFE", "Binary serialization, JSON, protobuf, save migration, checksum integrity", ["gameplay_programming", "engine_architecture"]),
+        ("vr_ar_programming", "VR/AR Programming", "#DBEAFE", "Stereo rendering, hand tracking, room-scale, spatial anchors, passthrough", ["rendering_prog", "input_systems_dev"]),
+        ("cloud_gaming_infra", "Cloud Gaming", "#2563EB", "Game streaming, latency compensation, server-side rendering, encoding", ["network_programming", "rendering_prog"]),
+        ("streaming_tech", "Streaming Tech", "#1D4ED8", "Level streaming, asset streaming, texture streaming, world partitioning", ["engine_architecture", "memory_management"]),
+        ("procedural_code", "Procedural Gen Code", "#1E40AF", "Noise generation, WFC implementation, L-systems, graph grammars, seeded random", ["gameplay_programming", "data_structures_algo"]),
+        ("database_gaming", "Game Database", "#1E3A8A", "Player profiles, leaderboard storage, inventory persistence, analytics DB", ["network_programming", "save_systems_dev"]),
+        ("security_programming", "Security Programming", "#172554", "Anti-cheat, encryption, packet validation, memory protection, obfuscation", ["network_programming", "engine_architecture"]),
+        ("testing_frameworks", "Test Frameworks", "#3B82F6", "Unit testing, integration tests, fuzzing, property-based testing, CI gates", ["build_systems", "debugging_tools"]),
+        ("localization_dev", "Localization Systems", "#60A5FA", "String tables, plural forms, RTL support, font fallbacks, hot-swap locale", ["ui_programming", "tools_programming"]),
+        ("analytics_dev", "Analytics Pipeline", "#93C5FD", "Event tracking, data warehousing, real-time dashboards, ETL pipelines", ["database_gaming", "network_programming"]),
+        ("devops_gaming", "Game DevOps", "#BFDBFE", "Container orchestration, auto-scaling, blue-green deploys, monitoring, alerting", ["build_systems", "cloud_gaming_infra"]),
+    ],
+    # ─── PRODUCTION & MANAGEMENT (29 more → total 30) ───
+    "production_mgmt": [
+        ("team_leadership", "Team Leadership", "#10B981", "Culture building, mentorship, conflict resolution, team health, motivation", ["hiring_onboarding", "crunch_prevention"]),
+        ("scheduling_mgmt", "Scheduling", "#059669", "Timeline management, Gantt charts, critical path, buffer allocation, dependencies", ["milestone_tracking", "scope_management"]),
+        ("quality_gates", "Quality Gates", "#047857", "Approval workflows, sign-off criteria, stage-gate reviews, quality metrics", ["milestone_tracking", "content_pipeline_mgmt"]),
+        ("content_pipeline_mgmt", "Content Pipeline", "#065F46", "Asset intake, review cycles, integration gates, version control, approval flow", ["quality_gates", "tool_adoption"]),
+        ("vendor_management", "Vendor Management", "#064E3B", "SOW creation, vendor evaluation, cost negotiation, quality benchmarks", ["outsource_production", "budget_forecasting"]),
+        ("budget_forecasting", "Budget Forecasting", "#022C22", "Cost modeling, burn rate, contingency funds, ROI projection, variance analysis", ["vendor_management", "data_driven_production"]),
+        ("milestone_tracking", "Milestone Tracking", "#10B981", "Deliverable tracking, demo preparation, go/no-go criteria, milestone review", ["scheduling_mgmt", "quality_gates"]),
+        ("cross_team_coord", "Cross-Team Coordination", "#059669", "Inter-department sync, dependency mapping, integration planning, communication", ["stakeholder_communication", "scheduling_mgmt"]),
+        ("pre_production_planning", "Pre-Production", "#047857", "Concept phase, proof-of-concept, tech spikes, design pillars, vertical slice", ["greenlight_process", "scope_management"]),
+        ("production_phase", "Production Phase", "#065F46", "Sprint execution, feature lockdown, content creation, daily standups", ["scheduling_mgmt", "quality_gates"]),
+        ("post_launch_ops", "Post-Launch Ops", "#064E3B", "Live monitoring, hotfix triage, community feedback, update cadence", ["release_management", "data_driven_production"]),
+        ("documentation_mgmt", "Documentation", "#022C22", "Wiki management, design docs, technical specs, knowledge bases, changelogs", ["knowledge_transfer", "stakeholder_communication"]),
+        ("knowledge_transfer", "Knowledge Transfer", "#10B981", "Onboarding materials, cross-training, documentation, pair programming", ["documentation_mgmt", "team_leadership"]),
+        ("tool_adoption", "Tool Adoption", "#059669", "Workflow tooling, adoption metrics, training sessions, migration planning", ["content_pipeline_mgmt", "knowledge_transfer"]),
+        ("performance_reviews", "Performance Reviews", "#047857", "OKR setting, feedback cycles, growth plans, recognition programs", ["team_leadership", "data_driven_production"]),
+        ("hiring_onboarding", "Hiring & Onboarding", "#065F46", "Job descriptions, interview processes, technical assessments, 30-60-90 plans", ["team_leadership", "knowledge_transfer"]),
+        ("crunch_prevention", "Anti-Crunch", "#064E3B", "Work-life balance, burnout prevention, sustainable velocity, overtime policies", ["team_leadership", "scheduling_mgmt"]),
+        ("retrospective_mgmt", "Retrospectives", "#022C22", "Sprint retros, post-milestone analysis, action item tracking, improvement culture", ["postmortem_analysis", "team_leadership"]),
+        ("dependency_risk", "Dependency & Risk", "#10B981", "Risk register, mitigation strategies, dependency graphs, contingency triggers", ["scheduling_mgmt", "scope_management"]),
+        ("release_management", "Release Management", "#059669", "Release trains, branching strategy, deployment checklists, rollback plans", ["post_launch_ops", "quality_gates"]),
+        ("change_management", "Change Management", "#047857", "Feature requests, change control boards, impact assessment, communication", ["scope_management", "stakeholder_communication"]),
+        ("scope_management", "Scope Management", "#065F46", "Feature prioritization, scope creep control, MoSCoW method, backlog grooming", ["change_management", "budget_forecasting"]),
+        ("stakeholder_communication", "Stakeholder Comms", "#064E3B", "Executive reporting, publisher updates, board presentations, investor relations", ["cross_team_coord", "documentation_mgmt"]),
+        ("data_driven_production", "Data-Driven Production", "#022C22", "Velocity tracking, predictive analytics, capacity modeling, burndown charts", ["budget_forecasting", "performance_reviews"]),
+        ("greenlight_process", "Greenlight Process", "#10B981", "Pitch decks, market analysis, feasibility studies, prototyping for approval", ["pre_production_planning", "budget_forecasting"]),
+        ("outsource_production", "Outsource Production", "#059669", "External studio management, quality gates, cultural communication, IP protection", ["vendor_management", "content_pipeline_mgmt"]),
+        ("ip_management", "IP Management", "#047857", "Intellectual property, licensing, rights clearance, trademark protection", ["legal_compliance_mgmt", "vendor_management"]),
+        ("legal_compliance_mgmt", "Compliance", "#065F46", "GDPR, COPPA, PEGI, ESRB, regional regulations, loot box laws, data privacy", ["ip_management", "release_management"]),
+        ("postmortem_analysis", "Postmortem Analysis", "#064E3B", "Project retrospective, lessons learned, knowledge archival, success metrics", ["retrospective_mgmt", "data_driven_production"]),
+    ],
+    # ─── QA & TESTING (29 more → total 30) ───
+    "qa_testing": [
+        ("automation_testing", "Test Automation", "#14B8A6", "Framework selection, script maintenance, CI integration, parallel execution", ["testing_frameworks", "functional_testing"]),
+        ("performance_testing_qa", "Performance QA", "#0D9488", "Frame rate profiling, memory leaks, load testing, thermal testing, battery drain", ["functional_testing", "automation_testing"]),
+        ("network_testing", "Network Testing", "#0F766E", "Latency simulation, packet loss, reconnection, matchmaking QA, cross-region", ["functional_testing", "multiplayer_testing"]),
+        ("mobile_testing", "Mobile Testing", "#115E59", "Device matrix, touch input, orientation, battery, thermal, app lifecycle", ["functional_testing", "platform_testing"]),
+        ("console_testing", "Console Testing", "#134E4A", "TRC/XR/Lotcheck, controller input, achievement/trophy, suspend/resume", ["functional_testing", "platform_testing"]),
+        ("pc_testing", "PC Testing", "#042F2E", "Hardware matrix, driver compatibility, resolution scaling, peripheral support", ["functional_testing", "performance_testing_qa"]),
+        ("vr_testing", "VR Testing", "#14B8A6", "Motion sickness assessment, tracking accuracy, guardian boundary, comfort rating", ["functional_testing", "performance_testing_qa"]),
+        ("accessibility_testing_qa", "Accessibility QA", "#0D9488", "Screen reader, color contrast, motor accommodation, cognitive load, WCAG", ["functional_testing", "mobile_testing"]),
+        ("localization_testing_qa", "Localization QA", "#0F766E", "Linguistic accuracy, text overflow, cultural sensitivity, RTL layout, font rendering", ["functional_testing", "console_testing"]),
+        ("security_testing_qa", "Security QA", "#115E59", "Penetration testing, vulnerability scanning, memory manipulation, packet analysis", ["functional_testing", "network_testing"]),
+        ("usability_testing", "Usability Testing", "#134E4A", "User studies, think-aloud protocol, heuristic evaluation, task completion rates", ["functional_testing", "accessibility_testing_qa"]),
+        ("regression_testing", "Regression Testing", "#042F2E", "Regression suites, automated regression, build verification, change impact", ["automation_testing", "functional_testing"]),
+        ("smoke_testing", "Smoke Testing", "#14B8A6", "Build acceptance, critical path, sanity checks, deployment verification", ["regression_testing", "automation_testing"]),
+        ("exploratory_testing", "Exploratory Testing", "#0D9488", "Session-based, charter-driven, risk-based exploration, boundary testing", ["functional_testing", "usability_testing"]),
+        ("compliance_testing_qa", "Compliance Testing", "#0F766E", "Store certification, age rating, regional compliance, legal verification", ["console_testing", "mobile_testing"]),
+        ("monetization_testing", "Monetization QA", "#115E59", "IAP testing, receipt validation, pricing display, purchase flow, refund testing", ["functional_testing", "security_testing_qa"]),
+        ("analytics_testing", "Analytics QA", "#134E4A", "Event validation, funnel accuracy, data pipeline testing, dashboard verification", ["automation_testing", "functional_testing"]),
+        ("ai_testing", "AI Testing", "#042F2E", "NPC behavior validation, pathfinding QA, difficulty tuning, bot performance", ["functional_testing", "performance_testing_qa"]),
+        ("audio_qa_testing", "Audio QA", "#14B8A6", "Listening tests, spatial accuracy, music transition, voice sync, loudness", ["functional_testing", "localization_testing_qa"]),
+        ("visual_testing", "Visual QA", "#0D9488", "Screenshot comparison, shader validation, texture quality, animation review", ["functional_testing", "performance_testing_qa"]),
+        ("input_testing", "Input QA", "#0F766E", "Controller compatibility, input latency, dead zone calibration, rebinding", ["functional_testing", "mobile_testing"]),
+        ("save_testing", "Save System QA", "#115E59", "Save/load integrity, corruption recovery, cloud sync, migration testing", ["functional_testing", "regression_testing"]),
+        ("balance_testing", "Balance Testing", "#134E4A", "DPS validation, economy simulation, difficulty assessment, player power curves", ["functional_testing", "ai_testing"]),
+        ("live_service_testing", "Live Service QA", "#042F2E", "Patch verification, hotfix validation, event testing, rollback testing", ["smoke_testing", "regression_testing"]),
+        ("beta_management", "Beta Management", "#14B8A6", "Beta distribution, feedback collection, bug triage, NDA management", ["usability_testing", "functional_testing"]),
+        ("bug_triage_qa", "Bug Triage", "#0D9488", "Severity classification, priority assignment, root cause hypothesis, duplicate detection", ["functional_testing", "regression_testing"]),
+        ("test_environment", "Test Environments", "#0F766E", "Device farms, cloud testing, environment provisioning, data seeding, reset scripts", ["automation_testing", "functional_testing"]),
+        ("crowd_testing", "Crowd Testing", "#115E59", "Community QA, crowd-sourced testing, diverse device coverage, localized testing", ["beta_management", "usability_testing"]),
+        ("test_documentation", "Test Documentation", "#134E4A", "Test plans, test cases, defect reports, coverage matrices, release notes QA", ["functional_testing", "bug_triage_qa"]),
+    ],
+    # ─── MARKETING & COMMUNITY (29 more → total 30) ───
+    "marketing_community": [
+        ("community_management", "Community Management", "#F43F5E", "Discord management, forum moderation, community events, fan programs", ["brand_marketing", "social_listening"]),
+        ("content_marketing", "Content Marketing", "#E11D48", "Blog posts, dev diaries, behind-the-scenes, tutorial content, SEO", ["brand_marketing", "video_production"]),
+        ("email_marketing", "Email Marketing", "#BE123C", "Newsletter campaigns, drip sequences, segmentation, CRM integration", ["brand_marketing", "retention_marketing"]),
+        ("event_marketing", "Event Marketing", "#9F1239", "Convention booths, press events, community meetups, launch parties", ["brand_marketing", "press_relations"]),
+        ("analytics_marketing", "Marketing Analytics", "#881337", "Attribution modeling, funnel analysis, CAC/LTV, campaign ROI, cohort analysis", ["brand_marketing", "paid_acquisition"]),
+        ("partnership_marketing", "Partnership Marketing", "#4C0519", "Co-marketing, cross-promotion, brand collaborations, bundle deals", ["brand_marketing", "event_marketing"]),
+        ("launch_campaign", "Launch Campaign", "#F43F5E", "Launch strategy, countdown, press embargo, streamer drops, day-one content", ["brand_marketing", "press_relations"]),
+        ("early_access_strategy", "Early Access", "#E11D48", "EA pricing, feedback loops, update cadence, community development, roadmaps", ["brand_marketing", "community_management"]),
+        ("press_relations", "Press Relations", "#BE123C", "Press releases, media outreach, review copies, embargo management, interviews", ["brand_marketing", "launch_campaign"]),
+        ("streamer_relations", "Streamer Relations", "#9F1239", "Creator outreach, key distribution, content guidelines, sponsorship management", ["brand_marketing", "community_management"]),
+        ("social_listening", "Social Listening", "#881337", "Sentiment analysis, trend monitoring, crisis detection, brand mention tracking", ["community_management", "analytics_marketing"]),
+        ("brand_safety", "Brand Safety", "#4C0519", "Crisis communication, reputation management, content moderation, legal review", ["brand_marketing", "social_listening"]),
+        ("localized_marketing", "Localized Marketing", "#F43F5E", "Regional campaigns, cultural adaptation, local influencers, market-specific", ["brand_marketing", "analytics_marketing"]),
+        ("merchandise_design", "Merchandise", "#E11D48", "Physical merch, digital goods, collector editions, licensing, fulfillment", ["brand_marketing", "community_management"]),
+        ("esports_marketing", "Esports Marketing", "#BE123C", "Tournament promotion, team sponsorship, broadcast partnerships, fan engagement", ["brand_marketing", "event_marketing"]),
+        ("paid_acquisition", "Paid Acquisition", "#9F1239", "Ad creative, targeting, bid optimization, retargeting, cross-platform ads", ["analytics_marketing", "brand_marketing"]),
+        ("organic_growth", "Organic Growth", "#881337", "SEO, app store optimization, word-of-mouth, viral mechanics, referral programs", ["brand_marketing", "content_marketing"]),
+        ("retention_marketing", "Retention Marketing", "#4C0519", "Re-engagement campaigns, lapsed player outreach, loyalty programs, newsletters", ["email_marketing", "analytics_marketing"]),
+        ("video_production", "Video Production", "#F43F5E", "Trailers, dev diaries, gameplay captures, editing, motion graphics, music sync", ["brand_marketing", "content_marketing"]),
+        ("screenshot_art", "Screenshot Art", "#E11D48", "Store screenshots, promotional captures, composition, annotation, A/B testing", ["brand_marketing", "video_production"]),
+        ("copywriting_mkt", "Copywriting", "#BE123C", "Taglines, store descriptions, ad copy, email subjects, social media posts", ["brand_marketing", "content_marketing"]),
+        ("market_research", "Market Research", "#9F1239", "Competitor analysis, audience surveys, market sizing, trend forecasting", ["analytics_marketing", "brand_marketing"]),
+        ("competitive_intel", "Competitive Intel", "#881337", "Competitor feature tracking, pricing analysis, release calendar, market gaps", ["market_research", "analytics_marketing"]),
+        ("pricing_strategy", "Pricing Strategy", "#4C0519", "Launch pricing, regional parity, sale cadence, bundle pricing, DLC pricing", ["analytics_marketing", "brand_marketing"]),
+        ("season_marketing", "Seasonal Marketing", "#F43F5E", "Holiday campaigns, seasonal events, anniversary celebrations, themed content", ["event_marketing", "content_marketing"]),
+        ("cross_plat_marketing", "Cross-Platform Mktg", "#E11D48", "Multi-platform campaigns, unified messaging, platform-specific creative", ["brand_marketing", "analytics_marketing"]),
+        ("review_management", "Review Management", "#BE123C", "Rating monitoring, review response, sentiment tracking, store optimization", ["social_listening", "brand_marketing"]),
+        ("user_feedback_mkt", "User Feedback", "#9F1239", "Survey design, feedback channels, feature request tracking, NPS measurement", ["community_management", "analytics_marketing"]),
+        ("growth_hacking", "Growth Hacking", "#881337", "Viral loops, referral mechanics, social sharing, A/B experimentation, funnel hacks", ["organic_growth", "analytics_marketing"]),
+    ],
+    # ─── NARRATIVE & WRITING (29 more → total 30) ───
+    "narrative_writing": [
+        ("dialogue_writing", "Dialogue Writing", "#A855F7", "Character voice, conversation flow, branching dialogue, barks, ambient chatter", ["world_building", "character_writing"]),
+        ("quest_writing", "Quest Writing", "#9333EA", "Quest objectives, story quests, side quests, dynamic quest text, journal entries", ["world_building", "dialogue_writing"]),
+        ("character_writing", "Character Writing", "#7C3AED", "Character arcs, motivation, backstory, personality, growth, relationships", ["dialogue_writing", "villain_writing"]),
+        ("environmental_narrative", "Environmental Story", "#6D28D9", "Found documents, visual storytelling, architectural narrative, graffiti, decay", ["world_building", "item_descriptions"]),
+        ("barks_callouts", "Barks & Callouts", "#5B21B6", "Combat barks, contextual callouts, idle chatter, reaction lines, emote text", ["dialogue_writing", "world_building"]),
+        ("item_descriptions", "Item Descriptions", "#4C1D95", "Weapon lore, armor descriptions, consumable text, artifact stories, flavor text", ["world_building", "environmental_narrative"]),
+        ("journal_codex", "Journal & Codex", "#7E22CE", "Bestiary entries, lore codex, character bios, location descriptions, timeline", ["world_building", "item_descriptions"]),
+        ("tutorial_writing", "Tutorial Writing", "#9333EA", "Instruction text, tooltip help, loading tips, hint text, onboarding copy", ["ui_text_writing", "world_building"]),
+        ("ui_text_writing", "UI Text", "#A855F7", "Menu labels, button text, status messages, error text, notification copy", ["tutorial_writing", "achievement_text"]),
+        ("cinematic_writing", "Cinematic Writing", "#C084FC", "Cutscene scripts, motion capture scripts, storyboard notes, scene direction", ["dialogue_writing", "character_writing"]),
+        ("branching_narrative", "Branching Narrative", "#D8B4FE", "Choice trees, consequence mapping, state tracking, parallel storylines", ["dialogue_writing", "quest_writing"]),
+        ("procedural_narrative", "Procedural Narrative", "#E9D5FF", "Generated story beats, dynamic text insertion, contextual descriptions", ["quest_writing", "world_building"]),
+        ("companion_writing", "Companion Writing", "#8B5CF6", "Companion dialogue, relationship progression, approval systems, banter", ["character_writing", "dialogue_writing"]),
+        ("villain_writing", "Villain Writing", "#7C3AED", "Antagonist motivation, villain monologues, redemption arcs, faction leaders", ["character_writing", "world_building"]),
+        ("comedy_writing", "Comedy Writing", "#6D28D9", "Humor timing, running gags, character comedy, absurdist writing, satire", ["dialogue_writing", "barks_callouts"]),
+        ("horror_writing", "Horror Writing", "#5B21B6", "Dread building, unreliable narration, cosmic horror, psychological horror", ["environmental_narrative", "world_building"]),
+        ("romance_writing", "Romance Writing", "#4C1D95", "Relationship arcs, romantic dialogue, chemistry building, heartbreak, reunion", ["character_writing", "companion_writing"]),
+        ("political_narrative", "Political Narrative", "#7E22CE", "Faction politics, diplomacy, propaganda, revolution, governance systems", ["world_building", "villain_writing"]),
+        ("mythology_creation", "Mythology Creation", "#9333EA", "Creation myths, pantheons, prophecies, sacred texts, origin stories", ["world_building", "item_descriptions"]),
+        ("song_lyrics", "Song & Lyrics", "#A855F7", "In-game songs, bard lyrics, tavern songs, thematic music text, chants", ["world_building", "comedy_writing"]),
+        ("loading_tips", "Loading Tips", "#C084FC", "Gameplay tips, lore snippets, humor, mechanical hints, contextual loading text", ["tutorial_writing", "ui_text_writing"]),
+        ("achievement_text", "Achievement Text", "#D8B4FE", "Achievement names, descriptions, secret achievements, trophy text, milestones", ["ui_text_writing", "quest_writing"]),
+        ("patch_notes_writing", "Patch Notes", "#E9D5FF", "Update communication, changelog writing, feature announcements, known issues", ["ui_text_writing", "tutorial_writing"]),
+        ("marketing_copy_writing", "Marketing Copy", "#8B5CF6", "Store descriptions, taglines, press kit text, social media posts", ["world_building", "patch_notes_writing"]),
+        ("audio_log_writing", "Audio Logs", "#7C3AED", "Recorded diaries, intercepted communications, research notes, personal logs", ["environmental_narrative", "character_writing"]),
+        ("epistolary_writing", "Epistolary Design", "#6D28D9", "Letters, telegrams, emails, notes, official documents, newspapers", ["environmental_narrative", "world_building"]),
+        ("unreliable_narrator_writing", "Unreliable Narrator", "#5B21B6", "Perspective shifts, hidden truth, misdirection, reveal design, bias", ["branching_narrative", "horror_writing"]),
+        ("meta_narrative", "Meta-Narrative", "#4C1D95", "Fourth wall, metagame storytelling, ARG hooks, player-as-character", ["branching_narrative", "comedy_writing"]),
+        ("accessible_writing", "Accessible Writing", "#7E22CE", "Clear language, reading level targeting, dyslexia-friendly, plain English", ["ui_text_writing", "tutorial_writing"]),
+    ],
+    # ─── MULTIPLAYER & SOCIAL (29 more → total 30) ───
+    "multiplayer_social": [
+        ("matchmaking_design", "Matchmaking", "#06B6D4", "Skill-based matching, queue optimization, team balancing, smurf detection", ["social_systems", "leaderboard_design"]),
+        ("lobby_design", "Lobby Design", "#0891B2", "Room creation, ready checks, map voting, host migration, spectator slots", ["social_systems", "matchmaking_design"]),
+        ("voice_chat_sys", "Voice Chat", "#0E7490", "Push-to-talk, proximity chat, voice moderation, noise suppression, channels", ["social_systems", "moderation_tools"]),
+        ("text_chat_sys", "Text Chat", "#155E75", "Chat channels, filters, emojis, stickers, translation, chat history", ["social_systems", "moderation_tools"]),
+        ("friend_systems", "Friend Systems", "#164E63", "Friend requests, best friends, blocking, activity feed, online status", ["social_systems", "cross_play_design"]),
+        ("guild_clan", "Guild & Clan", "#083344", "Guild creation, ranks, permissions, guild bank, guild quests, wars", ["social_systems", "territory_control"]),
+        ("trading_systems", "Trading Systems", "#06B6D4", "Player-to-player trade, auction house, market listings, price history", ["social_systems", "guild_clan"]),
+        ("leaderboard_design", "Leaderboard Design", "#0891B2", "Global rankings, friend rankings, seasonal boards, anti-cheat integration", ["matchmaking_design", "social_systems"]),
+        ("spectator_systems", "Spectator Mode", "#0E7490", "Free camera, player follow, stats overlay, caster tools, replay scrub", ["social_systems", "tournament_infra"]),
+        ("replay_design", "Replay Systems", "#155E75", "Replay recording, timeline scrubbing, camera controls, sharing, highlights", ["spectator_systems", "social_systems"]),
+        ("cross_play_design", "Cross-Play", "#164E63", "Platform interop, input fairness, account linking, unified matchmaking", ["friend_systems", "matchmaking_design"]),
+        ("coop_multiplayer", "Co-Op Design", "#083344", "Drop-in/out, difficulty scaling, shared objectives, revive mechanics", ["social_systems", "matchmaking_design"]),
+        ("pvp_design", "PvP Design", "#06B6D4", "Arena modes, ranked tiers, battlegrounds, open world PvP, dueling", ["matchmaking_design", "leaderboard_design"]),
+        ("mmo_systems", "MMO Systems", "#0891B2", "Persistent world, zone sharding, massive battles, world bosses, phasing", ["social_systems", "guild_clan"]),
+        ("battle_royale_sys", "Battle Royale", "#0E7490", "Zone shrink, loot spawning, squad mechanics, spectator deathcam, ranking", ["pvp_design", "matchmaking_design"]),
+        ("social_spaces", "Social Spaces", "#155E75", "Hub worlds, player housing, guild halls, social minigames, gathering areas", ["social_systems", "guild_clan"]),
+        ("emote_expression", "Emote & Expression", "#164E63", "Emote wheels, dance animations, combo emotes, purchasable emotes", ["social_systems", "social_spaces"]),
+        ("mentorship_sys", "Mentorship Systems", "#083344", "Mentor matching, new player guidance, rewards for mentoring, knowledge base", ["social_systems", "friend_systems"]),
+        ("moderation_tools", "Moderation Tools", "#06B6D4", "Report systems, chat filters, behavior scoring, tribunal, ban management", ["voice_chat_sys", "text_chat_sys"]),
+        ("multiplayer_events", "Multiplayer Events", "#0891B2", "World events, community challenges, raid races, seasonal multiplayer modes", ["social_systems", "mmo_systems"]),
+        ("territory_control", "Territory Control", "#0E7490", "Clan territories, siege mechanics, resource control, map domination", ["guild_clan", "pvp_design"]),
+        ("group_finder", "Group Finder", "#155E75", "LFG boards, activity finder, role queue, group recommendations, auto-match", ["matchmaking_design", "coop_multiplayer"]),
+        ("auction_house", "Auction House", "#164E63", "Listing, bidding, buyout, search filters, price history, tax systems", ["trading_systems", "social_systems"]),
+        ("mail_gifting", "Mail & Gifting", "#083344", "In-game mail, gift wrapping, gift recommendations, holiday gifting events", ["friend_systems", "social_systems"]),
+        ("social_rewards", "Social Rewards", "#06B6D4", "Friendship XP, mentor rewards, guild achievements, social milestones", ["friend_systems", "guild_clan"]),
+        ("tournament_infra", "Tournament Infra", "#0891B2", "Bracket generation, seeding, lobby automation, prize distribution, streams", ["spectator_systems", "leaderboard_design"]),
+        ("party_formation", "Party Formation", "#0E7490", "Quick-party, invite system, role assignments, ready check, party sync", ["group_finder", "matchmaking_design"]),
+        ("server_community", "Server Community", "#155E75", "Realm identity, server events, server transfers, community reputation", ["social_systems", "mmo_systems"]),
+        ("social_analytics", "Social Analytics", "#164E63", "Social graph analysis, engagement metrics, toxicity tracking, community health", ["moderation_tools", "social_systems"]),
+    ],
+    # ─── PLATFORM & DISTRIBUTION (29 more → total 30) ───
+    "platform_distrib": [
+        ("pc_distribution", "PC Distribution", "#7C3AED", "Steam, Epic, GOG, itch.io integration, key management, store page setup", ["store_distribution", "key_management"]),
+        ("console_dist", "Console Distribution", "#6D28D9", "PlayStation, Xbox, Nintendo submission, TRC/XR/Lotcheck compliance", ["store_distribution", "age_ratings"]),
+        ("mobile_stores", "Mobile Stores", "#5B21B6", "App Store, Google Play, Galaxy Store, optimization, review compliance", ["store_distribution", "mobile_analytics"]),
+        ("web_distribution", "Web Distribution", "#4C1D95", "Browser builds, WebGL, PWA, web storefront, embed distribution", ["store_distribution", "cdn_optimization"]),
+        ("cloud_dist", "Cloud Distribution", "#7E22CE", "Cloud gaming platforms, streaming services, thin client deployment", ["web_distribution", "cdn_optimization"]),
+        ("vr_stores", "VR Stores", "#9333EA", "Meta Quest Store, SteamVR, PSVR, submission, comfort ratings", ["store_distribution", "console_dist"]),
+        ("regional_compliance", "Regional Compliance", "#A855F7", "China, Japan, Korea, Germany, Australia-specific regulations", ["age_ratings", "legal_compliance_dist"]),
+        ("age_ratings", "Age Ratings", "#C084FC", "ESRB, PEGI, CERO, USK, GRAC, IARC, content descriptors, questionnaires", ["regional_compliance", "store_distribution"]),
+        ("dlc_management", "DLC Management", "#D8B4FE", "DLC creation, pricing, bundling, compatibility, content unlocking", ["season_pass_infra", "store_distribution"]),
+        ("season_pass_infra", "Season Pass", "#E9D5FF", "Season pass structure, tier rewards, premium track, progression tracking", ["dlc_management", "subscription_models"]),
+        ("microtransaction_infra", "Microtransaction", "#8B5CF6", "In-app purchases, virtual currency, cosmetic stores, receipt validation", ["store_distribution", "subscription_models"]),
+        ("subscription_models", "Subscriptions", "#7C3AED", "Game Pass, PS Plus, subscription billing, entitlement management", ["microtransaction_infra", "store_distribution"]),
+        ("f2p_infra", "Free-to-Play", "#6D28D9", "F2P monetization, progression walls, ad integration, premium conversion", ["microtransaction_infra", "store_distribution"]),
+        ("demo_trial", "Demo & Trial", "#5B21B6", "Demo builds, time-limited trials, content gating, conversion tracking", ["store_distribution", "f2p_infra"]),
+        ("early_access_dist", "Early Access", "#4C1D95", "EA program setup, build distribution, feedback collection, update cadence", ["store_distribution", "beta_dist"]),
+        ("beta_dist", "Beta Distribution", "#7E22CE", "Closed beta, open beta, NDA management, build branches, feedback tools", ["early_access_dist", "key_management"]),
+        ("key_management", "Key Management", "#9333EA", "Serial key generation, activation, revocation, distribution platforms", ["pc_distribution", "beta_dist"]),
+        ("patch_delivery", "Patch Delivery", "#A855F7", "Delta patching, mandatory updates, optional updates, rollback, staging", ["cdn_optimization", "store_distribution"]),
+        ("cdn_optimization", "CDN Optimization", "#C084FC", "Download acceleration, regional CDN, torrent seeding, background downloads", ["patch_delivery", "web_distribution"]),
+        ("mobile_analytics", "Platform Analytics", "#D8B4FE", "Crash reporting, ANR tracking, install attribution, retention funnels", ["store_distribution", "mobile_stores"]),
+        ("crash_reporting", "Crash Reporting", "#E9D5FF", "Symbol upload, stack trace analysis, automated grouping, prioritization", ["mobile_analytics", "patch_delivery"]),
+        ("user_support_dist", "User Support", "#8B5CF6", "Ticket systems, FAQ, knowledge base, in-game support, escalation", ["store_distribution", "crash_reporting"]),
+        ("refund_policy", "Refund Policy", "#7C3AED", "Platform refund rules, dispute handling, chargeback prevention", ["store_distribution", "user_support_dist"]),
+        ("legal_compliance_dist", "Legal Compliance", "#6D28D9", "EULA, ToS, privacy policy, GDPR, data protection, COPPA", ["regional_compliance", "age_ratings"]),
+        ("accessibility_platform", "Platform Accessibility", "#5B21B6", "Platform accessibility APIs, certification requirements, testing standards", ["store_distribution", "regional_compliance"]),
+        ("achievement_platform", "Platform Achievements", "#4C1D95", "Trophies, achievements, gamerscore, progression tracking, showcase", ["store_distribution", "console_dist"]),
+        ("cloud_saves_platform", "Cloud Saves", "#7E22CE", "Save sync, conflict resolution, quota management, offline fallback", ["store_distribution", "cross_platform_accounts"]),
+        ("cross_platform_accounts", "Cross-Platform Accounts", "#9333EA", "Unified accounts, platform linking, entitlement merging, migration", ["cloud_saves_platform", "pc_distribution"]),
+        ("mod_workshop", "Mod Workshop", "#A855F7", "UGC platform, mod uploads, curation, compatibility, featured mods", ["pc_distribution", "store_distribution"]),
+    ],
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# GENERATOR — Builds full specialist records from seeds + templates
+# ═══════════════════════════════════════════════════════════════════════
+
+def _slugify(name: str) -> str:
+    """Convert display name to a snake_case ID."""
+    return name.lower().replace(" ", "_").replace("&", "and").replace("-", "_").replace(".", "").replace("/", "_")[:30]
+
+
+def generate_extended_domains(cat_id: str, cat_icon: str, cat_color: str) -> dict:
+    """Generate fully-formed domain dicts from seeds for a given category."""
+    seeds = SEEDS.get(cat_id, [])
+    templates = _ROLE_TEMPLATES.get(cat_id, _ROLE_TEMPLATES["core_design"])
+    result = {}
+
+    for (domain_id, display_name, color, desc, synergy_ids) in seeds:
+        specialists = {}
+        for i, (title_template, _role_desc) in enumerate(templates):
+            spec_title = title_template.replace("{N}", display_name)
+            spec_name = spec_title.replace(" ", "")[:20]
+            spec_id = f"{domain_id}_s{i}"
+            specialists[spec_id] = {
+                "id": spec_id,
+                "name": spec_name,
+                "title": spec_title,
+                "expertise": _make_expertise(spec_title, desc),
+                "synergy_links": synergy_ids,
+            }
+
+        result[domain_id] = {
+            "name": display_name.replace(" ", ""),
+            "version": "v25.0",
+            "icon": cat_icon,
+            "color": color,
+            "description": desc,
+            "category": cat_id,
+            "specialists": specialists,
+        }
+
+    return result

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-16:incremental_build:v1",
+  "title": "FLGB-16 incremental build",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "changed_nodes"
+  ],
+  "properties": {
+    "changed_nodes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  }
+}

@@ -1,0 +1,59 @@
+"""
+╔══════════════════════════════════════════════════════════════════════════╗
+║  ROSETTA WAVE 13 — HYPERSCALE EXPANSION                                  ║
+║  generators_yield | namespaces_packages | inline_assembly |             ║
+║  optional_chaining                                                       ║
+╚══════════════════════════════════════════════════════════════════════════╝
+"""
+
+EXPANDED_V13 = {}
+
+EXPANDED_V13["generators_yield"] = {
+    "Python": "def count_up_to(max):\n    count = 1\n    while count <= max:\n        yield count\n        count += 1\n\ncounter = count_up_to(5)\nfor num in counter:\n    print(num)\n\n# Generator expression\nsquares = (x**2 for x in range(10))\n\n# yield from\ndef yield_all(lst1, lst2):\n    yield from lst1\n    yield from lst2",
+    "JavaScript": "function* countUpTo(max) {\n  let count = 1;\n  while (count <= max) {\n    yield count;\n    count++;\n  }\n}\n\nconst counter = countUpTo(5);\nfor (const num of counter) {\n  console.log(num);\n}\n\n// yield*\nfunction* yieldAll(iter1, iter2) {\n  yield* iter1;\n  yield* iter2;\n}",
+    "C#": "using System.Collections.Generic;\n\nIEnumerable<int> CountUpTo(int max) {\n    int count = 1;\n    while (count <= max) {\n        yield return count;\n        count++;\n    }\n}\n\nforeach (int num in CountUpTo(5)) {\n    Console.WriteLine(num);\n}\n\n// IAsyncEnumerable for async streams\nasync IAsyncEnumerable<int> GenerateAsync() {\n    await Task.Delay(100);\n    yield return 1;\n}",
+    "PHP": "function countUpTo($max) {\n    $count = 1;\n    while ($count <= $max) {\n        yield $count;\n        $count++;\n    }\n}\n\n$counter = countUpTo(5);\nforeach ($counter as $num) {\n    echo \"$num\\n\";\n}\n\n// yield from (PHP 7+)\nfunction yieldAll($arr1, $arr2) {\n    yield from $arr1;\n    yield from $arr2;\n}",
+    "Ruby": "# Ruby uses Enumerator for generators\ndef count_up_to(max)\n  Enumerator.new do |yielder|\n    count = 1\n    while count <= max\n      yielder << count\n      count += 1\n    end\n  end\nend\n\ncounter = count_up_to(5)\ncounter.each { |num| puts num }\n\n# Fiber for more complex coroutines\nf = Fiber.new do\n  Fiber.yield 1\n  Fiber.yield 2\nend",
+    "Rust": "// Rust currently uses Iterators instead of generators/yield\n// (Generators/Coroutines are unstable nightly features)\n\nstruct Counter {\n    count: u32,\n    max: u32,\n}\n\nimpl Iterator for Counter {\n    type Item = u32;\n    fn next(&mut self) -> Option<Self::Item> {\n        if self.count < self.max {\n            self.count += 1;\n            Some(self.count)\n        } else {\n            None\n        }\n    }\n}\n\nlet counter = Counter { count: 0, max: 5 };",
+    "Go": "// Go has no yield. Use channels + goroutines.\nfunc countUpTo(max int) <-chan int {\n    ch := make(chan int)\n    go func() {\n        for count := 1; count <= max; count++ {\n            ch <- count\n        }\n        close(ch)\n    }()\n    return ch\n}\n\n// Usage\nfor num := range countUpTo(5) {\n    fmt.Println(num)\n}\n\n// Go 1.22+ adds range-over-func for iterators",
+    "C++": "// C++20 Coroutines\n#include <coroutine>\n\n// Needs a complex Generator return type (omitted for brevity)\n// Generator<int> count_up_to(int max) {\n//     for (int i = 1; i <= max; i++) {\n//         co_yield i;\n//     }\n// }",
+    "Java": "// Java has no yield. \n// Use Iterators or Streams.\nIntStream.rangeClosed(1, 5)\n         .forEach(System.out::println);\n\n// Or returning an Iterator manually\n// Custom Iterator implementation...",
+    "Swift": "// Swift uses Sequence and IteratorProtocol\n// No direct yield (though async streams exist)\nstruct Counter: Sequence, IteratorProtocol {\n    var count = 1\n    let max: Int\n    \n    mutating func next() -> Int? {\n        if count <= max {\n            defer { count += 1 }\n            return count\n        }\n        return nil\n    }\n}"
+}
+
+EXPANDED_V13["namespaces_packages"] = {
+    "C++": "namespace MathLib {\n    int add(int a, int b) { return a + b; }\n    \n    // Nested namespace\n    namespace Advanced {\n        int power(int a) { return a * a; }\n    }\n}\n\n// Usage\nint x = MathLib::add(2, 3);\n\n// using directive\nusing namespace MathLib;\nint y = add(4, 5);\n\n// Anonymous namespace (internal linkage)\nnamespace {\n    int secret = 42;\n}",
+    "C#": "namespace App.Utilities {\n    public class MathLib {\n        public static int Add(int a, int b) => a + b;\n    }\n}\n\n// Usage (at top of file)\nusing App.Utilities;\nint result = MathLib.Add(2, 3);\n\n// File-scoped namespaces (C# 10)\nnamespace App.Models;\npublic class User { }",
+    "PHP": "namespace App\\Utilities;\n\nclass MathLib {\n    public static function add($a, $b) { return $a + $b; }\n}\n\n// Usage\nuse App\\Utilities\\MathLib;\n$result = MathLib::add(2, 3);\n\n// Global namespace\n$date = new \\DateTime();\n\n// Aliasing\nuse App\\Utilities\\MathLib as Math;",
+    "Python": "# Python uses files/directories as modules/packages\n# my_package/__init__.py\n# my_package/math_utils.py\n\n# In math_utils.py:\n# def add(a, b): return a + b\n\n# Usage:\nimport my_package.math_utils\nmy_package.math_utils.add(2, 3)\n\nfrom my_package.math_utils import add\nadd(2, 3)\n\nimport my_package.math_utils as mu\nmu.add(2, 3)",
+    "Java": "package com.example.app.utilities;\n\npublic class MathLib {\n    public static int add(int a, int b) { return a + b; }\n}\n\n// Usage\nimport com.example.app.utilities.MathLib;\n// Static import\nimport static com.example.app.utilities.MathLib.add;\n\nint result = add(2, 3);",
+    "Go": "package mathutils\n\n// Exported (Capitalized)\nfunc Add(a, b int) int { return a + b }\n\n// Unexported (Lowercase)\nfunc helper() {}\n\n// Usage (main.go)\nimport \"myapp/mathutils\"\n// import m \"myapp/mathutils\" (alias)\n\nresult := mathutils.Add(2, 3)",
+    "Rust": "pub mod math_lib {\n    pub fn add(a: i32, b: i32) -> i32 { a + b }\n    \n    // Private module\n    mod internal {\n        fn helper() {}\n    }\n}\n\n// Usage\nuse math_lib::add;\nlet result = add(2, 3);\n\n// Aliasing\nuse math_lib::add as plus;",
+    "TypeScript": "// Modules are preferred over namespaces\nexport function add(a: number, b: number) { return a + b; }\n\n// Import\nimport { add } from './mathUtils';\nimport * as math from './mathUtils';\n\n// Legacy internal namespaces\nnamespace Validation {\n  export const isString = (s: any) => typeof s === \"string\";\n}",
+    "Ruby": "# Modules serve as namespaces\nmodule MathLib\n  def self.add(a, b)\n    a + b\n  end\n  \n  # Classes can be inside modules\n  class Calculator\n  end\nend\n\nresult = MathLib.add(2, 3)\ncalc = MathLib::Calculator.new"
+}
+
+EXPANDED_V13["inline_assembly"] = {
+    "C": "int a = 10, b;\n// GCC/Clang syntax (x86)\nasm (\"movl %1, %%eax;\"\n     \"addl $5, %%eax;\"\n     \"movl %%eax, %0;\"\n     : \"=r\" (b)   // output\n     : \"r\" (a)    // input\n     : \"%eax\"     // clobbered register\n);\n\n// MSVC syntax\n// __asm {\n//     mov eax, a\n//     add eax, 5\n//     mov b, eax\n// }",
+    "C++": "// Same as C\nint src = 1;\nint dst;\nasm (\"mov %1, %0\\n\\t\"\n    \"add $1, %0\"\n    : \"=r\" (dst) \n    : \"r\" (src));\nstd::cout << dst << \"\\n\"; // 2",
+    "Rust": "// Requires unsafe\nuse std::arch::asm;\n\nlet mut x: u64 = 3;\nunsafe {\n    asm!(\n        \"add {0}, 5\",\n        inout(reg) x\n    );\n}\nprintln!(\"{}\", x); // 8\n\n// Naked functions\n// #[naked]\n// extern \"C\" fn my_func() { ... }",
+    "Go": "// Go uses separate .s files for assembly, not inline\n// math.go:\n// package math\n// func Add(a, b int) int\n\n// math_amd64.s:\n// TEXT ·Add(SB),$0-24\n//     MOVQ a+0(FP), AX\n//     ADDQ b+8(FP), AX\n//     MOVQ AX, ret+16(FP)\n//     RET",
+    "Zig": "var a: i32 = 10;\nvar b: i32 = undefined;\n\n// AT&T syntax inline assembly\nb = asm (\n    \\\\movl %[in], %%eax\n    \\\\addl $5, %%eax\n    \\\\movl %%eax, %[out]\n    : [out] \"=r\" (-> i32)\n    : [in] \"r\" (a)\n    : \"eax\"\n);",
+    "Nim": "# Nim compiles to C, so it uses C inline asm\nvar a = 10\nvar b: int\n\nwhen defined(gcc) or defined(clang):\n  asm \"\"\"\n    mov %1, %0\n    add $5, %0\n    : \"=r\" (`b`)\n    : \"r\" (`a`)\n  \"\"\"\n\necho b",
+    "D": "// DMD/GDC inline asm\nint a = 10;\nint b;\nasm {\n    mov EAX, a;\n    add EAX, 5;\n    mov b, EAX;\n}",
+    "Python": "# Python is interpreted. No inline assembly.\n# Workarounds: ctypes or C extensions.\n# Or using specialized libraries like 'llvmlite'",
+    "Java": "# Java runs on JVM. No inline assembly.\n# Workarounds: JNI/JNA to call C code, or new Project Panama."
+}
+
+EXPANDED_V13["optional_chaining"] = {
+    "JavaScript": "const user = {\n  profile: {\n    address: { city: \"New York\" }\n  }\n};\n\n// ES2020 Optional Chaining\nconst city = user?.profile?.address?.city;\nconst zip = user?.profile?.address?.zipCode;\n\n// With functions\nconst result = user.getContact?.();\n\n// Nullish coalescing\nconst finalCity = city ?? \"Unknown\";",
+    "TypeScript": "interface User {\n  profile?: {\n    address?: { city: string }\n  }\n  getContact?: () => string;\n}\n\nconst user: User = {};\nconst city = user?.profile?.address?.city;\n\n// Non-null assertion (different concept)\nconst forcedCity = user.profile!.address!.city; // Crash if null",
+    "C#": "// Null-conditional operator\nUser user = new User();\nstring city = user?.Profile?.Address?.City;\n\n// Delegate invocation\nAction action = null;\naction?.Invoke();\n\n// Null-coalescing\nstring finalCity = city ?? \"Unknown\";\n\n// Null-coalescing assignment\ncity ??= \"Default\";",
+    "Swift": "// Optional chaining (core feature of Swift)\nlet user: User?\nlet city = user?.profile?.address?.city\n\n// Optional binding (if let)\nif let unwrappedCity = user?.profile?.address?.city {\n    print(unwrappedCity)\n}\n\n// Nil-coalescing\nlet finalCity = city ?? \"Unknown\"",
+    "Kotlin": "// Safe call operator\nval user: User? = null\nval city = user?.profile?.address?.city\n\n// Safe call with let\nuser?.let { println(\"User exists: $it\") }\n\n// Elvis operator\nval finalCity = city ?: \"Unknown\"\n\n// Not-null assertion\nval forcedCity = user!!.profile!!.address!!.city",
+    "Ruby": "# Safe navigation operator (Ruby 2.3+)\nuser = User.new\ncity = user&.profile&.address&.city\n\n# Hash safe navigation\ndata = { profile: nil }\ncity = data.dig(:profile, :address, :city)\n\n# Or equals\nfinal_city = city || \"Unknown\"",
+    "PHP": "// Nullsafe operator (PHP 8+)\n$user = new User();\n$city = $user?->profile?->address?->city;\n\n// Null coalescing\n$finalCity = $city ?? \"Unknown\";\n\n// Array access (doesn't use ?., uses ?? or isset)\n$data = [];\n$city = $data['profile']['address']['city'] ?? \"Unknown\";",
+    "Python": "# Python does NOT have optional chaining natively.\n# Alternatives: dict.get(), getattr(), or try/except\n\ndata = {}\n# Dictionary chaining\ncity = data.get('profile', {}).get('address', {}).get('city')\n\n# Object chaining requires try/except\ntry:\n    city = user.profile.address.city\nexcept AttributeError:\n    city = None",
+    "Rust": "// Rust uses Option and methods instead of syntax operators\nlet user: Option<User> = None;\n\n// and_then (monadic bind)\nlet city = user\n    .and_then(|u| u.profile)\n    .and_then(|p| p.address)\n    .map(|a| a.city);\n\n// The ? operator for early return (requires returning Option/Result)\nfn get_city(user: Option<User>) -> Option<String> {\n    Some(user?.profile?.address?.city)\n}",
+    "Go": "// Go has no optional chaining. Explicit nil checks required.\nvar city string\nif user != nil && user.Profile != nil && user.Profile.Address != nil {\n    city = user.Profile.Address.City\n}\n\n// For maps\nif profile, ok := data[\"profile\"]; ok {\n    if address, ok := profile[\"address\"]; ok {\n        city = address[\"city\"]\n    }\n}"
+}

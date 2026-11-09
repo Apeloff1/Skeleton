@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-03:semantic_memory:v1",
+  "title": "FLGB-03 semantic memory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fact_id",
+    "subject",
+    "predicate",
+    "object_digest",
+    "evidence_digest",
+    "confidence_ppm",
+    "revision"
+  ],
+  "properties": {
+    "fact_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "predicate": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "object_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "confidence_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

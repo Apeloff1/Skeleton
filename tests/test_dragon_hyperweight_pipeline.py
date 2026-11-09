@@ -1,0 +1,764 @@
+"""100-matrix, sandbox, visual, RSS and weekly Dragon regression gates."""
+from dataclasses import replace
+from unittest.mock import patch
+from datetime import datetime,timezone
+from hashlib import sha256
+import sqlite3
+
+import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from skeleton.ai.game_builder.contracts import canonical_digest,canonical_json
+from skeleton.ai.webcrawler.dragon_hundred_matrix_scrutiny import (
+    MATRIX_IDS,SignedMatrixFinding,scrutinize_one_hundred)
+from skeleton.ai.webcrawler.dragon_cross_source_factchecking import (
+    ClaimSubject,SourceWitness,SignedClaimAdjudication,witness_set_digest,
+)
+from skeleton.ai.webcrawler.dragon_weight_deployment_vault import (
+    DragonDurableWeightVault, SignedRollbackOrder)
+from skeleton.ai.webcrawler.dragon_weight_canary import (
+    DragonWeightCanary, SignedCanaryPlan, SignedCanaryPair)
+from skeleton.ai.webcrawler.dragon_weight_tier_sandbox import (
+    HoldoutTrial,SealedTierEvaluation,SignedOverlayApproval,
+    JeevesWeightOverlay,qualify_tier)
+from skeleton.ai.webcrawler.dragon_video_inspiration import digest_video_inspiration
+from skeleton.ai.webcrawler.dragon_video_tool_research import (
+    SignedVisualPacketReview, index_video_tool_research,
+)
+from skeleton.ai.webcrawler.dragon_mother_hundred_handoff import run_hundred_matrix_mother_to_shadow
+from skeleton.ai.webcrawler.dragon_nest_research_scheduler import IdleResearchPlan
+from skeleton.ai.webcrawler.dragon_rss_update_queue import (
+    SignedRssSnapshot,DragonRssUpdateQueue)
+from skeleton.ai.webcrawler.dragon_weekly_research_export import export_weekly,render_weekly_backlog
+from skeleton.ai.webcrawler.dragon_nest_worker_admission import (
+    HatchlingWorkerTicket,DragonNestWorkerAdmission)
+from skeleton.ai.webcrawler.dragon_frame_custody import CapturedFrame,FrameBatch
+from skeleton.ai.webcrawler.dragon_visual_features import VisualFeatureBatch
+from skeleton.ai.webcrawler.dragon_temporal_segmentation import FeatureFrame
+from skeleton.ai.webcrawler.video_digest import VideoKnowledgeChunk,VideoObservation
+
+def keypair():
+    key=Ed25519PrivateKey.generate()
+    return key,key.public_key().public_bytes_raw()
+
+def sign(key,obj):
+    return key.sign(canonical_json(obj).encode()).hex()
+
+def matrix_bundle():
+    key,pub=keypair()
+    records=[]
+    for matrix_id in MATRIX_IDS:
+        f=SignedMatrixFinding(
+            matrix_id=matrix_id,owner="studio",knowledge_digest="a"*64,
+            evidence_digest="b"*64,
+            independent_group_digests=("1"*64,"2"*64),
+            reviewer="independent-wiki",key_id="review-key-1",
+            issued_at=100,expires_at=1000,verdict="pass",signature_hex="")
+        records.append(replace(f,signature_hex=sign(key,f.body())))
+    return key,pub,tuple(records)
+
+def test_hundred_matrix_catalog_complete_signed_and_nonpromoting():
+    _,pub,records=matrix_bundle()
+    assert len(MATRIX_IDS)==100 and len(set(MATRIX_IDS))==100
+    report=scrutinize_one_hundred(
+        "studio","a"*64,records,public_key=pub,
+        trusted_reviewer="independent-wiki",key_id="review-key-1",now=150)
+    assert report["shadow_review_proposal_eligible"] is True
+    assert report["passed_matrix_count"]==100
+    assert len(report["axis_pass_counts"])==10
+    assert all(v==10 for v in report["axis_pass_counts"].values())
+    assert not report["normal_weight_promotion_authorized"]
+    assert not report["hyperweight_promotion_authorized"]
+    assert not report["neural_training_authorized"]
+    assert len(report["report_digest"])==64
+
+def test_hundred_matrix_missing_conflicted_expired_or_bad_signature_stays_closed():
+    key,pub,records=matrix_bundle()
+    kwargs=dict(public_key=pub,trusted_reviewer="independent-wiki",
+                key_id="review-key-1",now=150)
+    part=scrutinize_one_hundred("studio","a"*64,records[:-1],**kwargs)
+    assert part["passed_matrix_count"]==99
+    assert len(part["missing_matrix_ids"])==1
+    assert not part["shadow_review_proposal_eligible"]
+    failed=replace(records[0],verdict="conflict",signature_hex="")
+    failed=replace(failed,signature_hex=sign(key,failed.body()))
+    no=scrutinize_one_hundred("studio","a"*64,(failed,)+records[1:],**kwargs)
+    assert not no["shadow_review_proposal_eligible"]
+    assert failed.matrix_id in no["failed_matrix_ids"]
+    with pytest.raises(ValueError,match="duplicate"):
+        scrutinize_one_hundred("studio","a"*64,records[:-1]+(records[0],),**kwargs)
+    with pytest.raises(PermissionError,match="signature"):
+        scrutinize_one_hundred(
+            "studio","a"*64,(replace(records[0],evidence_digest="f"*64),)+records[1:],**kwargs)
+    with pytest.raises(PermissionError,match="identity"):
+        scrutinize_one_hundred(
+            "other","a"*64,records,**kwargs)
+    expired=scrutinize_one_hundred(
+        "studio","a"*64,records,**{**kwargs,"now":1000})
+    assert not expired["shadow_review_proposal_eligible"]
+
+def make_eval(key,candidate,*,tier="shadow_to_weight",prior=None,matrix_report_digest="a"*64):
+    trials=tuple(HoldoutTrial(
+        case_id="case-"+str(i),task_family=("platform","npc","physics")[i%3],
+        source_group=("publisher-1","publisher-2","publisher-3")[i%3],
+        expected_digest="d"*64,
+        baseline_correct=i<7,candidate_correct=i<9,
+        baseline_latency_ms=50,candidate_latency_ms=45,
+        baseline_peak_kib=100,candidate_peak_kib=95)
+        for i in range(12))
+    e=SealedTierEvaluation(
+        owner="studio",candidate_digest=candidate,prior_digest=prior or "0"*64,
+        matrix_report_digest=matrix_report_digest,tier=tier,
+        suite_digest=canonical_digest([vars(t) for t in trials]),
+        trials=trials,holdout_excluded_from_training=True,
+        evaluator="independent-mirror",key_id="eval-1",
+        issued_at=100,expires_at=900,signature_hex="")
+    return replace(e,signature_hex=sign(key,e.body()))
+
+def trusted_mother():
+    _,pub,records=matrix_bundle()
+    report=scrutinize_one_hundred(
+        "studio","a"*64,records,public_key=pub,
+        trusted_reviewer="independent-wiki",key_id="review-key-1",now=150)
+    # Each factual witness has a different signing key and source revision.
+    # A separate, third adjudicator signs the complete witness-set digest.
+    a,apub=keypair()
+    b,bpub=keypair()
+    judge,jpub=keypair()
+    claim=ClaimSubject("f"*64,"b"*64,"game-physics")
+    witnesses=[]
+    trusted={}
+    for n,(key,public,group,name) in enumerate((
+        (a,apub,"publisher-one","fact-auditor-one"),
+        (b,bpub,"publisher-two","fact-auditor-two"),
+    ),start=1):
+        trusted[group]=(name,"fact-key-"+str(n),public)
+        w=SourceWitness(
+            "studio","a"*64,claim.claim_digest,claim.context_digest,
+            "source-"+str(n)*64,str(n+2)*64,group,"supports",
+            name,"fact-key-"+str(n),100,900,"")
+        witnesses.append(replace(w,signature_hex=sign(key,w.body())))
+    claims=(claim,)
+    witnesses=tuple(witnesses)
+    review=SignedClaimAdjudication(
+        "studio","a"*64,claim.claim_digest,claim.context_digest,
+        witness_set_digest(witnesses),"accept",
+        "independent-fact-judge","judge-key",100,900,"")
+    review=replace(review,signature_hex=sign(judge,review.body()))
+    parameters=dict(mother_findings=records,mother_public_key=pub,
+                    mother_reviewer="independent-wiki",
+                    mother_key_id="review-key-1",
+                    mother_knowledge_digest="a"*64,
+                    fact_claims=claims,fact_witnesses=witnesses,
+                    fact_adjudications=(review,),fact_reviewers=trusted,
+                    fact_adjudicator_public_key=jpub,
+                    fact_adjudicator="independent-fact-judge",
+                    fact_adjudicator_key_id="judge-key")
+    return report,parameters
+
+
+def test_two_signed_sandboxes_and_jeeves_fast_index_with_rollback():
+    eval_key,eval_pub=keypair()
+    op_key,op_pub=keypair()
+    matrix, mother_args=trusted_mother()
+    entries=(("f"*64,("gameboy","sprite")),("e"*64,("physics","editor")))
+    digest=canonical_digest([[identity,list(words)] for identity,words in entries])
+    signed=make_eval(eval_key,digest,matrix_report_digest=matrix["report_digest"])
+    verdict=qualify_tier(
+        signed,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+        key_id="eval-1",now=150,**mother_args)
+    assert verdict["promotion_review_eligible"]
+    assert verdict["newly_correct"]==2 and verdict["regressions"]==0
+    assert not verdict["neural_training_authorized"]
+    assert verdict["corroborated_claim_count"]==1
+    assert len(verdict["cross_source_fact_report_digest"])==64
+    with pytest.raises(PermissionError,match="disputed or incomplete"):
+        qualify_tier(
+            signed,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+            key_id="eval-1",now=150,
+            **{**mother_args,"fact_adjudications":()})
+    with pytest.raises(PermissionError,match="signed factual"):
+        qualify_tier(
+            signed,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+            key_id="eval-1",now=150,
+            **{**mother_args,"fact_witnesses":(
+                replace(mother_args["fact_witnesses"][0],
+                        source_revision_digest="9"*64),
+                mother_args["fact_witnesses"][1])})
+    with pytest.raises(PermissionError,match="100 independently signed"):
+        qualify_tier(
+            signed,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+            key_id="eval-1",now=150,
+            **{**mother_args,"mother_findings":mother_args["mother_findings"][:-1]})
+
+    approval=SignedOverlayApproval(
+        owner="studio",tier="shadow_to_weight",candidate_digest=digest,
+        verdict_digest=verdict["verdict_digest"],operator="operator",
+        key_id="operator-1",expires_at=800,signature_hex="")
+    approval=replace(approval,signature_hex=sign(op_key,approval.body()))
+    router=JeevesWeightOverlay("studio")
+    args=dict(entries=entries,verdict=verdict,approval=approval,evaluation=signed,
+        evaluator_public_key=eval_pub,evaluator="independent-mirror",
+        evaluator_key_id="eval-1",operator_public_key=op_pub,
+        operator="operator",key_id="operator-1",now=150,**mother_args)
+    with pytest.raises(PermissionError,match="holdout"):
+        router.activate(expected_generation=0,**{
+            **args,"evaluation":replace(signed,holdout_excluded_from_training=False)})
+    status=router.activate(expected_generation=0,**args)
+    assert status["generation"]==1 and status["rollback_available"]
+    assert not status["neural_weights_changed"]
+    assert router.route("gameboy sprite")["bookmarked_retrieval_ids"]==["f"*64]
+    with pytest.raises(PermissionError,match="stale"):
+        router.activate(expected_generation=0,**args)
+    assert router.rollback(expected_generation=1,authorized=True)==2
+    assert router.route("gameboy")["bookmarked_retrieval_ids"]==[]
+    with pytest.raises(PermissionError,match="rollback"):
+        router.rollback(expected_generation=2,authorized=False)
+
+def test_weight_to_hyper_requires_new_benchmark_and_preserves_rollback():
+    eval_key,eval_pub=keypair()
+    op_key,op_pub=keypair()
+    mother,mother_args=trusted_mother()
+    router=JeevesWeightOverlay("studio")
+    previous="0"*64
+    for generation,tier,entries in (
+        (0,"shadow_to_weight",(("b"*64,("physics","npc")),)),
+        (1,"weight_to_hyper",(("c"*64,("physics","npc","gameboy")),)),
+    ):
+        digest=canonical_digest([[identity,list(words)] for identity,words in entries])
+        evidence=make_eval(eval_key,digest,tier=tier,prior=previous,
+                           matrix_report_digest=mother["report_digest"])
+        verdict=qualify_tier(
+            evidence,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+            key_id="eval-1",now=150,**mother_args)
+        assert verdict["promotion_review_eligible"]
+        approved=SignedOverlayApproval(
+            "studio",tier,digest,verdict["verdict_digest"],
+            "operator","operator-1",800,"")
+        approved=replace(approved,signature_hex=sign(op_key,approved.body()))
+        kwargs=dict(entries=entries,verdict=verdict,approval=approved,
+            evaluation=evidence,evaluator_public_key=eval_pub,
+            evaluator="independent-mirror",evaluator_key_id="eval-1",
+            operator_public_key=op_pub,operator="operator",
+            key_id="operator-1",now=150,**mother_args)
+        if generation==1:
+            wrong=make_eval(eval_key,digest,tier=tier,prior="9"*64,
+                            matrix_report_digest=mother["report_digest"])
+            bad_verdict=qualify_tier(
+                wrong,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+                key_id="eval-1",now=150,**mother_args)
+            bad_approval=SignedOverlayApproval(
+                "studio",tier,digest,bad_verdict["verdict_digest"],
+                "operator","operator-1",800,"")
+            bad_approval=replace(
+                bad_approval,signature_hex=sign(op_key,bad_approval.body()))
+            with pytest.raises(PermissionError,match="tier baseline"):
+                router.activate(expected_generation=1,**{
+                    **kwargs,"evaluation":wrong,"verdict":bad_verdict,
+                    "approval":bad_approval})
+        status=router.activate(expected_generation=generation,**kwargs)
+        assert status["generation"]==generation+1
+        previous=digest
+    assert router.route("gameboy")["bookmarked_retrieval_ids"]==["c"*64]
+    assert router.rollback(expected_generation=2,authorized=True)==3
+    assert router.route("physics")["bookmarked_retrieval_ids"]==["b"*64]
+    assert router.route("gameboy")["bookmarked_retrieval_ids"]==[]
+
+
+def test_sandbox_requires_real_holdout_improvement_and_no_regressions():
+    key,pub=keypair()
+    matrix,mother_args=trusted_mother()
+    sig=make_eval(key,"e"*64,matrix_report_digest=matrix["report_digest"])
+    trials=list(sig.trials)
+    trials[0]=replace(trials[0],candidate_correct=False)
+    modified=replace(sig,trials=tuple(trials),
+        suite_digest=canonical_digest([vars(t) for t in trials]),signature_hex="")
+    signed=replace(modified,signature_hex=sign(key,modified.body()))
+    report=qualify_tier(
+        signed,evaluator_public_key=pub,evaluator="independent-mirror",
+        key_id="eval-1",now=150,**mother_args)
+    assert not report["promotion_review_eligible"]
+    assert report["regressions"]==1
+    with pytest.raises(PermissionError):
+        qualify_tier(replace(sig,holdout_excluded_from_training=False),
+            evaluator_public_key=pub,evaluator="independent-mirror",
+            key_id="eval-1",now=150,**mother_args)
+
+def visual_packet():
+    source_url="https://video.example/watch/demo"
+    frame=CapturedFrame("frame-1","studio","job","b"*64,
+        "consent","scope",150,"c"*64,3000,"local-frame-1")
+    frames=FrameBatch((frame,),"a"*64)
+    features=VisualFeatureBatch(
+        (FeatureFrame(150,(0.4,0.6),"frame-1"),),"d"*64,"a"*64)
+    chunks=(VideoKnowledgeChunk("chunk-1",100,400,
+        "Sprite editor and tilemap tool demo.",("transcript",),
+        ("line-1",),source_url),)
+    observations=(VideoObservation(100,400,"frame_description",
+        "Sprite editor visible in tool panel.",0.9,"frame-1"),)
+    return source_url,frames,features,chunks,observations
+
+def test_video_inspiration_creates_timecoded_frame_bookmarks_not_weights():
+    source_url,frames,features,chunks,obs=visual_packet()
+    packet=digest_video_inspiration(
+        "source-"+"1"*64,source_url,chunks,features,obs,frames,
+        consent_verified=True,authorized=True)
+    assert packet["bookmarked_clips"]==1
+    assert packet["notes"][0]["frame_digest"]=="c"*64
+    assert "editor" in packet["tool_editor_leads"]
+    assert packet["independent_visual_fact_review_required"]
+    assert not packet["normal_weight_promotion_authorized"]
+    assert not packet["hyperweight_promotion_authorized"]
+    with pytest.raises(PermissionError):
+        digest_video_inspiration(
+            "source-"+"1"*64,source_url,chunks,features,obs,frames,
+            consent_verified=False,authorized=True)
+    with pytest.raises(ValueError,match="frame"):
+        digest_video_inspiration(
+            "source-"+"1"*64,source_url,chunks,features,
+            (replace(obs[0],source_id="forged"),),frames,
+            consent_verified=True,authorized=True)
+
+def _signed_visual_review(key, packet, *, decision="research"):
+    receipt=SignedVisualPacketReview(
+        owner="studio",source_id=packet["source_id"],
+        packet_digest=packet["bookmark_digest"],
+        reviewer="independent-video-reviewer",key_id="video-review-1",
+        issued_at=100,expires_at=1000,decision=decision,signature_hex="")
+    return replace(receipt,signature_hex=sign(key,receipt.body()))
+
+
+def test_video_tool_backlog_binds_timecoded_visual_frames_to_signed_review():
+    source_url,frames,features,chunks,obs=visual_packet()
+    packet=digest_video_inspiration(
+        "source-"+"1"*64,source_url,chunks,features,obs,frames,
+        consent_verified=True,authorized=True)
+    key,pub=keypair()
+    signed=_signed_visual_review(key,packet)
+    index=index_video_tool_research(
+        "studio",((packet,signed),),reviewer_public_key=pub,
+        reviewer="independent-video-reviewer",key_id="video-review-1",
+        now=200,task_terms=("editor",),limit=10)
+    assert index["schema"]=="skeleton.dragon.video_tool_research_index.v1"
+    assert index["reviewed_video_sources"]==1
+    assert index["distinct_tool_topics"]>=1
+    editor=next(i for i in index["entries"] if i["tool_topic"]=="editor")
+    assert editor["task_topic_match"]
+    assert editor["bookmarks"][0]["source_id"]==packet["source_id"]
+    assert editor["bookmarks"][0]["frame_digest"]=="c"*64
+    assert editor["bookmarks"][0]["clip_digest"]==packet["notes"][0]["clip_digest"]
+    assert editor["observed_video_sources"]==1
+    assert not editor["approved_software_recommendation"]
+    assert not index["weight_promotion_authorized"]
+    assert not index["hyperweight_promotion_authorized"]
+    assert not index["neural_training_authorized"]
+    assert index["network_requests"]==0
+    assert len(index["index_digest"])==64
+    md,weekly = render_weekly_backlog(
+        "studio",datetime(2026,10,12,tzinfo=timezone.utc),
+        visual=(),rss=(),matrix_reports=(),
+        video_tool_indexes=(index,))
+    assert "Software" in md
+    assert "editor" in md
+    assert weekly["items"][0]["lane"]=="software"
+    assert weekly["items"][0]["source_id"]==packet["source_id"]
+    with pytest.raises(ValueError,match="tampered"):
+        render_weekly_backlog(
+            "studio",datetime(2026,10,12,tzinfo=timezone.utc),
+            visual=(),rss=(),matrix_reports=(),
+            video_tool_indexes=(dict(index,checked_at=201),))
+
+
+
+def test_visual_tool_leads_reject_duplicate_sources_stale_consent_or_forgery():
+    source_url,frames,features,chunks,obs=visual_packet()
+    packet=digest_video_inspiration(
+        "source-"+"1"*64,source_url,chunks,features,obs,frames,
+        consent_verified=True,authorized=True)
+    key,pub=keypair()
+    receipt=_signed_visual_review(key,packet)
+    opts=dict(reviewer_public_key=pub,
+              reviewer="independent-video-reviewer",
+              key_id="video-review-1",now=200)
+    with pytest.raises(ValueError,match="repeated video packet"):
+        index_video_tool_research(
+            "studio",((packet,receipt),(packet,receipt)),**opts)
+    forged=dict(packet,normal_weight_promotion_authorized=True)
+    with pytest.raises(ValueError,match="custody"):
+        index_video_tool_research("studio",((forged,receipt),),**opts)
+    with pytest.raises(PermissionError,match="wrong tenant"):
+        index_video_tool_research("other",((packet,receipt),),**opts)
+    with pytest.raises(ValueError,match="stale"):
+        index_video_tool_research(
+            "studio",((packet,receipt),),
+            **{**opts,"now":1000})
+    with pytest.raises(PermissionError,match="forged"):
+        index_video_tool_research(
+            "studio",((packet,replace(receipt,decision="reject")),),**opts)
+    rejected=_signed_visual_review(key,packet,decision="reject")
+    result=index_video_tool_research(
+        "studio",((packet,rejected),),**opts)
+    assert result["review_rejections"]==1
+    assert result["entries"]==[]
+    assert not result["neural_training_authorized"]
+
+
+def rss_xml():
+    return b'<rss version="2.0"><channel><item><title>New game physics guide</title><link>https://updates.example/game-physics</link><guid>update-1</guid><pubDate>Mon, 12 Oct 2026 08:00:00 GMT</pubDate></item></channel></rss>'
+
+def rss_snapshot(key,xml):
+    obj=SignedRssSnapshot("studio","source-"+"1"*64,
+        "https://updates.example/feed.xml",sha256(xml).hexdigest(),
+        100,180,"rss-independent","rss-1","f"*64,"")
+    return replace(obj,signature_hex=sign(key,obj.body()))
+
+def test_rss_idle_only_signed_queue_deduplicates_and_weekly_exports(tmp_path):
+    key,pub=keypair()
+    xml=rss_xml()
+    ticket=HatchlingWorkerTicket(
+        "studio","updates","source-"+"1"*64,
+        "https://updates.example/feed.xml",
+        "hatchling:updates-1","d"*64,
+        "2026-10-12T00:00:00Z","2026-10-12T00:00:30Z")
+    admission=object.__new__(DragonNestWorkerAdmission)
+    checks=[]
+    admission.authorize_chunk=lambda *args,**kw:(checks.append(kw) or True)
+    with sqlite3.connect(":memory:") as db:
+        queue=DragonRssUpdateQueue(db)
+        kwargs=dict(reviewer_public_key=pub,trusted_issuer="rss-independent",
+            key_id="rss-1",now=150,admission_kwargs={},authorized=True)
+        first=queue.ingest(ticket,admission,xml,rss_snapshot(key,xml),**kwargs)
+        assert first["new_unverified_leads"]==1
+        assert len(checks)==2
+        second=queue.ingest(ticket,admission,xml,rss_snapshot(key,xml),**kwargs)
+        assert second["idempotent"] and second["new_unverified_leads"]==0
+        report=queue.pending("studio",authorized=True)
+        assert report["count"]==1
+        assert queue.pending("different-tenant",authorized=True)["entries"]==[]
+        assert not report["training_authorized"]
+        md,index=render_weekly_backlog(
+            "studio",datetime(2026,10,12,tzinfo=timezone.utc),
+            visual=(),rss=(report,),matrix_reports=())
+        assert "New game physics guide" in md
+        assert index["item_count"]==1
+        dest=export_weekly(
+            tmp_path.resolve(),"studio",
+            datetime(2026,10,12,tzinfo=timezone.utc),
+            visual=(),rss=(report,),matrix_reports=())
+        assert (tmp_path/"2026-W42"/"dragon-upgrade-backlog.md").is_file()
+        assert (tmp_path/"2026-W42"/"dragon-bookmarks.json").is_file()
+        assert dest["items"]==1 and not dest["model_weights_changed"]
+        with pytest.raises(PermissionError):
+            queue.ingest(ticket,admission,xml,replace(
+                rss_snapshot(key,xml),rights_receipt_digest="a"*64),**kwargs)
+        db.execute("UPDATE dragon_rss_updates_v1 SET payload='{}'")
+        with pytest.raises(ValueError,match="tamper"):
+            queue.pending("studio",authorized=True)
+
+
+def test_signed_hundred_matrix_is_required_before_existing_shadow_dispatch():
+    _,pub,records=matrix_bundle()
+    idle=IdleResearchPlan(
+        "studio","2026-10-12T00:00:00Z",(),"idle",0,0)
+    args=dict(
+        ledger=None,automation=None,library=None,nest=None,
+        plan=idle,reviewed=(),acquisitions=(),
+        now="2026-10-12T00:00:00Z",
+        idle_since="2026-10-11T23:40:00Z",
+        hardware=None,hardware_now=0,consented=True,
+        background_allowed=True,owner_authorized=True,
+        privacy_clear=True,knowledge_digest="a"*64,
+        findings=records,reviewer_public_key=pub,
+        reviewer="independent-wiki",key_id="review-key-1",
+        review_at=150)
+    with patch(
+        "skeleton.ai.webcrawler.dragon_mother_hundred_handoff.run_mother_to_shadow",
+        return_value="original-worker-must-verify-all-lineage") as dispatch:
+        with pytest.raises(PermissionError,match="all 100"):
+            run_hundred_matrix_mother_to_shadow(
+                **{**args,"findings":records[:-1]})
+        dispatch.assert_not_called()
+        assert run_hundred_matrix_mother_to_shadow(**args)==(
+            "original-worker-must-verify-all-lineage")
+        dispatch.assert_called_once()
+        with pytest.raises(PermissionError,match="lawful idle"):
+            run_hundred_matrix_mother_to_shadow(
+                **{**args,"background_allowed":False})
+        dispatch.assert_called_once()
+
+
+
+def _vault_activation(generation, tier, entries, previous, mother,
+                      mother_args, eval_key, eval_pub, op_key, op_pub):
+    digest=canonical_digest([[ident,list(words)] for ident,words in entries])
+    evaluation=make_eval(
+        eval_key,digest,tier=tier,prior=previous,
+        matrix_report_digest=mother["report_digest"])
+    verdict=qualify_tier(
+        evaluation,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+        key_id="eval-1",now=150,**mother_args)
+    approval=SignedOverlayApproval(
+        "studio",tier,digest,verdict["verdict_digest"],"operator",
+        "operator-1",800,"")
+    approval=replace(approval,signature_hex=sign(op_key,approval.body()))
+    kwargs=dict(verdict=verdict,approval=approval,evaluation=evaluation,
+        evaluator_public_key=eval_pub,evaluator="independent-mirror",
+        evaluator_key_id="eval-1",operator_public_key=op_pub,
+        operator="operator",key_id="operator-1",now=150,**mother_args)
+    return digest,kwargs
+
+
+def test_durable_jeeves_two_tier_activation_restart_and_signed_rollback(tmp_path):
+    eval_key,eval_pub=keypair()
+    operator,operator_pub=keypair()
+    mother,mother_args=trusted_mother()
+    dbfile=tmp_path/"durable-weights.sqlite"
+    key=b"tenant-retrieval-ledger-independent-custody-key-64bytes"
+    entries1=(("b"*64,("physics","npc")),)
+    entries2=(("c"*64,("physics","npc","gameboy")),)
+    digest1,kwargs1=_vault_activation(0,"shadow_to_weight",entries1,"0"*64,
+        mother,mother_args,eval_key,eval_pub,operator,operator_pub)
+    digest2,kwargs2=_vault_activation(1,"weight_to_hyper",entries2,digest1,
+        mother,mother_args,eval_key,eval_pub,operator,operator_pub)
+    with sqlite3.connect(dbfile) as db:
+        vault=DragonDurableWeightVault(db,owner="studio",signing_key=key)
+        assert vault.audit()["generation"]==0
+        assert vault.publish(entries=entries1,activation_kwargs=kwargs1,
+                             expected_generation=0)["durably_committed"]
+        with pytest.raises(PermissionError,match="stale"):
+            vault.publish(entries=entries1,activation_kwargs=kwargs1,
+                          expected_generation=0)
+        assert vault.publish(entries=entries2,activation_kwargs=kwargs2,
+                             expected_generation=1)["generation"]==2
+        assert vault.route("gameboy physics",now=150)["bookmarked_retrieval_ids"]==[
+            "c"*64]
+        assert vault.audit()["generation"]==2
+        foreign=DragonDurableWeightVault(db,owner="unrelated-studio",
+                                         signing_key=key)
+        assert foreign.audit()["generation"]==0
+        assert foreign.route("physics",now=150)["bookmarked_retrieval_ids"]==[]
+    with sqlite3.connect(dbfile) as reopened:
+        restarted=DragonDurableWeightVault(
+            reopened,owner="studio",signing_key=key)
+        assert restarted.route("gameboy",now=151)["bookmarked_retrieval_ids"]==[
+            "c"*64]
+        order=SignedRollbackOrder(
+            "studio",2,digest2,digest1,"operator","operator-1",
+            151,650,"f"*64,"")
+        order=replace(order,signature_hex=sign(operator,order.body()))
+        with pytest.raises(PermissionError,match="signature"):
+            restarted.rollback(replace(order,reason_digest="e"*64),
+                public_key=operator_pub,operator="operator",
+                key_id="operator-1",now=151)
+        restored=restarted.rollback(order,public_key=operator_pub,
+            operator="operator",key_id="operator-1",now=151)
+        assert restored["generation"]==3
+        assert restored["restored_digest"]==digest1
+        assert restarted.route("gameboy",now=152)["bookmarked_retrieval_ids"]==[]
+        assert restarted.route("physics",now=152)["bookmarked_retrieval_ids"]==[
+            "b"*64]
+        assert restarted.route("physics",now=651)["bookmarked_retrieval_ids"]==[]
+        assert restarted.audit()["history_verified"] is True
+        with pytest.raises(PermissionError,match="stale"):
+            restarted.rollback(order,public_key=operator_pub,
+                operator="operator",key_id="operator-1",now=152)
+
+
+def test_durable_weight_vault_detects_rewritten_history_and_missing_head():
+    key=b"owner-specific-hmac-separately-provisioned-64bytes-here"
+    with sqlite3.connect(":memory:") as db:
+        vault=DragonDurableWeightVault(db,owner="studio",signing_key=key)
+        initial=dict(schema="skeleton.jeeves.weight_vault_event.v1",
+            owner="studio",generation=1,action="activate",
+            tier="shadow_to_weight",previous_digest="0"*64,
+            index_digest=canonical_digest([["f"*64,["physics"]]]),
+            entries=[["f"*64,["physics"]]],
+            holdout_digest="a"*64,matrix_digest="b"*64,
+            approval_digest="c"*64,expires_at=900,observed_at=150)
+        db.execute("BEGIN IMMEDIATE")
+        vault._append(event=initial,seq=1,previous_event_digest="0"*64)
+        db.commit()
+        assert vault.route("physics",now=151)["bookmarked_retrieval_ids"]==[
+            "f"*64]
+        db.execute("UPDATE dragon_weight_vault_events_v1 "
+                   "SET payload='{}' WHERE owner='studio' AND sequence=1")
+        with pytest.raises(ValueError,match="custody"):
+            vault.audit()
+        with pytest.raises(ValueError,match="custody"):
+            vault.route("physics",now=152)
+        db.rollback()
+
+
+def test_durable_vault_missing_or_swapped_operator_key_never_publishes():
+    eval_key,eval_pub=keypair()
+    op_key,op_pub=keypair()
+    _,wrong_pub=keypair()
+    mother,mother_args=trusted_mother()
+    entries=(("f"*64,("physics",)),)
+    _,kwargs=_vault_activation(0,"shadow_to_weight",entries,"0"*64,
+        mother,mother_args,eval_key,eval_pub,op_key,op_pub)
+    with sqlite3.connect(":memory:") as db:
+        vault=DragonDurableWeightVault(
+            db,owner="studio",signing_key=b"durable-vault-key-very-long-and-separate")
+        with pytest.raises(PermissionError,match="operator approval signature"):
+            vault.publish(entries=entries,expected_generation=0,
+                activation_kwargs={**kwargs,"operator_public_key":wrong_pub})
+        assert vault.audit()["generation"]==0
+        with pytest.raises(PermissionError,match="100 independently signed"):
+            vault.publish(entries=entries,expected_generation=0,
+                activation_kwargs={**kwargs,
+                    "mother_findings":mother_args["mother_findings"][:-1]})
+        assert vault.audit()["generation"]==0
+
+
+
+def _canary_setup(db):
+    eval_key,eval_pub=keypair()
+    operator,operator_pub=keypair()
+    reviewer,reviewer_pub=keypair()
+    mother,mother_args=trusted_mother()
+    vault=DragonDurableWeightVault(
+        db,owner="studio",
+        signing_key=b"independent-custody-service-hmac-key-2026-vault")
+    past="0"*64
+    for i,(tier,entries) in enumerate((
+        ("shadow_to_weight",(("b"*64,("physics","npc")),)),
+        ("weight_to_hyper",(("c"*64,("gameboy","physics")),)),
+    )):
+        digest,kwargs=_vault_activation(
+            i,tier,entries,past,mother,mother_args,
+            eval_key,eval_pub,operator,operator_pub)
+        vault.publish(entries=entries,activation_kwargs=kwargs,
+                      expected_generation=i)
+        if i==0:
+            baseline=digest
+        past=digest
+    plan=SignedCanaryPlan(
+        "studio",past,baseline,15,12,1.05,
+        "operator","operator-1",100,700,"")
+    plan=replace(plan,signature_hex=sign(operator,plan.body()))
+    kwargs=dict(vault=vault,plan=plan,operator_public_key=operator_pub,
+        operator="operator",operator_key_id="operator-1",
+        assessor_public_key=reviewer_pub,assessor="independent-canary",
+        assessor_key_id="canary-1",
+        signing_key=b"canary-observations-separate-secret-2026-long-key")
+    governor=DragonWeightCanary(db,**kwargs)
+    return governor,kwargs,reviewer,operator
+
+
+def _canary_pair(plan,reviewer,i,*,regression=False):
+    observed=SignedCanaryPair(
+        owner="studio",plan_digest=canonical_digest(plan.body()),
+        case_digest=canonical_digest({"case":i}),
+        task_family=("physics","npc","platform")[i%3],
+        source_group_digest=canonical_digest({"origin":i%3}),
+        baseline_correct=i<7,
+        candidate_correct=False if regression else i<9,
+        baseline_latency_ms=50,candidate_latency_ms=48,
+        assessor="independent-canary",assessor_key_id="canary-1",
+        observed_at=150,signature_hex="")
+    return replace(observed,signature_hex=sign(reviewer,observed.body()))
+
+
+def test_durable_canary_balances_real_versions_and_gates_full_rollout():
+    with sqlite3.connect(":memory:") as db:
+        canary,kwargs,reviewer,_=_canary_setup(db)
+        assert canary.audit(now=150)["status"]=="canary_running"
+        assert not canary.audit(now=150)["full_rollout_authorized"]
+        selected=set()
+        for i in range(120):
+            cohort=canonical_digest({"cohort":i})
+            result=canary.select("gameboy physics",cohort_digest=cohort,
+                                 now=150)
+            selected.add(result["selected_index_digest"])
+            assert result["candidate_selected"] == (
+                result["selected_index_digest"]==kwargs["plan"].candidate_digest)
+            assert not result["full_rollout_authorized"]
+        assert selected=={kwargs["plan"].candidate_digest,
+                         kwargs["plan"].control_digest}
+        for i in range(12):
+            status=canary.observe(
+                _canary_pair(kwargs["plan"],reviewer,i),now=151)
+        assert status["candidate_pairs"]==12
+        assert status["newly_correct"]==2 and status["regressions"]==0
+        assert status["status"]=="ready_for_operator_review"
+        assert status["candidate_exposure_permitted"]
+        assert not status["full_rollout_authorized"]
+        recovered=DragonWeightCanary(db,**kwargs)
+        assert recovered.audit(now=152)==canary.audit(now=152)
+        with pytest.raises(sqlite3.IntegrityError):
+            canary.observe(_canary_pair(kwargs["plan"],reviewer,0),now=152)
+        with pytest.raises(PermissionError,match="not current"):
+            canary.select("physics",cohort_digest="a"*64,now=701)
+        assert canary.audit(now=701)["status"]=="expired"
+
+
+def test_canary_signed_regression_halts_all_candidate_traffic():
+    with sqlite3.connect(":memory:") as db:
+        canary,kwargs,reviewer,operator=_canary_setup(db)
+        different=replace(kwargs["plan"],traffic_percent=25,signature_hex="")
+        different=replace(different,signature_hex=sign(operator,different.body()))
+        settings={**kwargs,"plan":different}
+        canary=DragonWeightCanary(db,**settings)
+        result=canary.observe(
+            _canary_pair(different,reviewer,3,regression=True),now=151)
+        assert result["status"]=="halted_regression"
+        assert result["regressions"]==1
+        for i in range(30):
+            selected=canary.select(
+                "physics gameboy",
+                cohort_digest=canonical_digest({"cohort":i}),now=151)
+            assert selected["selected_index_digest"]==different.control_digest
+            assert not selected["candidate_selected"]
+        with pytest.raises(PermissionError,match="halted"):
+            canary.observe(_canary_pair(different,reviewer,4),now=152)
+        with pytest.raises(PermissionError,match="signature"):
+            canary.observe(replace(
+                _canary_pair(different,reviewer,4),
+                candidate_latency_ms=60),now=152)
+        db.execute(
+            "UPDATE dragon_canary_pairs_v1 SET payload='{}' "
+            "WHERE owner=? AND plan_digest=?",
+            ("studio",canary.plan_digest))
+        with pytest.raises(ValueError,match="custody|trial"):
+            canary.audit(now=153)
+
+
+def test_canary_rejects_unsigned_plan_wrong_operator_and_unapproved_versions():
+    with sqlite3.connect(":memory:") as db:
+        canary,kwargs,_,_=_canary_setup(db)
+        with pytest.raises(PermissionError,match="signature"):
+            DragonWeightCanary(
+                db,**{**kwargs,"plan":replace(kwargs["plan"],traffic_percent=4)})
+        with pytest.raises(ValueError,match="bounded"):
+            DragonWeightCanary(
+                db,**{**kwargs,"plan":replace(kwargs["plan"],traffic_percent=26)})
+        with pytest.raises(ValueError,match="bounded"):
+            DragonWeightCanary(
+                db,**{**kwargs,"operator":"unrecognized-operator"})
+        with pytest.raises(ValueError,match="digest"):
+            canary.select("gameboy",cohort_digest="../secret",now=150)
+        with pytest.raises(PermissionError,match="requested prior"):
+            kwargs["vault"].route_version(
+                "physics",index_digest="a"*64,now=151)
+
+
+
+def test_signed_canary_latency_spike_halts_even_correct_candidates():
+    with sqlite3.connect(":memory:") as db:
+        _,kwargs,reviewer,operator=_canary_setup(db)
+        plan=replace(kwargs["plan"],traffic_percent=18,signature_hex="")
+        plan=replace(plan,signature_hex=sign(operator,plan.body()))
+        canary=DragonWeightCanary(db,**{**kwargs,"plan":plan})
+        slow=_canary_pair(plan,reviewer,10)
+        slow=replace(slow,candidate_latency_ms=60,signature_hex="")
+        slow=replace(slow,signature_hex=sign(reviewer,slow.body()))
+        status=canary.observe(slow,now=152)
+        assert status["status"]=="halted_regression"
+        assert status["regressions"]==0
+        assert status["max_latency_ratio_observed"]==1.2
+        assert not status["candidate_exposure_permitted"]
+        for i in range(20):
+            out=canary.select("gameboy physics",
+                cohort_digest=canonical_digest({"case":i}),now=152)
+            assert out["selected_index_digest"]==plan.control_digest

@@ -1,0 +1,108 @@
+{
+  "schema": "skeleton.game.harbor.season.v1",
+  "source_id": "lantern-quay",
+  "points": {
+    "gold": 10,
+    "silver": 7,
+    "bronze": 4,
+    "finish": 2
+  },
+  "rounds": [
+    {
+      "id": "lantern_sprint",
+      "course": {
+        "schema": "skeleton.game.harbor.time-trial.v1",
+        "source_id": "lantern-quay",
+        "checkpoints": [
+          {
+            "id": "timber",
+            "at": [
+              2,
+              1
+            ],
+            "latest_tick": 3
+          },
+          {
+            "id": "ore",
+            "at": [
+              3,
+              1
+            ],
+            "latest_tick": 6
+          },
+          {
+            "id": "pantry",
+            "at": [
+              1,
+              3
+            ],
+            "latest_tick": 12
+          },
+          {
+            "id": "dock_approach",
+            "at": [
+              5,
+              3
+            ],
+            "latest_tick": 20
+          }
+        ],
+        "deadline": 32,
+        "medals": {
+          "gold": 18,
+          "silver": 24,
+          "bronze": 32
+        },
+        "choice": "signal"
+      }
+    },
+    {
+      "id": "night_shift",
+      "course": {
+        "schema": "skeleton.game.harbor.time-trial.v1",
+        "source_id": "lantern-quay",
+        "checkpoints": [
+          {
+            "id": "timber",
+            "at": [
+              2,
+              1
+            ],
+            "latest_tick": 3
+          },
+          {
+            "id": "ore",
+            "at": [
+              3,
+              1
+            ],
+            "latest_tick": 6
+          },
+          {
+            "id": "pantry",
+            "at": [
+              1,
+              3
+            ],
+            "latest_tick": 12
+          },
+          {
+            "id": "dock_approach",
+            "at": [
+              5,
+              3
+            ],
+            "latest_tick": 20
+          }
+        ],
+        "deadline": 33,
+        "medals": {
+          "gold": 19,
+          "silver": 25,
+          "bronze": 33
+        },
+        "choice": "shelter"
+      }
+    }
+  ]
+}

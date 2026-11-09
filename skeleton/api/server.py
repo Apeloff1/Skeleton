@@ -1,0 +1,1541 @@
+"""
+Skeleton API Server — FastAPI application factory and state management.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+from pathlib import Path
+from dataclasses import asdict, is_dataclass
+from threading import RLock
+from typing import Any, Dict, Optional
+
+from skeleton.api.errors import (
+    install_error_handlers,
+    skeleton_error_handler,
+    unhandled_error_handler,
+)
+
+__all__ = [
+    "ServerState",
+    "create_app",
+    "get_state",
+    "install_error_handlers",
+    "run_server",
+    "skeleton_error_handler",
+    "unhandled_error_handler",
+]
+
+_fastapi = None
+_uvicorn = None
+
+
+def _get_fastapi():
+    global _fastapi
+    if _fastapi is None:
+        import fastapi
+        _fastapi = fastapi
+    return _fastapi
+
+
+def _get_uvicorn():
+    global _uvicorn
+    if _uvicorn is None:
+        import uvicorn
+        _uvicorn = uvicorn
+    return _uvicorn
+
+
+class ServerState:
+    """Shared runtime state for the API server."""
+
+    def __init__(self):
+        self.genesis: Optional[Any] = None
+        self.jeeves: Optional[Any] = None
+        self.forge: Optional[Any] = None
+        self.mesh: Optional[Any] = None
+        self.registry: Optional[Any] = None
+        self.ledger: Optional[Any] = None
+        self.scheduler: Optional[Any] = None
+        self.swarm: Optional[Any] = None
+        self.swarm_recovery: Optional[Any] = None
+        self.swarm_supervisor: Optional[Any] = None
+        self.swarm_broker: Optional[Any] = None
+        self.swarm_ingress: Optional[Any] = None
+        self.swarm_tenant_broker: Optional[Any] = None
+        self.health: Optional[Any] = None
+        self.metrics: Optional[Any] = None
+        self.realtime_hub: Optional[Any] = None
+        self.cockpit: Optional[Any] = None
+        self.npc_pipeline: Optional[Any] = None
+        self.game_logic_pipeline: Optional[Any] = None
+        self.animation_pipeline: Optional[Any] = None
+        self.gameforge: Optional[Any] = None
+        self.memory_trinity: Optional[Any] = None
+        self.resilience: Optional[Any] = None
+        self.intelligence: Optional[Any] = None
+        self.intelligence_core: Optional[Any] = None
+        self.operation_runtime: Optional[Any] = None
+        self.engine_execution_service: Optional[Any] = None
+        self.engine_execution_coordinator: Optional[Any] = None
+        # Trusted application-owned local guard, never sourced from HTTP or
+        # environment payloads. Bound once before engine startup.
+        self._engine_local_guard_components: Optional[Any] = None
+        self.engine_tool_receipt_store: Optional[Any] = None
+        self.engine_admission_runtime: Optional[Any] = None
+        self.engine_execution_admission_runtime: Optional[Any] = None
+        self.engine_quota_ledger: Optional[Any] = None
+        self.engine_pressure_ledger: Optional[Any] = None
+        self._engine_shutdown_pending = False
+        self._engine_close_task: asyncio.Task[None] | None = None
+        self.governance_lifecycle: Optional[Any] = None
+        self.governance_registry: Optional[Any] = None
+        self.governance_audit_log: Optional[Any] = None
+        self.governance_audit_timeline: Optional[Any] = None
+        self.governance_lifecycle_adapters: Optional[Any] = None
+        self.governance_lifecycle_executor: Optional[Any] = None
+        self.canonical_artifact_store: Optional[Any] = None
+        self.canonical_retrieval_index: Optional[Any] = None
+        self.canonical_memory_mongo_client: Optional[Any] = None
+        self.canonical_memory_repository: Optional[Any] = None
+        self.canonical_memory_writer: Optional[Any] = None
+        self.canonical_memory_projection_coordinator: Optional[Any] = None
+        self.jeeves_sam: Optional[Any] = None
+        self.jeeves_clom: Optional[Any] = None
+        self.jeeves_krem: Optional[Any] = None
+        self.jeeves_memory: Optional[Any] = None
+        self._swarm_bind_lock = RLock()
+
+    def bind_governance_registry(self) -> Any:
+        """Bind one restart-safe lifecycle/governance owner for the API process."""
+
+        if self.governance_registry is not None:
+            return self.governance_registry
+
+        from pathlib import Path
+
+        from skeleton.vault.audit import AuditLog
+        from skeleton.vault.data_lifecycle import DataLifecycleRegistry
+        from skeleton.vault.governance_audit import GovernanceAuditTimeline
+        from skeleton.vault.governance_registry import GovernanceRegistry
+        from skeleton.vault.lifecycle_adapters import (
+            LifecycleAdapterRegistry,
+            LifecycleExecutor,
+        )
+
+        path = os.environ.get(
+            "SKL_GOVERNANCE_LIFECYCLE_PATH",
+            ":memory:",
+        ).strip() or ":memory:"
+        if path != ":memory:":
+            Path(path).expanduser().parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+        lifecycle = DataLifecycleRegistry(path)
+        audit_override = os.environ.get(
+            "SKL_GOVERNANCE_AUDIT_PATH",
+            "",
+        ).strip()
+        if audit_override:
+            audit_log = AuditLog.open(audit_override)
+        elif path == ":memory:":
+            audit_log = AuditLog()
+        else:
+            lifecycle_path = Path(path).expanduser()
+            audit_log = AuditLog.open(
+                lifecycle_path.with_name(
+                    lifecycle_path.name + ".audit.jsonl"
+                )
+            )
+        timeline = GovernanceAuditTimeline(
+            audit_log,
+            actor="governance-runtime",
+        )
+        self.governance_lifecycle = lifecycle
+        self.governance_audit_log = audit_log
+        self.governance_audit_timeline = timeline
+        self.governance_lifecycle_adapters = LifecycleAdapterRegistry()
+        self.governance_lifecycle_executor = LifecycleExecutor(
+            lifecycle,
+            self.governance_lifecycle_adapters,
+            timeline=timeline,
+        )
+        self.governance_registry = GovernanceRegistry(
+            lifecycle,
+            timeline=timeline,
+        )
+        return self.governance_registry
+
+    def close_governance_registry(self) -> None:
+        lifecycle = self.governance_lifecycle
+        if lifecycle is not None:
+            lifecycle.close()
+        self.governance_registry = None
+        self.governance_lifecycle = None
+        self.governance_audit_log = None
+        self.governance_audit_timeline = None
+        self.governance_lifecycle_adapters = None
+        self.governance_lifecycle_executor = None
+        self.canonical_artifact_store = None
+        self.canonical_retrieval_index = None
+
+    def bind_canonical_artifact_store(
+        self,
+        root: str | Path | None = None,
+    ) -> Any:
+        """Bind one governed filesystem artifact authority to lifecycle execution."""
+
+        if self.canonical_artifact_store is not None:
+            return self.canonical_artifact_store
+
+        from pathlib import Path
+
+        from skeleton.artifact_plane.governance import GovernedArtifactStore
+        from skeleton.vault.lifecycle_adapters import (
+            GovernedArtifactLifecycleAdapter,
+        )
+
+        governance = self.bind_governance_registry()
+        adapters = self.governance_lifecycle_adapters
+        if adapters is None:
+            raise RuntimeError(
+                "governance lifecycle adapters are unavailable"
+            )
+
+        if root is None:
+            override = os.environ.get(
+                "SKL_GOVERNANCE_ARTIFACT_ROOT",
+                "",
+            ).strip()
+            if override:
+                artifact_root = Path(override).expanduser()
+            else:
+                lifecycle_path = os.environ.get(
+                    "SKL_GOVERNANCE_LIFECYCLE_PATH",
+                    ":memory:",
+                ).strip() or ":memory:"
+                if lifecycle_path == ":memory:":
+                    artifact_root = Path.cwd() / ".skeleton-governed-artifacts"
+                else:
+                    lifecycle_file = Path(lifecycle_path).expanduser()
+                    artifact_root = lifecycle_file.parent / "governed_artifacts"
+        else:
+            artifact_root = Path(root).expanduser()
+
+        store = GovernedArtifactStore(artifact_root, governance)
+        adapter = GovernedArtifactLifecycleAdapter(store)
+        adapters.register_deletion("artifact", adapter)
+        adapters.register_export("artifact", adapter)
+        self.canonical_artifact_store = store
+        return store
+
+    def bind_canonical_retrieval_index(self) -> Any:
+        """Bind one tenant-scoped governed retrieval owner to lifecycle execution."""
+
+        if self.canonical_retrieval_index is not None:
+            return self.canonical_retrieval_index
+
+        from skeleton.retrieval.governance import GovernedRetrievalIndex
+        from skeleton.vault.lifecycle_adapters import (
+            GovernedRetrievalLifecycleAdapter,
+        )
+
+        governance = self.bind_governance_registry()
+        adapters = self.governance_lifecycle_adapters
+        if adapters is None:
+            raise RuntimeError(
+                "governance lifecycle adapters are unavailable"
+            )
+
+        retrieval = GovernedRetrievalIndex(governance)
+        adapter = GovernedRetrievalLifecycleAdapter(retrieval)
+        adapters.register_deletion("retrieval", adapter)
+        adapters.register_export("retrieval", adapter)
+        self.canonical_retrieval_index = retrieval
+        return retrieval
+
+    async def bind_canonical_memory_writer(
+        self,
+        database: Any | None = None,
+    ) -> Any:
+        """Bind the production Mongo memory authority to governance/admission."""
+
+        if self.canonical_memory_writer is not None:
+            return self.canonical_memory_writer
+        if self.engine_execution_admission_runtime is None:
+            self.bind_engine_execution_service()
+        admission_runtime = self.engine_execution_admission_runtime
+        if admission_runtime is None:
+            raise RuntimeError(
+                "engine execution admission must be bound before memory"
+            )
+
+        from skeleton.config.settings import get_settings
+        from skeleton.memory.projection import AsyncMemoryProjectionCoordinator
+        from skeleton.memory.writeback import AsyncGovernedMemoryWriter
+        from skeleton.persistence.memory_repository import (
+            MongoMemoryRepository,
+        )
+        from skeleton.vault.lifecycle_adapters import (
+            MongoMemoryLifecycleAdapter,
+        )
+
+        # Protected local inference must use the exact canonical memory owner
+        # whose writes participate in the shared durable source epoch. Creating
+        # a second unfenced repository would invalidate admission/postflight.
+        mongo_owners = getattr(self, "_engine_canonical_mongo_owners", None)
+        if mongo_owners is not None:
+            if database is not None:
+                raise RuntimeError("protected canonical memory owner cannot be overridden")
+            _, repository, _, shared_epoch, _ = mongo_owners
+            if (not isinstance(repository, MongoMemoryRepository)
+                    or repository.canonical_source_epoch is not shared_epoch):
+                raise RuntimeError("protected canonical memory writer is not epoch-fenced")
+        else:
+            if database is None:
+                from motor.motor_asyncio import AsyncIOMotorClient
+
+                mongo = get_settings().mongo
+                client = AsyncIOMotorClient(
+                    mongo.uri,
+                    serverSelectionTimeoutMS=mongo.timeout_ms,
+                )
+                database = client[mongo.database]
+                self.canonical_memory_mongo_client = client
+
+            repository = MongoMemoryRepository(database)
+        await repository.ensure_indexes()
+
+        governance = self.bind_governance_registry()
+        adapters = self.governance_lifecycle_adapters
+        if adapters is None:
+            raise RuntimeError(
+                "governance lifecycle adapters are unavailable"
+            )
+        memory_lifecycle = MongoMemoryLifecycleAdapter(repository)
+        adapters.register_deletion("memory", memory_lifecycle)
+        adapters.register_export("memory", memory_lifecycle)
+
+        writer = AsyncGovernedMemoryWriter(
+            repository,
+            governance=governance,
+            admission_runtime=admission_runtime,
+        )
+        self.canonical_memory_repository = repository
+        self.canonical_memory_writer = writer
+        self.canonical_memory_projection_coordinator = (
+            AsyncMemoryProjectionCoordinator(
+                repository,
+                admission_runtime=admission_runtime,
+                governance=governance,
+                lifecycle_adapters=adapters,
+            )
+        )
+        return writer
+
+    async def bind_verified_memory_finalization(
+        self,
+        request: Any,
+        candidate: str,
+        payload: Any,
+    ) -> Any:
+        """Commit only explicit verified-final-output memory intents."""
+
+        from datetime import datetime, timezone
+        from uuid import NAMESPACE_URL, UUID, uuid5
+
+        from skeleton.contracts.memory_record import (
+            MemoryKind,
+            MemoryWriteProposal,
+        )
+        from skeleton.intelligence.execution_runtime import (
+            ExecutionFinalizationBindings,
+        )
+
+        context_policy = dict(request.context_policy)
+        raw_intent = context_policy.get("memory_write_intent")
+        if raw_intent is None:
+            return ExecutionFinalizationBindings()
+        if not isinstance(raw_intent, dict):
+            raise RuntimeError(
+                "memory_write_intent must be a normalized object"
+            )
+        writer = self.canonical_memory_writer
+        if writer is None:
+            raise RuntimeError(
+                "canonical memory authority is required by execution intent"
+            )
+
+        tenant_id = str(context_policy.get("tenant_id") or "").strip()
+        subject_id = str(raw_intent.get("subject_id") or "").strip()
+        namespace = str(
+            raw_intent.get("namespace") or "assistant"
+        ).strip()
+        if not tenant_id or not subject_id or not namespace:
+            raise RuntimeError(
+                "memory finalization authority scope is invalid"
+            )
+        try:
+            kind = MemoryKind(str(raw_intent.get("kind") or ""))
+        except ValueError as exc:
+            raise RuntimeError(
+                "memory finalization kind is invalid"
+            ) from exc
+        if raw_intent.get("content_from") != "verified_final_output":
+            raise RuntimeError(
+                "memory finalization may only persist verified final output"
+            )
+
+        proposed_at = datetime.now(timezone.utc)
+        expires_at = None
+        raw_expiry = raw_intent.get("expires_at")
+        if raw_expiry is not None:
+            try:
+                expires_at = datetime.fromisoformat(str(raw_expiry))
+            except ValueError as exc:
+                raise RuntimeError(
+                    "memory finalization expiry is invalid"
+                ) from exc
+            if expires_at.tzinfo is None or expires_at.utcoffset() is None:
+                raise RuntimeError(
+                    "memory finalization expiry must be timezone-aware"
+                )
+            expires_at = expires_at.astimezone(timezone.utc)
+            if expires_at <= proposed_at:
+                raise RuntimeError(
+                    "memory finalization expiry has elapsed"
+                )
+
+        try:
+            source_operation_id = str(UUID(str(request.operation_id)))
+        except (ValueError, AttributeError):
+            source_operation_id = str(
+                uuid5(
+                    NAMESPACE_URL,
+                    "skeleton-operation:" + str(request.operation_id),
+                )
+            )
+
+        provenance_refs = [
+            "execution:" + str(request.execution_id),
+            "context:" + str(
+                context_policy.get("context_digest") or "unknown"
+            ),
+            "verified-final-output",
+        ]
+        if isinstance(payload, dict):
+            for field, prefix in (
+                ("provider_receipts", "provider:"),
+                ("tool_receipts", "tool:"),
+            ):
+                values = payload.get(field, [])
+                if not isinstance(values, list):
+                    continue
+                for raw in values:
+                    value = str(raw).strip()
+                    if value:
+                        ref = prefix + value
+                        if ref not in provenance_refs:
+                            provenance_refs.append(ref)
+        raw_refs = raw_intent.get("provenance_refs", [])
+        if isinstance(raw_refs, list):
+            for raw in raw_refs:
+                value = str(raw).strip()
+                if value and value not in provenance_refs:
+                    provenance_refs.append(value)
+
+        idempotency_key = str(
+            raw_intent.get("idempotency_key")
+            or (
+                "execution-memory:"
+                + str(request.execution_id)
+                + ":verified-final-output"
+            )
+        ).strip()
+        proposal_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                "skeleton-memory-finalization:"
+                + str(request.execution_id)
+                + ":"
+                + idempotency_key,
+            )
+        )
+        proposal = MemoryWriteProposal(
+            proposal_id=proposal_id,
+            tenant_id=tenant_id,
+            namespace=namespace,
+            subject_id=subject_id,
+            kind=kind,
+            idempotency_key=idempotency_key,
+            proposed_at=proposed_at,
+            content=str(candidate).strip(),
+            provenance_refs=tuple(provenance_refs),
+            source_operation_id=source_operation_id,
+            expires_at=expires_at,
+            data_class=str(
+                raw_intent.get("data_class")
+                or context_policy.get("data_class")
+                or "confidential"
+            ),
+        )
+        writer.stage(proposal)
+        record = await writer.commit(
+            proposal.proposal_id,
+            now=proposed_at,
+        )
+        return ExecutionFinalizationBindings(
+            memory_refs=("memory:" + record.memory_id,),
+        )
+
+    async def close_canonical_memory_writer(self) -> None:
+        client = self.canonical_memory_mongo_client
+        if client is not None:
+            client.close()
+        self.canonical_memory_writer = None
+        self.canonical_memory_repository = None
+        self.canonical_memory_projection_coordinator = None
+        self.canonical_memory_mongo_client = None
+
+    def bind_swarm_runtime(self, runtime: Any) -> Any:
+        """Replace the live swarm runtime and atomically rebind dependent control planes."""
+        from skeleton.agents.swarm_broker import SwarmBroker
+        from skeleton.agents.swarm_supervisor import SwarmSupervisor
+
+        with self._swarm_bind_lock:
+            self.swarm = runtime
+            if self.swarm_supervisor is None:
+                self.swarm_supervisor = SwarmSupervisor()
+            self.swarm_broker = SwarmBroker(runtime, supervisor=self.swarm_supervisor)
+            if self.swarm_tenant_broker is not None:
+                self.swarm_tenant_broker.rebind(self.swarm_broker)
+            return runtime
+
+    def bind_swarm_ingress(self, ingress: Any) -> Any:
+        """Bind ingress and tenant execution control to the current runtime broker."""
+        from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
+
+        with self._swarm_bind_lock:
+            self.swarm_ingress = ingress
+            if self.swarm_broker is not None:
+                if self.swarm_tenant_broker is None:
+                    self.swarm_tenant_broker = TenantSwarmBroker(self.swarm_broker, ingress)
+                else:
+                    self.swarm_tenant_broker.ingress = ingress
+                    self.swarm_tenant_broker.rebind(self.swarm_broker)
+            return ingress
+
+    def commit_swarm_bundle(self, runtime: Any, broker: Any, ingress: Any, tenant_broker: Any) -> Any:
+        """Publish a fully staged swarm recovery bundle under one server-state lock."""
+        if getattr(broker, "runtime", None) is not runtime:
+            raise ValueError("staged broker runtime mismatch")
+        if getattr(tenant_broker, "broker", None) is not broker:
+            raise ValueError("staged tenant broker mismatch")
+        if getattr(tenant_broker, "ingress", None) is not ingress:
+            raise ValueError("staged tenant ingress mismatch")
+        if self.swarm_supervisor is not None and getattr(broker, "supervisor", None) is not self.swarm_supervisor:
+            raise ValueError("staged broker supervisor mismatch")
+        reconcile = tenant_broker.reconcile()
+        if any(bool(values) for values in reconcile.values()):
+            raise ValueError("staged tenant bundle is not reconciled")
+        with self._swarm_bind_lock:
+            previous_tenant = self.swarm_tenant_broker
+            if previous_tenant is not None and previous_tenant is not tenant_broker:
+                previous_tenant.retire()
+            self.swarm = runtime
+            self.swarm_broker = broker
+            self.swarm_ingress = ingress
+            self.swarm_tenant_broker = tenant_broker
+            return runtime
+
+    def is_healthy(self) -> Dict[str, Any]:
+        checks = {}
+        memory_configured = _canonical_memory_mongo_configured()
+        memory_bound = (
+            self.canonical_memory_repository is not None
+            and self.canonical_memory_writer is not None
+            and self.canonical_memory_projection_coordinator is not None
+        )
+        checks["canonical_memory"] = {
+            "configured": memory_configured,
+            "bound": memory_bound,
+            "status": (
+                "ready"
+                if memory_bound
+                else ("unavailable" if memory_configured else "disabled")
+            ),
+            "error": (
+                "canonical memory authority configured but not bound"
+                if memory_configured and not memory_bound
+                else None
+            ),
+        }
+        for attr in dir(self):
+            if not attr.startswith("_") and not callable(getattr(self, attr)):
+                val = getattr(self, attr)
+                if val is not None and hasattr(val, "stats"):
+                    try:
+                        checks[attr] = val.stats()
+                    except Exception:
+                        checks[attr] = {"error": "stats failed"}
+
+        with self._swarm_bind_lock:
+            swarm = self.swarm
+            recovery = self.swarm_recovery
+            supervisor = self.swarm_supervisor
+            ingress = self.swarm_ingress
+            tenant_broker = self.swarm_tenant_broker
+
+        if swarm is not None and hasattr(swarm, "health"):
+            try:
+                checks["swarm"] = swarm.health()
+            except Exception:
+                checks["swarm"] = {"error": "health failed"}
+        if recovery is not None:
+            try:
+                recovery_status = recovery.status()
+                checks["swarm_recovery"] = asdict(recovery_status) if is_dataclass(recovery_status) else recovery_status
+            except Exception:
+                checks["swarm_recovery"] = {"error": "recovery status failed"}
+        if supervisor is not None:
+            try:
+                checks["swarm_supervisor"] = supervisor.status()
+            except Exception:
+                checks["swarm_supervisor"] = {"error": "supervisor status failed"}
+        if ingress is not None:
+            try:
+                checks["swarm_ingress"] = ingress.status()
+            except Exception:
+                checks["swarm_ingress"] = {"error": "ingress status failed"}
+        if tenant_broker is not None:
+            try:
+                checks["swarm_tenant_broker"] = tenant_broker.status()
+            except Exception:
+                checks["swarm_tenant_broker"] = {"error": "tenant broker status failed"}
+        has_error = any(isinstance(check, dict) and check.get("error") for check in checks.values())
+        swarm_critical = isinstance(checks.get("swarm"), dict) and checks["swarm"].get("status") == "critical"
+        recovery_mismatch = False
+        recovery_check = checks.get("swarm_recovery")
+        if isinstance(recovery_check, dict) and recovery_check.get("tenant_aligned") is False:
+            recovery_mismatch = True
+        tenant_mismatch = False
+        tenant_check = checks.get("swarm_tenant_broker")
+        if isinstance(tenant_check, dict):
+            if tenant_check.get("retired") is True:
+                tenant_mismatch = True
+            reconcile = tenant_check.get("reconcile")
+            if isinstance(reconcile, dict):
+                tenant_mismatch = tenant_mismatch or any(
+                    bool(reconcile.get(field))
+                    for field in ("missing_active", "terminal_not_terminal", "active_terminal", "phase_mismatch")
+                )
+        overall = not has_error and not swarm_critical and not recovery_mismatch and not tenant_mismatch
+        return {"overall": overall, "checks": checks}
+
+    def bind_operation_runtime(self) -> Any:
+        """Bind the live intelligence surface to durable operation state."""
+        if self.intelligence_core is None:
+            if self.genesis is None:
+                raise RuntimeError("genesis must be wired before operation runtime")
+            self.intelligence_core = self.genesis.handles.get("orchestrator")
+        if self.intelligence_core is None:
+            raise RuntimeError("intelligence orchestrator is unavailable")
+        if self.operation_runtime is not None and not getattr(
+            self.operation_runtime, "_closed", False
+        ):
+            self.intelligence = self.operation_runtime
+            return self.operation_runtime
+
+        from skeleton.config.settings import get_settings
+        from skeleton.persistence.operation_runtime import DurableOperationRuntime
+
+        runtime = DurableOperationRuntime.from_settings(
+            self.intelligence_core,
+            get_settings().operation,
+        )
+        runtime.dispatch_outbox()
+        runtime.start_dispatcher()
+        self.operation_runtime = runtime
+        self.intelligence = runtime
+        return runtime
+
+    def close_operation_runtime(self) -> None:
+        runtime = self.operation_runtime
+        if runtime is not None:
+            runtime.close()
+        self.operation_runtime = None
+        self.intelligence = self.intelligence_core
+
+    def configure_engine_local_guard(self, components: Any) -> None:
+        """Install exactly one trusted local inference guard before startup.
+
+        The independent reader/reviewer/tokenizer must be assembled by the
+        application owner. Neither model output nor an API request can select
+        these dependencies. Never replace a running guard after activation.
+        """
+        from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
+
+        if not isinstance(components, ProtectedLocalComponents):
+            raise TypeError("engine local guard requires trusted application components")
+        if (self.engine_execution_coordinator is not None
+                or self.engine_execution_service is not None
+                or self._engine_shutdown_pending):
+            raise RuntimeError("engine local guard must be configured before startup")
+        if self._engine_local_guard_components is not None:
+            raise RuntimeError("engine local guard may not be rebound")
+        self._engine_local_guard_components = components
+
+    def configure_engine_canonical_sources(self, *, factory: Any, policy_sha256: str) -> None:
+        """Bind trusted persisted execution->source owners before engine startup.
+
+        Components still require an attested native backend, independent reviewer
+        and sampler. No provider request is allowed to choose these owners.
+        """
+        from skeleton.ai.runtime.inference.canonical_execution_source_factory import (
+            CanonicalExecutionSourceFactory,
+        )
+
+        if not isinstance(factory, CanonicalExecutionSourceFactory):
+            raise TypeError("production canonical source owner factory required")
+        if (not isinstance(policy_sha256, str) or len(policy_sha256) != 64
+                or any(char not in "0123456789abcdef" for char in policy_sha256)):
+            raise ValueError("independently pinned canonical instruction digest required")
+        if (self.engine_execution_service is not None
+                or self.engine_execution_coordinator is not None
+                or self._engine_shutdown_pending):
+            raise RuntimeError("canonical source owners must be configured before startup")
+        if (getattr(self, "_engine_canonical_sources", None) is not None
+                or getattr(self, "_engine_canonical_mongo_owners", None) is not None):
+            raise RuntimeError("canonical source owners cannot be replaced")
+        self._engine_canonical_sources = (factory, policy_sha256)
+
+    def configure_engine_canonical_mongo_owners(
+        self, *, conversation: Any, shared_epoch: Any, policy_sha256: str,
+        memory: Any | None = None, memory_namespace: str | None = None,
+    ) -> None:
+        """Select real canonical Mongo owners for per-execution guarded admission.
+
+        The trusted application owner supplies the SAME source epoch installed
+        on its conversation and memory writers. At service startup we build the
+        resolver from the actual durable engine and existing canonical chat
+        command, not from HTTP or an archived handoff.
+        """
+        from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch
+
+        if not isinstance(shared_epoch, MongoCanonicalSourceEpoch):
+            raise TypeError("majority-backed canonical writer epoch required")
+        if getattr(conversation, "canonical_source_epoch", None) is not shared_epoch:
+            raise RuntimeError("canonical conversation owner must enforce installed writer epoch")
+        if (memory is not None
+                and getattr(memory, "canonical_source_epoch", None) is not shared_epoch):
+            raise RuntimeError("canonical memory owner must enforce same writer epoch")
+        if (memory is None and memory_namespace is not None
+                or memory is not None and not memory_namespace):
+            raise ValueError("memory owner and namespace must be supplied together")
+        if (not isinstance(policy_sha256, str) or len(policy_sha256) != 64
+                or any(char not in "0123456789abcdef" for char in policy_sha256)):
+            raise ValueError("trusted canonical policy digest required")
+        if (self.engine_execution_service is not None
+                or self.engine_execution_coordinator is not None
+                or self._engine_shutdown_pending):
+            raise RuntimeError("canonical source owner wiring must precede engine startup")
+        if (getattr(self, "_engine_canonical_sources", None) is not None
+                or getattr(self, "_engine_canonical_mongo_owners", None) is not None):
+            raise RuntimeError("canonical source owner wiring cannot be replaced")
+        self._engine_canonical_mongo_owners = (
+            conversation, memory, memory_namespace, shared_epoch, policy_sha256,
+        )
+
+    @staticmethod
+    def _activate_engine_provider_registry(
+        *, admission_runtime: Any, guarded_local_components: Any | None,
+    ) -> Any:
+        """One canonical registry path for trusted startup policy injection."""
+        from skeleton.provider_runtime import ProviderRegistry
+
+        return ProviderRegistry.from_env(
+            admission_runtime=admission_runtime, retain_unavailable=True,
+            guarded_components=guarded_local_components,
+        )
+
+    def bind_engine_execution_service(
+        self,
+        *,
+        runtime_lifecycle: Any | None = None,
+    ) -> Any:
+        """Bind durable engine API authority and local execution coordinator."""
+
+        if self._engine_shutdown_pending or (
+            self.engine_execution_coordinator is not None
+            and self.engine_execution_coordinator.shutdown_started
+        ):
+            raise RuntimeError("engine shutdown must finish before execution authority can start")
+        if self.engine_execution_service is not None:
+            return self.engine_execution_service
+
+        # This entrypoint is also used directly by product code. Enforce the
+        # same trusted writer inventory here, not only in create_app's
+        # optional bootstrap, BEFORE opening any local execution resources.
+        mongo_owners = getattr(self, "_engine_canonical_mongo_owners", None)
+        if mongo_owners is not None:
+            from skeleton.persistence.mongo_source_epoch import verify_canonical_source_writer_inventory
+
+            conversation, memory, _, shared_epoch, _ = mongo_owners
+            verify_canonical_source_writer_inventory(
+                conversation=conversation, memory=memory, epoch=shared_epoch,
+            )
+
+        from pathlib import Path
+
+        from skeleton.api.engine_authority import (
+            EngineAuthorityRegistry,
+            EngineServiceGrant,
+        )
+        from skeleton.api.engine_runtime import (
+            EngineExecutionCoordinator,
+            build_engine_tool_runtime,
+        )
+        from skeleton.api.engine_service import (
+            EngineExecutionService,
+            SQLiteEngineSubmissionStore,
+        )
+        from skeleton.config.settings import get_settings
+        from skeleton.intelligence.admission_runtime import AdmissionRuntime
+        from skeleton.intelligence.quota import (
+            TenantQuota,
+            TenantQuotaLedger,
+        )
+        from skeleton.intelligence.quota_sqlite import (
+            SqliteTenantQuotaLedger,
+        )
+        from skeleton.intelligence.shared_pressure import (
+            SharedPressurePolicy,
+            SqliteSharedPressureLedger,
+        )
+        from skeleton.persistence.execution_repository import (
+            SQLiteExecutionRepository,
+        )
+        from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
+
+        settings = get_settings().engine
+        for raw_path in (
+            settings.execution_state_path,
+            settings.submission_state_path,
+            settings.tool_receipt_path,
+            settings.quota_state_path,
+            settings.pressure_state_path,
+        ):
+            if raw_path != ":memory:":
+                Path(raw_path).expanduser().parent.mkdir(
+                    parents=True,
+                    exist_ok=True,
+                )
+
+        repository = SQLiteExecutionRepository(
+            settings.execution_state_path
+        )
+        submissions = SQLiteEngineSubmissionStore(
+            settings.submission_state_path
+        )
+        authorities = EngineAuthorityRegistry(
+            [
+                EngineServiceGrant(
+                    service_principal=settings.service_principal,
+                    scopes=frozenset(
+                        {
+                            "engine:submit",
+                            "engine:read",
+                            "engine:cancel",
+                            "engine:events",
+                            "engine:approve",
+                            "engine:media",
+                            "engine:admission",
+                            "engine:governance",
+                            "engine:memory",
+                            "engine:runtime-control",
+                        }
+                    ),
+                    tenant_ids=settings.allowed_tenants,
+                    capabilities=settings.allowed_capabilities,
+                )
+            ]
+        )
+        receipt_store = SQLiteToolReceiptStore(
+            settings.tool_receipt_path
+        )
+
+        quota_ledger = (
+            TenantQuotaLedger()
+            if settings.quota_state_path == ":memory:"
+            else SqliteTenantQuotaLedger(settings.quota_state_path)
+        )
+        default_tenant_quota = TenantQuota(
+            window_id=settings.quota_window_id,
+            max_operations=settings.quota_max_operations,
+            max_input_tokens=settings.quota_max_input_tokens,
+            max_output_tokens=settings.quota_max_output_tokens,
+            max_cost_usd=settings.quota_max_cost_usd,
+            max_tool_calls=settings.quota_max_tool_calls,
+            max_artifact_bytes=settings.quota_max_artifact_bytes,
+            max_storage_bytes=settings.quota_max_storage_bytes,
+            max_concurrent_operations=(
+                settings.quota_max_concurrent_operations
+            ),
+        )
+
+        pressure_ledger = None
+        if settings.pressure_state_path != ":memory:":
+            pressure_ledger = SqliteSharedPressureLedger(
+                settings.pressure_state_path
+            )
+            pressure_ledger.configure(
+                SharedPressurePolicy(
+                    scope=settings.pressure_scope,
+                    max_concurrency=settings.pressure_max_concurrency,
+                    max_queue_depth=settings.pressure_max_queue_depth,
+                    max_tenant_concurrency=(
+                        settings.pressure_max_tenant_concurrency
+                    ),
+                    max_tenant_queue_depth=(
+                        settings.pressure_max_tenant_queue_depth
+                    ),
+                    soft_shed_fraction=(
+                        settings.pressure_soft_shed_fraction
+                    ),
+                    protect_priority_at_or_below=(
+                        settings.pressure_protect_priority_at_or_below
+                    ),
+                    default_lease_seconds=settings.pressure_lease_seconds,
+                ),
+                replace=True,
+            )
+
+        execution_admission_runtime = AdmissionRuntime(
+            quota_ledger=quota_ledger,
+            default_tenant_quota=default_tenant_quota,
+        )
+        provider_admission_runtime = AdmissionRuntime(
+            quota_ledger=quota_ledger,
+            default_tenant_quota=default_tenant_quota,
+            shared_pressure_ledger=pressure_ledger,
+            shared_pressure_scope=(
+                settings.pressure_scope
+                if pressure_ledger is not None
+                else None
+            ),
+            shared_pressure_owner_id=(
+                settings.pressure_owner_id
+                if pressure_ledger is not None
+                else None
+            ),
+        )
+        # Freeze any application-owned verifier composition before building
+        # the provider graph. Without it, the compatibility default can still
+        # activate unguarded local inference unless the guard is required.
+        guarded_local_components = self._engine_local_guard_components
+        service = EngineExecutionService(
+            repository,
+            submissions,
+            authorities,
+            admission_runtime=execution_admission_runtime,
+            governance_registry=self.bind_governance_registry(),
+            governance_lifecycle_executor=(
+                self.governance_lifecycle_executor
+            ),
+        )
+        try:
+            # The actual durable service only exists here: assemble a task-scoped
+            # canonical owner reader AFTER its construction and BEFORE model startup.
+            # Explicit canonical source wiring requires an installed native guard.
+            canonical_sources = getattr(self, "_engine_canonical_sources", None)
+            mongo_owners = getattr(self, "_engine_canonical_mongo_owners", None)
+            if mongo_owners is not None:
+                from skeleton.ai.runtime.inference.canonical_execution_source_factory import (
+                    CanonicalExecutionSourceFactory,
+                )
+                from skeleton.persistence.mongo_execution_source_binding import (
+                    MongoExecutionConversationResolver,
+                )
+                conversation, memory, memory_namespace, shared_epoch, policy_sha256 = mongo_owners
+                canonical_sources = (
+                    CanonicalExecutionSourceFactory(
+                        conversation=conversation,
+                        resolver=MongoExecutionConversationResolver(
+                            conversation=conversation, engine_service=service,
+                        ),
+                        memory=memory, memory_namespace=memory_namespace,
+                        shared_epoch=shared_epoch,
+                    ),
+                    policy_sha256,
+                )
+            if canonical_sources is not None:
+                if guarded_local_components is None:
+                    raise RuntimeError("canonical owners require protected native components")
+                from dataclasses import replace
+                from skeleton.ai.runtime.inference.engine_submission_snapshot import (
+                    ScopedEngineCompiledSnapshotReader,
+                )
+
+                source_factory, policy_sha256 = canonical_sources
+                guarded_local_components = replace(
+                    guarded_local_components,
+                    snapshots=ScopedEngineCompiledSnapshotReader(
+                        service=service,
+                        source_authority_factory=source_factory,
+                        policy_sha256=policy_sha256,
+                    ),
+                )
+            coordinator = EngineExecutionCoordinator(
+                service,
+                # Acquire exclusive execution custody before activating model
+                # graphs, so a duplicate worker cannot allocate another catalog.
+                provider_registry_factory=lambda: self._activate_engine_provider_registry(
+                    admission_runtime=provider_admission_runtime,
+                    guarded_local_components=guarded_local_components,
+                ),
+                finalization_binding_hook=(
+                    self.bind_verified_memory_finalization
+                ),
+                lifecycle=runtime_lifecycle,
+                tool_runtime=build_engine_tool_runtime(
+                    admission_runtime=execution_admission_runtime,
+                    receipt_store=receipt_store,
+                ),
+            )
+        except BaseException:
+            # These handles have not yet transferred into AppState ownership.
+            # Preserve the original startup error while closing local resources.
+            for owner in (receipt_store, pressure_ledger, quota_ledger, submissions, repository):
+                closer = getattr(owner, "close", None)
+                if callable(closer):
+                    try:
+                        closer()
+                    except Exception:
+                        pass
+            raise
+        self.engine_execution_service = service
+        self.engine_execution_coordinator = coordinator
+        self.engine_tool_receipt_store = receipt_store
+        self.engine_admission_runtime = provider_admission_runtime
+        self.engine_execution_admission_runtime = (
+            execution_admission_runtime
+        )
+        self.engine_quota_ledger = quota_ledger
+        self.engine_pressure_ledger = pressure_ledger
+        return service
+
+    async def recover_engine_executions(self) -> tuple[str, ...]:
+        coordinator = self.engine_execution_coordinator
+        if coordinator is None:
+            return ()
+        return await coordinator.recover()
+
+    async def close_engine_execution_service(self) -> None:
+        """Drain execution authority and close durable handles without masking faults."""
+
+        if self._engine_close_task is None:
+            self._engine_shutdown_pending = True
+            self._engine_close_task = asyncio.create_task(self._close_engine_execution_service_owned())
+        task = self._engine_close_task
+        cancelled = False
+        try:
+            while not task.done():
+                try:
+                    await asyncio.shield(task)
+                except asyncio.CancelledError:
+                    cancelled = True
+            task.result()
+            if cancelled:
+                raise asyncio.CancelledError
+        finally:
+            if task.done() and self._engine_close_task is task:
+                # Failed cleanup retains its actual owners below. A later
+                # explicit close can retry without starting replacement work.
+                self._engine_close_task = None
+
+    async def _close_engine_execution_service_owned(self) -> None:
+
+        errors: list[BaseException] = []
+        coordinator = self.engine_execution_coordinator
+        if coordinator is not None:
+            try:
+                await coordinator.shutdown()
+            except BaseException as exc:
+                errors.append(exc)
+            if coordinator.physical_shutdown_complete is not True:
+                raise RuntimeError(
+                    "engine shutdown has not established physical drain; live authority retained for retry"
+                ) from (errors[0] if errors else None)
+
+        service = self.engine_execution_service
+        if service is not None:
+            service_closed = True
+            for closer in (
+                service.repository.close,
+                service.submissions.close,
+            ):
+                try:
+                    closer()
+                except BaseException as exc:
+                    errors.append(exc)
+                    service_closed = False
+            if service_closed:
+                self.engine_execution_service = None
+
+        receipt_store = self.engine_tool_receipt_store
+        if receipt_store is not None:
+            try:
+                receipt_store.close()
+                self.engine_tool_receipt_store = None
+            except BaseException as exc:
+                errors.append(exc)
+
+        quota_ledger = self.engine_quota_ledger
+        close_quota = getattr(quota_ledger, "close", None)
+        try:
+            if callable(close_quota):
+                close_quota()
+            self.engine_quota_ledger = None
+        except BaseException as exc:
+            errors.append(exc)
+
+        pressure_ledger = self.engine_pressure_ledger
+        close_pressure = getattr(pressure_ledger, "close", None)
+        try:
+            if callable(close_pressure):
+                close_pressure()
+            self.engine_pressure_ledger = None
+        except BaseException as exc:
+            errors.append(exc)
+
+        if all(
+            owner is None
+            for owner in (
+                self.engine_execution_service,
+                self.engine_tool_receipt_store,
+                self.engine_quota_ledger,
+                self.engine_pressure_ledger,
+            )
+        ):
+            self.engine_execution_coordinator = None
+            self.engine_admission_runtime = None
+            self.engine_execution_admission_runtime = None
+            self._engine_shutdown_pending = False
+
+        if errors:
+            kinds = ",".join(type(exc).__name__ for exc in errors[:8])
+            raise RuntimeError(
+                "engine runtime shutdown completed with supervision/cleanup "
+                f"errors ({kinds})"
+            ) from errors[0]
+
+    def wire_from_genesis(self, genesis: Any) -> None:
+        self.genesis = genesis
+        self.forge = genesis.handles.get("forge")
+        self.mesh = genesis.handles.get("mesh")
+        self.memory_trinity = genesis.handles.get("trinity")
+        self.intelligence_core = genesis.handles.get("orchestrator")
+        self.intelligence = self.intelligence_core
+        self.bind_operation_runtime()
+        self.resilience = genesis.handles.get("fortress")
+
+        from skeleton.pipelines import AnimationPipeline, GameForge, GameLogicPipeline, NPCPipeline
+        self.npc_pipeline = NPCPipeline(genesis=genesis)
+        self.game_logic_pipeline = GameLogicPipeline(genesis=genesis)
+        self.animation_pipeline = AnimationPipeline(genesis=genesis)
+        self.gameforge = GameForge(genesis=genesis, bus=genesis.bus)
+
+        from skeleton.jeeves import JeevesCore
+        self.jeeves = JeevesCore(bus=genesis.bus, retriever=genesis.handles.get("quad"), cycle=genesis.handles.get("cycle"))
+        self.jeeves_sam = self.jeeves.sam
+        self.jeeves_clom = self.jeeves.clom
+        self.jeeves_krem = self.jeeves.krem
+        self.jeeves_memory = self.jeeves._memory
+
+        from skeleton.cortex import live
+        self.cockpit = live.attach(genesis.bus)
+
+        from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
+        from skeleton.agents.swarm_ingress import SwarmIngressGovernor
+        from skeleton.agents.swarm_recovery import SwarmRecoveryManager
+        runtime = HardenedSwarmRuntime(max_tasks=100_000, max_workers=10_000, default_lease_seconds=30.0, max_lease_seconds=86_400.0)
+        self.bind_swarm_runtime(runtime)
+        self.swarm_recovery = SwarmRecoveryManager(max_checkpoints=16)
+        self.bind_swarm_ingress(SwarmIngressGovernor())
+
+        from skeleton.observability import MetricsCollector
+        self.metrics = MetricsCollector()
+        self.health = type("Health", (), {
+            "liveness": staticmethod(lambda: {"alive": True}),
+            "readiness": staticmethod(lambda: {"ready": True, "subsystems": len(genesis.handles)}),
+        })()
+        self.ledger = genesis.handles.get("provenance")
+        self.scheduler = genesis.handles.get("repetition")
+        self.registry = genesis.handles.get("lattice")
+
+
+_state: Optional[ServerState] = None
+
+
+def get_state() -> ServerState:
+    global _state
+    if _state is None:
+        _state = ServerState()
+    return _state
+
+
+_DEV_OPEN_PREFIXES = (
+    "/cortex/status",
+    "/cockpit",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/api/v1/health",
+    "/api/v1/metrics",
+    "/api/v1/genesis",
+)
+
+
+def _public_dev_surfaces_enabled() -> bool:
+    return os.environ.get("SKELETON_PUBLIC_DEV_SURFACES", "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+
+
+def _omnifabric_api_enabled() -> bool:
+    """OmniFabric HTTP surface toggle (default on).
+
+    ``SKELETON_OMNIFABRIC_API`` set to ``0``/``false``/``no``/``off`` keeps the
+    router unmounted. When mounted it sits behind the HMAC gate like every
+    other ``/api/v1`` route; it is never added to the open prefixes.
+    """
+
+    return os.environ.get("SKELETON_OMNIFABRIC_API", "1").strip().lower() not in {
+        "0", "false", "no", "off",
+    }
+
+
+def _canonical_memory_mongo_configured() -> bool:
+    """Return whether the production canonical Mongo memory binding is configured."""
+
+    return bool(os.environ.get("SKL_MONGO_URI", "").strip())
+
+
+def _gate_open_prefixes() -> tuple[str, ...]:
+    from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES
+
+    # The engine API has its own fail-closed service-to-service bearer token
+    # and principal validation. Exempt only this exact route prefix from the
+    # generic user/API HMAC gate so the backend EngineClient can reach it.
+    # Segment-aware prefix matching keeps /api/v1/engineer sealed.
+    prefixes = DEFAULT_OPEN_PREFIXES + ("/", "/api/v1/engine")
+    if _public_dev_surfaces_enabled():
+        prefixes += _DEV_OPEN_PREFIXES
+    return prefixes
+
+
+def _gate_body_limits() -> tuple[tuple[str, int], ...]:
+    """Route-scoped ceilings for authenticated engine transport envelopes."""
+
+    mib = 1024 * 1024
+    return (
+        # Edit can carry a source image and mask, each bounded to 32 MiB
+        # base64 text by the engine request model.
+        ("/api/v1/engine/media/images/edit", 70 * mib),
+        ("/api/v1/engine/media/images/variation", 34 * mib),
+        # Canonical text commands may include bounded instructions + prompt +
+        # compiled context metadata above the generic 1 MiB API ceiling.
+        ("/api/v1/engine/executions", 4 * mib),
+    )
+
+
+def _bind_realtime(app: Any, state: Any) -> None:
+    """Wire the realtime hub into observability and the jobs fan-out.
+
+    * SLO samples flow into the existing ``ServerState.metrics`` collector
+      (served by ``/api/v1/metrics``) under ``realtime.*``.
+    * If app services (#4097) are mounted, the hub subscribes to the shared
+      ``AppServices.events`` FanOutPublisher via a ``JobEventPublisher``
+      sink. Without them this is a no-op, so either PR can merge first.
+    """
+    from skeleton.realtime import HubJobEventSink, attach_hub
+
+    hub = getattr(app.state, "realtime_hub", None)
+    if hub is None:
+        return
+    hub.slo.bind_sink(getattr(state, "metrics", None))
+    state.realtime_hub = hub
+    hub.start()
+    sink = HubJobEventSink(hub)
+    app.state.realtime_job_sink = sink
+    services = getattr(app.state, "app_services", None) or getattr(state, "app_services", None)
+    if getattr(app.state, "realtime_unsubscribe", None) is None:
+        app.state.realtime_unsubscribe = attach_hub(getattr(services, "events", None), sink)
+
+
+async def _close_realtime(app: Any) -> None:
+    unsubscribe = getattr(app.state, "realtime_unsubscribe", None)
+    if callable(unsubscribe):
+        unsubscribe()
+    app.state.realtime_unsubscribe = None
+    hub = getattr(app.state, "realtime_hub", None)
+    if hub is not None:
+        await hub.aclose()
+
+
+async def _run_trusted_protected_bootstrap(state: ServerState, bootstrap: Any) -> None:
+    """Allow deployer-owned native and canonical Mongo authorities before engine startup.
+
+    Never source a bootstrap from an HTTP request, environment variable or
+    persisted conversation. The trusted application composition must install
+    its attested native backend, reviewer, real canonical owners and the shared
+    majority-durable writer epoch. Missing authorities abort startup.
+    """
+    if bootstrap is None:
+        return
+    if not callable(bootstrap):
+        raise TypeError("trusted protected bootstrap must be callable")
+    if (state.engine_execution_service is not None
+            or state.engine_execution_coordinator is not None
+            or state._engine_shutdown_pending):
+        raise RuntimeError("protected bootstrap must precede engine startup")
+    from inspect import isawaitable
+
+    result = bootstrap(state)
+    if isawaitable(result):
+        await result
+    elif result is not None:
+        raise TypeError("protected bootstrap must not return an authority")
+    mongo_owners = getattr(state, "_engine_canonical_mongo_owners", None)
+    if (state._engine_local_guard_components is None
+            or mongo_owners is None or mongo_owners[1] is None):
+        raise RuntimeError(
+            "protected bootstrap requires native guard, canonical conversation "
+            "and memory owners, and one shared durable writer epoch"
+        )
+    from skeleton.persistence.memory_repository import MongoMemoryRepository
+
+    conversation, memory, _, shared_epoch, _ = mongo_owners
+    if (not isinstance(memory, MongoMemoryRepository)
+            or memory.canonical_source_epoch is not shared_epoch):
+        raise RuntimeError("protected bootstrap requires the real epoch-fenced Mongo memory authority")
+    if (not callable(getattr(conversation, "get_thread", None))
+            or not callable(getattr(conversation, "active_transcript", None))
+            or conversation.canonical_source_epoch is not shared_epoch):
+        raise RuntimeError("protected bootstrap requires a live epoch-fenced conversation authority")
+    from skeleton.persistence.mongo_source_epoch import verify_canonical_source_writer_inventory
+
+    # Inventory verifies the real Mongo implementation's known mutation
+    # entrypoints, rather than trusting arbitrary objects with matching names.
+    verify_canonical_source_writer_inventory(
+        conversation=conversation, memory=memory, epoch=shared_epoch,
+    )
+
+
+def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
+    from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle, ServicePhase
+
+    fastapi = _get_fastapi()
+    app = fastapi.FastAPI(title="Skeleton API", version="16.0.0", description="AI game engine / agent orchestration framework")
+    from starlette.middleware.cors import CORSMiddleware
+    from skeleton.config.settings import get_settings
+
+    runtime_lifecycle = RuntimeServiceLifecycle("skeleton")
+    app.state.runtime_lifecycle = runtime_lifecycle
+    install_error_handlers(app)
+
+    from skeleton.kernel.runtime_supervision import RuntimeAdmissionMiddleware
+    app.add_middleware(
+        RuntimeAdmissionMiddleware,
+        lifecycle=runtime_lifecycle,
+        exempt_prefixes=("/api/v1/health",),
+    )
+
+    from skeleton.api.routes import router
+    from skeleton.api.command_routes import router as command_router
+    from skeleton.api.cockpit import router as cockpit_router
+    from skeleton.api.swarm_routes import router as swarm_router
+    from skeleton.api.swarm_operator_routes import router as swarm_operator_router
+    from skeleton.api.swarm_policy_routes import router as swarm_policy_router
+    from skeleton.api.swarm_lifecycle_routes import router as swarm_lifecycle_router
+    from skeleton.api.swarm_integrity_routes import router as swarm_integrity_router
+    from skeleton.api.swarm_fence_routes import router as swarm_fence_router
+    from skeleton.api.swarm_supervisor_routes import router as swarm_supervisor_router
+    from skeleton.api.swarm_broker_routes import router as swarm_broker_router
+    from skeleton.api.swarm_batch_routes import router as swarm_batch_router
+    from skeleton.api.swarm_ingress_routes import router as swarm_ingress_router
+    from skeleton.api.swarm_tenant_broker_routes import router as swarm_tenant_broker_router
+    from skeleton.api.swarm_recovery_archive_routes import router as swarm_recovery_archive_router
+    from skeleton.api.engine_routes import router as engine_router
+    app.include_router(router, prefix="/api/v1")
+    app.include_router(command_router, prefix="/api/v1")
+    app.include_router(swarm_router, prefix="/api/v1")
+    app.include_router(swarm_operator_router, prefix="/api/v1")
+    app.include_router(swarm_policy_router, prefix="/api/v1")
+    app.include_router(swarm_lifecycle_router, prefix="/api/v1")
+    app.include_router(swarm_integrity_router, prefix="/api/v1")
+    app.include_router(swarm_fence_router, prefix="/api/v1")
+    app.include_router(swarm_supervisor_router, prefix="/api/v1")
+    app.include_router(swarm_broker_router, prefix="/api/v1")
+    app.include_router(swarm_batch_router, prefix="/api/v1")
+    app.include_router(swarm_ingress_router, prefix="/api/v1")
+    app.include_router(swarm_tenant_broker_router, prefix="/api/v1")
+    app.include_router(swarm_recovery_archive_router, prefix="/api/v1")
+    app.include_router(engine_router, prefix="/api/v1")
+    # skeleton.projects.v1 (Internal Systems, #4097): seal via install_gate + session.
+    # Restored: dropped by the stale-base merge of #4139.
+    from skeleton.api.projects_routes import router as projects_router
+    app.include_router(projects_router, prefix="/api/v1")
+    app.include_router(cockpit_router)
+    if _omnifabric_api_enabled():
+        # Lazy import keeps the kernel OmniFabric service off the import path
+        # when the surface is disabled. Mounted before install_gate so the
+        # gate covers /api/v1/omnifabric/*. Cortex stays unmounted here.
+        # Restored after #4139 dropped it in conflict resolution.
+        from skeleton.api.omnifabric_routes import router as omnifabric_router
+        app.include_router(omnifabric_router, prefix="/api/v1")
+
+    # Realtime transport (ADR-realtime-transport, #4101): canonical SSE stream
+    # GET /api/v1/events + POST /api/v1/presence, hub lifecycle owned here.
+    from skeleton.api.realtime_routes import router as realtime_router
+    from skeleton.realtime import RealtimeHub, sealed_principal_authorizer
+    # Hub default is deny-all; the gate-verified principal opens channels and
+    # per-event owner / job-grant checks decide delivery (Jenkins S1-1).
+    realtime_hub = RealtimeHub(authorizer=sealed_principal_authorizer)
+    app.state.realtime_hub = realtime_hub
+    app.state.realtime_unsubscribe = None
+    app.include_router(realtime_router, prefix="/api/v1")
+
+    from skeleton.api.middleware import GatePolicy, install_gate
+    gate_policy = GatePolicy(
+        open_prefixes=_gate_open_prefixes(),
+        body_limits=_gate_body_limits(),
+    )
+    install_gate(app, policy=gate_policy)
+    from skeleton.api.agent_edge_mount import install_registered_agent_edge
+    install_registered_agent_edge(app)
+    # Wrap gate/lifecycle denials as well as successful route responses. CORS
+    # admits a browser origin; protected commands still need engine authority.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_settings().server.cors_origins,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+        allow_credentials=False,
+    )
+
+    @app.on_event("startup")
+    async def startup():
+        state = get_state()
+        if state.genesis is None:
+            from skeleton.genesis import Genesis
+            state.wire_from_genesis(Genesis(seed=42).boot())
+        state.bind_governance_registry()
+        state.bind_canonical_artifact_store()
+        state.bind_canonical_retrieval_index()
+        # A deployment-provided bootstrap is the only path to protected native
+        # mode. It must bind trusted owners BEFORE service/provider activation.
+        await _run_trusted_protected_bootstrap(state, trusted_protected_bootstrap)
+        state.bind_engine_execution_service(
+            runtime_lifecycle=runtime_lifecycle,
+        )
+        if (_canonical_memory_mongo_configured()
+                or getattr(state, "_engine_canonical_mongo_owners", None) is not None):
+            await state.bind_canonical_memory_writer()
+        await state.recover_engine_executions()
+        _bind_realtime(app, state)
+        runtime_lifecycle.mark_ready(reason="engine-recovery-complete")
+
+    @app.on_event("shutdown")
+    async def shutdown():
+        if getattr(app.state, "runtime_shutdown_complete", False):
+            return
+        if runtime_lifecycle.phase not in {ServicePhase.STOPPED, ServicePhase.FAILED}:
+            runtime_lifecycle.begin_drain(reason="engine-fastapi-shutdown")
+        task = getattr(app.state, "runtime_shutdown_task", None)
+        if task is None or task.done():
+            task = asyncio.create_task(finish_shutdown())
+            app.state.runtime_shutdown_task = task
+        cancelled = False
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                cancelled = True
+        task.result()
+        if cancelled:
+            raise asyncio.CancelledError
+
+    async def finish_shutdown():
+        # Execution finalization can still need Mongo/governance/realtime.
+        # Close the producer of that work before its finalization dependencies,
+        # under one owned task that survives cancellation of the ASGI caller.
+        state = get_state()
+        engine_failure = None
+        try:
+            await state.close_engine_execution_service()
+        except BaseException as exc:
+            if state._engine_shutdown_pending or state.engine_execution_coordinator is not None:
+                # An unconfirmed owner and every dependency remain reachable
+                # for an explicit retry; a later step cannot mask its custody.
+                raise
+            engine_failure = exc
+        state.close_operation_runtime()
+        await _close_realtime(app)
+        await state.close_canonical_memory_writer()
+        state.close_governance_registry()
+        if engine_failure is not None:
+            raise RuntimeError("engine workers drained with shutdown supervision errors") from engine_failure
+        if runtime_lifecycle.phase is ServicePhase.DRAINING:
+            runtime_lifecycle.mark_stopped(reason="engine-durable-runtimes-drained")
+        app.state.runtime_shutdown_complete = True
+
+    @app.get("/")
+    async def root():
+        body = {"name": "Skeleton", "version": "16.0.0", "status": "running"}
+        if _public_dev_surfaces_enabled():
+            state = get_state()
+            body.update({
+                "jeeves_provider": state.jeeves.provider_name if state.jeeves else None,
+                "cockpit": "/cockpit", "swarm": "/api/v1/swarm/status",
+                "swarm_operator": "/api/v1/swarm/operator/overview",
+                "swarm_policy": "/api/v1/swarm/policy/admission-preview",
+                "swarm_lifecycle": "/api/v1/swarm/lifecycle/pressure",
+                "swarm_integrity": "/api/v1/swarm/integrity/audit",
+                "swarm_fenced": "/api/v1/swarm/fenced/workers/{worker_id}/tasks/{task_id}/success",
+                "swarm_supervisor": "/api/v1/swarm/supervisor/status",
+                "swarm_broker": "/api/v1/swarm/broker/status",
+                "swarm_batch": "/api/v1/swarm/batch/submit",
+                "swarm_ingress": "/api/v1/swarm/ingress/status",
+                "swarm_tenant_broker": "/api/v1/swarm/tenant-broker/status",
+                "swarm_recovery_archive": "/api/v1/swarm/recovery/archive",
+            })
+        return body
+
+    @app.get("/cortex/status")
+    async def cortex_status():
+        from skeleton.cortex import live
+        return live.status()
+
+    # Cortex's historical register_routes() contains unchartered GET/POST
+    # /api/v1/secrets endpoints. Validate the final assembled HTTP routes,
+    # not merely today's static import graph, before exposing the app.
+    from skeleton.api.cortex_mount_guard import CortexRouteGuardMiddleware, reject_cortex_secret_routes
+    reject_cortex_secret_routes(app)
+    # On by default (Jenkins #4129 B5): the guard middleware re-walks the route
+    # graph when the ASGI server boots and whenever the route table changes, so
+    # late or nested additions to live included routers are refused too.
+    app.add_middleware(CortexRouteGuardMiddleware, guarded_app=app)
+    return app
+
+
+def run_server(
+    host: str = "0.0.0.0", port: int = 8000, *,
+    trusted_protected_bootstrap: Any = None,
+) -> None:
+    """Run with the same deployer-owned composition as create_app()."""
+    uvicorn = _get_uvicorn()
+    app = create_app(trusted_protected_bootstrap=trusted_protected_bootstrap)
+    uvicorn.run(app, host=host, port=port)

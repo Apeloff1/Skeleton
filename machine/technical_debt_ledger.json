@@ -1,0 +1,18 @@
+{
+  "schema_version": "skeleton.technical_debt_ledger.v1",
+  "ledger_version": "0.1.0",
+  "status": "active",
+  "purpose": "Canonical debt IDs seeded from P2 repository-control masterplan gaps with ownership, risk, backlog and ADR disposition.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-115",
+    "title": "Technical Debt Ledger",
+    "required_gap_texts": []
+  },
+  "items": [],
+  "policy": {
+    "ownership": "Every debt item has a canonical accountability owner.",
+    "backlog": "Every debt item links exactly to its canonical backlog gap item.",
+    "adr": "Each item either names an ADR or explicitly states why no ADR is yet required; architecture-changing retirement requires ADR.",
+    "retirement": "Debt retirement cannot bypass compatibility, migration, rollback, tests or signed verification."
+  }
+}

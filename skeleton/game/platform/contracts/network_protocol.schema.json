@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-15:network_protocol:v1",
+  "title": "FLGB-15 network protocol",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_id",
+    "version",
+    "schema_digest",
+    "max_packet_bytes",
+    "compatibility_floor"
+  ],
+  "properties": {
+    "protocol_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "schema_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "max_packet_bytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16777216
+    },
+    "compatibility_floor": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

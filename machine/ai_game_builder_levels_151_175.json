@@ -1,0 +1,1604 @@
+{
+  "schema_version": "skeleton.ai_game_builder_levels_shard.v1",
+  "manifest": "machine/ai_game_builder_500_levels.json",
+  "start": 151,
+  "end": 175,
+  "count": 25,
+  "levels": [
+    {
+      "id": "GBL-151",
+      "ordinal": 151,
+      "family_id": "GB16",
+      "family": "Core Game Loop",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Define the moment-to-moment action, decision, feedback and reward loop that delivers the game's player promise.",
+      "owner": "skeleton/ai/simulation/game/mechanics.py",
+      "batches": [
+        "B021",
+        "B030"
+      ],
+      "metrics": [
+        "loop clarity",
+        "engagement density",
+        "decision quality",
+        "feedback quality"
+      ],
+      "requirements": [
+        "Specify Core Game Loop: Define the moment-to-moment action, decision, feedback and reward loop that delivers the game's player promise.",
+        "Declare input/action/state/output contracts, invariants, anti-goals, failure modes and player-facing acceptance tests.",
+        "Bind skeleton/ai/simulation/game/mechanics.py and B021, B030."
+      ],
+      "adversarial": [
+        "dead loop",
+        "busywork",
+        "unclear feedback",
+        "reward mismatch",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-151 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-152",
+      "ordinal": 152,
+      "family_id": "GB16",
+      "family": "Core Game Loop",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Define the moment-to-moment action, decision, feedback and reward loop that delivers the game's player promise.",
+      "owner": "skeleton/ai/simulation/game/mechanics.py",
+      "batches": [
+        "B021",
+        "B030"
+      ],
+      "metrics": [
+        "loop clarity",
+        "engagement density",
+        "decision quality",
+        "feedback quality"
+      ],
+      "requirements": [
+        "Define deterministic typed state, events, transitions, provenance and replay identity.",
+        "Separate authoritative rules from presentation and AI suggestion.",
+        "Define compatibility and invalid-state behavior."
+      ],
+      "adversarial": [
+        "dead loop",
+        "busywork",
+        "unclear feedback",
+        "reward mismatch",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-152 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-153",
+      "ordinal": 153,
+      "family_id": "GB16",
+      "family": "Core Game Loop",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Define the moment-to-moment action, decision, feedback and reward loop that delivers the game's player promise.",
+      "owner": "skeleton/ai/simulation/game/mechanics.py",
+      "batches": [
+        "B021",
+        "B030"
+      ],
+      "metrics": [
+        "loop clarity",
+        "engagement density",
+        "decision quality",
+        "feedback quality"
+      ],
+      "requirements": [
+        "Implement/create through canonical gameplay state and ProjectDNA rather than prompt-only behavior.",
+        "Make mutations deterministic/idempotent where applicable and retain reference behavior.",
+        "Record generated rule/code provenance and tool/model identity."
+      ],
+      "adversarial": [
+        "dead loop",
+        "busywork",
+        "unclear feedback",
+        "reward mismatch",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-153 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-154",
+      "ordinal": 154,
+      "family_id": "GB16",
+      "family": "Core Game Loop",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Define the moment-to-moment action, decision, feedback and reward loop that delivers the game's player promise.",
+      "owner": "skeleton/ai/simulation/game/mechanics.py",
+      "batches": [
+        "B021",
+        "B030"
+      ],
+      "metrics": [
+        "loop clarity",
+        "engagement density",
+        "decision quality",
+        "feedback quality"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate rivals.",
+        "Challenge exploitability, clarity, depth and player value; submit a materially better playable candidate.",
+        "Deterministic tests/arbiter decide champion."
+      ],
+      "adversarial": [
+        "dead loop",
+        "busywork",
+        "unclear feedback",
+        "reward mismatch",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-154 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-155",
+      "ordinal": 155,
+      "family_id": "GB16",
+      "family": "Core Game Loop",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Define the moment-to-moment action, decision, feedback and reward loop that delivers the game's player promise.",
+      "owner": "skeleton/ai/simulation/game/mechanics.py",
+      "batches": [
+        "B021",
+        "B030"
+      ],
+      "metrics": [
+        "loop clarity",
+        "engagement density",
+        "decision quality",
+        "feedback quality"
+      ],
+      "requirements": [
+        "Verify the change against progression, quests, NPC/world state, input, animation, audio/visual feedback and narrative constraints.",
+        "Propagate state-contract changes to coupled systems.",
+        "Reject local gains that violate the core player promise."
+      ],
+      "adversarial": [
+        "dead loop",
+        "busywork",
+        "unclear feedback",
+        "reward mismatch",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-155 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-156",
+      "ordinal": 156,
+      "family_id": "GB16",
+      "family": "Core Game Loop",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Define the moment-to-moment action, decision, feedback and reward loop that delivers the game's player promise.",
+      "owner": "skeleton/ai/simulation/game/mechanics.py",
+      "batches": [
+        "B021",
+        "B030"
+      ],
+      "metrics": [
+        "loop clarity",
+        "engagement density",
+        "decision quality",
+        "feedback quality"
+      ],
+      "requirements": [
+        "Run deterministic simulations, property/fuzz tests and replayable playtests.",
+        "Attack dead loop, busywork, unclear feedback, reward mismatch.",
+        "Preserve seeds and minimized exploit traces as regressions."
+      ],
+      "adversarial": [
+        "dead loop",
+        "busywork",
+        "unclear feedback",
+        "reward mismatch",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-156 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-157",
+      "ordinal": 157,
+      "family_id": "GB16",
+      "family": "Core Game Loop",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Define the moment-to-moment action, decision, feedback and reward loop that delivers the game's player promise.",
+      "owner": "skeleton/ai/simulation/game/mechanics.py",
+      "batches": [
+        "B021",
+        "B030"
+      ],
+      "metrics": [
+        "loop clarity",
+        "engagement density",
+        "decision quality",
+        "feedback quality"
+      ],
+      "requirements": [
+        "Improve loop clarity, engagement density, decision quality, feedback quality plus fun, accessibility, performance and maintainability jointly.",
+        "Reject one-dimensional tuning wins that collapse strategy diversity or clarity.",
+        "Keep champion on non-Pareto challengers."
+      ],
+      "adversarial": [
+        "dead loop",
+        "busywork",
+        "unclear feedback",
+        "reward mismatch",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-157 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-158",
+      "ordinal": 158,
+      "family_id": "GB16",
+      "family": "Core Game Loop",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Define the moment-to-moment action, decision, feedback and reward loop that delivers the game's player promise.",
+      "owner": "skeleton/ai/simulation/game/mechanics.py",
+      "batches": [
+        "B021",
+        "B030"
+      ],
+      "metrics": [
+        "loop clarity",
+        "engagement density",
+        "decision quality",
+        "feedback quality"
+      ],
+      "requirements": [
+        "Support data-driven semantic diff, rollback, hot reload/migration and exact state checkpointing.",
+        "Recover interrupted edits with no corrupt gameplay state.",
+        "Maintain replay compatibility or explicit migration."
+      ],
+      "adversarial": [
+        "dead loop",
+        "busywork",
+        "unclear feedback",
+        "reward mismatch",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-158 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-159",
+      "ordinal": 159,
+      "family_id": "GB16",
+      "family": "Core Game Loop",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Define the moment-to-moment action, decision, feedback and reward loop that delivers the game's player promise.",
+      "owner": "skeleton/ai/simulation/game/mechanics.py",
+      "batches": [
+        "B021",
+        "B030"
+      ],
+      "metrics": [
+        "loop clarity",
+        "engagement density",
+        "decision quality",
+        "feedback quality"
+      ],
+      "requirements": [
+        "Run Forge-100/1000/10000 with three stages each and no wall-clock deadline.",
+        "Use large simulation/playtest batches to hunt exploits and emergent failure.",
+        "Prove bounded resources, checkpoint/restart and no iterative quality collapse."
+      ],
+      "adversarial": [
+        "dead loop",
+        "busywork",
+        "unclear feedback",
+        "reward mismatch",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-159 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort exploit report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-160",
+      "ordinal": 160,
+      "family_id": "GB16",
+      "family": "Core Game Loop",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Define the moment-to-moment action, decision, feedback and reward loop that delivers the game's player promise.",
+      "owner": "skeleton/ai/simulation/game/mechanics.py",
+      "batches": [
+        "B021",
+        "B030"
+      ],
+      "metrics": [
+        "loop clarity",
+        "engagement density",
+        "decision quality",
+        "feedback quality"
+      ],
+      "requirements": [
+        "Require independent exact-head playable evidence and protected-metric non-regression.",
+        "Block rights/provenance, canon, exploit, determinism or state-integrity failures.",
+        "Expire qualification on material code/model/canon/evaluator/effort drift."
+      ],
+      "adversarial": [
+        "dead loop",
+        "busywork",
+        "unclear feedback",
+        "reward mismatch",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-160 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort exploit report",
+        "independent playable verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-161",
+      "ordinal": 161,
+      "family_id": "GB17",
+      "family": "Mechanics & Rules",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Author deterministic extensible mechanics, interactions, state transitions and combinable rules that support emergent play.",
+      "owner": "skeleton/ai/forge/pipelines/game_logic.py",
+      "batches": [
+        "B021",
+        "B023"
+      ],
+      "metrics": [
+        "rule correctness",
+        "emergence",
+        "composability",
+        "exploit resistance"
+      ],
+      "requirements": [
+        "Specify Mechanics & Rules: Author deterministic extensible mechanics, interactions, state transitions and combinable rules that support emergent play.",
+        "Declare input/action/state/output contracts, invariants, anti-goals, failure modes and player-facing acceptance tests.",
+        "Bind skeleton/ai/forge/pipelines/game_logic.py and B021, B023."
+      ],
+      "adversarial": [
+        "rule contradiction",
+        "hidden state mutation",
+        "degenerate interaction",
+        "script escape",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-161 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-162",
+      "ordinal": 162,
+      "family_id": "GB17",
+      "family": "Mechanics & Rules",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Author deterministic extensible mechanics, interactions, state transitions and combinable rules that support emergent play.",
+      "owner": "skeleton/ai/forge/pipelines/game_logic.py",
+      "batches": [
+        "B021",
+        "B023"
+      ],
+      "metrics": [
+        "rule correctness",
+        "emergence",
+        "composability",
+        "exploit resistance"
+      ],
+      "requirements": [
+        "Define deterministic typed state, events, transitions, provenance and replay identity.",
+        "Separate authoritative rules from presentation and AI suggestion.",
+        "Define compatibility and invalid-state behavior."
+      ],
+      "adversarial": [
+        "rule contradiction",
+        "hidden state mutation",
+        "degenerate interaction",
+        "script escape",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-162 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-163",
+      "ordinal": 163,
+      "family_id": "GB17",
+      "family": "Mechanics & Rules",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Author deterministic extensible mechanics, interactions, state transitions and combinable rules that support emergent play.",
+      "owner": "skeleton/ai/forge/pipelines/game_logic.py",
+      "batches": [
+        "B021",
+        "B023"
+      ],
+      "metrics": [
+        "rule correctness",
+        "emergence",
+        "composability",
+        "exploit resistance"
+      ],
+      "requirements": [
+        "Implement/create through canonical gameplay state and ProjectDNA rather than prompt-only behavior.",
+        "Make mutations deterministic/idempotent where applicable and retain reference behavior.",
+        "Record generated rule/code provenance and tool/model identity."
+      ],
+      "adversarial": [
+        "rule contradiction",
+        "hidden state mutation",
+        "degenerate interaction",
+        "script escape",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-163 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-164",
+      "ordinal": 164,
+      "family_id": "GB17",
+      "family": "Mechanics & Rules",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Author deterministic extensible mechanics, interactions, state transitions and combinable rules that support emergent play.",
+      "owner": "skeleton/ai/forge/pipelines/game_logic.py",
+      "batches": [
+        "B021",
+        "B023"
+      ],
+      "metrics": [
+        "rule correctness",
+        "emergence",
+        "composability",
+        "exploit resistance"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate rivals.",
+        "Challenge exploitability, clarity, depth and player value; submit a materially better playable candidate.",
+        "Deterministic tests/arbiter decide champion."
+      ],
+      "adversarial": [
+        "rule contradiction",
+        "hidden state mutation",
+        "degenerate interaction",
+        "script escape",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-164 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-165",
+      "ordinal": 165,
+      "family_id": "GB17",
+      "family": "Mechanics & Rules",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Author deterministic extensible mechanics, interactions, state transitions and combinable rules that support emergent play.",
+      "owner": "skeleton/ai/forge/pipelines/game_logic.py",
+      "batches": [
+        "B021",
+        "B023"
+      ],
+      "metrics": [
+        "rule correctness",
+        "emergence",
+        "composability",
+        "exploit resistance"
+      ],
+      "requirements": [
+        "Verify the change against progression, quests, NPC/world state, input, animation, audio/visual feedback and narrative constraints.",
+        "Propagate state-contract changes to coupled systems.",
+        "Reject local gains that violate the core player promise."
+      ],
+      "adversarial": [
+        "rule contradiction",
+        "hidden state mutation",
+        "degenerate interaction",
+        "script escape",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-165 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-166",
+      "ordinal": 166,
+      "family_id": "GB17",
+      "family": "Mechanics & Rules",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Author deterministic extensible mechanics, interactions, state transitions and combinable rules that support emergent play.",
+      "owner": "skeleton/ai/forge/pipelines/game_logic.py",
+      "batches": [
+        "B021",
+        "B023"
+      ],
+      "metrics": [
+        "rule correctness",
+        "emergence",
+        "composability",
+        "exploit resistance"
+      ],
+      "requirements": [
+        "Run deterministic simulations, property/fuzz tests and replayable playtests.",
+        "Attack rule contradiction, hidden state mutation, degenerate interaction, script escape.",
+        "Preserve seeds and minimized exploit traces as regressions."
+      ],
+      "adversarial": [
+        "rule contradiction",
+        "hidden state mutation",
+        "degenerate interaction",
+        "script escape",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-166 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-167",
+      "ordinal": 167,
+      "family_id": "GB17",
+      "family": "Mechanics & Rules",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Author deterministic extensible mechanics, interactions, state transitions and combinable rules that support emergent play.",
+      "owner": "skeleton/ai/forge/pipelines/game_logic.py",
+      "batches": [
+        "B021",
+        "B023"
+      ],
+      "metrics": [
+        "rule correctness",
+        "emergence",
+        "composability",
+        "exploit resistance"
+      ],
+      "requirements": [
+        "Improve rule correctness, emergence, composability, exploit resistance plus fun, accessibility, performance and maintainability jointly.",
+        "Reject one-dimensional tuning wins that collapse strategy diversity or clarity.",
+        "Keep champion on non-Pareto challengers."
+      ],
+      "adversarial": [
+        "rule contradiction",
+        "hidden state mutation",
+        "degenerate interaction",
+        "script escape",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-167 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-168",
+      "ordinal": 168,
+      "family_id": "GB17",
+      "family": "Mechanics & Rules",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Author deterministic extensible mechanics, interactions, state transitions and combinable rules that support emergent play.",
+      "owner": "skeleton/ai/forge/pipelines/game_logic.py",
+      "batches": [
+        "B021",
+        "B023"
+      ],
+      "metrics": [
+        "rule correctness",
+        "emergence",
+        "composability",
+        "exploit resistance"
+      ],
+      "requirements": [
+        "Support data-driven semantic diff, rollback, hot reload/migration and exact state checkpointing.",
+        "Recover interrupted edits with no corrupt gameplay state.",
+        "Maintain replay compatibility or explicit migration."
+      ],
+      "adversarial": [
+        "rule contradiction",
+        "hidden state mutation",
+        "degenerate interaction",
+        "script escape",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-168 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-169",
+      "ordinal": 169,
+      "family_id": "GB17",
+      "family": "Mechanics & Rules",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Author deterministic extensible mechanics, interactions, state transitions and combinable rules that support emergent play.",
+      "owner": "skeleton/ai/forge/pipelines/game_logic.py",
+      "batches": [
+        "B021",
+        "B023"
+      ],
+      "metrics": [
+        "rule correctness",
+        "emergence",
+        "composability",
+        "exploit resistance"
+      ],
+      "requirements": [
+        "Run Forge-100/1000/10000 with three stages each and no wall-clock deadline.",
+        "Use large simulation/playtest batches to hunt exploits and emergent failure.",
+        "Prove bounded resources, checkpoint/restart and no iterative quality collapse."
+      ],
+      "adversarial": [
+        "rule contradiction",
+        "hidden state mutation",
+        "degenerate interaction",
+        "script escape",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-169 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort exploit report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-170",
+      "ordinal": 170,
+      "family_id": "GB17",
+      "family": "Mechanics & Rules",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Author deterministic extensible mechanics, interactions, state transitions and combinable rules that support emergent play.",
+      "owner": "skeleton/ai/forge/pipelines/game_logic.py",
+      "batches": [
+        "B021",
+        "B023"
+      ],
+      "metrics": [
+        "rule correctness",
+        "emergence",
+        "composability",
+        "exploit resistance"
+      ],
+      "requirements": [
+        "Require independent exact-head playable evidence and protected-metric non-regression.",
+        "Block rights/provenance, canon, exploit, determinism or state-integrity failures.",
+        "Expire qualification on material code/model/canon/evaluator/effort drift."
+      ],
+      "adversarial": [
+        "rule contradiction",
+        "hidden state mutation",
+        "degenerate interaction",
+        "script escape",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-170 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort exploit report",
+        "independent playable verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-171",
+      "ordinal": 171,
+      "family_id": "GB18",
+      "family": "Combat & Ability Design",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Design attacks, abilities, timing, hit logic, resources, enemy interactions, readability and tactical counterplay.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/combat_engine.py",
+      "batches": [
+        "B027"
+      ],
+      "metrics": [
+        "combat readability",
+        "tactical depth",
+        "counterplay",
+        "determinism"
+      ],
+      "requirements": [
+        "Specify Combat & Ability Design: Design attacks, abilities, timing, hit logic, resources, enemy interactions, readability and tactical counterplay.",
+        "Declare input/action/state/output contracts, invariants, anti-goals, failure modes and player-facing acceptance tests.",
+        "Bind skeleton/ai/simulation/game/mechanics_depth/combat_engine.py and B027."
+      ],
+      "adversarial": [
+        "dominant strategy",
+        "unreadable hit logic",
+        "stunlock loop",
+        "resource exploit",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-171 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-172",
+      "ordinal": 172,
+      "family_id": "GB18",
+      "family": "Combat & Ability Design",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Design attacks, abilities, timing, hit logic, resources, enemy interactions, readability and tactical counterplay.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/combat_engine.py",
+      "batches": [
+        "B027"
+      ],
+      "metrics": [
+        "combat readability",
+        "tactical depth",
+        "counterplay",
+        "determinism"
+      ],
+      "requirements": [
+        "Define deterministic typed state, events, transitions, provenance and replay identity.",
+        "Separate authoritative rules from presentation and AI suggestion.",
+        "Define compatibility and invalid-state behavior."
+      ],
+      "adversarial": [
+        "dominant strategy",
+        "unreadable hit logic",
+        "stunlock loop",
+        "resource exploit",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-172 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-173",
+      "ordinal": 173,
+      "family_id": "GB18",
+      "family": "Combat & Ability Design",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Design attacks, abilities, timing, hit logic, resources, enemy interactions, readability and tactical counterplay.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/combat_engine.py",
+      "batches": [
+        "B027"
+      ],
+      "metrics": [
+        "combat readability",
+        "tactical depth",
+        "counterplay",
+        "determinism"
+      ],
+      "requirements": [
+        "Implement/create through canonical gameplay state and ProjectDNA rather than prompt-only behavior.",
+        "Make mutations deterministic/idempotent where applicable and retain reference behavior.",
+        "Record generated rule/code provenance and tool/model identity."
+      ],
+      "adversarial": [
+        "dominant strategy",
+        "unreadable hit logic",
+        "stunlock loop",
+        "resource exploit",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-173 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-174",
+      "ordinal": 174,
+      "family_id": "GB18",
+      "family": "Combat & Ability Design",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Design attacks, abilities, timing, hit logic, resources, enemy interactions, readability and tactical counterplay.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/combat_engine.py",
+      "batches": [
+        "B027"
+      ],
+      "metrics": [
+        "combat readability",
+        "tactical depth",
+        "counterplay",
+        "determinism"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate rivals.",
+        "Challenge exploitability, clarity, depth and player value; submit a materially better playable candidate.",
+        "Deterministic tests/arbiter decide champion."
+      ],
+      "adversarial": [
+        "dominant strategy",
+        "unreadable hit logic",
+        "stunlock loop",
+        "resource exploit",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-174 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-175",
+      "ordinal": 175,
+      "family_id": "GB18",
+      "family": "Combat & Ability Design",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Design attacks, abilities, timing, hit logic, resources, enemy interactions, readability and tactical counterplay.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/combat_engine.py",
+      "batches": [
+        "B027"
+      ],
+      "metrics": [
+        "combat readability",
+        "tactical depth",
+        "counterplay",
+        "determinism"
+      ],
+      "requirements": [
+        "Verify the change against progression, quests, NPC/world state, input, animation, audio/visual feedback and narrative constraints.",
+        "Propagate state-contract changes to coupled systems.",
+        "Reject local gains that violate the core player promise."
+      ],
+      "adversarial": [
+        "dominant strategy",
+        "unreadable hit logic",
+        "stunlock loop",
+        "resource exploit",
+        "protected-expression leakage",
+        "cross-system regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "rights/provenance known",
+        "no high similarity risk",
+        "gameplay/narrative consistency",
+        "bounded resources",
+        "deterministic/state-safe behavior",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-175 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort run evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    }
+  ]
+}

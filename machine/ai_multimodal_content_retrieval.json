@@ -1,0 +1,66 @@
+{
+  "schema_version": "skeleton.ai.multimodal_content_retrieval.v1",
+  "status": "implementation_candidate",
+  "owner": "skeleton/ai/runtime/learning_foundation/content_retrieval.py",
+  "corpus_owner": "skeleton/ai/runtime/learning_foundation/multimodal.py",
+  "decoder_owner": "skeleton/ai/runtime/multimodal/intake.py",
+  "retrieval_owner": "skeleton/ai/runtime/retrieval/fusion.py",
+  "persistence_owner": "skeleton/ai/runtime/training/data.py",
+  "architecture_reference": "machine/ai_app_construction.json",
+  "state_authority_reference": "machine/state_topology.json",
+  "volumes": [
+    "VOL-154",
+    "VOL-156",
+    "VOL-159"
+  ],
+  "scope": "actual bounded handcrafted image and PCM signal features and auditable nearest-neighbor retrieval; no semantic embeddings, OCR, ASR, provider calls or new durable store",
+  "apis": [
+    "ContentSignalIndex.add",
+    "ContentSignalIndex.search",
+    "ContentSignalIndex.checkpoint",
+    "ContentSignalIndex.restore",
+    "ContentSimilarityHit.as_scored_result",
+    "DatasetRegistry.source_binding",
+    "DatasetRegistry.assert_source_binding",
+    "DatasetRegistry.source_authority",
+    "DatasetRegistry.materialized_source"
+  ],
+  "features": {
+    "images": "Verified actual RGBA pixels, alpha-composited color, a 4x4 spatial color grid, three eight-bin color histograms and horizontal/vertical luminance gradients; fixed 90-dimensional integer vector.",
+    "audio": "Verified actual integer PCM bytes, measured channels/rate/width, downmixed temporal RMS/absolute-amplitude/DC/zero-crossing cells and bounded Hann-window FFT power bands, spectral centroid/bandwidth/flatness and peak; fixed 52-dimensional quantized vector.",
+    "identity": "Immutable feature receipt binds exact original corpus record, raw source and decoded byte digests, verified intake receipt, algorithm/runtime reference, feature values, measured geometry/audio parameters, source/rights/lineage, simulation cohort and optional declared time span.",
+    "trust": "No extracted operator text contributes to features or similarity scores; every result remains evidence with instruction_trusted=false."
+  },
+  "bounds": {
+    "max_records": 256,
+    "max_source_bytes": 524288,
+    "max_total_source_bytes": 33554432,
+    "max_image_pixels": 1048576,
+    "max_audio_sample_frames": 262144,
+    "max_audio_seconds": 60,
+    "fft_window_samples": 2048,
+    "fft_windows": 8,
+    "max_references": 128,
+    "max_recovery_document_bytes": 1048576,
+    "max_preserved_projection_bytes": 16384,
+    "max_checkpoints": 128
+  },
+  "retrieval": "Explicit ordered candidate record IDs; exact self/asset exclusion, rights, simulation cohort, modality and optional half-open time window filter before source authority, hashing/decoding and ranking. Recompute actual features against issued receipt; score=1-normalized mean absolute vector distance, deterministic score/record-ID tie order. Fresh detached canonical ScoredResult adapters preserve full receipt provenance for existing retrieval fusion.",
+  "durability": {
+    "purpose": "media_retrieval is an explicitly consented isolated single-purpose DatasetRegistry materialization and cannot mix with speech recovery, training or evaluation or enter normal text-training export.",
+    "original_authority": "Register actual verified original raw media digest in existing DatasetRegistry; SourceAuthorityBinding pins original envelope digest, exact authority epoch and media_retrieval purpose. Existing rights cannot escalate when the same raw digest is already registered for another purpose.",
+    "copy_binding": "Stable snapshot sources preserve exact original bytes, original issued record and verification receipts, feature identity and original SourceAuthorityBinding. Native materialization persists and checks original bindings before commit and on every materialized read; deleting or revoking originals blocks every retained copy, including later versions.",
+    "recovery": "CAS checkpoint versions fence stale writers and stale snapshots. Restore stages corpus changes, revalidates current original/copy authority and exact bytes, decodes and recomputes features, compares all receipt/config identities, then publishes under the canonical authority guard.",
+    "linearization": "Original-source registration is a separate valid verified acquisition; explicit checkpoint publishes a new version only after all copied/original evidence passes. Similarity publication and recovery use the existing SQLite authority guard, preserving withdrawal order across processes."
+  },
+  "failure_contract": "MultimodalFoundationError for source/feature/policy/bounds drift and canonical DatasetRegistry CAS/rights errors; rejected additions/recovery publish no index/corpus state, failed checkpoints publish no new snapshot",
+  "verification": [
+    "skeleton/testing/test_governed_training_data.py",
+    "skeleton/testing/test_multimodal_media_validation.py"
+  ],
+  "rollback": "Disable content signal admission/retrieval and retain governed original/copy identities and versioned receipts; no model promotion or completion signoff.",
+  "production_model_promotion_authorized": false,
+  "planned_acceptance": "skeleton/testing/test_p3_multimodal_content_retrieval.py",
+  "acceptance_status": "unverified_source_candidate",
+  "verification_note": "Content feature implementation preserved; dedicated acceptance not authored or run because the user directed implementation without tests on 2026-10-13."
+}

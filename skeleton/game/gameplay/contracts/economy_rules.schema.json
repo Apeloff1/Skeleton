@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:economy_rules:v1",
+  "title": "FLGB-13 economy rules",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "currency_id",
+    "min_balance",
+    "max_balance",
+    "transfer_limit"
+  ],
+  "properties": {
+    "currency_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "min_balance": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_balance": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "transfer_limit": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

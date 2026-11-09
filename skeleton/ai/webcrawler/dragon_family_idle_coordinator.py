@@ -1,0 +1,637 @@
+"""Durable, governed idle-only scheduler for Dragon Family's three gatherers.
+
+Host-invoked on an authenticated user/device idle signal; never starts threads,
+network tasks or an interval. This is a persistent lease + fair queue over the
+canonical source inventory, not another crawler. The *trusted* host supplies
+cancelable policy-bound article/video/recrawl adapters and review approvals.
+All progress still passes DragonFamily.digest_idle and the current evidence gate.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from math import isfinite
+from secrets import token_hex
+from typing import Callable, Mapping
+import json
+import sqlite3
+
+from .dragon_family import DragonFamily, IdleWindow, SourceReceipt, ROLES, _epoch, _owner, _source_id, _utc, _hash
+from .dragon_family_idle_failures import IdleResearchFailure
+
+@dataclass(frozen=True)
+class IdleTask:
+    dragon: str
+    source_id: str
+    url: str
+    media: str
+    topics: tuple[str, ...]
+    last_content_digest: str
+    attempt: int
+
+@dataclass(frozen=True)
+class IdleCoordinatorPolicy:
+    max_tasks: int = 3
+    min_idle_seconds: float = 300
+    lease_seconds: float = 120
+    changed_cooldown_seconds: float = 6 * 3600
+    unchanged_cooldown_seconds: float = 6 * 3600
+    transient_backoff_seconds: float = 300
+    maximum_backoff_seconds: float = 8 * 3600
+    max_eligible_scan: int = 2000
+
+    def validate(self) -> None:
+        if type(self.max_tasks) is not int or not 1 <= self.max_tasks <= 3:
+            raise ValueError("invalid idle task limit")
+        if type(self.max_eligible_scan) is not int or not 10 <= self.max_eligible_scan <= 100000:
+            raise ValueError("invalid source scan budget")
+        for name in ("min_idle_seconds", "lease_seconds", "changed_cooldown_seconds",
+                     "unchanged_cooldown_seconds", "transient_backoff_seconds",
+                     "maximum_backoff_seconds"):
+            value = getattr(self, name)
+            if type(value) not in (int,float) or not isfinite(value) or value < 1:
+                raise ValueError("invalid scheduling policy: " + name)
+        if not 60 <= self.min_idle_seconds <= 86400 or not 10 <= self.lease_seconds <= 3600:
+            raise ValueError("invalid idle or lease duration")
+        if self.transient_backoff_seconds > self.maximum_backoff_seconds:
+            raise ValueError("backoff floor above ceiling")
+
+
+def read_idle_family_history(db: sqlite3.Connection, owner: str, *,
+                             authorized: bool, limit: int = 15) -> list[dict[str, object]]:
+    """Verify the entire owner chain, then return bounded recent events."""
+    _owner(owner)
+    if not authorized:
+        raise PermissionError("idle family journal requires authentication")
+    if type(limit) is not int or not 1<=limit<=100:
+        raise ValueError("invalid idle event page limit")
+    exists=db.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+        AND name='dragon_family_idle_attempt_events'""").fetchone()
+    if not exists:
+        return []
+    rows=db.execute("""SELECT sequence,at,role,source_id,outcome,details,
+        previous_hash,event_hash FROM dragon_family_idle_attempt_events
+        WHERE owner=? ORDER BY sequence""",(owner,)).fetchall()
+    prior="0"*64
+    last=-1.
+    result=[]
+    for ordinal,row in enumerate(rows,1):
+        sequence,at,role,sid,outcome,note,previous,digest=row
+        if (sequence!=ordinal or at<last or previous!=prior or
+                digest!=_hash([owner,sequence,at,role,sid,outcome,note,previous])):
+            raise ValueError("idle family attempt journal integrity failure")
+        last=at
+        prior=digest
+        result.append(dict(sequence=sequence,at=_utc(at),dragon=role,
+                           source_id=sid,outcome=outcome,change=note,
+                           digest=digest))
+    return result[-limit:][::-1]
+
+
+def read_idle_family_health(db: sqlite3.Connection, owner: str, *,
+                            authorized: bool) -> dict[str, object]:
+    """Authenticated read-only UI projection; never constructs worker authority.
+
+    A queued lease's existence is not proof that a background task is currently
+    running or even that a host scheduler is installed. The UI must distinguish
+    last-known dispatch from the device's current idle status.
+    """
+    _owner(owner)
+    if not authorized:
+        raise PermissionError("idle family health requires authentication")
+    exists=db.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+        AND name='dragon_family_idle_leases'""").fetchone()
+    if not exists:
+        return dict(schema="skeleton.ai.dragon.idle_status.v1",
+                    configured=False,workers={},history=[],
+                    idle_only=True,host_state="not_connected",
+                    max_tasks_per_tick=3)
+    rows=db.execute("""SELECT role,COUNT(*),
+        SUM(last_outcome='failed'),SUM(last_outcome='running'),
+        SUM(last_outcome='changed'),SUM(last_outcome='unchanged'),
+        SUM(last_outcome='policy_blocked'),SUM(last_outcome='rate_limited'),
+        MIN(CASE WHEN next_due>0 THEN next_due ELSE NULL END)
+        FROM dragon_family_idle_leases
+        WHERE owner=? GROUP BY role ORDER BY role""", (owner,)).fetchall()
+    details={role:dict(known_sources=n,failed=failed or 0,
+            incomplete_leases=running or 0,
+            last_changes=changed or 0,unchanged=unchanged or 0,
+            policy_blocked=blocked or 0,rate_limited=limited or 0,
+            earliest_due_at=_utc(due) if due is not None else None)
+            for role,n,failed,running,changed,unchanged,blocked,limited,due in rows}
+    history=read_idle_family_history(db,owner,authorized=True,limit=15)
+    return dict(schema="skeleton.ai.dragon.idle_status.v1",configured=True,
+                workers=details,history=history,idle_only=True,
+                host_state="not_observed",
+                max_tasks_per_tick=3)
+
+
+class DragonIdleCoordinator:
+    """Policy-bound, owner-fenced SQLite dispatch with finite durable leases.
+
+    The host MUST restrict construction to its canonical Dragon owner and supply
+    authoritative idle_state(). Browser-supplied booleans and public endpoints
+    are never valid admission signals. Multi-host deployments must share the
+    same canonical SQLite file or use an equivalent transactional coordinator.
+    """
+    def __init__(self, family: DragonFamily, *, policy: IdleCoordinatorPolicy = IdleCoordinatorPolicy(),
+                 reserve_budget: Callable[[str, str, float], None] | None = None):
+        policy.validate()
+        if not isinstance(family, DragonFamily) or family.owner_scope is None:
+            raise PermissionError("idle coordinator requires an owner-locked trusted family")
+        if family.approval is None:
+            raise PermissionError("canonical review callback required")
+        if family.min_idle_seconds > policy.min_idle_seconds:
+            raise ValueError("idle coordinator cannot weaken family idle policy")
+        self.family = family
+        self.db = family.db
+        self.policy = policy
+        if reserve_budget is not None and not callable(reserve_budget):
+            raise ValueError("trusted reservation budget hook must be callable")
+        self.reserve_budget = reserve_budget
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_family_idle_leases(
+            owner TEXT NOT NULL, role TEXT NOT NULL, source_id TEXT NOT NULL,
+            next_due REAL NOT NULL DEFAULT 0,
+            failures INTEGER NOT NULL DEFAULT 0,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            last_started REAL, last_completed REAL,
+            lease_token TEXT NOT NULL DEFAULT '',
+            lease_expires REAL NOT NULL DEFAULT 0,
+            last_outcome TEXT NOT NULL DEFAULT 'new',
+            PRIMARY KEY(owner,role,source_id))""")
+        self.db.execute("""CREATE INDEX IF NOT EXISTS dragon_family_idle_due
+            ON dragon_family_idle_leases(owner,role,next_due,lease_expires)""")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_family_idle_scan_cursor(
+            owner TEXT PRIMARY KEY, last_source_id TEXT NOT NULL)""")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_family_idle_attempt_events(
+            owner TEXT NOT NULL, sequence INTEGER NOT NULL, at REAL NOT NULL,
+            role TEXT NOT NULL, source_id TEXT NOT NULL,
+            outcome TEXT NOT NULL, details TEXT NOT NULL,
+            previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL,
+            PRIMARY KEY(owner,sequence))""")
+        self.db.commit()
+
+    def _window(self, read: Callable[[], IdleWindow]) -> IdleWindow:
+        state = read()
+        if not isinstance(state, IdleWindow) or not state.permitted(
+                min_idle_seconds=self.policy.min_idle_seconds):
+            raise PermissionError("trusted host is not idle or consented")
+        return state
+
+    def _candidates(self, owner: str, now: float,
+                    task_topics: tuple[str, ...], adjacent_topics: tuple[str, ...],
+                    revisit_sources: frozenset[str] = frozenset()) -> list[tuple]:
+        from .dragon_family import _tokens
+        focus, adjacent = set(_tokens(task_topics)), set(_tokens(adjacent_topics))
+        if not focus:
+            raise ValueError("idle research requires real task context")
+        # Use the latest known source version across the *whole* family to
+        # avoid duplicate fetches sold as novelty. A monitor must have a
+        # previously acquired source; article/video may also discover new
+        # approved, previously registered catalog entries.
+        # Keyset cursor means a massive catalog cannot starve sources after
+        # the first fixed-size window. We advance the scan even if every row
+        # is irrelevant, and wrap deterministically at the end.
+        self.db.execute("BEGIN IMMEDIATE")
+        with self.db:
+            previous=self.db.execute("""SELECT last_source_id
+                FROM dragon_family_idle_scan_cursor WHERE owner=?""",(owner,)).fetchone()
+            marker=previous[0] if previous else ""
+            query="""WITH latest AS (
+                SELECT owner,source_id,content_digest,observed_at,
+                  ROW_NUMBER() OVER (PARTITION BY owner,source_id
+                      ORDER BY observed_at DESC,rowid DESC) AS ordinal
+                FROM dragon_family_readings WHERE owner=?
+              )
+              SELECT s.source_id,s.url,s.media,s.topics_json,
+                     COALESCE(l.content_digest,s.parent_digest),
+                     COALESCE(l.observed_at,s.registered_at)
+              FROM dragon_family_sources s LEFT JOIN latest l ON
+                l.owner=s.owner AND l.source_id=s.source_id AND l.ordinal=1
+              WHERE s.owner=? AND s.source_id {operator} ?
+              ORDER BY s.source_id LIMIT ?"""
+            rows=self.db.execute(query.format(operator=">"),
+                                 (owner,owner,marker,self.policy.max_eligible_scan)).fetchall()
+            if len(rows)<self.policy.max_eligible_scan and marker:
+                rows+=self.db.execute(query.format(operator="<="),
+                    (owner,owner,marker,self.policy.max_eligible_scan-len(rows))).fetchall()
+            if rows:
+                self.db.execute("""INSERT INTO dragon_family_idle_scan_cursor VALUES(?,?)
+                    ON CONFLICT(owner) DO UPDATE SET last_source_id=excluded.last_source_id""",
+                    (owner,rows[-1][0]))
+        out = []
+        for sid,url,media,topics_json,revision,seen_at in rows:
+            source_topics = set(json.loads(topics_json))
+            direct = bool(source_topics & focus)
+            related = bool(source_topics & adjacent)
+            if not (direct or related):
+                continue
+            for role in ROLES:
+                if role != "monitor" and media != role:
+                    continue
+                if role == "monitor" and not revision:
+                    continue
+                lease = self.db.execute("""SELECT next_due,lease_expires,attempts,last_outcome
+                    FROM dragon_family_idle_leases WHERE owner=? AND role=? AND source_id=?""",
+                    (owner,role,sid)).fetchone()
+                if lease and (lease[0] > now or lease[1] > now or
+                              lease[3]=="policy_blocked"):
+                    continue
+                ordinal = lease[2] if lease else 0
+                # Direct relevance > adjacent, then least tried, then least
+                # recently examined, then stable ID. Separate candidate
+                # generation from trusted network execution.
+                # Dispatch primary article/video workers before the monitor;
+                # otherwise Scout can claim a video's lease first and starve
+                # Flicker despite three available catalog sources.
+                # The already-reviewed Mother's contradictory-source brief
+                # may put Scout first for that exact known source. It changes
+                # only the order of consented, catalog-eligible work, never
+                # permits a new URL, media type, fetch, or weight promotion.
+                urgent = 0 if role=="monitor" and sid in revisit_sources else 1
+                out.append((urgent,ROLES.index(role),0 if direct else 1,
+                            ordinal,float(seen_at),sid,role,url,media,
+                            tuple(sorted(source_topics)),revision or ""))
+        return sorted(out)
+
+    def _reserve(self, owner: str, role: str, sid: str, start: float) -> str | None:
+        key = token_hex(24)
+        self.db.execute("BEGIN IMMEDIATE")
+        with self.db:
+            row = self.db.execute("""SELECT next_due,lease_expires,attempts,last_outcome
+                FROM dragon_family_idle_leases WHERE owner=? AND role=? AND source_id=?""",
+                (owner,role,sid)).fetchone()
+            if row and (row[0] > start or row[1] > start or
+                        row[3]=="policy_blocked"):
+                return None
+            # Different siblings on different processes must not acquire the
+            # same source revision in overlapping leases. This fence spans
+            # ALL specialist roles and is checked under the SQLite writer lock.
+            if self.db.execute("""SELECT 1 FROM dragon_family_idle_leases
+                WHERE owner=? AND source_id=? AND
+                  (last_outcome='policy_blocked' OR lease_expires>?
+                   OR (next_due>? AND last_outcome IN
+                     ('changed','unchanged','paused','recovered'))) LIMIT 1""",
+                (owner,sid,start,start)).fetchone():
+                # A sibling cannot instantly recrawl the same reviewed
+                # revision just because its own role cooldown is empty.
+                return None
+            # The owner/role admission budget is debited in the SAME SQLite
+            # transaction as the lease. No concurrent host can overrun quota
+            # by claiming work before its usage counter becomes visible.
+            if self.reserve_budget is not None:
+                self.reserve_budget(owner,role,start)
+            self.db.execute("""INSERT INTO dragon_family_idle_leases
+                (owner,role,source_id,next_due,failures,attempts,last_started,
+                 lease_token,lease_expires,last_outcome)
+                VALUES(?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(owner,role,source_id) DO UPDATE SET
+                  attempts=dragon_family_idle_leases.attempts+1,
+                  last_started=excluded.last_started,
+                  lease_token=excluded.lease_token,
+                  lease_expires=excluded.lease_expires,
+                  last_outcome='running'""",
+                (owner,role,sid,0,0,1,start,key,start+self.policy.lease_seconds,"running"))
+        return key
+
+    def _owned(self, owner: str, role: str, sid: str, key: str, now: float) -> bool:
+        row=self.db.execute("""SELECT lease_expires FROM dragon_family_idle_leases
+            WHERE owner=? AND role=? AND source_id=? AND lease_token=?""",
+            (owner,role,sid,key)).fetchone()
+        return bool(row and now < row[0])
+
+    def _record_attempt(self, owner: str, role: str, sid: str,
+                        at: float, outcome: str) -> None:
+        notes = {
+            "changed": "(improved: independently reviewed new source content acquired)",
+            "unchanged": "(checked: no novel verified source information)",
+            "failed": "(deferred: adapter failed; bounded retry scheduled)",
+            "paused": "(paused: user activity, consent, capacity, or lease fence)",
+            "recovered": "(recovered: interrupted or crashed worker lease expired; no XP granted)",
+            "policy_blocked": "(blocked: source rights, robots, destination or capture approval denied; manual review required)",
+            "rate_limited": "(deferred: source requested bounded Retry-After; no acquisition accepted)",
+            "review_cleared": "(approved: policy block cleared by independent host rights reviewer)",
+        }
+        if outcome not in notes:
+            raise ValueError("unknown idle research outcome")
+        previous=self.db.execute("""SELECT sequence,event_hash,at
+            FROM dragon_family_idle_attempt_events WHERE owner=?
+            ORDER BY sequence DESC LIMIT 1""",(owner,)).fetchone()
+        sequence,prior=(previous[0]+1,previous[1]) if previous else (1,"0"*64)
+        if sequence>100000:
+            raise ValueError("idle attempt history capacity exhausted")
+        if previous and at<previous[2]:
+            raise ValueError("idle research event time regressed")
+        note=notes[outcome]
+        fingerprint=_hash([owner,sequence,at,role,sid,outcome,note,prior])
+        self.db.execute("""INSERT INTO dragon_family_idle_attempt_events
+            VALUES(?,?,?,?,?,?,?,?,?)""",
+            (owner,sequence,at,role,sid,outcome,note,prior,fingerprint))
+
+    def fence_owner_leases(self, owner: str, *, authorized: bool,
+                           at: float, max_fences: int = 1000) -> int:
+        """Stop owned in-flight jobs now; invalidate every selected token.
+
+        Called only by the authenticated host after durable opt-out. The work
+        adapter still owns actual network cancellation. Fencing guarantees
+        any later result cannot be admitted as verified Dragon knowledge.
+        """
+        self.family._assert_owner(owner)
+        if not authorized:
+            raise PermissionError("authenticated idle cancellation required")
+        at=_epoch(at)
+        if type(max_fences) is not int or not 1<=max_fences<=1000:
+            raise ValueError("invalid cancellation batch limit")
+        self.db.execute("BEGIN IMMEDIATE")
+        with self.db:
+            rows=self.db.execute("""SELECT role,source_id,next_due
+                FROM dragon_family_idle_leases WHERE owner=?
+                  AND last_outcome='running' AND lease_token<>''
+                ORDER BY role,source_id LIMIT ?""",
+                (owner,max_fences)).fetchall()
+            for role,sid,due in rows:
+                changed=self.db.execute("""UPDATE dragon_family_idle_leases
+                    SET lease_token='',lease_expires=0,
+                        next_due=?,last_completed=?,last_outcome='paused'
+                    WHERE owner=? AND role=? AND source_id=?
+                      AND last_outcome='running' AND lease_token<>''""",
+                    (max(due,at+self.policy.transient_backoff_seconds),
+                     at,owner,role,sid)).rowcount
+                if changed!=1:
+                    raise RuntimeError("idle cancellation lost source fence")
+                self._record_attempt(owner,role,sid,at,"paused")
+        return len(rows)
+
+    def clear_source_policy_block(self, owner: str, source_id: str, *,
+                                  authorized: bool, at: float,
+                                  review: Callable[[str,str], bool]) -> int:
+        """Require an independent new rights/policy review before retry.
+
+        This operation never grants source XP or issues capture consent. It
+        clears only the stored source-wide policy blockade on the canonical
+        owner. The next idle tick still needs opt-in, lease, topical fit,
+        robots/network rights and normal evidence review.
+        """
+        self.family._assert_owner(owner)
+        if not authorized:
+            raise PermissionError("authenticated source policy review required")
+        _source_id(source_id)
+        at=_epoch(at)
+        if not callable(review):
+            raise PermissionError("independent host source rights review required")
+        self.db.execute("BEGIN IMMEDIATE")
+        with self.db:
+            if not self.db.execute("""SELECT 1 FROM dragon_family_sources
+                WHERE owner=? AND source_id=?""",(owner,source_id)).fetchone():
+                raise PermissionError("source not in current authorized catalog")
+            blocked=self.db.execute("""SELECT role FROM dragon_family_idle_leases
+                WHERE owner=? AND source_id=? AND last_outcome='policy_blocked'
+                ORDER BY role""",(owner,source_id)).fetchall()
+            if not blocked:
+                return 0
+            if review(owner,source_id) is not True:
+                raise PermissionError("source rights reviewer did not approve retry")
+            for (role,) in blocked:
+                changed=self.db.execute("""UPDATE dragon_family_idle_leases
+                    SET last_outcome='review_cleared',next_due=?,
+                        last_completed=?,failures=0
+                    WHERE owner=? AND source_id=? AND role=?
+                      AND last_outcome='policy_blocked'""",
+                    (at,at,owner,source_id,role)).rowcount
+                if changed!=1:
+                    raise RuntimeError("source policy clearance lost owner fence")
+                self._record_attempt(owner,role,source_id,at,"review_cleared")
+        return len(blocked)
+
+    def reconcile_expired_leases(self, owner: str, *, authorized: bool,
+                                 at: float, max_recover: int = 100) -> int:
+        """Fence abandoned host work after crash/restart, without replaying it.
+
+        Expiration is determined by a trusted host time observation; stale
+        leases never qualify as completed content and cannot regain XP.
+        Recovery is bounded, transactional, owner-scoped and hash-chained.
+        Future eligibility is delayed with the normal transient backoff.
+        """
+        self.family._assert_owner(owner)
+        if not authorized:
+            raise PermissionError("authenticated idle worker recovery required")
+        at = _epoch(at)
+        if type(max_recover) is not int or not 1 <= max_recover <= 1000:
+            raise ValueError("invalid idle recovery capacity")
+        self.db.execute("BEGIN IMMEDIATE")
+        with self.db:
+            rows = self.db.execute("""SELECT role,source_id,failures,next_due
+                FROM dragon_family_idle_leases WHERE owner=?
+                  AND last_outcome='running' AND lease_token<>''
+                  AND lease_expires<=?
+                ORDER BY lease_expires,role,source_id LIMIT ?""",
+                (owner,at,max_recover)).fetchall()
+            for role,sid,failures,due in rows:
+                errors = min(16,failures+1)
+                delay = min(self.policy.maximum_backoff_seconds,
+                            self.policy.transient_backoff_seconds *
+                            (2**min(12,errors-1)))
+                changed = self.db.execute("""UPDATE dragon_family_idle_leases
+                    SET lease_token='',lease_expires=0,
+                        next_due=?,failures=?,last_completed=?,
+                        last_outcome='recovered'
+                    WHERE owner=? AND role=? AND source_id=?
+                      AND last_outcome='running' AND lease_token<>''
+                      AND lease_expires<=?""",
+                    (max(due,at+delay),errors,at,
+                     owner,role,sid,at)).rowcount
+                if changed!=1:
+                    raise RuntimeError("expired lease recovery lost its fence")
+                self._record_attempt(owner,role,sid,at,"recovered")
+        return len(rows)
+
+    def _finish_uncommitted(self, owner: str, role: str, sid: str,
+                            key: str, now: float, outcome: str,
+                            retry_after_seconds: float | None = None) -> bool:
+        """Shared terminal transition; caller must already hold write lock."""
+        if outcome not in ("changed","unchanged","failed","paused",
+                           "policy_blocked","rate_limited"):
+            raise ValueError("invalid idle completion")
+        if outcome=="rate_limited":
+            if (type(retry_after_seconds) not in (int,float) or
+                    not isfinite(retry_after_seconds) or
+                    not 60<=retry_after_seconds<=86400):
+                raise ValueError("invalid rate limit delay")
+        elif retry_after_seconds is not None:
+            raise ValueError("unexpected rate limit delay")
+        previous=self.db.execute("""SELECT failures FROM dragon_family_idle_leases
+            WHERE owner=? AND role=? AND source_id=? AND lease_token=?""",
+            (owner,role,sid,key)).fetchone()
+        if previous is None:
+            return False
+        errors=min(16,previous[0]+1) if outcome in (
+            "failed","rate_limited") else 0
+        due=(self.policy.changed_cooldown_seconds if outcome=="changed" else
+             self.policy.unchanged_cooldown_seconds if outcome=="unchanged" else
+             min(self.policy.maximum_backoff_seconds,
+                 self.policy.transient_backoff_seconds*(2**min(12,errors-1))) if outcome=="failed" else
+             max(86400*30,self.policy.maximum_backoff_seconds) if outcome=="policy_blocked" else
+             max(self.policy.transient_backoff_seconds,retry_after_seconds) if outcome=="rate_limited" else
+             self.policy.transient_backoff_seconds)
+        changed=self.db.execute("""UPDATE dragon_family_idle_leases SET next_due=?,
+            failures=?,last_completed=?,last_outcome=?,lease_token='',lease_expires=0
+            WHERE owner=? AND role=? AND source_id=? AND lease_token=?""",
+            (now+due,errors,now,outcome,owner,role,sid,key)).rowcount
+        if changed!=1:
+            raise RuntimeError("idle source finalization lost its lease")
+        self._record_attempt(owner,role,sid,now,outcome)
+        return True
+
+    def _commit_verified_completion(
+            self, owner: str, role: str, sid: str, key: str,
+            now: float, changed: bool) -> None:
+        # Called within DragonFamily.digest_idle's transaction; a missing
+        # token raises, ensuring both the new knowledge and XP roll back.
+        if not self._finish_uncommitted(
+                owner,role,sid,key,now,"changed" if changed else "unchanged"):
+            raise PermissionError("source lease disappeared during atomic admission")
+
+    def _finish(self, owner: str, role: str, sid: str, key: str,
+                now: float, outcome: str,
+                retry_after_seconds: float | None = None) -> bool:
+        self.db.execute("BEGIN IMMEDIATE")
+        with self.db:
+            return self._finish_uncommitted(owner,role,sid,key,now,outcome,
+                                           retry_after_seconds)
+
+    def run_once(self, owner: str, *,
+                 authorized: bool,
+                 idle_state: Callable[[], IdleWindow],
+                 gatherers: Mapping[str, Callable[[IdleTask], SourceReceipt | None]],
+                 task_topics: tuple[str, ...],
+                 adjacent_topics: tuple[str, ...] = (),
+                 commit_gate: Callable[[float], bool] | None = None,
+                 revisit_source_ids: tuple[str, ...] = ()) -> dict[str, object]:
+        """Host-invoked bounded tick; fails closed if foreground becomes active.
+
+        A trusted adapter must apply DNS/SSRF/robots/license policies, network
+        deadlines < lease duration, rate limits, video grants, content hash and
+        independently reviewed evidence before returning SourceReceipt. `None`
+        means unchanged evidence, not a successful acquisition. No catch-up or
+        unbounded work is scheduled after an interruption.
+        """
+        self.family._assert_owner(owner)
+        if not authorized:
+            raise PermissionError("authenticated host owner required")
+        if not callable(idle_state):
+            raise ValueError("trusted idle observer required")
+        if not isinstance(gatherers,Mapping):
+            raise ValueError("host must supply policy-bound gatherers")
+        if commit_gate is not None and not callable(commit_gate):
+            raise ValueError("invalid owner-scoped source commit guard")
+        if not isinstance(revisit_source_ids,tuple) or len(revisit_source_ids)>64:
+            raise ValueError("invalid bounded review brief source list")
+        for source_id in revisit_source_ids:
+            _source_id(source_id)
+        state=self._window(idle_state)
+        if not self.db.execute("SELECT 1 FROM dragon_family_broods WHERE owner=?",
+                               (owner,)).fetchone():
+            return dict(at=_utc(state.now),attempted=0,changed=0,unchanged=0,
+                        failed=0,paused=False,reason="parent_source_quest_incomplete")
+        # A crashed process may have left a durable 'running' row. Recover
+        # only after confirming this is an authorized idle tick.
+        recovered=self.reconcile_expired_leases(
+            owner,authorized=True,at=state.now,max_recover=100)
+        candidates=self._candidates(
+            owner,state.now,task_topics,adjacent_topics,
+            revisit_sources=frozenset(revisit_source_ids))
+        stats: dict[str,object] = dict(at=_utc(state.now),attempted=0,changed=0,
+                                       unchanged=0,failed=0,paused=False,recovered=recovered,
+                                       policy_blocked=0,rate_limited=0)
+        roles_seen: set[str] = set()
+        sources_seen: set[str] = set()
+        for _,_,_,attempts,seen,sid,role,url,media,tags,digest in candidates:
+            if len(roles_seen) >= self.policy.max_tasks:
+                break
+            if sid in sources_seen or role in roles_seen or role not in gatherers:
+                continue
+            adapter = gatherers[role]
+            if not callable(adapter):
+                raise ValueError("invalid specialist adapter")
+            try:
+                before=self._window(idle_state)
+            except PermissionError:
+                stats["paused"]=True
+                break
+            key=self._reserve(owner,role,sid,before.now)
+            if key is None:
+                continue
+            roles_seen.add(role)
+            sources_seen.add(sid)
+            stats["attempted"] += 1
+            task=IdleTask(role,sid,url,media,tags,digest,attempts+1)
+            try:
+                receipt=adapter(task)
+                after=self._window(idle_state)
+                if not self._owned(owner,role,sid,key,after.now):
+                    raise PermissionError("idle lease lost or expired")
+                if receipt is None:
+                    status="unchanged"
+                elif (not isinstance(receipt,SourceReceipt) or
+                      receipt.source_id!=sid):
+                    raise ValueError("untrusted adapter returned wrong source receipt")
+                else:
+                    changed=self.family.digest_idle(
+                        owner,role,receipt,authorized=True,window=after,
+                        task_topics=task_topics,adjacent_topics=adjacent_topics,
+                        lease_guard=lambda: (
+                            self._owned(owner,role,sid,key,after.now) and
+                            (commit_gate is None or commit_gate(after.now) is True)),
+                        completion_hook=lambda changed:
+                            self._commit_verified_completion(
+                                owner,role,sid,key,after.now,changed))
+                    status="changed" if changed else "unchanged"
+                if receipt is None:
+                    self._finish(owner,role,sid,key,after.now,status)
+                stats[status] += 1
+            except IdleResearchFailure as failure:
+                # The trusted crawler adapter classifies HTTP 429 versus
+                # license/robots/SSRF denial. Neither can award XP. Respect
+                # bounded Retry-After and quarantine denied sources for
+                # operator review without repeating source access.
+                if failure.category=="policy_blocked":
+                    outcome="policy_blocked"
+                elif failure.category=="rate_limited":
+                    outcome="rate_limited"
+                else:
+                    outcome="failed"
+                stats[outcome] += 1
+                self._finish(owner,role,sid,key,before.now,outcome,
+                             failure.retry_after_seconds)
+            except PermissionError:
+                # Losing consent/foreground/lease is terminal for this tick.
+                # Re-invoking a consent-checked observer here can itself deny,
+                # leaving a dangling lease and masking the safe interruption.
+                # The last verified observation is the only trusted clock
+                # available after an opt-out. The next idle tick may recover.
+                stats["paused"]=True
+                self._finish(owner,role,sid,key,before.now,"paused")
+                break
+            except Exception:
+                # A generic adapter failure cannot be confused with a valid
+                # completion, nor may a failure callback bypass revoked consent.
+                # Audit at the last known trusted time; never call the adapter
+                # or permission gate again just to record the failure.
+                stats["failed"] += 1
+                self._finish(owner,role,sid,key,before.now,"failed")
+        return stats
+
+    def health(self, owner: str, *, authorized: bool) -> dict[str,object]:
+        self.family._assert_owner(owner)
+        if not authorized:
+            raise PermissionError("authenticated idle coordinator status required")
+        rows=self.db.execute("""SELECT role,COUNT(*),SUM(last_outcome='failed'),
+            SUM(last_outcome='running'),MIN(next_due)
+            FROM dragon_family_idle_leases WHERE owner=? GROUP BY role ORDER BY role""",
+            (owner,)).fetchall()
+        by_role={role:dict(sources=n,failed=errors or 0,
+                           running=running or 0,
+                           next_due_at=_utc(due) if due is not None else None)
+                 for role,n,errors,running,due in rows}
+        return dict(idle_only=True,workers=by_role,
+                    max_tasks_per_tick=self.policy.max_tasks,
+                    scheduling="trusted host-invoked; bounded lease; no daemon")

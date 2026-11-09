@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-04:handoff:v1",
+  "title": "FLGB-04 handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "handoff_id",
+    "from_worker",
+    "to_worker",
+    "scope_digest",
+    "from_authority_digest",
+    "to_authority_digest",
+    "checkpoint_digest"
+  ],
+  "properties": {
+    "handoff_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "from_worker": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "to_worker": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "scope_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "from_authority_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "to_authority_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "checkpoint_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

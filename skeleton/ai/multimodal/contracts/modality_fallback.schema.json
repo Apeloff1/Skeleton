@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-08:modality_fallback:v1",
+  "title": "FLGB-08 modality fallback",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "modality",
+    "capability",
+    "available",
+    "quality_ppm"
+  ],
+  "properties": {
+    "modality": {
+      "enum": [
+        "text",
+        "image",
+        "document",
+        "audio",
+        "video"
+      ]
+    },
+    "capability": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "available": {
+      "type": "boolean"
+    },
+    "quality_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    }
+  }
+}

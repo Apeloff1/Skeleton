@@ -1,0 +1,31 @@
+{
+  "schema_version": "skeleton.ai.local_provider_activation.v1",
+  "status": "implemented_unpromoted",
+  "canonical_owner": "skeleton/provider_runtime.py",
+  "adapter": "LocalArtifactProviderAdapter",
+  "backend_adapter": "skeleton/ai/runtime/inference/local.py:LocalModelAdapter",
+  "artifact_loader": "skeleton/ai/runtime/inference/artifact.py:load_local_model_artifact",
+  "provider_id": "local",
+  "network_policy": "none",
+  "credentials": [],
+  "activation": {
+    "required_configuration": ["AI_LOCAL_MODEL_PATH"],
+    "optional_configuration": ["AI_LOCAL_MODEL_CACHE_SIZE", "AI_LOCAL_MODEL_SEED", "AI_TIMEOUT_SECONDS"],
+    "cache_size_bounds": [0, 4096],
+    "seed_bounds": [0, 9223372036854775807],
+    "max_input_characters_with_role_framing": 1048576,
+    "max_output_tokens": 8192,
+    "architecture_acknowledgement": "mandatory provider_contract receipt for the canonical local runtime provider declaration on readiness and before inference",
+    "fallback": "no hosted provider registration or fallback; secondary configuration and semantic verifier configuration fail closed",
+    "artifact_identity": "full bounded artifact receipt pins model ID and model digest; mutable model drift fails before dispatch"
+  },
+  "inference": {
+    "governance": "existing effective governance context and require_provider_transfer; conservative existing data-class ceiling retained",
+    "admission": "existing AdmissionRuntime request token/concurrency/wall budgets before allocation; exact reference-token or neural-byte input estimate; one provider attempt; billed monetary cost zero",
+    "actual_usage": "actual model input/output tokens and measured elapsed wall time reconcile through canonical provider usage helpers",
+    "deadline_cancellation": "bounded timeout preserves LocalInferenceEngine cooperative cancellation; incomplete local compute usage remains conservatively quarantined",
+    "response": "provider-neutral text response includes governance/admission/context receipts; registry-activated artifacts reject tool and structured-output requests according to the declared text-only capability matrix; direct LocalModelAdapter behavior remains separately bounded"
+  },
+  "tests": ["skeleton/testing/test_local_provider_activation.py", "skeleton/testing/test_local_provider_runtime_guards.py", "skeleton/testing/test_local_model_artifact_intake.py"],
+  "scope_limitations": ["optional explicit local activation", "no external transport or credentials", "no automatic verifier self-qualification", "no model quality or masterplan closure claim"]
+}

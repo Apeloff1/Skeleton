@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-15:replication:v1",
+  "title": "FLGB-15 replication",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entity_id",
+    "field_id",
+    "tick",
+    "value_digest",
+    "authority_id"
+  ],
+  "properties": {
+    "entity_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "field_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "value_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "authority_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}

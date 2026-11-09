@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:layout_grammar:v1",
+  "title": "FLGB-14 layout grammar",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rule_id",
+    "symbol",
+    "expansion_digest",
+    "weight"
+  ],
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "symbol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "expansion_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "weight": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

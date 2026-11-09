@@ -1,0 +1,37 @@
+{
+  "schema_version": "skeleton.ai.multimodal_media_validation.v1",
+  "status": "implementation_candidate",
+  "owner": "skeleton/ai/runtime/multimodal/intake.py",
+  "adapter": "skeleton/ai/runtime/multimodal/media_validation.py",
+  "source_task": "P3T2-MULTIMODAL-01",
+  "volume_refs": ["VOL-153", "VOL-154", "VOL-156"],
+  "scope": "bounded_local_image_and_pcm_wave_verification",
+  "apis": ["MultimodalIntake.sanitize_verified", "MultimodalIntake.verify_verified_asset"],
+  "compatibility": "sanitize remains an opaque envelope admission API; it supplies no verified decoder evidence",
+  "formats": {
+    "image": ["PNG (noninterlaced single frame)", "JPEG (single frame)", "WebP (single frame)"],
+    "audio": ["RIFF/WAVE integer PCM, 8/16/24/32 bits, one fmt and one data chunk"]
+  },
+  "limits": {
+    "max_image_bytes": 33554432,
+    "max_audio_bytes": 134217728,
+    "max_pixels": 16000000,
+    "max_dimension": 16384,
+    "max_decoded_bytes": 67108864,
+    "max_audio_seconds": 3600,
+    "max_sample_rate_hz": 192000,
+    "max_audio_channels": 8,
+    "max_container_chunks": 1024,
+    "max_metadata_bytes": 65536
+  },
+  "decoder": "PNG structure, CRC and bounded zlib scanlines validate before Pillow verification and full bounded RGB/RGBA decode; JPEG/WebP require Pillow header admission then full bounded decode. WAVE uses strict bounded RIFF structure and stdlib wave sample verification. Pillow absence or permissive truncated-image configuration fails verified image intake.",
+  "receipt": "Immutable deterministic identity binds source bytes, actual container format, measured geometry/audio parameters, decoder version, selected resource ceilings and exact decoded output digest; receipt is evidence of decoding, not semantic/OCR/ASR correctness.",
+  "metadata": "Caller dimensions, duration and sample rate must agree with measurements; measured fields replace accepted scalar metadata. No metadata or derived media gains instruction authority.",
+  "atomicity": "Parsing and verification finish before asset publication. Corruption, unsupported format, MIME disagreement, metadata conflict, budget exhaustion or identity reuse conflict publishes no asset.",
+  "revalidation": "verify_verified_asset re-verifies actual payload and immutable receipt/asset fields; constructing or mutating a receipt does not confer decoder authority.",
+  "failure_contract": "MultimodalSanitizationError at intake; MediaValidationError inside decoder adapter",
+  "verification": ["skeleton/testing/test_multimodal_media_validation.py"],
+  "rollback": "Withdraw verified-intake adapter without deleting issued source/projection lineage; opaque compatibility assets remain explicitly outside decoder evidence.",
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false
+}

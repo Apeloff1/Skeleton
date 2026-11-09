@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "map_version": "0.1.0",
+  "status": "closed",
+  "title": "P4 production plane",
+  "source_scope": [
+    "VOL-400",
+    "VOL-401",
+    "VOL-402",
+    "VOL-407",
+    "VOL-408",
+    "VOL-411",
+    "VOL-412",
+    "VOL-413",
+    "VOL-418",
+    "VOL-416",
+    "VOL-417",
+    "VOL-393",
+    "VOL-394",
+    "VOL-395",
+    "VOL-396",
+    "VOL-383",
+    "VOL-384",
+    "VOL-387",
+    "VOL-388",
+    "VOL-389"
+  ],
+  "first_tranche": {
+    "scheduled_volume_refs": [
+      "VOL-400",
+      "VOL-401",
+      "VOL-402",
+      "VOL-407",
+      "VOL-408",
+      "VOL-411",
+      "VOL-412",
+      "VOL-413",
+      "VOL-418",
+      "VOL-416",
+      "VOL-417",
+      "VOL-393",
+      "VOL-394",
+      "VOL-395",
+      "VOL-396",
+      "VOL-383",
+      "VOL-384",
+      "VOL-387",
+      "VOL-388",
+      "VOL-389"
+    ],
+    "queued_volume_refs": []
+  },
+  "lanes": [
+    {
+      "id": "P4-FARM-01"
+    },
+    {
+      "id": "P4-RIGHTS-01"
+    },
+    {
+      "id": "P4-LIFECYCLE-01"
+    },
+    {
+      "id": "P4-SANDBOX-01"
+    },
+    {
+      "id": "P4-LOCALITY-01"
+    },
+    {
+      "id": "P4-CACHE-01"
+    }
+  ],
+  "progress": {
+    "closed_tasks": [
+      "P4-FARM-01",
+      "P4-RIGHTS-01",
+      "P4-LIFECYCLE-01",
+      "P4-SANDBOX-01",
+      "P4-LOCALITY-01",
+      "P4-CACHE-01"
+    ],
+    "landed_unpromoted_tasks": [],
+    "rule": "Closed requires both signoffs and the production envelope suite."
+  }
+}

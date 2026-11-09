@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-07:checkpoint_lineage:v1",
+  "title": "FLGB-07 checkpoint lineage",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_manifest_digest",
+    "sequence",
+    "weights_digest",
+    "optimizer_digest",
+    "rng_digest",
+    "prior_checkpoint_digest"
+  ],
+  "properties": {
+    "run_manifest_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "weights_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "optimizer_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rng_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prior_checkpoint_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

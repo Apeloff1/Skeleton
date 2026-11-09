@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:shadow_system:v1",
+  "title": "FLGB-11 shadow system",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "light_id",
+    "resolution",
+    "cascade_count",
+    "priority"
+  ],
+  "properties": {
+    "light_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "resolution": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 32768
+    },
+    "cascade_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "priority": {
+      "type": "integer"
+    }
+  }
+}

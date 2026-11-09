@@ -1,0 +1,158 @@
+from importlib import import_module
+
+from .lifecycle import (
+    LifecycleTransitionReceipt,
+    ModelBillOfMaterials,
+    ModelLifecycleError,
+    ModelLifecycleRegistry,
+    ModelLifecycleState,
+    ModelMigrationDecision,
+)
+from .multimodal import (
+    LearningModality,
+    MultimodalCorpus,
+    MultimodalFoundationError,
+    MultimodalRecord,
+    RetrievalHit,
+    SpeechChunkReceipt,
+    TextProjection,
+)
+from .learning import (
+    CurriculumDecision,
+    CurriculumStage,
+    EpisodeReceipt,
+    LearningProgram,
+    LearningProgramError,
+    ReinforcementEnvironment,
+    VerifierCandidate,
+    VerifierDecision,
+)
+"""P3-T2 provider-independent data, training and multimodal runtime."""
+
+from .training import (
+    DistributedTrainingPlan,
+    LocalTrainingControlPlane,
+    MetricGate,
+    PostTrainingReceipt,
+    RecoveryReceipt,
+    TrainingCheckpoint,
+    TrainingControlError,
+    TrainingEvaluationDecision,
+    TrainingObservation,
+    TrainingRun,
+    TrainingShard,
+)
+from .data import (
+    ContentAddressedStore,
+    DataConflictError,
+    DataPlaneError,
+    DataQualityReport,
+    DatasetRecord,
+    DatasetRegistry,
+    DatasetTransactionReceipt,
+    IngestionRecord,
+)
+
+__all__ = [
+    "LifecycleTransitionReceipt",
+    "ModelBillOfMaterials",
+    "ModelLifecycleError",
+    "ModelLifecycleRegistry",
+    "ModelLifecycleState",
+    "ModelMigrationDecision",
+    "LearningModality",
+    "MultimodalCorpus",
+    "MultimodalFoundationError",
+    "MultimodalRecord",
+    "RetrievalHit",
+    "SpeechChunkReceipt",
+    "TextProjection",
+    "CurriculumDecision",
+    "CurriculumStage",
+    "EpisodeReceipt",
+    "LearningProgram",
+    "LearningProgramError",
+    "ReinforcementEnvironment",
+    "VerifierCandidate",
+    "VerifierDecision",
+    "DistributedTrainingPlan",
+    "LocalTrainingControlPlane",
+    "MetricGate",
+    "PostTrainingReceipt",
+    "RecoveryReceipt",
+    "TrainingCheckpoint",
+    "TrainingControlError",
+    "TrainingEvaluationDecision",
+    "TrainingObservation",
+    "TrainingRun",
+    "TrainingShard",
+    "ContentAddressedStore",
+    "DataConflictError",
+    "DataPlaneError",
+    "DataQualityReport",
+    "DatasetRecord",
+    "DatasetRegistry",
+    "DatasetTransactionReceipt",
+    "IngestionRecord",
+]
+
+
+# Preserve stable P3 multimodal evidence and measured-rollout APIs from the
+# reconciled source modules without eagerly loading optional runtime backends.
+__all__ += ["VerifierEvaluationReceipt", "MigrationParityCase", "ModelMigrationEvaluationReceipt",
+            "ModelMigrationReceipt", "ModelMigrationRollbackReceipt", "LifecycleBackupReceipt",
+            "ModelLifecyclePersistenceError", "SQLiteModelLifecycleRepository",
+            "MultimodalTrainingManifest", "MultimodalTrainingSample"]
+
+_LAZY_EXPORTS = {
+    "learning": frozenset({"VerifierEvaluationReceipt"}),
+    "lifecycle": frozenset({"MigrationParityCase", "ModelMigrationEvaluationReceipt",
+                            "ModelMigrationReceipt", "ModelMigrationRollbackReceipt"}),
+    "lifecycle_repository": frozenset({"LifecycleBackupReceipt", "ModelLifecyclePersistenceError",
+                                       "SQLiteModelLifecycleRepository"}),
+    "multimodal": frozenset({"MultimodalTrainingManifest", "MultimodalTrainingSample"}),
+    "content_retrieval": frozenset({
+        "ContentSignalIndex", "ContentFeatureReceipt", "ContentSimilarityHit",
+    }),
+    "rollout": frozenset({
+        "MeasuredModelRollout", "MeasuredRolloutError", "RolloutPlan",
+        "RolloutGatePolicy", "RolloutMeasurementReceipt", "RolloutStageReceipt",
+        "RolloutActionReceipt", "LocalUsageTariff",
+    }),
+    "temporal": frozenset({
+        "LiveSpeechExecution", "SpeechFrameEvidence", "SpeechExecutionReceipt",
+        "VideoEvidenceIndex", "TimedMediaFragment", "VideoFragmentEvidence",
+        "VideoTimelineReceipt", "VideoFusionHit",
+    }),
+}
+
+
+def _load_trusted_lazy_module(module_name: str):
+    """Import from the repository-owned export map using only literal targets."""
+    if module_name == "content_retrieval":
+        return import_module(".content_retrieval", __name__)
+    if module_name == "learning":
+        return import_module(".learning", __name__)
+    if module_name == "lifecycle":
+        return import_module(".lifecycle", __name__)
+    if module_name == "lifecycle_repository":
+        return import_module(".lifecycle_repository", __name__)
+    if module_name == "multimodal":
+        return import_module(".multimodal", __name__)
+    if module_name == "rollout":
+        return import_module(".rollout", __name__)
+    if module_name == "temporal":
+        return import_module(".temporal", __name__)
+    raise ImportError("unregistered lazy export module")
+
+
+
+def __getattr__(name: str):
+    for module_name, names in _LAZY_EXPORTS.items():
+        if name in names:
+            from importlib import import_module
+
+            value = getattr(_load_trusted_lazy_module(module_name), name)
+            globals()[name] = value
+            return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

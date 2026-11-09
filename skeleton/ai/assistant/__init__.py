@@ -1,0 +1,385 @@
+"""Clean-room product-assistant control plane for the canonical AI tree.
+
+The package composes Skeleton's existing model, memory, tool, artifact and
+automation planes. It contains no vendor model weights, hidden prompts, private
+reasoning traces or proprietary provider implementation.
+"""
+
+from .artifacts import ArtifactRoute, ArtifactRouter
+from .automation import (
+    AutomationAdmission,
+    AutomationBuilder,
+    AutomationPolicy,
+    AutomationPolicyError,
+)
+from .capabilities import (
+    CapabilityAdmissionError,
+    CapabilityAuthorizer,
+    CapabilityDecision,
+    CapabilityRegistry,
+)
+from .context import ContextCompiler
+from .contracts import (
+    ASSISTANT_SCHEMA_VERSION,
+    ArtifactKind,
+    AssistantContractError,
+    AssistantRequest,
+    AutomationIntent,
+    CapabilityDescriptor,
+    CapabilityGrant,
+    CapabilityKind,
+    CapabilityPlanStep,
+    CompiledContext,
+    ContextCandidate,
+    IntentSignals,
+    RoutingPlan,
+    SideEffectClass,
+    TimingMode,
+    ToolProposal,
+    ToolReceipt,
+    TrustTier,
+    deterministic_id,
+    digest_json,
+)
+from .handoff import AssistantHandoff, build_handoff
+from .memory import (
+    MemoryAction,
+    MemoryCandidate,
+    MemoryDecision,
+    MemoryPolicy,
+    MemorySensitivity,
+)
+from .provenance import AssistantRunRecord, ProvenanceBuilder, receipt_digest
+from .routing import AssistantRouter, infer_signals
+from .runtime import AssistantControlPlane, AssistantPreparation
+from .tooling import (
+    CapabilityHandler,
+    ToolCoordinator,
+    ToolCoordinatorError,
+    ToolRunResult,
+)
+
+__all__ = [
+    "ASSISTANT_SCHEMA_VERSION",
+    "ArtifactKind",
+    "ArtifactRoute",
+    "ArtifactRouter",
+    "AssistantContractError",
+    "AssistantControlPlane",
+    "AssistantHandoff",
+    "AssistantPreparation",
+    "AssistantRequest",
+    "AssistantRouter",
+    "AssistantRunRecord",
+    "AutomationAdmission",
+    "AutomationBuilder",
+    "AutomationIntent",
+    "AutomationPolicy",
+    "AutomationPolicyError",
+    "CapabilityAdmissionError",
+    "CapabilityAuthorizer",
+    "CapabilityDecision",
+    "CapabilityDescriptor",
+    "CapabilityGrant",
+    "CapabilityHandler",
+    "CapabilityKind",
+    "CapabilityPlanStep",
+    "CapabilityRegistry",
+    "CompiledContext",
+    "ContextCandidate",
+    "ContextCompiler",
+    "IntentSignals",
+    "MemoryAction",
+    "MemoryCandidate",
+    "MemoryDecision",
+    "MemoryPolicy",
+    "MemorySensitivity",
+    "ProvenanceBuilder",
+    "RoutingPlan",
+    "SideEffectClass",
+    "TimingMode",
+    "ToolCoordinator",
+    "ToolCoordinatorError",
+    "ToolProposal",
+    "ToolReceipt",
+    "ToolRunResult",
+    "TrustTier",
+    "build_handoff",
+    "deterministic_id",
+    "digest_json",
+    "infer_signals",
+    "receipt_digest",
+]
+
+
+from .turn_runtime import (
+    CHAT_TURN_SCHEMA_VERSION,
+    BudgetDecision,
+    BudgetGovernor,
+    BudgetUsage,
+    ExecutionBudget,
+    FailureClass,
+    RecoveryAction,
+    RecoveryDecision,
+    RecoveryPlanner,
+    TERMINAL_STATES,
+    TurnEvent,
+    TurnJournal,
+    TurnRuntimeError,
+    TurnSnapshot,
+    TurnState,
+    budget_usage_from_dict,
+    execution_budget_from_dict,
+    make_event,
+    operation_digest,
+    start_turn,
+    turn_event_from_dict,
+    turn_snapshot_dict,
+    turn_snapshot_from_dict,
+)
+
+__all__ += [
+    "CHAT_TURN_SCHEMA_VERSION",
+    "BudgetDecision",
+    "BudgetGovernor",
+    "BudgetUsage",
+    "ExecutionBudget",
+    "FailureClass",
+    "RecoveryAction",
+    "RecoveryDecision",
+    "RecoveryPlanner",
+    "TERMINAL_STATES",
+    "TurnEvent",
+    "TurnJournal",
+    "TurnRuntimeError",
+    "TurnSnapshot",
+    "TurnState",
+    "budget_usage_from_dict",
+    "execution_budget_from_dict",
+    "make_event",
+    "operation_digest",
+    "start_turn",
+    "turn_event_from_dict",
+    "turn_snapshot_dict",
+    "turn_snapshot_from_dict",
+]
+
+
+from .streaming import (
+    CHAT_STREAM_SCHEMA_VERSION,
+    ChatStreamError,
+    TurnStreamCursor,
+    TurnStreamEvent,
+    TurnStreamPage,
+    project_turn_event,
+    project_turn_page,
+    require_resume_cursor,
+)
+
+__all__ += [
+    "CHAT_STREAM_SCHEMA_VERSION",
+    "ChatStreamError",
+    "TurnStreamCursor",
+    "TurnStreamEvent",
+    "TurnStreamPage",
+    "project_turn_event",
+    "project_turn_page",
+    "require_resume_cursor",
+]
+
+
+from .tool_recovery import (
+    ToolRecoveryAction,
+    ToolRecoveryDecision,
+    ToolRecoveryError,
+    committed_receipt_event,
+    decide_tool_preflight,
+    map_tool_side_effect,
+    preflight_event,
+    reconciliation_event,
+    tool_receipt_ref,
+)
+
+__all__ += [
+    "ToolRecoveryAction",
+    "ToolRecoveryDecision",
+    "ToolRecoveryError",
+    "committed_receipt_event",
+    "decide_tool_preflight",
+    "map_tool_side_effect",
+    "preflight_event",
+    "reconciliation_event",
+    "tool_receipt_ref",
+]
+
+
+from .attachments import (
+    AttachmentAdmissionError,
+    AttachmentAdmissionPlane,
+    AttachmentBatchReceipt,
+    AttachmentFormat,
+    AttachmentPolicy,
+    AttachmentReference,
+    AttachmentUpload,
+    admit_multimodal_reference,
+    attachment_context_evidence,
+)
+
+__all__ += [
+    "AttachmentAdmissionError",
+    "AttachmentAdmissionPlane",
+    "AttachmentBatchReceipt",
+    "AttachmentFormat",
+    "AttachmentPolicy",
+    "AttachmentReference",
+    "AttachmentUpload",
+    "admit_multimodal_reference",
+    "attachment_context_evidence",
+]
+
+
+from .evidence import (
+    EVIDENCE_CITATION_SCHEMA_VERSION,
+    ClaimEvidenceBundle,
+    ClaimEvidenceReceipt,
+    ClaimPublicationPolicy,
+    EvidenceAssessment,
+    EvidenceCitationPlane,
+    EvidencePlaneError,
+    PublicationDisposition,
+    SourceClass,
+    SourceQualityProfile,
+)
+
+__all__ += [
+    "EVIDENCE_CITATION_SCHEMA_VERSION",
+    "ClaimEvidenceBundle",
+    "ClaimEvidenceReceipt",
+    "ClaimPublicationPolicy",
+    "EvidenceAssessment",
+    "EvidenceCitationPlane",
+    "EvidencePlaneError",
+    "PublicationDisposition",
+    "SourceClass",
+    "SourceQualityProfile",
+]
+
+
+from .response_acceptance import (
+    LIVE_RESPONSE_ACCEPTANCE_SCHEMA_VERSION,
+    LiveResponseAcceptancePolicy,
+    LiveResponseAcceptanceReceipt,
+    ResponseAcceptanceDecision,
+    ResponseAcceptanceError,
+    ResponseAcceptancePolicy,
+    evaluate_live_response_acceptance,
+    evaluate_response_acceptance,
+)
+
+__all__ += [
+    "LIVE_RESPONSE_ACCEPTANCE_SCHEMA_VERSION",
+    "LiveResponseAcceptancePolicy",
+    "LiveResponseAcceptanceReceipt",
+    "ResponseAcceptanceDecision",
+    "ResponseAcceptanceError",
+    "ResponseAcceptancePolicy",
+    "evaluate_live_response_acceptance",
+    "evaluate_response_acceptance",
+]
+from .resilience import (
+    CROSS_PLANE_RESILIENCE_SCHEMA_VERSION,
+    CrossPlaneResilienceReceipt,
+    ResilienceBindingError,
+    TurnAttachmentBinding,
+    TurnAuthorityFingerprint,
+    TurnRouteBinding,
+    TurnToolRecoveryBinding,
+    bind_attachment_batch,
+    bind_route_decision,
+    bind_tool_recovery_decision,
+    build_cross_plane_resilience_receipt,
+    remaining_execution_budget,
+    route_request_for_remaining_turn,
+)
+
+__all__ += [
+    "CROSS_PLANE_RESILIENCE_SCHEMA_VERSION",
+    "CrossPlaneResilienceReceipt",
+    "ResilienceBindingError",
+    "TurnAttachmentBinding",
+    "TurnAuthorityFingerprint",
+    "TurnRouteBinding",
+    "TurnToolRecoveryBinding",
+    "bind_attachment_batch",
+    "bind_route_decision",
+    "bind_tool_recovery_decision",
+    "build_cross_plane_resilience_receipt",
+    "remaining_execution_budget",
+    "route_request_for_remaining_turn",
+]
+
+
+from .salon import (
+    SALON_CITATION,
+    SALON_LAW,
+    SALON_SCHEMA_VERSION,
+    Affect,
+    BeatKind,
+    CitationChip,
+    DiscourseAct,
+    Motif,
+    PresenceLamp,
+    Reaction,
+    SalonBeat,
+    SalonCard,
+    SalonError,
+    SalonPlan,
+    SalonPolicy,
+    SalonSession,
+    classify_act,
+    classify_affect,
+    surface_contract,
+)
+
+__all__ += [
+    "SALON_CITATION",
+    "SALON_LAW",
+    "SALON_SCHEMA_VERSION",
+    "Affect",
+    "BeatKind",
+    "CitationChip",
+    "DiscourseAct",
+    "Motif",
+    "PresenceLamp",
+    "Reaction",
+    "SalonBeat",
+    "SalonCard",
+    "SalonError",
+    "SalonPlan",
+    "SalonPolicy",
+    "SalonSession",
+    "classify_act",
+    "classify_affect",
+    "surface_contract",
+]
+from .turn_ownership import (
+    TURN_OWNERSHIP_SCHEMA_VERSION,
+    TurnLeaseBusy,
+    TurnLeaseExpired,
+    TurnLeasePolicy,
+    TurnLeaseStale,
+    TurnLeaseToken,
+    TurnOwnershipError,
+    TurnOwnershipReceipt,
+)
+
+__all__ += [
+    "TURN_OWNERSHIP_SCHEMA_VERSION",
+    "TurnLeaseBusy",
+    "TurnLeaseExpired",
+    "TurnLeasePolicy",
+    "TurnLeaseStale",
+    "TurnLeaseToken",
+    "TurnOwnershipError",
+    "TurnOwnershipReceipt",
+]

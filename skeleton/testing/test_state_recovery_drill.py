@@ -1,0 +1,390 @@
+from __future__ import annotations
+
+import pytest
+
+from scripts import state_recovery_drill as drill
+
+
+def test_recovery_drill_refuses_non_scratch_database_names() -> None:
+    for name in ("production", "galaxy_studio_db", "skeleton", ""):
+        with pytest.raises(drill.RecoveryDrillError, match="refusing destructive"):
+            drill.require_scratch_database(name)
+
+    assert (
+        drill.require_scratch_database("skeleton_recovery_drill_source")
+        == "skeleton_recovery_drill_source"
+    )
+
+
+def test_sqlite_recovery_drill_requires_scratch_workdir(tmp_path) -> None:
+    with pytest.raises(
+        drill.RecoveryDrillError,
+        match="refusing destructive SQLite recovery drill",
+    ):
+        drill.run_operation_sqlite_drill(tmp_path / "unsafe", cleanup=False)
+
+    with pytest.raises(
+        drill.RecoveryDrillError,
+        match="refusing destructive SQLite recovery drill",
+    ):
+        drill.run_engine_sqlite_bundle_drill(tmp_path / "unsafe-engine", cleanup=False)
+
+
+def test_recovery_journal_forbids_derived_rebuild_before_authority_verify() -> None:
+    journal = drill.RecoveryJournal()
+
+    journal.record("seed_authority")
+    journal.record("backup_authority")
+    journal.record("destroy_restore_target")
+    journal.record("restore_authority")
+
+    with pytest.raises(
+        drill.RecoveryDrillError,
+        match="expected verify_authority",
+    ):
+        journal.record("rebuild_derived")
+
+
+def test_recovery_journal_requires_authority_verification_before_rebuild() -> None:
+    journal = drill.RecoveryJournal()
+    phases = [
+        "seed_authority",
+        "backup_authority",
+        "destroy_restore_target",
+        "restore_authority",
+        "verify_authority",
+        "rebuild_derived",
+        "verify_derived",
+        "ready",
+    ]
+
+    for phase in phases:
+        journal.record(phase, evidence={"phase": phase})
+
+    rendered = journal.as_dict()
+    assert rendered["verified_authority"] is True
+    assert rendered["complete"] is True
+    assert [event["phase"] for event in rendered["events"]] == phases
+    assert [event["sequence"] for event in rendered["events"]] == list(
+        range(1, len(phases) + 1)
+    )
+
+
+def test_verify_snapshot_rejects_document_or_index_drift() -> None:
+    expected = {
+        "collections": {
+            "rag_user_progress": {
+                "count": 1,
+                "documents_digest": "docs-a",
+                "indexes_digest": "idx-a",
+            }
+        },
+        "digest": "backup-a",
+    }
+
+    with pytest.raises(drill.RecoveryDrillError, match="documents_digest"):
+        drill.verify_snapshot(
+            expected,
+            {
+                "collections": {
+                    "rag_user_progress": {
+                        "count": 1,
+                        "documents_digest": "docs-b",
+                        "indexes_digest": "idx-a",
+                    }
+                },
+                "digest": "restore-b",
+            },
+        )
+
+    with pytest.raises(drill.RecoveryDrillError, match="indexes_digest"):
+        drill.verify_snapshot(
+            expected,
+            {
+                "collections": {
+                    "rag_user_progress": {
+                        "count": 1,
+                        "documents_digest": "docs-a",
+                        "indexes_digest": "idx-b",
+                    }
+                },
+                "digest": "restore-b",
+            },
+        )
+
+
+def test_verify_snapshot_returns_count_and_digest_evidence() -> None:
+    expected = {
+        "collections": {
+            "rag_user_progress": {
+                "count": 2,
+                "documents_digest": "docs",
+                "indexes_digest": "idx",
+            },
+            "rag_feedback": {
+                "count": 1,
+                "documents_digest": "feedback-docs",
+                "indexes_digest": "feedback-idx",
+            },
+        },
+        "digest": "backup-digest",
+    }
+    actual = {
+        "collections": {
+            name: dict(values) for name, values in expected["collections"].items()
+        },
+        "digest": "restore-digest",
+    }
+
+    evidence = drill.verify_snapshot(expected, actual)
+
+    assert evidence == {
+        "collections": {
+            "rag_feedback": 1,
+            "rag_user_progress": 2,
+        },
+        "backup_digest": "backup-digest",
+        "restore_digest": "restore-digest",
+        "verified_fields": ["count", "documents_digest", "indexes_digest"],
+    }
+
+
+def test_derived_rebuild_is_deterministic_from_verified_snapshot_shape() -> None:
+    snapshot = {
+        "collections": {
+            "rag_learning_sessions": {
+                "documents": [
+                    {
+                        "session_id": "session-2",
+                        "user_id": "u2",
+                        "content": "two",
+                    },
+                    {
+                        "session_id": "session-1",
+                        "user_id": "u1",
+                        "content": "one",
+                    },
+                ]
+            },
+            "rag_feedback": {
+                "documents": [
+                    {
+                        "feedback_id": "feedback-1",
+                        "user_id": "u1",
+                        "content": "useful",
+                    }
+                ]
+            },
+        }
+    }
+
+    first = drill.rebuild_derived_projection(snapshot)
+    second = drill.rebuild_derived_projection(snapshot)
+
+    assert first == second
+    assert first["count"] == 3
+    assert first["digest"] == second["digest"]
+    assert [row["record_id"] for row in first["records"]] == [
+        "feedback-1",
+        "session-1",
+        "session-2",
+    ]
+
+
+def test_failed_phase_stops_recovery_journal() -> None:
+    journal = drill.RecoveryJournal()
+
+    with pytest.raises(drill.RecoveryDrillError, match="seed_authority"):
+        journal.record("seed_authority", status="failed")
+
+    assert len(journal.events) == 1
+    assert journal.events[0].status == "failed"
+
+
+def test_operation_sqlite_restore_preserves_authority_and_outbox_order(
+    tmp_path,
+) -> None:
+    result = drill.run_operation_sqlite_drill(
+        tmp_path / "skeleton_recovery_drill_sqlite",
+        cleanup=False,
+    )
+
+    assert result["status"] == "passed"
+    assert result["backup_digest"] == result["restore_digest"]
+    journal = result["journal"]
+    assert journal["complete"] is True
+    phases = [event["phase"] for event in journal["events"]]
+    assert phases == [
+        "seed_operation_authority",
+        "backup_operation_authority",
+        "destroy_operation_authority",
+        "restore_operation_authority",
+        "verify_operation_authority",
+        "reconcile_operation_outbox",
+        "ready",
+    ]
+    verification = journal["events"][4]["evidence"]
+    assert verification["state"] == "admitted"
+    assert verification["version"] == 4
+    assert verification["pending_outbox"] == 4
+    reconciliation = journal["events"][5]["evidence"]
+    assert reconciliation["remaining"] == 0
+    assert reconciliation["published"] == 4
+    assert reconciliation["event_types"] == [
+        "operation.created",
+        "operation.validated",
+        "operation.authorized",
+        "operation.admitted",
+    ]
+    assert len(set(reconciliation["event_ids"])) == 4
+
+
+def test_sqlite_snapshot_verification_rejects_restore_drift(tmp_path) -> None:
+    source = tmp_path / "source.sqlite"
+    conn = drill.sqlite3.connect(str(source))
+    try:
+        conn.execute("CREATE TABLE authority (id TEXT PRIMARY KEY, value TEXT)")
+        conn.execute("INSERT INTO authority VALUES ('a', 'one')")
+        conn.commit()
+    finally:
+        conn.close()
+
+    expected = drill.capture_sqlite_database(source)
+    conn = drill.sqlite3.connect(str(source))
+    try:
+        conn.execute("UPDATE authority SET value = 'two' WHERE id = 'a'")
+        conn.commit()
+    finally:
+        conn.close()
+    actual = drill.capture_sqlite_database(source)
+
+    with pytest.raises(
+        drill.RecoveryDrillError,
+        match="differs from backup",
+    ):
+        drill.verify_sqlite_snapshot(expected, actual)
+
+
+def test_engine_sqlite_bundle_restore_preserves_authoritative_ledgers(
+    tmp_path,
+) -> None:
+    result = drill.run_engine_sqlite_bundle_drill(
+        tmp_path / "skeleton_recovery_drill_engine_bundle",
+        cleanup=False,
+    )
+
+    assert result["status"] == "passed"
+    assert result["bundle_digest"] == result["restored_bundle_digest"]
+    assert set(result["stores"]) == {
+        "execution",
+        "pressure",
+        "quota",
+        "submissions",
+        "tool_receipts",
+    }
+    for store in result["stores"].values():
+        assert store["backup_digest"] == store["restore_digest"]
+
+    verified = result["verified"]
+    assert verified["execution_state"] == "routing"
+    assert verified["checkpoint_version"] == 1
+    assert verified["approval_ref"].startswith("approval:")
+    assert len(verified["approval_ref"]) == len("approval:") + 64
+    assert verified["tool_reservation_status"] == "in_doubt"
+    assert verified["quota_committed_input_tokens"] == 90
+    assert verified["pressure_active"] == 1
+    assert verified["pressure_queued"] == 1
+
+
+def test_derived_rebuild_includes_only_active_canonical_memory() -> None:
+    snapshot = {
+        "collections": {
+            "canonical_memory_records": {
+                "documents": [
+                    {
+                        "memory_id": "memory-active",
+                        "tenant_id": "tenant-a",
+                        "subject_id": "user-a",
+                        "state": "active",
+                        "content": "remember this",
+                    },
+                    {
+                        "memory_id": "memory-deleted",
+                        "tenant_id": "tenant-a",
+                        "subject_id": "user-a",
+                        "state": "tombstoned",
+                        "content": "do not project this",
+                    },
+                ]
+            }
+        }
+    }
+
+    projection = drill.rebuild_derived_projection(snapshot)
+
+    assert projection["count"] == 1
+    assert projection["records"] == [
+        {
+            "source": "canonical_memory_records",
+            "record_id": "memory-active",
+            "tenant_or_user": "tenant-a",
+            "digest": drill.digest_payload(
+                snapshot["collections"]["canonical_memory_records"]["documents"][0]
+            ),
+        }
+    ]
+
+
+def test_spine_bind_checkpoint_restore_preserves_dark_evidence(tmp_path) -> None:
+    result = drill.run_spine_bind_sqlite_drill(
+        tmp_path / "skeleton_recovery_drill_spine_bind",
+        cleanup=False,
+    )
+
+    assert result["status"] == "passed"
+    assert result["policy"] == "spine-bind-checkpoint-dark-restore"
+    assert result["backup_digest"] == result["restore_digest"]
+    assert result["checkpoint"]["rows"] == 1
+    assert len(result["checkpoint"]["recovery_digest"]) == 64
+    assert result["replay"] == {
+        "rows_before": 1,
+        "rows_after": 1,
+        "inserted": False,
+        "rewritten": False,
+    }
+    assert result["tenant"]["own_count"] == 1
+    assert result["tenant"]["foreign_count"] == 0
+    assert result["chain"]["rows"] == 1
+    assert result["chain"]["rewritten"] is False
+    assert result["bundle"]["verified"] is True
+    assert result["bundle"]["activated"] is False
+    assert len(result["restore_receipt"]["digest"]) == 64
+    assert result["restore_receipt"]["backup_restore_digest"] == result["backup_digest"]
+    assert result["restore_receipt"]["recovery_digest"] == result["checkpoint"]["recovery_digest"]
+    assert result["restore_receipt"]["verified"] is True
+    assert result["restore_receipt"]["activated"] is False
+    assert result["restore_journal"]["backup_digest"] == result["restore_journal"]["restore_digest"]
+    assert result["restore_journal"]["receipt_digest"] == result["restore_receipt"]["digest"]
+    assert result["restore_journal"]["rows"] == 1
+    assert result["restore_journal"]["foreign_rows"] == 0
+    assert result["restore_journal"]["replay_rows_before"] == 1
+    assert result["restore_journal"]["replay_rows_after"] == 1
+    assert result["restore_journal"]["replay_inserted"] is False
+    assert result["restore_journal"]["chain_rows"] == 1
+    assert len(result["restore_journal"]["chain_digest"]) == 64
+    assert len(result["restore_journal"]["continuity_digest"]) == 64
+    assert result["restore_journal"]["durable"] is True
+    assert result["restore_journal"]["tenant_isolated"] is True
+    assert result["restore_journal"]["replay_safe"] is True
+    assert result["restore_journal"]["activated"] is False
+    assert len(result["portable_evidence"]["digest"]) == 64
+    assert result["portable_evidence"]["bytes"] > 0
+    assert result["portable_evidence"]["verified"] is True
+    assert result["portable_evidence"]["roundtrip_exact"] is True
+    assert result["portable_evidence"]["activated"] is False
+    assert result["activation_claimed"] is False
+    assert result["apply_landed"] is False
+    assert result["live_motor"] is False
+    assert result["dispatcher_running"] is False
+    assert result["ci_green"] is False
+    assert result["merged"] is False

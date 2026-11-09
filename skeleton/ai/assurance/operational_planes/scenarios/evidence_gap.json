@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.operational_plane.scenarios.v1",
+  "plane": "agents.evidence_gap",
+  "synthetic": true,
+  "examples": [
+    {
+      "name": "nominal",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "unsupported_claims": 0,
+        "missing_evidence_links": 0
+      },
+      "expected": "nominal"
+    },
+    {
+      "name": "primary_breach",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "unsupported_claims": 1,
+        "missing_evidence_links": 0
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "secondary_breach",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "unsupported_claims": 0,
+        "missing_evidence_links": 1
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "stale",
+      "observed_at": 1000,
+      "now": 1061,
+      "measurements": {
+        "unsupported_claims": 0,
+        "missing_evidence_links": 0
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "future",
+      "observed_at": 1001,
+      "now": 1000,
+      "measurements": {
+        "unsupported_claims": 0,
+        "missing_evidence_links": 0
+      },
+      "expected": "blocked"
+    }
+  ]
+}

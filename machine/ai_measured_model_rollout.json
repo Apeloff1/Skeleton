@@ -1,0 +1,52 @@
+{
+  "schema_version": "skeleton.ai.measured_model_rollout.v1",
+  "status": "implementation_candidate",
+  "volume_refs": [
+    "VOL-413"
+  ],
+  "canonical_owner": "skeleton/ai/runtime/learning_foundation/lifecycle.py:ModelLifecycleRegistry",
+  "implementation_extensions": [
+    "skeleton/ai/runtime/learning_foundation/rollout.py"
+  ],
+  "existing_plane": "feedback-learning",
+  "authority": "bounded local lifecycle candidate rollout evidence only; no production provider, router, promotion, service or remote credential authority",
+  "intake": "exact issued EvaluationModelSource candidate, baseline and independent local verifier; source/model/runtime/training identity, MBOM, current lifecycle prefix, immutable heldout EvaluationSuite, deterministic assignment salt, seed and gate/cost policies pinned before inference",
+  "execution": {
+    "phases": "shadow completes before canary; both execute actual paired candidate/baseline generation and independent local verifier inference; shadow selects baseline, canary deterministically selects by SHA256 basis-point bucket",
+    "requests": "assignment decisions pinned before execution; contiguous drained per-case actual outputs, parsed verifier decisions/confidence, gold classifications, token counts and monotonic elapsed time persisted",
+    "cost": "integer local cost units derived from actual input/output tokens and immutable declared role tariffs; an accounting proxy, not billed price, energy or hosted provider cost",
+    "rights": "source training authority checked before inference and transactionally fenced before evidence publication/staging/cutover; rollback requires current restore baseline and verifier authority and can withdraw a revoked candidate",
+    "contamination": "existing observed training-document fingerprints checked against heldout prompt/full labeled sample; no semantic or factual correctness claim",
+    "canary_coverage": "both persisted candidate and baseline selection branches required for staging; paired generation runs for every request regardless selected local branch",
+    "paired_input": "same exact prompt, max output budget and generation seed for candidate/baseline; model identities differ; independent verifier gets the actual answer without expected gold label"
+  },
+  "gates": "Completed measurement acceptance thresholds applied independently to each shadow/canary phase: actual candidate/baseline quality and verifier empirical metrics, exact output parity, per-phase token/cost accounting proxy and regression, per-inference completed elapsed-time gate, declared rights references and current authority; these thresholds are not cumulative runtime admission limits or cancellation timeouts; no caller scalar reports/approval flags",
+  "persistence": {
+    "owner": "existing versioned SQLite lifecycle snapshot row and repository transaction; no second durable authority",
+    "format": "legacy snapshot v1 remains unchanged without rollouts; additive snapshot v2 includes rollout evidence and validates original lifecycle graph plus complete rollout plan/assignment/case/metric/stage/action graph",
+    "transactions": "existing BEGIN IMMEDIATE + snapshot CAS; per-phase worker owner/monotonic epoch/expiry fences, precommit expiry recheck, durable case prefix reuse, atomic measured stage/cutover/rollback and lifecycle history",
+    "recovery": "completed cases reused without inference; uncommitted work may retry; corruption, changed binding, stale model history or source revocation fail closed; ordinary caller-created receipt clones cannot execute",
+    "compatibility": "read v1/v2; retain v1 until first admitted rollout; backup/restore uses existing validated repository machinery"
+  },
+  "bounds": {
+    "rollouts": 32,
+    "cases_per_phase": 64,
+    "case_evidence_bytes": 262144,
+    "snapshot_bytes": 16777216,
+    "lease_seconds": [
+      1,
+      3600
+    ],
+    "canary_basis_points": [
+      1,
+      9999
+    ],
+    "integer_cost_units": 1000000000000
+  },
+  "tests": [
+    "skeleton/testing/test_measured_model_rollout.py",
+    "skeleton/testing/test_measured_model_rollout_fences.py"
+  ],
+  "completion_checkbox": false,
+  "signoffs_granted": false
+}

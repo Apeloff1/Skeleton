@@ -1,0 +1,1412 @@
+{
+  "schema": "skeleton.dragon.source_discovery_supplement.v1",
+  "recorded_on": "2026-10-12",
+  "baseline_registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "requested_total_urls": 44050,
+  "target_interpretation": "Git SHA-pinned game-building catalog hyperlinks; metadata leads only, not reviewed content or legal/use/training authority.",
+  "status": "raw_discovery_only_not_ingested_into_canonical_queue",
+  "parents": [
+    "docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0021.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0022.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0031.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0032.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0033.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0034.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0035.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0036.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0037.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0038.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0039.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0040.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0041.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0042.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0043.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0044.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0045.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0046.json"
+  ],
+  "catalogs": [
+    {
+      "repository": "Calinou/awesome-gamedev",
+      "commit_sha": "9918eea4f16a122e86df4e1176b1346ea8a22aac",
+      "readme_blob_sha": "560680be5964c57ca6e0e471bba74f0a2c2330af",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "ChessMax/awesome-game-engines",
+      "commit_sha": "e19767a028d1975d1e5a46361c203327bdbb9152",
+      "readme_blob_sha": "7e6ca159063c32c0d501d66941e83659adf278c2",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "terrehbyte/awesome-ue4",
+      "commit_sha": "95bf18a4c3742c2baa2ef262356997b5a1c5adb8",
+      "readme_blob_sha": "c9f1c83e19276a914e18f1961e04a990ff218b79",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "8bitworkshop/awesome-8bitgamedev",
+      "commit_sha": "8d09649c7623dc6c611e59ffd5320e31329a87fc",
+      "readme_blob_sha": "5c75207e3760ea72fa6819fadd831f484674f829",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "ellisonleao/magictools",
+      "commit_sha": "4ec63e7a96457ae72b3d9da17e5803e1f4ade495",
+      "readme_blob_sha": "adcb39397a5d6ef4857cac70bcb2fc56cf954da1",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "Dvergar/awesome-haxe-gamedev",
+      "commit_sha": "6731f6ebc91caa68bc3d104efd49f6cdc1e79ec7",
+      "readme_blob_sha": "ab99cff65413400f64ca1ede9e8d132ad0853b5e",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "fire/awesome-godot-procedural-manual-generation",
+      "commit_sha": "f1071025db5b2ecf93b04e6af61d301d73f9b445",
+      "readme_blob_sha": "ee330644987573bbae6234044ee6131d7268c9a4",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "OTFCG/Awesome-Game-Analysis",
+      "commit_sha": "9b9866dfe480706e14886a86665061e7d29de1d7",
+      "readme_blob_sha": "88a1b11a9fd24366d13850600026ad86c9ba950b",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "devanshutak25/3d-resources",
+      "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+      "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+      "readme_path": "README.md"
+    }
+  ],
+  "counts": {
+    "previous_raw_provisional_urls": 19175,
+    "new_raw_candidate_urls": 53,
+    "raw_provisional_urls": 19228,
+    "requested_raw_url_target": 44050
+  },
+  "candidates": [
+    {
+      "url": "https://www.youtube.com/channel/UCxOJdR3lmUf9XP_ME-C9jlg",
+      "source_id": "source-42b3dd578a0f05e2927a447915a477dd21940896398c0640167385dc2d217d8b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/channel/UCxOJdR3lmUf9XP_ME-C9jlg",
+          "line": 4730,
+          "headers": [
+            "3D Resources",
+            "Learning, Community & Industry",
+            "YouTube Channels: Sculpting & Characters"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/channel/UCy1f4m64dwCwk8CBZ_vHfPg",
+      "source_id": "source-ac39bdaa473256d244a41760ed6c43a1560306bf1c48fe041ff6d3f8e1e3fe5c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/channel/UCy1f4m64dwCwk8CBZ_vHfPg",
+          "line": 4662,
+          "headers": [
+            "3D Resources",
+            "Learning, Community & Industry",
+            "YouTube Channels: Blender"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/channel/UCY6Kqpw3gSc2DHtfsSGeYdQ",
+      "source_id": "source-344d1768b6263231ee4adab20e781c9df6504dfdb7c19a63b0c4c983496d6c73",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/channel/UCY6Kqpw3gSc2DHtfsSGeYdQ",
+          "line": 4628,
+          "headers": [
+            "3D Resources",
+            "Learning, Community & Industry",
+            "YouTube Channels: Motion Graphics & Cinema 4D"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/channel/UCYtaJtRbQtpd1KEP_q0Pq9w",
+      "source_id": "source-afc27266417b730d4abc30f8f80a0c49e20ebed61a7ae8b105f8493259e98a90",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/channel/UCYtaJtRbQtpd1KEP_q0Pq9w",
+          "line": 4611,
+          "headers": [
+            "3D Resources",
+            "Learning, Community & Industry",
+            "YouTube Channels: Motion Graphics & Cinema 4D"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/channel/UCyvvQJrfsoXdgasGuuXnYIg",
+      "source_id": "source-264fb4f9829a1999a6bc526b00e43672dfcaebd22dd11632a314bdf1cac5244a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/channel/UCyvvQJrfsoXdgasGuuXnYIg",
+          "line": 4638,
+          "headers": [
+            "3D Resources",
+            "Learning, Community & Industry",
+            "YouTube Channels: Motion Graphics & Cinema 4D"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/channel/UCz-eYJAUgSE-mqzKtit7m9g",
+      "source_id": "source-622ba33001ea58faa8d294e8044cdcd29c79e362a7f2dcf8af2825d0480e0d46",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/channel/UCz-eYJAUgSE-mqzKtit7m9g",
+          "line": 2741,
+          "headers": [
+            "3D Resources",
+            "Game Development",
+            "Unreal Engine: Resources"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/channel/UCZDR4vfP841oQ7QLO_7pK0w",
+      "source_id": "source-17b80408ac05293f9bbaaf13fdc4533dff2cc744e25a049e712b625ecd8c6044",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/channel/UCZDR4vfP841oQ7QLO_7pK0w",
+          "line": 4636,
+          "headers": [
+            "3D Resources",
+            "Learning, Community & Industry",
+            "YouTube Channels: Motion Graphics & Cinema 4D"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/channel/UCZsHHoDLK0s6r44ifx0DnXQ",
+      "source_id": "source-d4de7c1acefb463c8a4845c1e85f2fc541ec121e39c4ef77dbe0906c414ad9e4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/channel/UCZsHHoDLK0s6r44ifx0DnXQ",
+          "line": 4612,
+          "headers": [
+            "3D Resources",
+            "Learning, Community & Industry",
+            "YouTube Channels: Motion Graphics & Cinema 4D"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/playlist?list=PL05Yj9M-fWdJUySLU5fJ8Lg6h6t43_0nf",
+      "source_id": "source-45ef553ccfc4b538d3b44de9a28b6c12a45f62c4bf7c3eb1e1df09bab5509ada",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "Calinou/awesome-gamedev",
+          "commit_sha": "9918eea4f16a122e86df4e1176b1346ea8a22aac",
+          "readme_blob_sha": "560680be5964c57ca6e0e471bba74f0a2c2330af",
+          "exact_url": "https://www.youtube.com/playlist?list=PL05Yj9M-fWdJUySLU5fJ8Lg6h6t43_0nf",
+          "line": 1254,
+          "headers": [
+            "Awesome Gamedev #",
+            "Utilities ##"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/playlist?list=PLyzOQqMHGyYTsz7-jlj-SeOm6iC0v-7B3",
+      "source_id": "source-e25347f61422cb95942c40ed3ae48395aaf099abee60d95573ef55a4a4eae380",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/playlist?list=PLyzOQqMHGyYTsz7-jlj-SeOm6iC0v-7B3",
+          "line": 3286,
+          "headers": [
+            "3D Resources",
+            "Art, Design & Visual Storytelling",
+            "General Inspiration"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=eZ5hpcn6tIM",
+      "source_id": "source-2eaed44b6f69bf743cc3d3fc62f85d00f58eae47b384a0f1e4d7830d87bc9fcd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/watch?v=eZ5hpcn6tIM",
+          "line": 3173,
+          "headers": [
+            "3D Resources",
+            "Art, Design & Visual Storytelling",
+            "Cinematography & Camera Work"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=G_0M_GHw9GI",
+      "source_id": "source-5837e6269713b6a290ddc1f40e10c716aa5b13a249dcaad21da45e9fe994229b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/watch?v=G_0M_GHw9GI",
+          "line": 3178,
+          "headers": [
+            "3D Resources",
+            "Art, Design & Visual Storytelling",
+            "Cinematography & Camera Work"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=K9w8I_YD29E",
+      "source_id": "source-c90c056096e1deea99bbaf0cd720d6b4f69e7f8a71e04a45f3bf3124633ce0b1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/watch?v=K9w8I_YD29E",
+          "line": 3176,
+          "headers": [
+            "3D Resources",
+            "Art, Design & Visual Storytelling",
+            "Cinematography & Camera Work"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=Ly6pErhA3NA",
+      "source_id": "source-e9829e7d093b67581c8b223f0a03048afc0400a3c88e14edda64adb1383e0956",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.youtube.com/watch?v=Ly6pErhA3NA",
+          "line": 3177,
+          "headers": [
+            "3D Resources",
+            "Art, Design & Visual Storytelling",
+            "Cinematography & Camera Work"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.zammedev.com/home/wip_projects/blender2godot",
+      "source_id": "source-75bf64ae065396f28332848fec87a9b5eacf2dd33f961341b69ef1fe886fca5e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.zammedev.com/home/wip_projects/blender2godot",
+          "line": 646,
+          "headers": [
+            "3D Resources",
+            "Modeling, Sculpting & Texturing",
+            "Blender: Plugins & Addons"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.zapsplat.com/",
+      "source_id": "source-1dc1d73cfb26d40ebe5526802aad1589c33e8ef9119009a5ed50c67730fe2cf1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.zapsplat.com/",
+          "line": 507,
+          "headers": [
+            "3D Resources",
+            "Assets & Libraries",
+            "Audio: SFX & Music Libraries"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.zbrushcentral.com/",
+      "source_id": "source-b3d6087b09839dc1a42f90868600101bcbc6ecdec54278217de755138f375f74",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.zbrushcentral.com/",
+          "line": 5009,
+          "headers": [
+            "3D Resources",
+            "Learning, Community & Industry",
+            "3D Communities & Forums"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.zeiss.com/photonics-and-optics/en/cinematography/cincraft/scenario.html",
+      "source_id": "source-eb9cd656720d7ab263fcd26cef30a95491fafc654f4ac9d3d251c1bdde6dec46",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.zeiss.com/photonics-and-optics/en/cinematography/cincraft/scenario.html",
+          "line": 5737,
+          "headers": [
+            "3D Resources",
+            "Software Reference",
+            "Virtual Production Software"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://www.zerodensity.tv/",
+      "source_id": "source-58dbf0e868fbbb2025b11e15d39fbe39df980976f589c7d5313a439244fc10f3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.zerodensity.tv/",
+          "line": 1691,
+          "headers": [
+            "3D Resources",
+            "VFX, Compositing & Virtual Production",
+            "Virtual Production"
+          ]
+        },
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.zerodensity.tv/",
+          "line": 1795,
+          "headers": [
+            "3D Resources",
+            "VFX, Compositing & Virtual Production",
+            "Compositing Learning, Books & Industry"
+          ]
+        },
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://www.zerodensity.tv/",
+          "line": 5718,
+          "headers": [
+            "3D Resources",
+            "Software Reference",
+            "Virtual Production Software"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://wwwtyro.net/2019/11/18/instanced-lines.html",
+      "source_id": "source-3962c739a72f530c8e54f03c9beee6d9d600a8578a1a44d6fc95b4f7e0e7821e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://wwwtyro.net/2019/11/18/instanced-lines.html",
+          "line": 3143,
+          "headers": [
+            "3D Resources",
+            "Art, Design & Visual Storytelling",
+            "Drawing & Painting for 3D Artists"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://wwwtyro.net/2021/10/01/instanced-lines-part-2.html",
+      "source_id": "source-5dc0fdef08a19ed423e549cf8a1d2388e9af9ad5467e1059232bc2cf4974755e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://wwwtyro.net/2021/10/01/instanced-lines-part-2.html",
+          "line": 1494,
+          "headers": [
+            "3D Resources",
+            "Lighting, Rendering & Shaders",
+            "Rendering & Shader Theory"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://x.ai/",
+      "source_id": "source-2c762da6c4432ac1c1c07dd549e0b7f76e90c68955a51f6d7b805dc31b2a1ba0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://x.ai/",
+          "line": 3438,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Image Generation"
+          ]
+        },
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://x.ai/",
+          "line": 3839,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        },
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://x.ai/",
+          "line": 5960,
+          "headers": [
+            "3D Resources",
+            "Software Reference",
+            "AI Image & Texture Generation Software"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://x.com/JamesLucasIT/status/1795507471693320546",
+      "source_id": "source-a2c271a8f2817cf7dfea43c6aced614531ea96eb8cb9cba13577d32e33060c65",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://x.com/JamesLucasIT/status/1795507471693320546",
+          "line": 3306,
+          "headers": [
+            "3D Resources",
+            "Art, Design & Visual Storytelling",
+            "General Inspiration"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://xdpixel.com/about-me/",
+      "source_id": "source-d28e4912991161a3e9806052a1c2a8a86637e2c63af7d3b03d00fb5778969b4e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://xdpixel.com/about-me/",
+          "line": 1440,
+          "headers": [
+            "3D Resources",
+            "Lighting, Rendering & Shaders",
+            "Rendering & Shader Theory"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://xeokit.io/",
+      "source_id": "source-a9e8b8dc21df30768b364a5e2758c4d02b810cb84f856671be2deb270f5aa02f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://xeokit.io/",
+          "line": 1626,
+          "headers": [
+            "3D Resources",
+            "Lighting, Rendering & Shaders",
+            "Rendering & Shader Theory"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://xharlie.github.io/projects/project_sites/pointnerf/index.html",
+      "source_id": "source-b81e1c7bc4ddb40b0e4f838d4b39a992ca3181115629ac702d0ee964dc39394c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://xharlie.github.io/projects/project_sites/pointnerf/index.html",
+          "line": 3779,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://xingangpan.github.io/projects/ShadeGAN.html",
+      "source_id": "source-6668b19bcb6bfe6ce69e78e0991e6e51d3c36e8b6e1acbf32c6bd519a19fd7b9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://xingangpan.github.io/projects/ShadeGAN.html",
+          "line": 3659,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://xnormal.net/",
+      "source_id": "source-27d26cbfaa8f718247696eb25da51ea8494d46a2ee5922ccc288039a245908c3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://xnormal.net/",
+          "line": 989,
+          "headers": [
+            "3D Resources",
+            "Modeling, Sculpting & Texturing",
+            "Material Creation Tools"
+          ]
+        },
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://xnormal.net/",
+          "line": 1052,
+          "headers": [
+            "3D Resources",
+            "Modeling, Sculpting & Texturing",
+            "Material Creation Tools"
+          ]
+        },
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://xnormal.net/",
+          "line": 5634,
+          "headers": [
+            "3D Resources",
+            "Software Reference",
+            "Material & Texture Creation Software"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://xrbootcamp.com/xr-creators-expert-group/",
+      "source_id": "source-a7b606a01c02456483e568e9c3208c0aa0d4fafdb7adaf9f406e182c6b2dbf22",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://xrbootcamp.com/xr-creators-expert-group/",
+          "line": 5007,
+          "headers": [
+            "3D Resources",
+            "Learning, Community & Industry",
+            "3D Communities & Forums"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://xyzed3d.gumroad.com/",
+      "source_id": "source-1e38add378101464385e513f9bacad1e95d132846aca82883cbfff5dd9ac3a7d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://xyzed3d.gumroad.com/",
+          "line": 292,
+          "headers": [
+            "3D Resources",
+            "Assets & Libraries",
+            "Model Libraries: Free & General"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://yarn.co/",
+      "source_id": "source-996f083823aebc4375963267c58c1f8df7feabeb559711d44762b597d8ebc5b2",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://yarn.co/",
+          "line": 3371,
+          "headers": [
+            "3D Resources",
+            "Art, Design & Visual Storytelling",
+            "Pre-Production, Storyboarding & Script Tools"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://yarnspinner.dev/",
+      "source_id": "source-7c2267a5999beb14dc2abad5e11fc68a60d90db650655c1355396ccb54279e46",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://yarnspinner.dev/",
+          "line": 2786,
+          "headers": [
+            "3D Resources",
+            "Game Development",
+            "Game Dev Tools: Dialogue & Narrative"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://yenchenlin.me/inerf/",
+      "source_id": "source-881a9e497acb1a63a1553963d51d20109897578e24f31c3dfc9a77d143f1b808",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://yenchenlin.me/inerf/",
+          "line": 3722,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://yifanjiang19.github.io/alignerf",
+      "source_id": "source-681d68a51bfd22f0ac5794127436c67db18ba48d57c8bc603af60a380bf832c8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://yifanjiang19.github.io/alignerf",
+          "line": 3661,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://yilundu.github.io/nerflow/",
+      "source_id": "source-9d7013f3ab289ab4bf55a4cc40a0b7e4f6a2793db472d19033618fe13bea499e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://yilundu.github.io/nerflow/",
+          "line": 3761,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://yt-project.org/",
+      "source_id": "source-95e2dc05c101c9e00706c4f50f94c8305066334d67eeda211b0165725e773247",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://yt-project.org/",
+          "line": 5931,
+          "headers": [
+            "3D Resources",
+            "Software Reference",
+            "Scientific & Medical Visualization Software"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://ytini.com/",
+      "source_id": "source-7765314507464e4cae2a658317852c3e77021860e500d7cdf9a5f1ac2cd06913",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://ytini.com/",
+          "line": 871,
+          "headers": [
+            "3D Resources",
+            "Modeling, Sculpting & Texturing",
+            "Houdini: Miscellaneous Tutorials"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zawa.ai/",
+      "source_id": "source-f45a85af522d7da910898fb96b9bfb25b1432795311d2427796c8f765656f0c5",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zawa.ai/",
+          "line": 3280,
+          "headers": [
+            "3D Resources",
+            "Art, Design & Visual Storytelling",
+            "Design Tools"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zegley.itch.io/2d-platformermetroidvania-asset-pack",
+      "source_id": "source-fa6d1895afb430d8de8c2be018c82c931c4e01b7dd0dcfab52e9abac0a559cdd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zegley.itch.io/2d-platformermetroidvania-asset-pack",
+          "line": 572,
+          "headers": [
+            "3D Resources",
+            "Assets & Libraries",
+            "Game Assets"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zerie.itch.io/tiny-rpg-character-asset-pack",
+      "source_id": "source-7c0c07894b04824585d3383323a87d3c49824cf7fe09b1b8d3a14a1222792a6d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zerie.itch.io/tiny-rpg-character-asset-pack",
+          "line": 612,
+          "headers": [
+            "3D Resources",
+            "Assets & Libraries",
+            "Game Assets"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zerokobo.web.fc2.com/",
+      "source_id": "source-54fc2861a0b3e0505fea4c4142344e9f0bb5dafa4ae31fa08f2842c97271f5d9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zerokobo.web.fc2.com/",
+          "line": 309,
+          "headers": [
+            "3D Resources",
+            "Assets & Libraries",
+            "Model Libraries: Specialized"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zeux.io/2020/02/27/writing-an-efficient-vulkan-renderer/",
+      "source_id": "source-341163ad19854f3beab6d765354a18d55ea33df7f28d955f8825da4ef591a86e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zeux.io/2020/02/27/writing-an-efficient-vulkan-renderer/",
+          "line": 1625,
+          "headers": [
+            "3D Resources",
+            "Lighting, Rendering & Shaders",
+            "Rendering & Shader Theory"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zhiwenfan.github.io/NeRF-SOS/",
+      "source_id": "source-e3b8f6b29b9723c6ae62ff4fabf66cca7939c525329b2839a7e81cdd46fa1f29",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zhiwenfan.github.io/NeRF-SOS/",
+          "line": 3753,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://ziyanw1.github.io/hybrid_nerf/",
+      "source_id": "source-afec22a78bebae666eee443b5ce573e7227c5d8deb68976e3a2ef922cf04817d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://ziyanw1.github.io/hybrid_nerf/",
+          "line": 3729,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zju3dv.github.io/animatable_nerf/",
+      "source_id": "source-f0040dd7390b55858b7f7633069d0bc0b2ea95bb5219bed2a21fc9ca7e3ad562",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zju3dv.github.io/animatable_nerf/",
+          "line": 3662,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zju3dv.github.io/enerf/",
+      "source_id": "source-74499c1087b2716f5b6656d2409bcc81daaefddf5798054db2df4afa8cc7f0eb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zju3dv.github.io/enerf/",
+          "line": 3700,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zju3dv.github.io/neuralbody/",
+      "source_id": "source-1b97ac09cfbcb3228ea6e8b53af62e76ad411cd9122ab0783369325d13160a29",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zju3dv.github.io/neuralbody/",
+          "line": 3760,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zju3dv.github.io/object_nerf/",
+      "source_id": "source-b3b2546c9992445a5a8ff1299ba19958ab06ae69d418f4da47360f4593f8c9cc",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zju3dv.github.io/object_nerf/",
+          "line": 3731,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zju3dv.github.io/sine/",
+      "source_id": "source-7cbe7002d2c312f5440b599bb2dee624c11803ced1defb81ee642a9c9fb22252",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zju3dv.github.io/sine/",
+          "line": 3801,
+          "headers": [
+            "3D Resources",
+            "AI & Machine Learning for CG",
+            "Research Papers"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zoo.cs.yale.edu/classes/cs538/readings/papers/terrano_1500arch.pdf",
+      "source_id": "source-b240d6d7a8b28c624fd2a7c3897d38b62a613b3806110473185ece05cf89fb44",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "OTFCG/Awesome-Game-Analysis",
+          "commit_sha": "9b9866dfe480706e14886a86665061e7d29de1d7",
+          "readme_blob_sha": "88a1b11a9fd24366d13850600026ad86c9ba950b",
+          "exact_url": "https://zoo.cs.yale.edu/classes/cs538/readings/papers/terrano_1500arch.pdf",
+          "line": 294,
+          "headers": [
+            "Awesome Game Analysis ! Awesome (https://awesome.re/badge.svg) (https://awesome.re)",
+            "Analysis - Games"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zoo.dev/",
+      "source_id": "source-dc0de248d68ca6b8980e0cdc54ca0ede7ecae4e7daff5aa37c02e4c0dcd59cee",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zoo.dev/",
+          "line": 1027,
+          "headers": [
+            "3D Resources",
+            "Modeling, Sculpting & Texturing",
+            "Material Creation Tools"
+          ]
+        },
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zoo.dev/",
+          "line": 5206,
+          "headers": [
+            "3D Resources",
+            "Software Reference",
+            "CAD Software"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zurbrigg.teachable.com/p/python-3-for-maya-vol-1",
+      "source_id": "source-acf0b40ca389a34c7a18808288b3d5f702d814845822b88c4a42d5e3620b34b9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zurbrigg.teachable.com/p/python-3-for-maya-vol-1",
+          "line": 4754,
+          "headers": [
+            "3D Resources",
+            "Learning, Community & Industry",
+            "Paid Tutorial Platforms"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zzz.dog/",
+      "source_id": "source-f5e5aca841c7a4222c0792708a5900965bb6efbc27272f86091567a963a0f68c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zzz.dog/",
+          "line": 4600,
+          "headers": [
+            "3D Resources",
+            "Tools, Pipeline & Utilities",
+            "Pipeline Overview"
+          ]
+        },
+        {
+          "repository": "devanshutak25/3d-resources",
+          "commit_sha": "6da3ae085d90fa733f002ad5adc910c39245d443",
+          "readme_blob_sha": "ee10fca3bb448b90ae3222de9ff5f92affb9cbba",
+          "exact_url": "https://zzz.dog/",
+          "line": 5870,
+          "headers": [
+            "3D Resources",
+            "Software Reference",
+            "Misc 3D Utilities Software"
+          ]
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Metadata was observed only in SHA-pinned repository READMEs. Downstream linked documents, videos, assets and licenses were not fetched or reviewed.",
+    "Source associations across catalogs do not prove independence, intellectual property clearance or factual accuracy.",
+    "Actual fetching, application use, knowledge promotion and model training require separate policy authorization."
+  ]
+}

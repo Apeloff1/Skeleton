@@ -1,0 +1,1357 @@
+{
+  "schema": "skeleton.dragon.source_discovery_supplement.v1",
+  "recorded_at": "2026-10-12T01:11:06Z",
+  "baseline_registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "requested_total_urls": 44050,
+  "target_interpretation": "10 times original 4,405 URL snapshot; raw URLs are candidates, not independent or canonical sources.",
+  "status": "raw_discovery_only_not_ingested_into_canonical_queue",
+  "parents": [
+    "docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0021.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0022.json"
+  ],
+  "catalogs": [
+    {
+      "repository": "PandaArcade/UIOutline",
+      "commit_sha": "b89129996e25019393265279c7b17e73b2b2af17",
+      "requested_ref": "b89129996e25019393265279c7b17e73b2b2af17",
+      "readme_blob_sha": "5ba1097ece434eb9bdb64e79c97e48d74c68a617"
+    },
+    {
+      "repository": "mgerhardy/simpleai",
+      "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+      "requested_ref": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+      "readme_blob_sha": "f7425ffe0012c5d75c482f269bb9582dc6b25021"
+    },
+    {
+      "repository": "godot-sdk-integrations/godot-play-game-services",
+      "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+      "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+      "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756"
+    },
+    {
+      "repository": "Relintai/broken_seals",
+      "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+      "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+      "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd"
+    },
+    {
+      "repository": "aaronfranke/Linux-tools",
+      "commit_sha": "5710f5249a6d7c1ce448d086c100cc7666630ad8",
+      "requested_ref": "5710f5249a6d7c1ce448d086c100cc7666630ad8",
+      "readme_blob_sha": "e2d5e95a0c495122d2bdc5302374275d57bdf25a"
+    },
+    {
+      "repository": "Kromster80/kam_remake",
+      "commit_sha": "b199128f2ce826302a7626463018bfb88cfde032",
+      "requested_ref": "b199128f2ce826302a7626463018bfb88cfde032",
+      "readme_blob_sha": "5fe34a27b43568b514b5698ac633f1377046f58e"
+    },
+    {
+      "repository": "blackears/cyclopsLevelBuilder",
+      "commit_sha": "957247802f50e96044648fab6a93d6a1910fee74",
+      "requested_ref": "957247802f50e96044648fab6a93d6a1910fee74",
+      "readme_blob_sha": "02033ceab933a7b45b534a6984c728baaa8a8109"
+    },
+    {
+      "repository": "bladecoder/bladecoder-adventure-engine",
+      "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+      "requested_ref": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+      "readme_blob_sha": "833b09ccef1aecd2f47ccc267912c6ed6e355f18"
+    }
+  ],
+  "counts": {
+    "previous_raw_provisional_urls": 5369,
+    "new_raw_candidate_urls": 69,
+    "raw_provisional_urls": 5438,
+    "canonical_discovered_urls": null,
+    "requested_raw_url_target": 44050
+  },
+  "candidates": [
+    {
+      "url": "http://amplify.pt/unity/amplify-shader-editor",
+      "source_id": "source-1f223ed5572ff71beb6dafd56815c6df9fe1e61d451bc3249075e4c97625f843",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "PandaArcade/UIOutline",
+          "commit_sha": "b89129996e25019393265279c7b17e73b2b2af17",
+          "requested_ref": "b89129996e25019393265279c7b17e73b2b2af17",
+          "readme_blob_sha": "5ba1097ece434eb9bdb64e79c97e48d74c68a617",
+          "exact_url": "http://amplify.pt/unity/amplify-shader-editor"
+        }
+      ]
+    },
+    {
+      "url": "http://developers.google.com/games/services/android/troubleshooting",
+      "source_id": "source-fcf07dc868013e1b07a9ad84babce4553d8685ba52e865e91ffd44ce63a44867",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "http://developers.google.com/games/services/android/troubleshooting"
+        }
+      ]
+    },
+    {
+      "url": "http://libgdx.badlogicgames.com/",
+      "source_id": "source-175e3333b03bb964dc22b9a0b037c2502effd313407e040e5fc952a251825a03",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "bladecoder/bladecoder-adventure-engine",
+          "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "requested_ref": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "readme_blob_sha": "833b09ccef1aecd2f47ccc267912c6ed6e355f18",
+          "exact_url": "http://libgdx.badlogicgames.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://mgerhardy.github.io/simpleai/",
+      "source_id": "source-bb29a630ac2fe3662c077f441019ae85db4460c072327c42832d2a78ef864115",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "mgerhardy/simpleai",
+          "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "requested_ref": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "readme_blob_sha": "f7425ffe0012c5d75c482f269bb9582dc6b25021",
+          "exact_url": "http://mgerhardy.github.io/simpleai/"
+        }
+      ]
+    },
+    {
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html",
+      "source_id": "source-4a219c2cfe732e14a4317f9098048fed4fec76c29e8df07a49eabf3a3961f162",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "bladecoder/bladecoder-adventure-engine",
+          "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "requested_ref": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "readme_blob_sha": "833b09ccef1aecd2f47ccc267912c6ed6e355f18",
+          "exact_url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        }
+      ]
+    },
+    {
+      "url": "http://www.kamremake.com/about/",
+      "source_id": "source-2463288e57d1f3fd9bc43370d9728740fabb5043fa03f900efed244a31dadd0e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Kromster80/kam_remake",
+          "commit_sha": "b199128f2ce826302a7626463018bfb88cfde032",
+          "requested_ref": "b199128f2ce826302a7626463018bfb88cfde032",
+          "readme_blob_sha": "5fe34a27b43568b514b5698ac633f1377046f58e",
+          "exact_url": "http://www.kamremake.com/about/"
+        }
+      ]
+    },
+    {
+      "url": "https://api.codacy.com/project/badge/Grade/d549361de7964845984a6e505379ba33",
+      "source_id": "source-d9c48975c0cde7a4242f82f4e906036d857fe05d1b0197f75e0dffc845b2413e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "mgerhardy/simpleai",
+          "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "requested_ref": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "readme_blob_sha": "f7425ffe0012c5d75c482f269bb9582dc6b25021",
+          "exact_url": "https://api.codacy.com/project/badge/Grade/d549361de7964845984a6e505379ba33"
+        }
+      ]
+    },
+    {
+      "url": "https://apps.apple.com/au/app/pico-tanks/id1261614771",
+      "source_id": "source-12f9bbc82752590518879adb67c431f05667559105b3ad0e0ff44191df1562bf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "PandaArcade/UIOutline",
+          "commit_sha": "b89129996e25019393265279c7b17e73b2b2af17",
+          "requested_ref": "b89129996e25019393265279c7b17e73b2b2af17",
+          "readme_blob_sha": "5ba1097ece434eb9bdb64e79c97e48d74c68a617",
+          "exact_url": "https://apps.apple.com/au/app/pico-tanks/id1261614771"
+        }
+      ]
+    },
+    {
+      "url": "https://blackears.github.io/cyclopsLevelBuilder/",
+      "source_id": "source-fa3858e4337c71f97fa15a41a89872bdd4e4a41df2598f6615f7d53b1b9a74e6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "blackears/cyclopsLevelBuilder",
+          "commit_sha": "957247802f50e96044648fab6a93d6a1910fee74",
+          "requested_ref": "957247802f50e96044648fab6a93d6a1910fee74",
+          "readme_blob_sha": "02033ceab933a7b45b534a6984c728baaa8a8109",
+          "exact_url": "https://blackears.github.io/cyclopsLevelBuilder/"
+        }
+      ]
+    },
+    {
+      "url": "https://ci.appveyor.com/api/projects/status/lo1co9g9xfxft4ui?svg=true",
+      "source_id": "source-45d9e05f5fa70535cecc55cbc10386036685660109b762516892ef04f4fc28a5",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "mgerhardy/simpleai",
+          "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "requested_ref": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "readme_blob_sha": "f7425ffe0012c5d75c482f269bb9582dc6b25021",
+          "exact_url": "https://ci.appveyor.com/api/projects/status/lo1co9g9xfxft4ui?svg=true"
+        }
+      ]
+    },
+    {
+      "url": "https://ci.appveyor.com/project/mgerhardy/simpleai",
+      "source_id": "source-22b531fdc9fce473d94b9a1b2655edb129127007e8a4d62959c8996f8814fd6d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "mgerhardy/simpleai",
+          "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "requested_ref": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "readme_blob_sha": "f7425ffe0012c5d75c482f269bb9582dc6b25021",
+          "exact_url": "https://ci.appveyor.com/project/mgerhardy/simpleai"
+        }
+      ]
+    },
+    {
+      "url": "https://developer.android.com",
+      "source_id": "source-a797b2ea3fcea91e17eaba5030132fd4f967f313c8afed2a0d90c10be45ca7d0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://developer.android.com"
+        }
+      ]
+    },
+    {
+      "url": "https://developer.android.com/distribute/console",
+      "source_id": "source-c562189cbdec9ea6db506cb8d5123a2be9bc5623bdc42902f984a80457100d02",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://developer.android.com/distribute/console"
+        },
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://developer.android.com/distribute/console"
+        }
+      ]
+    },
+    {
+      "url": "https://developers.google.com/games/services",
+      "source_id": "source-9f54a17d2616540485ee57e52db4b4cea8ae1b1cac7c9c769bf2b369d98eda9c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://developers.google.com/games/services"
+        }
+      ]
+    },
+    {
+      "url": "https://developers.google.com/games/services/android/quickstart",
+      "source_id": "source-1c7aa021328f5bb269218aecb6057eccee66ee9f33b2707004449db98b6c2217",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://developers.google.com/games/services/android/quickstart"
+        },
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://developers.google.com/games/services/android/quickstart"
+        }
+      ]
+    },
+    {
+      "url": "https://developers.google.com/games/services/common/concepts/achievements",
+      "source_id": "source-b82f4da1a171acad6e134991f6763d98c739ba16af350e617f07f9484b5a31af",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://developers.google.com/games/services/common/concepts/achievements"
+        }
+      ]
+    },
+    {
+      "url": "https://developers.google.com/games/services/console/enabling",
+      "source_id": "source-417802026c2e4260f53b2112c36013a768a2ab3abf9e027fbf83c57351f305ad",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://developers.google.com/games/services/console/enabling"
+        }
+      ]
+    },
+    {
+      "url": "https://developers.google.com/games/services/console/enabling#b_create_a_credential",
+      "source_id": "source-9f3406f528d1aaca8aacdf64ea397b75c1da704f6e4e5d14b373941088201162",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://developers.google.com/games/services/console/enabling#b_create_a_credential"
+        }
+      ]
+    },
+    {
+      "url": "https://developers.google.com/games/services/console/enabling#step_3_generate_an_oauth_20_client_id",
+      "source_id": "source-75b138b289bab6a4e10c59023e2bcb1821c7d54c0019e2de328ddd8ebe9b3af1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://developers.google.com/games/services/console/enabling#step_3_generate_an_oauth_20_client_id"
+        }
+      ]
+    },
+    {
+      "url": "https://developers.google.com/games/services/reference",
+      "source_id": "source-ec71cba54d5a3e39af38becf80b3c3b9bea4d51dfc6a8257e725dba8ab60db3a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://developers.google.com/games/services/reference"
+        }
+      ]
+    },
+    {
+      "url": "https://discord.gg/BkhwU8Dx5c",
+      "source_id": "source-4219fa1d85bf543b3cbaee4236724de70f7a5576f2d6a97aa27d252454ca3d89",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "blackears/cyclopsLevelBuilder",
+          "commit_sha": "957247802f50e96044648fab6a93d6a1910fee74",
+          "requested_ref": "957247802f50e96044648fab6a93d6a1910fee74",
+          "readme_blob_sha": "02033ceab933a7b45b534a6984c728baaa8a8109",
+          "exact_url": "https://discord.gg/BkhwU8Dx5c"
+        }
+      ]
+    },
+    {
+      "url": "https://docs.godotengine.org/en/3.4/development/compiling/index.html",
+      "source_id": "source-f35f03c5e8058b09aec541c83622516dda33cae0ca292d0e017eb50e527acc6f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://docs.godotengine.org/en/3.4/development/compiling/index.html"
+        }
+      ]
+    },
+    {
+      "url": "https://docs.godotengine.org/en/latest/development/compiling/index.html",
+      "source_id": "source-da1e979d3fdd9a8a8a31dbc703c20d97328b6f4ce43f748ab249003094cf1ca6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://docs.godotengine.org/en/latest/development/compiling/index.html"
+        }
+      ]
+    },
+    {
+      "url": "https://docs.godotengine.org/en/stable/tutorials/export/android_gradle_build.html",
+      "source_id": "source-eeebfc05cdf3d1f371a4dfecbfdf0e47e2903cddb2719884071d79858d3d1129",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://docs.godotengine.org/en/stable/tutorials/export/android_gradle_build.html"
+        }
+      ]
+    },
+    {
+      "url": "https://docs.godotengine.org/en/stable/tutorials/platform/android/android_plugin.html",
+      "source_id": "source-cbb5bd2a3f49c79662e556586fd7c5f7865f5d3c65f891597b92cb135a4957e0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://docs.godotengine.org/en/stable/tutorials/platform/android/android_plugin.html"
+        }
+      ]
+    },
+    {
+      "url": "https://flathub.org/apps/details/com.bladecoder.adventure-editor",
+      "source_id": "source-26217077ef3a789aa0bf30673e82f700a94352f486be338bce83ece342c48bfa",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "bladecoder/bladecoder-adventure-engine",
+          "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "requested_ref": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "readme_blob_sha": "833b09ccef1aecd2f47ccc267912c6ed6e355f18",
+          "exact_url": "https://flathub.org/apps/details/com.bladecoder.adventure-editor"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/blackears/cyclopsLevelBuilder/discussions",
+      "source_id": "source-47bd563361371fd34fda5dd70a3583dae2391105e7f69890f483f3b9f3fa71ef",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "blackears/cyclopsLevelBuilder",
+          "commit_sha": "957247802f50e96044648fab6a93d6a1910fee74",
+          "requested_ref": "957247802f50e96044648fab6a93d6a1910fee74",
+          "readme_blob_sha": "02033ceab933a7b45b534a6984c728baaa8a8109",
+          "exact_url": "https://github.com/blackears/cyclopsLevelBuilder/discussions"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/blackears/cyclopsLevelBuilder/releases",
+      "source_id": "source-13aeaffb13bfcc1c832f1c7c34526cb839b4e7a7280f7e38c9b3b72851e9b8fe",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "blackears/cyclopsLevelBuilder",
+          "commit_sha": "957247802f50e96044648fab6a93d6a1910fee74",
+          "requested_ref": "957247802f50e96044648fab6a93d6a1910fee74",
+          "readme_blob_sha": "02033ceab933a7b45b534a6984c728baaa8a8109",
+          "exact_url": "https://github.com/blackears/cyclopsLevelBuilder/releases"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/bladecoder/bladecoder-adventure-engine/releases/latest",
+      "source_id": "source-a460d6ba31847b03eaafca481d302b8d3740535c6dad69e7830fd1e0ff786fcf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "bladecoder/bladecoder-adventure-engine",
+          "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "requested_ref": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "readme_blob_sha": "833b09ccef1aecd2f47ccc267912c6ed6e355f18",
+          "exact_url": "https://github.com/bladecoder/bladecoder-adventure-engine/releases/latest"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/bladecoder/bladecoder-adventure-engine/wiki",
+      "source_id": "source-5fb5edfb85f1041614bfdcb38f9b87bea58f4f7a8ce7c6daf7793483ca747dbd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "bladecoder/bladecoder-adventure-engine",
+          "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "requested_ref": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "readme_blob_sha": "833b09ccef1aecd2f47ccc267912c6ed6e355f18",
+          "exact_url": "https://github.com/bladecoder/bladecoder-adventure-engine/wiki"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/bladecoder/bladecoder-adventure-tests/",
+      "source_id": "source-c13b21b409249f7f3506c7e951a02236a65366e116bfc61424eeeb83fde70d79",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "bladecoder/bladecoder-adventure-engine",
+          "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "requested_ref": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "readme_blob_sha": "833b09ccef1aecd2f47ccc267912c6ed6e355f18",
+          "exact_url": "https://github.com/bladecoder/bladecoder-adventure-tests/"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/bladecoder/bladecoder-adventure-tests/tree/master/venus",
+      "source_id": "source-07141497494d14784ae319cd2b0fb8a395e51c0b174f38308df9ecb25b536dd5",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "bladecoder/bladecoder-adventure-engine",
+          "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "requested_ref": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "readme_blob_sha": "833b09ccef1aecd2f47ccc267912c6ed6e355f18",
+          "exact_url": "https://github.com/bladecoder/bladecoder-adventure-tests/tree/master/venus"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/godot-sdk-integrations/godot-google-play-game-services-android-plugin",
+      "source_id": "source-15a459222524e0d1c0fe7803327911230bd7d2841e04f55714ec2eaa511ae6d4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://github.com/godot-sdk-integrations/godot-google-play-game-services-android-plugin"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/godot-sdk-integrations/godot-google-play-game-services-android-plugin/tree/main",
+      "source_id": "source-8057f49ab84f461e20329ec315cbc3e6033c6ae10eb9b96f7c9354ac98913bf3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://github.com/godot-sdk-integrations/godot-google-play-game-services-android-plugin/tree/main"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/godot-sdk-integrations/godot-play-game-services/issues/new",
+      "source_id": "source-e387f4f7c997b00f449196d8820b4b9221dc5b949bdd1908670a9c8e428697e7",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://github.com/godot-sdk-integrations/godot-play-game-services/issues/new"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/godot-sdk-integrations/godot-play-game-services/releases",
+      "source_id": "source-66a6c5fd2b91c8374f042b917ebf53a36379cac344783dab6c49b5c62c3d4e2a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://github.com/godot-sdk-integrations/godot-play-game-services/releases"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/godotengine/godot/",
+      "source_id": "source-f384d1f197453bebae1b4b18930a59ec8abba9e1f82ba72880fc603149b0fad7",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://github.com/godotengine/godot/"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Iakobs",
+      "source_id": "source-6e09f1e643a9af3390dffef05e8e73ac70521d961cf25d2d37a84597b9bfc78c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://github.com/Iakobs"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/rafalagoon",
+      "source_id": "source-5e8b409cf81083e5313c0499abe80ad96a54327e5b5337e33e41b3502e828113",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://github.com/rafalagoon"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/broken_seals/blob/master/game/modules/entity_classes/naturalist/game_module.tres",
+      "source_id": "source-7633bcd821cec8c531f41977384409e7aa8b88f9326abf12f2836a7dd7798124",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/broken_seals/blob/master/game/modules/entity_classes/naturalist/game_module.tres"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/broken_seals/blob/master/game/modules/entity_classes/naturalist/resource_db.tres",
+      "source_id": "source-255956ddb48d3fea55aa4f7b3937f2ff54d5d9f8fcfcc220ce5a88d2656a111b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/broken_seals/blob/master/game/modules/entity_classes/naturalist/resource_db.tres"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/broken_seals/blob/master/game/player/Body.gd",
+      "source_id": "source-a73e02a092c88296aa1fd51a827123f8ee638913c94d75f51fa2ec630e6bc476",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/broken_seals/blob/master/game/player/Body.gd"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/broken_seals/blob/master/game/scripts/game_modules/DataManager.gd",
+      "source_id": "source-6e024700f08227b9df06acc0c033686dad862d6ef88c7f95b94cf5b34024a6b9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/broken_seals/blob/master/game/scripts/game_modules/DataManager.gd"
+        },
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/broken_seals/blob/master/game/scripts/game_modules/DataManager.gd"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/broken_seals/blob/master/HEADS",
+      "source_id": "source-9886b00ceeccbd2eafa951b580771c18da4c8b7c7791c2b573b1037737df0f32",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/broken_seals/blob/master/HEADS"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/broken_seals/releases",
+      "source_id": "source-dca7fd0dfe71c8a263f0573901d17d50bac55e4e9d3630acafd8a9a45b9c10fa",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/broken_seals/releases"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/broken_seals/tree/master/game",
+      "source_id": "source-d8660f3a06102de60b61a9f7250b1047e5b15ea2d1867e67aa9e68d81e119a21",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/broken_seals/tree/master/game"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/broken_seals/tree/master/game/addons/world_generator",
+      "source_id": "source-0f22a60b0b787041d10cb48ed08f2f57309c7d0ce3adc55dab001025758d3bd0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/broken_seals/tree/master/game/addons/world_generator"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/broken_seals/tree/master/game/modules",
+      "source_id": "source-6000b5ad40a7aac6935400c3a9fe19d7fffa85c10d5d9bac035168dbe39dbfbb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/broken_seals/tree/master/game/modules"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/broken_seals/tree/master/game/scripts/game_modules",
+      "source_id": "source-e292e6287ce9be5be088e63cf8ea6348a4a40a2a51a12e35be2396bd8cbcc747",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/broken_seals/tree/master/game/scripts/game_modules"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/pandemonium_engine",
+      "source_id": "source-ec3e59f5a67e439567229a1e52ca348d0d56ba1119da38bb19fec0bee6dfdb2b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/pandemonium_engine"
+        },
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/pandemonium_engine"
+        },
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/pandemonium_engine"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/pandemonium_engine/blob/master/CHANGELOG.md",
+      "source_id": "source-5ca00542c12fb78a329b9d3894956af7f13cdc8bd7eb86e5f2f232639c5c2ebf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/pandemonium_engine/blob/master/CHANGELOG.md"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Relintai/pandemonium_engine/tree/master/modules",
+      "source_id": "source-7bf7b14624716b84f96689a09cf0c0ebcf0269dd9682a819b37fdf025c09ddff",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://github.com/Relintai/pandemonium_engine/tree/master/modules"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/reyandme/kam_remake",
+      "source_id": "source-d54243789acce2a3586cb00b0b8ea80fdc4dfcb7934eaf5802bbc0364ab7a05e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Kromster80/kam_remake",
+          "commit_sha": "b199128f2ce826302a7626463018bfb88cfde032",
+          "requested_ref": "b199128f2ce826302a7626463018bfb88cfde032",
+          "readme_blob_sha": "5fe34a27b43568b514b5698ac633f1377046f58e",
+          "exact_url": "https://github.com/reyandme/kam_remake"
+        }
+      ]
+    },
+    {
+      "url": "https://godot.foundation/",
+      "source_id": "source-a86bf0511dd45f91153da165256046825683ab5242f9817f31a98ad39a8fe85d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://godot.foundation/"
+        }
+      ]
+    },
+    {
+      "url": "https://godot.jacobibanez.com/",
+      "source_id": "source-1d591b30c83a42957de9e61e512ae4f3f0d31a7f57a2b45bf160412b30234cf6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://godot.jacobibanez.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://ko-fi.com/Y8Y43J6OB",
+      "source_id": "source-8185e759dca90e6610cecec77cfb4d4f8d77fcbf51967ded4ee0493aae75cb7c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "blackears/cyclopsLevelBuilder",
+          "commit_sha": "957247802f50e96044648fab6a93d6a1910fee74",
+          "requested_ref": "957247802f50e96044648fab6a93d6a1910fee74",
+          "readme_blob_sha": "02033ceab933a7b45b534a6984c728baaa8a8109",
+          "exact_url": "https://ko-fi.com/Y8Y43J6OB"
+        }
+      ]
+    },
+    {
+      "url": "https://kotlinlang.org/docs/dokka-introduction.html",
+      "source_id": "source-66a9a41cb2247888dad8038e5df37b337b86763ca21e8d97dfd6a9cbb571ad7f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://kotlinlang.org/docs/dokka-introduction.html"
+        }
+      ]
+    },
+    {
+      "url": "https://kotlinlang.org/docs/kotlin-doc.html",
+      "source_id": "source-17e8e71b212c233a0fdcdd709704a5c1b65e6c57174181f86d92b9fa580a284b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://kotlinlang.org/docs/kotlin-doc.html"
+        }
+      ]
+    },
+    {
+      "url": "https://lgtm.com/projects/g/mgerhardy/simpleai/alerts",
+      "source_id": "source-6cc9bf01daaf4fbf912426ec5506a91ac7fe118d0fc0911f3a001b858ce0803d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "mgerhardy/simpleai",
+          "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "requested_ref": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "readme_blob_sha": "f7425ffe0012c5d75c482f269bb9582dc6b25021",
+          "exact_url": "https://lgtm.com/projects/g/mgerhardy/simpleai/alerts"
+        }
+      ]
+    },
+    {
+      "url": "https://lgtm.com/projects/g/mgerhardy/simpleai/context:cpp",
+      "source_id": "source-51c187e842db6f6a13088f2bf1e4e77c5813ffc38b5ab61b0386f9c4427e7d19",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "mgerhardy/simpleai",
+          "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "requested_ref": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "readme_blob_sha": "f7425ffe0012c5d75c482f269bb9582dc6b25021",
+          "exact_url": "https://lgtm.com/projects/g/mgerhardy/simpleai/context:cpp"
+        }
+      ]
+    },
+    {
+      "url": "https://play.google.com/store/apps/details?id=com.pandaarcade.picotanks",
+      "source_id": "source-640cb192550a2374964c5352dd2e84c3f1aaf02291450270829cd9be792d3f18",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "PandaArcade/UIOutline",
+          "commit_sha": "b89129996e25019393265279c7b17e73b2b2af17",
+          "requested_ref": "b89129996e25019393265279c7b17e73b2b2af17",
+          "readme_blob_sha": "5ba1097ece434eb9bdb64e79c97e48d74c68a617",
+          "exact_url": "https://play.google.com/store/apps/details?id=com.pandaarcade.picotanks"
+        }
+      ]
+    },
+    {
+      "url": "https://play.google.com/store/apps/details?id=org.bladecoder.engine",
+      "source_id": "source-60913a51bbe20ea717ccf6d12d68fa96ea27fa58fe8033f9b0dd36463737763d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "bladecoder/bladecoder-adventure-engine",
+          "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "requested_ref": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+          "readme_blob_sha": "833b09ccef1aecd2f47ccc267912c6ed6e355f18",
+          "exact_url": "https://play.google.com/store/apps/details?id=org.bladecoder.engine"
+        }
+      ]
+    },
+    {
+      "url": "https://relintai.github.io/broken_seals/",
+      "source_id": "source-f4ffeeae3adebaca72d2f84a4ed6c13eb7d77a1775e0000dc29e794aabbf3692",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Relintai/broken_seals",
+          "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+          "readme_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+          "exact_url": "https://relintai.github.io/broken_seals/"
+        }
+      ]
+    },
+    {
+      "url": "https://store.godotengine.org/asset/jacob-ibanez-sanchez/google-play-games-services-for-godot/",
+      "source_id": "source-15ae7f1d538b9eb4a7144c6a805f10e2cb6bb5110d1d1d155bbd27001d90d510",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "godot-sdk-integrations/godot-play-game-services",
+          "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+          "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+          "readme_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+          "exact_url": "https://store.godotengine.org/asset/jacob-ibanez-sanchez/google-play-games-services-for-godot/"
+        }
+      ]
+    },
+    {
+      "url": "https://travis-ci.org/mgerhardy/simpleai",
+      "source_id": "source-c5963e14cd1482607a327101785d6ddcc5421676f23ab9a5de4d61c62966cbc1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "mgerhardy/simpleai",
+          "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "requested_ref": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "readme_blob_sha": "f7425ffe0012c5d75c482f269bb9582dc6b25021",
+          "exact_url": "https://travis-ci.org/mgerhardy/simpleai"
+        }
+      ]
+    },
+    {
+      "url": "https://www.codacy.com/app/martin-gerhardy/simpleai?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=mgerhardy/simpleai&amp;utm_campaign=Badge_Grade",
+      "source_id": "source-54ce2f93e7153ec191d826d37d960bcfbac1f96eaca9fb0ad57e9f80f3a5b434",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "mgerhardy/simpleai",
+          "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "requested_ref": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+          "readme_blob_sha": "f7425ffe0012c5d75c482f269bb9582dc6b25021",
+          "exact_url": "https://www.codacy.com/app/martin-gerhardy/simpleai?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=mgerhardy/simpleai&amp;utm_campaign=Badge_Grade"
+        }
+      ]
+    },
+    {
+      "url": "https://www.picotanks.com/",
+      "source_id": "source-7886c448f73ee26eb7e7d735299a968db73f187a2d888282769040a70162a895",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "PandaArcade/UIOutline",
+          "commit_sha": "b89129996e25019393265279c7b17e73b2b2af17",
+          "requested_ref": "b89129996e25019393265279c7b17e73b2b2af17",
+          "readme_blob_sha": "5ba1097ece434eb9bdb64e79c97e48d74c68a617",
+          "exact_url": "https://www.picotanks.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=mbw_6dnOt_g",
+      "source_id": "source-f304bb35f4720b8405bcdf805cb21cbe1e749c8fb545413b6a14252b2464f1d7",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "blackears/cyclopsLevelBuilder",
+          "commit_sha": "957247802f50e96044648fab6a93d6a1910fee74",
+          "requested_ref": "957247802f50e96044648fab6a93d6a1910fee74",
+          "readme_blob_sha": "02033ceab933a7b45b534a6984c728baaa8a8109",
+          "exact_url": "https://www.youtube.com/watch?v=mbw_6dnOt_g"
+        }
+      ]
+    },
+    {
+      "url": "https://youtu.be/BEh2s9NOTiE",
+      "source_id": "source-a215f243879aa14ecfdf01e40e51e6671f7086df4792f9820234dce9255e21bf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "PandaArcade/UIOutline",
+          "commit_sha": "b89129996e25019393265279c7b17e73b2b2af17",
+          "requested_ref": "b89129996e25019393265279c7b17e73b2b2af17",
+          "readme_blob_sha": "5ba1097ece434eb9bdb64e79c97e48d74c68a617",
+          "exact_url": "https://youtu.be/BEh2s9NOTiE"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Not 10× complete.",
+    "Raw count is not a canonical unique-source count.",
+    "README links are discovery leads, not approval.",
+    "Repository licenses do not license linked destinations.",
+    "Staged canonical importer/policy jobs were not executed in this batch.",
+    "Identity, mirror, edition and publisher clustering remain incomplete."
+  ]
+}

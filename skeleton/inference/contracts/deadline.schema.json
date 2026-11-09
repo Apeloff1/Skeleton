@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-01:deadline:v1",
+  "title": "FLGB-01 Deadline Budget",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operation_id",
+    "deadline_ms"
+  ],
+  "properties": {
+    "operation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "deadline_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400000
+    }
+  }
+}

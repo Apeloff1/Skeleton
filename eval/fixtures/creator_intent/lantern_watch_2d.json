@@ -1,0 +1,51 @@
+{
+  "schema": "eval.fixtures.creator_intent.v1",
+  "schema_version": 1,
+  "fixture_id": "lantern_watch_2d",
+  "concept": {
+    "title": "Lantern Watch",
+    "statement": "A local 2D lantern-watch stealth loop. Guards patrol a quay; the player extinguishes lamps and reaches a skiff. No realtime network play."
+  },
+  "expected_normalized": {
+    "constraints": [
+      {
+        "id": "c_presentation",
+        "field": "presentation",
+        "op": "equals",
+        "value": "2d"
+      },
+      {
+        "id": "c_networking",
+        "field": "networking",
+        "op": "forbid",
+        "value": "realtime"
+      }
+    ]
+  },
+  "expected_design_graph": {
+    "nodes": [
+      {
+        "id": "n_quay",
+        "kind": "world",
+        "title": "Quay rooms",
+        "depends_on": []
+      },
+      {
+        "id": "n_watch",
+        "kind": "system",
+        "title": "Lantern watch",
+        "depends_on": ["n_quay"]
+      }
+    ],
+    "constraints": [
+      {
+        "id": "c_presentation",
+        "applies_to": ["n_quay"]
+      },
+      {
+        "id": "c_networking",
+        "applies_to": ["n_watch"]
+      }
+    ]
+  }
+}

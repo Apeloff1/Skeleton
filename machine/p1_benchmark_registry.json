@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "registry_version": "1.0.0",
+  "task_id": "P1-LEARN-02",
+  "accountability_ref": "ACC-P1-LEARN-02",
+  "authority": "machine/p1_benchmark_registry.json",
+  "policy": {
+    "production_authority": false,
+    "clean_status_required_for_promotion": true,
+    "contamination_evidence_required": true,
+    "unknown_contamination_blocks": true,
+    "independent_evaluator_required": true,
+    "exact_environment_binding": true,
+    "reproducibility_bundle_required": true,
+    "offline_experiment_required": true,
+    "immutable_benchmark_identity": true,
+    "additive_lineage_only": true,
+    "allowed_split_roles": [
+      "train",
+      "validation",
+      "test",
+      "holdout"
+    ],
+    "evaluation_split_roles": [
+      "test",
+      "holdout"
+    ]
+  },
+  "benchmarks": []
+}

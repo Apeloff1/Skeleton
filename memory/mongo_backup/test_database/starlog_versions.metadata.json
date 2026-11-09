@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"13e358305750443c957bda22b3808b30","collectionName":"starlog_versions","type":"collection"}

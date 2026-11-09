@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-02:quantization:v1",
+  "title": "FLGB-02 quantization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scheme",
+    "bits",
+    "group_size",
+    "calibration_digest"
+  ],
+  "properties": {
+    "scheme": {
+      "enum": [
+        "none",
+        "int8",
+        "int4",
+        "nf4",
+        "fp8"
+      ]
+    },
+    "bits": {
+      "enum": [
+        4,
+        8,
+        16,
+        32
+      ]
+    },
+    "group_size": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "calibration_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

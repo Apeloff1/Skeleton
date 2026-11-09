@@ -1,0 +1,1119 @@
+"""Torch / CUDA accel for the neo LM.
+
+Lazy import. GameForge CI never loads this file unless someone
+calls TinyTransformer.to() and torch is installed.
+
+TorchAccel: same TinyTransformer weights, pinned on cpu|cuda|mps,
+autograd SGD through stacked Pre-LN blocks. Python lists catch
+up on sync() / snapshot(). GPU is a harness, not a rewrite.
+
+TorchTransformer: optional nn.TransformerEncoder stack, restored
+only when a snapshot kind is torch-stack.
+"""
+from __future__ import annotations
+
+import math
+import threading
+from contextlib import contextmanager
+from typing import Any, Callable, Dict, Iterable, List, Sequence
+
+from skeleton.cortex.port import tokens
+
+UNK = "__unk__"
+
+
+def _torch():
+    import torch
+    return torch
+
+
+class TorchAccel:
+    """Run TinyTransformer steps with autograd. Weights live on the device."""
+
+    def __init__(
+        self,
+        lm: Any,
+        device: str = "cpu",
+        *,
+        kv_dtype: str = "fp32",
+        max_kv_bytes: int | None = None,
+        prefill_query_chunk: int | None = None,
+        max_grad_norm: float | None = None,
+    ) -> None:
+        if max_grad_norm is not None and (
+            isinstance(max_grad_norm, bool)
+            or not isinstance(max_grad_norm, (int, float))
+            or not math.isfinite(float(max_grad_norm))
+            or max_grad_norm <= 0
+        ):
+            raise ValueError("max_grad_norm must be a finite positive number")
+        torch = _torch()
+        if prefill_query_chunk is not None and (
+            isinstance(prefill_query_chunk, bool)
+            or not isinstance(prefill_query_chunk, int)
+            or not 1 <= prefill_query_chunk <= lm.ctx
+        ):
+            raise ValueError("prefill_query_chunk must be between 1 and context length")
+        if kv_dtype not in {"fp32", "fp16", "bf16"}:
+            raise ValueError("kv_dtype must be fp32, fp16 or bf16")
+        if max_kv_bytes is not None and (
+            isinstance(max_kv_bytes, bool)
+            or not isinstance(max_kv_bytes, int)
+            or max_kv_bytes <= 0
+        ):
+            raise ValueError("max_kv_bytes must be a positive integer or None")
+        if device in {"cuda", "gpu"}:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        elif device == "mps":
+            device = "mps" if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available() else "cpu"
+        self.torch = torch
+        self.lm = lm
+        self.device = torch.device(device)
+        self.device_name = self.device.type
+        self.kv_dtype_name = kv_dtype
+        self.kv_dtype = {
+            "fp32": torch.float32,
+            "fp16": torch.float16,
+            "bf16": torch.bfloat16,
+        }[kv_dtype]
+        self.max_kv_bytes = max_kv_bytes
+        self.prefill_query_chunk = prefill_query_chunk
+        self.max_grad_norm = float(max_grad_norm) if max_grad_norm is not None else None
+        self.last_grad_norm: float | None = None
+        self._adam_moments: dict[int, dict[str, Any]] = {}
+        self.resident = False
+        self._E = self._P = self._Wout = self._bout = None
+        self._layers: List[Dict[str, Any]] = []
+        self._weights_modified = False
+        self._training_failed = False
+        self._state_lock = threading.RLock()
+        self.reset_decode_cache()
+
+    @property
+    def cached_tokens(self) -> tuple[int, ...]:
+        """Expose countable decode occupancy without exporting device tensors."""
+        with self._state_lock:
+            return tuple(self._cached_ids)
+
+    @contextmanager
+    def _inference_lock(self, interrupt: Callable[[], None] | None = None):
+        """Let a queued caller cancel while another request owns resident K/V."""
+        if interrupt is None:
+            with self._state_lock:
+                yield
+            return
+        while True:
+            interrupt()
+            if self._state_lock.acquire(timeout=0.05):
+                break
+        try:
+            interrupt()
+            yield
+        finally:
+            self._state_lock.release()
+
+    def reset_decode_cache(self) -> None:
+        """Drop all accelerator-local decode history after weight changes."""
+        with self._state_lock:
+            self._reset_decode_cache_unlocked()
+
+    def _reset_decode_cache_unlocked(self) -> None:
+        """Mutate resident cache only while holding the accelerator lock."""
+        occupied = bool(getattr(self, "_cached_ids", ()) or getattr(self, "_cached_keys", ()))
+        self._cache_reset_count = getattr(self, "_cache_reset_count", 0) + int(occupied)
+        self._cached_ids: List[int] = []
+        self._cached_keys: List[Any] = []
+        self._cached_values: List[Any] = []
+        self._key_buffers: List[Any] = []
+        self._value_buffers: List[Any] = []
+        self._cached_next_position = 0
+        self._cached_logits: tuple[float, ...] | None = None
+
+    @property
+    def kv_reserved_bytes(self) -> int:
+        """Actual reserved resident K+V storage across layers, not logical occupancy."""
+        with self._state_lock:
+            return sum(
+                bank.numel() * bank.element_size()
+                for bank in self._key_buffers + self._value_buffers
+            )
+
+    def _reserve_kv(self, layer: int, needed: int, heads: int, head_dim: int) -> None:
+        """Amortized resident KV allocation, bounded by the model context.
+
+        Append within existing capacity never concatenates/copies history.
+        Geometric expansion copies only on capacity transitions, while short
+        prompts avoid allocating for the entire maximum context up front.
+        """
+        torch = self.torch
+        if not 1 <= needed <= self.lm.ctx:
+            raise ValueError("requested KV cache capacity outside model context")
+        if layer < len(self._key_buffers):
+            old_cap = self._key_buffers[layer].shape[-2]
+            if old_cap >= needed:
+                return
+            old_used = self._cached_keys[layer].shape[-2]
+        else:
+            old_cap = old_used = 0
+        new_cap = min(self.lm.ctx, max(needed, 16, old_cap * 2))
+        shape = (1, heads, new_cap, head_dim)
+        new_bank_bytes = 2 * heads * new_cap * head_dim * (
+            torch.empty((), dtype=self.kv_dtype).element_size()
+        )
+        if self.max_kv_bytes is not None:
+            # Account for the old bank and the new allocation coexisting
+            # during growth, not just the smaller final resident footprint.
+            # This is a KV-specific allocation cap, not an overall GPU OOM
+            # guarantee (activations, kernels and model weights are separate).
+            temporary_peak = self.kv_reserved_bytes + new_bank_bytes
+            if temporary_peak > self.max_kv_bytes:
+                raise MemoryError("KV cache allocation exceeds max_kv_bytes budget")
+        new_keys = torch.empty(shape, dtype=self.kv_dtype, device=self.device)
+        new_values = torch.empty(shape, dtype=self.kv_dtype, device=self.device)
+        if old_used:
+            new_keys[:, :, :old_used, :].copy_(self._cached_keys[layer])
+            new_values[:, :, :old_used, :].copy_(self._cached_values[layer])
+        if layer < len(self._key_buffers):
+            self._key_buffers[layer] = new_keys
+            self._value_buffers[layer] = new_values
+        else:
+            self._key_buffers.append(new_keys)
+            self._value_buffers.append(new_values)
+
+    def _assert_training_integrity(self) -> None:
+        if self._training_failed:
+            raise RuntimeError(
+                "accelerator weights may contain a partial training update; "
+                "restore from a trusted checkpoint"
+            )
+
+    def _t2(self, rows: List[List[float]], grad: bool = True):
+        return self.torch.tensor(rows, dtype=self.torch.float32, device=self.device, requires_grad=grad)
+
+    def _t1(self, row: List[float], grad: bool = True):
+        return self.torch.tensor(row, dtype=self.torch.float32, device=self.device, requires_grad=grad)
+
+    def pin(self) -> "TorchAccel":
+        with self._state_lock:
+            return self._pin_unlocked()
+
+    def _pin_unlocked(self) -> "TorchAccel":
+        """Stage every tensor before atomically publishing a new weight set.
+
+        A failed upload previously replaced embeddings and some layers while
+        the accelerator still claimed resident=True, allowing a hybrid graph.
+        The old graph remains fully intact until *all* allocations complete.
+        An explicit rebind still invalidates old KV, but only on success.
+        """
+        self._assert_training_integrity()
+        if self._weights_modified:
+            self._sync_unlocked()
+        lm = self.lm
+        if getattr(lm, "use_mod", False):
+            raise ValueError("accelerator does not implement Mixture of Depths routing")
+        embedding = self._t2(lm.E)
+        positions = self._t2(lm.P)
+        projection = embedding if getattr(lm, "tied", False) else self._t2(lm.Wout)
+        bias = self._t1(lm.bout)
+        staged_layers: List[Dict[str, Any]] = []
+        blocks = getattr(lm, "layers", None) or []
+        if not blocks:
+            blocks = [lm]
+        for L in blocks:
+            blob: Dict[str, Any] = {
+                "Wq": self._t2(L.Wq), "Wk": self._t2(L.Wk),
+                "Wv": self._t2(L.Wv), "Wo": self._t2(L.Wo),
+                "ln1_g": self._t1(getattr(L, "ln1_g", [1.0] * lm.dim)),
+                "ln1_b": self._t1(getattr(L, "ln1_b", [0.0] * lm.dim)),
+                "W1": None, "b1": None, "Wu": None, "bu": None,
+                "W2": None, "b2": None,
+                "ln2_g": None, "ln2_b": None,
+            }
+            W1 = getattr(L, "W1", None)
+            if W1:
+                blob["W1"] = self._t2(W1)
+                blob["b1"] = self._t1(getattr(L, "b1", [0.0] * len(W1)))
+                if getattr(L, "ffn_kind", "gelu") == "swiglu":
+                    blob["Wu"] = self._t2(L.Wu)
+                    blob["bu"] = self._t1(L.bu)
+                blob["W2"] = self._t2(L.W2)
+                blob["b2"] = self._t1(getattr(L, "b2", [0.0] * lm.dim))
+                blob["ln2_g"] = self._t1(getattr(L, "ln2_g", [1.0] * lm.dim))
+                blob["ln2_b"] = self._t1(getattr(L, "ln2_b", [0.0] * lm.dim))
+            staged_layers.append(blob)
+        # This is the single publish point. All steps above are fallible;
+        # nothing below allocates device tensors or computes gradients.
+        self._E, self._P, self._Wout, self._bout = (
+            embedding, positions, projection, bias,
+        )
+        self._layers = staged_layers
+        self._reset_decode_cache_unlocked()
+        self._weights_modified = False
+        self._adam_moments = {}
+        self.resident = True
+        lm.resident = True
+        lm.device = self.device_name
+        return self
+
+    def _params(self):
+        # Weight tying shares a tensor; never apply SGD to it twice.
+        seen = set()
+        for value in (self._E, self._P, self._Wout, self._bout):
+            if id(value) not in seen:
+                seen.add(id(value))
+                yield value
+        for layer in self._layers:
+            for value in layer.values():
+                if value is not None and id(value) not in seen:
+                    seen.add(id(value))
+                    yield value
+
+    def sync(self) -> None:
+        with self._state_lock:
+            self._sync_unlocked()
+
+    def _sync_unlocked(self) -> None:
+        """Stage the entire device-to-canonical copy before writing CPU state.
+
+        Partial .cpu().tolist() failures must not publish a mixed checkpoint
+        containing some new parameters and some parameters from the old step.
+        """
+        self._assert_training_integrity()
+        if not self.resident or self._E is None or not self._weights_modified:
+            return
+        lm = self.lm
+        # Download *everything* first. Device/host transfers, especially
+        # asynchronous GPU execution, can fail long after an SGD kernel.
+        embeddings = self._E.detach().cpu().tolist()
+        positions = self._P.detach().cpu().tolist()
+        projection = embeddings if getattr(lm, "tied", False) else self._Wout.detach().cpu().tolist()
+        bias = self._bout.detach().cpu().tolist()
+        staged_layers: List[Dict[str, Any]] = []
+        for blob in self._layers:
+            staged: Dict[str, Any] = {
+                "Wq": blob["Wq"].detach().cpu().tolist(),
+                "Wk": blob["Wk"].detach().cpu().tolist(),
+                "Wv": blob["Wv"].detach().cpu().tolist(),
+                "Wo": blob["Wo"].detach().cpu().tolist(),
+            }
+            if blob.get("ln1_g") is not None:
+                staged["ln1_g"] = blob["ln1_g"].detach().cpu().tolist()
+                staged["ln1_b"] = blob["ln1_b"].detach().cpu().tolist()
+            if blob.get("W1") is not None:
+                for key in ("W1", "b1", "W2", "b2"):
+                    staged[key] = blob[key].detach().cpu().tolist()
+                if blob.get("Wu") is not None:
+                    staged["Wu"] = blob["Wu"].detach().cpu().tolist()
+                    staged["bu"] = blob["bu"].detach().cpu().tolist()
+                if blob.get("ln2_g") is not None:
+                    staged["ln2_g"] = blob["ln2_g"].detach().cpu().tolist()
+                    staged["ln2_b"] = blob["ln2_b"].detach().cpu().tolist()
+            staged_layers.append(staged)
+        # Publication begins only after every CPU copy succeeds. The Torch
+        # tensors and canonical architecture are internal mutable objects;
+        # state is serialized under _state_lock to prevent concurrent use.
+        lm.E, lm.P, lm.Wout, lm.bout = embeddings, positions, projection, bias
+        blocks = getattr(lm, "layers", None) or []
+        for i, blob in enumerate(staged_layers):
+            target = blocks[i] if i < len(blocks) else lm
+            for name, value in blob.items():
+                if name.startswith("ln") and not hasattr(target, name):
+                    continue
+                setattr(target, name, value)
+        self._weights_modified = False
+
+    def _normalize(self, x, layer, prefix: str):
+        torch = self.torch
+        weight = layer[prefix + "_g"]
+        if getattr(self.lm, "norm", "ln") == "rms":
+            # Match the reference path's epsilon and RMS definition.
+            return x * torch.rsqrt(x.square().mean(dim=-1, keepdim=True) + 1e-5) * weight
+        return torch.nn.functional.layer_norm(
+            x, (int(self.lm.dim),), weight, layer[prefix + "_b"], eps=1e-5
+        )
+
+    def _attention(self, q, k, v, *, heads: int, head_dim: int,
+                   interrupt: Callable[[], None] | None = None):
+        """Delegate kernel choice to SDPA: Flash/memory-efficient/math where supported."""
+        torch = self.torch
+        functional = torch.nn.functional
+        length = q.size(0)
+        qh = q.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
+        kh = k.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
+        vh = v.reshape(length, heads, head_dim).transpose(0, 1).unsqueeze(0)
+        chunk = self.prefill_query_chunk
+        if chunk is not None and length > chunk:
+            # Causal chunking must use *absolute query positions*. SDPA's
+            # is_causal=True uses an upper-left-aligned triangular mask when
+            # Q is shorter than K; using it here would silently hide previous
+            # tokens and damage autoregressive training/inference.
+            # Queries [start:stop) need only K/V [:stop], reducing the
+            # largest attention mask from T*T to at most chunk*T.
+            parts = []
+            for start in range(0, length, chunk):
+                if interrupt is not None:
+                    interrupt()
+                stop = min(length, start + chunk)
+                qc = qh[:, :, start:stop, :]
+                kc = kh[:, :, :stop, :]
+                vc = vh[:, :, :stop, :]
+                positions = torch.arange(start, stop, device=q.device)
+                keys = torch.arange(stop, device=q.device)
+                allowed = keys.unsqueeze(0) <= positions.unsqueeze(1)
+                if hasattr(functional, "scaled_dot_product_attention"):
+                    part = functional.scaled_dot_product_attention(
+                        qc, kc, vc, attn_mask=allowed,
+                        dropout_p=0.0, is_causal=False,
+                    )
+                else:
+                    scores = (qc @ kc.transpose(-2, -1)) * (head_dim ** -0.5)
+                    part = torch.softmax(
+                        scores.masked_fill(~allowed, float("-inf")), dim=-1
+                    ) @ vc
+                parts.append(part)
+            output = torch.cat(parts, dim=-2)
+        elif hasattr(functional, "scaled_dot_product_attention"):
+            # The default remains native fused full-prompt SDPA.
+            output = functional.scaled_dot_product_attention(
+                qh, kh, vh, dropout_p=0.0, is_causal=True
+            )
+        else:
+            scores = (qh @ kh.transpose(-2, -1)) * (head_dim ** -0.5)
+            mask = torch.ones(length, length, dtype=torch.bool, device=q.device).triu(1)
+            output = torch.softmax(scores.masked_fill(mask, float("-inf")), dim=-1) @ vh
+        return output.squeeze(0).transpose(0, 1).contiguous().reshape(length, heads * head_dim)
+
+    def _forward_ids(
+        self, ids: Sequence[int], *, fill_cache: bool = False, all_positions: bool = False,
+        interrupt: Callable[[], None] | None = None,
+    ):
+        torch = self.torch
+        lm = self.lm
+        if not self.resident:
+            self.pin()
+        if fill_cache:
+            self.reset_decode_cache()
+        idx = torch.tensor(list(ids), dtype=torch.long, device=self.device)
+        pos = torch.arange(len(ids), device=self.device).clamp(max=lm.ctx - 1)
+        X = self._E[idx] if getattr(lm, "position_mode", "learned_rope") == "rope" else self._E[idx] + self._P[pos]
+        D = int(lm.dim)
+        heads = max(1, int(lm.n_heads))
+        dh = D // heads
+        for blob in self._layers:
+            if interrupt is not None:
+                interrupt()
+            Xn = self._normalize(X, blob, "ln1")
+            Q, K, V = Xn @ blob["Wq"].T, Xn @ blob["Wk"].T, Xn @ blob["Wv"].T
+            Q, K = self._rope(Q), self._rope(K)
+            if fill_cache:
+                length = K.size(0)
+                self._reserve_kv(len(self._cached_keys), length, heads, dh)
+                li = len(self._cached_keys)
+                self._key_buffers[li][:, :, :length, :].copy_(
+                    K.reshape(length, heads, dh).transpose(0, 1).unsqueeze(0)
+                )
+                self._value_buffers[li][:, :, :length, :].copy_(
+                    V.reshape(length, heads, dh).transpose(0, 1).unsqueeze(0)
+                )
+                self._cached_keys.append(self._key_buffers[li][:, :, :length, :])
+                self._cached_values.append(self._value_buffers[li][:, :, :length, :])
+            C = self._attention(Q, K, V, heads=heads, head_dim=dh, interrupt=interrupt)
+            X = X + C @ blob["Wo"].T
+            if blob.get("W1") is not None:
+                Un = self._normalize(X, blob, "ln2")
+                gate = Un @ blob["W1"].T + blob["b1"]
+                if blob.get("Wu") is not None:
+                    up = Un @ blob["Wu"].T + blob["bu"]
+                    z = torch.nn.functional.silu(gate) * up
+                else:
+                    z = self._gelu(gate)
+                X = X + z @ blob["W2"].T + blob["b2"]
+        if fill_cache:
+            self._cached_ids = list(ids)
+            self._cached_next_position = len(ids)
+        hidden = X if all_positions else X[-1]
+        return hidden @ self._Wout.T + self._bout, hidden
+
+    def _rope(self, X, *, position_offset: int = 0):
+        """Match attn.apply_rope, including absolute offsets for cached decode."""
+        torch = self.torch
+        T, D = X.shape
+        d = D - (D % 2)
+        if d < 2:
+            return X
+        out = X.clone()
+        pos = (torch.arange(T, device=X.device, dtype=X.dtype) + position_offset).unsqueeze(1)
+        i = torch.arange(0, d, 2, device=X.device, dtype=X.dtype)
+        theta = pos / (10000.0 ** (i / float(d)))
+        c, s = torch.cos(theta), torch.sin(theta)
+        even = X[:, 0:d:2]
+        odd = X[:, 1:d:2]
+        out = out.clone()
+        out[:, 0:d:2] = even * c - odd * s
+        out[:, 1:d:2] = even * s + odd * c
+        return out
+
+    def _gelu(self, x):
+        """Tanh approximation matching attn.gelu — not erf."""
+        torch = self.torch
+        k = 0.7978845608028654  # sqrt(2/pi)
+        return 0.5 * x * (1.0 + torch.tanh(k * (x + 0.044715 * x * x * x)))
+
+    def _cached_step(self, token_id: int, *,
+                     interrupt: Callable[[], None] | None = None) -> "Any":
+        """Single-token attention using resident K/V (no repeated prefill).
+
+        Keys are rotated exactly once at their original position. For learned
+        absolute positional embeddings, a sliding window always re-prefills.
+        Rotary-only sliding eviction is safe only for a one-block transformer
+        because deeper blocks' historic keys depend on discarded context.
+        """
+        torch = self.torch
+        lm = self.lm
+        pos = self._cached_next_position
+        token_id = int(token_id) if 0 <= int(token_id) < lm.V else lm.unk
+        x = self._E[token_id]
+        if getattr(lm, "position_mode", "learned_rope") != "rope":
+            x = x + self._P[min(pos, lm.ctx - 1)]
+        heads = lm.n_heads
+        hd = lm.dim // heads
+        for layer_index, blob in enumerate(self._layers):
+            if interrupt is not None:
+                interrupt()
+            xn = self._normalize(x, blob, "ln1")
+            q = self._rope((xn @ blob["Wq"].T).unsqueeze(0), position_offset=pos)
+            k = self._rope((xn @ blob["Wk"].T).unsqueeze(0), position_offset=pos)
+            v = (xn @ blob["Wv"].T).unsqueeze(0)
+            qh = q.reshape(1, heads, hd).transpose(0, 1).unsqueeze(0)
+            kh = k.reshape(1, heads, hd).transpose(0, 1).unsqueeze(0)
+            vh = v.reshape(1, heads, hd).transpose(0, 1).unsqueeze(0)
+            current_len = (
+                self._cached_keys[layer_index].shape[-2]
+                if layer_index < len(self._cached_keys) else 0
+            )
+            self._reserve_kv(layer_index, current_len + 1, heads, hd)
+            self._key_buffers[layer_index][:, :, current_len:current_len + 1, :].copy_(kh)
+            self._value_buffers[layer_index][:, :, current_len:current_len + 1, :].copy_(vh)
+            kh = self._key_buffers[layer_index][:, :, :current_len + 1, :]
+            vh = self._value_buffers[layer_index][:, :, :current_len + 1, :]
+            if layer_index < len(self._cached_keys):
+                self._cached_keys[layer_index] = kh
+                self._cached_values[layer_index] = vh
+            else:
+                self._cached_keys.append(kh)
+                self._cached_values.append(vh)
+            # Compact storage is opt-in; attention math remains fp32 and
+            # dispatches through the same SDPA kernels as the full cache.
+            # Never silently cast the entire transformer to lower precision.
+            kh_compute = kh.to(qh.dtype)
+            vh_compute = vh.to(qh.dtype)
+            # A single query attends to all preceding keys, including its
+            # own; is_causal=True would mask almost the entire key history.
+            if hasattr(torch.nn.functional, "scaled_dot_product_attention"):
+                context = torch.nn.functional.scaled_dot_product_attention(
+                    qh, kh_compute, vh_compute, dropout_p=0.0, is_causal=False
+                )
+            else:
+                scores = qh @ kh_compute.transpose(-2, -1) * (hd ** -0.5)
+                context = torch.softmax(scores, dim=-1) @ vh_compute
+            x = x + context.squeeze(0).transpose(0, 1).reshape(lm.dim) @ blob["Wo"].T
+            if blob.get("W1") is not None:
+                un = self._normalize(x, blob, "ln2")
+                gate = un @ blob["W1"].T + blob["b1"]
+                if blob.get("Wu") is not None:
+                    z = torch.nn.functional.silu(gate) * (un @ blob["Wu"].T + blob["bu"])
+                else:
+                    z = self._gelu(gate)
+                x = x + z @ blob["W2"].T + blob["b2"]
+        self._cached_ids.append(token_id)
+        self._cached_next_position += 1
+        return x @ self._Wout.T + self._bout
+
+    def logits_window(self, ids: Sequence[int]) -> List[float]:
+        """Serialize resident KV mutation across concurrent local requests."""
+        result, _ = self.logits_window_with_cache(ids)
+        return result
+
+    def logits_window_with_cache(
+        self, ids: Sequence[int], *, interrupt: Callable[[], None] | None = None,
+        metrics: dict[str, int] | None = None,
+    ) -> tuple[List[float], tuple[int, ...]]:
+        """Return logits and occupancy from the same atomic cache transition.
+
+        Separate logits and cache-token reads race with another inference
+        session and can corrupt resource/replay accounting even if logits
+        themselves remain correct.
+        """
+        with self._inference_lock(interrupt):
+            try:
+                resets_before = self._cache_reset_count
+                if interrupt is not None:
+                    interrupt()
+                result = self._logits_window_unlocked(ids, interrupt=interrupt)
+                if metrics is not None:
+                    metrics["cache_resets"] = self._cache_reset_count - resets_before
+                    metrics["reserved_kv_bytes"] = self.kv_reserved_bytes
+                return result, tuple(self._cached_ids)
+            except Exception:
+                # A failed kernel or layer allocation can occur after an
+                # earlier layer has already appended its K/V. In that state
+                # _cached_ids still describes the previous prefix but the
+                # physical cache contains a different graph. Never reuse it:
+                # evict all layers and retry via a clean fused prefill.
+                self._reset_decode_cache_unlocked()
+                raise
+
+    def _logits_window_unlocked(self, ids: Sequence[int], *,
+                                interrupt: Callable[[], None] | None = None) -> List[float]:
+        """Prefill once, then decode with on-device per-layer K/V tensors."""
+        self._assert_training_integrity()
+        if not self.resident:
+            self.pin()
+        lm = self.lm
+        window = list(ids[-lm.ctx:] or [lm.unk])
+        # Inference mode avoids autograd view/version bookkeeping on the
+        # hot prefill/decode path; SGD remains in regular grad-enabled mode.
+        with self.torch.inference_mode():
+            if self._cached_ids == window and self._cached_logits is not None:
+                # Avoid a second full prefill for the same immutable prompt.
+                return list(self._cached_logits)
+            if self._cached_ids == window[:-1]:
+                result = self._cached_step(window[-1], interrupt=interrupt)
+            elif (
+                self._cached_ids
+                and len(self._cached_ids) < len(window)
+                and len(window) - len(self._cached_ids) <= 4
+                and window[:len(self._cached_ids)] == self._cached_ids
+            ):
+                # Short continuations can consume resident K/V without
+                # discarding a warm prefix. Longer prompts use fused SDPA
+                # prefill rather than many tiny device launches.
+                for suffix_id in window[len(self._cached_ids):]:
+                    result = self._cached_step(suffix_id, interrupt=interrupt)
+            elif (
+                getattr(lm, "position_mode", "learned_rope") == "rope"
+                and lm.n_layers == 1
+                and len(self._cached_ids) == lm.ctx
+                and self._cached_ids[1:] == window[:-1]
+            ):
+                for i in range(len(self._cached_keys)):
+                    # Reclaim the first slot; views preserve the same buffers
+                    # and no new full-size cache allocation is required.
+                    self._key_buffers[i][:, :, :-1, :].copy_(
+                        self._cached_keys[i][:, :, 1:, :].clone()
+                    )
+                    self._value_buffers[i][:, :, :-1, :].copy_(
+                        self._cached_values[i][:, :, 1:, :].clone()
+                    )
+                    self._cached_keys[i] = self._key_buffers[i][:, :, :-1, :]
+                    self._cached_values[i] = self._value_buffers[i][:, :, :-1, :]
+                del self._cached_ids[0]
+                result = self._cached_step(window[-1], interrupt=interrupt)
+            else:
+                # Batched fused causal prefill; one-token loops are only used
+                # for decode. Avoid O(context) Python/GPU launches on prompts.
+                result, _ = self._forward_ids(window, fill_cache=True, interrupt=interrupt)
+            values = tuple(float(value) for value in result.detach().cpu().tolist())
+            self._cached_logits = values
+            return list(values)
+
+    def logits(self, ids: Sequence[int], *,
+               interrupt: Callable[[], None] | None = None) -> List[float]:
+        with self._inference_lock(interrupt), self.torch.inference_mode():
+            self._assert_training_integrity()
+            y, _ = self._forward_ids(ids, interrupt=interrupt)
+            return y.detach().cpu().tolist()
+
+    def hidden(self, ids: Sequence[int]) -> List[float]:
+        with self._state_lock, self.torch.inference_mode():
+            self._assert_training_integrity()
+            _, h = self._forward_ids(ids)
+            return h.detach().cpu().tolist()
+
+    def sgd(self, ids: Sequence[int], target: int, lr: float) -> float:
+        with self._state_lock:
+            return self._sgd_unlocked(ids, target, lr)
+
+    def _sgd_unlocked(self, ids: Sequence[int], target: int, lr: float) -> float:
+        self._assert_training_integrity()
+        if not isinstance(ids, (list, tuple)) or not 1 <= len(ids) <= self.lm.ctx:
+            raise ValueError("SGD input tokens must fit model context")
+        if any(
+            isinstance(token_id, bool) or not isinstance(token_id, int)
+            or not 0 <= token_id < self.lm.V
+            for token_id in ids
+        ):
+            raise ValueError("SGD input token ID outside vocabulary")
+        if isinstance(target, bool) or not isinstance(target, int) or not 0 <= target < self.lm.V:
+            raise ValueError("SGD target token ID outside vocabulary")
+        if (
+            isinstance(lr, bool) or not isinstance(lr, (int, float))
+            or not math.isfinite(float(lr)) or not 0 <= lr <= 1
+        ):
+            raise ValueError("SGD learning rate must be finite and within [0, 1]")
+        self._prepare_sgd()
+        logits, _ = self._forward_ids(ids)
+        tgt = self.torch.tensor([target], dtype=self.torch.long, device=self.device)
+        loss = self.torch.nn.functional.cross_entropy(logits.unsqueeze(0), tgt)
+        return self._apply_sgd(loss, lr)
+
+    def sgd_sequence(self, ids: Sequence[int], lr: float) -> float:
+        """One token-mean SGD update from every next-token pair in a sequence.
+
+        Input has 2..context+1 IDs; its final ID is a target, never a query.
+        A single causal forward predicts ids[1:] from ids[:-1], avoiding
+        repeated prefix forwards. This changes the optimization schedule:
+        steps increments once per sequence, not once per predicted token.
+        No CPU fallback or corpus/tokenizer mutation occurs here.
+        """
+        with self._state_lock:
+            self._assert_training_integrity()
+            if not isinstance(ids, (list, tuple)) or not 2 <= len(ids) <= self.lm.ctx + 1:
+                raise ValueError("SGD sequence needs 2..context+1 token IDs")
+            if any(type(i) is not int or not 0 <= i < self.lm.V for i in ids):
+                raise ValueError("SGD sequence token ID outside vocabulary")
+            if (
+                isinstance(lr, bool) or not isinstance(lr, (int, float))
+                or not math.isfinite(float(lr)) or not 0 <= lr <= 1
+            ):
+                raise ValueError("SGD learning rate must be finite and within [0, 1]")
+            self._prepare_sgd()
+            logits, _ = self._forward_ids(ids[:-1], all_positions=True)
+            targets = self.torch.tensor(ids[1:], dtype=self.torch.long, device=self.device)
+            loss = self.torch.nn.functional.cross_entropy(logits, targets, reduction="mean")
+            return self._apply_sgd(loss, lr)
+
+    def adamw_sequence(
+        self,
+        ids: Sequence[int],
+        lr: float,
+        *,
+        weight_decay: float = 0.0,
+        beta1: float = 0.9,
+        beta2: float = 0.95,
+        eps: float = 1e-8,
+        z_loss: float = 0.0,
+    ) -> float:
+        """One AdamW update over a causal sequence.
+
+        Beta2 defaults to 0.95, the short-horizon transformer setting, and
+        decoupled decay applies only to matrices. A fresh pin drops moments
+        so they cannot be applied to a replaced weight set. Non-finite loss
+        or gradients are rejected before the first weight write.
+        """
+        with self._state_lock:
+            self._assert_training_integrity()
+            if not isinstance(ids, (list, tuple)) or not 2 <= len(ids) <= self.lm.ctx + 1:
+                raise ValueError("AdamW sequence needs 2..context+1 token IDs")
+            if any(type(i) is not int or not 0 <= i < self.lm.V for i in ids):
+                raise ValueError("AdamW sequence token ID outside vocabulary")
+            self._validate_adamw(lr, weight_decay, beta1, beta2, eps, z_loss)
+            self._prepare_sgd()
+            torch = self.torch
+            logits, _ = self._forward_ids(ids[:-1], all_positions=True)
+            targets = torch.tensor(ids[1:], dtype=torch.long, device=self.device)
+            loss = torch.nn.functional.cross_entropy(logits, targets, reduction="mean")
+            if z_loss:
+                log_partition = torch.logsumexp(logits.float(), dim=-1)
+                loss = loss + float(z_loss) * torch.mean(log_partition * log_partition)
+            return self._apply_adamw(
+                loss,
+                float(lr),
+                weight_decay=float(weight_decay),
+                beta1=float(beta1),
+                beta2=float(beta2),
+                eps=float(eps),
+            )
+
+    def _validate_adamw(
+        self,
+        lr: float,
+        weight_decay: float,
+        beta1: float,
+        beta2: float,
+        eps: float,
+        z_loss: float,
+    ) -> None:
+        def _unit(name: str, value: float, *, lower: float, upper: float, positive: bool) -> None:
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                raise ValueError(f"AdamW {name} must be finite")
+            number = float(value)
+            if positive:
+                if not lower < number <= upper:
+                    raise ValueError(f"AdamW {name} out of range")
+            elif not lower <= number <= upper:
+                raise ValueError(f"AdamW {name} out of range")
+
+        _unit("learning rate", lr, lower=0.0, upper=1.0, positive=True)
+        _unit("weight decay", weight_decay, lower=0.0, upper=1.0, positive=False)
+        _unit("beta1", beta1, lower=0.0, upper=1.0, positive=True)
+        _unit("beta2", beta2, lower=0.0, upper=1.0, positive=True)
+        _unit("eps", eps, lower=0.0, upper=1e-2, positive=True)
+        _unit("z_loss", z_loss, lower=0.0, upper=1.0, positive=False)
+        if not beta1 < 1.0 or not beta2 < 1.0:
+            raise ValueError("AdamW betas must be below 1")
+
+    def _apply_adamw(
+        self,
+        loss,
+        lr: float,
+        *,
+        weight_decay: float,
+        beta1: float,
+        beta2: float,
+        eps: float,
+    ) -> float:
+        torch = self.torch
+        params = tuple(self._params())
+        loss_value = float(loss.detach().cpu())
+        if not math.isfinite(loss_value):
+            raise ValueError("AdamW non-finite loss rejected before any weight update")
+        loss.backward()
+        norm = torch.nn.utils.clip_grad_norm_(
+            params,
+            max_norm=self.max_grad_norm if self.max_grad_norm is not None else float("inf"),
+            error_if_nonfinite=True,
+        )
+        norm_value = float(norm.detach().cpu())
+        if not math.isfinite(norm_value):
+            raise ValueError("AdamW non-finite gradient norm rejected")
+        self.last_grad_norm = norm_value
+        staged: list[tuple[Any, Any, Any, bool]] = []
+        with torch.no_grad():
+            for parameter in params:
+                if parameter.grad is None:
+                    continue
+                slot = self._adam_moments.get(id(parameter))
+                if slot is None or tuple(slot["m"].shape) != tuple(parameter.shape):
+                    slot = {
+                        "m": torch.zeros_like(parameter),
+                        "v": torch.zeros_like(parameter),
+                        "t": 0,
+                    }
+                    self._adam_moments[id(parameter)] = slot
+                slot["t"] += 1
+                step = int(slot["t"])
+                gradient = parameter.grad.detach()
+                slot["m"].mul_(beta1).add_(gradient, alpha=1.0 - beta1)
+                slot["v"].mul_(beta2).addcmul_(gradient, gradient, value=1.0 - beta2)
+                bias1 = 1.0 - beta1 ** step
+                bias2 = 1.0 - beta2 ** step
+                corrected_m = slot["m"] / bias1
+                corrected_v = slot["v"] / bias2
+                staged.append((parameter, corrected_m, corrected_v, parameter.ndim >= 2))
+        self._weights_modified = True
+        try:
+            with torch.no_grad():
+                for parameter, corrected_m, corrected_v, decay in staged:
+                    if decay and weight_decay:
+                        parameter.mul_(1.0 - lr * weight_decay)
+                    parameter.addcdiv_(corrected_m, corrected_v.sqrt().add(eps), value=-lr)
+        except Exception:
+            self._training_failed = True
+            self.reset_decode_cache()
+            raise
+        self.lm.steps += 1
+        return loss_value
+
+    def _prepare_sgd(self) -> None:
+        self.reset_decode_cache()
+        self.last_grad_norm = None
+        if not self.resident:
+            self.pin()
+        for parameter in self._params():
+            if parameter.grad is not None:
+                parameter.grad.zero_()
+
+    def _apply_sgd(self, loss, lr: float) -> float:
+        """Shared finite-gradient gate and poisoned-state recovery contract."""
+        torch = self.torch
+        params = tuple(self._params())
+        loss_value = float(loss.detach().cpu())
+        if not math.isfinite(loss_value):
+            raise ValueError("SGD non-finite loss rejected before any weight update")
+        loss.backward()
+        # torch's stable primitive checks the *global* norm and optionally
+        # clips it. A non-finite norm raises before the first in-place write.
+        # Infinite max_norm performs validation without changing gradients.
+        norm = torch.nn.utils.clip_grad_norm_(
+            params,
+            max_norm=self.max_grad_norm if self.max_grad_norm is not None else float("inf"),
+            error_if_nonfinite=True,
+        )
+        norm_value = float(norm.detach().cpu())
+        if not math.isfinite(norm_value):
+            raise ValueError("SGD non-finite gradient norm rejected")
+        self.last_grad_norm = norm_value
+        # Once the first write begins, any subsequent failure leaves an
+        # ambiguous graph. Poison it rather than replaying a CPU update.
+        self._weights_modified = True
+        try:
+            with torch.no_grad():
+                for p in params:
+                    if p.grad is not None:
+                        p.add_(p.grad, alpha=-float(lr))
+        except Exception:
+            self._training_failed = True
+            self.reset_decode_cache()
+            raise
+        self.lm.steps += 1
+        return loss_value
+
+    def decode(self, prefix: str, n: int = 14, seed: int = 0) -> str:
+        """Decode atomically relative to other sessions sharing the model."""
+        with self._state_lock:
+            return self._decode_unlocked(prefix, n=n, seed=seed)
+
+    def _decode_unlocked(self, prefix: str, n: int = 14, seed: int = 0) -> str:
+        """Sample next tokens on the bound device."""
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError("n must be a nonnegative integer")
+        torch = self.torch
+        lm = self.lm
+        if not self.resident:
+            self.pin()
+        g = torch.Generator(device="cpu")
+        g.manual_seed(int(seed) & 0xFFFFFFFF)
+        ids = lm._ids(prefix)
+        prompt_length = len(ids)
+        with torch.no_grad():
+            for _ in range(n):
+                window = ids[-lm.ctx:]
+                logits = self.logits_window(window)
+                p = torch.softmax(torch.tensor(logits, dtype=torch.float32), dim=-1)
+                nxt = int(torch.multinomial(p, 1, generator=g).item())
+                ids.append(nxt)
+        return " ".join(lm.itos[i] if 0 <= i < len(lm.itos) else UNK for i in ids[prompt_length:])
+
+
+class TorchTransformer:
+    """Stacked TransformerEncoder on cpu|cuda. Optional high-standard neo LM."""
+
+    name = "torch-lm"
+    scale = "neo"
+    slot = "neo"
+
+    def __init__(
+        self,
+        vocab: Iterable[str] | None = None,
+        *,
+        dim: int = 8,
+        ctx: int = 8,
+        seed: int = 19,
+        n_heads: int = 2,
+        n_layers: int = 2,
+        d_ff: int = 32,
+        device: str = "cpu",
+    ) -> None:
+        torch = _torch()
+        if device in {"cuda", "gpu"}:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        elif device == "mps":
+            device = "mps" if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available() else "cpu"
+        self.torch = torch
+        self.device_obj = torch.device(device)
+        self.device = self.device_obj.type
+        self.requested = device
+        self.resident = True
+        itos = [UNK] + sorted({str(t) for t in (vocab or ()) if t and t != UNK})
+        self.itos = itos
+        self.stoi = {t: i for i, t in enumerate(itos)}
+        self.unk = 0
+        self.dim = max(4, int(dim))
+        self.ctx = max(2, int(ctx))
+        self.n_heads = max(1, int(n_heads))
+        if self.dim % self.n_heads:
+            self.n_heads = 1
+        self.n_layers = max(1, int(n_layers))
+        self.d_ff = max(self.dim, int(d_ff))
+        self.fitted = 0
+        self.steps = 0
+        torch.manual_seed(int(seed) & 0xFFFFFFFF)
+        V = max(2, len(itos))
+        self.net = _Stack(
+            V, self.dim, self.ctx, self.n_heads, self.n_layers, self.d_ff, torch,
+        ).to(self.device_obj)
+        self._opt = torch.optim.SGD(self.net.parameters(), lr=0.06)
+
+    def to(self, device: str = "cpu") -> "TorchTransformer":
+        torch = self.torch
+        requested = "cuda" if device in {"cuda", "gpu"} else device
+        if requested not in {"cuda", "mps", "cpu"}:
+            requested = "cpu"
+        if requested == "cuda" and not torch.cuda.is_available():
+            actual = "cpu"
+        elif requested == "mps" and not (
+            getattr(torch.backends, "mps", None) is not None
+            and torch.backends.mps.is_available()
+        ):
+            actual = "cpu"
+        else:
+            actual = requested
+        self.requested = requested
+        self.device = actual
+        self.device_obj = torch.device(actual)
+        self.net.to(self.device_obj)
+        return self
+
+    def _id(self, tok: str) -> int:
+        return int(self.stoi.get(tok, self.unk))
+
+    def fit(self, texts: Iterable[str], *, lr: float = 0.06,
+            schedule: str = "const") -> int:
+        """Bounded token SGD, compatible with Jeeves's native cosine curriculum."""
+        torch = self.torch
+        if not math.isfinite(float(lr)) or not 0 < float(lr) <= 1:
+            raise ValueError("Torch learning rate must be finite and positive")
+        if schedule not in {"const", "cosine"}:
+            raise ValueError("Torch schedule must be const or cosine")
+        corpus = [tokens(raw) for raw in texts if raw]
+        if len(corpus) > 4096:
+            raise ValueError("Torch single-fit corpus exceeds document budget")
+        total = sum(max(0, len(words) - 1) for words in corpus)
+        n = 0
+        self.net.train()
+        for body in corpus:
+            if len(body) < 2:
+                continue
+            ids = [self._id(t) for t in body]
+            for i in range(1, len(ids)):
+                rate = (
+                    float(lr) * 0.5 * (1.0 + math.cos(math.pi * n / max(1, total)))
+                    if schedule == "cosine" else float(lr)
+                )
+                for group in self._opt.param_groups:
+                    group["lr"] = rate
+                window = ids[max(0, i - self.ctx):i]
+                x = torch.tensor([window], dtype=torch.long, device=self.device_obj)
+                y = torch.tensor([ids[i]], dtype=torch.long, device=self.device_obj)
+                self._opt.zero_grad(set_to_none=True)
+                logits = self.net(x)
+                loss = torch.nn.functional.cross_entropy(logits, y)
+                loss.backward()
+                self._opt.step()
+                self.steps += 1
+                n += 1
+            self.fitted += 1
+        return n
+
+    def decode(self, prefix: str, *, n: int = 14, seed: int = 0) -> str:
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError("n must be a nonnegative integer")
+        torch = self.torch
+        self.net.eval()
+        g = torch.Generator(device="cpu")
+        g.manual_seed(int(seed) & 0xFFFFFFFF)
+        ids = [self._id(t) for t in tokens(prefix)] or [self.unk]
+        prompt_length = len(ids)
+        with torch.no_grad():
+            for _ in range(n):
+                window = ids[-self.ctx:]
+                x = torch.tensor([window], dtype=torch.long, device=self.device_obj)
+                logits = self.net(x)[0]
+                p = torch.softmax(logits.float().cpu(), dim=-1)
+                nxt = int(torch.multinomial(p, 1, generator=g).item())
+                ids.append(nxt)
+        return " ".join(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in ids[prompt_length:])
+
+    def generate(self, prefix: str, n: int = 12, *, seed: int = 0):
+        return tuple(self.decode(prefix, n=n, seed=seed).split())
+
+    def logprob(self, text: str) -> float:
+        torch = self.torch
+        body = tokens(text)
+        if len(body) < 2:
+            return 0.0
+        ids = [self._id(t) for t in body]
+        self.net.eval()
+        lp = 0.0
+        n = 0
+        with torch.no_grad():
+            for i in range(1, len(ids)):
+                window = ids[max(0, i - self.ctx):i]
+                x = torch.tensor([window], dtype=torch.long, device=self.device_obj)
+                logp = torch.log_softmax(self.net(x)[0], dim=-1)
+                lp += float(logp[ids[i]].cpu())
+                n += 1
+        return lp / max(1, n)
+
+    def perplexity(self, texts) -> float:
+        import math
+        if isinstance(texts, str):
+            seq = [texts]
+        else:
+            seq = [t for t in texts if t]
+        if not seq:
+            return float(len(self.itos))
+        mean = sum(self.logprob(t) for t in seq) / len(seq)
+        return math.exp(-mean)
+
+    def snapshot(self) -> Dict[str, Any]:
+        blob = {k: v.detach().cpu().tolist() for k, v in self.net.state_dict().items()}
+        return {
+            "kind": "torch-stack",
+            "dim": self.dim, "ctx": self.ctx,
+            "n_heads": self.n_heads, "n_layers": self.n_layers, "d_ff": self.d_ff,
+            "device": self.device, "fitted": self.fitted, "steps": self.steps,
+            "itos": list(self.itos), "state": blob, "resident": True,
+        }
+
+    @classmethod
+    def from_snapshot(cls, data: Dict[str, Any]) -> "TorchTransformer":
+        if not isinstance(data, dict):
+            raise ValueError("torch checkpoint must be a mapping")
+        itos = data.get("itos")
+        if (not isinstance(itos, list) or len(itos) < 2 or
+                itos[0] != UNK or
+                any(not isinstance(token, str) or not token for token in itos) or
+                len(set(itos)) != len(itos)):
+            raise ValueError("torch checkpoint must declare unique ordered token identities")
+        want = str(data.get("device") or "cpu")
+        lm = cls(
+            vocab=[t for t in itos if t != UNK],
+            dim=int(data.get("dim") or 8),
+            ctx=int(data.get("ctx") or 8),
+            n_heads=int(data.get("n_heads") or 2),
+            n_layers=int(data.get("n_layers") or 2),
+            d_ff=int(data.get("d_ff") or 32),
+            device=want,
+        )
+        # Constructor sorts a fresh vocabulary. A trained checkpoint MUST
+        # restore its original token IDs unchanged, including appended BPE
+        # vocabulary growth, or learned embedding rows lose their meaning.
+        lm.itos = list(itos)
+        lm.stoi = {token: index for index, token in enumerate(itos)}
+        state = data.get("state")
+        if not isinstance(state, dict) or not state:
+            raise ValueError("torch checkpoint is missing trained tensor state")
+        torch = lm.torch
+        sd = {k: torch.tensor(v) for k, v in state.items()}
+        lm.net.load_state_dict(sd, strict=True)
+        lm.net.to(lm.device_obj)
+        lm.fitted = int(data.get("fitted") or 0)
+        lm.steps = int(data.get("steps") or 0)
+        return lm
+
+
+def _Stack(V, dim, ctx, n_heads, n_layers, d_ff, torch):
+    class Stack(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.E = torch.nn.Embedding(V, dim)
+            self.P = torch.nn.Embedding(ctx, dim)
+            layer = torch.nn.TransformerEncoderLayer(
+                d_model=dim, nhead=n_heads, dim_feedforward=d_ff,
+                batch_first=True, dropout=0.0, activation="relu",
+            )
+            self.enc = torch.nn.TransformerEncoder(layer, num_layers=n_layers)
+            self.out = torch.nn.Linear(dim, V)
+            self._ctx = ctx
+
+        def forward(self, ids):
+            _B, T = ids.shape
+            pos = torch.arange(T, device=ids.device).clamp(max=self._ctx - 1).unsqueeze(0)
+            x = self.E(ids) + self.P(pos)
+            mask = torch.triu(torch.ones(T, T, device=ids.device), diagonal=1).bool()
+            x = self.enc(x, mask=mask)
+            return self.out(x[:, -1, :])
+
+    return Stack()

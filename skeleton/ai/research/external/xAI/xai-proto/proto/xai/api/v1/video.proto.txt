@@ -1,0 +1,287 @@
+syntax = "proto3";
+
+package xai_api;
+
+import "xai/api/v1/deferred.proto";
+import "xai/api/v1/image.proto";
+import "xai/api/v1/usage.proto";
+
+// Aspect ratio for video generation.
+enum VideoAspectRatio {
+  // Invalid/unspecified aspect ratio - defaults to 16:9.
+  VIDEO_ASPECT_RATIO_UNSPECIFIED = 0;
+
+  // 1:1 aspect ratio (square).
+  VIDEO_ASPECT_RATIO_1_1 = 1;
+
+  // 16:9 aspect ratio (wide landscape).
+  VIDEO_ASPECT_RATIO_16_9 = 2;
+
+  // 9:16 aspect ratio (tall portrait).
+  VIDEO_ASPECT_RATIO_9_16 = 3;
+
+  // 4:3 aspect ratio (standard landscape).
+  VIDEO_ASPECT_RATIO_4_3 = 4;
+
+  // 3:4 aspect ratio (standard portrait).
+  VIDEO_ASPECT_RATIO_3_4 = 5;
+
+  // 3:2 aspect ratio (photo landscape).
+  VIDEO_ASPECT_RATIO_3_2 = 6;
+
+  // 2:3 aspect ratio (photo portrait).
+  VIDEO_ASPECT_RATIO_2_3 = 7;
+}
+
+// Resolution for video generation.
+enum VideoResolution {
+  // Invalid/unspecified resolution - defaults to 480p.
+  VIDEO_RESOLUTION_UNSPECIFIED = 0;
+
+  // 480p resolution.
+  // Dimensions vary by aspect ratio
+  VIDEO_RESOLUTION_480P = 1;
+
+  // 720p resolution.
+  // Dimensions vary by aspect ratio
+  VIDEO_RESOLUTION_720P = 2;
+
+  // 1080p resolution.
+  // Dimensions vary by aspect ratio.
+  // Supported on models that advertise 1080p (e.g. grok-imagine-video-1.5 for
+  // image-to-video); not available on all video models.
+  VIDEO_RESOLUTION_1080P = 3;
+}
+
+// Specifies a video by URL or file reference for video editing.
+message VideoUrlContent {
+  // The source of the video — either a direct URL/base64 string or a
+  // file_id from the xAI Files API. Exactly one must be set.
+  oneof source {
+    // Either a URL of the video (e.g., a public URL) or a base64-encoded video
+    // as a data URL (e.g., "data:video/mp4;base64,...").
+    string url = 1;
+
+    // A file ID from the xAI Files API. The file must be a video
+    // (e.g., MP4).
+    string file_id = 2;
+  }
+}
+
+// Reference audio input for video generation.
+message AudioUrlContent {
+  reserved 1;
+
+  // The source of the audio. Must be set.
+  oneof source {
+    // Identifier of a first-party preset voice (e.g. "ara"), using the same
+    // voice identifiers as the TTS API. Resolved server-side to a curated
+    // reference clip from the model's voice-preset catalog. Only supported
+    // by models that accept reference audio.
+    string voice_id = 2;
+  }
+}
+
+// An API service for interaction with video generation models.
+service Video {
+  // Create a video based on a text prompt and optionally an image.
+  // If an image is provided, generates video with the image as the first frame
+  // (image-to-video). If no image is provided, generates video from text only
+  // (text-to-video).
+  //
+  // This is an asynchronous operation. The method returns immediately with a
+  // request_id that can be used to poll for the result using GetDeferredVideo.
+  rpc GenerateVideo(GenerateVideoRequest) returns (StartDeferredResponse) {}
+
+  // Extend an existing video by generating continuation content.
+  //
+  // This is an asynchronous operation. The method returns immediately with a
+  // request_id that can be used to poll for the result using GetDeferredVideo.
+  rpc ExtendVideo(ExtendVideoRequest) returns (StartDeferredResponse) {}
+
+  // Gets the result of a video generation started by calling `GenerateVideo` or
+  // `ExtendVideo`.
+  rpc GetDeferredVideo(GetDeferredVideoRequest) returns (GetDeferredVideoResponse) {}
+}
+
+// A mid-video keyframe anchor: the image appears literally at `timestamp_s`
+// seconds, strictly inside the clip (endpoints use `image` / `last_frame`).
+// Timestamps snap to the engine's keyframe grid (one anchor per 1/3 second),
+// so anchors closer together than that are rejected.
+message VideoKeyframe {
+  // The pinned image. Supports the same formats as image generation: URL or
+  // base64-encoded image.
+  ImageUrlContent image = 1;
+
+  // Anchor time in seconds, strictly inside the clip (0 < t < duration).
+  float timestamp_s = 2;
+}
+
+// Request message for generating a video.
+message GenerateVideoRequest {
+  // Input prompt to generate a video from.
+  string prompt = 1;
+
+  // Optional input image used as the video's exact FIRST frame.
+  // Alone, selects image-to-video generation. Combined with
+  // reference_images / reference_audios / last_frame / keyframes (select
+  // models only), the video generates from those references while starting
+  // literally on this image. If omitted, generates text-to-video (or
+  // reference-to-video when references are present).
+  // Supports the same formats as image generation: URL or base64-encoded image.
+  ImageUrlContent image = 2;
+
+  // Name or alias of the video generation model to be used.
+  string model = 3;
+
+  // Duration of the video to be generated in seconds (1-15 seconds).
+  optional int32 duration = 4;
+
+  // Optional input video for video editing.
+  // If provided, the video will be edited based on the prompt.
+  // Supports URL or base64-encoded video data.
+  VideoUrlContent video = 6;
+
+  // Optional aspect ratio for video generation.
+  // Defaults to 16:9 if not specified.
+  optional VideoAspectRatio aspect_ratio = 7;
+
+  // Optional resolution for video generation.
+  // Defaults to 480p if not specified.
+  optional VideoResolution resolution = 8;
+
+  // Optional reference images for reference-to-video (R2V) generation.
+  // When provided, generates video using these images as style/content
+  // references.
+  repeated ImageUrlContent reference_images = 13;
+
+  // Optional output storage configuration. When present, the generated
+  // video is stored in the Files API and a file_id is returned in
+  // the response alongside the ephemeral URL.
+  optional StorageOptions storage_options = 14;
+
+  reserved 15;
+
+  // Optional reference audio (voice identity) for reference-to-video
+  // generation. Each entry selects a first-party preset voice via
+  // `voice_id` (same identifiers as the TTS API). Only supported by select
+  // video models; at most three entries. May be provided without
+  // reference_images (audio-only reference-to-video) — at least one
+  // reference of either kind selects the reference-to-video mode.
+  repeated AudioUrlContent reference_audios = 16;
+
+  // Whether the generated video includes an audio track. Defaults to true.
+  // Set to false for a silent video (the audio track is stripped
+  // server-side after generation).
+  optional bool generate_audio = 17;
+
+  // Optional image pinned as the video's exact LAST frame — the clip ends
+  // arriving on it (unlike reference_images, which condition the video and
+  // appear re-rendered). With image, the video interpolates between the two
+  // frames. Only supported by select video models. Supports URL or
+  // base64-encoded image.
+  ImageUrlContent last_frame = 18;
+
+  // Optional mid-video keyframe anchors, strictly between the endpoint pins
+  // (`image` as the first frame, `last_frame` as the last). Selects
+  // reference-to-video like the other reference inputs. Only supported by
+  // select video models; at most 4 entries.
+  repeated VideoKeyframe keyframes = 20;
+}
+
+// Request for retrieving deferred video generation results.
+message GetDeferredVideoRequest {
+  // The ID of the request to get.
+  string request_id = 1;
+}
+
+// The response from the video generation models containing the generated video.
+message VideoResponse {
+  // The generated video.
+  GeneratedVideo video = 1;
+
+  // The model used to generate the video (ignoring aliases).
+  string model = 2;
+
+  // Billing and cost information for this request.
+  SamplingUsage usage = 3;
+
+  // Structured error describing why video generation failed.
+  // Only present when the background generation encountered a failure
+  // (either client error 4xx or server error 5xx).
+  optional VideoError error = 6;
+
+  // Approximate completion percentage for the video generation task (0-100).
+  // - When status is `PENDING`: progress is between 0-99, indicating current
+  // completion.
+  // - When status is `DONE`: progress is 100.
+  // - When status is `FAILED`: progress is 0.
+  int32 progress = 7;
+}
+
+// Contains all data related to a generated video.
+message GeneratedVideo {
+  // A url that points to the generated video.
+  string url = 1;
+
+  // Duration of the generated video in seconds.
+  int32 duration = 4;
+
+  // Whether the video generated by the model respects moderation rules.
+  // The field will be true if the video respects moderation rules. Otherwise
+  // the field will be false and the video url field will be empty.
+  bool respect_moderation = 5;
+
+  // Storage info for the generated video. Only present when the request
+  // included `storage_options` and the upload succeeded.
+  optional FileOutput file_output = 6;
+
+  // Human-readable error when `storage_options` was set but the upload
+  // failed. Only present on storage failure; absent on success or when
+  // storage was not requested.
+  optional string storage_error = 7;
+}
+
+// Response from GetDeferredVideo, including the response if the video
+// generation request has been processed without error.
+message GetDeferredVideoResponse {
+  // Current status of the request.
+  DeferredStatus status = 1;
+
+  // Response. Only present if `status=DONE` or `status=FAILED`.
+  // When failed, the `error` field in VideoResponse describes the failure.
+  optional VideoResponse response = 2;
+}
+
+// Structured error returned when video generation fails.
+message VideoError {
+  // Machine-readable error code (e.g. "invalid_argument", "internal_error").
+  string code = 1;
+  // Human-readable error message describing the failure.
+  string message = 2;
+}
+
+// Request message for extending an existing video.
+message ExtendVideoRequest {
+  // Prompt describing what should happen next in the video.
+  string prompt = 1;
+
+  // Input video to extend. The extension continues from the end of this video.
+  // Supports URL or base64-encoded video data.
+  // Input video must be between 2 and 30 seconds long.
+  VideoUrlContent video = 2;
+
+  // Name or alias of the video generation model to be used.
+  string model = 3;
+
+  // Duration of the extension segment to generate in seconds (1-10).
+  // Defaults to 6 seconds if not specified.
+  optional int32 duration = 4;
+
+  // Optional output storage configuration. When present, the generated
+  // video is stored in the Files API and a file_id is returned in
+  // the response alongside the ephemeral URL.
+  optional StorageOptions storage_options = 6;
+
+  reserved 7;
+}

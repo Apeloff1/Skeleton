@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:mesh_pipeline:v1",
+  "title": "FLGB-11 mesh pipeline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mesh_id",
+    "source_digest",
+    "vertex_count",
+    "index_count",
+    "topology",
+    "bounds_digest"
+  ],
+  "properties": {
+    "mesh_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "vertex_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "index_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "topology": {
+      "enum": [
+        "triangles",
+        "lines",
+        "points"
+      ]
+    },
+    "bounds_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

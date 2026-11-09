@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for frostmarrow."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('frostmarrow_arrival', (), (), ('arrival_record',)), Quest('frostmarrow_source', ('frostmarrow_arrival',), ('arrival_record',), ('source_proof',)), Quest('frostmarrow_witness', ('frostmarrow_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('frostmarrow_reconcile', ('frostmarrow_source', 'frostmarrow_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('frostmarrow_crossing', ('frostmarrow_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('frostmarrow_conclusion', ('frostmarrow_crossing',), ('crossing_pass',), ('ending_unlocked',)))

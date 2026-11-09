@@ -1,0 +1,198 @@
+name: Game Frontier Focused Validation
+
+# Specialized scope only; does not add broad expensive app checks.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/jeeves/game_frontier*.py"
+      - "skeleton/forge/game_frontier_godot.py"
+      - "skeleton/forge/game_frontier_studio.py"
+      - "skeleton/forge/game_frontier_rpg_events.py"
+      - "tests/test_game_frontier*.py"
+      - "scripts/run_game_frontier_capture.py"
+      - "scripts/qualify_game_frontier_godot.py"
+      - "scripts/build_game_frontier_smoke.py"
+      - "scripts/validate_game_frontier_native_smoke.py"
+      - "skeleton/game/production_*.py"
+      - "skeleton/jeeves/game_production_quality_tools.py"
+      - "skeleton/jeeves/game_complete_studio_quality_tools.py"
+      - "skeleton/jeeves/game_advanced_studio_quality_tools.py"
+      - "skeleton/jeeves/game_expanded_studio_quality_tools.py"
+      - "skeleton/jeeves/game_studio_tools.py"
+      - "skeleton/jeeves/game_frontier_studio_authoring_tools.py"
+      - "skeleton/forge/game_frontier_studio*.py"
+      - "skeleton/testing/test_game_production_*.py"
+      - "skeleton/testing/test_game_frontier_studio_authoring.py"
+      - "skeleton/testing/test_game_frontier_studio_second_fifty.py"
+      - "skeleton/testing/test_game_frontier_studio_authoring_next50.py"
+      - "skeleton/testing/test_game_frontier_studio_authoring_hundred.py"
+      - "skeleton/testing/test_game_frontier_studio_authoring_500.py"
+      - "skeleton/testing/test_game_frontier_studio_production_5000.py"
+      - "skeleton/testing/test_game_frontier_studio_production_50000.py"
+      - "skeleton/testing/test_game_frontier_studio_production_500000.py"
+      - "skeleton/testing/test_game_frontier_studio_production_5000000.py"
+      - "skeleton/testing/test_game_frontier_studio_production_50000000.py"
+      - "skeleton/testing/test_game_frontier_studio_production_500000000.py"
+      - "skeleton/testing/test_game_frontier_studio_production_5000000000.py"
+      - "skeleton/testing/test_game_frontier_studio_production_50000000000.py"
+      - "skeleton/testing/test_game_frontier_studio_route_assurance.py"
+      - "skeleton/testing/test_game_frontier_studio_production_500000000000.py"
+      - "skeleton/testing/test_game_frontier_studio_production_5000000000000.py"
+      - "skeleton/testing/test_game_frontier_studio_production_50000000000000.py"
+      - "skeleton/testing/test_game_frontier_book_curriculum_operational.py"
+      - "skeleton/jeeves/game_frontier_curriculum_path.py"
+      - "frontend/src/features/Jeeves/GameFrontierCurriculumPanel.tsx"
+      - "frontend/src/product/gameFrontierCurriculumClient.ts"
+      - "skeleton/testing/test_game_frontier_studio_epic_routes.py"
+      - "skeleton/testing/test_game_frontier_studio_epic_lod.py"
+      - "skeleton/forge/game_frontier_studio_epic_lod.py"
+      - "skeleton/forge/game_frontier_studio_terrain_runtime.py"
+      - "skeleton/forge/game_frontier_studio_epic_route_graph.py"
+      - "frontend/src/features/Jeeves/GameFrontierEpicRoutePanel.tsx"
+      - "skeleton/forge/game_frontier_studio_epic_*.py"
+      - "scripts/export_game_studio_epic_handbooks.py"
+      - "skeleton/forge/game_frontier_studio_saga_*.py"
+      - "scripts/export_game_studio_saga_handbooks.py"
+      - "skeleton/forge/game_frontier_studio_epoch_*.py"
+      - "scripts/export_game_studio_epoch_handbooks.py"
+      - "skeleton/forge/game_frontier_studio_chronicle_*.py"
+      - "skeleton/forge/game_frontier_studio_route_assurance.py"
+      - "scripts/export_game_studio_chronicle_handbooks.py"
+      - "scripts/certify_game_frontier_godot_import.py"
+      - "scripts/run_game_frontier_gfd_native_checks.py"
+      - "tests/test_gf_d_godot_import_cert.py"
+      - "tests/test_game_frontier_gfd_native_checks.py"
+      - ".github/workflows/game-frontier-native-smoke.yml"
+      - ".github/workflows/game-frontier-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-frontier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontier-reference:
+    runs-on: ubuntu-latest
+    # Compile and run the first focused batch; the full studio batch runs
+    # in two separate required matrix partitions below.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.11.16"
+      - name: Install focused runtime and test dependencies
+        # Backend Game Frontier route imports pass through gameforge_auth, which
+        # imports jwt during pytest collection. Keep the focused environment
+        # aligned with the pinned backend authentication dependency so route
+        # tests exercise real auth imports instead of failing before collection.
+        run: python -m pip install --disable-pip-version-check -e . "pytest>=8,<9" "PyJWT==2.15.1"
+      - name: Compile all frontier source and tests
+        run: python -m compileall -q skeleton/jeeves/game_frontier*.py skeleton/jeeves/game_production_quality_tools.py skeleton/jeeves/game_complete_studio_quality_tools.py skeleton/jeeves/game_advanced_studio_quality_tools.py skeleton/jeeves/game_expanded_studio_quality_tools.py skeleton/jeeves/game_frontier_studio_authoring_tools.py skeleton/jeeves/game_studio_tools.py skeleton/forge/game_frontier_studio*.py skeleton/game/production_*.py skeleton/testing/test_game_production_*.py skeleton/testing/test_game_frontier_studio_authoring_next50.py skeleton/testing/test_game_frontier_studio_authoring_hundred.py skeleton/testing/test_game_frontier_studio_authoring_500.py skeleton/testing/test_game_frontier_studio_production_5000.py skeleton/testing/test_game_frontier_studio_production_50000.py skeleton/testing/test_game_frontier_studio_production_500000.py skeleton/testing/test_game_frontier_studio_production_5000000.py skeleton/testing/test_game_frontier_studio_production_50000000.py skeleton/testing/test_game_frontier_studio_production_500000000.py skeleton/testing/test_game_frontier_studio_production_5000000000.py skeleton/testing/test_game_frontier_studio_production_50000000000.py skeleton/testing/test_game_frontier_studio_route_assurance.py skeleton/forge/game_frontier_godot.py skeleton/forge/game_frontier_studio.py skeleton/forge/game_frontier_rpg_events.py scripts/run_game_frontier_capture.py scripts/qualify_game_frontier_godot.py scripts/build_game_frontier_smoke.py scripts/validate_game_frontier_native_smoke.py tests/test_game_frontier*.py
+      - name: Focused regression proof
+        run: |
+          python -m pytest -q tests/test_game_frontier*.py
+
+
+  # Every canonical studio regression module is required exactly once.
+  # Both prior 60-minute partitions timed out at 84% and 94%.
+  # Isolate expensive production scales without suppressing any tests.
+  frontier-studio-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        partition: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.11.16"
+      - name: Install focused runtime and test dependencies
+        run: python -m pip install --disable-pip-version-check -e . "pytest>=8,<9" "PyJWT==2.15.1"
+      - name: Run complete studio regression partition
+        env:
+          PARTITION: ${{ matrix.partition }}
+        run: |
+          set -euo pipefail
+          case "$PARTITION" in
+            0)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_production_quality.py \
+                skeleton/testing/test_game_production_frontier_quality.py \
+                skeleton/testing/test_game_production_advanced_quality.py
+              ;;
+            1)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_production_deep_quality.py \
+                skeleton/testing/test_game_production_studio_quality.py \
+                skeleton/testing/test_game_production_expanded_quality.py
+              ;;
+            2)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_frontier_studio_authoring.py \
+                skeleton/testing/test_game_frontier_studio_authoring_next50.py \
+                skeleton/testing/test_game_frontier_studio_authoring_500.py
+              ;;
+            3)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_frontier_studio_second_fifty.py \
+                skeleton/testing/test_game_frontier_studio_authoring_hundred.py
+              ;;
+            4)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_frontier_studio_production_5000.py \
+                skeleton/testing/test_game_frontier_studio_production_50000.py
+              ;;
+            5)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_frontier_studio_production_500000.py \
+                skeleton/testing/test_game_frontier_studio_production_5000000.py
+              ;;
+            6)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_frontier_studio_production_50000000.py \
+                skeleton/testing/test_game_frontier_studio_production_500000000.py
+              ;;
+            7)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_frontier_studio_production_5000000000.py \
+                skeleton/testing/test_game_frontier_studio_production_50000000000.py
+              ;;
+            8)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_frontier_studio_production_500000000000.py
+              ;;
+            9)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_frontier_studio_production_5000000000000.py
+              ;;
+            10)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_frontier_studio_production_50000000000000.py
+              ;;
+            11)
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python -m pytest -vv --noconftest --durations=10 \
+                skeleton/testing/test_game_frontier_book_curriculum_operational.py \
+                skeleton/testing/test_game_frontier_studio_epic_lod.py \
+                skeleton/testing/test_game_frontier_studio_epic_routes.py
+              ;;
+            *) echo "Invalid required studio partition: $PARTITION" >&2; exit 64 ;;
+          esac
+
+  godot4-native-smoke:
+    # No new root Actions admission: retain the pinned real-Godot checks as a reusable job.
+    uses: ./.github/workflows/game-frontier-native-smoke.yml
+    permissions:
+      contents: read

@@ -1,0 +1,394 @@
+{
+  "schema": "skeleton.dragon.source_discovery_supplement.v1",
+  "recorded_on": "2026-10-12",
+  "status": "raw_discovery_only_not_ingested_into_canonical_queue",
+  "baseline_registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "requested_total_urls": 44050,
+  "target_interpretation": "Reconciled, unreviewed raw URL leads from Git SHA-pinned public game-development README catalogs. Does not grant any source/use/training authority.",
+  "parents": [
+    "docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0021.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0022.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0031.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0032.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0033.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0034.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0035.json",
+    "docs/ai/evidence/dragon-source-expansion-20261012-batch-0036.json"
+  ],
+  "catalogs": [
+    {
+      "repository": "ajhager/engi",
+      "commit_sha": "ec911cc4c51074656c2645456c165974c9241343",
+      "readme_blob_sha": "18ea3c0604ea76fde8f2c95506de2cdf48198a84",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "alicevision/Meshroom",
+      "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+      "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "Ardour/ardour",
+      "commit_sha": "26d2e03b793f7553165518ddd5906ad9bdae6ce3",
+      "readme_blob_sha": "680377fb74ac9bcd02f56ab6c307138055d7d592",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "biou/DrugsNRock",
+      "commit_sha": "dd266743fc5df8ed818b898dc5f9d8551df4825f",
+      "readme_blob_sha": "9a3f8fcec7bd2a15888bcff0a36c498ec056c552",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "Caerind/AwesomeCppGameDev",
+      "commit_sha": "0426419acfd7508c5c14e658660ac9a6445aea6e",
+      "readme_blob_sha": "d0e6a89c4af62d697c97d1fd8950d07daf0075be",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "dawdle-deer/awesome-learn-gamedev",
+      "commit_sha": "28e61535a7180f0174242ce0980d9337a7328a02",
+      "readme_blob_sha": "ea02900f953b417abd2e71286e7f51cf640baf02",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "dfranx/SHADERed",
+      "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+      "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "FronkonGames/Awesome-Gamedev",
+      "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+      "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "hzoo/awesome-gametalks",
+      "commit_sha": "733d0328293686894a2025a1d321778e7322b468",
+      "readme_blob_sha": "4270593f0271ba1b5725bfdd90b76f02bb37c6f9",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "jarneson/godot-ply",
+      "commit_sha": "4457a19e0316aeabcf81badfb7e0b906410a97b9",
+      "readme_blob_sha": "da7a2f08aa6a809868ac11175bd3744c507294b3",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "stevinz/awesome-game-engine-dev",
+      "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+      "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "wellcaffeinated/PhysicsJS",
+      "commit_sha": "b9eca1634b6db222571e7e820a09404513fe2e46",
+      "readme_blob_sha": "b88f3fefa1b5300df5c31da2af76b3bd21e8d164",
+      "readme_path": "README.md"
+    },
+    {
+      "repository": "zgrossbart/bridges",
+      "commit_sha": "65cd0bbc33d26b2f2e65ebcf83fdda354ae58469",
+      "readme_blob_sha": "8676442e873e66d6b0b965fe0f52511c9686a3ab",
+      "readme_path": "README.md"
+    }
+  ],
+  "counts": {
+    "previous_raw_provisional_urls": 10538,
+    "new_raw_candidate_urls": 13,
+    "raw_provisional_urls": 10551,
+    "requested_raw_url_target": 44050
+  },
+  "candidates": [
+    {
+      "url": "https://youtube.com/watch?v=_f-CBxcY8Bk&list=PLS9G7A6kaaHNTbz4bsmrhpAvzljf_ZvRg",
+      "source_id": "source-72c2c398511209237d7b3faf1ec7413eb1055932fd16fdb97d39d46da0dab4c8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=_f-CBxcY8Bk&list=PLS9G7A6kaaHNTbz4bsmrhpAvzljf_ZvRg",
+          "line": 247,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=7YPPFIqUN84",
+      "source_id": "source-7e66556b6af734d57bc0e898d9b7ab0eb06487544e9767b76a18ab927e7a78f0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=7YPPFIqUN84",
+          "line": 239,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=8w0qvO4Vumc",
+      "source_id": "source-60815b2b15eb9e26486582f9605ce8d3bed84c9c2db7ba52e20669eda23d1e69",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=8w0qvO4Vumc",
+          "line": 392,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=bZEJ3nZe9J4",
+      "source_id": "source-5e41d565368f6b53ab6b7160cf66929bda1ecdd33967c2967283ecc06fb6d071",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=bZEJ3nZe9J4",
+          "line": 155,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=hRL56gXqj-4&list=PLU2nPsAdxKWQYxkmQ3TdbLsyc1l2j25XM",
+      "source_id": "source-ff14524c53f2be0aad422e37654bc906ed40b963ab02c72c535a65d7996e1d36",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=hRL56gXqj-4&list=PLU2nPsAdxKWQYxkmQ3TdbLsyc1l2j25XM",
+          "line": 228,
+          "headers": [
+            "Code"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=IE2siVRMXCw",
+      "source_id": "source-fa199d4695648de9ea2ee5ad5f9fe15781818f64dcd031b57663f2c7de8065eb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=IE2siVRMXCw",
+          "line": 328,
+          "headers": [
+            "Organization"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=u0yksFw9PSs",
+      "source_id": "source-a72c2bf46980108c673908ab40855f9acaa8f06cdbc0f4ebe8027ff6b52b6ccc",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=u0yksFw9PSs",
+          "line": 369,
+          "headers": [
+            "Unity"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://youtube.com/watch?v=zyVTxGpEO30",
+      "source_id": "source-fee77c6a0ea905fc2f3fe44e5dce2c091914d313ed94060883904316b1939328",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://youtube.com/watch?v=zyVTxGpEO30",
+          "line": 151,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zenorogue.medium.com/what-roguelike-meant-fb8b0e1601a",
+      "source_id": "source-31a40054e90065b311501d5bf358c4b6269f4f77bc2493290edb72e278f97c47",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "FronkonGames/Awesome-Gamedev",
+          "commit_sha": "fc0f586ffe178305f9de183900ea21019e4ad5f8",
+          "readme_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+          "exact_url": "https://zenorogue.medium.com/what-roguelike-meant-fb8b0e1601a",
+          "line": 142,
+          "headers": [
+            "Design"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zeux.io/",
+      "source_id": "source-23ceb0273c2f6ff8d07bb122c61b6ca4e1e7e8b9819ad3dc750e4202473732f4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "stevinz/awesome-game-engine-dev",
+          "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+          "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+          "exact_url": "https://zeux.io/",
+          "line": 233,
+          "headers": [
+            "Awesome Game Engine Development ! Awesome (https://awesome.re/badge-flat.svg) (https://github.com/sindresorhus/awesome#readme)",
+            "Learning",
+            "Engine Development"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://ziglang.org/",
+      "source_id": "source-31fb4c7d9ab7e6eff8199f6b62bb1677f7b2cd1a4f5b73d23479e32abfa3e2fb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "stevinz/awesome-game-engine-dev",
+          "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+          "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+          "exact_url": "https://ziglang.org/",
+          "line": 1129,
+          "headers": [
+            "Awesome Game Engine Development ! Awesome (https://awesome.re/badge-flat.svg) (https://github.com/sindresorhus/awesome#readme)",
+            "Libraries",
+            "Zig"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://ziglang.org/documentation/master/",
+      "source_id": "source-1f865b2594b212c1af6bfdc23ec5ed8b55d5c0d1f7f20e28dd14035777828f89",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "stevinz/awesome-game-engine-dev",
+          "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+          "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+          "exact_url": "https://ziglang.org/documentation/master/",
+          "line": 1129,
+          "headers": [
+            "Awesome Game Engine Development ! Awesome (https://awesome.re/badge-flat.svg) (https://github.com/sindresorhus/awesome#readme)",
+            "Libraries",
+            "Zig"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://zimjs.com/",
+      "source_id": "source-61d1e1f1155fab7d61f8fb61cfd17d06085973dbfadc395a9c8be1aa8feef8e4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "independence": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "discoveries": [
+        {
+          "repository": "stevinz/awesome-game-engine-dev",
+          "commit_sha": "f7f76faaf7f78ab3c5f24cbe10e7b9a83a205a4b",
+          "readme_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+          "exact_url": "https://zimjs.com/",
+          "line": 901,
+          "headers": [
+            "Awesome Game Engine Development ! Awesome (https://awesome.re/badge-flat.svg) (https://github.com/sindresorhus/awesome#readme)",
+            "Libraries",
+            "JavaScript"
+          ]
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Archived orphan discovery batches 0024/0030 were reconciled as raw leads; their broken parent sequence is not represented as authoritative.",
+    "README links were recorded without fetching the linked destinations, examining licenses, or copying games, videos, assets or transcripts.",
+    "Duplicate hosts and linked mirrors do not constitute independent corroboration. Policy, fetch, rights and model-promotion decisions remain external."
+  ]
+}

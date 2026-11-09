@@ -1,0 +1,1 @@
+{"features":[{"file_shards":["skeleton/pr_automation"],"files":25,"name":"skeleton/pr_automation","zones":{"repository-automation":25}},{"file_shards":["skeleton/pr_automation"],"files":14,"name":"skeleton/pr_automation/runner_hygiene","zones":{"repository-automation":14}}],"schema":"skeleton.repository-navigation.v1"}

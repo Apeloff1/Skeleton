@@ -1,0 +1,5 @@
+{
+  "schema": "skeleton.game_builder.competitor_watch_config.v1",
+  "polling_enabled": false,
+  "titles": []
+}

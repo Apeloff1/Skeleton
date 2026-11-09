@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "app/game-learning.tsx",
+    "src/features/Jeeves/GameLearningWorkspace.tsx",
+    "src/features/Jeeves/GameLearningWorkspace.styles.ts",
+    "src/features/Jeeves/gameLearningFiles.ts",
+    "src/product/gameLearningClient.ts",
+    "expo-env.d.ts"
+  ]
+}

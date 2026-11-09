@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-01:stream_decoder:v1",
+  "title": "FLGB-01 Stream Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sequence",
+    "kind",
+    "payload"
+  ],
+  "properties": {
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4095
+    },
+    "kind": {
+      "enum": [
+        "text",
+        "structured",
+        "tool_call",
+        "usage",
+        "final",
+        "cancelled",
+        "error"
+      ]
+    },
+    "payload": {}
+  }
+}

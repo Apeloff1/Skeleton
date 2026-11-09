@@ -1,0 +1,32 @@
+# EAS Build ignore file
+# Prevents problematic files from being uploaded to EAS
+
+# Cache directories
+.metro-cache/
+.expo/
+.pytest_cache/
+.ruff_cache/
+
+# Python cache (shouldn't be in frontend but just in case)
+__pycache__/
+*.pyc
+
+# Build artifacts
+dist/
+web-build/
+*.tsbuildinfo
+
+# Debug logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Lock files (EAS does fresh install)
+package-lock.json
+
+# Native build artifacts
+*.orig.*

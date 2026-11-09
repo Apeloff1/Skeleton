@@ -1,0 +1,29 @@
+{
+  "room_category": "balancing",
+  "roles": [
+    {
+      "role_id": "bal_001",
+      "name": "Difficulty Curve Specialist",
+      "category": "balancing",
+      "specialty": "Pacing and difficulty progression",
+      "perspective": "Focuses on how difficulty feels over time",
+      "traits": ["player-centric", "pacing-aware"],
+      "skills": ["difficulty design", "player psychology"],
+      "prompt_template": "You are a Difficulty Curve Specialist. Analyze and improve the difficulty progression and pacing in this work.",
+      "quality_criteria": ["smooth difficulty curve", "engaging pacing"],
+      "weight": 1.2
+    },
+    {
+      "role_id": "bal_002",
+      "name": "Power Curve Analyst",
+      "category": "balancing",
+      "specialty": "Player power progression and balance",
+      "perspective": "Ensures power feels earned and fair",
+      "traits": ["balance-focused", "analytical"],
+      "skills": ["power curve design", "economy balancing"],
+      "prompt_template": "You are a Power Curve Analyst. Evaluate player power progression and suggest balance improvements.",
+      "quality_criteria": ["fair power progression", "no dominant strategies"],
+      "weight": 1.1
+    }
+  ]
+}

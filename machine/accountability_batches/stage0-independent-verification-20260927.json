@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "plan_version": "1.0.0",
+  "status": "verification-evidence-bound",
+  "purpose": "Bind six already implementation-signed Stage-0 atomic queue tasks to successful independent exact-head closure runs before canonical accountability completion.",
+  "source_pr": 2038,
+  "exact_head_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+  "records": [
+    {
+      "accountability_id": "ACC-AIQ-S0-STATE-01",
+      "workflow": "State Recovery Drill",
+      "run_id": 36284789226,
+      "independent_job_id": 108523369309,
+      "verified_at_utc": "2026-09-27T01:14:27Z",
+      "verification_statement": "Independent State Recovery Drill verified the closed state-authority contract, including canonical durable state ownership and rebuild/recovery invariants covering STATE-01.",
+      "verifier_script": "scripts/verify_state_authority_closure.py",
+      "evidence_refs": [
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
+        "github-actions-job:108523369309",
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "scripts/verify_state_authority_closure.py"
+      ]
+    },
+    {
+      "accountability_id": "ACC-AIQ-S0-STATE-02",
+      "workflow": "State Recovery Drill",
+      "run_id": 36284789226,
+      "independent_job_id": 108523369309,
+      "verified_at_utc": "2026-09-27T01:14:27Z",
+      "verification_statement": "Independent State Recovery Drill verified the closed state-authority contract, including durable OperationEnvelope ownership and authoritative/outbox recovery invariants covering STATE-02.",
+      "verifier_script": "scripts/verify_state_authority_closure.py",
+      "evidence_refs": [
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
+        "github-actions-job:108523369309",
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "scripts/verify_state_authority_closure.py"
+      ]
+    },
+    {
+      "accountability_id": "ACC-AIQ-S0-GOV-01",
+      "workflow": "Governance Closure Gate",
+      "run_id": 36284789145,
+      "independent_job_id": 108523368586,
+      "verified_at_utc": "2026-09-27T01:18:24Z",
+      "verification_statement": "Independent Governance Closure Gate verified the closed governance-registry contract and canonical governed-write registration invariants covering GOV-01.",
+      "verifier_script": "scripts/verify_governance_closure.py",
+      "evidence_refs": [
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+        "github-actions-job:108523368586",
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "scripts/verify_governance_closure.py"
+      ]
+    },
+    {
+      "accountability_id": "ACC-AIQ-S0-GOV-02",
+      "workflow": "Governance Closure Gate",
+      "run_id": 36284789145,
+      "independent_job_id": 108523368586,
+      "verified_at_utc": "2026-09-27T01:18:24Z",
+      "verification_statement": "Independent Governance Closure Gate verified durable delete/export/retention adapter execution and lifecycle propagation invariants covering GOV-02.",
+      "verifier_script": "scripts/verify_governance_closure.py",
+      "evidence_refs": [
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+        "github-actions-job:108523368586",
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "scripts/verify_governance_closure.py"
+      ]
+    },
+    {
+      "accountability_id": "ACC-AIQ-S0-GOV-03",
+      "workflow": "Governance Closure Gate",
+      "run_id": 36284789145,
+      "independent_job_id": 108523368586,
+      "verified_at_utc": "2026-09-27T01:18:24Z",
+      "verification_statement": "Independent Governance Closure Gate verified governance receipt/lifecycle audit integration and payload-safe observability invariants covering GOV-03.",
+      "verifier_script": "scripts/verify_governance_closure.py",
+      "evidence_refs": [
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+        "github-actions-job:108523368586",
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "scripts/verify_governance_closure.py"
+      ]
+    },
+    {
+      "accountability_id": "ACC-AIQ-S0-COST-01",
+      "workflow": "Cost Admission Closure Gate",
+      "run_id": 36284789200,
+      "independent_job_id": 108523367880,
+      "verified_at_utc": "2026-09-27T01:14:42Z",
+      "verification_statement": "Independent Cost Admission Closure Gate verified durable quota/reservation restart and multi-worker accounting invariants covering COST-01.",
+      "verifier_script": "scripts/verify_cost_admission_closure.py",
+      "evidence_refs": [
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789200",
+        "github-actions-job:108523367880",
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "scripts/verify_cost_admission_closure.py"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1628 @@
+{
+  "schema_version": "skeleton.ai.first_install_session_evidence.v1",
+  "status": "implementation_candidate_operationally_qualified",
+  "session_started_utc": "2026-10-15T11:29:00Z",
+  "user_priority": "Make the app functional for first install; complete AI and crawler through real application owners.",
+  "automated_tests_authored": false,
+  "automated_tests_run": false,
+  "production_promoted": false,
+  "masterplan_completed": false,
+  "contracts": [
+    "machine/ai_first_install.json",
+    "machine/ai_first_install_product.json",
+    "machine/ai_chat_runtime_contract.json",
+    "machine/ai_chat_model_catalog.json",
+    "machine/ai_chat_runtime_selection.json",
+    "machine/ai_dragon_crawler_operations.json",
+    "machine/ai_dragon_crawler_app.json",
+    "machine/ai_local_model_provisioning.json"
+  ],
+  "guide": "docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md",
+  "local_ai_provisioning": {
+    "actual_provisioning": {
+      "status": "provisioned",
+      "receipt_digest": "aac80106688adde0fbda8a30c9215fc9cf8d43356b460157967d53d76bde09c9",
+      "destination": "/workspace/scratch/jeeves-first-install-2026-10-15/local-ai-hardened",
+      "model_bytes": 639446688,
+      "runtime_files": 40,
+      "platform": {
+        "target": "linux-x86_64-glibc",
+        "host_system": "Linux",
+        "host_machine": "x86_64",
+        "host_libc": "glibc",
+        "host_native_compatible": true,
+        "preparation_mode": "native",
+        "native_execution_verified": false
+      },
+      "threads": 2,
+      "activation": {
+        "AI_PROVIDER": "local",
+        "AI_LOCAL_MODEL_PATH": "",
+        "AI_LOCAL_DEPLOYMENT_PATH": "/app/local-ai/deployment.json"
+      },
+      "inference_executed": false
+    },
+    "actual_verified_reopen": {
+      "status": "verified_existing",
+      "receipt_digest": "aac80106688adde0fbda8a30c9215fc9cf8d43356b460157967d53d76bde09c9",
+      "destination": "/workspace/scratch/jeeves-first-install-2026-10-15/local-ai-hardened",
+      "platform": {
+        "target": "linux-x86_64-glibc",
+        "host_system": "Linux",
+        "host_machine": "x86_64",
+        "host_libc": "glibc",
+        "host_native_compatible": true,
+        "preparation_mode": "native",
+        "native_execution_verified": false
+      },
+      "threads": 2
+    },
+    "runtime_files": 40,
+    "directory_modes": "0755 target/runtime, 0444 model/manifest/provisioning receipt; caller-private ancestor modes unchanged",
+    "download_recipe_exercised": "Exact previously acquired pinned artifacts copied by the new bounded offline path; new download-worker source reviewed, not exercised as a fresh network download.",
+    "inference_executed_by_provisioner": false,
+    "final_qwen_nonthinking": {
+      "status": "offline_provision_and_verified_reopen",
+      "receipt_digest": "70eacf1f9f7c5772a69571d1945338a54bb9f849ffef4bd593f479debfab818f",
+      "deployment_digest": "faa4d24357ca6c478e7a6766e81017cfc29a1ab1e2fe98463220e75db930adfd",
+      "files": 42,
+      "runtime_files": 40,
+      "bytes": 710843625,
+      "target": "linux-x86_64-glibc",
+      "template_bytes": 219,
+      "template_sha256": "08b0a3f7b20d7818e90c2ad0f27d255e8156f37cb8078969fc7e5fbfec2bf6a1",
+      "inference_executed": false,
+      "automated_tests_run": false,
+      "retained_files": [
+        "/workspace/scratch/jeeves-first-install-2026-10-15/provision-qwen-nonthinking.json",
+        "/workspace/scratch/jeeves-first-install-2026-10-15/provision-qwen-nonthinking-reopen.json",
+        "/workspace/scratch/jeeves-first-install-2026-10-15/local-ai-qwen-nonthinking/deployment.json",
+        "/workspace/scratch/jeeves-first-install-2026-10-15/local-ai-qwen-nonthinking/provisioning.json"
+      ]
+    },
+    "historical_hardened_artifact_bytes": 710843364,
+    "historical_hardened_assets_retired": {
+      "retired_receipt_digest": "aac80106688adde0fbda8a30c9215fc9cf8d43356b460157967d53d76bde09c9",
+      "authorization": "root explicitly authorized exact obsolete duplicate; frontier verified zero running/stopped container references",
+      "preserved": [
+        "deployment.json",
+        "provisioning.json"
+      ],
+      "deleted_manifest_paths": [
+        "Qwen3-0.6B-Q8_0.gguf",
+        "runtime/LICENSE",
+        "runtime/libggml-base.so",
+        "runtime/libggml-base.so.0",
+        "runtime/libggml-base.so.0.26.0",
+        "runtime/libggml-cpu-alderlake.so",
+        "runtime/libggml-cpu-cannonlake.so",
+        "runtime/libggml-cpu-cascadelake.so",
+        "runtime/libggml-cpu-cooperlake.so",
+        "runtime/libggml-cpu-haswell.so",
+        "runtime/libggml-cpu-icelake.so",
+        "runtime/libggml-cpu-ivybridge.so",
+        "runtime/libggml-cpu-piledriver.so",
+        "runtime/libggml-cpu-sandybridge.so",
+        "runtime/libggml-cpu-sapphirerapids.so",
+        "runtime/libggml-cpu-skylakex.so",
+        "runtime/libggml-cpu-sse42.so",
+        "runtime/libggml-cpu-x64.so",
+        "runtime/libggml-cpu-zen4.so",
+        "runtime/libggml-rpc.so",
+        "runtime/libggml.so",
+        "runtime/libggml.so.0",
+        "runtime/libggml.so.0.26.0",
+        "runtime/libllama-batched-bench-impl.so",
+        "runtime/libllama-bench-impl.so",
+        "runtime/libllama-cli-impl.so",
+        "runtime/libllama-common.so",
+        "runtime/libllama-common.so.0",
+        "runtime/libllama-common.so.0.6.0",
+        "runtime/libllama-completion-impl.so",
+        "runtime/libllama-fit-params-impl.so",
+        "runtime/libllama-perplexity-impl.so",
+        "runtime/libllama-quantize-impl.so",
+        "runtime/libllama-server-impl.so",
+        "runtime/libllama.so",
+        "runtime/libllama.so.0",
+        "runtime/libllama.so.0.6.0",
+        "runtime/libmtmd.so",
+        "runtime/libmtmd.so.0",
+        "runtime/libmtmd.so.0.6.0",
+        "runtime/llama-completion"
+      ],
+      "reclaimed_bytes": 710842550,
+      "final_qwen_artifacts_untouched": true
+    },
+    "empty_owned_directory": {
+      "kind": "actual_operator_precreated_empty_directory_provision",
+      "preparation": "mkdir mode0755 before invoking actualprovisioner",
+      "operator_effective_uid": 1000,
+      "destination_uid": 1000,
+      "destination_mode": "0o755",
+      "provision_status": "provisioned",
+      "reopen_status": "verified_existing",
+      "receipt_digest": "70eacf1f9f7c5772a69571d1945338a54bb9f849ffef4bd593f479debfab818f",
+      "deployment_digest": "faa4d24357ca6c478e7a6766e81017cfc29a1ab1e2fe98463220e75db930adfd",
+      "files": 42,
+      "retained_artifact_bytes": 710843625,
+      "incomplete_marker_remaining": false,
+      "free_bytes_after": 3098099712,
+      "script_sha256": "01a2c8d6f5ec38acd415f43311e8daee6c972ceda8edb16934a6a3a0b10bb787",
+      "inference_executed": false,
+      "automated_tests_run": false,
+      "retained_files": [
+        "/workspace/scratch/jeeves-first-install-2026-10-15/provision-empty-directory.json",
+        "/workspace/scratch/jeeves-first-install-2026-10-15/provision-empty-directory-reopen.json",
+        "/workspace/scratch/jeeves-first-install-2026-10-15/hardened-retirement.json",
+        "/workspace/scratch/jeeves-first-install-2026-10-15/local-ai-empty-directory/deployment.json",
+        "/workspace/scratch/jeeves-first-install-2026-10-15/local-ai-empty-directory/provisioning.json"
+      ]
+    },
+    "empty_directory_assets_retired": {
+      "schema_version": "skeleton.local_model.artifact_retirement.v1",
+      "retired_at": "2026-10-15T12:47:47.390294+00:00",
+      "root": "/workspace/scratch/jeeves-first-install-2026-10-15/local-ai-empty-directory",
+      "retired_receipt_digest": "70eacf1f9f7c5772a69571d1945338a54bb9f849ffef4bd593f479debfab818f",
+      "authorization": "Root explicitly authorized unused proof assets; frontier and direct Docker inspection confirmed zero running/stopped mounts and no planned bind.",
+      "all_file_shas_verified_before_deletion": true,
+      "preflight_file": "/workspace/scratch/jeeves-first-install-2026-10-15/empty-directory-retirement-preflight.json",
+      "containers_inspected": 4,
+      "mounts_inspected": 7,
+      "overlapping_mounts": [],
+      "preserved": {
+        "deployment.json": "b5fd22e156e1b854fc360691b8104d530316091dd1625bc7f950de0990373a9c",
+        "provisioning.json": "1c56e62b4b1313969489e53741d1606008e84dc329a8ac9e26ee3cc6188ee598"
+      },
+      "deleted_manifest_paths": [
+        "Qwen3-0.6B-Q8_0.gguf",
+        "runtime/LICENSE",
+        "runtime/libggml-base.so",
+        "runtime/libggml-base.so.0",
+        "runtime/libggml-base.so.0.26.0",
+        "runtime/libggml-cpu-alderlake.so",
+        "runtime/libggml-cpu-cannonlake.so",
+        "runtime/libggml-cpu-cascadelake.so",
+        "runtime/libggml-cpu-cooperlake.so",
+        "runtime/libggml-cpu-haswell.so",
+        "runtime/libggml-cpu-icelake.so",
+        "runtime/libggml-cpu-ivybridge.so",
+        "runtime/libggml-cpu-piledriver.so",
+        "runtime/libggml-cpu-sandybridge.so",
+        "runtime/libggml-cpu-sapphirerapids.so",
+        "runtime/libggml-cpu-skylakex.so",
+        "runtime/libggml-cpu-sse42.so",
+        "runtime/libggml-cpu-x64.so",
+        "runtime/libggml-cpu-zen4.so",
+        "runtime/libggml-rpc.so",
+        "runtime/libggml.so",
+        "runtime/libggml.so.0",
+        "runtime/libggml.so.0.26.0",
+        "runtime/libllama-batched-bench-impl.so",
+        "runtime/libllama-bench-impl.so",
+        "runtime/libllama-cli-impl.so",
+        "runtime/libllama-common.so",
+        "runtime/libllama-common.so.0",
+        "runtime/libllama-common.so.0.6.0",
+        "runtime/libllama-completion-impl.so",
+        "runtime/libllama-fit-params-impl.so",
+        "runtime/libllama-perplexity-impl.so",
+        "runtime/libllama-quantize-impl.so",
+        "runtime/libllama-server-impl.so",
+        "runtime/libllama.so",
+        "runtime/libllama.so.0",
+        "runtime/libllama.so.0.6.0",
+        "runtime/libmtmd.so",
+        "runtime/libmtmd.so.0",
+        "runtime/libmtmd.so.0.6.0",
+        "runtime/llama-completion"
+      ],
+      "deleted_files": 41,
+      "reclaimed_manifest_bytes": 710842550,
+      "free_bytes_before": 2445660160,
+      "free_bytes_after": 3156606976,
+      "final_qwen_artifacts_untouched": true,
+      "shared_model_untouched": true,
+      "repo_source_changes": false,
+      "retirement_digest": "4b279773bde21cc3b0a47061605b5c84e814a81ea236e44ae2a320b5c0f8080c"
+    }
+  },
+  "canonical_crawler": {
+    "schema_version": "skeleton.operator.crawler_workload_evidence.v1",
+    "kind": "actual_authorized_public_crawl",
+    "automated_tests_run": false,
+    "code_digest": "a52eab8736eab231f90d779453e9573b973f2d90ae840412a36a9479ad9cc7c0",
+    "status": "completed",
+    "usage": {
+      "bytes": 29491,
+      "documents": 2,
+      "failures": 0,
+      "requests": 4,
+      "reserved_bytes": 0
+    },
+    "source_count": 2,
+    "source_urls": [
+      "https://example.com/",
+      "https://docs.python.org/3/library/urllib.robotparser.html"
+    ],
+    "anchored_search_hits": 7,
+    "actual_controls": [
+      "paused_after_first_committed_outcome",
+      "reopened_from_snapshot",
+      "resumed_current_consent"
+    ],
+    "checkpoint_events": [
+      "dispatch_reserved",
+      "robots",
+      "dispatch_reserved",
+      "robots",
+      "dispatch_reserved",
+      "captured",
+      "dispatch_reserved",
+      "captured"
+    ],
+    "source_pins": {
+      "bound_http.py": "dc8621c0d56197a095d239175a7366e3d0628eeb6374012e5f4dc621f957fad8",
+      "core.py": "f1676e2257b74b5f2507c1190f0fb45c3fc75577d8fb78522ffca92c7a7c56b0",
+      "dns_binding.py": "cd928f64d745ac538aefce29c239aa9f0966f0563b6611487b631bd1b1b0ea56",
+      "dragon_mission_quality.py": "1b805393182ede51e2a090ffc334f47a445b6d73f144aa81306a90732846a886",
+      "http.py": "f43e5836d4c2ba59ee50dc6b0d4705c1d1e0e5cfc487847e765e387eedc56172",
+      "operations.py": "06dbea09c200d2a31d68f7bbee443fb5b399383e8299bc9825ba12449eae01cf",
+      "research.py": "bed602c63c1c06a8507ab56c2a7117740509d3008f6cc4c62f38108a1059d89d"
+    },
+    "retained_files": [
+      "/workspace/scratch/dragon-crawler-2026-10-15/final-v3/receipt.json",
+      "/workspace/scratch/dragon-crawler-2026-10-15/final-v3/checkpoint.json",
+      "/workspace/scratch/dragon-crawler-2026-10-15/final-v3/events.jsonl"
+    ],
+    "static_checks": [
+      "black five owned Python files",
+      "ruff five owned Python files",
+      "py_compile five owned Python files",
+      "JSON parse candidatecontract"
+    ],
+    "authority": "Existing CORE_DB Mongo application custody; scratch files are operator evidence only",
+    "claims_excluded": [
+      "verified knowledge",
+      "human source review",
+      "publisher training rights",
+      "model training",
+      "XP/mastery",
+      "production promotion",
+      "masterplan completion",
+      "origin-peer pinning through configured proxy"
+    ]
+  },
+  "authenticated_crawler_application": {
+    "schema_version": "operator.actual_crawler_app.v1",
+    "session_id": "a2fcb7ed-d987-5f30-a445-ecd713cb1aac",
+    "status_before_erasure": "completed",
+    "actual_usage": {
+      "bytes": 1154,
+      "documents": 1,
+      "failures": 0,
+      "requests": 2,
+      "reserved_bytes": 0
+    },
+    "source_count": 1,
+    "event_count": 6,
+    "history_truncated": false,
+    "exports": [
+      {
+        "format": "json",
+        "bytes": 2477,
+        "content_digest": "23d517f82a7987dc349de75ef0875bdfaf29e3a7a5c611b7536fb5fe7d1a71af"
+      },
+      {
+        "format": "markdown",
+        "bytes": 260,
+        "content_digest": "3bce70dd138f4fcc025efebb009a22b3f63c1f5db826b57521c6ac9662eb002f"
+      }
+    ],
+    "final_source_state": "erased_from_application",
+    "exported_copies_retained_in_operator_evidence": true,
+    "model_calls": 0,
+    "automatic_review_or_training": false,
+    "credentials_in_receipts": false
+  },
+  "actual_model_studio_goal": {
+    "goal_id": "53f0d2a1-571f-5e24-935a-fd7b62577878",
+    "completed": true,
+    "model_calls": 2,
+    "executed_command": "console.inspect",
+    "provider_receipts": 2,
+    "receipt_sha256": "3ae4bc70e9cf6e39653b963c273df60dd18116c22ad7840136d31ed1ef8c4929",
+    "goal_satisfaction_verified": false,
+    "evidence": "machine/ai_game_studio_session_evidence_2026-10-14.json#runtime_continuation"
+  },
+  "historical_chat_first_turn": {
+    "actual_canonical_model_execution": "d30321d8-7daf-5fda-864d-ecdd80f26c97",
+    "output_budget": 64,
+    "result": "Canonical USER+prepared command and assistant lineage, replay, same-execution resume and title CAS completed. Model output was unfinished reasoning; retained without useful-answer quality claim. Proper nonthinking profile and transport recovery under development."
+  },
+  "unconfigured_model_startup": {
+    "active": "local",
+    "available": false,
+    "providers": [
+      {
+        "active": true,
+        "architecture_acknowledged": true,
+        "architecture_tag": "arch-map/v3.7",
+        "available": false,
+        "capabilities": [
+          "text-generation"
+        ],
+        "configured": false,
+        "construction_version": "3.7.0",
+        "context_window": 16384,
+        "credential_free": true,
+        "default_output_tokens": 256,
+        "execution_mode": "local",
+        "fallback": false,
+        "id": "local",
+        "limits_source": "engine_chat_policy",
+        "max_output_tokens": 8192,
+        "model": null,
+        "readiness_code": "local_model_not_configured",
+        "routing": null,
+        "semantic_verifier_configured": false,
+        "supports_temperature": false,
+        "tokenizer": "utf8_bytes"
+      }
+    ]
+  },
+  "source_validation": {
+    "architecture_map": "pass",
+    "construction": "pass",
+    "capability_interfaces": "pass",
+    "enterprise_superiority": "valid",
+    "enterprise_notes": "valid",
+    "changed_python_ownership_ast_compilation": {
+      "status": "pass",
+      "files": 123,
+      "receipt": {
+        "path": "/workspace/scratch/jeeves-integrated-source-validation.json",
+        "bytes": 19289,
+        "sha256": "4da9c6493e2ec7f83610f064cc737a4b1be40015c82b1b3d41cd89409ae29ea0"
+      }
+    },
+    "whole_provider_bootstrap": {
+      "status": "pass",
+      "final_evidence": {
+        "path": "/workspace/scratch/jeeves-integrated-provider-final-evidence.json",
+        "bytes": 5159,
+        "sha256": "94a8d7819fb73b68cd8ba78d9e8d9ed788aedb1b25e59f82173f1fd90931aaed"
+      },
+      "prior_integrated_evidence": {
+        "path": "/workspace/scratch/jeeves-integrated-provider-evidence.json",
+        "bytes": 5159,
+        "sha256": "94a8d7819fb73b68cd8ba78d9e8d9ed788aedb1b25e59f82173f1fd90931aaed"
+      }
+    },
+    "automated_tests_run": false,
+    "docker_materialization": [
+      {
+        "dockerfile": "Dockerfile",
+        "mandatory_documents": 12,
+        "final_stage": "stage-0",
+        "stage_names": [
+          "stage-0"
+        ],
+        "errors": []
+      },
+      {
+        "dockerfile": "backend/Dockerfile",
+        "mandatory_documents": 12,
+        "final_stage": "development",
+        "stage_names": [
+          "builder",
+          "runtime-source",
+          "production",
+          "development"
+        ],
+        "errors": []
+      }
+    ],
+    "ai_file_tree": "pass; 179 governed mappings, 49 missing/stale existing-main mirrors repaired, 12 existing-main AI-only training overlays declared, 60 source object pointers refreshed",
+    "provider_validator_lint": "Only two unchanged baseline diagnostics; no introduced diagnostic",
+    "lint_delta": {
+      "status": "pass",
+      "files": 123,
+      "introduced_diagnostics": 0,
+      "scope": "Current-main canonical-owner diagnostics distinguished from authored changes and restored mirrors",
+      "receipt": {
+        "path": "/workspace/scratch/jeeves-integrated-lint-delta.json",
+        "bytes": 27701,
+        "sha256": "a216d9c720c5df4ba7029f191b6b4cee6b5cfb00a41a3cd961f37b24d8727178"
+      }
+    },
+    "known_private_credential_values": {
+      "status": "pass",
+      "known_private_values_checked": 8,
+      "staged_paths": 200,
+      "matched_paths": [],
+      "scope": "Exact privately generated runtime credential values; no secret values included in this report"
+    }
+  },
+  "remaining_operational_checks": [],
+  "actual_grounded_chat": {
+    "thread_id": "074d28c1-44f3-4a81-8de1-0818acd26add",
+    "operation_id": "e8f0beae-e7f1-55ed-a8a6-b8eb4142869b",
+    "execution_id": "1ea86e24-9a3c-5885-9841-7e5e9e79490c",
+    "terminal": true,
+    "state": "completed",
+    "assistant_message_id": "220f5415-6e11-4428-880d-9977eee1cc7a",
+    "provider_receipts": [
+      "provider:local:local:llama:7119bef261611b26f326f7c4da4dc3fdeb7bb28e2faf1ec392bda7b21215ef52:9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031:7896cf5071cf8d5b39ca4fc6f426caf7"
+    ],
+    "same_assistant_on_replay": true,
+    "same_execution_on_resume": true,
+    "stream_events": 9,
+    "stream_final_seen": true,
+    "stream_errors": [],
+    "connections": 2,
+    "last_cursor": "9:1c130d295b9718669c903c565ddfd05389027638773d16b95009eb5e45d67be2",
+    "export_content_sha_matches": true,
+    "export_messages": 2,
+    "context": {
+      "context_id": "97260704-14b1-536c-b428-5073f93e9b8c",
+      "context_digest": "7b8fe9cd7204068623b6c6928e535f8877975cb63f6d50e2567c8a425ea531e8",
+      "source_snapshot": [
+        [
+          "20c4553a-4e20-5968-86a1-258fbc765928",
+          "2174f5ed64ec27491c57d62c7942d7daf607c550802dd64f6981c05a5db68214"
+        ],
+        [
+          "69eb7bde-415b-592b-8a06-344a2b2caf11",
+          "c2b41787a7eefb464ba9a874888473ff6c0d2a81d1b481d2abf7db3b430fb475"
+        ],
+        [
+          "86f9772a-32f9-5676-9d41-e2617484370e",
+          "896fb51cb08b2feab8618608108f74e6153ed325db3adf16b9d9b209c308246a"
+        ],
+        [
+          "f75bc81d-1d65-5959-8681-5e9a8907683e",
+          "be1bd7b2b6caab5d54a9300a44d94a0607295b04c9af5edc00f61d817ca61da0"
+        ]
+      ],
+      "compiler_version": "context-compiler-v2",
+      "handoff_digest": "83abdf0d29170ec8ffc13676a187fe7bcf147fc8bbd64f438cb8cc5daef8f79b"
+    },
+    "files": {
+      "resume.json": "fc0a070e05bc47fa30aac03b66afe41cab50238a40f54bcf6cc38e9011caf223",
+      "session.json": "110cda198c07bd4cc32135d079999f9700c64e8d1ea0e4f417496743a2e6fe04",
+      "stream.json": "2da427d23ba1218bf8d522cfb2caa34b39fea3e6297d71b292ec8e2190098254",
+      "final.json": "0375e75f20d93b227bb99372a627866063994de255e95c71bf0e5550bb43faae",
+      "submitted.json": "612666bc697c5fd1ac08923f6d712630ac56c3b60f7eb8966ce03321058534e0",
+      "export-markdown.json": "0b39ea1c48e8b13a6fae96b41991e812b73cf59f055fdaf9a4cab7eb51443857",
+      "thread-final.json": "2344b83f7f4b53dabcf81451b06c11f8394744e99c5f03697861f8e26dd80c2c",
+      "replayed.json": "8af8b8ea3b3529803967c69118b968870e4466399096596c2430b15015a171be",
+      "thread-created.json": "0b588e505ec5188cf804044861b3f914f41aa38e6c69cd324957fdc16faae063",
+      "readiness.json": "d229b4baca738151394c9ac41d661994804f1c59979b7586a968607b9a0edd1b"
+    },
+    "answer": "The Example Domain page is for use in documentation examples without needing permission, citing its source URL at https://example.com.",
+    "source_withdrawal": {
+      "source_erased": true,
+      "erasure_replay_same_version": true,
+      "source_get_after_erasure_status": 404,
+      "followup_status": 409,
+      "followup_code": "chat_crawler_source_withdrawn",
+      "thread_version_unchanged": true,
+      "thread_sequence_unchanged": true,
+      "messages_unchanged": true,
+      "new_model_request_not_admitted": true
+    }
+  },
+  "web_export": {
+    "archive": "/workspace/scratch/jeeves-app-oct15-operational-final.zip",
+    "bytes": 9314864,
+    "sha256": "cd0a6a960c232647c01cbda1a24568acd61a844c0b19a0c2a317ccabc231f2ac",
+    "files": 294,
+    "uncompressed_bytes": 33818692,
+    "html_routes": 188,
+    "javascript_files": 67,
+    "main_sha256": "7b28e2d06bac1c506f355231683990386e04bbfb633dbc7b07af52d684b1a5c7",
+    "actual_unauthenticated_browser_pages": 4,
+    "javascript_exceptions": 0,
+    "browser_checks": [
+      "actual hydration and API effects",
+      "desktop/mobile setup and visible sign-in",
+      "truthful current readiness",
+      "false passive-inactivity outage banner removed"
+    ],
+    "deployed": false
+  },
+  "historical_web_builds": {
+    "jeeves-app-oct15-first-install-final.zip": "Compiled/exported but rejected by actual browser due import.meta runtime syntax error; preserved.",
+    "jeeves-app-oct15-first-install-hydrated-final": "Babel-transform fix established actual hydration; final auth/connectivity revisions are in operational-final."
+  },
+  "authenticated_browser": {
+    "at": "2026-10-15T12:39:46.374Z",
+    "status": "success",
+    "qualification": "manual actual Chromium CDP production-bundle inspection",
+    "bundle_sha256": "7b28e2d06bac1c506f355231683990386e04bbfb633dbc7b07af52d684b1a5c7",
+    "login_status": 200,
+    "canonical_conversations": 3,
+    "cache_scope_matches_verified_identity": true,
+    "cache_ids_all_in_owned_library": true,
+    "legacy_unscoped_cache_opened": false,
+    "javascript_exceptions": 0,
+    "model_calls_started": 0,
+    "automated_tests_run": 0,
+    "source_edits": 0,
+    "desktop_screenshots": [
+      "/workspace/scratch/jeeves-first-install-2026-10-15/authenticated-browser/authenticated-chat-initial.png",
+      "/workspace/scratch/jeeves-first-install-2026-10-15/authenticated-browser/account-conversation-library.png",
+      "/workspace/scratch/jeeves-first-install-2026-10-15/authenticated-browser/account-model-selector.png",
+      "/workspace/scratch/jeeves-first-install-2026-10-15/authenticated-browser/authenticated-readiness.png",
+      "/workspace/scratch/jeeves-first-install-2026-10-15/authenticated-browser/authenticated-crawler-list.png"
+    ],
+    "mobile_screenshot": "/workspace/scratch/jeeves-first-install-2026-10-15/authenticated-browser/authenticated-chat-mobile.png",
+    "observed_legacy_practice_unconfigured": true,
+    "shared_services_restarted": false,
+    "temporary_preview_port": 3040,
+    "temporary_browser_profile_removed_after_shutdown": true,
+    "scope": "Actual final production export and existing authenticated backend/engine/Mongo; isolated clean Compose ingress is qualified separately.",
+    "receipt": {
+      "path": "/workspace/scratch/jeeves-first-install-2026-10-15/authenticated-browser/receipt.json",
+      "bytes": 1411,
+      "sha256": "5f9164e27867e1928a30d53d21581351446b1a04376b13bd7238e7b45b4a76ac"
+    },
+    "cleanup_receipt": {
+      "path": "/workspace/scratch/jeeves-first-install-2026-10-15/authenticated-browser/cleanup.json",
+      "bytes": 162,
+      "sha256": "9fd6095e53e2c49c2b470fe7dad46f902b653bbf660ba79c7fc36d15a360076f"
+    }
+  },
+  "qualification_limits": [
+    "Implementation candidate; no production promotion or masterplan completion.",
+    "No automated tests authored or run, following user instruction.",
+    "Real local inference uses a small 0.6B CPU model; useful complex planning and general game-development quality are not established.",
+    "Captured sources remain unreviewed; no automatic model training, XP, source rights or knowledge promotion is inferred.",
+    "Buffered inference publishes real durable transitions and final answers. The first-install session UI has no token deltas or attachment upload; existing main governed chat attachments/edit/regenerate remain supported.",
+    "Native Windows/macOS/ARM execution, hosted model inference, all-console/all-title compatibility and 100000-run endurance are not qualified.",
+    "The newly hardened network-download worker was source-reviewed; actual new provisioning used verified offline copies of previously acquired pinned artifacts.",
+    "Operational scratch artifacts and private credentials are not repository state; source evidence records their measured identities.",
+    "Separate reviewed Dragon practice/companion storage is optional and unconfigured in these first-install workloads; its unavailable state remains visible."
+  ],
+  "preintegration_clean_compose": {
+    "automated_tests_run": false,
+    "source_scope": "preintegration candidate images; final current-main merge not requalified by this workload",
+    "images": {
+      "skeleton-first-install-mongo": "sha256:afc88244d9e7cd1881688f8952bd120bddbf8814e7a0fc683d296f52a71f375d",
+      "skeleton-first-install-skeleton": "sha256:a898c961f4bca60b62aaca4e143f1d08a626d272a284839c9740934512bf8556",
+      "skeleton-first-install-backend": "sha256:9c1ef96040e170f353454968bb3cd1eb813a5fb9440ae326250783a8907409da",
+      "skeleton-first-install-frontend": "sha256:f2b5f93807a0e1d212c76f628f7bb4674da55b6cffbd4c1f4a8d8d949892f3df"
+    },
+    "container_health": {
+      "skeleton-first-install-mongo": "healthy",
+      "skeleton-first-install-skeleton": "healthy",
+      "skeleton-first-install-backend": "healthy",
+      "skeleton-first-install-frontend": "healthy"
+    },
+    "accounts": {
+      "viewer": {
+        "http_status": 200,
+        "authenticated": true,
+        "observed_role": "viewer",
+        "token_predates_current_container": true
+      },
+      "admin": {
+        "http_status": 200,
+        "authenticated": true,
+        "observed_role": "admin",
+        "token_predates_current_container": true
+      }
+    },
+    "sameorigin": {
+      "automated_tests_run": false,
+      "actual_sameorigin_routes": {
+        "/healthz": {
+          "http_status": 200,
+          "bytes": 3
+        },
+        "/product": {
+          "http_status": 200,
+          "bytes": 111091
+        },
+        "/api/v1/health/live": {
+          "http_status": 200,
+          "bytes": 115
+        },
+        "/api/auth/me": {
+          "http_status": 200,
+          "bytes": 180,
+          "authenticated": true
+        },
+        "/api/v1/conversations": {
+          "http_status": 200,
+          "bytes": 24
+        },
+        "/api/dragon-academy/crawler/readiness": {
+          "http_status": 200,
+          "bytes": 637,
+          "available": true,
+          "code": "ready"
+        }
+      },
+      "served_main_js_sha256": "7b28e2d06bac1c506f355231683990386e04bbfb633dbc7b07af52d684b1a5c7",
+      "exact_browser_qualified_export": true
+    },
+    "unconfigured_doctor": {
+      "platform_ready": true,
+      "configuration_ready": true,
+      "services_ready": true,
+      "ai": {
+        "provider": "local",
+        "configuration": "unconfigured",
+        "available": false,
+        "observed": true,
+        "scope": "Canonical AI readiness projection; no inference or model quality claim."
+      }
+    },
+    "configured_doctor": {
+      "platform_ready": false,
+      "configuration_ready": true,
+      "services_ready": true,
+      "ai": {
+        "provider": "local",
+        "configuration": "configured",
+        "available": true,
+        "observed": true,
+        "scope": "Canonical AI readiness projection; no inference or model quality claim."
+      }
+    },
+    "canonical_chat": {
+      "automated_tests_run": false,
+      "scope": "actual preintegration glibc engine container inference through canonical sameorigin chat, real readonly pinned model",
+      "terminal": true,
+      "success": true,
+      "ai_generated": true,
+      "engine_execution_id": "f97b2746-add2-54f7-bb16-a5ff873bef70",
+      "operation_id": "c50a0b73-bf0f-54a3-aa7e-cd617a0bbd4c",
+      "provider": "skeleton-engine",
+      "model": "engine-routed",
+      "response_bytes": 39,
+      "response_sha256": "88840176b3ce4600ae6471f08894fde39c411fc3f3a4253ea219af4c7a8c0c6f",
+      "response": "Hello! How can I assist you today? \ud83d\ude0a",
+      "elapsed_poll_seconds": 11.365,
+      "assistant_message_id": "b437f6f1-4bbc-46ed-87be-838e0b92ce56"
+    },
+    "provider_receipt_refs": [
+      "provider:local:local:llama:7119bef261611b26f326f7c4da4dc3fdeb7bb28e2faf1ec392bda7b21215ef52:9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031:b930b76150c8ea7c6497cb765949f022"
+    ],
+    "response_acceptance_receipt": "response-acceptance-sha256:b18ed9bc57ee281bce98f0814b57686cebc79ce9adf86cbffbab7185b487e803",
+    "actual_runtime_provider": "local",
+    "model_inventory": {
+      "providers": [
+        {
+          "id": "local",
+          "model": "Qwen3-0.6B-Q8_0",
+          "available": true,
+          "ownership": "engine-process",
+          "execution_mode": "local",
+          "artifact": {
+            "schema": "skeleton.local_model.deployment.v1",
+            "model_id": "Qwen3-0.6B-Q8_0",
+            "model_digest": "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
+            "artifact_sha256": "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
+            "artifact_bytes": 639446688,
+            "reference": "local-model-deployment:faa4d24357ca6c478e7a6766e81017cfc29a1ab1e2fe98463220e75db930adfd"
+          }
+        }
+      ],
+      "active": "local",
+      "engine": "skeleton-engine",
+      "llm_available": true,
+      "configured": true,
+      "availability_observed": true
+    },
+    "source_hash_report": "actual-final-container-source-identities.json",
+    "frontend_packaging": "actualhostExpoexport inexactcanonicalpinnedNginxruntime, NodeDockerbuildernotrerun; originalproductionexportpreviouslybrowserqualified",
+    "free_disk_bytes": 1927090176,
+    "configured_doctor_disk_blocker": "Configured platform_ready=false was the managed VFS host disk floor (1.8GiB<2GiB), not service/auth/model failure. Exact full doctor retained; resource cleanup and final integrated qualification recorded separately."
+  },
+  "integrated_current_main": {
+    "parent": "020fa731fd3a295aa0fbc98f219a00503c788742",
+    "previous_feature_checkpoint": "9467b9b12",
+    "previous_pr": {
+      "number": 3816,
+      "merged": true,
+      "merged_at": "2026-10-14T17:06:07Z",
+      "branch_deleted": true
+    },
+    "publication": "New isolated continuation branch; do not overwrite merged PR or current main.",
+    "semantic_preservation": [
+      "main governed attachments/edit/regenerate and searchable library",
+      "exact canonical lease and original prepared-request identities",
+      "graceful backend shutdown forwarding",
+      "neural train_document and bounded context intake",
+      "Dragon native/world/codex/maze/original routes and delivery",
+      "native checkpoints/rewind, controller devices, video/PCM source-linked receipts",
+      "existing CLI entrypoints and optional production-training extra"
+    ],
+    "provider_policy_aliases": "Strict model_selection/temperature and legacy provider_selection/provider_temperature; reject unequal dual keys without changing historical request bytes.",
+    "source_preservation_reports": [
+      {
+        "path": "/workspace/scratch/dragon-first-install-integration-preservation.json",
+        "bytes": 2564,
+        "sha256": "2938ceecb2abd7a086f5cd863fc171be745245c25b2c7c8fae7ea91a86bad7b9"
+      },
+      {
+        "path": "/workspace/scratch/jeeves-app-oct15-frontend-integration-notes.json",
+        "bytes": 2336,
+        "sha256": "c07cd1c06b039b86ed2653802250af98890200850851507d0edd864ba25cb256"
+      }
+    ],
+    "web_artifact": {
+      "archive": "/workspace/scratch/jeeves-app-oct15-integrated-observed-final.zip",
+      "archive_bytes": 10083796,
+      "archive_sha256": "9d89e64b0d9d3658fa854f83102f2f1876f7e73309e4696cf40fc3ad2c8fbbfe",
+      "file_count": 306,
+      "uncompressed_bytes": 36961078,
+      "html_routes": 199,
+      "javascript_files": 68,
+      "main_bundle": "_expo/static/js/web/entry-a6d099e2210caf48f35bd895c358ab01.js",
+      "main_bundle_bytes": 5972032,
+      "main_bundle_sha256": "61f9e7c26ce4985b63eff14613b618a2bc821fc72e9702039a3578f8501a28f2",
+      "source_snapshot": "/workspace/scratch/jeeves-app-oct15-integrated-observed-frontend-source.json",
+      "source_snapshot_sha256": "cf97f2d61fe49deb4540cf6063293016082f217ee8f4b5d60f4fee7fc5cd9432",
+      "public_api_build_env": {
+        "EXPO_PUBLIC_BACKEND_URL": null,
+        "EXPO_PUBLIC_SKELETON_URL": null,
+        "EXPO_BACKEND_URL": null,
+        "EXPO_SKELETON_URL": null,
+        "EXPO_PUBLIC_BACKEND_FALLBACK_URL": null
+      },
+      "api_resolution": "Same-origin browser endpoints; native nonbrowser fallback literals are not browser routing.",
+      "observed_layout": {
+        "desktop_width": 1440,
+        "mobile_width": 390,
+        "composer_obscured": false,
+        "crawler_heading_mobile_width": 342,
+        "javascript_exceptions": 0,
+        "console_errors": 0,
+        "browser_model_calls": 0
+      },
+      "typescript": "pass",
+      "eslint": "pass; 42 source files",
+      "production_export": "pass",
+      "metadata": {
+        "path": "/workspace/scratch/jeeves-app-oct15-integrated-observed-final-artifact.json",
+        "bytes": 39459,
+        "sha256": "57c05f6fd520ce9a09015412e7ba3e03493d5100f7b6d89973eb45d6af780ab1"
+      }
+    },
+    "operational_status": "Qualified actual current-source host API/crawler/model/browser plus fresh canonical engine/production-backend/Mongo/production-Nginx installation; no production or masterplan promotion.",
+    "actual_workflow": {
+      "schema_version": "operator.integrated_first_install_actual.v1",
+      "thread_id": "9b23f558-a07f-4dcc-acbe-c25b8b840b1d",
+      "operation_id": "539a0689-d1d9-5b0b-9f09-903763a482df",
+      "execution_id": "9b4fe69d-0af1-59e0-a833-af8b257dfa8a",
+      "assistant_message_id": "d605711e-1a8f-4d73-8b29-4e8d42bf8996",
+      "terminal_state": "completed",
+      "answer": "The Example Domain page is for use in documentation examples without needing permission, citing its source URL at https://example.com.",
+      "exact_source_url_in_answer": true,
+      "same_assistant_on_replay": true,
+      "same_execution_on_resume": true,
+      "stream_events": 9,
+      "retained_governed_stream_events": 9,
+      "stream_connections": 1,
+      "stream_errors": [],
+      "export_sha_verified": true,
+      "export_message_count": 2,
+      "source_session_id": "58136a34-9e10-5a40-91af-615902e3f167",
+      "source_erased": true,
+      "withdrawn_followup_code": "chat_crawler_source_withdrawn",
+      "withdrawn_followup_admitted": false,
+      "canonical_transcript_unchanged_after_denial": true,
+      "actual_model_turns": 1,
+      "automated_tests_run": 0,
+      "source_changes": 0,
+      "credentials_in_receipts": false,
+      "provider_receipts": [
+        "provider:local:local:llama:7119bef261611b26f326f7c4da4dc3fdeb7bb28e2faf1ec392bda7b21215ef52:9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031:48a8471b209510bb14f5d84bf0ff3f19"
+      ],
+      "context": {
+        "context_id": "7ff6ed87-8d24-564a-8419-19722b99ac9c",
+        "context_digest": "8d0f765cbaf4049faccd9b240e44fe0a13a4995708ae117f0ab5b188ff8179ee",
+        "context_source_snapshot": [
+          [
+            "20c4553a-4e20-5968-86a1-258fbc765928",
+            "2174f5ed64ec27491c57d62c7942d7daf607c550802dd64f6981c05a5db68214"
+          ],
+          [
+            "69eb7bde-415b-592b-8a06-344a2b2caf11",
+            "c2b41787a7eefb464ba9a874888473ff6c0d2a81d1b481d2abf7db3b430fb475"
+          ],
+          [
+            "8581e4bd-0d74-5db3-8453-a7910c3ec5d2",
+            "1253b60f5f7cc078133cfb240e0717fde11dc6ad9c02eb8fc8d8e47f466d3cce"
+          ],
+          [
+            "f75bc81d-1d65-5959-8681-5e9a8907683e",
+            "be1bd7b2b6caab5d54a9300a44d94a0607295b04c9af5edc00f61d817ca61da0"
+          ]
+        ],
+        "context_compiler_version": "context-compiler-v2"
+      },
+      "crawler_code_digest": "07dde39b79d1d8191b792389292f2494b2648eb955a236413a93dd081da80c8a",
+      "initial_lineage_failure_receipt_sha256": "ab41cc824f5bd4bae53dc491225bf373e259e214d7bd477c566d074de1d20fcd",
+      "initial_lineage_failure_admitted": false,
+      "retained_governed_client_empty_attachment_refs": true,
+      "evidence_files": {
+        "chat-submitted-initial-lineage-block.json": "ab41cc824f5bd4bae53dc491225bf373e259e214d7bd477c566d074de1d20fcd",
+        "withdrawn-history-followup.json": "b2b8e7943b77b120aae532124eccd9b770347fd785aea7f127957cbee03c49ef",
+        "chat-governed-events.json": "56b5849782d78f859b6b6ea87739a2979727292c80ae23e85f70fa4f8d01d624",
+        "source-erased.json": "9b05a419702c048fe0e453b196ccf9bbd50c118a4ae1c4faefa79229ece16d1a",
+        "auth-me.json": {"sha256":"533a58c4806ffbf40ea20f8385812a52ee9b7d1469e0f262770fbad6dd73d1e5"},
+        "crawler-events.json": "aac29fc999c731ebbdb3b82b3e157b65d667a62eda4afcc62c0a95f4f6cf62d7",
+        "chat-thread-before-exact-retry.json": "a679d5450cec8ff72e9346417fa87c61236d43ececd7682be0339e99ee8df51c",
+        "initial-admission-block-thread.json": "a679d5450cec8ff72e9346417fa87c61236d43ececd7682be0339e99ee8df51c",
+        "crawler-readiness.json": "ce72f7bee1e57d5562256f960cb6135ed31b88bc8f20692b0778e6920d4b82fe",
+        "chat-export.json": "cf9dd89f56d5d79f8f2a1a7f75b419e547e7d1a96cbef782b3f6a5ce426e2e4f",
+        "initial-admission-block-turn.json": "3f7e940d1a208df0f3967c3de29ad33c72fa3bda133500a829c2a1ed2d3199a8",
+        "crawler-created.json": "d20e496c98ecb3f9bbb64b7b5e376004537ad743bd9c29da2572080f5d093a37",
+        "crawler-slice-1.json": "795f4f61e5d8b9744b1a396e4c068eb2ffcea603764d13ababc834566ac73cf5",
+        "crawler-slice-0.json": "0cc19b64933637ab313eeeee74fb0e6460d2363cd797aa2b35ccce0e25d73c50",
+        "operator-bootstrap.json": "aa42b1c9ba89fa01402d7d911b224578bdde8ce5044b15b1c41614f34553b3c9",
+        "crawler-export.json": "31db27cd57cf83f807977adcd8dd561ac1dbe669b62e6a8ccad89017d140272f",
+        "chat-stream.json": "c837dba5b3a7e0f0c52a688584cef89cc6f98e66ccba24f01633344b515b7116",
+        "crawler-sources.json": "e038bbd901f1948598a2fc233884082d65d8c546ec452816d3a9e141ff608366",
+        "source-after-erasure.json": "bf6753885d1655c8fb946dfee8d6b42af1baafea78c4648a374f7dd3de246d56",
+        "crawler-resume.json": "7c75f079136569ea90a54b5c366b8dc840acc823c8ed1573e1edbebf337c97d7",
+        "crawler-summary.json": "bd2632ffe2edffb97b4042b880cadd7b6129856a734391870e49ca2792be9e60",
+        "crawler-create-replay.json": "d20e496c98ecb3f9bbb64b7b5e376004537ad743bd9c29da2572080f5d093a37",
+        "normal-api-exact-retry-requests.json": "6cd35ee300b1240a53da738bb0e3b9b8f7b7d922441196dbad53e813b11349c9",
+        "final-historical-turn-read.json": "e57f3c2b1547bf3e3a38c62e8c3c34680f599b5f0967b49040b0cfef857c0145",
+        "final-owned-crawler-list.json": "028c6430a6c641b68c4f45e0311ddf8b22d52e0b62d2e8f653a39038329b145a",
+        "chat-submitted.json": "0a01e4daddd8bd3994089164b8a02bd4fb5b16fbb99d33b6c1005d97889359fd",
+        "crawler-pause.json": "30596a4b1858361fe629f63eb5b3ba9a9dfedeb88d0ff1a21cf09c612751eff1",
+        "chat-thread-final.json": "cd7f5cb17c565478599898d883882e84db715cf6bef1391188320c03ddb999e5",
+        "chat-readiness.json": "a3a8e1bbb8518900c6e76adc2f271a748f6beb05540b60fcec2224d121aa4684",
+        "chat-thread-created.json": "8ba615bada675ef4ab3b749b90a40ee19622cf2145ee55c015fb3634e0ce19a3",
+        "chat-final.json": "8df12dc705e33bf075611564dabc7e1a45ffa00a62d18615eee524fd74d6abe3",
+        "chat-models.json": "9ee198a212c48388dca7fdd27ea563211c91905f17f842e0b8c1d337e311ebbf",
+        "thread-after-denied-followup.json": "cd7f5cb17c565478599898d883882e84db715cf6bef1391188320c03ddb999e5",
+        "normal-api-requests.json": {"sha256":"2e93eb5e78e85813323f81125fb256c979b678469acb73cd1cabf0703474f829"},
+        "chat-exact-resume.json": "756e75b58b3bd23de2aef8e09e416f4586969cbfab7f4f788a6514ab9eae6699",
+        "chat-exact-replay.json": "024249666257b61bbdd214b5db54241e83b11321cf0f4a7a4d526daeb381a8ef",
+        "source-erasure-replay.json": "9b05a419702c048fe0e453b196ccf9bbd50c118a4ae1c4faefa79229ece16d1a",
+        "final-quiescence.json": "25a52695832e27f7de13457689f6e5e903a450f251898df36aaccc1225f48844",
+        "crawler-before-erasure.json": "78b006c77c8f711b4105c9a05fc157fc74f1d82ca4b6563a780a2af1b22829ed",
+        "crawler-source.json": "a69e47e54c378dd6198e7b9913eb0cb8bc77ca3ab14249e353652a1c89f13785"
+      },
+      "final_quiescence": {
+        "owned_crawler_sessions": 0,
+        "canonical_turn_terminal": true,
+        "canonical_turn_state": "completed",
+        "historical_answer_read_after_source_erasure": true,
+        "additional_model_admission": false,
+        "private_auth_mode": "0o600"
+      },
+      "receipt": {
+        "path": "/workspace/scratch/jeeves-integrated-first-install-runtime/workflow/receipt.json",
+        "bytes": 6760,
+        "sha256": "ccb04b5aca62db36236f64661994cd140f816886792f17a94ee8b62f99edcfff"
+      },
+      "crawler": {
+        "session_id": "58136a34-9e10-5a40-91af-615902e3f167",
+        "source_id": "8ec8c4f98cfe1deeb8b7c3c20fe72a391656a93d7109c8acdeeceb39070141e2",
+        "status": "completed",
+        "usage": {
+          "bytes": 1154,
+          "documents": 1,
+          "failures": 0,
+          "requests": 2,
+          "reserved_bytes": 0
+        },
+        "source_count": 1,
+        "event_count": 6,
+        "export_digest": "3bce70dd138f4fcc025efebb009a22b3f63c1f5db826b57521c6ac9662eb002f",
+        "review_state": "unreviewed",
+        "model_training": false
+      },
+      "quiescence": {
+        "owned_crawler_sessions": 0,
+        "canonical_turn_terminal": true,
+        "canonical_turn_state": "completed",
+        "historical_answer_read_after_source_erasure": true,
+        "additional_model_admission": false,
+        "private_auth_mode": "0o600"
+      }
+    },
+    "browser": {
+      "canonical_response_sha256": "7e26f569b9b5bd34e8f5576145e0302d24d4bba556abed44f4d7eb330601ad9b",
+      "rendered_matches": {
+        "/ai-chat": true,
+        "/ai-chat#mobile": true,
+        "/jeeves-chat#mobile": true
+      },
+      "javascript_exceptions": 0,
+      "console_errors": 0,
+      "browser_model_posts": 0,
+      "account_scope_verified": true,
+      "loaded_entry_scripts": [
+        "http://127.0.0.1:3041/_expo/static/js/web/entry-a6d099e2210caf48f35bd895c358ab01.js"
+      ],
+      "final_form_login_status": [
+        200
+      ],
+      "final_fresh_login_exceptions": 0,
+      "final_source_snapshot_entries": 816,
+      "source_drift": false,
+      "remaining_limitations": [
+        "Optional Dragon practice storage and companion feed are unconfigured and truthfully return503; core scoped crawler and chat endpoints are ready.",
+        "Browser proof used real read/login operations only; no browser model calls, uploads or message mutations.",
+        "No automated tests or production deployment authorized."
+      ],
+      "cleanup": {
+        "browser_pid": 183981,
+        "owned_browser_signalled": true,
+        "ephemeral_profile_removed": true,
+        "preview_3041_retained": true,
+        "private_auth_untouched": true
+      },
+      "receipt": {
+        "path": "/workspace/scratch/jeeves-integrated-first-install-runtime/browser/qualification-summary.json",
+        "bytes": 1152,
+        "sha256": "64246b9ad305da507e3984b2fbc2834128b456744bfe905cb5e7a230c70d72c9"
+      },
+      "actual_fresh_login": {
+        "path": "/workspace/scratch/jeeves-integrated-first-install-runtime/browser/final-form-login.json",
+        "bytes": 6699,
+        "sha256": "852f5e931534c041835ca767733117fcb5a36d9084130684909a59b31decf440"
+      },
+      "model_calls_started_by_browser": 0,
+      "optional_unconfigured": "Separate reviewed Dragon practice/companion feed remains unconfigured and visibly unavailable; authenticated chat and bounded crawler are ready."
+    },
+    "historical_observed_failures": {
+      "first_fresh_chat": "Real initial409 before user/model admission, caused by prospective current USER being mistaken for persisted history. Failed receipt preserved; exact same body/key/thread succeeded after explicit current-input lineage validation.",
+      "main_layout": "Actual screenshot showed companion obscuring composer and compressed mobile crawler heading. Narrow responsive fixes are included in the observed-final export; historical exports retained.",
+      "receipt": {
+        "path": "/workspace/scratch/jeeves-integrated-first-install-runtime/workflow/chat-submitted-initial-lineage-block.json",
+        "bytes": 113,
+        "sha256": "ab41cc824f5bd4bae53dc491225bf373e259e214d7bd477c566d074de1d20fcd"
+      }
+    },
+    "governed_mirror_repair": {
+      "scope": "Current-main inherited governed mirror drift; canonical implementations preserved; existing AI-only training overlays declared before mirror writes",
+      "overlays_added": [
+        "jeeves_game_corpus.py",
+        "jeeves_game_corpus_builder.py",
+        "jeeves_game_design_benchmark.py",
+        "jeeves_game_design_review_cli.py",
+        "jeeves_game_design_review_gate.py",
+        "jeeves_game_vocabulary.py",
+        "jeeves_production_game_recovery.py",
+        "jeeves_production_game_session.py",
+        "jeeves_production_game_train.py",
+        "jeeves_production_readiness.py",
+        "jeeves_torch_game_vocabulary.py",
+        "jeeves_training_progress.py"
+      ],
+      "copies": [
+        {
+          "source": "skeleton/jeeves/game_comparison_boomerang.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_boomerang.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_branch_analysis.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_branch_analysis.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_controllers.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_controllers.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_counterfactual.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_counterfactual.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_counterfactual_viewer.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_counterfactual_viewer.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_host_preflight.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_host_preflight.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_inspiration.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_inspiration.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_inspiration_viewer.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_inspiration_viewer.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_live.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_live.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_live_evidence.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_live_evidence.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_live_http.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_live_http.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_live_viewer.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_live_viewer.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_media.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_media.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_multispectral.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_multispectral.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_readiness.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_readiness.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_schema.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_schema.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_series_ledger.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_series_ledger.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_series_viewer.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_series_viewer.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_shadow_learning.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_shadow_learning.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_signal_features.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_signal_features.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_studio.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_studio.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_synthesis.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_synthesis.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_uptake.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_uptake.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_variant_forge.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_variant_forge.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_comparison_viewer.py",
+          "destination": "skeleton/ai/agents/jeeves/game_comparison_viewer.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_emulator_cross_core.py",
+          "destination": "skeleton/ai/agents/jeeves/game_emulator_cross_core.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_emulator_exploration.py",
+          "destination": "skeleton/ai/agents/jeeves/game_emulator_exploration.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_emulator_qualification.py",
+          "destination": "skeleton/ai/agents/jeeves/game_emulator_qualification.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_emulator_replay_audit.py",
+          "destination": "skeleton/ai/agents/jeeves/game_emulator_replay_audit.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_emulator_savestate_audit.py",
+          "destination": "skeleton/ai/agents/jeeves/game_emulator_savestate_audit.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_emulator_target_gap_matrix.py",
+          "destination": "skeleton/ai/agents/jeeves/game_emulator_target_gap_matrix.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/cortex/production_profile.py",
+          "destination": "skeleton/ai/runtime/cortex/production_profile.py",
+          "kind": "missing_declared_mirror"
+        },
+        {
+          "source": "skeleton/automation/backlog_index.py",
+          "destination": "skeleton/ai/build/automation/backlog_index.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/app/runtime/runtime_commands.py",
+          "destination": "skeleton/ai/runtime/application/runtime_commands.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/repo_machine/builder.py",
+          "destination": "skeleton/ai/build/repo_machine/builder.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/repo_machine/impact.py",
+          "destination": "skeleton/ai/build/repo_machine/impact.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/repo_machine/manifest.py",
+          "destination": "skeleton/ai/build/repo_machine/manifest.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/repo_machine/navigation.py",
+          "destination": "skeleton/ai/build/repo_machine/navigation.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/repo_machine/planner.py",
+          "destination": "skeleton/ai/build/repo_machine/planner.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/repo_machine/query.py",
+          "destination": "skeleton/ai/build/repo_machine/query.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/repo_machine/retrieval.py",
+          "destination": "skeleton/ai/build/repo_machine/retrieval.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/repo_machine/shards.py",
+          "destination": "skeleton/ai/build/repo_machine/shards.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/repo_machine/workgraph.py",
+          "destination": "skeleton/ai/build/repo_machine/workgraph.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/multimodal/intake.py",
+          "destination": "skeleton/ai/runtime/multimodal/intake.py",
+          "kind": "stale_declared_mirror"
+        },
+        {
+          "source": "skeleton/jeeves/game_emulator_worker.py",
+          "destination": "skeleton/ai/agents/jeeves/game_emulator_worker.py",
+          "kind": "stale_declared_mirror_after_membership_repair"
+        },
+        {
+          "source": "skeleton/jeeves/game_learning_ingestion.py",
+          "destination": "skeleton/ai/agents/jeeves/game_learning_ingestion.py",
+          "kind": "stale_declared_mirror_after_membership_repair"
+        },
+        {
+          "source": "skeleton/cortex/live.py",
+          "destination": "skeleton/ai/runtime/cortex/live.py",
+          "kind": "stale_declared_mirror_after_membership_repair"
+        },
+        {
+          "source": "skeleton/cortex/neocortex.py",
+          "destination": "skeleton/ai/runtime/cortex/neocortex.py",
+          "kind": "stale_declared_mirror_after_membership_repair"
+        },
+        {
+          "source": "skeleton/cortex/torch_lm.py",
+          "destination": "skeleton/ai/runtime/cortex/torch_lm.py",
+          "kind": "stale_declared_mirror_after_membership_repair"
+        }
+      ],
+      "canonical_runtime_source_changed": false,
+      "automated_tests_run": false
+    },
+    "source_pin_refresh": {
+      "path": "/workspace/scratch/jeeves-integrated-all-source-pins-refresh.json",
+      "bytes": 11476,
+      "sha256": "fbdd8f0c16a215315f9fc0bb160bd99aaa9928a4cc8baf3defbe1a999016e88b"
+    }
+  },
+  "publication_target": {
+    "branch": "codex/jeeves-first-install-ai-crawler-2026-10-15",
+    "base": "main",
+    "integration_parent": "020fa731fd3a295aa0fbc98f219a00503c788742",
+    "draft_only": true,
+    "production_promotion": false
+  },
+  "final_clean_compose": {
+    "schema_version": "skeleton.first_install.actual_integrated_qualification.v1",
+    "observed_at": "2026-10-15T13:42:39.210248+00:00",
+    "automated_tests_run": false,
+    "source_scope": {
+      "repository": "/workspace/jeeves-first-install-integration",
+      "base_commit": "020fa731fd3a295aa0fbc98f219a00503c788742",
+      "qualification": "final frozen integrated working-tree file identities; publication commit managed by parent",
+      "backend_source_files_observed": 46,
+      "backend_source_mismatches": [],
+      "engine_source_mismatches": [],
+      "engine_console_scripts": 15,
+      "engine_console_scripts_match_pyproject": true
+    },
+    "images": {
+      "skeleton-first-install-final-mongo": "sha256:afc88244d9e7cd1881688f8952bd120bddbf8814e7a0fc683d296f52a71f375d",
+      "skeleton-first-install-final-skeleton": "sha256:9ffd4f8f6bed8f2e41b3c29fba73516c674272d2094154abdad16161c0b797c3",
+      "skeleton-first-install-final-backend": "sha256:8b93c5a6508c2df909febc2e7415ba05652ee1b55a9be9de73c183ef95f96ef8",
+      "skeleton-first-install-final-frontend": "sha256:b40c842d294bbc5c2b3af65a82b17a99432e89cc1e1d67c392759800a1a86d57"
+    },
+    "container_health": {
+      "skeleton-first-install-final-mongo": "healthy",
+      "skeleton-first-install-final-skeleton": "healthy",
+      "skeleton-first-install-final-backend": "healthy",
+      "skeleton-first-install-final-frontend": "healthy"
+    },
+    "fresh_configuration": {
+      "separate_scoped_mongo_and_runtime_named_volumes": true,
+      "project": "skeleton-first-install-final-oct15",
+      "explicit_private_operator_admin": true,
+      "public_registration_role": "viewer",
+      "default_provider": "local",
+      "default_model_paths_empty_until_explicit_activation": true,
+      "jwt_signing_secret_stable": true,
+      "heavy_synthetic_seed_disabled": true,
+      "local_model_mount_read_only": true
+    },
+    "accounts": {
+      "automated_tests_run": false,
+      "scope": "actual clean isolated Compose accounts/readiness, no model request",
+      "register_status": 200,
+      "registered_role": "viewer",
+      "viewer_login_status": 200,
+      "viewer_login_role": "viewer",
+      "operator_login_status": 200,
+      "operator_role": "admin",
+      "viewer_me_authenticated": true,
+      "operator_me_authenticated": true,
+      "unauthenticated_crawler_readiness_status": 401,
+      "operator_crawler_readiness_status": 200,
+      "crawler": {
+        "configured": true,
+        "available": true,
+        "code": "ready",
+        "storage_authority": "CORE_DB Mongo",
+        "network_reachability_verified": false
+      },
+      "ai_provider_status": 200,
+      "ai_available": false,
+      "ai_availability_observed": true
+    },
+    "existing_tokens_after_actual_backend_process_restart": {
+      "viewer": {
+        "http_status": 200,
+        "authenticated": true,
+        "observed_role": "viewer",
+        "token_predates_current_process_start": true
+      },
+      "admin": {
+        "http_status": 200,
+        "authenticated": true,
+        "observed_role": "admin",
+        "token_predates_current_process_start": true
+      }
+    },
+    "unconfigured_doctor": {
+      "platform_ready": true,
+      "configuration_ready": true,
+      "services_ready": true,
+      "ai": {
+        "provider": "local",
+        "configuration": "unconfigured",
+        "available": false,
+        "observed": true,
+        "scope": "Canonical AI readiness projection; no inference or model quality claim."
+      }
+    },
+    "configured_doctor": {
+      "platform_ready": true,
+      "configuration_ready": true,
+      "services_ready": true,
+      "ai": {
+        "provider": "local",
+        "configuration": "configured",
+        "available": true,
+        "observed": true,
+        "scope": "Canonical AI readiness projection; no inference or model quality claim."
+      }
+    },
+    "same_origin": {
+      "automated_tests_run": false,
+      "scope": "actual final integrated same-origin production Nginx ingress with genuine Expo export",
+      "checks": {
+        "/healthz": {
+          "status": 200,
+          "bytes": 3,
+          "sha256": "dc51b8c96c2d745df3bd5590d990230a482fd247123599548e0632fdbf97fc22"
+        },
+        "/product": {
+          "status": 200,
+          "bytes": 131454,
+          "sha256": "1312e089b2c0c8fbd227f5988995d6fe99cca710686678fcad2f2e48067c50e9"
+        },
+        "/api/v1/health/live": {
+          "status": 200,
+          "bytes": 115,
+          "sha256": "2f9236e0e08e24c29c73bf6540f65b77e539751fc17ff98f34e6f7ec4f2ed9f7"
+        },
+        "/api/auth/me": {
+          "status": 200,
+          "bytes": 180,
+          "sha256": "523f73867cd91e0afcc24ba0a8f8860e484d9b674257b75f319d1e40a9a9ca40",
+          "authenticated": true,
+          "role": "admin"
+        },
+        "/api/v1/conversations": {
+          "status": 200,
+          "bytes": 445,
+          "sha256": "03ac9e9422df16809205bc6cc0b709f53a39b847fdef43ed281d4f77300f3518"
+        },
+        "/api/dragon-academy/crawler/readiness": {
+          "status": 200,
+          "bytes": 637,
+          "sha256": "7898246b4850893f450eb0d1ecad62bd67f8b4aaf7407ea00b857d0a9c991412",
+          "available": true,
+          "configured": true,
+          "code": "ready"
+        }
+      },
+      "main_bundle": {
+        "path": "/_expo/static/js/web/entry-a6d099e2210caf48f35bd895c358ab01.js",
+        "status": 200,
+        "bytes": 5972032,
+        "sha256": "61f9e7c26ce4985b63eff14613b618a2bc821fc72e9702039a3578f8501a28f2",
+        "matches_qualified_integrated_export": true
+      }
+    },
+    "local_ai": {
+      "actual_canonical_chat": {
+        "automated_tests_run": false,
+        "scope": "actual final integrated glibc engine container inference through canonical sameorigin chat, real readonly pinned model",
+        "terminal": true,
+        "success": true,
+        "ai_generated": true,
+        "engine_execution_id": "cd371fa1-e544-5295-a90c-b23eb8566771",
+        "operation_id": "3b8bfbb6-5fb0-55aa-844e-e9b2a726c5db",
+        "provider": "skeleton-engine",
+        "model": "engine-routed",
+        "response_bytes": 39,
+        "response_sha256": "88840176b3ce4600ae6471f08894fde39c411fc3f3a4253ea219af4c7a8c0c6f",
+        "response": "Hello! How can I assist you today? \ud83d\ude0a",
+        "elapsed_poll_seconds": 4.392,
+        "assistant_message_id": "4d525ccf-ff33-482b-8540-9aed1978d93f"
+      },
+      "durable_independent_conversation_read": {
+        "automated_tests_run": false,
+        "scope": "independent canonical Mongo-backed conversation read after final container chat completion",
+        "http_status": 200,
+        "message_count": 2,
+        "assistant_message_id": "4d525ccf-ff33-482b-8540-9aed1978d93f",
+        "assistant_operation_id": "3b8bfbb6-5fb0-55aa-844e-e9b2a726c5db",
+        "assistant_ai_result_id": "engine-result:cd371fa1-e544-5295-a90c-b23eb8566771",
+        "response_sha256": "88840176b3ce4600ae6471f08894fde39c411fc3f3a4253ea219af4c7a8c0c6f",
+        "matches_terminal_response": true,
+        "causal_user_message_id": "0f3175c7-2001-4326-b8cd-1ea135547091",
+        "context_digest": "2a14cb38a9c617c154565d9087b3bcbb91c8e20e48e26fcd43ff8b5cc04e11cd",
+        "provider_receipt_refs": [
+          "provider:local:local:llama:7119bef261611b26f326f7c4da4dc3fdeb7bb28e2faf1ec392bda7b21215ef52:9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031:b4ae9ccfaca436e06adaacb7c330438c"
+        ],
+        "runtime_provider": "local",
+        "response_acceptance_receipt": "response-acceptance-sha256:5232de14d04c15463ab978f526e062ee248ff272c9eeeaeec20e6cea2561d07f"
+      },
+      "sse": {
+        "automated_tests_run": false,
+        "scope": "actual authenticated final integrated chat SSE replay through production sameorigin Nginx; existing canonical execution only, no secondmodelrequest",
+        "http_status": 200,
+        "content_type": "text/event-stream; charset=utf-8",
+        "x_accel_buffering": null,
+        "event_count": 10,
+        "events": [
+          {
+            "id": "1:cd0020ca4fbb6f709dba450ddd1cfe83e7de754110d923470ef1fb7ce621f136",
+            "event": "chat.event",
+            "bytes": 624,
+            "sha256": "d6ea87bc939a32b92e6a4d4cc748e924c4f522afe0d44c1c52d2cae25b6dfe77"
+          },
+          {
+            "id": "2:bc6e769e120accb18638fa766a9f1ee13f69e56550b54a6b74acf68e4e547ccb",
+            "event": "chat.event",
+            "bytes": 709,
+            "sha256": "97839d3a57eafbd7ba486affc0a9f5ae8954bf38b1db23bdd364f648f5bc2ccb"
+          },
+          {
+            "id": "3:2d93f4c065fd52bae0ad1f5e879b7aad6dedf494a5d88cd7c932a1f0810f4983",
+            "event": "chat.event",
+            "bytes": 711,
+            "sha256": "582be20964952436ca0b9c3ea7d3ae2d91da7656b130e3085a59b440061b2ce7"
+          },
+          {
+            "id": "4:319483f3fae6a950bda0cf2944f39591554768415b82da0212a7d12f855e2659",
+            "event": "chat.event",
+            "bytes": 685,
+            "sha256": "252481ad105e6e58723d8023e643ef5be28ef73b77b6c0850c2d7afcd146bfca"
+          },
+          {
+            "id": "5:6eb2fe88e1522eee8946f898f9cf130006452dc466ed9dece9820e10c691003b",
+            "event": "chat.event",
+            "bytes": 686,
+            "sha256": "bd98ac9b48e3548695d505c736bd5911e4795a8ab2898369aee419fd8aa87219"
+          },
+          {
+            "id": "6:9cba67fc6e9a2f888ce7bc6547a7421b9a1c6a5b9c03d0f5515f57569bb155c7",
+            "event": "chat.event",
+            "bytes": 836,
+            "sha256": "08da263721ee77b2c6eaa2f07a58a97c7ede14dcefded578702ea30252751ce3"
+          },
+          {
+            "id": "7:cef9da25f3f6b1473d58fca3523ce699ca48d1241da986cb4dbf7015b86b9821",
+            "event": "chat.event",
+            "bytes": 832,
+            "sha256": "a923730deeea6e6bd2d2df41676c83c0857f3d35201140e65d4eeeee1ba3b5c0"
+          },
+          {
+            "id": "8:359ad07f3e406d3cc2204639e1f1c35a5b2311a492f45642b0a572ffc9939a62",
+            "event": "chat.event",
+            "bytes": 712,
+            "sha256": "9471a9bb3a2d140c835fe54c1e83057078b28bda7055d4e6948845bcca2dcee1"
+          },
+          {
+            "id": "9:a162310892f5706589d356fc28d0b5183a814768c7f92b7eda0d92cd434735e1",
+            "event": "chat.event",
+            "bytes": 706,
+            "sha256": "18396f79a81438e8c9ad09b4edc0e80084becfd074de0556df2b8234fb1c31dc"
+          },
+          {
+            "event": "chat.final",
+            "bytes": 4068,
+            "sha256": "c5f6191b1d6ea5f5fafdbbdfdbe1c7e68a7c555fb9fde35c0eefc86fcf44d973"
+          }
+        ],
+        "observed_bytes": 10579,
+        "elapsed_seconds": 0.073
+      }
+    },
+    "crawler": {
+      "readiness": {
+        "configured": true,
+        "available": true,
+        "code": "ready",
+        "storage_authority": "CORE_DB Mongo",
+        "network_reachability_verified": false
+      },
+      "actual_controls": {
+        "automated_tests_run": false,
+        "scope": "actual final isolated authenticated canonical crawler create/pause/resume/cancel/purge; no run and no HTTP capture performed",
+        "session_id": "cd3801cb-e7b0-5ee5-8648-016f21e8d166",
+        "operations": [
+          {
+            "action": "create",
+            "status": 200,
+            "session_state": "queued",
+            "version": 1
+          },
+          {
+            "action": "pause",
+            "status": 200,
+            "session_state": "paused",
+            "version": 2
+          },
+          {
+            "action": "resume",
+            "status": 200,
+            "session_state": "queued",
+            "version": 3
+          },
+          {
+            "action": "cancel",
+            "status": 200,
+            "session_state": "cancelled",
+            "version": 4
+          },
+          {
+            "action": "purge",
+            "status": 200,
+            "session_state": "deleted",
+            "version": 5
+          },
+          {
+            "action": "get_after_purge",
+            "status": 404
+          }
+        ],
+        "network_capture_started": false
+      },
+      "network_capture_in_this_isolated_stack": false,
+      "scope": "readiness plus canonical admitted control lifecycle; separate parent final-host proof covers actual public HTTP capture and source-grounded chat"
+    },
+    "frontend_packaging": {
+      "source_export": "/workspace/scratch/jeeves-app-oct15-integrated-observed-final",
+      "zip_sha256": "9d89e64b0d9d3658fa854f83102f2f1876f7e73309e4696cf40fc3ad2c8fbbfe",
+      "main_bundle_sha256": "61f9e7c26ce4985b63eff14613b618a2bc821fc72e9702039a3578f8501a28f2",
+      "file_count": 306,
+      "method": "genuine final observed Expo production export in exact canonical pinned Nginx production stage; Docker Node builder not re-executed",
+      "canonical_nginx_config_sha256": "9cd4ef13b6c16e90009ae05a1475a97dfff87efc570dc00d41e2dd813fa9d542",
+      "limitation": "Fresh Docker Node builder was not rerun; genuine final host Expo production export was browser-qualified by UI owner and served unchanged from canonical pinned production Nginx stage."
+    },
+    "resource_state": {
+      "free_bytes": 2307977216,
+      "minimum_floor_bytes": 2147483648,
+      "shared_original_services_and_mongo_untouched": true,
+      "all_old_proof_named_volumes_and_receipts_retained": true,
+      "no_global_prune": true,
+      "only_exact_owned_obsolete_images_and_unused_cache_retired": true
+    },
+    "receipt_sha256": {
+      "final-engine-build-receipt.json": "2041e713565f10e0f52b7e80d192924d1475f5ffc3d2127f721c5711a489e02c",
+      "final-backend-dependencies-receipt.json": "00e8293b2d5cc326ad54b708eb251b2399e506b216102a7d5c1e0a8521e277f9",
+      "corrected-final-backend-production-build-receipt.json": "7d59f8c31a54731f359a87a54f946e2001b142e03cff7432d16860336b5107b0",
+      "final-observed-frontend-package-receipt.json": "e05035fa71232f475271784484f2ef2367f9da866e79a73d1f289295357cb973",
+      "actual-final-runtime-source-and-image-identities.json": "1d41a6fa7f44cad55e08d75f598e653279027948b780119961e6b961a8e95d62",
+      "actual-final-engine-source-and-metadata.json": "1076c9cd107a68c9211b37d0a6f75604c6828de46c216663cbb1e21e2e0ba35b",
+      "actual-account-and-readiness.json": "93de5cb7b66b3a5a26cdb1f8a20c7f86b9c0fbbc03f338945fdfb583178ed056",
+      "actual-account-restart-persistence.json": "38f2202a5e1d531ab13e2c1d9527033795e8439a25d71c16ddffdefb14b9b132",
+      "actual-final-whole-stack-ingress.json": "a1de535be152e543140cd938ce1f5dd36c7d7e8c9df096af80d0d28d4e5c5ce0",
+      "actual-unconfigured-whole-stack-doctor.json": "bf0c9fe486efc9d1e72f4799aa7a8ca4f5a5c469e07efc0616a450047c71c00a",
+      "actual-configured-whole-stack-doctor.json": "e95d9e4dfd9657cfb86687e6e5f822722c22b7aa36431561c22205d2ebc2160d",
+      "actual-container-qwen-chat.json": "13bb128c8ffc2e8e09e06dc69df9e71e198d681d1c6538d813f69e57009795a2",
+      "actual-container-qwen-chat-summary.json": "58e77e10417d94814b86450c1e4c3aedb0ddd370b25f35b2d41926b311ed44b5",
+      "actual-final-durable-conversation.json": "c1f89697b6007258d3f1d90e82a54fee248028595704480b264995af74d4ab2c",
+      "actual-final-container-chat-sse.json": "4244fad9923dd405908d28e9f181fcb3a8b078a37e1e23ccb5ecb6e3ae2bd525",
+      "actual-final-crawler-controls.json": "6964900e73715b9242940a6bdda2d9b557efa868dc9c8be212bbcc736ae7db88",
+      "frontend-observed-prebuilt-proof-input.json": "454e9cd2b2af4943ec3ad1e0847fadc0a0855921dc9e9a1def0e2b6fa566e498",
+      "approved-obsolete-base-retirement.json": "7ff452fb3645055251101aae3657dfe8919fbe9f41777d8c88fda7de933fb2a9",
+      "completed-build-storage-retirement.json": "94cd79a2cc2925cccd91d2024e111ee57648afc3e323de33f49d01d7b5148568",
+      "exact-owned-source-cache-retirement.json": "d4842b97def853cefe74d4e5c98ea33bf46d83830b06b3a3a41a155c8447d022",
+      "superseded-frontend-retirement.json": "3e9523828d2e00868ffdcc6a3110f0e6023c60f6f1ada2474e9ecacaa3b15054"
+    },
+    "limits": [
+      "No automated tests authored or run.",
+      "Hosted-provider inference was not exercised; local pinned Qwen CPU deployment was exercised.",
+      "No production/masterplan promotion or full hardware-emulation claim.",
+      "This is actual isolated local installation qualification, not a hosted deployment."
+    ],
+    "report": {
+      "path": "/workspace/scratch/jeeves-first-install-2026-10-15/final-integrated/actual-final-integrated-first-install-report.json",
+      "bytes": 15568,
+      "sha256": "9a51da3317ed071762b22bcb0df8fcde8fb1a396688d07dab480fe581d0ac040"
+    }
+  },
+  "session_completed_utc": "2026-10-15T13:44:15Z",
+  "completion_scope": "First-install AI chat, explicit local model provisioning/activation, bounded Dragon source capture, canonical recovery and source withdrawal are implemented and operationally qualified. Wider every-console studio vision remains an implementation roadmap."
+}

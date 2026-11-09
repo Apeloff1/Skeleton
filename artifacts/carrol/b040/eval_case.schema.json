@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "skeleton/b040/eval_case.schema.json",
+  "title": "B040 eval arena case (draft, QA-owned)",
+  "type": "object",
+  "required": ["case_id", "version", "brief", "seed", "dimensions"],
+  "additionalProperties": false,
+  "properties": {
+    "case_id": {"type": "string", "pattern": "^B040-[A-Z]{2,8}-[0-9]{3}$"},
+    "version": {"type": "integer", "minimum": 1},
+    "brief": {
+      "type": "object",
+      "required": ["title", "genre"],
+      "properties": {"title": {"type": "string", "minLength": 1}, "genre": {"type": "string", "minLength": 1}, "description": {"type": "string"}}
+    },
+    "seed": {"type": "integer", "minimum": 0},
+    "dimensions": {
+      "type": "object",
+      "required": ["correctness", "editability", "latency", "cost", "safety"],
+      "additionalProperties": false,
+      "properties": {
+        "correctness": {"$ref": "#/$defs/threshold"},
+        "editability": {"$ref": "#/$defs/threshold"},
+        "latency": {"$ref": "#/$defs/threshold"},
+        "cost": {"$ref": "#/$defs/threshold"},
+        "safety": {"$ref": "#/$defs/threshold"}
+      }
+    },
+    "baseline": {"type": ["object", "null"]}
+  },
+  "$defs": {
+    "threshold": {
+      "type": "object",
+      "required": ["metric", "pass_if"],
+      "properties": {"metric": {"type": "string"}, "pass_if": {"type": "string", "pattern": "^(>=|<=|==) -?[0-9.]+$"}}
+    }
+  }
+}

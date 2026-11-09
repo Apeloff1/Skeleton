@@ -1,0 +1,177 @@
+{
+  "schema_version": "skeleton.project_self_improvement_idle_scheduler.v1",
+  "version": "1.0.0",
+  "purpose": "Choose the highest-value bounded PSI-1000 mirror-room work whenever a project is foreground-idle while preserving fairness, exploration, preemption and project scope.",
+  "authority": {
+    "ladder": "machine/project_self_improvement_1000.json",
+    "epoch_contract": "machine/project_self_improvement_epoch_contract.json",
+    "essentials": "machine/essentials_1000.json"
+  },
+  "eligibility": {
+    "required": [
+      "project_idle_predicate_true",
+      "no_active_epoch_for_project",
+      "resource_budget_available",
+      "candidate_namespace_available",
+      "baseline_snapshot_possible",
+      "no_safety_or_recovery_intervention"
+    ],
+    "unknown_state": "ineligible",
+    "production_mutation": "forbidden"
+  },
+  "opportunity_schema": {
+    "required": [
+      "opportunity_id",
+      "project_id",
+      "psi_level_ids",
+      "hypothesis_family",
+      "evidence_digest",
+      "expected_capability_gain",
+      "expected_risk_reduction",
+      "knowledge_value",
+      "uncertainty",
+      "project_relevance",
+      "staleness",
+      "estimated_cost",
+      "estimated_duration",
+      "non_compensable_risk",
+      "last_attempt_result",
+      "attempt_count"
+    ]
+  },
+  "ranking": {
+    "method": "bounded multi-objective priority score plus hard gates",
+    "hard_reject": [
+      "outside_project_scope",
+      "violates_non_compensable_invariant",
+      "cannot_be_sandboxed",
+      "no_reproducible_baseline",
+      "no_rollback_or_compensation_path",
+      "requires_production_in_place_mutation",
+      "budget_exceeds_available_idle_envelope"
+    ],
+    "maximize": [
+      "expected_capability_gain",
+      "expected_risk_reduction",
+      "knowledge_value",
+      "project_relevance",
+      "uncertainty_reduction",
+      "staleness_repair"
+    ],
+    "minimize": [
+      "resource_cost",
+      "foreground_interference_risk",
+      "experiment_duration",
+      "rollback_complexity",
+      "repeat_no_gain_probability"
+    ],
+    "tie_breakers": [
+      "unresolved paired essential first",
+      "higher non-compensable risk reduction",
+      "older unresolved evidence gap",
+      "fewer prior attempts",
+      "lower resource cost",
+      "stable opportunity_id"
+    ]
+  },
+  "portfolio_policy": {
+    "exploit_share_ceiling": 0.7,
+    "exploration_share_floor": 0.2,
+    "reserve_share": 0.1,
+    "explanation": "No more than 70% of long-run idle budget may remain in known high-score exploit families; at least 20% is reserved for underexplored project-relevant hypotheses and 10% for urgent newly-arrived evidence or regressions.",
+    "domain_starvation_limit_epochs": 25,
+    "starvation_action": "raise priority for eligible under-served PSI strata unless a hard reject applies",
+    "critical_regression_override": "a reproducible security, correctness, data-loss, rollback or severe reliability regression outranks ordinary capability optimization"
+  },
+  "plateau_policy": {
+    "no_gain_threshold": 3,
+    "repeated_failure_threshold": 5,
+    "action_after_no_gain": "exponential backoff for the hypothesis family and require materially new evidence, mechanism or project change before high-priority retry",
+    "action_after_repeated_failure": "quarantine hypothesis family for manual/research review while retaining negative results",
+    "success_saturation": "when measured marginal gain falls below project significance threshold, redirect idle budget to another eligible PSI stratum"
+  },
+  "project_fairness": {
+    "scope": "only among projects already eligible for background improvement",
+    "rule": "foreground activity always dominates; among independently idle projects use weighted fair sharing constrained by user/project priority and resource locality",
+    "starvation_forbidden": true,
+    "cross_project_evidence_use": "deny-by-default until transfer-qualified",
+    "cross_project_resource_borrowing": "allowed only if source project has no eligible work and borrowing does not violate reservations or policy"
+  },
+  "capability_vector": {
+    "required_dimensions": [
+      "correctness",
+      "security",
+      "privacy",
+      "reliability",
+      "recovery",
+      "performance",
+      "cost",
+      "knowledge",
+      "reasoning",
+      "learning",
+      "tool_use",
+      "multimodal",
+      "user_experience",
+      "developer_experience",
+      "maintainability",
+      "governance",
+      "long_horizon_quality"
+    ],
+    "update": "only from verified epoch receipts",
+    "regression_rule": "a gain in one dimension cannot compensate for failure of a non-compensable invariant"
+  },
+  "trigger_sources": [
+    "new_or_reopened_essential_gap",
+    "foreground_idle_transition",
+    "new_project_evidence",
+    "failed_or_regressed_ci",
+    "new_benchmark_result",
+    "dependency_or_environment_change",
+    "new_user_correction",
+    "new_learning_400_evidence",
+    "new_adversarial_400_evidence",
+    "candidate_rejection_or_rollback",
+    "scheduled_evidence_freshness_check"
+  ],
+  "dispatch": {
+    "one_active_epoch_per_project": true,
+    "recheck_idle_before_dispatch": true,
+    "recheck_idle_before_experiment": true,
+    "recheck_idle_before_promotion": true,
+    "foreground_preemption": "absolute",
+    "epoch_receipt_required_before_redispatch": true
+  },
+  "anti_gaming": [
+    "scheduler score is not itself an acceptance metric",
+    "candidate may not modify its own ranking evidence without independent verification",
+    "benchmark-specific gains cannot erase broader regressions",
+    "repeated easy wins cannot starve hard high-value strata",
+    "proposer and challenger do not choose final promotion authority",
+    "resource accounting includes failed and rejected experiments"
+  ],
+  "audit_receipt": {
+    "required": [
+      "scheduler_decision_id",
+      "project_id",
+      "candidate_opportunities",
+      "ranked_order",
+      "selected_opportunity_id",
+      "hard_rejections",
+      "budget_snapshot",
+      "fairness_state",
+      "plateau_state",
+      "capability_vector_digest",
+      "decision_reason",
+      "created_at"
+    ]
+  },
+  "essential_priority": {
+    "enabled": true,
+    "mapping": "ESS1000-nnnn -> PSI1000-nnnn",
+    "unresolved_essential_priority": "above_optional_same_domain",
+    "hard_rule": "An unresolved paired ESS level or a regressed previously-signed ESS level is promoted ahead of optional capability polish in the affected PSI domain unless a more severe non-compensable incident elsewhere overrides it.",
+    "evidence_reuse": "PSI may reuse exact current evidence, but ESS completion requires its own independent closure signature.",
+    "stale_evidence": "Stale ESS evidence reopens the essential and restores essential-first scheduling priority.",
+    "disabled_capability_rule": "A disabled optional capability still requires its ESS safe-disabled control path and cannot be skipped as not-applicable."
+  }
+}

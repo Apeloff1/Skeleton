@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "purpose": "Quarantine historical dependency manifests under a vendored archival path with non-installable snapshot names while preserving exact Git blob identity.",
+  "entries": [
+    {
+      "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/pyproject.toml",
+      "archive_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/vendor/dependency-manifests/backend/pyproject.snapshot.toml",
+      "blob_sha": "d4189869804c59efc28c6a5fe23e0ff063f75f33",
+      "size": 5771
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/frontend/package.json",
+      "archive_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/vendor/dependency-manifests/frontend/package.snapshot.json",
+      "blob_sha": "a1d95bbad5d9cc78754eb552ed98cd894700fa63",
+      "size": 2846
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/frontend/yarn.lock",
+      "archive_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/vendor/dependency-manifests/frontend/yarn.snapshot.lock",
+      "blob_sha": "88b129eedf9e73c825dabf35975feac52d37c8c6",
+      "size": 397794
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/pyproject.toml",
+      "archive_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/vendor/dependency-manifests/pyproject.snapshot.toml",
+      "blob_sha": "0a2f1324a72aa2cd0e613e32795000f21f215c31",
+      "size": 761
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/requirements-dev.txt",
+      "archive_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/vendor/dependency-manifests/requirements-dev.snapshot",
+      "blob_sha": "774fe94377a6d7c56f353407faa02452df4f2a99",
+      "size": 83
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/requirements-frontier.txt",
+      "archive_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/vendor/dependency-manifests/requirements-frontier.snapshot",
+      "blob_sha": "432c0110e92baac76f6ea03d70936c5defbd7d43",
+      "size": 219
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/setup.cfg",
+      "archive_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/vendor/dependency-manifests/setup.snapshot.cfg",
+      "blob_sha": "143719df858673183f07b4141e5003015446ba6b",
+      "size": 771
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/backend/pyproject.toml",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/vendor/dependency-manifests/backend/pyproject.snapshot.toml",
+      "blob_sha": "335d1668d921a1e1d052045310a405f902eb2238",
+      "size": 6299
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/frontend/package.json",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/vendor/dependency-manifests/frontend/package.snapshot.json",
+      "blob_sha": "fa78461354354fd46aa3b1a3d787485e25172d50",
+      "size": 2846
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/frontend/yarn.lock",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/vendor/dependency-manifests/frontend/yarn.snapshot.lock",
+      "blob_sha": "9d26e81555bdd491923d0b8e9cbe4d208383b020",
+      "size": 393746
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/pyproject.toml",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/vendor/dependency-manifests/pyproject.snapshot.toml",
+      "blob_sha": "0a2f1324a72aa2cd0e613e32795000f21f215c31",
+      "size": 761
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/requirements-dev.txt",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/vendor/dependency-manifests/requirements-dev.snapshot",
+      "blob_sha": "774fe94377a6d7c56f353407faa02452df4f2a99",
+      "size": 83
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/setup.cfg",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/vendor/dependency-manifests/setup.snapshot.cfg",
+      "blob_sha": "143719df858673183f07b4141e5003015446ba6b",
+      "size": 771
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/backend/pyproject.toml",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/vendor/dependency-manifests/backend/pyproject.snapshot.toml",
+      "blob_sha": "335d1668d921a1e1d052045310a405f902eb2238",
+      "size": 6299
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/frontend/package.json",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/vendor/dependency-manifests/frontend/package.snapshot.json",
+      "blob_sha": "fa78461354354fd46aa3b1a3d787485e25172d50",
+      "size": 2846
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/frontend/yarn.lock",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/vendor/dependency-manifests/frontend/yarn.snapshot.lock",
+      "blob_sha": "9d26e81555bdd491923d0b8e9cbe4d208383b020",
+      "size": 393746
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/pyproject.toml",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/vendor/dependency-manifests/pyproject.snapshot.toml",
+      "blob_sha": "0a2f1324a72aa2cd0e613e32795000f21f215c31",
+      "size": 761
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/requirements-dev.txt",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/vendor/dependency-manifests/requirements-dev.snapshot",
+      "blob_sha": "774fe94377a6d7c56f353407faa02452df4f2a99",
+      "size": 83
+    },
+    {
+      "source_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/setup.cfg",
+      "archive_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/vendor/dependency-manifests/setup.snapshot.cfg",
+      "blob_sha": "143719df858673183f07b4141e5003015446ba6b",
+      "size": 771
+    }
+  ]
+}

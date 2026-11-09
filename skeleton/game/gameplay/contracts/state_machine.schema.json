@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:state_machine:v1",
+  "title": "FLGB-13 state machine",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "from_state",
+    "event",
+    "to_state"
+  ],
+  "properties": {
+    "from_state": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "event": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "to_state": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}

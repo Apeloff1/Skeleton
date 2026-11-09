@@ -1,0 +1,53 @@
+{
+  "schema": "platform.godot_adapter.input.v1",
+  "schema_version": 1,
+  "project": {
+    "title": "Adapter Conformance",
+    "viewport_width": 1280,
+    "viewport_height": 720,
+    "renderer": "gl_compatibility",
+    "features": ["4.3"]
+  },
+  "game": {
+    "combat_style": "real_time",
+    "mechanic_types": ["combat", "movement"],
+    "currencies": ["gold"]
+  },
+  "world": {
+    "kind": "forge.room_graph",
+    "rooms": [
+      {
+        "id": "r00",
+        "kind": "spawn",
+        "x": 320.0,
+        "y": 180.0,
+        "occupants": [{"kind": "player"}]
+      },
+      {
+        "id": "r01",
+        "kind": "combat",
+        "x": 960.0,
+        "y": 180.0,
+        "occupants": [{"kind": "enemy", "tier": "trash"}]
+      },
+      {
+        "id": "r02",
+        "kind": "extract",
+        "x": 1600.0,
+        "y": 180.0,
+        "occupants": [{"kind": "extract"}]
+      }
+    ],
+    "edges": [
+      {"from": "r00", "to": "r01"},
+      {"from": "r01", "to": "r02"}
+    ]
+  },
+  "creator": {
+    "kind": "game-spec",
+    "schema": "2026.09.06-gamespec",
+    "vision": "Adapter Conformance",
+    "genre": "action",
+    "platform": "godot"
+  }
+}

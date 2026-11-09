@@ -1,0 +1,1772 @@
+{
+  "schema": "skeleton.dragon.acquisition_observations.v1",
+  "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "source_range": {
+    "start_inclusive": 704,
+    "end_exclusive": 736
+  },
+  "checked_at": "2026-10-12T01:11:06Z",
+  "counts": {
+    "newly_checked": 32,
+    "fetched_representations": 21,
+    "target_page_representations": 19,
+    "repository_metadata_checks": 10,
+    "repository_metadata_only": 2,
+    "metadata_shells": 1,
+    "retrieval_failed": 10,
+    "blocked_from_admission": 32,
+    "distilled": 0,
+    "approved": 0,
+    "auxiliary_identity_or_rights_files_fetched": 16,
+    "additional_license_or_rights_files_fetched": 8,
+    "git_blob_identities_captured": 16
+  },
+  "count_definitions": {
+    "fetched_representations": "Unique candidates with substantive page or repository identity/README; metadata-only video shell excluded.",
+    "repository_metadata_checks": "Pinned or explicitly revision-limited API checks; overlaps eight web pages and includes two repository-only outcomes.",
+    "blocked_from_admission": "All outcomes; none passed custody, independent review, Wiki/HOAG and rights gates."
+  },
+  "registry_shard": {
+    "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-005.jsonl",
+    "git_blob_sha": "33d4309a6c6a1226d74ce43d0d5e5eca7431c4d1",
+    "content_sha256": "4829e9725d931b1b3020c4173d524af735ab128dbe243ff006965cf3a37113b7",
+    "manifest_content_sha256": "4829e9725d931b1b3020c4173d524af735ab128dbe243ff006965cf3a37113b7"
+  },
+  "receipts": [
+    {
+      "source_id": "source-26f2e0146643931b27d4dbaa65786591269d937e0c4d9cf5d6890205749fac6d",
+      "source_offset": 704,
+      "url": "http://inventwithpython.com/pygcurse/",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn235view0",
+      "representation_sha256": "46a092bb23ef207bef746164e7d31f8c18649d4ad3569e07547f7a3d111efa85",
+      "representation_byte_length": 4476,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Al Sweigart / Invent with Python",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+          "Libraries",
+          "Python"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The page describes Pygcurse as a curses-like text-grid emulator built on Pygame.",
+        "span": "turn235view0; pinned repository evidence where stated",
+        "limitations": "Project description only; compatibility, maintenance and licensing were not independently validated.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-26f51b8ada0319fd020d9379456c0db069c28d5437ac459ceca478a367ea3b92",
+      "source_offset": 705,
+      "url": "https://dev.to/virtualmaker/unit-testing-for-unity-developers-52lp",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn235view1",
+      "representation_sha256": "6ee077dd3bfe8e8a83c0ef82aa835bd2cdd0cde9bcf0a27bfd6a615d16a57add",
+      "representation_byte_length": 24869,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Virtual Maker, DEV Community byline",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "**Unity**"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The article presents Unity unit-testing practices and examples for editor/runtime code.",
+        "span": "turn235view1; pinned repository evidence where stated",
+        "limitations": "Single-author tutorial; no controlled defect-reduction evidence or project-specific reproduction.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-26fb768e65ae252823fd3d2858079963f6674d2aad7d373c66deca4827995432",
+      "source_offset": 706,
+      "url": "https://en.wikipedia.org/wiki/MonoGame",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn235view2",
+      "representation_sha256": "2cb770e703481bcf7636b4201aec67b36b29e6521f1ec5f06ad5d7a4061f97fa",
+      "representation_byte_length": 235,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Wikipedia contributors",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+          "Learning",
+          "Computer Graphics"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The page provides secondary background on MonoGame and its lineage.",
+        "span": "turn235view2; pinned repository evidence where stated",
+        "limitations": "Secondary orientation only; use official project documentation and exact licenses for implementation decisions.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-2710cd88212fc14ddf04fac7faa4e2cebe5bb2ba386cf1f00d19bad9aa6602b9",
+      "source_offset": 707,
+      "url": "https://github.com/PandaArcade/UIOutline/",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open_plus_GitHub_connector",
+      "citation_ref": "turn235view3",
+      "representation_sha256": "a8bfda2d0058e89b9aa954aac26e3530494b6a09a9f15c60f6e32025be9e4eb4",
+      "representation_byte_length": 268,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": "b89129996e25019393265279c7b17e73b2b2af17",
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "PandaArcade repository account",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "**Unity**"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The pinned repository describes a Unity UI outline component.",
+        "span": "turn235view3; pinned repository evidence where stated",
+        "limitations": "Component availability does not clear Unity, example assets, fonts or downstream product rights; no Unity build ran.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": {
+        "repository": "PandaArcade/UIOutline",
+        "owner": "PandaArcade",
+        "archived": false,
+        "default_branch": "master",
+        "commit_sha": "b89129996e25019393265279c7b17e73b2b2af17",
+        "commit_date": "2021-09-15T06:38:43Z",
+        "files": [
+          {
+            "repository": "PandaArcade/UIOutline",
+            "path": "README.md",
+            "url": "https://github.com/PandaArcade/UIOutline/blob/b89129996e25019393265279c7b17e73b2b2af17/README.md",
+            "requested_ref": "b89129996e25019393265279c7b17e73b2b2af17",
+            "commit_sha": "b89129996e25019393265279c7b17e73b2b2af17",
+            "api_git_blob_sha": "5ba1097ece434eb9bdb64e79c97e48d74c68a617",
+            "content_sha256": "42bd92eafe9b09b742459a35eed3a10ed6844c2317877ccee0b7eb17ff21dd38",
+            "byte_length": 1063,
+            "role": "identity_or_discovery_file",
+            "revision_limit": null
+          },
+          {
+            "repository": "PandaArcade/UIOutline",
+            "path": "LICENSE",
+            "url": "https://github.com/PandaArcade/UIOutline/blob/b89129996e25019393265279c7b17e73b2b2af17/LICENSE",
+            "requested_ref": "b89129996e25019393265279c7b17e73b2b2af17",
+            "commit_sha": "b89129996e25019393265279c7b17e73b2b2af17",
+            "api_git_blob_sha": "fdddb29aa445bf3d6a5d843d6dd77e10a9f99657",
+            "content_sha256": "6b0382b16279f26ff69014300541967a356a666eb0b91b422f6862f6b7dad17e",
+            "byte_length": 1211,
+            "role": "license_or_rights_file",
+            "revision_limit": null
+          }
+        ]
+      },
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-2711ccd31b4b37f0500a9b562cd6a353eb313fa7fbdc66fb86ad676bb09b0081",
+      "source_offset": 708,
+      "url": "https://github.com/mgerhardy/simpleai/",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "repository_metadata_returned",
+      "retrieval_method": "authorized_web_open_plus_GitHub_connector",
+      "citation_ref": "turn235view4",
+      "representation_sha256": "55e01fa22fe8d15080eba5fc45d0b66433492ded75ab682cc4bab1b154837d9a",
+      "representation_byte_length": 148,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "mgerhardy/simpleai maintainer",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Table of Contents",
+          "AI"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The pinned README describes a small C++ AI library with steering and behavior-tree facilities.",
+        "span": "turn235view4; pinned repository evidence where stated",
+        "limitations": "Repository age and a license file do not prove present compatibility, performance or rights to linked examples.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": {
+        "repository": "mgerhardy/simpleai",
+        "owner": "mgerhardy",
+        "archived": false,
+        "default_branch": "master",
+        "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+        "commit_date": "2019-11-16T20:44:37Z",
+        "files": [
+          {
+            "repository": "mgerhardy/simpleai",
+            "path": "README.md",
+            "url": "https://github.com/mgerhardy/simpleai/blob/db3acd891f46f67ae70c271bf88a46e6e6b28b0f/README.md",
+            "requested_ref": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+            "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+            "api_git_blob_sha": "f7425ffe0012c5d75c482f269bb9582dc6b25021",
+            "content_sha256": "bb7e37c648d5cf35ee98b61173253f589108904bf614536e8f56965d8eef50dd",
+            "byte_length": 1646,
+            "role": "identity_or_discovery_file",
+            "revision_limit": null
+          },
+          {
+            "repository": "mgerhardy/simpleai",
+            "path": "COPYING",
+            "url": "https://github.com/mgerhardy/simpleai/blob/db3acd891f46f67ae70c271bf88a46e6e6b28b0f/COPYING",
+            "requested_ref": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+            "commit_sha": "db3acd891f46f67ae70c271bf88a46e6e6b28b0f",
+            "api_git_blob_sha": "7a28f8632267c9808ab399ce1b76c51e746473a7",
+            "content_sha256": "dfdf99c23ed68073efe29f4219c48c08c928f3c58e1d932732315e033de66a2e",
+            "byte_length": 892,
+            "role": "license_or_rights_file",
+            "revision_limit": null
+          }
+        ]
+      },
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-272a6b124e0280b4f18944769cf9a4df0772ae5ab348848b653865e6fc29c837",
+      "source_offset": 709,
+      "url": "https://web.archive.org/web/20220815160634/http://db-design.splashdamage.com.s3-eu-west-1.amazonaws.com/dirty_bomb-game_design_document.pdf",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "retrieval_failed",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn235view5",
+      "representation_sha256": "375099f0d76e392bc8a5a3ec8df9b4fe1ae344eb5d939af7e2630c0efde3c5e5",
+      "representation_byte_length": 249,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": {
+        "detail": "Internal Error ()\n【turn235view5】 [wordlim: 200] Source: open({\"ref_id\":\"https://web.archive.org/web/20220815160634/http://db-design.splashdamage.com.s3-eu-west-1.amazonaws.com/dirty_bomb-game_design_document.pdf\",\"lineno\":null}); Total lines: 1\n",
+        "scope": "This authorized channel only; no bypass, PDF workaround or restricted media retrieval attempted."
+      },
+      "creator_publisher_identity": "Not established",
+      "relevance": "unresolved",
+      "discovery_headers": [
+        [
+          "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+          "Design",
+          "Reference"
+        ]
+      ],
+      "attributable_observation": null,
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-272b925a473750a79c663c27a36293fd7638410462e3b67ecd4828d17f2bff2c",
+      "source_offset": 710,
+      "url": "http://js13kgames.com/games/save-the-forest/index.html",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn235view6",
+      "representation_sha256": "098f9ae24a274bbbbc4882f68d031ed67c1aeb03b0cb21a1449609ea510f172a",
+      "representation_byte_length": 344,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": "https://play.js13kgames.com/save-the-forest/",
+      "failure": null,
+      "creator_publisher_identity": "js13kGames and listed game author",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Browser-Based",
+          "Arcade"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The page exposes a 2016 browser-game entry and playable presentation.",
+        "span": "turn235view6; pinned repository evidence where stated",
+        "limitations": "Competition listing access is not permission to copy the game's code, expression, audio or assets; it was not executed.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-27362ed4d2a79646d67e73d612b3ff1d36184dbec7f0314507b95360c496b7b3",
+      "source_offset": 711,
+      "url": "https://github.com/dominikwilkowski/beast.js",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "repository_metadata_returned",
+      "retrieval_method": "authorized_web_open_plus_GitHub_connector",
+      "citation_ref": "turn235view7",
+      "representation_sha256": "2b63113af1ccebe023cf809c895208dc17e7fde54c5652aafbc499020d43f475",
+      "representation_byte_length": 154,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "dominikwilkowski repository account",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Browser-Based",
+          "Others"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "Repository metadata confirms a public beast.js repository, but no README, license file or latest commit identity was returned.",
+        "span": "turn235view7; pinned repository evidence where stated",
+        "limitations": "Visibility alone is not a license grant; creator, revision and reuse scope remain unresolved.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": {
+        "repository": "dominikwilkowski/beast.js",
+        "owner": "dominikwilkowski",
+        "archived": false,
+        "default_branch": "main",
+        "commit_sha": null,
+        "commit_date": null,
+        "files": []
+      },
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-2741510fda70ca04acbc00fea8086917ea8ab22dc54fe127bb9c9499bc261678",
+      "source_offset": 712,
+      "url": "https://github.com/Iakobs/godot-play-game-services",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open_plus_GitHub_connector",
+      "citation_ref": "turn236view0",
+      "representation_sha256": "27735f2e709fed2931745da535c5de31da52c7bcc8a8e31b67d6088aff864b76",
+      "representation_byte_length": 26969,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": "e38b618578572b558691c4f476f70f5e142226ce",
+      "resolved_url": "https://github.com/godot-sdk-integrations/godot-play-game-services",
+      "failure": null,
+      "creator_publisher_identity": "godot-sdk-integrations organization",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+          "Plugins and scripts",
+          "Godot 4"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The pinned README identifies a Godot 4 plugin for Google Play Games Services integration.",
+        "span": "turn236view0; pinned repository evidence where stated",
+        "limitations": "Plugin terms do not clear Google service terms, credentials, platform policies or game data; no service call ran.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": {
+        "repository": "godot-sdk-integrations/godot-play-game-services",
+        "owner": "godot-sdk-integrations",
+        "archived": false,
+        "default_branch": "main",
+        "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+        "commit_date": "2026-07-20T05:45:27Z",
+        "files": [
+          {
+            "repository": "godot-sdk-integrations/godot-play-game-services",
+            "path": "README.md",
+            "url": "https://github.com/godot-sdk-integrations/godot-play-game-services/blob/e38b618578572b558691c4f476f70f5e142226ce/README.md",
+            "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+            "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+            "api_git_blob_sha": "f1a0a0ea333c45e4b3e030dd2dc93d77eb082756",
+            "content_sha256": "77fde299162f4de24b0b5ff9e0128aed91bbafa8b89a349c787cb5bd74782886",
+            "byte_length": 19388,
+            "role": "identity_or_discovery_file",
+            "revision_limit": null
+          },
+          {
+            "repository": "godot-sdk-integrations/godot-play-game-services",
+            "path": "LICENSE",
+            "url": "https://github.com/godot-sdk-integrations/godot-play-game-services/blob/e38b618578572b558691c4f476f70f5e142226ce/LICENSE",
+            "requested_ref": "e38b618578572b558691c4f476f70f5e142226ce",
+            "commit_sha": "e38b618578572b558691c4f476f70f5e142226ce",
+            "api_git_blob_sha": "7c725aa68de62d5f576132a8eeefb5048c044737",
+            "content_sha256": "ed364d1a1fe81fcd672eabc639889075173da2906c69b746753ccb3672b1ea94",
+            "byte_length": 1080,
+            "role": "license_or_rights_file",
+            "revision_limit": null
+          }
+        ]
+      },
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-274799c83c49c0918ebcbc1a15759c2fb981f34a31010dbb187f44d70cabb42a",
+      "source_offset": 713,
+      "url": "http://www.tigsource.com/",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "retrieval_failed",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn236view1",
+      "representation_sha256": "3795ccda008e6d710adf9329a58e17a946d493b3da4d3a00d86d7f905be3a521",
+      "representation_byte_length": 199,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": {
+        "detail": "Internal Error ()\n【turn236view1】 [wordlim: 200] Source: open({\"ref_id\":\"http://www.tigsource.com/\",\"lineno\":null}); Total lines: 1\nL0: Failed to fetch https://www.tigsource.com/: (403) Forbidden\n",
+        "scope": "This authorized channel only; no bypass, PDF workaround or restricted media retrieval attempted."
+      },
+      "creator_publisher_identity": "Not established",
+      "relevance": "unresolved",
+      "discovery_headers": [
+        [
+          "Table of Contents",
+          "Blogs and Portals"
+        ]
+      ],
+      "attributable_observation": null,
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-274809436fd9be2bf4e71860e7566057e245c08fa2d2eaeef328dafb6982435f",
+      "source_offset": 714,
+      "url": "https://www.gabrielgambetta.com/lag-compensation.html",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn236view2",
+      "representation_sha256": "67e446840655f1d43f4f07e7875d834c0124599366a6b36be894c143e0eaae30",
+      "representation_byte_length": 803,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Gabriel Gambetta",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+          "Programming",
+          "Networking"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The article explains client prediction, server reconciliation and lag compensation conceptually.",
+        "span": "turn236view2; pinned repository evidence where stated",
+        "limitations": "Educational networking model; no latency experiment, security analysis or production benchmark was reproduced.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-27484c96765a50ddf4deab046e858359f084468bb5f10d778d6262d64fa6f953",
+      "source_offset": 715,
+      "url": "https://github.com/Relintai/broken_seals",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open_plus_GitHub_connector",
+      "citation_ref": "turn236view3",
+      "representation_sha256": "8de164071e567382add5904ac30ada0127dfc5c8181aeb43e3c926131289f2b9",
+      "representation_byte_length": 325,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Relintai repository account",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+          "Games",
+          "3D",
+          "Godot 3"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The pinned README describes an open-source third-person action RPG with multiplayer support.",
+        "span": "turn236view3; pinned repository evidence where stated",
+        "limitations": "Game code and game assets may have distinct provenance; no asset acquisition, build or gameplay test occurred.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": {
+        "repository": "Relintai/broken_seals",
+        "owner": "Relintai",
+        "archived": false,
+        "default_branch": "master",
+        "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+        "commit_date": "2023-10-09T10:46:20Z",
+        "files": [
+          {
+            "repository": "Relintai/broken_seals",
+            "path": "README.md",
+            "url": "https://github.com/Relintai/broken_seals/blob/3b86f3bee5a225d1b9bd5810ea2684791e914347/README.md",
+            "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+            "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+            "api_git_blob_sha": "fba9e423db46d4e83d2b23c7942c998e230dcebd",
+            "content_sha256": "30926d452479d20f97a55c452fb92078b69512dbf76a8337ca4136b81c9525a2",
+            "byte_length": 17679,
+            "role": "identity_or_discovery_file",
+            "revision_limit": null
+          },
+          {
+            "repository": "Relintai/broken_seals",
+            "path": "LICENSE",
+            "url": "https://github.com/Relintai/broken_seals/blob/3b86f3bee5a225d1b9bd5810ea2684791e914347/LICENSE",
+            "requested_ref": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+            "commit_sha": "3b86f3bee5a225d1b9bd5810ea2684791e914347",
+            "api_git_blob_sha": "dfbc805e95acc66dae98f86b570422ee8f69963d",
+            "content_sha256": "0c67cd28663e74123a1e4359788d291e7c703680f77f8e28afcfac3b940d8b9f",
+            "byte_length": 1061,
+            "role": "license_or_rights_file",
+            "revision_limit": null
+          }
+        ]
+      },
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-274ad8114289d6eee7861a3e6388f941fe51965ce5e1492ed3611727b8b376ce",
+      "source_offset": 716,
+      "url": "https://www.youtube.com/playlist?list=PLLx_Nt-I7Viqp_BIKm8gyyOHVrLi8HrEI",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "retrieval_failed",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn236view4",
+      "representation_sha256": "6af9d7f0ac5b0a056e29b6d220cbd61a1156efec7155b64203a56c7252f0ebb5",
+      "representation_byte_length": 182,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": {
+        "detail": "Internal Error ()\n【turn236view4】 [wordlim: 200] Source: open({\"ref_id\":\"https://www.youtube.com/playlist?list=PLLx_Nt-I7Viqp_BIKm8gyyOHVrLi8HrEI\",\"lineno\":null}); Total lines: 1\n",
+        "scope": "This authorized channel only; no bypass, PDF workaround or restricted media retrieval attempted."
+      },
+      "creator_publisher_identity": "Not established",
+      "relevance": "unresolved",
+      "discovery_headers": [
+        [
+          "Awesome Game Talks [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindres",
+          "Conferences"
+        ]
+      ],
+      "attributable_observation": null,
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-275be1a6e8f045cf9cd525cb293dd73b3537e005ed66274776070abcdf26c908",
+      "source_offset": 717,
+      "url": "https://github.com/aaronfranke/Linux-tools/blob/master/all-distros/build-godot",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open_plus_GitHub_connector",
+      "citation_ref": "turn236view5",
+      "representation_sha256": "81496d4972e08092863a871a8b03cea5246891edec9dfc0422f06d3e3d463481",
+      "representation_byte_length": 382,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": "5710f5249a6d7c1ce448d086c100cc7666630ad8",
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Aaron Franke repository account",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+          "Bash scripts"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The pinned repository contains cross-distribution Linux tooling including a Godot build script.",
+        "span": "turn236view5; pinned repository evidence where stated",
+        "limitations": "Script presence is not target-toolchain validation; package-manager, compiler and platform combinations were not executed.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": {
+        "repository": "aaronfranke/Linux-tools",
+        "owner": "aaronfranke",
+        "archived": false,
+        "default_branch": "master",
+        "commit_sha": "5710f5249a6d7c1ce448d086c100cc7666630ad8",
+        "commit_date": "2026-08-28T15:53:59Z",
+        "files": [
+          {
+            "repository": "aaronfranke/Linux-tools",
+            "path": "README.md",
+            "url": "https://github.com/aaronfranke/Linux-tools/blob/5710f5249a6d7c1ce448d086c100cc7666630ad8/README.md",
+            "requested_ref": "5710f5249a6d7c1ce448d086c100cc7666630ad8",
+            "commit_sha": "5710f5249a6d7c1ce448d086c100cc7666630ad8",
+            "api_git_blob_sha": "e2d5e95a0c495122d2bdc5302374275d57bdf25a",
+            "content_sha256": "885486aee70afe9c854eff0a7d9b5c1212350e9d750ce531b8d03b22f4b90a58",
+            "byte_length": 513,
+            "role": "identity_or_discovery_file",
+            "revision_limit": null
+          },
+          {
+            "repository": "aaronfranke/Linux-tools",
+            "path": "LICENSE.md",
+            "url": "https://github.com/aaronfranke/Linux-tools/blob/5710f5249a6d7c1ce448d086c100cc7666630ad8/LICENSE.md",
+            "requested_ref": "5710f5249a6d7c1ce448d086c100cc7666630ad8",
+            "commit_sha": "5710f5249a6d7c1ce448d086c100cc7666630ad8",
+            "api_git_blob_sha": "65c5ca88a67c30becee01c5a8816d964b03862f9",
+            "content_sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+            "byte_length": 7651,
+            "role": "license_or_rights_file",
+            "revision_limit": null
+          }
+        ]
+      },
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-276c179e692fadea740d01db8e73e6a6a6a413c230ef31c0902fe18df8aabfdf",
+      "source_offset": 718,
+      "url": "https://medium.com/@ahmetyasinburul/set-of-rules-to-standarize-software-versions-semantic-versioning-b7f71f71851e",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "retrieval_failed",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn236view6",
+      "representation_sha256": "c1127889ed8f5672ac966cbd4979adbb4ee2679af3809f7a79056635ae14d3a2",
+      "representation_byte_length": 223,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": {
+        "detail": "Internal Error ()\n【turn236view6】 [wordlim: 200] Source: open({\"ref_id\":\"https://medium.com/@ahmetyasinburul/set-of-rules-to-standarize-software-versions-semantic-versioning-b7f71f71851e\",\"lineno\":null}); Total lines: 1\n",
+        "scope": "This authorized channel only; no bypass, PDF workaround or restricted media retrieval attempted."
+      },
+      "creator_publisher_identity": "Not established",
+      "relevance": "unresolved",
+      "discovery_headers": [
+        [
+          "**Code**"
+        ]
+      ],
+      "attributable_observation": null,
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-279b1796bc4df75e8fe9c4aadef2fe08135fc3f8c19a2c7762662c01cc564c03",
+      "source_offset": 719,
+      "url": "https://github.com/tesselode/kira",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open_plus_GitHub_connector",
+      "citation_ref": "turn236view7",
+      "representation_sha256": "3210a6569970802204039e174e534463c0ec9efbd91c554176a28fe788a581e2",
+      "representation_byte_length": 274,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": "74b3ef0fd8bd15f90e3b469208ee741f04374a62",
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "tesselode/kira maintainers",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+          "Libraries",
+          "Rust"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The repository page describes Kira as an expressive Rust game-audio library.",
+        "span": "turn236view7; pinned repository evidence where stated",
+        "limitations": "No audio was downloaded or rendered; backend compatibility and performance were not measured.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": {
+        "repository": "tesselode/kira",
+        "owner": "tesselode",
+        "archived": false,
+        "default_branch": "main",
+        "commit_sha": "74b3ef0fd8bd15f90e3b469208ee741f04374a62",
+        "commit_date": "2026-09-26T19:24:09Z",
+        "files": []
+      },
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-279f8ea589f533115d3b99cf801b409b1990356ce3c155af2d22694d55f8e1da",
+      "source_offset": 720,
+      "url": "http://www.gdcvault.com/play/1024176/Finding-Duskers-Innovation-Through-Better",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn237view0",
+      "representation_sha256": "739ca390cb319c21dc4a286b200f7bccf828b45cce8d27f60752893ef7bd55f0",
+      "representation_byte_length": 5886,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "GDC Vault and Duskers presenter metadata",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "**Design**"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The page identifies a talk on Duskers and design pillars.",
+        "span": "turn237view0; pinned repository evidence where stated",
+        "limitations": "Talk-page metadata only for this review; no full transcript, timecodes or independent design-outcome evidence was captured.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-27a28fdab076c104f8a029160623c7b0ea79c76354f17865d804d97a989b7ac3",
+      "source_offset": 721,
+      "url": "https://github.com/Kromster80/kam_remake",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open_plus_GitHub_connector",
+      "citation_ref": "turn237view1",
+      "representation_sha256": "d941ccdb45a6e9506eaf420e019f1de0c360d85fce5eefcd71562a91ce4ef953",
+      "representation_byte_length": 11369,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": "b199128f2ce826302a7626463018bfb88cfde032",
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Kromster80 / KaM Remake contributors",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Native",
+          "Strategy"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The archived repository describes a from-scratch RTS remake.",
+        "span": "turn237view1; pinned repository evidence where stated",
+        "limitations": "Archived/open source status does not grant rights to Knights and Merchants data, names, maps, art or audio.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": {
+        "repository": "Kromster80/kam_remake",
+        "owner": "Kromster80",
+        "archived": true,
+        "default_branch": "master",
+        "commit_sha": "b199128f2ce826302a7626463018bfb88cfde032",
+        "commit_date": "2022-06-01T17:40:02Z",
+        "files": [
+          {
+            "repository": "Kromster80/kam_remake",
+            "path": "README.md",
+            "url": "https://github.com/Kromster80/kam_remake/blob/b199128f2ce826302a7626463018bfb88cfde032/README.md",
+            "requested_ref": "b199128f2ce826302a7626463018bfb88cfde032",
+            "commit_sha": "b199128f2ce826302a7626463018bfb88cfde032",
+            "api_git_blob_sha": "5fe34a27b43568b514b5698ac633f1377046f58e",
+            "content_sha256": "939fe9e0e08e99ed95c0c7c24a50e7756face5804a47a955b36a1e8dcf9b4c70",
+            "byte_length": 937,
+            "role": "identity_or_discovery_file",
+            "revision_limit": null
+          },
+          {
+            "repository": "Kromster80/kam_remake",
+            "path": "LICENSE.txt",
+            "url": "https://github.com/Kromster80/kam_remake/blob/b199128f2ce826302a7626463018bfb88cfde032/LICENSE.txt",
+            "requested_ref": "b199128f2ce826302a7626463018bfb88cfde032",
+            "commit_sha": "b199128f2ce826302a7626463018bfb88cfde032",
+            "api_git_blob_sha": "dba13ed2ddf783ee8118c6a581dbf75305f816a3",
+            "content_sha256": "57c8ff33c9c0cfc3ef00e650a1cc910d7ee479a8bc509f6c9209a7c2a11399d6",
+            "byte_length": 34520,
+            "role": "license_or_rights_file",
+            "revision_limit": null
+          }
+        ]
+      },
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-27c6db113eb0cf798568383d674d589388b075d258417b0a610e186f03f6dea3",
+      "source_offset": 722,
+      "url": "https://kripken.github.io/BananaBread/cube2/bb.html",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn237view2",
+      "representation_sha256": "fd595767bb93aeb9c3232c837b63f32613e29e1902974340ed27cc6fe8e6e424",
+      "representation_byte_length": 300,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Emscripten/BananaBread project page",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Browser-Based",
+          "FPS"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The page presents an Emscripten-generated browser demonstration derived from Cube 2 technology.",
+        "span": "turn237view2; pinned repository evidence where stated",
+        "limitations": "Demonstration access does not establish rights to engine/game data or benchmark modern browser performance.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-27d96b9368691413d2caea6dd1cf6226486406cdea2c05d1a4a4b55ff1e5b999",
+      "source_offset": 723,
+      "url": "https://www.uptheretheylove.com/blog/marketing/how-to-get-attention-for-your-game",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "retrieval_failed",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn237view3",
+      "representation_sha256": "3c2e994e7d707d36d7973c7173398cc98bfa0679a8e7fb96f3f10739e0709834",
+      "representation_byte_length": 314,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": {
+        "detail": "Internal Error ()\n【turn237view3】 [wordlim: 200] Source: open({\"ref_id\":\"https://www.uptheretheylove.com/blog/marketing/how-to-get-attention-for-your-game\",\"lineno\":null}); Total lines: 1\nL0: URL https://www.uptheretheylove.com/blog/marketing/how-to-get-attention-for-your-game is not accessible via this tool.\n",
+        "scope": "This authorized channel only; no bypass, PDF workaround or restricted media retrieval attempted."
+      },
+      "creator_publisher_identity": "Not established",
+      "relevance": "unresolved",
+      "discovery_headers": [
+        [
+          "**Marketing**"
+        ]
+      ],
+      "attributable_observation": null,
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-27e72c5a0a35f9d5c436400256a25cfa71f9b92b875a912af2686185625f01cb",
+      "source_offset": 724,
+      "url": "https://www.youtube.com/watch?v=yNdjdmepMMQ",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "retrieval_failed",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn237view4",
+      "representation_sha256": "70c35c8f37b7237e58624586c09df989cfa9f83bd1e2e33da9f3be8b3f9f521d",
+      "representation_byte_length": 277,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": {
+        "detail": "Internal Error ()\n【turn237view4】 [wordlim: 200] Source: open({\"ref_id\":\"https://www.youtube.com/watch?v=yNdjdmepMMQ\",\"lineno\":null}); Total lines: 1\nL0: Failed to fetch https://www.youtube.com/watch?v=yNdjdmepMMQ: Error fetching https://www.youtube.com/watch?v=yNdjdmepMMQ\n",
+        "scope": "This authorized channel only; no bypass, PDF workaround or restricted media retrieval attempted."
+      },
+      "creator_publisher_identity": "Not established",
+      "relevance": "unresolved",
+      "discovery_headers": [
+        [
+          "**Code**"
+        ]
+      ],
+      "attributable_observation": null,
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-27ec957a7ee381ee7456c621ed495daa2c5d9be8854704c6a8705debe59fb1c1",
+      "source_offset": 725,
+      "url": "https://www.youtube.com/watch?v=mCCC9hQm6MM%29%3A",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "retrieval_failed",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn237view5",
+      "representation_sha256": "e55bd1f08f9e4a1c406ccbd0b14eb6fba122520e6cafb86335ea3a97f6baded0",
+      "representation_byte_length": 244,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": {
+        "detail": "Internal Error ()\n【turn237view5】 [wordlim: 200] Source: open({\"ref_id\":\"https://www.youtube.com/watch?v=mCCC9hQm6MM%29%3A\",\"lineno\":null}); Total lines: 1\nL0: Failed to fetch https://www.youtube.com/watch?v=mCCC9hQm6MM%29%3A: DisabledError\n",
+        "scope": "This authorized channel only; no bypass, PDF workaround or restricted media retrieval attempted."
+      },
+      "creator_publisher_identity": "Not established",
+      "relevance": "unresolved",
+      "discovery_headers": [
+        [
+          "Awesome Game Talks [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindres",
+          "Other Talks"
+        ]
+      ],
+      "attributable_observation": null,
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-27f45480f3f0269279a43dceb9c99c614b3b526d78f88323cc120b1bc06bc1c0",
+      "source_offset": 726,
+      "url": "https://www.youtube.com/watch?v=549J0eHE88k",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "metadata_shell_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn237view6",
+      "representation_sha256": "eb0f7080522bb6eb97c81d4f7647829036ee4761e091e47a4ebfa48061f3b442",
+      "representation_byte_length": 623,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "YouTube platform and Yarn Spinner presentation metadata",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "**Design**"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "Only title-level metadata for a Yarn Spinner narrative-games video was returned.",
+        "span": "turn237view6; pinned repository evidence where stated",
+        "limitations": "No transcript, timecodes, speaker verification or reusable code evidence was captured.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-27f9385eef7d0f33f236888202d1331f8592829d22f4308a464ca94128f22f14",
+      "source_offset": 727,
+      "url": "https://www.gridsagegames.com/rexpaint/",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn237view7",
+      "representation_sha256": "c324b51bbe771003862e6b725957df55c74022dd5608feb0844a2908b84da0a9",
+      "representation_byte_length": 2793,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Grid Sage Games",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Table of Contents",
+          "Vector/Image Editor"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "REXPaint is presented as an ASCII-art editor with its own distribution and usage information.",
+        "span": "turn237view7; pinned repository evidence where stated",
+        "limitations": "Tool availability does not license imported/exported third-party art; no executable was downloaded.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-28051553712b5f1335ecccdadd0a4671c8ac2da26c8462c42085301a287b0a88",
+      "source_offset": 728,
+      "url": "http://www.deconstructoroffun.com/",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn238view0",
+      "representation_sha256": "6db762378cf29c55d1f436b1c35aa704570b936327b8d4f97652d01d171acbc3",
+      "representation_byte_length": 5664,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Deconstructor of Fun editorial team",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "**Design**"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The site presents mobile-game analysis and strategy articles.",
+        "span": "turn238view0; pinned repository evidence where stated",
+        "limitations": "Industry commentary can guide questions but is not automatically peer-reviewed, causal or dataset-reproducible.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-281fe4c3c797d8a7e88c3a8b6b680bc3c644a7cb5f7f08444f784de3546949f1",
+      "source_offset": 729,
+      "url": "https://github.com/blackears/cyclopsLevelBuilder",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open_plus_GitHub_connector",
+      "citation_ref": "turn238view1",
+      "representation_sha256": "907e6a544ae061dc437f305e3fd4c1062b25c1bf2f63db12e81c97fca5c8f5db",
+      "representation_byte_length": 11015,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": "957247802f50e96044648fab6a93d6a1910fee74",
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "blackears repository account",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+          "Plugins and scripts",
+          "Godot 4"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The pinned README describes a Godot in-editor level-blockout plugin.",
+        "span": "turn238view1; pinned repository evidence where stated",
+        "limitations": "No editor compatibility, geometry correctness or performance test was executed.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": {
+        "repository": "blackears/cyclopsLevelBuilder",
+        "owner": "blackears",
+        "archived": false,
+        "default_branch": "master",
+        "commit_sha": "957247802f50e96044648fab6a93d6a1910fee74",
+        "commit_date": "2026-10-11T23:13:43Z",
+        "files": [
+          {
+            "repository": "blackears/cyclopsLevelBuilder",
+            "path": "README.md",
+            "url": "https://github.com/blackears/cyclopsLevelBuilder/blob/957247802f50e96044648fab6a93d6a1910fee74/README.md",
+            "requested_ref": "957247802f50e96044648fab6a93d6a1910fee74",
+            "commit_sha": "957247802f50e96044648fab6a93d6a1910fee74",
+            "api_git_blob_sha": "02033ceab933a7b45b534a6984c728baaa8a8109",
+            "content_sha256": "a4cc290104a0e63823045b8f60a9e732544e6f82a9649584b74fefc701c2dc37",
+            "byte_length": 3596,
+            "role": "identity_or_discovery_file",
+            "revision_limit": null
+          },
+          {
+            "repository": "blackears/cyclopsLevelBuilder",
+            "path": "LICENSE.txt",
+            "url": "https://github.com/blackears/cyclopsLevelBuilder/blob/957247802f50e96044648fab6a93d6a1910fee74/LICENSE.txt",
+            "requested_ref": "957247802f50e96044648fab6a93d6a1910fee74",
+            "commit_sha": "957247802f50e96044648fab6a93d6a1910fee74",
+            "api_git_blob_sha": "17f9cf98e53ae6d6e626164d7b0910d019baa30a",
+            "content_sha256": "e603d4efd50a78809336620f557aa771f6643146254b120172427fbee55b8e0f",
+            "byte_length": 1057,
+            "role": "license_or_rights_file",
+            "revision_limit": null
+          }
+        ]
+      },
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-282837c2eb2ea09c5674e2cfe5a98d59157ada0c1dfec04e68e328a70a991d4b",
+      "source_offset": 730,
+      "url": "https://github.com/bladecoder/bladecoder-adventure-engine",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open_plus_GitHub_connector",
+      "citation_ref": "turn238view2",
+      "representation_sha256": "2acf95909af1104a535f622af3621d2adb1fd4912045e6b6d05e7b2b636a826f",
+      "representation_byte_length": 8482,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Bladecoder contributors",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Table of Contents",
+          "Engines and Frameworks"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The pinned README describes a point-and-click adventure engine and editor.",
+        "span": "turn238view2; pinned repository evidence where stated",
+        "limitations": "Engine licensing does not clear story, characters, art, audio or third-party sample-game expression.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": {
+        "repository": "bladecoder/bladecoder-adventure-engine",
+        "owner": "bladecoder",
+        "archived": false,
+        "default_branch": "master",
+        "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+        "commit_date": "2026-08-04T16:41:16Z",
+        "files": [
+          {
+            "repository": "bladecoder/bladecoder-adventure-engine",
+            "path": "README.md",
+            "url": "https://github.com/bladecoder/bladecoder-adventure-engine/blob/553c96e21e139caba64e3d8dfa6efb28e7384234/README.md",
+            "requested_ref": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+            "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+            "api_git_blob_sha": "833b09ccef1aecd2f47ccc267912c6ed6e355f18",
+            "content_sha256": "4eeefaadeca291de3b7a0c22ebba2dcb10ecf6719fd6657d72a3cc8eb5d23a99",
+            "byte_length": 3789,
+            "role": "identity_or_discovery_file",
+            "revision_limit": null
+          },
+          {
+            "repository": "bladecoder/bladecoder-adventure-engine",
+            "path": "LICENSE",
+            "url": "https://github.com/bladecoder/bladecoder-adventure-engine/blob/553c96e21e139caba64e3d8dfa6efb28e7384234/LICENSE",
+            "requested_ref": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+            "commit_sha": "553c96e21e139caba64e3d8dfa6efb28e7384234",
+            "api_git_blob_sha": "f433b1a53f5b830a205fd2df78e2b34974656c7b",
+            "content_sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+            "byte_length": 10174,
+            "role": "license_or_rights_file",
+            "revision_limit": null
+          }
+        ]
+      },
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-28461effeb1696592d94ec006fa87072961e0ad12aea5cc6c04050ef0c155dc3",
+      "source_offset": 731,
+      "url": "https://poly.pizza/",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn238view3",
+      "representation_sha256": "784e6f691246dd2d03ae25c524152ff48f39479087ad0bf4490942c641c66149",
+      "representation_byte_length": 215,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": null,
+      "creator_publisher_identity": "Poly Pizza operator and individual model creators",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+          "Video Game Assets",
+          "Model Assets"
+        ],
+        [
+          "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+          "Art",
+          "Resources for Non-Artists"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The site presents downloadable low-poly models.",
+        "span": "turn238view3; pinned repository evidence where stated",
+        "limitations": "No collection-wide license was inferred; each model, creator attribution and permitted use requires item-level verification. No model downloaded.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-2858726215d68b3b50bc7c87d214bad1c5dc12e84454d59e4302a077420ff504",
+      "source_offset": 732,
+      "url": "https://youtu.be/rfBp9YhkoWo",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "retrieval_failed",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn238view4",
+      "representation_sha256": "86a3f32820e1d326d7241b24e9a74828f5627c04f7203f17d889c429d5df03b2",
+      "representation_byte_length": 138,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": {
+        "detail": "Internal Error ()\n【turn238view4】 [wordlim: 200] Source: open({\"ref_id\":\"https://youtu.be/rfBp9YhkoWo\",\"lineno\":null}); Total lines: 1\n",
+        "scope": "This authorized channel only; no bypass, PDF workaround or restricted media retrieval attempted."
+      },
+      "creator_publisher_identity": "Not established",
+      "relevance": "unresolved",
+      "discovery_headers": [
+        [
+          "**Art**"
+        ]
+      ],
+      "attributable_observation": null,
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-286d9e2a12817c75ba825326f2cae8d16d8ee2587602f0d1615848e76557b14f",
+      "source_offset": 733,
+      "url": "https://www.youtube.com/watch?v=Saqz6uRlKyA",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "retrieval_failed",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn238view5",
+      "representation_sha256": "b218c615eb90adf04ab90d1671fba55b55cc25af87ad3fc8869e582a5e5adbd8",
+      "representation_byte_length": 153,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": {
+        "detail": "Internal Error ()\n【turn238view5】 [wordlim: 200] Source: open({\"ref_id\":\"https://www.youtube.com/watch?v=Saqz6uRlKyA\",\"lineno\":null}); Total lines: 1\n",
+        "scope": "This authorized channel only; no bypass, PDF workaround or restricted media retrieval attempted."
+      },
+      "creator_publisher_identity": "Not established",
+      "relevance": "unresolved",
+      "discovery_headers": [
+        [
+          "**Art**"
+        ]
+      ],
+      "attributable_observation": null,
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-28706d432cf441be5e9361df6b29846d4c364b42e8881026d130952653bc6f7d",
+      "source_offset": 734,
+      "url": "http://liu.diva-portal.org/smash/get/diva2:462098/FULLTEXT01.pdf",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "page_representation_returned",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn238view6",
+      "representation_sha256": "327b48085f0cb387d9c0e6569fbc66ac5faae9f36a26d96f16128a9391116b82",
+      "representation_byte_length": 388,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": "https://liu.diva-portal.org/smash/get/diva2:462098/FULLTEXT01.pdf",
+      "failure": null,
+      "creator_publisher_identity": "Linköping University publication repository",
+      "relevance": "matches discovery topic; not independent validation",
+      "discovery_headers": [
+        [
+          "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+          "Programming",
+          "Graphics"
+        ]
+      ],
+      "attributable_observation": {
+        "statement": "The archived PDF representation identifies a 55-page academic document relevant to graphics.",
+        "span": "turn238view6; pinned repository evidence where stated",
+        "limitations": "A follow-up fetch timed out; title, authors, methods and findings were not safely extracted, so no substantive claim was distilled.",
+        "state": "unreviewed_reference_observation",
+        "independent_support_count": 1,
+        "peer_review_verified": false
+      },
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    },
+    {
+      "source_id": "source-2889e8e3fdb55f7201193a2480b9960c867d050b836c921cd863a9fbc5774465",
+      "source_offset": 735,
+      "url": "http://www.theanimatorssurvivalkit.com/",
+      "checked_at": "2026-10-12T01:11:06Z",
+      "timestamp_scope": "Assembled after authorized retrieval; origin timestamp unavailable.",
+      "availability": "retrieval_failed",
+      "retrieval_method": "authorized_web_open",
+      "citation_ref": "turn238view7",
+      "representation_sha256": "81ceff45a40aaba6ace400ebb9274444f93ca84e8f21ce62547c9939571be7dd",
+      "representation_byte_length": 149,
+      "representation_identity_encoding": "SHA-256 of complete single-target UTF-8 tool text; repository files use commit/API Git blob identities when available",
+      "origin_body_sha256": null,
+      "source_revision": null,
+      "resolved_url": null,
+      "failure": {
+        "detail": "Internal Error ()\n【turn238view7】 [wordlim: 200] Source: open({\"ref_id\":\"http://www.theanimatorssurvivalkit.com/\",\"lineno\":null}); Total lines: 1\n",
+        "scope": "This authorized channel only; no bypass, PDF workaround or restricted media retrieval attempted."
+      },
+      "creator_publisher_identity": "Not established",
+      "relevance": "unresolved",
+      "discovery_headers": [
+        [
+          "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+          "Art",
+          "Animation"
+        ]
+      ],
+      "attributable_observation": null,
+      "provider_metadata": null,
+      "access_policy": {
+        "channel": "authorized retrieval/API",
+        "robots": "No deployed-crawler robots grant captured; automated recrawl blocked.",
+        "terms": "No general crawling, reuse, training, PDF workaround or media authorization. License files apply only within proven scope.",
+        "reference_use": "Unreviewed narrow notes only; canonical review pending.",
+        "training_authorized": false,
+        "media_downloaded": false,
+        "raw_http_receipt_available": false
+      },
+      "admission": "blocked_pending_policy_custody_source_review_Wiki_HOAG_rights",
+      "approved": false,
+      "distilled": false
+    }
+  ],
+  "repo_selection": {
+    "pr": 3605,
+    "head": "d48f7a15235bb8fd702435981025867b6debacab",
+    "branch": "feat/dragon-wisdom-review-20261010",
+    "implementation_ancestor": "46e3e0a4eca79245e31fe5cfb5687cff4fc55071",
+    "concurrent_commit_preserved": "d48f7a15235bb8fd702435981025867b6debacab",
+    "runtime_or_code_changed": false
+  },
+  "learning": {
+    "external_training": false,
+    "original_experiment_executed": false,
+    "neural_parameters_generated": false,
+    "sparse_routing_weights_generated": false,
+    "retrieval_pack_rebuilt": false,
+    "reason": "No evidence passed canonical admission; AI descendants add no independent support."
+  }
+}

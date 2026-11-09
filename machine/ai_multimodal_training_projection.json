@@ -1,0 +1,61 @@
+{
+  "schema_version": "skeleton.ai.multimodal_training_projection.v1",
+  "status": "implementation_candidate",
+  "owner": "skeleton/ai/runtime/learning_foundation/multimodal.py",
+  "consumer_owner": "skeleton/ai/runtime/training/data.py",
+  "architecture_reference": "machine/ai_app_construction.json",
+  "state_authority_reference": "machine/state_topology.json",
+  "scope": "bounded_provider_independent_text_projection_export",
+  "api": "MultimodalCorpus.export_text_training",
+  "inputs": {
+    "record_ids": "explicit nonempty ordered sequence of distinct canonical record IDs",
+    "export_id": "nonempty caller operation identity",
+    "purpose": ["training", "evaluation", "simulation_training", "simulation_evaluation"],
+    "rights_policy": "explicit mapping of source rights reference to permitted export purposes",
+    "allow_simulated": "boolean, false by default; true only for an isolated simulation purpose",
+    "max_documents": "positive integer, default and hard ceiling 4096",
+    "max_document_bytes": "positive integer, default and hard ceiling 1048576",
+    "max_total_bytes": "positive integer, default and hard ceiling 67108864"
+  },
+  "outputs": {
+    "manifest": "deeply immutable MultimodalTrainingManifest",
+    "documents": "ordered immutable tuple of the verified exact extracted text; never source URLs or digest placeholders",
+    "samples": [
+      "ordinal", "record_id", "record_digest", "asset_digest", "projection_digest",
+      "text_digest", "extractor_ref", "language", "modality", "media_type",
+      "source_refs", "rights_refs", "lineage_refs", "simulated",
+      "embedded_instruction_detected", "instruction_trusted"
+    ],
+    "manifest_fields": [
+      "export_id", "purpose", "samples", "allowed_rights_refs", "rights_policy_digest",
+      "allow_simulated", "corpus_digest", "document_sequence_digest", "total_bytes"
+    ],
+    "manifest_digest": "sha256 of canonical JSON manifest fields, including ordered source sample identities",
+    "corpus_digest": "sha256 of UTF-8 newline-joined documents, preserving the native trainer compatibility contract",
+    "document_sequence_digest": "sha256 of canonical JSON document array with ensure_ascii=false and compact separators; disambiguates document boundaries",
+    "text_digest": "sha256 of each exact UTF-8 extracted document"
+  },
+  "invariants": [
+    "Cheap projected-document bounds are admitted before source hashing/scanning; cumulative original source bytes have a fixed 536870912-byte verification ceiling.",
+    "Export validates issued record identity, original content bytes, intake provenance and extracted text digests before exposing documents.",
+    "Record IDs must be explicit and ordered; strings, mappings, sets, generators, missing IDs and duplicate normalized IDs fail closed.",
+    "Repeated original asset identities in one export are rejected to avoid ambiguous duplicate source projections.",
+    "Records without verified TextProjection cannot export binary media as trainable text.",
+    "Every rights reference on every selected record must explicitly permit the exact declared purpose.",
+    "Simulation purposes require allow_simulated=true and exclusively simulated records; ordinary purposes reject simulated records and simulation opt-in.",
+    "All documents remain untrusted evidence and never gain instruction authority.",
+    "Instruction-shaped source or extracted text is rejected rather than promoted into normal model-training evidence.",
+    "Export has strict count, per-document and aggregate UTF-8 byte ceilings; booleans, invalid or above-ceiling limits are rejected.",
+    "The manifest validates ordered per-document hashes, byte counts and both sequence digests before governed dataset ingestion.",
+    "Export IDs are idempotent only for the exact manifest and document sequence; conflicting reuse does not modify issued exports or source corpus state.",
+    "Governed native dataset ingestion owns persistent dataset versions, quality, split materialization and train/evaluation isolation; this exporter creates no new tenant boundary or durable store."
+  ],
+  "failure_contract": "MultimodalFoundationError with no export publication or mutation of corpus, intake, content store or earlier issued export",
+  "verification": [
+    "skeleton/testing/test_p3_multimodal_foundation.py",
+    "skeleton/testing/test_p3_multimodal_integrity.py",
+    "skeleton/testing/test_p3_multimodal_training_projection.py",
+    "skeleton/testing/test_governed_multimodal_model_lifecycle.py"
+  ],
+  "rollback": "Disable text-training export while retaining original assets, issued records, projection receipts and governed dataset versions."
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-01:terminal_commit:v1",
+  "title": "FLGB-01 Terminal Commit Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operation_id",
+    "request_digest",
+    "result_digest",
+    "state_digest_before",
+    "state_digest_after",
+    "sequence",
+    "idempotency_key",
+    "terminal_reason"
+  ],
+  "properties": {
+    "operation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "request_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "result_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "state_digest_before": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "state_digest_after": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "terminal_reason": {
+      "enum": [
+        "completed",
+        "cancelled",
+        "deadline",
+        "provider_error",
+        "policy_denied"
+      ]
+    }
+  }
+}

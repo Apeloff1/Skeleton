@@ -1,0 +1,6 @@
+{"b":57,"f":"skeleton/era","g":"cee541fe819c9fc9a86a9e06615c24a9215e5c01","m":"100644","p":"skeleton/era/__init__.py","t":"blob","z":"era-compat"}
+{"b":63,"f":"skeleton/era","g":"149313da1f44ee08be6bcc8abf46b8352a933169","m":"100644","p":"skeleton/era/admit.py","t":"blob","z":"era-compat"}
+{"b":62,"f":"skeleton/era","g":"f149aaada11165bbd437a593c31a77c4af6bc5a2","m":"100644","p":"skeleton/era/bind.py","t":"blob","z":"era-compat"}
+{"b":70,"f":"skeleton/era","g":"0d72f87be94dfe58247125e42c57f221dcfe763c","m":"100644","p":"skeleton/era/capabilities.py","t":"blob","z":"era-compat"}
+{"b":63,"f":"skeleton/era","g":"79e781bfd0002219bb07509e79be016d82bbd78d","m":"100644","p":"skeleton/era/forge.py","t":"blob","z":"era-compat"}
+{"b":61,"f":"skeleton/era","g":"4840a4f21028dba32b9a2ec1c3dae70c733c2566","m":"100644","p":"skeleton/era/law.py","t":"blob","z":"era-compat"}

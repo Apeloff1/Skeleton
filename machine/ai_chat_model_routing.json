@@ -1,0 +1,52 @@
+{
+  "schema_version": "ai-chat-model-routing/v1",
+  "status": "implemented_candidate",
+  "prepared_at_utc": "2026-10-06T00:48:00Z",
+  "prepared_by": "chatgpt:gpt-5.6-sol",
+  "canonical_module": "backend/core/model_router.py",
+  "mirror_module": "skeleton/ai/compat/backend_core/model_router.py",
+  "scope": "provider-neutral AI chat model placement, fail-closed eligibility, health quarantine, and safe fallback",
+  "invariants": [
+    "provider preference is never authority and cannot bypass hard constraints",
+    "turn execution budgets own routing latency cost and output ceilings",
+    "privacy is a hard eligibility constraint for primary and fallback endpoints",
+    "jurisdiction requirements fail closed when endpoint placement is unknown or disallowed",
+    "provider receipt capability is a hard constraint when requested",
+    "minimum telemetry observations and freshness are hard constraints when requested",
+    "quarantined endpoints are ineligible until explicit clear or expiry",
+    "every fallback candidate satisfies the same immutable route request",
+    "route request and route decision have deterministic sha256 evidence digests",
+    "canonical and compatibility mirror routing modules are byte-identical",
+    "model routing performs no provider network call and reads no provider credential",
+    "retry and failover routing consume the durable turn's remaining authority rather than restoring the original execution budget"
+  ],
+  "hard_constraint_fields": [
+    "required_capabilities",
+    "required_modalities",
+    "context_tokens",
+    "expected_output_tokens",
+    "privacy",
+    "latency_budget_ms",
+    "cost_budget",
+    "excluded_endpoints",
+    "minimum_reliability",
+    "minimum_quality",
+    "minimum_observations",
+    "max_telemetry_age_s",
+    "allowed_jurisdictions",
+    "require_provider_receipt",
+    "governance_record_ids",
+    "governance_tenant_id",
+    "governance_purpose"
+  ],
+  "files": {
+    "canonical": "backend/core/model_router.py",
+    "mirror": "skeleton/ai/compat/backend_core/model_router.py",
+    "tests": "backend/tests/test_model_router.py",
+    "validator": "scripts/check_ai_chat_model_routing.py",
+    "independent_verifier": "scripts/verify_ai_chat_model_routing.py",
+    "workflow": ".github/workflows/ai-chat-model-routing-closure.yml",
+    "plan": "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
+  },
+  "promotion_rule": "implemented candidate only; exact-head structural, regression, and independent verification must pass before qualification"
+}

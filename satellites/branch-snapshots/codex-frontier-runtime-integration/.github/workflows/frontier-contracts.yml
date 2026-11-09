@@ -1,0 +1,50 @@
+name: Frontier Contracts
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - 'frontier/**'
+      - 'codex/frontier-**'
+
+concurrency:
+  group: frontier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Frontier integration (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install frontier test dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-frontier.txt
+      - name: Check frontier implementation quality
+        run: |
+          ruff check --config ruff-frontier.toml skeleton/frontier skeleton/services skeleton/api/frontier_routes.py
+          ruff format --config ruff-frontier.toml --check skeleton/frontier skeleton/services skeleton/api/frontier_routes.py
+      - name: Compile frontier package
+        run: python -m compileall -q skeleton/frontier skeleton/services skeleton/api
+      - name: Run frontier contract tests
+        env:
+          PYTHONPATH: .
+        run: python scripts/test_frontier.py --junitxml=frontier-results.xml
+      - name: Retain integration results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontier-results-${{ matrix.python }}
+          path: frontier-results.xml
+          if-no-files-found: error

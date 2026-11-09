@@ -1,0 +1,348 @@
+{
+  "schema_version": "skeleton.ai.game_learning_session_evidence.v1",
+  "status": "implementation_candidate",
+  "started_utc": "2026-10-14T03:32:31Z",
+  "integration_base": "c855120431ada865ebebf0e53425f170ea4f3e3d",
+  "authority": "Measured explicit local-operator workloads and source/build evidence; no application consent, enterprise closure or production promotion receipt",
+  "automated_tests_run": false,
+  "automated_tests_added": false,
+  "profiles": {
+    "total": 375,
+    "emulator_targets": 169,
+    "approved_installed_hardware_targets": 15
+  },
+  "compiled_cores": [
+    {
+      "core_id": "gambatte",
+      "source_repository": "https://github.com/libretro/gambatte-libretro.git",
+      "source_revision": "d9d6cd06382d1ced30de34d56d3609452323dab1",
+      "library_sha256": "4b5bdc518400b8a3a0d9c4c7902ecab3066ce2f94b793f929478fcb4af26c35a",
+      "library_bytes": 4968280,
+      "architecture": "x86_64"
+    },
+    {
+      "core_id": "fceumm",
+      "source_repository": "https://github.com/libretro/libretro-fceumm.git",
+      "source_revision": "ac0d00a7fc01166f84c7bac01d1084ebfd2b865e",
+      "library_sha256": "3bd01f64d9dc262ecbd750d39e165c5623e54d191cc7fdb0a608e1914c84e478",
+      "library_bytes": 4714592,
+      "architecture": "x86_64"
+    },
+    {
+      "core_id": "genesis_plus_gx",
+      "source_repository": "https://github.com/libretro/Genesis-Plus-GX.git",
+      "source_revision": "393f70cd64c7334564c19a424c383f53986c13f4",
+      "library_sha256": "1ba3f40ed6aea2511b9c0d48d079283a884ac8667b916f772443f717e49db04f",
+      "library_bytes": 12854720,
+      "architecture": "x86_64"
+    },
+    {
+      "core_id": "snes9x",
+      "source_repository": "https://github.com/libretro/snes9x.git",
+      "source_revision": "fae2fea08f74180759ef540ee94259213f503480",
+      "library_sha256": "76be5384ba2701bf34e21841779718449effc9afeb54f525cc8e3b98032badd9",
+      "library_bytes": 3202024,
+      "architecture": "x86_64"
+    },
+    {
+      "core_id": "mgba",
+      "source_repository": "https://github.com/mgba-emu/mgba.git",
+      "source_revision": "143adf5aa2a60c6036810b0cd72445e13d74b0e6",
+      "library_sha256": "aa593e672cd7a4b175bacf5c1e49e3cbf4ad14b4618d30e4360807252944c998",
+      "library_bytes": 3349368,
+      "architecture": "x86_64"
+    },
+    {
+      "core_id": "pcsx_rearmed",
+      "source_repository": "https://github.com/libretro/pcsx_rearmed.git",
+      "source_revision": "c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+      "library_sha256": "30e6b3fe1456a4a30c28c1462e4e48fe28ae2b78655f9ae15d5f1cae15777c49",
+      "library_bytes": 2274080,
+      "architecture": "x86_64"
+    }
+  ],
+  "learning": {
+    "original_generated_game_simulations": {
+      "successful_runs": 24,
+      "episodes": 192,
+      "q_updates": 8238,
+      "workers": 4,
+      "policies": [
+        {
+          "identity": "local-original-01-extraction_now",
+          "policy_digest": "da4121a5f3b272beb7c39ce4dd105aa6ec95562af27191e6c56d991eef83008b",
+          "episodes": 8,
+          "q_updates": 468
+        },
+        {
+          "identity": "local-original-02-soulslike",
+          "policy_digest": "79665d6ab55ed72b44e84c63c63532ace16d84c94d55e279a169d01a62fe1b8e",
+          "episodes": 8,
+          "q_updates": 301
+        },
+        {
+          "identity": "local-original-03-boomer_shooter",
+          "policy_digest": "e1e745224b85dbb90e420c1a8d09160437079ee30e8bb8de741f02350a9a70a0",
+          "episodes": 8,
+          "q_updates": 56
+        },
+        {
+          "identity": "local-original-04-arcade_golden_age",
+          "policy_digest": "6b4f31e5a7a20779bd2829b00dbcff8e8773bd79d547f72e9699d7902c3344d9",
+          "episodes": 8,
+          "q_updates": 173
+        },
+        {
+          "identity": "local-original-05-cozy_wholesome",
+          "policy_digest": "9f4ea65cefeb5505b2c3fa2f33fec5604724e01c40673109a63a8338d2d24ecc",
+          "episodes": 8,
+          "q_updates": 768
+        },
+        {
+          "identity": "local-original-06-modern_aaa",
+          "policy_digest": "a5ff6a68653b363031bcd614afbd1ebde98bada24487d055dfe68c614778f7ed",
+          "episodes": 8,
+          "q_updates": 266
+        },
+        {
+          "identity": "local-original-07-horror_survival",
+          "policy_digest": "f95a05460ea4a2e7b0bbfefd60716e3768a0779668da83d7f6e61b621303c4da",
+          "episodes": 8,
+          "q_updates": 277
+        },
+        {
+          "identity": "local-original-08-indie_experimental",
+          "policy_digest": "09441d98cf26280c5a2af4cea32e06a320cf1a62c3c7a07209a243036e6a354f",
+          "episodes": 8,
+          "q_updates": 768
+        },
+        {
+          "identity": "local-original-09-metroidvania",
+          "policy_digest": "dfb30663a25f1d7179b70d93fae7eda214c55d1958e23add5f3befa7055a35b3",
+          "episodes": 8,
+          "q_updates": 145
+        },
+        {
+          "identity": "local-original-10-roguelike",
+          "policy_digest": "a14796eab9a817fdb90f28df38163c35b5d8ca0a843600f60973e0327ac42272",
+          "episodes": 8,
+          "q_updates": 172
+        },
+        {
+          "identity": "local-original-11-jrpg",
+          "policy_digest": "687d7a83f3c9fc0c01dfb479999ae30c39723f7c8a5b5ed24f30584171b7b67d",
+          "episodes": 8,
+          "q_updates": 257
+        },
+        {
+          "identity": "local-original-12-crpg",
+          "policy_digest": "13894a5fdc5154a75a933556f308528ecf39dfad86a39dc82e076cbdc06704e7",
+          "episodes": 8,
+          "q_updates": 128
+        },
+        {
+          "identity": "local-original-13-immersive_sim",
+          "policy_digest": "cef4c81209ef5bdfad5320d6bada2f1df7be3a7ee42843b3ac6edfd4753bd1c7",
+          "episodes": 8,
+          "q_updates": 157
+        },
+        {
+          "identity": "local-original-14-stealth",
+          "policy_digest": "dea5458833fa069d2bd2a39fe453e437c8f3ff19d37cb9cdd024272adb42f297",
+          "episodes": 8,
+          "q_updates": 78
+        },
+        {
+          "identity": "local-original-15-tactics_grid",
+          "policy_digest": "f23610ef2d207c2d2470b73f4b560320378f2bde0e9635b94abfc310a317df4a",
+          "episodes": 8,
+          "q_updates": 297
+        },
+        {
+          "identity": "local-original-16-fighting_game",
+          "policy_digest": "c37a8c74b283494014c1c7d631a291e754c28d44b5e8ca0f3bd2854603e94083",
+          "episodes": 8,
+          "q_updates": 162
+        },
+        {
+          "identity": "local-original-17-bullet_heaven",
+          "policy_digest": "efbf4f2b4e751b0902b26f262a1e6387da04b8eaa0b6f6b442c4a0da66c468c9",
+          "episodes": 8,
+          "q_updates": 665
+        },
+        {
+          "identity": "local-original-18-deckbuilder",
+          "policy_digest": "d5d2f66e38ab0f68da5fbf578a192050e04e072559454e308e459894fd06811a",
+          "episodes": 8,
+          "q_updates": 193
+        },
+        {
+          "identity": "local-original-19-battle_royale",
+          "policy_digest": "49e5e8f9588b0b032b09a8bb5d59a69ba7149b92a39fc438fbf72de6fb37641f",
+          "episodes": 8,
+          "q_updates": 207
+        },
+        {
+          "identity": "local-original-20-mmorpg",
+          "policy_digest": "a9c82629b46327916e0f03f1d3ed296b46905e6579b9f7eece00bb2183e9f015",
+          "episodes": 8,
+          "q_updates": 353
+        },
+        {
+          "identity": "local-original-21-visual_novel",
+          "policy_digest": "0054c554266ef643f6a413509b8da74b786c5ca8aea52d54db616b7d3f6eae35",
+          "episodes": 8,
+          "q_updates": 95
+        },
+        {
+          "identity": "local-original-22-walking_sim",
+          "policy_digest": "956fe3ab3c4bb7f7e677210a1da21074aac1280557766a22e9c2d6339d8d86fb",
+          "episodes": 8,
+          "q_updates": 768
+        },
+        {
+          "identity": "local-original-23-grand_strategy",
+          "policy_digest": "10882e7dbe2f1137119775488e61ea0d08d0ca24111ad3d247dcb566c7c529b6",
+          "episodes": 8,
+          "q_updates": 768
+        },
+        {
+          "identity": "local-original-24-city_builder",
+          "policy_digest": "dcee06765a84c879456bfb8dcbc7e4dd342f18dfb8fa27e968c8a2f638ad8926",
+          "episodes": 8,
+          "q_updates": 716
+        }
+      ]
+    },
+    "existing_reference_engines": {
+      "successful_runs": 11,
+      "episodes": 88,
+      "q_updates": 5431,
+      "workers": 4,
+      "policies": [
+        {
+          "identity": "pong_discrete_1972",
+          "policy_digest": "b7cd8424cbf45557eec9be78b272da1dc714c1ea601f468b007406228b1afbff",
+          "episodes": 8,
+          "q_updates": 311
+        },
+        {
+          "identity": "vector_sprite_1977",
+          "policy_digest": "f26910065a6bf57a99ecd07c1e92788e430813d1d51bb378d9d4d28efc799ff7",
+          "episodes": 8,
+          "q_updates": 512
+        },
+        {
+          "identity": "eight_bit_tile_1983",
+          "policy_digest": "7ea789eccc21c848cbfe543035332815fa564320e9b3b962f4d1c6f1eecead91",
+          "episodes": 8,
+          "q_updates": 512
+        },
+        {
+          "identity": "sixteen_bit_raster_1989",
+          "policy_digest": "7c8c8c7b21ed21badf8c7cff7ffdc81a156d055e56148bd3d3a1fb026d46daf4",
+          "episodes": 8,
+          "q_updates": 512
+        },
+        {
+          "identity": "early_3d_software_1993",
+          "policy_digest": "86cba71438473a452bb2a7435862c6b765cc8eaae31cc2d3ad5744d858b8503c",
+          "episodes": 8,
+          "q_updates": 512
+        },
+        {
+          "identity": "fixed_function_3d_1996",
+          "policy_digest": "18060a47c764f193d54ad5194be654389a2d222425f0d27d7bfcc9ecd9166f1a",
+          "episodes": 8,
+          "q_updates": 512
+        },
+        {
+          "identity": "shader_console_2001",
+          "policy_digest": "4bbcb28256e1091615ea2e32a6d64ae0dbef6f3ba11cfab72bc7db33b7833521",
+          "episodes": 8,
+          "q_updates": 512
+        },
+        {
+          "identity": "hd_programmable_2005",
+          "policy_digest": "460aa71fd18e565fe9ef7716be062ee2da544d72e70a46e65e915aefb550defa",
+          "episodes": 8,
+          "q_updates": 512
+        },
+        {
+          "identity": "deferred_open_world_2013",
+          "policy_digest": "564d16f47eb01e638946c2ba9b9abdc729d18efa8e8ce04f1e25be9e81e9d845",
+          "episodes": 8,
+          "q_updates": 512
+        },
+        {
+          "identity": "data_oriented_modern_2020",
+          "policy_digest": "72558c578761f0b8a82e3eaa323a9bf23f877f14592deb1fe40332f84a655404",
+          "episodes": 8,
+          "q_updates": 512
+        },
+        {
+          "identity": "next_hybrid_2027",
+          "policy_digest": "1d35165381f840edf1ea23fe17d2e9a1b032c60901ea3c71c3e69737743b9534",
+          "episodes": 8,
+          "q_updates": 512
+        }
+      ]
+    },
+    "experimental_dmg_original_cartridge": {
+      "algorithm": "frozen_batch_local_actor_q_v1",
+      "committed_episodes": 8,
+      "policy_digest": "37fd8bcda3e08e90427e6a37adf13c4299ad990f1d7dea612cfd5514c190a646",
+      "policy_file": "/workspace/scratch/jeeves-dmg-game-boy-policy.json",
+      "production_promotion": false,
+      "status": "candidate_trained",
+      "updates": 768,
+      "workers": 4
+    },
+    "approved_gambatte_original_cartridge": {
+      "algorithm": "frozen_batch_local_actor_q_v1",
+      "committed_episodes": 4,
+      "policy_digest": "d33278cd8f321e702ac284ca63c8868c34ceefe04e04b49dbaa2c1a48d800e59",
+      "policy_file": "/workspace/scratch/jeeves-native-game-boy-policy.json",
+      "production_promotion": false,
+      "status": "candidate_trained",
+      "updates": 256,
+      "workers": 2
+    },
+    "total_episodes": 292,
+    "total_q_updates": 14693,
+    "biological_human_demonstrations_claimed": false,
+    "heldout_improvement_claimed": false
+  },
+  "verification": {
+    "python_compilation": "passed",
+    "ruff": "passed",
+    "scoped_typescript": "passed",
+    "scoped_eslint": "passed",
+    "production_web_export": "passed",
+    "authenticated_backend_end_to_end_acceptance": "not_performed",
+    "all_commercial_rom_or_hardware_compatibility": "not_established",
+    "automated_test_suite": "not_run_per_user"
+  },
+  "artifacts": {
+    "native_registry": "/workspace/scratch/jeeves-emulator-install/cores.json",
+    "installation_identity_report": "/workspace/scratch/jeeves-emulator-installation.json",
+    "original_curriculum": "/workspace/scratch/jeeves-original-learning-projects/curriculum.json",
+    "original_policies_and_traces": "/workspace/scratch/jeeves-original-learning-projects/policies",
+    "reference_policies_and_traces": "/workspace/scratch/jeeves-reference-learning",
+    "production_web_export": "/workspace/scratch/jeeves-game-learning-web-v3"
+  },
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "source_sha256": {
+    "game_learning.py": "879839ef47d0d9a6eaaf1d1cd8939c89706f354fed43309492db1463cf47d263",
+    "game_learning_parallel.py": "e0a05938987f818c863fc33d7ec8c9757506724454f37197550e63c1ff12fb7f",
+    "game_learning_demonstrations.py": "9e70cc6e327202efb350812d387692a6c09bf4cab87919efc7376260f92da2bb",
+    "game_learning_generation.py": "8f723a331155fe6a0335e81841df38ff9ea0a05a57f52eb25e2a77a21d0ab4b7",
+    "game_emulator_host.py": "eadbbfda7a530e98cf9d1411fc8f22830d91dbffd4e03e2c0ad5f2c5d02e4492",
+    "game_emulator_worker.py": "c2231a19b9485528cdcfc1e135b51c4ef99466e9319873866694ff06c3531f87",
+    "game_emulator_protocol.py": "83e590d9a74b5fee033d9fc2fad514aeb58568b06a84f73bb0da58f05e6ef920",
+    "game_emulator_catalog.py": "61cf76ab66226067515380ddb5ea30253389504784c634df941ce873eb07e9cc",
+    "game_learning_cli.py": "f99c7e4e77fc99dd0115e6b056405de2c91068298903a95666ba028c4e385ecc",
+    "game_console_build.py": "2d20129686c81d4d653b21addd6c3865936b0e8e4ffbdabdc7f0463a91aa6a9b"
+  }
+}

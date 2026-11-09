@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "tasks": [
+    {
+      "task_key": "reserve-S489-schema",
+      "status": "validated",
+      "prerequisites": []
+    },
+    {
+      "task_key": "reserve-S490-metrics",
+      "status": "merged",
+      "prerequisites": []
+    },
+    {
+      "task_key": "reserve-S491-unlock-scan",
+      "status": "blocked",
+      "prerequisites": ["reserve-S489-schema", "reserve-S490-metrics"]
+    },
+    {
+      "task_key": "reserve-S493-heatmap",
+      "status": "working",
+      "prerequisites": []
+    },
+    {
+      "task_key": "reserve-S492-reconcile",
+      "status": "blocked",
+      "prerequisites": ["reserve-S493-heatmap"]
+    },
+    {
+      "task_key": "reserve-S494-docs",
+      "status": "blocked",
+      "prerequisites": ["reserve-S490-metrics", "reserve-S493-heatmap"]
+    }
+  ]
+}

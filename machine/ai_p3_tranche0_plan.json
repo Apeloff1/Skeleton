@@ -1,0 +1,161 @@
+{
+  "schema_version": "skeleton.ai.p3.tranche0_plan.v1",
+  "plan_version": "0.1.0",
+  "status": "active",
+  "phase": "P3",
+  "title": "Autonomous Intelligence Expansion",
+  "purpose": "Expand the provider-independent Functional-AI frontier into model development, specialization, multi-agent/self-improvement/distributed vertical slices, and independent autonomous/research acceptance without erasing the remaining masterplan breadth.",
+  "parent_closure": {
+    "path": "machine/ai_p2_functional_ai_closure.json",
+    "closure_id": "P2-FUNCTIONAL-AI-FRONTIER",
+    "required_status": "closed",
+    "merge_commit": "11cea2fc8896e82dd2e30e326be26fbd70a67fcb"
+  },
+  "source": {
+    "path": "machine/ai_p2_execution_map.json#/first_tranche/queued_volume_refs",
+    "expected_volume_count": 257
+  },
+  "selection": {
+    "selected_volume_count": 23,
+    "selected_volume_refs": [
+      "VOL-001",
+      "VOL-006",
+      "VOL-019",
+      "VOL-020",
+      "VOL-071",
+      "VOL-072",
+      "VOL-073",
+      "VOL-074",
+      "VOL-085",
+      "VOL-086",
+      "VOL-087",
+      "VOL-088",
+      "VOL-098",
+      "VOL-099",
+      "VOL-100",
+      "VOL-101",
+      "VOL-102",
+      "VOL-103",
+      "VOL-105",
+      "VOL-106",
+      "VOL-107",
+      "VOL-111",
+      "VOL-114"
+    ],
+    "remaining_queued_volume_count": 234,
+    "rationale": [
+      "Start P3 with the remaining model-development and scientific foundations required to improve the local AI itself.",
+      "Move next into specialized/domain behavior and trust surfaces before permitting broad autonomous acceptance claims.",
+      "Materialize VS-002 through VS-007 as executable vertical slices rather than architecture-only milestones.",
+      "Gate autonomous-worker, research-system and SOTA-candidate acceptance on independent evidence from the vertical suite.",
+      "Keep the other 234 inherited volumes explicit and queued; P3-T0 is expansion, not blanket completion."
+    ]
+  },
+  "workstreams": [
+    {
+      "id": "P3-T0-MODEL",
+      "task_id": "P3-MODEL-FOUNDATION-01",
+      "lane_id": "P3-L0",
+      "name": "Model, research and multimodal foundation",
+      "depends_on": [],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-006",
+        "VOL-019",
+        "VOL-020"
+      ],
+      "objective": "Turn the remaining scientific/model-development/world-model/multimodal foundation into executable, provenance-bound capability without regressing the provider-independent Functional-AI frontier."
+    },
+    {
+      "id": "P3-T0-DOMAIN",
+      "task_id": "P3-DOMAIN-INTELLIGENCE-01",
+      "lane_id": "P3-L1",
+      "name": "Specialized and domain intelligence",
+      "depends_on": [
+        "P3-MODEL-FOUNDATION-01"
+      ],
+      "volume_refs": [
+        "VOL-071",
+        "VOL-072",
+        "VOL-073",
+        "VOL-074"
+      ],
+      "objective": "Materialize bounded specialization, Jeeves domain custody, simulation intelligence, and education behavior on top of the local functional runtime."
+    },
+    {
+      "id": "P3-T0-TRUST",
+      "task_id": "P3-TRUST-EXPERIENCE-01",
+      "lane_id": "P3-L2",
+      "name": "Explainability, accessibility, internationalization and compliance",
+      "depends_on": [
+        "P3-MODEL-FOUNDATION-01"
+      ],
+      "volume_refs": [
+        "VOL-085",
+        "VOL-086",
+        "VOL-087",
+        "VOL-088"
+      ],
+      "objective": "Bind explanations, accessible interaction, locale behavior, and compliance controls to operation evidence instead of presentation-only claims."
+    },
+    {
+      "id": "P3-T0-VS",
+      "task_id": "P3-VERTICAL-SUITE-01",
+      "lane_id": "P3-L3",
+      "name": "VS-002 through VS-007 executable validation suite",
+      "depends_on": [
+        "P3-MODEL-FOUNDATION-01",
+        "P3-DOMAIN-INTELLIGENCE-01",
+        "P3-TRUST-EXPERIENCE-01"
+      ],
+      "volume_refs": [
+        "VOL-098",
+        "VOL-099",
+        "VOL-100",
+        "VOL-101",
+        "VOL-102",
+        "VOL-103"
+      ],
+      "objective": "Materialize engineering, scientific-research, multi-agent, self-improvement, distributed-execution, and desktop-product vertical slices with independent evidence."
+    },
+    {
+      "id": "P3-T0-ACCEPT",
+      "task_id": "P3-ACCEPTANCE-01",
+      "lane_id": "P3-L4",
+      "name": "Autonomous worker, research system and SOTA-candidate acceptance",
+      "depends_on": [
+        "P3-VERTICAL-SUITE-01"
+      ],
+      "volume_refs": [
+        "VOL-105",
+        "VOL-106",
+        "VOL-107"
+      ],
+      "objective": "Create strict acceptance envelopes for autonomous work, research, and SOTA-candidate claims; require negative, aging, recovery, and independent-verification evidence."
+    },
+    {
+      "id": "P3-T0-AUTHORITY",
+      "task_id": "P3-CONSTRUCTION-AUTHORITY-01",
+      "lane_id": "P3-L5",
+      "name": "Construction manual and technology radar authority",
+      "depends_on": [
+        "P3-TRUST-EXPERIENCE-01",
+        "P3-ACCEPTANCE-01"
+      ],
+      "volume_refs": [
+        "VOL-111",
+        "VOL-114"
+      ],
+      "objective": "Make the construction manual and technology radar deterministic projections of machine/runtime evidence with no self-promoting completion authority."
+    }
+  ],
+  "invariants": [
+    "P3 source scope equals the exact 257-volume queue left by the merged P2 Functional-AI frontier.",
+    "P3-T0 scheduled and queued partitions are disjoint and together cover all 257 source volumes.",
+    "Every scheduled volume has exactly one task owner.",
+    "Task-local acceptance may add constraints but may not narrow canonical masterplan contracts, risks, gaps, tests, evaluations, accountability, or signing requirements.",
+    "File existence, line count, or documentation never promotes masterplan maturity.",
+    "No implementation task may self-sign independent verification.",
+    "The P2 provider-independent Functional-AI closure remains a required predecessor and may not be weakened by P3."
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "schema_version": "skeleton.ai.game_console_workspace.v1",
+  "status": "implementation_candidate",
+  "parent": "machine/ai_game_learning.json",
+  "owners": {
+    "editor_composition": "backend/core/game_console_studio.py",
+    "editor_api": "backend/routes/game_console_studio.py",
+    "successor_composition": "backend/core/game_successor.py",
+    "successor_api": "backend/routes/game_successor.py",
+    "authority": "Existing CORE_DB GameLearningWorkspace project/source/revision/job collections"
+  },
+  "interfaces": [
+    "/api/game-console-studio/profiles",
+    "/api/game-console-studio/projects",
+    "/api/game-console-studio/projects/{project_id}/document",
+    "/api/game-console-studio/projects/{project_id}/handoff",
+    "/api/game-successor/sources",
+    "/api/game-successor/projects/{project_id}/synthesize",
+    "/api/game-successor/candidates/{candidate_id}",
+    "/api/game-successor/candidates/{candidate_id}/adopt",
+    "/api/game-successor/candidates/{candidate_id}/compare",
+    "/api/game-successor/candidates/{candidate_id}/desktop",
+    "GamePlay.public.keyboard_bindings: exact source-pinned action-to-browser-key mapping for console_editor environments",
+    "/api/game-successor/projects/{project_id}/world",
+    "/api/game-successor/projects/{project_id}/desktop"
+  ],
+  "editor_authority": "Exact actor/tenant, current project version and complete canonical file-manifest digest fence typed edits. Existing revision journal saves complete original authored sources/assets; caller scripts never execute. Public console_editor and successor environment requests delegate to bounded canonical runtime adapters.",
+  "successor_authority": "Exactly one or three distinct source origins, each an explicit authored inspiration profile or a currently admitted owned source reference. Authored references grant no commercial asset rights or original-game measurements. Owned references retain exact source digest, bundle digest, authority epoch and owning project; cross-project withdrawal fences dependent queued/running work and future adoption/build/export. Generated files and assets are original; no source ROM payload copied.",
+  "job_authority": "Declared successor/successor_compare/desktop handlers use existing bounded durable queued/running/terminal jobs, worker lease, cancellation and exact source/input fences. Prepared candidates lack completed issuing-job authority until exact completed receipt validates result digest. Comparison reports actual candidate and normalized authored-source runtime measurements, never original ROM mastery.",
+  "bounds": {
+    "source_origins": [
+      1,
+      3
+    ],
+    "project_files": 128,
+    "file_utf8_bytes": 1048576,
+    "project_utf8_bytes": 7340032,
+    "project_revisions": 512,
+    "project_jobs": 512,
+    "comparison_steps": 131072,
+    "candidate_result_bytes": 2000000,
+    "console_json_utf8_bytes": 4194304,
+    "document_json_bytes": 8388608
+  },
+  "failure": "Unknown profiles, malformed assets, stale revisions, conflicting idempotency keys, revoked source authority, incomplete issuer receipts, missing compiler and unquiesced worker cancellation fail explicitly.",
+  "scope_limits": "Design-scene simulation is not hardware emulation. Downloaded copies cannot be globally erased by workspace withdrawal. No numerical unlearning, original-game mastery, all-target binary readiness, production promotion or masterplan closure is claimed.",
+  "automated_tests_requested": false,
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "source_projection": "Owned source requests may explicitly select authored family/adventure/fishing/farming/platformer/arena and bounded authored mechanic values. These labelled authoring choices preserve exact source provenance; lexical/ROM layout facts are not measured gameplay physics.",
+  "runtime_projection": "Actor requests carry canonical authored executable document/spec only. Console compiled source_manifest.json binds exact full original source graph digest; full source files remain in the existing workspace revision authority. Live play retains current revision/epoch/tree identity once, avoiding duplicate source graph persistence.",
+  "editor_recovery": "The existing project head has a bounded operational editor write-token lease. Committed journal retries return before fencing. Exact version/token/lease gates first input-epoch fence and final source-head CAS; uncommitted fenced writes deny new work until exact retry or expired-lease replacement. Losing owners cannot advance or fence a newer source head.",
+  "measured_controller": "Comparison may explicitly select a completed currently admitted owned Q-policy for the exact original successor environment. The frozen controller is transferred only across checked identical action/reward/observation semantics; changed candidate environment identities stay distinct. Exact policy digest, consent/source dependencies and transfer disclosure are retained in candidate lineage, adoption and export. This is measured controller transfer, not deployment or learned human satisfaction.",
+  "teacher_lineage": "Policy-guided comparison retains derived_demonstrations from exact completed policy issuance. Adoption and edited descendants retain those teacher IDs/digests and original input-tree identities; current explicit consent, immutable recorded content and all original source rights are rechecked without pretending a historical teacher recording belongs to the new runtime. Withdrawal fences dependent jobs/live plays and denies future compare/adoption/export; numerical unlearning is not claimed.",
+  "native_source_intake": "Outside canonical analysed NES/GB/SNES/Genesis/GBA/N64 platforms and protected parser extensions, a ROM upload may use an actually operator-approved target/core and its canonical pinned content-extension profile. Existing streamed create/chunk/complete authority stores exact immutable media descriptors; no decoded mechanics, header validity or successful execution is claimed. Known malformed parsed ROMs never fall back to opaque intake. Bounded payload identity hashes preserve16MiB ingress without serializing base64 into the8MiB metadata envelope."
+}

@@ -1,0 +1,15 @@
+# Dragon strict factual promotion gate — two measured tiers
+Timestamp 2026-10-12 UTC | PR #3605 | Authoritative scope: application-level Jeeves retrieval overlays only.
+
+## Direct cross-source verification at promotion time
+Both qualify_tier and JeevesWeightOverlay.activate now require the full signed ClaimSubject, SourceWitness and SignedClaimAdjudication graph and the operator-provisioned external publisher-group/auditor public keys. During qualification the exact current factual witness evidence is independently reverified by verify_cross_source_claims. The source claim owners, context digests and knowledge digest are shared with the 100-matrix mother scrutiny gate. The signed adjudicator must bind to exactly the witness set under review and every claim must be corroborated by two independently entrusted publishers with distinct source revisions, with zero contradictions or uncertainties.
+
+Because the fact graph is reverified when the retrieval overlay is activated, a previously qualified measurement is not sufficient if source evidence has expired, a reviewer key changes or any witnessed claim is no longer complete. The evaluator-signed holdout data, normal-weight or hyper-tier baseline, immutable retrieval index digest, and separately signed operator approval are all rechecked. A passed factual report's canonical digest and corroborated-claim count are included in the tier-verdict hash, so final operator approval binds them.
+
+## Fail-closed demonstrations
+The existing signed-shadow/hyper sandbox integration tests now construct three independent cryptographic signers: two source-group auditors and a separate final adjudicator. The tests cover measured promotion with complete 100-matrix scrutiny and source agreement, denial for missing adjudication, denial for a tampered witnessed revision even when the matrix set remains complete, denial when one of 100 matrices is missing, denial for a false holdout-exclusion claim and denial for stale rollback generation. The normal-to-hyper second tier uses the same factual revalidation.
+
+## What this means and what it does not mean
+This directly repairs a promotion-policy loophole: signed matrix scores alone cannot qualify routing weights if their source claims are disputed or are missing the independent fact-check graph. It does not demonstrate independent factual truth without an actual trusted reviewer performing source research. It does not grant a content license, download videos, generate facts, execute background jobs or rewrite a neural model. This feature PR must pass exact-head Source Safety/Dragon Python/Frontend/Backend checks and be deployed with real external trust anchors before any production use.
+
+2026-10-12 UTC improvements: (Bound signed cross-source factual consensus to both measured sandbox tiers); (Repeated source and matrix verification at activation, not just at initial assessment); (Included independent factual report digest in operator-approved sandbox verdict).

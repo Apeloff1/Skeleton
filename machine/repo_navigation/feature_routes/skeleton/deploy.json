@@ -1,0 +1,1 @@
+{"features":[{"file_shards":["skeleton/deploy"],"files":3,"name":"skeleton/deploy","zones":{"build-delivery":3}},{"file_shards":["skeleton/deploy"],"files":5,"name":"skeleton/deploy/strategies","zones":{"build-delivery":5}}],"schema":"skeleton.repository-navigation.v1"}

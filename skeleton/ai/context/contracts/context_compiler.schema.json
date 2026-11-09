@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-03:context_compiler:v1",
+  "title": "FLGB-03 context compiler",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operation_id",
+    "budget_tokens",
+    "selected_ids",
+    "omitted_ids",
+    "used_tokens",
+    "source_digest"
+  ],
+  "properties": {
+    "operation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "budget_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000000
+    },
+    "selected_ids": {
+      "type": "array",
+      "maxItems": 16384,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "omitted_ids": {
+      "type": "array",
+      "maxItems": 16384,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "used_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000000
+    },
+    "source_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,833 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from skeleton.app.assembly import (
+    checks_ok,
+    compose_command,
+    find_repo_root,
+    load_manifest,
+    manifest_payload,
+    preflight,
+)
+
+
+def test_manifest_is_self_consistent():
+    manifest = load_manifest()
+
+    assert manifest.schema_version == 1
+    assert manifest.name == "Skeleton"
+    assert manifest.compose_file == "docker-compose.yml"
+    assert {"frontend", "backend", "skeleton", "mongo"}.issubset(manifest.service_names)
+    assert set(manifest.default_services).issubset(manifest.service_names)
+    assert set(manifest.full_services).issubset(manifest.service_names)
+    assert manifest.architecture["tag"] == "arch-map/v3.7"
+    assert manifest.construction["contract"] == "machine/ai_app_construction.json"
+    assert manifest.construction["provider_activation_boundary"] == "skeleton/provider_runtime.py"
+    assert manifest.construction["provider_architecture_loader"] == "skeleton/provider_contract.py"
+    assert manifest.construction["construction_version"] == "3.7.0"
+    assert manifest.construction["interface_registry"] == "machine/capability_interfaces.json"
+    assert manifest.construction["interface_validator"] == "scripts/check_capability_interfaces.py"
+    assert manifest.construction["operation_contract"] == "skeleton/contracts/operation.py"
+    assert manifest.construction["stream_contract"] == "skeleton/frontier/runtime/operation_stream.py"
+    assert manifest.construction["stream_store"] == "skeleton/frontier/runtime/operation_stream_store.py"
+
+    for service in manifest.services:
+        assert set(service.depends_on).issubset(manifest.service_names)
+
+
+def test_manifest_payload_is_json_serializable():
+    payload = manifest_payload()
+    encoded = json.dumps(payload, sort_keys=True)
+
+    assert '"schema_version": 1' in encoded
+    assert '"frontend"' in encoded
+    assert '"backend"' in encoded
+    assert '"skeleton"' in encoded
+    assert '"architecture"' in encoded
+    assert '"construction"' in encoded
+    assert '"machine/ai_app_construction.json"' in encoded
+
+
+def test_structural_preflight_passes_for_repository_checkout():
+    root = find_repo_root(Path(__file__))
+    checks = preflight(root)
+
+    assert checks
+    assert checks_ok(checks), [check.message for check in checks if not check.ok]
+
+
+def test_runtime_preflight_reports_missing_environment_without_mutating_process(monkeypatch):
+    root = find_repo_root(Path(__file__))
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda _name: "/usr/bin/docker")
+    monkeypatch.setattr("skeleton.app.assembly._read_dotenv", lambda _path: {})
+
+    checks = preflight(root, runtime=True, environ={})
+    failures = {check.code for check in checks if not check.ok}
+
+    assert "env:MONGO_URL" in failures
+    assert "env:SKL_MONGO_URI" in failures
+    assert "env:MONGO_INITDB_ROOT_PASSWORD" in failures
+    assert "env:JWT_SECRET" in failures
+    assert "env:SKL_ENGINE_SERVICE_TOKEN" in failures
+    assert "runtime:docker" not in failures
+
+
+@pytest.mark.parametrize("token,expected", [
+    ("short", False), ("x" * 31, False), ("x" * 32, True),
+    ("x" * 4096, True), ("x" * 4097, False), (" " + "x" * 32, False),
+])
+def test_runtime_preflight_validates_engine_authentication(monkeypatch, token, expected):
+    monkeypatch.setattr("skeleton.app.assembly._read_dotenv", lambda _path: {})
+    checks = preflight(runtime=True, environ={"SKL_ENGINE_SERVICE_TOKEN": token})
+    check = next(item for item in checks if item.code == "env:SKL_ENGINE_SERVICE_TOKEN")
+    assert check.ok is expected
+    assert token not in check.message
+
+
+def test_up_command_is_deterministic_and_shell_free():
+    command = compose_command("up", build=True)
+
+    assert command[:4] == ("docker", "compose", "-f", "docker-compose.yml")
+    assert command[4:7] == ("up", "-d", "--build")
+    assert "frontend" in command
+    assert "backend" in command
+    assert "skeleton" in command
+
+
+def test_full_up_is_blocked_until_chroma_persistence_is_qualified():
+    with pytest.raises(ValueError, match="Chroma.*data"):
+        compose_command("up", full=True, build=False)
+
+
+def test_app_down_stops_all_declared_profiles_without_removing_data():
+    command = compose_command("down")
+    assert command[:4] == ("docker", "compose", "-f", "docker-compose.yml")
+    assert command[4:] == ("--profile", "full", "stop")
+    assert "down" not in command and "--remove-orphans" not in command
+    assert "--volumes" not in command and "-v" not in command
+
+
+def test_cli_refuses_unsafe_full_start_before_preflight_or_compose(monkeypatch, capsys):
+    from skeleton.app import cli
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Full startup must not dispatch or change configuration")
+
+    monkeypatch.setattr(cli, "preflight", forbidden)
+    monkeypatch.setattr(cli, "_run_compose", forbidden)
+    assert cli.run_app_cli(["up", "--full"]) == 1
+    assert "Chroma" in capsys.readouterr().out
+
+
+def test_app_compose_dispatch_disables_inherited_orphan_removal(monkeypatch, tmp_path):
+    import subprocess
+
+    from skeleton.app import cli
+
+    observed = {}
+
+    def runner(command, **kwargs):
+        observed.update(kwargs["env"])
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setenv("COMPOSE_REMOVE_ORPHANS", "1")
+    monkeypatch.setenv("SKELETON_TEST_SETTING", "preserved")
+    monkeypatch.setattr(cli.subprocess, "run", runner)
+    assert cli._run_compose(("docker", "compose", "up"), tmp_path,
+                            env_overrides={"COMPOSE_REMOVE_ORPHANS": "1"}) == 0
+    assert observed["COMPOSE_REMOVE_ORPHANS"] == "0"
+    assert observed["SKELETON_TEST_SETTING"] == "preserved"
+
+
+def test_logs_reject_unknown_service():
+    with pytest.raises(ValueError, match="unknown service"):
+        compose_command("logs", service="not-a-service")
+
+
+def test_http_probe_uses_declared_health_surface(monkeypatch):
+    from skeleton.app.health import probe_url
+
+    class _Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, _size):
+            return b"ok"
+
+    seen = {}
+
+    def fake_urlopen(request, timeout):
+        seen["url"] = request.full_url
+        seen["timeout"] = timeout
+        return _Response()
+
+    monkeypatch.setattr("skeleton.app.health.urlopen", fake_urlopen)
+    service = load_manifest().service("skeleton")
+
+    result = probe_url(service, timeout=1.25)
+
+    assert result.ok is True
+    assert result.status == 200
+    assert seen == {
+        "url": "http://localhost:8010/api/v1/health/live",
+        "timeout": 1.25,
+    }
+
+
+def test_default_smoke_profile_has_frontend_backend_and_engine():
+    manifest = load_manifest()
+    probed = {
+        service.name
+        for service in manifest.services
+        if service.name in manifest.default_services
+        and service.public_url
+        and service.health_path
+    }
+
+    assert probed == {"frontend", "backend", "skeleton"}
+
+
+def test_frontend_clients_share_canonical_runtime_endpoints():
+    root = find_repo_root(Path(__file__))
+    resolver = (root / "frontend/src/utils/apiBase.ts").read_text(encoding="utf-8")
+
+    assert "export const API_BASE" in resolver
+    assert "export const SKELETON_API_BASE" in resolver
+    assert "EXPO_PUBLIC_BACKEND_URL" in resolver
+    assert "EXPO_PUBLIC_SKELETON_URL" in resolver
+
+    expected_imports = {
+        "frontend/src/services/api.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/src/services/skeleton.ts": "import { SKELETON_API_BASE } from '../utils/apiBase';",
+        "frontend/src/utils/apiClient.ts": "import { API_BASE } from './apiBase';",
+        "frontend/src/utils/bootHealth.ts": "import { API_BASE } from './apiBase';",
+        "frontend/src/product/aiChatClient.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/src/product/appHealthClient.ts": "import { API_BASE, SKELETON_API_BASE } from '../utils/apiBase';",
+        "frontend/src/constants/config.ts": "import { API_BASE } from '../utils/apiBase';",
+    }
+    for relative, expected in expected_imports.items():
+        source = (root / relative).read_text(encoding="utf-8")
+        assert expected in source, f"{relative} bypasses canonical runtime endpoints"
+
+
+def test_frontend_skeleton_health_matches_engine_liveness_contract():
+    root = find_repo_root(Path(__file__))
+    client = (root / "frontend/src/services/skeleton.ts").read_text(encoding="utf-8")
+    routes = (root / "skeleton/api/routes.py").read_text(encoding="utf-8")
+
+    assert "'/api/v1/health/live'" in client
+    assert '@router.get("/health/live")' in routes
+
+
+def test_product_control_client_matches_mounted_backend_routes():
+    root = find_repo_root(Path(__file__))
+    client = (root / "frontend/src/product/productControlClient.ts").read_text(encoding="utf-8")
+    ops = (root / "backend/routes/ops.py").read_text(encoding="utf-8")
+    registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
+
+    assert "const ROOT = '/api/admin/ops/product-control';" in client
+    assert 'router = project_router(prefix="/api/admin/ops"' in ops
+    assert '("routes.ops",' in registry
+
+    required_routes = (
+        "/product-control/status",
+        "/product-control/deployment-preflight",
+        "/product-control/deployments",
+        "/product-control/pending",
+        "/product-control/audit",
+        "/product-control/receipts",
+        "/product-control/receipt/{operation_id}/result",
+        "/product-control/execute/{seq}",
+        "/product-control/execute-pending",
+        "/product-control/admit",
+    )
+    for route in required_routes:
+        assert route in ops, f"frontend product control contract is missing backend route {route}"
+
+
+def test_safe_mode_recovers_into_canonical_product_shell():
+    root = find_repo_root(Path(__file__))
+    safe_mode = (root / "frontend/app/safe-mode.tsx").read_text(encoding="utf-8")
+
+    assert "router.replace('/product')" in safe_mode
+    assert "Try Product" in safe_mode
+
+
+def test_wait_for_application_retries_until_healthy(monkeypatch):
+    from skeleton.app.health import ProbeResult, wait_for_application
+
+    calls = []
+    sleeps = []
+
+    def fake_probe_application(*, manifest, full, timeout):
+        calls.append((full, timeout))
+        ok = len(calls) >= 3
+        return (
+            ProbeResult(
+                service="backend",
+                url="http://localhost:8001/api/health",
+                ok=ok,
+                status=200 if ok else None,
+                detail="healthy" if ok else "not ready",
+            ),
+        )
+
+    monkeypatch.setattr("skeleton.app.health.probe_application", fake_probe_application)
+    monkeypatch.setattr("skeleton.app.health.time.sleep", lambda delay: sleeps.append(delay))
+
+    results = wait_for_application(attempts=5, delay=0.25, timeout=1.5)
+
+    assert results[0].ok is True
+    assert calls == [(False, 1.5), (False, 1.5), (False, 1.5)]
+    assert sleeps == [0.25, 0.25]
+
+
+def test_wait_for_application_rejects_invalid_budget():
+    from skeleton.app.health import wait_for_application
+
+    with pytest.raises(ValueError, match="attempts"):
+        wait_for_application(attempts=0)
+    with pytest.raises(ValueError, match="timeout"):
+        wait_for_application(timeout=0)
+    with pytest.raises(ValueError, match="delay"):
+        wait_for_application(delay=-1)
+
+
+def test_all_launcher_paths_converge_on_product_shell():
+    root = find_repo_root(Path(__file__))
+    launch = (root / "frontend/src/components/LaunchCascade.tsx").read_text(encoding="utf-8")
+    welcome = (root / "frontend/app/welcome.tsx").read_text(encoding="utf-8")
+    safe_mode = (root / "frontend/app/safe-mode.tsx").read_text(encoding="utf-8")
+
+    assert "router.replace('/product')" in launch
+    assert "router.replace('/product')" in welcome
+    assert "router.replace('/product')" in safe_mode
+    assert "t('launcher.enter_product')" in launch
+    assert "t('launcher.open')" in launch
+    en = (root / "frontend/src/i18n/catalogs/en.ts").read_text(encoding="utf-8")
+    nb = (root / "frontend/src/i18n/catalogs/nb.ts").read_text(encoding="utf-8")
+    assert "'launcher.enter_product': 'Enter Product'" in en
+    assert "'launcher.enter_product': 'Gå inn i produktet'" in nb
+    assert "Enter Product" in welcome
+
+
+def test_production_web_ingress_routes_both_application_apis():
+    root = find_repo_root(Path(__file__))
+    nginx = (root / "frontend/nginx.conf").read_text(encoding="utf-8")
+
+    directives = [line.strip() for line in nginx.splitlines()]
+    engine_location = directives.index("location ^~ /api/v1/ {")
+    backend_location = directives.index("location ^~ /api/ {")
+    assert engine_location < backend_location
+    assert "server skeleton:8001 resolve;" in nginx
+    assert "server backend:8001 resolve;" in nginx
+    assert "proxy_pass http://application_engine;" in nginx
+    assert "proxy_pass http://application_backend;" in nginx
+
+
+def test_frontend_security_probe_supplies_compose_upstream_names():
+    root = find_repo_root(Path(__file__))
+    active = root / ".github/workflows/dependency-security.yml"
+    archived = root / ".github/workflows-archive/dependency-security.yml"
+    # Validate the retained probe definition, independently of its execution schedule.
+    workflow = (active if active.is_file() else archived).read_text(encoding="utf-8")
+
+    assert "--add-host skeleton:127.0.0.1" in workflow
+    assert "--add-host backend:127.0.0.1" in workflow
+
+
+def test_backend_does_not_claim_skeleton_api_v1_prefix():
+    root = find_repo_root(Path(__file__))
+    registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
+    server = (root / "backend/server.py").read_text(encoding="utf-8")
+
+    assert "/api/v1" not in registry
+    assert "/api/v1" not in server
+
+
+def test_manifest_declares_explicit_runtime_modes():
+    manifest = load_manifest()
+
+    assert manifest.hot_compose_file == "docker-compose.hot.yml"
+    assert manifest.mode_env("development")["BUILD_TARGET"] == "development"
+    production = manifest.mode_env("production")
+    assert production["BUILD_TARGET"] == "production"
+    assert production["FRONTEND_BUILD_TARGET"] == "production"
+    assert production["FRONTEND_CONTAINER_PORT"] == "8080"
+
+
+def test_hot_compose_command_adds_only_explicit_overlay():
+    command = compose_command("up", hot=True, build=False)
+
+    assert command[:6] == (
+        "docker",
+        "compose",
+        "-f",
+        "docker-compose.yml",
+        "-f",
+        "docker-compose.hot.yml",
+    )
+    assert command[6:8] == ("up", "-d")
+
+
+def test_base_compose_is_image_based_and_hot_overlay_owns_source_mounts():
+    root = find_repo_root(Path(__file__))
+    base = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    hot = (root / "docker-compose.hot.yml").read_text(encoding="utf-8")
+
+    assert "./backend:/app" not in base
+    assert "./skeleton:/app/skeleton" not in base
+    assert "./frontend:/app" not in base
+
+    assert "./backend:/app:ro" in hot
+    assert "./skeleton:/app/skeleton:ro" in hot
+    assert "./frontend:/app" in hot
+
+
+def test_cli_rejects_production_hot_combination_before_preflight(capsys):
+    from skeleton.app.cli import run_app_cli
+
+    exit_code = run_app_cli(["up", "--production", "--hot"])
+
+    assert exit_code == 2
+    assert "mutually exclusive" in capsys.readouterr().out
+
+
+def test_product_shell_health_client_matches_assembly_manifest():
+    root = find_repo_root(Path(__file__))
+    client = (root / "frontend/src/product/appHealthClient.ts").read_text(encoding="utf-8")
+    shell = (root / "frontend/app/product.tsx").read_text(encoding="utf-8")
+    manifest = load_manifest()
+
+    backend = manifest.service("backend")
+    skeleton = manifest.service("skeleton")
+    assert "getAppBootstrap" in client
+    assert "getAppRuntimeStatus" in client
+    assert f"backend: '{backend.health_path}'" in client
+    assert f"skeleton: '{skeleton.health_path}'" in client
+    assert "bootstrapService(bootstrap, 'backend')" in client
+    assert "bootstrapService(bootstrap, 'skeleton')" in client
+    assert "probeAppHealth" in shell
+    assert "Application runtime" in shell
+    assert "Runtime" in shell
+
+
+def test_expo_dev_ports_are_hot_mode_only():
+    root = find_repo_root(Path(__file__))
+    base = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    hot = (root / "docker-compose.hot.yml").read_text(encoding="utf-8")
+
+    for port in ("8081:8081", "19000:19000", "19001:19001", "19002:19002"):
+        assert port not in base
+        assert port in hot
+
+
+def test_live_status_reports_runtime_health_and_fails_closed(monkeypatch, capsys):
+    from skeleton.app.cli import run_app_cli
+    from skeleton.app.health import ProbeResult
+
+    def fake_probe_application(*, manifest, full, timeout):
+        assert full is False
+        assert timeout == 1.25
+        return (
+            ProbeResult(
+                service="backend",
+                url="http://localhost:8001/api/health",
+                ok=True,
+                status=200,
+                detail="healthy",
+            ),
+            ProbeResult(
+                service="skeleton",
+                url="http://localhost:8010/api/v1/health/live",
+                ok=False,
+                status=503,
+                detail="HTTP error 503",
+            ),
+        )
+
+    monkeypatch.setattr("skeleton.app.health.probe_application", fake_probe_application)
+
+    exit_code = run_app_cli(["status", "--live", "--timeout", "1.25", "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 1
+    assert payload["runtime_health"]["ok"] is False
+    assert [item["service"] for item in payload["runtime_health"]["results"]] == [
+        "backend",
+        "skeleton",
+    ]
+
+
+def test_live_status_rejects_non_positive_timeout(capsys):
+    from skeleton.app.cli import run_app_cli
+
+    exit_code = run_app_cli(["status", "--live", "--timeout", "0"])
+
+    assert exit_code == 2
+    assert "timeout must be greater than zero" in capsys.readouterr().out
+
+
+def test_public_product_readiness_route_is_registered():
+    root = find_repo_root(Path(__file__))
+    route = (root / "backend/routes/product_runtime.py").read_text(encoding="utf-8")
+    registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
+    client = (root / "frontend/src/product/productControlClient.ts").read_text(encoding="utf-8")
+    capability = (root / "frontend/app/capability.tsx").read_text(encoding="utf-8")
+
+    assert 'APIRouter(prefix="/api/product"' in route
+    assert '@router.get("/readiness")' in route
+    assert '("routes.product_runtime",' in registry
+    assert "const PUBLIC_ROOT = '/api/product';" in client
+    assert "getProductReadiness" in capability
+    assert "getProductControlStatus(''," not in capability
+
+
+def test_product_routes_are_registered_in_canonical_route_registry():
+    root = find_repo_root(Path(__file__))
+    registry = (root / "frontend/src/utils/routeRegistry.ts").read_text(encoding="utf-8")
+
+    for route in (
+        "/product",
+        "/capability",
+        "/operation",
+        "/control-plane",
+        "/jeeves-workbench",
+    ):
+        assert f"path: '{route}'" in registry
+
+
+def test_application_probe_includes_aggregate_readiness(monkeypatch):
+    from skeleton.app.assembly import load_manifest
+    from skeleton.app.health import ProbeResult, probe_application
+
+    seen = []
+
+    def fake_probe_url(service, *, timeout):
+        seen.append((service.name, service.health_path, timeout))
+        return ProbeResult(service.name, service.public_url, True, 200, "healthy")
+
+    def fake_probe_http(name, url, *, timeout):
+        seen.append((name, url, timeout))
+        return ProbeResult(name, url, True, 200, "healthy")
+
+    monkeypatch.setattr("skeleton.app.health.probe_url", fake_probe_url)
+    monkeypatch.setattr("skeleton.app.health.probe_http", fake_probe_http)
+
+    manifest = load_manifest()
+    results = probe_application(manifest=manifest, timeout=1.5)
+
+    assert [item.service for item in results][-1] == "application"
+    assert (
+        "application",
+        "http://localhost:8001/api/app/ready",
+        1.5,
+    ) in seen
+
+
+def test_installed_public_ports_follow_compose_env(tmp_path):
+    from skeleton.app.assembly import public_service_urls
+
+    (tmp_path / ".env").write_text(
+        "FRONTEND_PORT=3300\nBACKEND_PORT=8101\nSKELETON_PORT=8110\n",
+        encoding="utf-8",
+    )
+    urls = public_service_urls(tmp_path, environ={})
+    assert urls == {
+        "frontend": "http://localhost:3300",
+        "backend": "http://localhost:8101",
+        "skeleton": "http://localhost:8110",
+    }
+
+
+@pytest.mark.parametrize("bad", ["0", "65536", "abc", "-2", "8080:80"])
+def test_installed_public_port_rejects_invalid_configuration(tmp_path, bad):
+    from skeleton.app.assembly import public_service_urls
+
+    (tmp_path / ".env").write_text(f"FRONTEND_PORT={bad}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="FRONTEND_PORT"):
+        public_service_urls(tmp_path, environ={})
+
+
+def test_runtime_probes_use_configured_ports_including_ready_route(monkeypatch):
+    from skeleton.app.health import ProbeResult, probe_application
+
+    seen = []
+    def fake_probe_http(name, url, *, timeout):
+        seen.append((name, url))
+        return ProbeResult(name, url, True, 200, "healthy")
+
+    monkeypatch.setattr("skeleton.app.health.probe_http", fake_probe_http)
+    results = probe_application(
+        manifest=load_manifest(),
+        public_url_overrides={
+            "frontend": "http://localhost:3300",
+            "backend": "http://localhost:8101",
+            "skeleton": "http://localhost:8110",
+        },
+    )
+    assert len(results) >= 3
+    assert ("frontend", "http://localhost:3300/") in seen
+    assert ("backend", "http://localhost:8101/api/health/ready") in seen
+    assert ("skeleton", "http://localhost:8110/api/v1/health/live") in seen
+    assert ("application", "http://localhost:8101/api/app/ready") in seen
+
+@pytest.mark.parametrize(
+    ("key", "invalid"),
+    [
+        ("GAMEFORGE_JWT_SECRET", "weak"),
+        ("GF_SEAL_SECRET", "too-short"),
+        ("GF_KEYHOLDER_SEED", "not-hex"),
+        ("GF_KEYHOLDER_SEED", "f" * 63),
+    ],
+)
+def test_runtime_preflight_rejects_invalid_forge_security_configuration(
+    tmp_path, monkeypatch, key, invalid,
+):
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    (tmp_path / ".env").write_text(f"{key}={invalid}\n", encoding="utf-8")
+    checks = preflight(tmp_path, runtime=True, environ={})
+    check = next(item for item in checks if item.code == f"env:{key}")
+    assert check.ok is False
+    assert invalid not in check.message
+
+@pytest.mark.parametrize("candidate", [
+    "",
+    "mongodb://mongo:27017/tutolage",
+    "mongodb://mongo:invalid/tutolage",
+    "mongodb+srv://service@cluster.example.net/app",
+    "srv_with_explicit_port",
+    "http://service:password@mongo:27017/app",
+])
+def test_app_preflight_rejects_malformed_or_unauthenticated_mongo_uris(tmp_path, monkeypatch, candidate):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    if candidate == "srv_with_explicit_port":
+        candidate = "mongodb+srv://" + "service:password@" + "cluster.example.net:27017/app"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={candidate}\nSKL_MONGO_URI={candidate}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    for key in ("MONGO_URL", "SKL_MONGO_URI"):
+        result = next(item for item in checks if item.code == f"env:{key}")
+        assert not result.ok
+        assert candidate not in result.message or not candidate
+
+
+def test_app_preflight_accepts_valid_mongo_db_uri_without_logging_credentials(tmp_path, monkeypatch):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    # Assemble authentication fixture components only at runtime, so the
+    # repository's secret scanner remains strict even on regression tests.
+    authority = "service" + ":" + "password" + "@"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL=mongodb://{authority}mongo:27017/app\n"
+        f"SKL_MONGO_URI=mongodb+srv://{authority}cluster.example.net/app\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    assert all(
+        next(item for item in checks if item.code == f"env:{key}").ok
+        for key in ("MONGO_URL", "SKL_MONGO_URI")
+    )
+    assert "password" not in repr(tuple(check.message for check in checks))
+
+def test_compose_browser_endpoints_follow_custom_published_host_ports():
+    from pathlib import Path
+
+    compose = Path("docker-compose.yml").read_text(encoding="utf-8")
+    env_example = Path(".env.example").read_text(encoding="utf-8")
+
+    assert (
+        "EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-"
+        "http://localhost:${BACKEND_PORT:-8001}}"
+    ) in compose
+    assert (
+        "EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-"
+        "http://localhost:${SKELETON_PORT:-8010}}"
+    ) in compose
+    assert "\nEXPO_PUBLIC_BACKEND_URL=\n" in env_example
+    assert "\nEXPO_PUBLIC_SKELETON_URL=\n" in env_example
+
+def test_probe_rejects_redirect_to_login_page_even_if_target_is_200(monkeypatch):
+    from skeleton.app.health import probe_http
+
+    class RedirectResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def geturl(self):
+            return "http://localhost:8001/login"
+
+        def read(self, _size):
+            return b"login page"
+
+    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+    result = probe_http("backend", "http://localhost:8001/api/health")
+    assert not result.ok
+    assert result.detail == "health endpoint redirected"
+    assert "/login" not in repr(result.to_dict())
+
+
+def test_probe_does_not_publish_sensitive_network_exception(monkeypatch):
+    from urllib.error import URLError
+    from skeleton.app.health import probe_http
+
+    def unavailable(*_args, **_kwargs):
+        raise URLError("private operator credential in daemon response")
+
+    monkeypatch.setattr("skeleton.app.health.urlopen", unavailable)
+    result = probe_http("backend", "http://localhost:8001/api/health")
+    assert result.ok is False
+    assert "URLError" in result.detail
+    assert "private operator credential" not in repr(result.to_dict())
+
+
+def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
+    from skeleton.app.health import probe_http
+
+    class RedirectResponse:
+        status = 302
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _size):
+            return b"redirect"
+
+    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+    result = probe_http("backend", "http://localhost:8001/api/health")
+    assert not result.ok
+    assert result.status == 302
+
+def test_full_profile_uses_custom_chroma_published_port(tmp_path):
+    from skeleton.app.assembly import public_service_urls
+
+    (tmp_path / ".env").write_text(
+        "CHROMA_PORT=8222\n", encoding="utf-8",
+    )
+    urls = public_service_urls(tmp_path, environ={})
+    assert urls["chroma"] == "http://localhost:8222"
+
+
+def test_full_profile_probes_custom_chroma_health(monkeypatch):
+    from skeleton.app.health import ProbeResult, probe_application
+
+    seen = []
+
+    def probe(service, *, timeout):
+        seen.append((service.name, service.public_url, service.health_path))
+        return ProbeResult(service.name, service.public_url, True, 200, "healthy")
+
+    def http(name, url, *, timeout):
+        return ProbeResult(name, url, True, 200, "healthy")
+
+    monkeypatch.setattr("skeleton.app.health.probe_url", probe)
+    monkeypatch.setattr("skeleton.app.health.probe_http", http)
+    probe_application(
+        full=True, public_url_overrides={"chroma": "http://localhost:8222"},
+    )
+    assert ("chroma", "http://localhost:8222", "/api/v2/heartbeat") in seen
+
+
+def test_optional_chroma_unavailability_fails_full_readiness_only(monkeypatch):
+    from skeleton.app.health import ProbeResult, probe_application, probes_ok
+
+    def probe(service, *, timeout):
+        ready = service.name != "chroma"
+        return ProbeResult(service.name, service.public_url, ready, 200 if ready else None, "observed")
+
+    monkeypatch.setattr("skeleton.app.health.probe_url", probe)
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_http",
+        lambda name, url, *, timeout: ProbeResult(name, url, True, 200, "healthy"),
+    )
+    assert probes_ok(probe_application(full=False))
+    assert not probes_ok(probe_application(full=True))
+
+def test_preflight_external_hostname_placeholder_text_is_not_a_secret(monkeypatch, tmp_path):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    authority = "external-user" + ":" + "operator-auth" + "@"
+    uri = f"mongodb://{authority}db.change-me.example.net:27017/app"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={uri}\nSKL_MONGO_URI={uri}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    assert all(
+        next(c for c in checks if c.code == f"env:{key}").ok
+        for key in ("MONGO_URL", "SKL_MONGO_URI")
+    )
+    assert "operator-auth" not in repr(tuple(c.message for c in checks))
+
+
+def test_preflight_fails_placeholder_in_mongo_password_not_dns(monkeypatch, tmp_path):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    uri = "mongodb://" + "real-user:change-me@" + "db.example.net/app"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={uri}\nSKL_MONGO_URI={uri}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    assert all(
+        not next(c for c in checks if c.code == f"env:{key}").ok
+        for key in ("MONGO_URL", "SKL_MONGO_URI")
+    )
+
+def test_app_preflight_accepts_authenticated_mongo_replica_set_seedlist(monkeypatch, tmp_path):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    authority = "replica-user" + ":" + "private-db-pass" + "@"
+    remote = f"mongodb://{authority}db-a.internal:27017,db-b.internal:27019/app?replicaSet=rs0"
+    (tmp_path / ".env").write_text(
+        f"MONGO_URL={remote}\nSKL_MONGO_URI={remote}\n",
+        encoding="utf-8",
+    )
+    checks = preflight(tmp_path, runtime=True, environ={})
+    for key in ("MONGO_URL", "SKL_MONGO_URI"):
+        result = next(c for c in checks if c.code == f"env:{key}")
+        assert result.ok
+        assert "private-db-pass" not in result.message
+
+
+@pytest.mark.parametrize("host_list", [
+    "db-a.internal:27017,",
+    ",db-b.internal:27017",
+    "db-a.internal:27017,db-b.internal:bad",
+    "db-a.internal:27017,,db-b.internal:27017",
+])
+def test_app_preflight_rejects_invalid_replica_set_host_list(tmp_path, monkeypatch, host_list):
+    from skeleton.app.assembly import preflight
+
+    monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda name: "/usr/bin/docker")
+    remote = "mongodb://" + "user:secret@" + host_list + "/app"
+    (tmp_path / ".env").write_text(f"MONGO_URL={remote}\n", encoding="utf-8")
+    checks = preflight(tmp_path, runtime=True, environ={})
+    entry = next(c for c in checks if c.code == "env:MONGO_URL")
+    assert not entry.ok
+    assert "secret" not in entry.message

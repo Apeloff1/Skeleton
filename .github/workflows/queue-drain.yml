@@ -1,0 +1,955 @@
+name: Drain superseded Actions queue
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Hourly recovery only; no workflow-run trigger cascade.
+    # Queue relief wake: 2026-10-25; existing exact-head safety checks unchanged.
+    - cron: "7 * * * *"
+  push:
+    branches: [main]
+    paths: ['.github/workflows/queue-drain.yml']
+
+# v7 restores an independent bounded cleanup lane after v6 remained queued
+# while an unrelated ARM owner-cleanup job successfully obtained a runner.
+# One worker and one pending wake coalesce future triggers.
+# Every run has a distinct admission identity so an older workflow-level
+# reservation cannot block the lightweight cleanup worker. The job-level
+# lock below still serializes all worker executions in this repository.
+concurrency:
+  group: queue-drain-admission-v9-${{ github.run_id }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  drain:
+    # v9: admit the workflow without a workflow-wide lock. The distinct
+    # slim-runner job lock retains exactly one active cleanup worker.
+    concurrency:
+      group: queue-drain-slim-v9-${{ github.repository }}
+      cancel-in-progress: false
+    # Main failures still trigger immediate recovery. Cancelled/skipped main
+    # head checks are supersession tombstones, not useful new queue evidence.
+    # The schedule still recovers capacity if no checks complete successfully.
+    permissions:
+      actions: write
+      contents: read
+    # Route the stdlib/HTTPS-only cleanup worker to the dedicated lightweight
+    # container runner pool instead of competing for saturated ARM/full-VM
+    # admission. Keep the exact-head and security gates unchanged.
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      CURRENT_RUN_ID: ${{ github.run_id }}
+    steps:
+      - name: Cancel obsolete workload runs without killing the control plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          repo = os.environ['REPO']
+          token = os.environ['GH_TOKEN']
+          current = int(os.environ['CURRENT_RUN_ID'])
+          api = 'https://api.github.com'
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f'Bearer {token}',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'skeleton-queue-drainer',
+          }
+          retryable = frozenset({0, 429, 500, 502, 503, 504})
+          max_cancellation_attempts = 240
+          deadline = time.monotonic() + 450
+          cancellation_attempts = 0
+          budget_exhausted = False
+
+          # The repository owner explicitly released the 19 frozen, jobless
+          # historical run IDs from the queue-drainer's broad backoff list.
+          # Other historical records remain excluded. Current-head, security
+          # lane, and immutable identity checks still apply to all requests.
+          owner_historical_run_ids = frozenset({
+              34952531648,
+              34952526576,
+              34952518480,
+              34952509012,
+              34952531743,
+              34952526568,
+              34952518541,
+              34952509095,
+              34952531771,
+              34952526563,
+              34952518481,
+              34952509059,
+          })
+          # Exact-ID allowlist: no unrelated, future, or current-head run can
+          # inherit this owner-approved historical cancellation eligibility.
+          unprotected_historical_heads = {
+              37539069375: '3048d670be32bf3720a5efcb90be20d5479060d6',
+              37539069791: '3048d670be32bf3720a5efcb90be20d5479060d6',
+              37642345734: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642355681: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642358530: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642383890: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642388873: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642398158: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642398159: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37642398161: 'cd6693a1dfc4ddccac3efb9dcb8c17d601cff656',
+              37655496094: 'cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b',
+              37655496139: 'cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b',
+              37655521563: 'cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b',
+              37655522865: 'cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b',
+              37655530898: 'cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b',
+              38320296726: '3293dff9480994d538a10b9e55983c65d649fb1d',
+              38320664775: 'eb71db3ab303d20cfcfeb1f2d67770db560d44f9',
+              38320664778: 'eb71db3ab303d20cfcfeb1f2d67770db560d44f9',
+              38320665862: 'eb71db3ab303d20cfcfeb1f2d67770db560d44f9',
+          }
+          # Preserve privileged controllers and per-event receipts from broad
+          # last-main supersession. Only explicitly idempotent, queued sweeps
+          # may be coalesced when a newer live sweep is independently verified.
+          control_plane_paths = frozenset({
+              '.github/workflows/actions-housekeeping-cli.yml',
+              '.github/workflows/branch-clean.yml',
+              '.github/workflows/branch-archive.yml',
+              '.github/workflows/branch-flow.yml',
+              '.github/workflows/branch-repair-100.yml',
+              '.github/workflows/pr-obsolete-run-drain.yml',
+              '.github/workflows/queue-drain.yml',
+              '.github/workflows/p1-evidence-identity.yml',
+              '.github/workflows/p1-maturity-reconciliation.yml',
+              '.github/workflows/p1-risk-evidence-binding.yml',
+              '.github/workflows/p1-reproducibility-bundle.yml',
+              '.github/workflows/p1-scope-freeze.yml',
+              '.github/workflows/automerge-control-plane.yml',
+              '.github/workflows/repair-intake.yml',
+              '.github/workflows/automation-traffic-manager.yml',
+              '.github/workflows/bot-manager.yml',
+              '.github/workflows/repo-bots.yml',
+              '.github/workflows/idle-security-bot.yml',
+              '.github/workflows/security-watch-bot.yml',
+              '.github/workflows/ci-failure-bot.yml',
+              '.github/workflows/shift-supervisor-control.yml',
+              '.github/workflows/shift-supervisor-watchdog.yml',
+              '.github/workflows/supervisor.yml',
+              '.github/workflows/pr-churn-control.yml',
+          })
+          # These periodic controllers inventory the current repository.
+          # Auto-Merge also performs a full fresh PR reconciliation: a newer
+          # live sweep replaces an older queued wake, but never a running one.
+          # Repair Intake and signed evidence consumers remain event-specific.
+          coalescible_control_plane_paths = frozenset({
+              '.github/workflows/queue-drain.yml',
+              '.github/workflows/branch-clean.yml',
+              '.github/workflows/actions-housekeeping-cli.yml',
+              '.github/workflows/branch-flow.yml',
+              '.github/workflows/automerge-control-plane.yml',
+              '.github/workflows/automation-traffic-manager.yml',
+              '.github/workflows/bot-manager.yml',
+              '.github/workflows/repo-bots.yml',
+              '.github/workflows/idle-security-bot.yml',
+              '.github/workflows/shift-supervisor-control.yml',
+              '.github/workflows/shift-supervisor-watchdog.yml',
+              '.github/workflows/pr-churn-control.yml',
+          })
+
+          def request(path, *, method='GET'):
+              req = urllib.request.Request(
+                  api + path,
+                  data=b'' if method != 'GET' else None,
+                  headers=headers,
+                  method=method,
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=15) as response:
+                      raw = response.read()
+                      return response.status, json.loads(raw) if raw else None
+              except urllib.error.HTTPError as exc:
+                  # GitHub installation quota exhaustion can return 403 as
+                  # well as 429; distinguish it from permission failures.
+                  if exc.code in {403, 429}:
+                      try:
+                          detail = json.loads(exc.read().decode('utf-8'))
+                      except (ValueError, UnicodeDecodeError):
+                          detail = {}
+                      message = str(detail.get('message') or '').casefold()
+                      if (
+                          exc.code == 429
+                          or 'rate limit' in message
+                          or 'abuse detection' in message
+                      ):
+                          return 429, None
+                  return exc.code, None
+              except urllib.error.URLError:
+                  return 0, None
+
+          def post_with_retry(path):
+              status = 0
+              for attempt in range(3):
+                  status, _ = request(path, method='POST')
+                  if status not in retryable or status == 429:
+                      return status
+                  if attempt < 2:
+                      time.sleep(2 ** attempt)
+              return status
+
+          def run_completed(run_id):
+              status, payload = request(f'/repos/{repo}/actions/runs/{run_id}')
+              return (
+                  status == 200
+                  and isinstance(payload, dict)
+                  and payload.get('status') == 'completed'
+              )
+
+          def security_lane(run):
+              # Rejected ordinary cancellation is not evidence that forced
+              # termination of security/provenance checks is acceptable.
+              name = str(run.get('name') or '').casefold()
+              workflow_path = str(run.get('path') or '').casefold()
+              sensitive = (
+                  'malware', 'secret', 'security', 'codeql', 'provenance',
+                  'artifact policy', 'dependency', 'repository hygiene',
+                  'workflow input', 'github-advanced-security',
+              )
+              return (
+                  any(term in name for term in sensitive)
+                  or any(term in workflow_path for term in sensitive)
+              )
+
+          def cancel(run_id, security_lane=False):
+              status = post_with_retry(
+                  f'/repos/{repo}/actions/runs/{run_id}/cancel'
+              )
+              if status in {200, 202, 404}:
+                  return status
+              if status == 429:
+                  return status
+              if status in {409, 422} and run_completed(run_id):
+                  return status
+              if security_lane:
+                  return status
+              if status in {409, 422} or status in retryable:
+                  forced = post_with_retry(
+                      f'/repos/{repo}/actions/runs/{run_id}/force-cancel'
+                  )
+                  if forced in {200, 202, 404}:
+                      return forced
+                  if forced in {409, 422} and run_completed(run_id):
+                      return forced
+                  return forced
+              return status
+
+          def main_sha():
+              status, payload = request(f'/repos/{repo}/branches/main')
+              sha = ((payload or {}).get('commit') or {}).get('sha', '')
+              if status != 200 or not sha:
+                  raise SystemExit(f'failed to resolve main HEAD: HTTP {status}')
+              return sha
+
+          def list_runs(run_status=None, head_sha=None):
+              out = []
+              for page in range(1, 11):
+                  params = {'per_page': 100, 'page': page}
+                  if run_status:
+                      params['status'] = run_status
+                  if head_sha:
+                      params['head_sha'] = head_sha
+                  query = urllib.parse.urlencode(params)
+                  status, payload = request(f'/repos/{repo}/actions/runs?{query}')
+                  if status != 200 or not isinstance(payload, dict):
+                      raise SystemExit(f'failed to list Actions runs: HTTP {status}')
+                  batch = payload.get('workflow_runs') or []
+                  out.extend(batch)
+                  if len(batch) < 100:
+                      break
+              return out
+
+          def current_workflow_paths(head_sha):
+              query = urllib.parse.urlencode({'ref': head_sha})
+              status, payload = request(
+                  f'/repos/{repo}/contents/.github/workflows?{query}'
+              )
+              if status != 200 or not isinstance(payload, list):
+                  raise SystemExit(
+                      f'failed to list current workflow files: HTTP {status}'
+                  )
+              paths = {
+                  item.get('path')
+                  for item in payload
+                  if isinstance(item, dict)
+                  and item.get('type') == 'file'
+                  and str(item.get('path') or '').startswith('.github/workflows/')
+              }
+              if not paths:
+                  raise SystemExit('current workflow file inventory is empty')
+              return paths
+
+          def orphaned_main_workflow_run(run, current_paths):
+              workflow_path = run.get('path') or ''
+              return (
+                  (run.get('head_branch') or '') == 'main'
+                  and workflow_path.startswith('.github/workflows/')
+                  and workflow_path not in current_paths
+              )
+
+          def list_open_pr_heads():
+              heads = {}
+              numbered_heads = {}
+              for page in range(1, 11):
+                  query = urllib.parse.urlencode({
+                      'state': 'open',
+                      'per_page': 100,
+                      'page': page,
+                  })
+                  status, payload = request(f'/repos/{repo}/pulls?{query}')
+                  if status != 200 or not isinstance(payload, list):
+                      raise SystemExit(f'failed to list open pull requests: HTTP {status}')
+                  for pull in payload:
+                      if not isinstance(pull, dict):
+                          raise SystemExit('malformed open pull-request payload')
+                      head = pull.get('head') or {}
+                      head_repo = (head.get('repo') or {}).get('full_name') or ''
+                      if head_repo != repo:
+                          continue
+                      branch = head.get('ref') or ''
+                      sha = head.get('sha') or ''
+                      number = int(pull.get('number') or 0)
+                      if not branch or not sha or number <= 0:
+                          raise SystemExit('same-repository open PR has incomplete head identity')
+                      heads.setdefault(branch, set()).add(sha)
+                      numbered_heads[number] = sha
+                  if len(payload) < 100:
+                      break
+              return heads, numbered_heads
+
+          def stale_pr_run(run, open_pr_heads):
+              if run.get('event') != 'pull_request':
+                  return False
+              run_repo = ((run.get('head_repository') or {}).get('full_name') or '')
+              branch = run.get('head_branch') or ''
+              sha = run.get('head_sha') or ''
+              if run_repo != repo or not branch or branch == 'main' or not sha:
+                  return False
+              return sha not in open_pr_heads.get(branch, set())
+
+          def stale_dynamic_pr_run(run, open_pr_numbered_heads):
+              if (
+                  run.get('event') != 'dynamic'
+                  or (run.get('path') or '') != 'dynamic/github-code-scanning/codeql'
+              ):
+                  return False
+              run_repo = ((run.get('head_repository') or {}).get('full_name') or '')
+              branch = run.get('head_branch') or ''
+              sha = run.get('head_sha') or ''
+              prefix = 'refs/pull/'
+              suffix = '/head'
+              if (
+                  run_repo != repo
+                  or not branch.startswith(prefix)
+                  or not branch.endswith(suffix)
+                  or not sha
+              ):
+                  return False
+              number_text = branch[len(prefix):-len(suffix)]
+              if not number_text.isdigit() or int(number_text) <= 0:
+                  return False
+              return sha != open_pr_numbered_heads.get(int(number_text), '')
+
+          def obsolete_dynamic_ai_pr_run(run):
+              if (
+                  run.get('event') != 'dynamic'
+                  or (run.get('path') or '') != 'dynamic/agents/github-advanced-security'
+              ):
+                  return False
+              run_repo = ((run.get('head_repository') or {}).get('full_name') or '')
+              branch = run.get('head_branch') or ''
+              sha = run.get('head_sha') or ''
+              prefix = 'Code scanning AI findings on PR #'
+              name = run.get('name') or ''
+              if (
+                  run_repo != repo
+                  or not branch
+                  or branch == 'main'
+                  or not sha
+                  or not name.startswith(prefix)
+              ):
+                  return False
+              number_text = name[len(prefix):]
+              if not number_text.isdigit() or int(number_text) <= 0:
+                  return False
+              number = int(number_text)
+              status, payload = request(f'/repos/{repo}/pulls/{number}')
+              if status != 200 or not isinstance(payload, dict):
+                  return False
+              head = payload.get('head') or {}
+              state = str(payload.get('state') or '')
+              head_repo = ((head.get('repo') or {}).get('full_name') or '')
+              head_ref = head.get('ref') or ''
+              head_sha = head.get('sha') or ''
+              if head_repo != repo or head_ref != branch:
+                  return False
+              if state == 'closed':
+                  return True
+              if state != 'open' or not head_sha:
+                  return False
+              return sha != head_sha
+
+          def closed_dynamic_ai_pr_run(run):
+              if (
+                  run.get('event') != 'dynamic'
+                  or (run.get('path') or '') != 'dynamic/agents/github-advanced-security'
+              ):
+                  return False
+              run_repo = ((run.get('head_repository') or {}).get('full_name') or '')
+              branch = run.get('head_branch') or ''
+              name = run.get('name') or ''
+              prefix = 'Code scanning AI findings on PR #'
+              if (
+                  run_repo != repo
+                  or not branch
+                  or branch == 'main'
+                  or not name.startswith(prefix)
+              ):
+                  return False
+              number_text = name[len(prefix):]
+              if not number_text.isdigit() or int(number_text) <= 0:
+                  return False
+              number = int(number_text)
+              status, payload = request(f'/repos/{repo}/pulls/{number}')
+              if status != 200 or not isinstance(payload, dict):
+                  return False
+              head = payload.get('head') or {}
+              state = str(payload.get('state') or '')
+              head_repo = ((head.get('repo') or {}).get('full_name') or '')
+              head_ref = head.get('ref') or ''
+              return state == 'closed' and head_repo == repo and head_ref == branch
+
+          def path(run):
+              return run.get('path') or ''
+
+          def is_control_plane(run):
+              return path(run) in control_plane_paths
+
+          def obsolete_main_observer(run, current_head):
+              # Auto-merge requires a successful PR source and feedback
+              # requires a PR source. A stale main workflow_run cannot do
+              # either. Preserve repair intake and signed evidence consumers.
+              return (
+                  run.get('event') == 'workflow_run'
+                  and run.get('head_branch') == 'main'
+                  and run.get('head_sha') != current_head
+                  and path(run) in {
+                      '.github/workflows/automerge-control-plane.yml',
+                      '.github/workflows/autonomous-build-feedback.yml',
+                  }
+              )
+
+          def periodic_controller_key(run):
+              workflow_path = path(run)
+              event = run.get('event')
+              if workflow_path not in coalescible_control_plane_paths:
+                  return None
+              if event == 'schedule':
+                  pass
+              elif event == 'workflow_run':
+                  if workflow_path not in {
+                      '.github/workflows/queue-drain.yml',
+                      '.github/workflows/branch-clean.yml',
+                      '.github/workflows/automerge-control-plane.yml',
+                  }:
+                      return None
+              elif event == 'push':
+                  # A workflow-file self-update is a replaceable full sweep,
+                  # but only for these idempotent recovery controllers.
+                  if workflow_path not in {
+                      '.github/workflows/queue-drain.yml',
+                      '.github/workflows/branch-clean.yml',
+                      '.github/workflows/actions-housekeeping-cli.yml',
+                      '.github/workflows/automerge-control-plane.yml',
+                  }:
+                      return None
+              else:
+                  # Never coalesce explicit dispatches or unique PR events.
+                  return None
+              return (workflow_path, run.get('head_branch') or '')
+
+          def workflow_event_key(run):
+              return (int(run.get('workflow_id') or 0), run.get('event') or '')
+
+          def lane_key(run):
+              return (
+                  int(run.get('workflow_id') or 0),
+                  run.get('head_branch') or '',
+                  run.get('event') or '',
+              )
+
+          def usable_replacement(run):
+              return not (
+                  run.get('status') == 'completed'
+                  and run.get('conclusion') == 'cancelled'
+              )
+
+          attempted = set()
+          transient = set()
+          totals = {
+              'queued_seen': 0,
+              'active_seen': 0,
+              'control_plane_preserved': 0,
+              'coalesced_control_plane_queued': 0,
+              'obsolete_main_observers_queued': 0,
+              'provider_conflicts_backed_off': 0,
+              'historical_unprotected_selected': 0,
+              'obsolete_main': 0,
+              'obsolete_main_active': 0,
+              'duplicates': 0,
+              'stale_dynamic_active': 0,
+              'closed_dynamic_ai_queued': 0,
+              'closed_dynamic_ai_active': 0,
+              'obsolete_pr_queued': 0,
+              'obsolete_pr_active': 0,
+              'obsolete_dynamic_pr_queued': 0,
+              'obsolete_dynamic_pr_active': 0,
+              'obsolete_dynamic_ai_queued': 0,
+              'obsolete_dynamic_ai_active': 0,
+              'orphaned_main_queued': 0,
+              'orphaned_main_active': 0,
+              'last_validation_preserved': 0,
+              'accepted': 0,
+              'moved': 0,
+              'deferred': 0,
+              'failed': 0,
+          }
+          pass_lines = []
+          latest_main = ''
+          rate_limit_hit = False
+
+          # Four passes catch GitHub-managed fanout that arrives seconds after a
+          # push. Each pass resolves main again, so the drainer follows the live
+          # repository rather than a stale workflow-event SHA.
+          for pass_no in range(1, 5):
+              if rate_limit_hit or budget_exhausted:
+                  break
+              if time.monotonic() >= deadline:
+                  budget_exhausted = True
+                  print('Queue drain time budget reached before pass; deferring remaining runs.')
+                  break
+              head = main_sha()
+              latest_main = head
+              head_runs = list_runs(head_sha=head)
+              current_paths = current_workflow_paths(head)
+              replacement_keys = {
+                  workflow_event_key(run)
+                  for run in head_runs
+                  if usable_replacement(run)
+              }
+              # Pending and waiting also occupy Actions admission slots.
+              # Deduplicate by immutable run ID before classifying.
+              queued_by_id = {}
+              for status_name in ('queued', 'pending', 'waiting'):
+                  for observed in list_runs(run_status=status_name):
+                      observed_id = int(observed.get('id') or 0)
+                      if observed_id:
+                          queued_by_id[observed_id] = observed
+              queued = list(queued_by_id.values())
+              active = list_runs(run_status='in_progress')
+              # The highest run ID is the newest live sweep of this exact
+              # controller lane. No completed/failed/non-live replacement can
+              # authorize retiring a still-queued controller.
+              latest_controllers = {}
+              for observed in (*queued, *active):
+                  key = periodic_controller_key(observed)
+                  if key is not None:
+                      prior = latest_controllers.get(key)
+                      if prior is None or int(observed['id']) > int(prior['id']):
+                          latest_controllers[key] = observed
+              open_pr_heads, open_pr_numbered_heads = list_open_pr_heads()
+              live_ids = {
+                  int(run.get('id') or 0)
+                  for run in (*queued, *active)
+                  if int(run.get('id') or 0)
+              }
+              transient.intersection_update(live_ids)
+              totals['queued_seen'] += len(queued)
+              totals['active_seen'] += len(active)
+
+              selected = []
+              seen = set()
+              local = {key: 0 for key in totals}
+
+              for run in sorted(
+                  queued,
+                  key=lambda item: item.get('created_at') or '',
+                  reverse=True,
+              ):
+                  run_id = int(run.get('id') or 0)
+                  if not run_id or run_id == current or run_id in attempted:
+                      continue
+                  if run_id in unprotected_historical_heads:
+                      if (
+                          run.get('status') == 'queued'
+                          and run.get('head_sha') == unprotected_historical_heads[run_id]
+                          and run.get('head_sha') != head
+                      ):
+                          selected.append(run)
+                          totals['historical_unprotected_selected'] += 1
+                          local['historical_unprotected_selected'] += 1
+                      continue
+                  if run_id in owner_historical_run_ids:
+                      totals['provider_conflicts_backed_off'] += 1
+                      local['provider_conflicts_backed_off'] += 1
+                      continue
+                  if stale_pr_run(run, open_pr_heads):
+                      selected.append(run)
+                      totals['obsolete_pr_queued'] += 1
+                      local['obsolete_pr_queued'] += 1
+                      continue
+                  if stale_dynamic_pr_run(run, open_pr_numbered_heads):
+                      selected.append(run)
+                      totals['obsolete_dynamic_pr_queued'] += 1
+                      local['obsolete_dynamic_pr_queued'] += 1
+                      continue
+                  if obsolete_dynamic_ai_pr_run(run):
+                      selected.append(run)
+                      totals['obsolete_dynamic_ai_queued'] += 1
+                      local['obsolete_dynamic_ai_queued'] += 1
+                      continue
+                  if closed_dynamic_ai_pr_run(run):
+                      selected.append(run)
+                      totals['closed_dynamic_ai_queued'] += 1
+                      local['closed_dynamic_ai_queued'] += 1
+                      continue
+                  if orphaned_main_workflow_run(run, current_paths):
+                      selected.append(run)
+                      totals['orphaned_main_queued'] += 1
+                      local['orphaned_main_queued'] += 1
+                      continue
+                  if obsolete_main_observer(run, head):
+                      selected.append(run)
+                      totals['obsolete_main_observers_queued'] += 1
+                      local['obsolete_main_observers_queued'] += 1
+                      continue
+                  periodic_key = periodic_controller_key(run)
+                  latest = latest_controllers.get(periodic_key) if periodic_key else None
+                  if (
+                      latest is not None
+                      and int(latest['id']) > run_id
+                      and (run.get('head_sha') or '') != head
+                  ):
+                      # Only a queued, superseded full-repository sweep. Do
+                      # not interrupt a running controller or an explicit
+                      # request, and always retain the newest live sweep.
+                      selected.append(run)
+                      totals['coalesced_control_plane_queued'] += 1
+                      local['coalesced_control_plane_queued'] += 1
+                      continue
+                  if is_control_plane(run):
+                      totals['control_plane_preserved'] += 1
+                      local['control_plane_preserved'] += 1
+                      continue
+
+                  lane = lane_key(run)
+                  replacement = workflow_event_key(run)
+                  old_main = (
+                      (run.get('head_branch') or '') == 'main'
+                      and (run.get('head_sha') or '') != head
+                  )
+
+                  if old_main:
+                      if replacement in replacement_keys:
+                          selected.append(run)
+                          totals['obsolete_main'] += 1
+                          local['obsolete_main'] += 1
+                          continue
+
+                      # For path-filtered validation lanes with no current-head
+                      # replacement, keep the newest outstanding result source.
+                      if lane in seen:
+                          selected.append(run)
+                          totals['duplicates'] += 1
+                          local['duplicates'] += 1
+                      else:
+                          seen.add(lane)
+                          totals['last_validation_preserved'] += 1
+                          local['last_validation_preserved'] += 1
+                      continue
+
+                  if lane in seen:
+                      selected.append(run)
+                      totals['duplicates'] += 1
+                      local['duplicates'] += 1
+                  else:
+                      seen.add(lane)
+
+              # Only dynamic generated workflows are cancelled while already
+              # running. Ordinary CI and all branch control-plane workflows finish.
+              for run in active:
+                  run_id = int(run.get('id') or 0)
+                  if not run_id or run_id == current or run_id in attempted:
+                      continue
+                  if stale_pr_run(run, open_pr_heads):
+                      selected.append(run)
+                      totals['obsolete_pr_active'] += 1
+                      local['obsolete_pr_active'] += 1
+                      continue
+                  if stale_dynamic_pr_run(run, open_pr_numbered_heads):
+                      selected.append(run)
+                      totals['obsolete_dynamic_pr_active'] += 1
+                      local['obsolete_dynamic_pr_active'] += 1
+                      continue
+                  if obsolete_dynamic_ai_pr_run(run):
+                      selected.append(run)
+                      totals['obsolete_dynamic_ai_active'] += 1
+                      local['obsolete_dynamic_ai_active'] += 1
+                      continue
+                  if closed_dynamic_ai_pr_run(run):
+                      selected.append(run)
+                      totals['closed_dynamic_ai_active'] += 1
+                      local['closed_dynamic_ai_active'] += 1
+                      continue
+                  if orphaned_main_workflow_run(run, current_paths):
+                      selected.append(run)
+                      totals['orphaned_main_active'] += 1
+                      local['orphaned_main_active'] += 1
+                      continue
+                  if is_control_plane(run):
+                      totals['control_plane_preserved'] += 1
+                      local['control_plane_preserved'] += 1
+                      continue
+                  # A newer canonical main-head run replaces older main
+                  # Merge Readiness work, including already running jobs.
+                  # Other running policy/security gates are not preempted.
+                  if (
+                      path(run) == '.github/workflows/merge-readiness.yml'
+                      and run.get('event') == 'push'
+                      and run.get('head_branch') == 'main'
+                      and run.get('head_sha') != head
+                      and workflow_event_key(run) in replacement_keys
+                  ):
+                      selected.append(run)
+                      totals['obsolete_main_active'] += 1
+                      local['obsolete_main_active'] += 1
+                      continue
+                  if (
+                      (run.get('head_branch') or '') == 'main'
+                      and (run.get('head_sha') or '') != head
+                      and path(run).startswith('dynamic/')
+                      and workflow_event_key(run) in replacement_keys
+                  ):
+                      selected.append(run)
+                      totals['stale_dynamic_active'] += 1
+                      local['stale_dynamic_active'] += 1
+
+              # Select lanes newest-first above so every unreplaced lane
+              # retains its most recent validation. Once eligibility has
+              # been proved, reclaim the *oldest* selected tombstones first
+              # to release long-blocked capacity before newer cancellations.
+              selected.sort(key=lambda run: run.get('created_at') or '')
+              accepted = moved = deferred = failed = 0
+              for run in selected:
+                  if cancellation_attempts >= max_cancellation_attempts or time.monotonic() >= deadline:
+                      budget_exhausted = True
+                      print('Queue drain write/time budget reached; deferring remaining runs.')
+                      break
+                  run_id = int(run['id'])
+                  if run_id in unprotected_historical_heads:
+                      # Fresh immutable, queued-only and zero-job proof at the
+                      # mutation boundary; any ambiguity preserves the run.
+                      live_status, live_run = request(
+                          f'/repos/{repo}/actions/runs/{run_id}'
+                      )
+                      jobs_status, jobs = request(
+                          f'/repos/{repo}/actions/runs/{run_id}/jobs?per_page=1'
+                      )
+                      verified = (
+                          live_status == 200
+                          and isinstance(live_run, dict)
+                          and all(
+                              live_run.get(key) == run.get(key)
+                              for key in (
+                                  'id', 'name', 'event', 'path',
+                                  'head_sha', 'created_at', 'updated_at',
+                              )
+                          )
+                          and live_run.get('status') == 'queued'
+                          and live_run.get('conclusion') is None
+                          and live_run.get('head_sha') == unprotected_historical_heads[run_id]
+                          and live_run.get('head_sha') != main_sha()
+                          and jobs_status == 200
+                          and isinstance(jobs, dict)
+                          and jobs.get('total_count') == 0
+                      )
+                      if not verified:
+                          attempted.add(run_id)
+                          deferred += 1
+                          print(f'historical unprotected preflight deferred id={run_id}')
+                          continue
+                  cancellation_attempts += 1
+                  status = cancel(run_id, security_lane=security_lane(run))
+                  if status == 429:
+                      # Retain the rest of this inventory for a later sweep;
+                      # additional API calls cannot cure installation limits.
+                      rate_limit_hit = True
+                      deferred += 1
+                      print('GitHub API rate limit reached; ending mutation sweep.')
+                      break
+                  if status in {200, 202}:
+                      attempted.add(run_id)
+                      transient.discard(run_id)
+                      accepted += 1
+                  elif status == 404 or (
+                      status in {409, 422} and run_completed(run_id)
+                  ):
+                      attempted.add(run_id)
+                      transient.discard(run_id)
+                      moved += 1
+                  elif run_id in unprotected_historical_heads and status in {403, 409, 422}:
+                      attempted.add(run_id)
+                      deferred += 1
+                      print(
+                          f'GitHub refused owner-unprotected historical '
+                          f'cancel id={run_id} http={status}; still queued'
+                      )
+                  elif status in retryable or status in {409, 422}:
+                      # GitHub can return conflict while a queued run is being
+                      # scheduled/cancelled internally. Keep it retryable so a
+                      # later sweep or scheduled invocation can reclaim it;
+                      # only terminally classify once GitHub reports completion.
+                      transient.add(run_id)
+                      deferred += 1
+                  else:
+                      attempted.add(run_id)
+                      transient.discard(run_id)
+                      failed += 1
+                      print(
+                          f'cancel failed: id={run_id} status={status} '
+                          'run remains non-terminal'
+                      )
+
+              totals['accepted'] += accepted
+              totals['moved'] += moved
+              totals['deferred'] += deferred
+              totals['failed'] += failed
+
+              line = (
+                  f'pass={pass_no} main={head} queued={len(queued)} '
+                  f'active={len(active)} selected={len(selected)} '
+                  f'control_plane_preserved={local["control_plane_preserved"]} '
+                  f'coalesced_control_plane_queued={local["coalesced_control_plane_queued"]} '
+                  f'obsolete_main_observers_queued={local["obsolete_main_observers_queued"]} '
+                  f'provider_conflicts_backed_off={local["provider_conflicts_backed_off"]} '
+                  f'obsolete_main={local["obsolete_main"]} '
+                  f'obsolete_main_active={local["obsolete_main_active"]} '
+                  f'obsolete_pr_queued={local["obsolete_pr_queued"]} '
+                  f'obsolete_pr_active={local["obsolete_pr_active"]} '
+                  f'obsolete_dynamic_pr_queued={local["obsolete_dynamic_pr_queued"]} '
+                  f'obsolete_dynamic_pr_active={local["obsolete_dynamic_pr_active"]} '
+                  f'obsolete_dynamic_ai_queued={local["obsolete_dynamic_ai_queued"]} '
+                  f'obsolete_dynamic_ai_active={local["obsolete_dynamic_ai_active"]} '
+                  f'closed_dynamic_ai_queued={local["closed_dynamic_ai_queued"]} '
+                  f'closed_dynamic_ai_active={local["closed_dynamic_ai_active"]} '
+                  f'orphaned_main_queued={local["orphaned_main_queued"]} '
+                  f'orphaned_main_active={local["orphaned_main_active"]} '
+                  f'duplicates={local["duplicates"]} '
+                  f'last_validation_preserved={local["last_validation_preserved"]} '
+                  f'accepted={accepted} moved={moved} deferred={deferred} '
+                  f'failed={failed}'
+              )
+              print(line)
+              pass_lines.append(line)
+              if pass_no < 4 and not rate_limit_hit and not budget_exhausted:
+                  time.sleep(8)
+
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as handle:
+                  handle.write('## Actions queue drain\n')
+                  handle.write(f'- Latest live main SHA: `{latest_main}`\n')
+                  handle.write(f'- API rate-limit backpressure: {rate_limit_hit}\n')
+                  handle.write(f'- Cancellation attempt budget: {cancellation_attempts}/{max_cancellation_attempts}\n')
+                  handle.write(f'- Time or cancellation budget exhausted: {budget_exhausted}\n')
+                  handle.write('- Sweep passes: 4 over ~24 seconds\n')
+                  handle.write(
+                      '- Branch control-plane observations preserved: '
+                      f'{totals["control_plane_preserved"]}\n'
+                  )
+                  handle.write(
+                      '- Superseded queued periodic-controller sweeps: '
+                      f'{totals["coalesced_control_plane_queued"]}\n'
+                  )
+                  handle.write(
+                      '- Stale, no-op main observers selected for cleanup: '
+                      f'{totals["obsolete_main_observers_queued"]}\n'
+                  )
+                  handle.write(
+                      '- Owner-authorized historical tombstones left for canary-gated deletion: '
+                      f'{totals["provider_conflicts_backed_off"]}\n'
+                  )
+                  handle.write(
+                      f'- Obsolete main selections: {totals["obsolete_main"]}\n'
+                  )
+                  handle.write(
+                      f'- Obsolete queued PR selections: {totals["obsolete_pr_queued"]}\n'
+                  )
+                  handle.write(
+                      f'- Obsolete active PR selections: {totals["obsolete_pr_active"]}\n'
+                  )
+                  handle.write(
+                      f'- Obsolete queued dynamic PR selections: {totals["obsolete_dynamic_pr_queued"]}\n'
+                  )
+                  handle.write(
+                      f'- Obsolete active dynamic PR selections: {totals["obsolete_dynamic_pr_active"]}\n'
+                  )
+                  handle.write(
+                      f'- Obsolete queued GHAS AI selections: {totals["obsolete_dynamic_ai_queued"]}\n'
+                  )
+                  handle.write(
+                      f'- Obsolete active GHAS AI selections: {totals["obsolete_dynamic_ai_active"]}\n'
+                  )
+                  handle.write(
+                      f'- Orphaned main queued selections: {totals["orphaned_main_queued"]}\n'
+                  )
+                  handle.write(
+                      f'- Orphaned main active selections: {totals["orphaned_main_active"]}\n'
+                  )
+                  handle.write(
+                      f'- Duplicate selections: {totals["duplicates"]}\n'
+                  )
+                  handle.write(
+                      '- Last path-filtered validations preserved: '
+                      f'{totals["last_validation_preserved"]}\n'
+                  )
+                  handle.write(
+                      f'- Cancel requests accepted: {totals["accepted"]}\n'
+                  )
+                  handle.write(
+                      f'- Terminal cancellation failures: {totals["failed"]}\n'
+                  )
+                  handle.write(
+                      '- Safety: `actions-housekeeping-cli.yml`, `branch-clean.yml`, `branch-flow.yml`, '
+                      '`branch-repair-100.yml`, '
+                      '`pr-obsolete-run-drain.yml`, and `queue-drain.yml` are '
+                      'never cancellation targets unless a pull_request run is proven '
+                      'obsolete against the fresh same-repository open-PR head map; '
+                      'current main, authoritative open-PR heads, cross-repository PRs, '
+                      'the current main Merge Readiness run, and the newest path-filtered validation without a live-head '
+                      'replacement are preserved.\n\n'
+                  )
+                  handle.write('### Passes\n')
+                  for line in pass_lines:
+                      handle.write(f'- `{line}`\n')
+
+          if totals['failed']:
+              raise SystemExit(
+                  f'queue drain had {totals["failed"]} terminal cancellation failure(s)'
+              )
+          PY
+

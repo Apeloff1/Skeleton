@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-18:product_boot:v1",
+  "title": "FLGB-18 product boot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "product_id",
+    "exact_head_commit",
+    "plane_evidence",
+    "config_digest",
+    "environment_digest"
+  ],
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "exact_head_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "plane_evidence": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "config_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "environment_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

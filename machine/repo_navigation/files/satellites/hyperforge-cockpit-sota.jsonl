@@ -1,0 +1,14 @@
+{"b":949,"f":"satellites/hyperforge-cockpit-sota/README.md","g":"66e5518dbf121700e6f74109a27c293c12e8925f","m":"100644","p":"satellites/hyperforge-cockpit-sota/README.md","t":"blob","z":"external-sources"}
+{"b":299,"f":"satellites/hyperforge-cockpit-sota/package.json","g":"360ba8e1c81cd5bd98d5d94f815e597347ca0f54","m":"100644","p":"satellites/hyperforge-cockpit-sota/package.json","t":"blob","z":"external-sources"}
+{"b":5369,"f":"satellites/hyperforge-cockpit-sota/src","g":"bdbe5517393316dcb5115964d2770cd553e0900a","m":"100644","p":"satellites/hyperforge-cockpit-sota/src/game/audio.ts","t":"blob","z":"external-sources"}
+{"b":6037,"f":"satellites/hyperforge-cockpit-sota/src","g":"e34c6ace208eb8731e2ea84b8dc42f5fe0f435af","m":"100644","p":"satellites/hyperforge-cockpit-sota/src/game/courses.ts","t":"blob","z":"external-sources"}
+{"b":5060,"f":"satellites/hyperforge-cockpit-sota/src","g":"6036e0c73ba1f916942b5c66da013c214fb5d5a7","m":"100644","p":"satellites/hyperforge-cockpit-sota/src/game/craft.ts","t":"blob","z":"external-sources"}
+{"b":17414,"f":"satellites/hyperforge-cockpit-sota/src","g":"e7287ad9037437580cc4151d56dc84ceee07610c","m":"100644","p":"satellites/hyperforge-cockpit-sota/src/game/engine.ts","t":"blob","z":"external-sources"}
+{"b":3187,"f":"satellites/hyperforge-cockpit-sota/src","g":"cf554fd585da0b482639a27c5522cb9f89bfc63c","m":"100644","p":"satellites/hyperforge-cockpit-sota/src/game/input.ts","t":"blob","z":"external-sources"}
+{"b":2536,"f":"satellites/hyperforge-cockpit-sota/src","g":"1ab480c60e41d3cf530c30583784463a78eb7bdb","m":"100644","p":"satellites/hyperforge-cockpit-sota/src/game/noise.ts","t":"blob","z":"external-sources"}
+{"b":2977,"f":"satellites/hyperforge-cockpit-sota/src","g":"5aa73b395e0a20055a0e566dd6ac399036d51f9d","m":"100644","p":"satellites/hyperforge-cockpit-sota/src/game/save.ts","t":"blob","z":"external-sources"}
+{"b":1578,"f":"satellites/hyperforge-cockpit-sota/src","g":"70d35246f3b05b463613ff83c7f5238579ba67c1","m":"100644","p":"satellites/hyperforge-cockpit-sota/src/game/store.ts","t":"blob","z":"external-sources"}
+{"b":1777,"f":"satellites/hyperforge-cockpit-sota/src","g":"96cf039681851b88edb7fbbfec63f99feae363d0","m":"100644","p":"satellites/hyperforge-cockpit-sota/src/game/types.ts","t":"blob","z":"external-sources"}
+{"b":10551,"f":"satellites/hyperforge-cockpit-sota/src","g":"35c1a53114fe0400a2b4a81660255eac1bf640d7","m":"100644","p":"satellites/hyperforge-cockpit-sota/src/game/vfx.ts","t":"blob","z":"external-sources"}
+{"b":15508,"f":"satellites/hyperforge-cockpit-sota/src","g":"2ad6b742f70bf8392cf16ee1556bd7a1220575bc","m":"100644","p":"satellites/hyperforge-cockpit-sota/src/game/world.ts","t":"blob","z":"external-sources"}
+{"b":240,"f":"satellites/hyperforge-cockpit-sota/tsconfig.json","g":"db72b2baefefb6a5883dfeb5e57ab7ed0eaad15c","m":"100644","p":"satellites/hyperforge-cockpit-sota/tsconfig.json","t":"blob","z":"external-sources"}

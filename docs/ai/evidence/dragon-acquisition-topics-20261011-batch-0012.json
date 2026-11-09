@@ -1,0 +1,987 @@
+{
+  "schema": "skeleton.dragon.acquisition_topic_triage.v1",
+  "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "source_range": {
+    "start_inclusive": 352,
+    "end_exclusive": 384
+  },
+  "checked_at": "2026-10-11T14:25:15.000Z",
+  "topics": [
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Plugins and scripts",
+        "Godot 4"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-13730e2803e1ae13444743d3b77fe909f17e8eeee770be3e9a2e0d242cc956cf",
+          "url": "https://github.com/Eneskp3441/Shaker",
+          "representation_sha256": "4e232794184798c60af4d77c95dc8954cc96cc6e13b9365bc8ccbc66124c4dbb",
+          "source_revision": "c127bcc49416cf1f3fb4dec63aca644b3788def9",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Shaker describes a Godot 4.2+ tool for configurable shaking effects on arbitrary nodes; the root LICENSE is MIT.",
+            "span": "README.md and LICENSE at c127bcc49416cf1f3fb4dec63aca644b3788def9",
+            "limitations": "Effects, compatibility, media and dependencies were not independently tested.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-13ccd671464a87f7641542c7539f6fe13af4bcac3f177d12f4174568822225d1",
+          "url": "https://github.com/you-win/obs-websocket-gd",
+          "representation_sha256": "d2a0165f69ed84c6eedf537d095f833be1816cc973b3736e51ba071a352de0a6",
+          "source_revision": "b1f518c48f11cab4d1198b53d2037e03f0818d31",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "OBS Websocket GD describes a Godot 4 addon for obs-websocket and local connection configuration; the root LICENSE is Apache-2.0.",
+            "span": "README.md and LICENSE at b1f518c48f11cab4d1198b53d2037e03f0818d31",
+            "limitations": "The integration was not executed; credentials, network exposure and downstream terms require review.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-14c079ae4ea8b6329e42e71d18541e5a498be4ba9a7577c3d50a9314685ece67",
+          "url": "https://codeberg.org/svetogam/yourbuil",
+          "representation_sha256": "cf3c7426c4bad72866641fe830a9ea64f348c22d95930e71f24043f81ae862e4",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn160view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-14c079ae4ea8b6329e42e71d18541e5a498be4ba9a7577c3d50a9314685ece67",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Websites"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-13784f126149c6652e3503593582e772ce7a7167fb8ae7cc98fa9fb0c467d8a7",
+          "url": "https://godotshaders.com/",
+          "representation_sha256": "8fdc3bbb1842c1579238da7af06080fccdec6e3ad33c87bf552355659df8a810",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn148view0",
+          "observation": {
+            "statement": "Godot Shaders describes a community-driven library where contributors upload shaders and users browse or like them.",
+            "span": "retrieved page lines 2–36",
+            "limitations": "Provider evidence only; per-shader authorship, license, quality and compatibility were not checked.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Postmortems**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1380f8e7ba1530f4ee4113630d1f922edb5aa5c81d39dde00a03341f048c3f1c",
+          "url": "http://juicybeast.com/2015/12/the-whole-making-of-toto-temple-deluxe/",
+          "representation_sha256": "96e97d14ea7df44f73a2be822a5b9bb1ed8b695439ec8eab68ec156bda8854c9",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn167view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1380f8e7ba1530f4ee4113630d1f922edb5aa5c81d39dde00a03341f048c3f1c",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Design",
+        "Reference"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-139941c4ae7ba38d5697497ab217cade86620cfc97513c2cb0d9776d0024d7b5",
+          "url": "https://web.archive.org/web/20180219004603/https://samandmax.co.uk/wp-content/uploads/Hit%20the%20Road%20design%20document.pdf",
+          "representation_sha256": "fc64ca76493bfa32444d39e44e64f484186bc1340ad9e1eef3ec24c8616e36ba",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn162view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-139941c4ae7ba38d5697497ab217cade86620cfc97513c2cb0d9776d0024d7b5",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Code**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-13a0b58d58ccd4e29d18a9d266c66da2ebd2ac475bf0ed41fbd173838016dd39",
+          "url": "https://mdzahidh.github.io/cs148/?class%2Fcs148%2F=",
+          "representation_sha256": "6e7ae9826fedf5b9cf92ea5522dce8b0aa99ab06c2503621c9596d205bcdb60d",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn155view0",
+          "observation": null
+        },
+        {
+          "source_id": "source-14bdb1ccd9d2e3a52b6c1bf24d2665d1235b474b2e868ea62729995149a6d275",
+          "url": "https://github.com/lettier/3d-game-shaders-for-beginners",
+          "representation_sha256": "9b0e74ce37ebf64e284305ba690df0d585f725d7d7209468943b4fbfbcf89108",
+          "source_revision": "29700852da7b730ed7c539efc6b31e08cb3ab684",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "3D Game Shaders For Beginners presents stack-portable explanations of major real-time shading techniques using Panda3D and GLSL examples.",
+            "span": "README.md at 29700852da7b730ed7c539efc6b31e08cb3ab684",
+            "limitations": "No root license file was captured; portability, code rights, performance and results were not independently tested.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-13a0b58d58ccd4e29d18a9d266c66da2ebd2ac475bf0ed41fbd173838016dd39",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Other"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-13b3261965f14f605e9319ff9f4bcb39f493a65ed263f313ad3f1a39652fc095",
+          "url": "https://screencraft.org/wp-content/uploads/2019/07/StrangerThings_Bible.pdf",
+          "representation_sha256": "769c15d6a4401b371c07b1cea3cb9f85d38d242c9993a46cabd1a07a860ba631",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn158view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-13b3261965f14f605e9319ff9f4bcb39f493a65ed263f313ad3f1a39652fc095",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Native",
+        "Puzzle/card/board"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-13b824b17fda7745fb65c8f82d2c7db13ad7aaed3d00bb37f77aca8c11629a9c",
+          "url": "https://github.com/cout-hello-world/tictactoe",
+          "representation_sha256": "5de2961c4cbc40af81a4e71fd63920347b53c63fe0e1ad79854a3565028ec993",
+          "source_revision": "4d356a5496bdf2192a9eccd13a33dbc82a0cb723",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "The TicTacToe README describes a desktop Java program using brute-force minimax for perfect play.",
+            "span": "README.md at 4d356a5496bdf2192a9eccd13a33dbc82a0cb723",
+            "limitations": "No root license was captured; perfect play was not executed or independently verified.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Complete Game Sources"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-13b8e6a786e858f32dca366178ab33e115ae010847bb0fedb65d55e374ee5419",
+          "url": "https://www.google.com.br/admob/",
+          "representation_sha256": "3724143c6146171b740076e6d2ac6f7302f889b7b5dd42cd88b3ff9eeb8c4364",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn147view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-13b8e6a786e858f32dca366178ab33e115ae010847bb0fedb65d55e374ee5419",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Testing**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-13e90d48ad713c8056e9c0d4ee167586bee298d7983d7166f39b8d60ff2468b2",
+          "url": "http://en.testbird.com/",
+          "representation_sha256": "ad8f0c5b61fc34527d9ec677f8f313faef75a25796c42fce2f9e2e5626ee375e",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn157view0",
+          "observation": null
+        },
+        {
+          "source_id": "source-1408efd4830b2c44e67fad1f84b7cb812736b9d69d75822f9762cbdb774cd20e",
+          "url": "https://gamesuserresearch.com/2022/06/12/a-simple-process-to-find-playtesters/",
+          "representation_sha256": "8c396f79b6d53c3b7b7ad2d1d8ff844eb0d0c6305515b4599d1585963fb7a0a8",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn154view0",
+          "observation": {
+            "statement": "Games User Research recommends a repeatable recruitment panel and argues that participant fit affects feedback usefulness.",
+            "span": "retrieved page lines 31–64",
+            "limitations": "Practitioner guidance, not a controlled study; ethics, privacy, compensation and representativeness require review.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-13e90d48ad713c8056e9c0d4ee167586bee298d7983d7166f39b8d60ff2468b2",
+          "finding": "target_content_mismatch",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Art**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-13f3ee8d3ced518bcc304d63e7964b8e14b6e30cfca3e9ccf0b63ada2cf8ca07",
+          "url": "https://www.sidefx.com/tutorials/sci-fi-level-builder/",
+          "representation_sha256": "573c677a3f083c781622f647e5d12f74da6dcd5d864e26454f4b4b1de5af5374",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn169view0",
+          "observation": {
+            "statement": "SideFX's 2020 tutorial describes a Houdini procedural level tool from one curve, modular corridors and Unity prefab attributes.",
+            "span": "retrieved page lines 13–55",
+            "limitations": "Vendor tutorial using Houdini 18, SideFX Labs and Unity; files were not downloaded, executed or licensed here.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-1415e96c5dfc1a7ead09297bfc263c59fb1e98f3c6c640b8f6f84b79b2971bf3",
+          "url": "http://www.gamasutra.com/blogs/TomasSala/20140206/210238/Making_textureless_3D_work_a_howtomaking_of_guide.php",
+          "representation_sha256": "5c421370d276e8232408bba68aa6ac5e08874508200942aec664f335664a23e3",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn159view0",
+          "observation": null
+        },
+        {
+          "source_id": "source-1494909f3d8b959ce01395c807b6b843f454b850ca0b49bf471a3f9668c2b48d",
+          "url": "http://gamelogos.tumblr.com/",
+          "representation_sha256": "5ccf50769ae0d4eafabf9a15d2bc3791732d8a3c6060c91f6a7138030f1a80ba",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn166view0",
+          "observation": {
+            "statement": "GameLogos describes a Dom2D-curated visual-reference collection of game logos from multiple eras.",
+            "span": "retrieved page lines 2–31",
+            "limitations": "Discovery-only; logos may be protected, no media was downloaded and curation grants no reuse rights.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1415e96c5dfc1a7ead09297bfc263c59fb1e98f3c6c640b8f6f84b79b2971bf3",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Engines and Frameworks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-13ffd14b890c5cf2f0c8c3405ff8e66b27a7d9080c3f7df819a6b9001e050ee4",
+          "url": "http://melonjs.org/",
+          "representation_sha256": "34fd67341d143964df36a7449120e0045a60a4702635abb1b95c8c6c6ac70535",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn161view0",
+          "observation": {
+            "statement": "melonJS describes an open-source 2.5D JavaScript/TypeScript engine with WebGPU, WebGL 2 and Canvas2D fallback and states MIT licensing.",
+            "span": "retrieved page lines 3–21",
+            "limitations": "Homepage claims were not benchmarked; exact license text, revision, compatibility and asset scope remain pending.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Programming"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-140751fd85f5b17ab194ca0529ae34f2a63a886c2a7c5e8855b74b1e81ad06f7",
+          "url": "https://blog.demofox.org/",
+          "representation_sha256": "154a574b1768d09b386eb9370156eb88006fb9919792efc56e9ddf02cc904166",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn151view0",
+          "observation": {
+            "statement": "Demofox's index reports 272 posts across graphics, programming, game development, mathematics, machine learning, DSP and audio.",
+            "span": "retrieved page lines 0–34",
+            "limitations": "Index evidence only; individual posts, code, experiments and rights were not acquired.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Resources**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-140a8e01528aa90fabcbee981941a0234c4c93efc90c819c3da27d5ea8e55275",
+          "url": "http://www.soundsnap.com/",
+          "representation_sha256": "e12770eeb3da2f5237ee5d7a0e683a80ac698a428131619c7e610a9299f23d7b",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn149view0",
+          "observation": {
+            "statement": "Soundsnap markets subscription sound-effect libraries to editors, sound designers and game-audio professionals.",
+            "span": "retrieved page lines 6–19 and 71–73",
+            "limitations": "Marketing metadata only; no track, agreement, entitlement or redistribution permission was acquired.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Video Game Assets",
+        "Audio Assets"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-143e749379bae031aff6549e798561a60b29cf75194808245113de2d3463777e",
+          "url": "https://freesound.org/browse/",
+          "representation_sha256": "96f3ef7f78e8e48aab382757c3f3e68a33b7e6fc4d945cb2f0a39db66b2ad0df",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn168view0",
+          "observation": {
+            "statement": "Freesound reported 737,233 sounds and item-level license filters including CC0, Attribution, Attribution-NonCommercial and Sampling+.",
+            "span": "retrieved page lines 52–157",
+            "limitations": "Dynamic snapshot; no audio or item license was acquired and mixed results are not one reusable dataset.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Web**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-144460bcb5a069787de0fcd0e2e52b1be63011c92c6dc744e89c40317ac2b2b2",
+          "url": "https://failory.com/battle-scars",
+          "representation_sha256": "482dc56177b19e053624e9792110ebe5739c03d301e6f7ca7dc216e55b5dd639",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn153view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-144460bcb5a069787de0fcd0e2e52b1be63011c92c6dc744e89c40317ac2b2b2",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "JavaScript"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-144573922ff74d6d2ac38eaaa61a099cd76f4f483fab39091537a987485d7707",
+          "url": "https://www.w3schools.com/default.asp",
+          "representation_sha256": "705a143a5016c1b78cc4d5fddfb9bcffefc48ceec9a2ba05c5a3f915e1509d7d",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn163view0",
+          "observation": {
+            "statement": "W3Schools exposes tutorial and reference indexes including HTML, CSS and JavaScript.",
+            "span": "retrieved page lines 42–86",
+            "limitations": "General educational index, not game-specific or peer-reviewed evidence; lesson reuse terms were not acquired.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-1451accd65c1e138c39a81fe6829c43ed7eb3034875baabcbe0dfabb71c4e12c",
+          "url": "https://github.com/barmalei/zebkit",
+          "representation_sha256": "29cd42458f0e58d53bceac6c123a4baac7812d13b988141847762397005b196a",
+          "source_revision": "daba90d7fdf24870d9fd829fea350e5010eedd97",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Zebkit describes an HTML5 Canvas UI framework with touch support and components separated from CSS; the root LICENSE is Apache-2.0.",
+            "span": "README.md and LICENSE at daba90d7fdf24870d9fd829fea350e5010eedd97",
+            "limitations": "Compatibility, accessibility, dependencies and performance were not independently tested.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "C++"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-144a18e972837079d3e11d756b5508832c430ecaa5ae73818505af44df0aa1ae",
+          "url": "https://github.com/cneben/QuickQanava",
+          "representation_sha256": "d54f5faa15341bf1994ffe054c7bb0f49a44c77aa63ab053bf854895f82d9a41",
+          "source_revision": "9585b586ba5c07614dd5f2ffb4f44312e3d94bfe",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "QuickQanava describes a C++17 Qt/QML library for visualizing medium-sized directed graphs; its README labels the project BSD-3-Clause.",
+            "span": "README.md at 9585b586ba5c07614dd5f2ffb4f44312e3d94bfe",
+            "limitations": "No root license file was captured; scale, performance and Qt licensing were not independently verified.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "General Game Development"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-14634addd03ec3e85b9a909af1176709a289e6bcd812f32acffd7c9f64c7cadf",
+          "url": "https://www.udacity.com/course/html5-game-development--cs255",
+          "representation_sha256": "874cbd0ed29a12a3b9375747acf6e7be29362fd60455ca05889e4f55a58b39da",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn152view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-14634addd03ec3e85b9a909af1176709a289e6bcd812f32acffd7c9f64c7cadf",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Native",
+        "Arcade"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1487579f13f6d92870a2d408c39f0041a10a22de91b93ee612ae4cac25c7a27c",
+          "url": "https://github.com/akien-mga/dynadungeons",
+          "representation_sha256": "dfadf66922b536c38308fe3b3d935934755a019acec0dd737040cefe708d885e",
+          "source_revision": "4cb71424d0c4aacf08471bb35fc0d5fbeb1c37c5",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "DynaDungeons describes an inactive Godot learning project modeled as a Bomberman clone, using a CC BY 3.0 tileset; LICENSE.txt is GPL-3.0.",
+            "span": "README.md and LICENSE.txt at 4cb71424d0c4aacf08471bb35fc0d5fbeb1c37c5",
+            "limitations": "Inactivity is not abandonment; software, tiles, related expression and trademarks remain separate rights layers.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Games",
+        "2D",
+        "Godot 2"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1487579f13f6d92870a2d408c39f0041a10a22de91b93ee612ae4cac25c7a27c",
+          "url": "https://github.com/akien-mga/dynadungeons",
+          "representation_sha256": "dfadf66922b536c38308fe3b3d935934755a019acec0dd737040cefe708d885e",
+          "source_revision": "4cb71424d0c4aacf08471bb35fc0d5fbeb1c37c5",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "DynaDungeons describes an inactive Godot learning project modeled as a Bomberman clone, using a CC BY 3.0 tileset; LICENSE.txt is GPL-3.0.",
+            "span": "README.md and LICENSE.txt at 4cb71424d0c4aacf08471bb35fc0d5fbeb1c37c5",
+            "limitations": "Inactivity is not abandonment; software, tiles, related expression and trademarks remain separate rights layers.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Talks [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindres",
+        "GDC Talks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-14a658a8d3c200ee88d2d6c9fdc761e92936c37c565f89ed68b13aea70fa4b81",
+          "url": "https://www.youtube.com/watch?v=ISutk1mauPM%29%3A",
+          "representation_sha256": "6aa8e9f296281e8fdb9d28c0173609198f5011769f89764bbbabfa5abe4eea0c",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn165view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-14a658a8d3c200ee88d2d6c9fdc761e92936c37c565f89ed68b13aea70fa4b81",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Puzzle"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-14a928771954710197eccaffee89400238f716ada6b2878cec8795c4b2535454",
+          "url": "http://www.kongregate.com/games/Sorobaid/clone-man",
+          "representation_sha256": "6d51047109e66c8fa75fcd2535870e84e46ab546ddc1c0287df72f265d61ca9b",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn156view0",
+          "observation": {
+            "statement": "Kongregate attributes Clone Man to Sorobaid, records a 25 November 2012 release, and describes temporary clockwise-turning clones.",
+            "span": "retrieved page lines 87–111",
+            "limitations": "Portal metadata only; executable media was not downloaded or run and no reuse license was established.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Audio**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-14a9f27d324ca36bc42f21858560c7a204192f44237fa5427d54fe6a718ec4c6",
+          "url": "https://github.com/meshula/LabMidi/blob/main/LabMuse/imuse-technical.md",
+          "representation_sha256": "4395b4320e2e5692d7d9c0ea353afa4de435f46d46bbd069b01a95738f8d0942",
+          "source_revision": "de0f14c5489ed0e4ebb819ad81f21c3ff6b2418a",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Nick Porcino's exact iMUSE technical-history file identifies itself as human-authored, permits indexing and derivatives under BSD-2-Clause, and states CORP_TRAIN: NO.",
+            "span": "LabMuse/imuse-technical.md, README.md and LICENSE at de0f14c5489ed0e4ebb819ad81f21c3ff6b2418a",
+            "limitations": "The provenance declaration is unauthenticated source metadata; no training occurred, and names, games, music and related rights remain gated.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Specialty Topics",
+        "Shaders"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-14bdb1ccd9d2e3a52b6c1bf24d2665d1235b474b2e868ea62729995149a6d275",
+          "url": "https://github.com/lettier/3d-game-shaders-for-beginners",
+          "representation_sha256": "9b0e74ce37ebf64e284305ba690df0d585f725d7d7209468943b4fbfbcf89108",
+          "source_revision": "29700852da7b730ed7c539efc6b31e08cb3ab684",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "3D Game Shaders For Beginners presents stack-portable explanations of major real-time shading techniques using Panda3D and GLSL examples.",
+            "span": "README.md at 29700852da7b730ed7c539efc6b31e08cb3ab684",
+            "limitations": "No root license file was captured; portability, code rights, performance and results were not independently tested.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Tools / Software",
+        "Pixel Art"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-14c97e0b502be764e26e6cc10739e1bfa95928e00c8bbc755145b3e77758f052",
+          "url": "https://github.com/piskelapp/piskel",
+          "representation_sha256": "1dbb5c627cbd44345c288fe1aceab178f8ff35a8575383c7281207d935c2c01c",
+          "source_revision": "bef52beb312e771bf0cbb915d873e8d638842d7a",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Piskel describes a JavaScript/HTML/CSS sprite, animation and pixel-art editor and lists third-party libraries; the root LICENSE is Apache-2.0.",
+            "span": "README.md and LICENSE at bef52beb312e771bf0cbb915d873e8d638842d7a",
+            "limitations": "Dependencies, screenshots, hosted behavior and exports require component-level review.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Vector/Image Editor"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-14d2a9934a15421da9820d2f112225ef6ac2688c19507f2f880feb414fe4b0a4",
+          "url": "http://www.gimp.org/",
+          "representation_sha256": "3401f1cc18cd6cd8c943926060ec6893137b228bc1a2883981866ee470f4dd19",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn164view0",
+          "observation": {
+            "statement": "GIMP's official site describes a cross-platform free-software image editor with source modification, distribution and extensibility.",
+            "span": "retrieved page lines 18–39",
+            "limitations": "Homepage summary only; exact revision, GPL component scope, plug-ins and resources were not acquired.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "Java"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-14db4587789b2f9fab6e5082dc908385e2ea4212df48ea80c1bb1533aef92838",
+          "url": "https://libgdx.com/",
+          "representation_sha256": "fa48de2f25bd0aa54b4647e03f52fe8fa868bd04e888b09c3c5d237f006b669f",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn150view0",
+          "observation": {
+            "statement": "libGDX describes a cross-platform Java/OpenGL game framework, states Apache-2.0, and reports releases 1.14.1 and 1.14.2 on 28 May 2026.",
+            "span": "retrieved page lines 9–61 and 80–87",
+            "limitations": "Community homepage claims; exact revision, dependencies, certification and performance were not verified.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    }
+  ]
+}

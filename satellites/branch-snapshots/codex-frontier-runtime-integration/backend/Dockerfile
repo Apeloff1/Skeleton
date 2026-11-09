@@ -1,0 +1,54 @@
+# ============================================================================
+# Tutolage Backend Dockerfile
+# ============================================================================
+# Build context MUST be the repository root because the image vendors
+# skeleton/ alongside backend/.
+# ============================================================================
+
+# Stage 1: Builder with uv
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY backend/pyproject.toml ./
+COPY backend/requirements.txt ./
+
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+RUN uv venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN uv pip install -r requirements.txt
+
+# Stage 2: Production
+FROM python:3.11-slim AS production
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY backend/ .
+COPY skeleton/ ./skeleton/
+
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8001
+
+HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=5 \
+    CMD curl -f http://localhost:8001/api/health || exit 1
+
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
+
+# Stage 3: Development
+FROM production AS development
+
+USER root
+RUN pip install pytest pytest-cov ruff
+USER appuser
+
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]

@@ -1,0 +1,33 @@
+{
+  "schema_version": "skeleton.ai.game_content_uploads.v1",
+  "status": "implementation_candidate",
+  "owners": {
+    "application": "backend/core/game_content_uploads.py",
+    "api": "backend/routes/game_content.py",
+    "catalogue": "skeleton/jeeves/game_emulator_catalog.py",
+    "product": "frontend/features/Jeeves/GameContentUpload.tsx",
+    "client": "frontend/src/product/gameContentClient.ts"
+  },
+  "authority": "Existing CORE_DB Mongo workspace and exact authenticated tenant/owner/project; no user-supplied host filesystem path",
+  "scope": "Chunked large cartridge/disc/PC game content with immutable per-file manifest, current source consent, bounded streamed verification and private file-backed emulator materialization",
+  "bounds": {
+    "chunk_bytes": 1048576,
+    "file_bytes": 2147483648,
+    "bundle_bytes": 4294967296,
+    "owner_reserved_bytes": 8589934592,
+    "files": 64,
+    "uploads": 32,
+    "private_cache_bytes": 8589934592,
+    "private_cache_bundles": 256
+  },
+  "interfaces": [
+    "create upload with exact project revision, idempotency, normalized relative paths and explicit rights",
+    "put immutable exact-index raw binary chunks with SHA-256 checks",
+    "complete by streamed per-file/hash/descriptor verification and workspace source association",
+    "read exact scoped manifests/status and revoke source/unlinked partial uploads",
+    "materialize_content(scope,project_id,bundle_id) and assert_content_authority(scope,project_id,bundle_id,expected_digest)"
+  ],
+  "failure": "Oversize, corrupt/changed chunks, missing media dependencies, foreign owner, altered source/project epoch, expired partial upload and inconsistent finalization deny. No full disc-byte concatenation into API, job JSON or actor IPC.",
+  "retention": "Incomplete upload TTL and exact reservation cleanup; owner withdrawal blocks use and removes original Mongo chunks/private materializations. Historical trained copies are not claimed globally erased.",
+  "verification": "No tests added/run in user-directed session; structural/source/build checks only. Large upload and hardware execution acceptance remains unverified."
+}

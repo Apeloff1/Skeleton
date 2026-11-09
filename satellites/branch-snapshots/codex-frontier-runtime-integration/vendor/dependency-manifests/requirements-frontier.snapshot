@@ -1,0 +1,8 @@
+# Lightweight execution, persistence, HTTP, and integration validation.
+pytest>=8,<10
+pytest-asyncio>=0.23,<2
+# Match the production backend's web contracts.
+fastapi==0.136.1
+pydantic==2.12.5
+httpx==0.28.1
+ruff==0.16.7

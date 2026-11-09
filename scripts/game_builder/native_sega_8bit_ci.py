@@ -1,0 +1,330 @@
+"""Build-stage orchestration and byte-level verification for original SMS/GG games.
+
+The GitHub workflow invokes this after running a real SDCC/makesms toolchain.
+No game ROM, proprietary SDK or distribution authorization is bundled here.
+A valid cartridge header is not equivalent to a playable game.
+"""
+from __future__ import annotations
+
+import argparse
+from hashlib import sha256
+import json
+import os
+from pathlib import Path
+import re
+import stat
+
+from skeleton.ai.game_builder.playable_world import GameBuildIntent, generate_playable_world
+from skeleton.ai.game_builder.playable_simulation import demonstrate_solvable
+from skeleton.ai.game_builder.port_planner import HomebrewSource
+from skeleton.ai.game_builder.sega_8bit_native_export import (
+    compile_native_sega_8bit, export_native_sega_8bit,
+)
+from skeleton.ai.game_builder.sega_8bit_rom import validate_rom_file
+from skeleton.ai.game_builder.native_release_intake import _open_directory, _read_bounded, _json
+
+
+_TARGETS = {"sega_master_system": "sms", "sega_game_gear": "gg"}
+# Extended profile is an independently authored real console campaign rather
+# than a synthetic header fixture. It reaches native maximum world/rank count.
+_ORIGINAL_PROFILES = {
+    "standard": dict(
+        project_id="skeleton-original-sega-evolution",
+        title="Original Stardust Exploration",
+        subtitle="Self-authored console game, not commercial-content replication",
+        seed=198701, width=17, height=15, levels=3,
+        collectibles_per_level=3, hazards_per_level=4,
+        starting_health=4, theme="space",
+    ),
+    "full_campaign": dict(
+        project_id="skeleton-original-sega-eight-worlds",
+        title="Original Eight World Expedition",
+        subtitle="Eight original stages, 48 gems and all companion bond ranks",
+        seed=90210, width=17, height=15, levels=8,
+        collectibles_per_level=6, hazards_per_level=4,
+        starting_health=4, theme="arcade",
+    ),
+    # No prepackaged world data: user-authored game identity and world
+    # parameters are mandatory for this route, and new content is generated
+    # algorithmically from the supplied original seed.
+    "custom_original": None,
+}
+_SHA = re.compile(r"^[0-9a-f]{64}$")
+_GIT_REVISION = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+
+
+def emit(
+    target: str, output: Path, authorship_file: Path, *,
+    reference_out: Path | None = None, profile: str = "standard",
+    original_config: dict[str, object] | None = None,
+) -> dict[str, object]:
+    if target not in _TARGETS:
+        raise ValueError("unsupported real Z80 console target")
+    if not isinstance(profile, str) or profile not in _ORIGINAL_PROFILES:
+        raise ValueError("unrecognized independently authored native campaign profile")
+    if profile == "custom_original":
+        required = frozenset((
+            "project_id", "title", "seed", "theme", "levels",
+        ))
+        allowed = required | frozenset((
+            "subtitle", "width", "height",
+            "collectibles_per_level", "hazards_per_level", "starting_health",
+        ))
+        if (not isinstance(original_config, dict)
+                or not required.issubset(original_config)
+                or frozenset(original_config) - allowed):
+            raise ValueError("custom original game requires bounded project, title, seed, theme and stages")
+        # Explicit console defaults are smaller than the shared generic
+        # world engine's 41x41 grid to fit physical SMS/GG video memory.
+        custom = dict(
+            subtitle="Independent original homebrew game",
+            width=17, height=15, collectibles_per_level=3,
+            hazards_per_level=4, starting_health=4,
+        )
+        custom.update(original_config)
+        intent = GameBuildIntent(**custom)
+        if (
+            intent.width > 19 or intent.height > 15
+            or intent.levels > 8
+            or intent.levels * intent.collectibles_per_level > 48
+        ):
+            raise ValueError("original game exceeds Sega native screen or campaign capacity")
+    elif original_config is not None:
+        raise ValueError("fixed native profiles cannot silently accept custom game overrides")
+    try:
+        declared_author_bytes = _read_bounded(Path(authorship_file), max_bytes=8*1024*1024)
+    except (ValueError, OSError) as exc:
+        raise ValueError("original author evidence must be an ordinary, private, bounded local file") from exc
+    author_reference = sha256(declared_author_bytes).hexdigest()
+    if profile != "custom_original":
+        intent = GameBuildIntent(**_ORIGINAL_PROFILES[profile])
+    world = generate_playable_world(intent, authorized=True)
+    rights = HomebrewSource(
+        project_id=intent.project_id,
+        # These worlds are authored *for* the requested native console.
+        # Do not invent a WonderSwan origin just to obtain a port blueprint.
+        platform_id=target,
+        rights_basis="project_owned",
+        evidence_sha256=author_reference,
+        creative_identity=(
+            "original independently authored maze and puzzle world",
+            "originally drawn console-safe tiles and thematic stage palettes",
+            "fresh generator-created layouts and companion behavior",
+        ),
+    )
+    # This explicit backend is in addition to the independently written Z80
+    # assembly SMS adapter. The generic native CLI is free to choose either.
+    project = compile_native_sega_8bit(world, rights, target, authorized=True)
+    folder = export_native_sega_8bit(project, output, authorized=True)
+    replay = demonstrate_solvable(world, authorized=True)
+    if reference_out is not None:
+        from scripts.game_builder.sega8_source_replay import export_host_reference
+        export_host_reference(world, project.content_digest, reference_out)
+    proof = {
+        "schema": "skeleton.game_builder.native_sega8_original_source_receipt.v1",
+        "target": target, "output_directory": str(folder),
+        "original_campaign_profile": profile,
+        "native_source_authoring_platform": target,
+        "third_party_console_origin_claimed": False,
+        "source_content_digest": project.content_digest,
+        "world_digest": world.digest,
+        "winning_replay_digest": replay.digest,
+        "rights_evidence_sha256": author_reference,
+        "native_binary_built": False,
+        "emulator_verified": False,
+        "physical_hardware_verified": False,
+        "rights_independently_verified": False,
+        "distribution_licensed": False,
+    }
+    if any(proof.get(flag) is not False for flag in (
+        "native_binary_built", "emulator_verified", "physical_hardware_verified",
+        "rights_independently_verified", "distribution_licensed",
+    )):
+        raise ValueError("generated source forged verification")
+    return proof
+
+
+def verify(
+    target: str, directory: Path, rom: Path, *,
+    toolchain_revision: str, expected_source_sha256: str | None = None,
+    expected_authorship_sha256: str | None = None,
+) -> dict[str, object]:
+    """Verify *actual* bytes, not just strings in a source generation report."""
+    if target not in _TARGETS:
+        raise ValueError("unknown emulator/console hardware target")
+    if not isinstance(toolchain_revision, str) or not _GIT_REVISION.fullmatch(toolchain_revision):
+        raise ValueError("exact 40-hex SHA-1 or 64-hex SHA-256 Git revision is required")
+    if expected_source_sha256 is not None and (
+        not isinstance(expected_source_sha256, str)
+        or not _SHA.fullmatch(expected_source_sha256)
+    ):
+        raise ValueError("independently supplied source digest must be SHA-256")
+    if expected_authorship_sha256 is not None and (
+        not isinstance(expected_authorship_sha256, str)
+        or not _SHA.fullmatch(expected_authorship_sha256)
+    ):
+        raise ValueError("expected authorship evidence must be a SHA-256 digest")
+    rootfd = _open_directory(directory)
+    try:
+        expected = {"game.c", "Makefile", "manifest.json"}
+        present = set(os.listdir(rootfd))
+        if not expected.issubset(present) or present - expected - {"build"}:
+            raise ValueError("generated source project has missing or unreviewed extra files")
+        if "build" in present:
+            build_meta = os.stat("build", dir_fd=rootfd, follow_symlinks=False)
+            if not stat.S_ISDIR(build_meta.st_mode):
+                raise ValueError("compiler output directory cannot be linked or replaced")
+        parts = [
+            _read_bounded(Path(filename), max_bytes=1024*1024, root_fd=rootfd)
+            for filename in ("game.c", "Makefile", "manifest.json")
+        ]
+    finally:
+        os.close(rootfd)
+    source_digest = sha256(b"\0".join(parts)).hexdigest()
+    if expected_source_sha256 is not None and source_digest != expected_source_sha256:
+        raise ValueError("generated source has changed since independently pinned evidence")
+    manifest = _json(parts[2], "native Sega source")
+    if not isinstance(manifest, dict):
+        raise ValueError("native source manifest must be a JSON object")
+    if (
+        manifest.get("schema") != "skeleton.game_builder.native_sega8_source.v1"
+        or manifest.get("platform") != target
+        or manifest.get("target_rom_suffix") != _TARGETS[target]
+        or not isinstance(manifest.get("world_digest"), str)
+        or not _SHA.fullmatch(manifest["world_digest"])
+        or not isinstance(manifest.get("reference_safe_replay_digest"), str)
+        or not _SHA.fullmatch(manifest["reference_safe_replay_digest"])
+    ):
+        raise ValueError("native console project identity or replay invalid")
+    if (
+        not isinstance(manifest.get("source_rights_evidence_sha256"), str)
+        or not _SHA.fullmatch(manifest["source_rights_evidence_sha256"])
+        or not isinstance(manifest.get("project_id"), str)
+        or not manifest["project_id"]
+        or manifest.get("toolchain_license_review_required") is not True
+    ):
+        raise ValueError("source rights and third-party toolchain legal evidence incomplete")
+    if (
+        expected_authorship_sha256 is not None
+        and manifest["source_rights_evidence_sha256"] != expected_authorship_sha256
+    ):
+        raise ValueError("authorship evidence changed since source review")
+    for field in (
+        "binary_compiled", "emulator_playthrough_verified",
+        "physical_hardware_verified", "release_approved",
+        "distribution_licensed", "third_party_game_or_firmware_redistributed",
+    ):
+        if manifest.get(field) is not False:
+            raise ValueError(f"pre-build manifest has forged claim: {field}")
+    if rom.suffix != "." + _TARGETS[target]:
+        raise ValueError("native ROM extension is inconsistent with requested console")
+    measured = validate_rom_file(rom, target)
+    return {
+        "schema": "skeleton.game_builder.sega8_actual_compilation_evidence.v1",
+        "target": target,
+        "original_world_digest": manifest["world_digest"],
+        "reference_safe_replay_digest": manifest["reference_safe_replay_digest"],
+        "original_project_id": manifest.get("project_id"),
+        "source_sha256": source_digest,
+        "source_digest_matches_expected": expected_source_sha256 is not None,
+        "source_digest_independently_attested": False,  # Caller-provided hash is not trusted external authority.
+        "source_rights_evidence_sha256": manifest["source_rights_evidence_sha256"],
+        "source_authorship_hash_matches_expected": expected_authorship_sha256 is not None,
+        "source_rights_independently_proven": False,
+        "rom_sha256": measured["sha256"],
+        "rom_size": measured["bytes"],
+        "toolchain_revision": toolchain_revision,
+        "toolchain_revision_hash_algorithm": "git-sha1" if len(toolchain_revision) == 40 else "git-sha256",
+        "toolchain_source_authenticated": False,  # Exact Git ID is not a signed supply-chain attestation.
+        "native_rom_compiled": False,  # Byte verification does not witness an SDCC execution.
+        "real_rom_structure_verified": True,
+        "rom_header_checksum_verified": measured["native_rom_checksum_verified"],
+        "emulator_playthrough_verified": False,
+        "physical_hardware_verified": False,
+        "release_approved": False,
+        "rights_independently_verified": False,
+        "distribution_licensed": False,
+    }
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__)
+    mode = ap.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--emit", type=Path)
+    mode.add_argument("--verify-rom", type=Path)
+    ap.add_argument("--target", choices=sorted(_TARGETS), required=True)
+    ap.add_argument("--profile", choices=sorted(_ORIGINAL_PROFILES), default="standard")
+    ap.add_argument("--original-project-id")
+    ap.add_argument("--original-title")
+    ap.add_argument("--original-subtitle")
+    ap.add_argument("--original-seed", type=int)
+    ap.add_argument("--original-theme", choices=("forest", "space", "desert", "ocean", "arcade"))
+    ap.add_argument("--original-levels", type=int)
+    ap.add_argument("--original-width", type=int)
+    ap.add_argument("--original-height", type=int)
+    ap.add_argument("--original-collectibles", type=int)
+    ap.add_argument("--original-hazards", type=int)
+    ap.add_argument("--original-health", type=int)
+    ap.add_argument("--author-evidence", type=Path)
+    ap.add_argument("--source-dir", type=Path)
+    ap.add_argument("--toolchain-revision")
+    ap.add_argument("--expected-source-sha256")
+    ap.add_argument("--expected-authorship-sha256")
+    ap.add_argument("--receipt-out", type=Path)
+    ap.add_argument("--host-reference-out", type=Path)
+    args = ap.parse_args()
+    if args.emit is not None:
+        if args.author_evidence is None:
+            ap.error("--author-evidence required with --emit")
+        overrides = {
+            key: getattr(args, field)
+            for key, field in (
+                ("project_id", "original_project_id"),
+                ("title", "original_title"),
+                ("subtitle", "original_subtitle"),
+                ("seed", "original_seed"),
+                ("theme", "original_theme"),
+                ("levels", "original_levels"),
+                ("width", "original_width"),
+                ("height", "original_height"),
+                ("collectibles_per_level", "original_collectibles"),
+                ("hazards_per_level", "original_hazards"),
+                ("starting_health", "original_health"),
+            )
+            if getattr(args, field) is not None
+        }
+        receipt = emit(
+            args.target, args.emit, args.author_evidence,
+            reference_out=args.host_reference_out,
+            profile=args.profile, original_config=overrides or None,
+        )
+    else:
+        if args.profile != "standard" or any(
+            getattr(args, field) is not None
+            for field in (
+                "original_project_id", "original_title", "original_subtitle",
+                "original_seed", "original_theme", "original_levels",
+                "original_width", "original_height", "original_collectibles",
+                "original_hazards", "original_health",
+            )
+        ):
+            ap.error("game-generation profile options cannot modify a verification-only ROM")
+        if args.source_dir is None or args.toolchain_revision is None:
+            ap.error("--source-dir and --toolchain-revision required with --verify-rom")
+        receipt = verify(
+            args.target, args.source_dir, args.verify_rom,
+            toolchain_revision=args.toolchain_revision,
+            expected_source_sha256=args.expected_source_sha256,
+            expected_authorship_sha256=args.expected_authorship_sha256,
+        )
+    if args.receipt_out is not None:
+        if args.receipt_out.exists() or args.receipt_out.is_symlink():
+            raise FileExistsError(str(args.receipt_out))
+        with args.receipt_out.open("x", encoding="utf-8") as out:
+            json.dump(receipt, out, indent=2, sort_keys=True)
+            out.write("\n")
+    print(json.dumps(receipt, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()

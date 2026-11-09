@@ -1,0 +1,768 @@
+{
+  "schema_version": "skeleton.ai.game_emulator_research_lab.v1",
+  "status": "source_committed_not_hardware_or_model_verification",
+  "scope": "actual retro worker or bounded experimental DMG interpreter, source/content rights asserted by operator",
+  "owners": [
+    "skeleton/jeeves/game_emulator_experiment_lab.py",
+    "skeleton/jeeves/game_emulator_curriculum.py",
+    "skeleton/jeeves/game_emulator_cross_core_lab.py",
+    "skeleton/jeeves/game_emulator_neural_world.py",
+    "skeleton/jeeves/game_emulator_planning_lab.py",
+    "skeleton/jeeves/game_emulator_goal_lab.py",
+    "skeleton/jeeves/game_original_rom_goal_training.py",
+    "skeleton/jeeves/game_rom_instruction_divergence.py",
+    "skeleton/jeeves/game_emulator_cross_game_lab.py"
+  ],
+  "governed_mirrors": [
+    "skeleton/ai/agents/jeeves/game_emulator_experiment_lab.py",
+    "skeleton/ai/agents/jeeves/game_emulator_curriculum.py",
+    "skeleton/ai/agents/jeeves/game_emulator_cross_core_lab.py",
+    "skeleton/ai/agents/jeeves/game_emulator_neural_world.py",
+    "skeleton/ai/agents/jeeves/game_emulator_planning_lab.py",
+    "skeleton/ai/agents/jeeves/game_emulator_goal_lab.py",
+    "skeleton/ai/agents/jeeves/game_original_rom_goal_training.py",
+    "skeleton/ai/agents/jeeves/game_rom_instruction_divergence.py",
+    "skeleton/ai/agents/jeeves/game_emulator_cross_game_lab.py"
+  ],
+  "entrypoints": [
+    "python -m skeleton.jeeves.game_learning_cli train-emulator-deep",
+    "python -m skeleton.jeeves.game_learning_cli experiment-emulator",
+    "python -m skeleton.jeeves.game_learning_cli compare-emulator-cores",
+    "python -m skeleton.jeeves.game_learning_cli fit-emulator-world-model",
+    "python -m skeleton.jeeves.game_learning_cli plan-emulator",
+    "python -m skeleton.jeeves.game_learning_cli probe-emulator-goals",
+    "python scripts/audit_game_emulator_first_boot.py",
+    "python scripts/accept_original_rom_ai_pipeline.py",
+    "python -m skeleton.jeeves.game_original_rom_goal_training",
+    "python scripts/run_game_rom_acceptance_suite.py",
+    "python scripts/audit_original_gameboy_mapper_matrix.py",
+    "python scripts/audit_original_rom_instruction_divergence.py",
+    "python scripts/audit_original_gameboy_cpu_opcodes.py",
+    "python scripts/audit_original_gameboy_alu_flags.py",
+    "python scripts/audit_original_gameboy_interrupts.py",
+    "python scripts/audit_game_emulator_disc_first_boot.py",
+    "python scripts/audit_original_gameboy_bus_arbitration.py",
+    "python scripts/audit_original_gameboy_serial_port.py",
+    "python scripts/audit_rom_cross_game_comparison.py --manifest-file /private/owned-comparison.json --evidence-file /private/evidence/comparison.json --rights-acknowledged"
+  ],
+  "experimental_conditions": [
+    "passive neutral",
+    "pulse",
+    "sustained",
+    "delayed",
+    "second action",
+    "A then B",
+    "B then A",
+    "alternating action",
+    "release/recovery",
+    "single action ablation",
+    "multi-button chord",
+    "two-controller source inputs",
+    "four-controller source inputs",
+    "multi-key input"
+  ],
+  "research_controls": {
+    "physical_axes": 24,
+    "independent_repeated_trials": 2,
+    "repeat_budget_max": 5,
+    "anchored_actual_savestates_max": 8,
+    "condition_budget_max": 128,
+    "actual_native_step_budget_max": 8192,
+    "raw_native_memory_export": false,
+    "operator_declared_memory_watches_max": 8,
+    "source_trace_exact_replay_required": true,
+    "visual_novelty_is_not_game_success": true,
+    "cutscene_like_heuristics_not_cinematic_scene_labels": true,
+    "hardware_correctness_not_inferred_from_core_agreement": true
+  },
+  "curriculum": {
+    "first_runs": "mandatory ten perspectives, one each",
+    "later_runs": "source-replay-grounded UCB priority; novelty, counterfactual disagreement, revisit uncertainty, replay cost",
+    "rare_actions": "use evidence of least-observed finite control",
+    "convergence": "10 sequential runs without new coarse visual state AND Q-value motion above 1e-6; not universal proof of no further learnability",
+    "boomerang": "seeded reshuffled reparse intervals and historical reservoir",
+    "source_evidence_auditable": true
+  },
+  "cross_core": {
+    "cores_min": 2,
+    "cores_max": 4,
+    "same_content_digest_required": true,
+    "same_console_target_required": true,
+    "identical_controller_sequences": true,
+    "attempt_native_availability": false,
+    "report_diff": "per-feature absolute sensor differences, exact frame digest agreements, measured reward deltas, per-core repeat stability",
+    "support_only": "already operator-approved real libretro cores"
+  },
+  "actual_neural_optimizer": {
+    "module": "game_emulator_neural_world.py",
+    "algorithm": "deterministic two hidden layer tanh MLP, minibatch AdamW",
+    "objective": "one-step source-measured numeric telemetry delta and reward",
+    "features": "all actual available observation channels and action one hot",
+    "episode_holdout": "SHA256-seeded trace-group disjoint holdout; no validation gradients or normalization leakage",
+    "optimizer_max": {
+      "hidden_width": 64,
+      "epochs": 40,
+      "minibatch": 64,
+      "source_examples": 8192,
+      "max_compute_units": 300000000
+    },
+    "receipt_validation": "reconstitute policy+evidence SHA256 report; verify every committed episode/trace/sequence and rights assertion",
+    "optimizer_measures": [
+      "real backprop gradient evaluations",
+      "actual optimizer steps",
+      "heldout MSE vs training-mean baseline",
+      "actual finite parameter count",
+      "SHA256 candidate checkpoint"
+    ],
+    "automatic_jeeves_production_transformer_update": false,
+    "automatic_promotion": false,
+    "weights_trained_in_this_commit": false,
+    "requirement_for_success": "independent local executable run on rights-cleared real ROMs and non-degenerate heldout improvement",
+    "default_max_compute_units": 50000000,
+    "imported_checkpoint_validation": [
+      "source digests and own checksum",
+      "typed source observation/action dimensions",
+      "exact finite two-layer weight matrix lengths",
+      "finite normalization and training values",
+      "bounded width and parameter count",
+      "explicit candidate-only production flag"
+    ],
+    "minibatch_cancellation_check": true
+  },
+  "tests_added": [
+    "skeleton/testing/test_game_emulator_training_lab.py",
+    "skeleton/testing/test_game_emulator_advanced_experiments.py",
+    "skeleton/testing/test_game_emulator_neural_world.py",
+    "skeleton/testing/test_game_emulator_physical_planning.py",
+    "skeleton/testing/test_game_emulator_operator_goals.py",
+    "skeleton/testing/test_game_emulator_first_boot_audit.py",
+    "skeleton/testing/test_game_original_rom_ai_acceptance.py",
+    "skeleton/testing/test_game_original_rom_goal_training.py",
+    "skeleton/testing/test_game_rom_acceptance_suite.py",
+    "skeleton/testing/test_game_original_mapper_bus_audit.py",
+    "skeleton/testing/test_game_rom_virtual_rtc.py",
+    "skeleton/testing/test_game_rom_cpu_timer.py",
+    "skeleton/testing/test_game_rom_instruction_divergence.py",
+    "skeleton/testing/test_game_rom_dma_timing.py",
+    "skeleton/testing/test_game_original_cpu_conformance.py",
+    "skeleton/testing/test_game_original_cpu_interrupts.py",
+    "skeleton/testing/test_game_emulator_disc_first_boot.py",
+    "skeleton/testing/test_game_original_cpu_bus_arbitration.py",
+    "skeleton/testing/test_game_rom_serial_port.py",
+    "skeleton/testing/test_game_original_serial_source_acceptance.py",
+    "skeleton/testing/test_game_emulator_cross_game_lab.py",
+    "skeleton/testing/test_game_emulator_cross_game_operator.py"
+  ],
+  "tests_executed": false,
+  "limitations": [
+    "No new native core compiled or ABI-verified by this PR",
+    "No real ROM replay or profile/e2e completion proved",
+    "Original in-process DMG runtime remains experimental",
+    "Native libretro requires approved external binaries and sandbox",
+    "Source-rights assertion is not third-party independent legal clearance",
+    "No game-event semantic classifier, joystick skill mastery, audiovisual cinematic labels, realtime cross-platform debugger, production LLM weight update or capability promotion has been verified",
+    "Native audio savestate and model-based real-run comparisons still need actual approved libretro replay verification",
+    "Operator RAM hypotheses are only experimentally controlled numerical measurements, not independently established score/health/victory flags",
+    "Pure-Python neural candidate optimizer is CPU bounded and not a production multimodal/transformer weight pipeline",
+    "Experimental OAM DMA does not yet emulate DMG CPU bus lockout or exact sprite fetch contention",
+    "Source-hashed emulator runtime is already part of the ROM environment digest, but executable opcode/ALU tests and cycle-perfect PPU/CPU bus stages remain unverified",
+    "Native disc boot acceptance is a separate explicit operator command; CI only runs synthetic media tests and does not silently certify optical consoles"
+  ],
+  "operator_docs": [
+    "docs/ROM_EMULATOR_COMPLETION.md",
+    "docs/ROM_EMULATOR_TRAINING_LAB.md",
+    "docs/ROM_EMULATOR_ADVANCED_RESEARCH.md"
+  ],
+  "replay_temporal_audio": {
+    "status": "source_implemented_unexecuted",
+    "native_snapshot_additions": [
+      "audio_size",
+      "audio_sha256",
+      "audio_base64"
+    ],
+    "reason": "Restoring libretro core state and video without preceding host audio changes subsequent 12 temporal audio/motion observations; exact rewind needs native audio history",
+    "checksum": "nested SHA256 plus outer snapshot digest",
+    "episode_reset_clears_previous_audio": true,
+    "independent_hardware_execution_verified": false
+  },
+  "model_based_planning": {
+    "module": "skeleton/jeeves/game_emulator_planning_lab.py",
+    "candidate_model_sha256_required": true,
+    "holdout_predictive_gain_gate_required": true,
+    "source_environment_digest_matches_model": true,
+    "search": "finite discounted beam search over controller action sequences; speculative",
+    "source_confirmation": "compare each neural proposal to matched neutral exact-state baseline using actual emulator, repeated runs",
+    "full_rollout_required_for_positive_evidence": true,
+    "promoted_policy_or_weights": false,
+    "hardware_replay_verified": false
+  },
+  "operator_defined_goal_experiments": {
+    "module": "skeleton/jeeves/game_emulator_goal_lab.py",
+    "read_source": "real approved libretro read_memory regions 0..3",
+    "operator_hypotheses": "explicit rights/source authority, numeric little-endian 1/2/4 byte offset, threshold or bitmask, no semantic auto labels",
+    "max_goals": 8,
+    "max_interventions": 12,
+    "max_source_anchors": 4,
+    "max_source_steps": 8192,
+    "neutral_baseline": "same source snapshot and full neutral horizon as active action padded to equal length",
+    "measured_active_only_controlled_effects": true,
+    "causal_or_achievement_labels_independently_certified": false,
+    "raw_memory_exported": false
+  },
+  "native_first_boot_gate": {
+    "operator_entrypoint": "python scripts/audit_game_emulator_first_boot.py",
+    "source": "operator-approved installed native libretro core + exact lawful ROM SHA256",
+    "limits": {
+      "max_cases": 32,
+      "max_single_rom_bytes": 16777216,
+      "native_steps_per_case": 3,
+      "per_command_timeout_seconds_max": 30,
+      "content_limit_source": "skeleton.jeeves.game_emulator_catalog.MAX_CONTENT_BYTES",
+      "supported_media": "single-file cartridge ROMs up to host inline content ceiling; multi-file optical discs separately governed"
+    },
+    "sequence": [
+      "approve exact installed native core and lawful ROM hash",
+      "reset and capture actual native framebuffer",
+      "step idle and serialize native core plus host temporal audio",
+      "step button a then serialize native state",
+      "restore idle savestate, replay a and compare observation/reward and native transition SHA",
+      "compare exact after-replay savestate including bound raw audio history",
+      "per-core source failure does not become success"
+    ],
+    "failure_policy": "all cores must independently pass; any failed case yields exit status 2 and failed receipt",
+    "hardware_accuracy_certified": false,
+    "first_boot_sessions_executed_in_this_pr": 0
+  },
+  "original_rom_end_to_end_acceptance": {
+    "operator_entrypoint": "python scripts/accept_original_rom_ai_pipeline.py",
+    "scope": "original locally generated Game Boy ROM CPU emulator only, no external native core",
+    "source": "build_original_dmg_game exact original bytes and SHA256",
+    "stages": [
+      "source-authored ROM generator",
+      "experimental LR35902 interpreter boot and true steps",
+      "reverse source snapshot replay proofs",
+      "real source Q updates",
+      "original transition-specific dataset digests",
+      "disjoint episode holdout",
+      "bounded real AdamW numeric gradient updates",
+      "heldout baseline gain acceptance verdict"
+    ],
+    "private_outputs": [
+      "original-training.gb",
+      "rom-policy.json",
+      "rom-source-evidence.json",
+      "neural-world-candidate.json",
+      "neural-world-measurements.json",
+      "acceptance.json"
+    ],
+    "boundaries": {
+      "max_source_runs": 32,
+      "max_episode_steps": 32,
+      "max_neural_epochs": 16,
+      "max_neural_width": 32,
+      "create_only_private_directory": true,
+      "real_libretro_cores_proven": 0,
+      "production_transformer_weights_changed": false
+    },
+    "proof": "Only after source Q and neural measurements validate; nonzero exit when heldout gain not shown",
+    "execution_verified_during_this_pr": false
+  },
+  "original_source_grounded_game_goal": {
+    "source_module": "skeleton/jeeves/game_original_rom_goal_training.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_original_rom_goal_training.py",
+    "operator_entrypoint": "python -m skeleton.jeeves.game_original_rom_goal_training",
+    "game": "generated original deterministic Game Boy maze only",
+    "author_declared_registers": {
+      "player_x": "0xC000",
+      "player_y": "0xC001",
+      "score": "0xC002",
+      "completion": "0xC004"
+    },
+    "source_grounding": "CPU writes VRAM maze, actual CPU-read positions/score/completion under controller actions, exact independent rewind/replay",
+    "baseline": "Same starting savestate and equal number of idle emulated frames",
+    "learning": "separate tabular Q-policy offline trained on actually measured tile movement/one-time completion gain",
+    "forbidden_claims": [
+      "unrelated ROM gameplay semantics",
+      "independent commercial license verification",
+      "generalization to unknown games",
+      "physical Game Boy compatibility",
+      "automatic Jeeves production promotion"
+    ],
+    "real_executable_proof_established": false
+  },
+  "mbc2_emulation": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "cartridge_type_ids": [
+      "0x05",
+      "0x06"
+    ],
+    "mode": "actual bounded GameBoyMachine interpreter bus",
+    "max_rom_bytes": 262144,
+    "ram": "512 internal half-byte registers, upper nibble reads high",
+    "bank_control": "A8-qualified separate RAM enable and 4-bit ROM bank selection, zero aliases one",
+    "snapshot": "full source CPU, memory, framebuffer and internal nibbles with verified reload",
+    "synthetic_tests": "skeleton/testing/test_game_rom_mapper_expansion.py",
+    "hardware_accuracy_independently_verified": false,
+    "real_executable_rom_tests_during_this_turn": 0
+  },
+  "original_mapper_bus_matrix": {
+    "entrypoint": "python scripts/audit_original_gameboy_mapper_matrix.py",
+    "actual_source_banks": [
+      "rom_only",
+      "mbc1_large",
+      "mbc1_ram",
+      "mbc2",
+      "mbc3",
+      "mbc3_timer_only",
+      "mbc3_timer_ram",
+      "mbc5"
+    ],
+    "source": "synthetic owned cartridge headers with bank markers, never third-party ROM media",
+    "checks": [
+      "source cartridge SHA",
+      "RAM enable and bank-select decode",
+      "high ROM bank address bits",
+      "A8 control gate",
+      "independent RAM banks and MBC2 nibble mirror",
+      "exact CPU/memory/raster snapshot restore"
+    ],
+    "integration": "scripts/run_game_rom_acceptance_suite.py",
+    "first_execution_confirmed": false,
+    "hardware_accuracy_certified": false,
+    "hardware_mapper_families": 5,
+    "independent_cartridge_geometry_profiles": 8,
+    "mbc1_wiring_gate": "1-2MiB source ROM only with <=8KiB SRAM; four SRAM banks only with <=512KiB ROM"
+  },
+  "manual_acceptance_runner": {
+    "entrypoint": "python scripts/run_game_rom_acceptance_suite.py",
+    "readiness": "operator-only, source implementation committed but not yet run",
+    "phases": [
+      "11 real source IRQ/IME/HALT/RETI/STOP source replay scenarios with 22 verified repetitions",
+      "64 conditional SM83 flag-controlled jump/call/return source experiments with actual PC/SP outcomes",
+      "500 actual synthetically authored legal CPU opcode variants against pinned CC0 gbdev reference timing; 11 invalid opcodes refused",
+      "5184 actual CPU ALU flag cases against independent mathematical reference",
+      "actual original-ROM CPU instruction input divergence traces, independent save/replay and per-sample SHA256",
+      "focused synthetic and original ROM regressions",
+      "five mapper source bus audit",
+      "generated original ROM Q and neural candidate evidence",
+      "source-authored original goal-conditioned Q",
+      "artifact content integrity and report custody validation",
+      "real source OAM DMA clocked-byte/scanline test with mid-transfer rewind custody",
+      "seven bounded repeated original-ROM CPU controller branches, including three multi-action temporal schedules with exact physical source input ledger",
+      "21 CPU-access isolation checks across HRAM, OAM DMA, VRAM/OAM PPU modes and same-source savestate",
+      "original CPU instruction-driven FF01/FF02 serial 8192Hz internal/external clock source replay and IF interrupt",
+      "real original source multiple-ROM replay and pairwise controlled comparison with adversarially rehashed report rejection"
+    ],
+    "failure": "nonzero subprocess and phase_*.json status, absence of suite-acceptance.json",
+    "production_model_promotion": false,
+    "native_libretro_core_tested": false,
+    "manual_only_workflow": ".github/workflows/on-demand-rom-ai-acceptance.yml",
+    "workflow_triggers": [
+      "workflow_dispatch"
+    ],
+    "normal_push_pr_merge_ci_runs_added": 0
+  },
+  "mbc1_geometry_correction": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "standard_wiring": true,
+    "large_rom_mbc1m_variants_supported": false,
+    "validation": "fail closed on size_code>=5 with >8192 bytes RAM",
+    "source": "https://gbdev.io/pandocs/MBC1.html",
+    "independent_acceptance_executed": false
+  },
+  "mbc3_virtual_rtc": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "cartridges": [
+      "0x0F timer-only",
+      "0x10 timer with RAM"
+    ],
+    "clock_source": "emulated CPU cycles only, 4,194,304 cycles/second",
+    "registers": "selected A000 RTC 0x08-0x0C, latched by 0-to-1 write at 6000",
+    "halt_and_carry": true,
+    "source_snapshot": "schema 2 RTC-equipped only with live, latched, previous latch bit and fractional cycle accumulator",
+    "battery_backed_wall_clock": false,
+    "standby_time_catchup": false,
+    "hardware_accuracy_verified": false,
+    "test": "skeleton/testing/test_game_rom_virtual_rtc.py",
+    "reference": "https://gbdev.io/pandocs/MBC3.html"
+  },
+  "gameboy_cpu_timer_engine": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "implementation": "actual DMG timer falling edges from selected DIV bit; checked TIMA four T-cycle pending overflow reload and IF request; DIV/TAC write-triggered falling edges; explicit TIMA cancellation during pending interval",
+    "divider_bits": {
+      "tac_00": 9,
+      "tac_01": 3,
+      "tac_10": 5,
+      "tac_11": 7
+    },
+    "overflow_pending_cycles": 4,
+    "source_snapshot": "checked timer_reload_delay persisted in CPU register source state, including pending phase",
+    "stop_halt": "STOP resets DIV and freezes time-driven registers until a controller event; HALT keeps the oscillator active",
+    "known_limitations": [
+      "CPU memory writes are still handled at instruction-level rather than true mid-instruction bus phases",
+      "same-cycle timer reload TMA collision not cycle-accurate",
+      "CGB speed switch, audio divider events and full DMA blocking unavailable",
+      "scheduler cycles during STOP represent budget consumed, not clock oscillator time"
+    ],
+    "spec_reference": "https://gbdev.io/pandocs/Timer_and_Divider_Registers.html",
+    "focused_test": "skeleton/testing/test_game_rom_cpu_timer.py",
+    "real_local_execution_verified": false
+  },
+  "original_rom_cpu_microtrace": {
+    "owner": "skeleton/jeeves/game_rom_instruction_divergence.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_instruction_divergence.py",
+    "operator_entrypoint": "python scripts/audit_original_rom_instruction_divergence.py",
+    "source": "only locally generated original homebrew ROM, real GameBoyMachine instructions",
+    "controls": [
+      "idle",
+      "up",
+      "down",
+      "left",
+      "right",
+      "a",
+      "b",
+      "start",
+      "select",
+      "a_right"
+    ],
+    "audited_domains": [
+      "CPU registers/PC/opcode/IME",
+      "divider/TIMA/TMA/TAC/IF/IE/pending overflow",
+      "cartridge ROM/RAM bank and RTC control",
+      "SHA256 of actual RAM, VRAM, IO, OAM, cartridge SRAM and framebuffer",
+      "original authorship declared game score, position and completion registers",
+      "in-flight sprite OAM DMA source page, copy progress, 4T byte phase and timing provenance"
+    ],
+    "acceptance": "same exact pre-branch CPU state, independently execute and replay every input branch; reject run if full digests differ; per-sample digests independently checked",
+    "limits": {
+      "max_instructions_per_branch": 16384,
+      "max_samples": 1024,
+      "max_branches": 8,
+      "max_branch_cycles": 524288,
+      "max_report_bytes": 8388608
+    },
+    "source_ci": "manual-only original ROM acceptance orchestrator",
+    "tests": "skeleton/testing/test_game_rom_instruction_divergence.py",
+    "no_automatic_model_promotion": true,
+    "actual_instruction_runs_executed_during_authoring": 0,
+    "temporal_input_experiments": {
+      "operator_command": "python scripts/audit_original_rom_instruction_divergence.py --sequence a,idle,right --sequence right,a --sequence a_right,idle",
+      "source_controls": [
+        "idle",
+        "a",
+        "right",
+        "a_right",
+        "a->idle->right",
+        "right->a",
+        "a_right->idle"
+      ],
+      "replay": "All seven physical CPU source branches independently replay exact input-phase instructions and final machine-state SHA",
+      "maximum_controller_branches": 8,
+      "maximum_phases_per_branch": 8,
+      "time_basis": "actual instruction ordinals; each opcode has variable emulated cycles",
+      "phase_ledger_integrity": "recheck every source phase identity and floor(index*instruction_count/phase_count) before accepting source evidence",
+      "learning_production_weight_updates": 0,
+      "test": "skeleton/testing/test_game_rom_instruction_divergence.py",
+      "execution_verified": false
+    }
+  },
+  "original_dmg_oam_dma": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "status": "source_implemented_not_hardware_or_exec_verified",
+    "engine": "actual 160-byte sprite DMA copied on T-cycles, not immediate FF46 memcpy",
+    "source_address": "FF46 upper byte 0x00-0xDF, bounded original ROM/WRAM page",
+    "transfer_timing": "four T-cycle startup plus one byte every four subsequent T-cycles, 160-byte total",
+    "controller_restart": "new FF46 write resets DMA startup/source/progress, can restart in-flight source",
+    "source_read_timing": "read from cartridge/WRAM on each real transfer tick, not at register write",
+    "visual_observation": "DIV timer, OAM DMA and PPU advance in source T-cycle order, and STAT edges are observed per T-cycle",
+    "source_savestate": "dma_active, dma_source, dma_index, dma_tcycles, dma_startup all restored with source CPU/memory/raster evidence",
+    "on_stop": "remains frozen until controller wakes source CPU",
+    "test": "skeleton/testing/test_game_rom_dma_timing.py (includes intermediate raster OAM index captures)",
+    "unsupported_hardware": [
+      "CPU bus access restriction to HRAM while DMA active",
+      "cycle-accurate OAM PPU fetch conflicts",
+      "DMG source pages E0-FF and arbitrary floating-bus modes",
+      "CGB DMA/HDMA/GDMA",
+      "true sound/PPU cycle exactness"
+    ],
+    "producer_source_grounding": "skeleton/jeeves/game_rom_instruction_divergence.py captures real DMA source, byte index/phase and SHA256 of actual sprite OAM",
+    "reference": "https://gbdev.io/pandocs/OAM_DMA_Transfer.html",
+    "source_tests_executed": false
+  },
+  "sm83_independent_opcode_conformance": {
+    "source": "https://github.com/gbdev/gb-opcodes",
+    "source_commit": "376f61c86fdac2048f7ce5fe838ae756b306017e",
+    "source_license": "CC0-1.0",
+    "vendored_reference": "machine/gbdev_sm83_opcode_reference.json",
+    "operator_commands": [
+      "python scripts/audit_original_gameboy_cpu_opcodes.py --evidence-file /private/source-cpu-opcode-proof.json",
+      "python scripts/audit_original_gameboy_alu_flags.py --evidence-file /private/source-cpu-arithmetic-proof.json"
+    ],
+    "evidence": "500 legal SM83 base-and-CB combinations executed from owned synthetic ROM cartridges, each independently replayed and compared to pinned upstream T-cycle reference",
+    "opcode_counts": {
+      "legal_base_including_prefix_dispatch": 245,
+      "nonprefixed_base_instructions_executed": 244,
+      "cb_subopcodes_executed": 256,
+      "invalid_base_denied": 11,
+      "conditional_opcodes": 16,
+      "conditional_zc_flag_combinations": 4,
+      "conditional_source_branches_executed": 64,
+      "conditional_taken_cases": 32,
+      "legal_single_step_instructions_and_replays": 1128,
+      "individual_reference_timing_comparisons": 564
+    },
+    "arithmetic": {
+      "real_flag_reference_cases": 5184,
+      "operations": [
+        "ADD",
+        "ADC",
+        "SUB",
+        "SBC",
+        "AND",
+        "XOR",
+        "OR",
+        "CP"
+      ],
+      "unique_boundary_bytes": 18,
+      "independent_expected_flags": [
+        "Z",
+        "N",
+        "H",
+        "C"
+      ]
+    },
+    "evidence_gate": "scripts/run_game_rom_acceptance_suite.py blocks verified neural candidate if opcode or independent ALU source proofs missing or inconsistent",
+    "test": "skeleton/testing/test_game_original_cpu_conformance.py",
+    "current_execution_verified": false,
+    "hardware_cycle_accuracy_certified": false,
+    "production_model_promotion": false,
+    "conditional_branch_model": {
+      "tested_groups": [
+        "JR NZ/Z/NC/C",
+        "JP NZ/Z/NC/C",
+        "CALL NZ/Z/NC/C",
+        "RET NZ/Z/NC/C"
+      ],
+      "physical_controls": [
+        "flags 0x00",
+        "flags 0x10",
+        "flags 0x80",
+        "flags 0x90"
+      ],
+      "source_conditions": "independently expected PC/SP after executing original ROM opcode with actual flags, conditional taken versus not taken and restored replay",
+      "pending_execution_verification": true
+    }
+  },
+  "sm83_interrupt_control_oracle": {
+    "source": "scripts/audit_original_gameboy_interrupts.py",
+    "regression": "skeleton/testing/test_game_original_cpu_interrupts.py",
+    "source_media": "synthetic authored cartridge instructions only",
+    "real_engine": "skeleton.jeeves.game_rom_runtime.GameBoyMachine",
+    "scenarios": [
+      "IRQ0 VBlank priority vector 0x40",
+      "IRQ1 LCD STAT priority vector 0x48",
+      "IRQ2 TIMA priority vector 0x50",
+      "IRQ3 serial priority vector 0x58",
+      "IRQ4 joypad priority vector 0x60",
+      "EI enables only after next instruction",
+      "DI cancels pending EI",
+      "HALT bug repeats opcode byte",
+      "HALT wakes and services pending IRQ",
+      "RETI stack and immediate IME",
+      "STOP frozen until joypad edge"
+    ],
+    "replay_pairs": 22,
+    "scenarios_count": 11,
+    "source_acceptance": "scripts/run_game_rom_acceptance_suite.py",
+    "mid_instruction_bus_timing_certified": false,
+    "real_executions_verified_during_this_authoring_pass": 0,
+    "production_neural_weights_updated": 0
+  },
+  "native_disc_first_boot_gate": {
+    "operator_entrypoint": "python scripts/audit_game_emulator_disc_first_boot.py",
+    "scope": "Approved real libretro cores loading operator-owned multi-file optical/playlist media, not synthetic game simulator",
+    "media": [
+      "CUE/BIN",
+      "GDI",
+      "M3U",
+      "CHD",
+      "ISO",
+      "other extensions accepted by governed native content bundle"
+    ],
+    "source": "explicit absolute local paths/size/SHA256 and current-rights GameContentReference streaming",
+    "bounds": {
+      "max_cases": 8,
+      "max_files_per_case": 16,
+      "max_case_aggregate_bytes": 4294967296,
+      "max_prefix_bytes_per_file": 65536,
+      "one_pass_streamed_hash_check": true,
+      "exact_manifest_bounds_apply_to_programmatic_calls": true
+    },
+    "source_integrity": [
+      "preflight regular non-symlink source file metadata",
+      "digest-verified source descriptor",
+      "file SHA256 and size checked during actual bounded read",
+      "existing GameContentBundle descriptor dependency validator",
+      "streaming to private host-owned sandbox content root",
+      "core and firmware approval from exact registry"
+    ],
+    "real_native_acceptance": [
+      "real libretro frame",
+      "actual idle and A native source inputs",
+      "opaque savestate restore",
+      "identical observation reward transition and final saved state"
+    ],
+    "source_code": "scripts/audit_game_emulator_disc_first_boot.py",
+    "regression_source": "skeleton/testing/test_game_emulator_disc_first_boot.py",
+    "native_disc_boots_executed": 0,
+    "bios_or_disc_image_distributed": false,
+    "hardware_accuracy_certified": false
+  },
+  "dmg_cpu_bus_arbitration": {
+    "canonical_source": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "source_operator": "python scripts/audit_original_gameboy_bus_arbitration.py --evidence-file /private/research/original-cpu-bus.json",
+    "real_machine_behavior": [
+      "DMG DMA locks CPU to HRAM FF80-FFFE",
+      "CPU external data reads treated as high open bus and writes ignored during DMA",
+      "opcode fetch and IRQ service from unmodeled DMA-inaccessible buses fail closed",
+      "internal source DMA and PPU access same underlying RAM independently of CPU bus restriction",
+      "CPU VRAM blocked during source Mode3 and OAM blocked during source Mode2/Mode3",
+      "LCDC off removes video DMA-independent bus restriction",
+      "transient CPU bus context never serialized or leaked on invalid instruction"
+    ],
+    "original_source_checks": 21,
+    "separate_source_regression": "skeleton/testing/test_game_original_cpu_bus_arbitration.py",
+    "existing_raster_regressions": "skeleton/testing/test_game_rom_dma_timing.py",
+    "manual_AI_acceptance_gate": "scripts/run_game_rom_acceptance_suite.py",
+    "source_reference_urls": [
+      "https://gbdev.io/pandocs/OAM_DMA_Transfer.html",
+      "https://gbdev.io/pandocs/Accessing_VRAM_and_OAM.html"
+    ],
+    "physical_accuracy_limitations": [
+      "PPU Mode3 fixed-duration approximation, no sprite pixel-fetch contention",
+      "DMG bus floating value approximate; exact electrical bus-value protocol not certified",
+      "CPU IRQ service while DMA remains unsupported and fails closed",
+      "CGB cross-bus timing and full OAM blocking not implemented"
+    ],
+    "actual_acceptance_executed_during_authoring": false,
+    "production_weights_updated": 0
+  },
+  "dmg_serial_source_clock": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "operator": "python scripts/audit_original_gameboy_serial_port.py",
+    "actual_cpu_source": "original homebrew cartridge CPU executes writes to SB FF01 and SC FF02",
+    "internal_clock_hz": 8192,
+    "cpu_tcycles_per_bit": 512,
+    "bits_per_byte": 8,
+    "hardware_cycles_per_complete_byte": 4096,
+    "peer": "none, input line idles high; disconnected transfer receives FF",
+    "external_clock": "pending without invented serial edges or interrupt",
+    "source_irq": "request IF serial bit3 once on real internal byte completion",
+    "snapshot": "serial_active, serial_bits, serial_phase, raw SB/SC/IF state",
+    "stop_halt": "STOP freezes internal serial oscillator; HALT continues it",
+    "source_instruction_microtraces": "serial SB/SC, real bit progress, IF and source-register clock phases",
+    "source_regressions": [
+      "skeleton/testing/test_game_rom_serial_port.py",
+      "skeleton/testing/test_game_original_serial_source_acceptance.py"
+    ],
+    "manual_acceptance": "scripts/run_game_rom_acceptance_suite.py requires two actual source CPU program and exact snapshot replay receipts",
+    "interconsole_link_peer_implemented": false,
+    "CGB_high_speed_serial_implemented": false,
+    "actual_local_execution_during_authoring": false,
+    "production_model_weights_updated": 0
+  },
+  "native_core_manual_build_pipeline": {
+    "workflow": ".github/workflows/on-demand-libretro-core-build.yml",
+    "trigger": "workflow_dispatch only, absolutely no push/PR/schedule/merge trigger",
+    "exact_core_choices": [
+      "sameboy",
+      "nestopia",
+      "mesen",
+      "snes9x2010",
+      "mednafen_saturn"
+    ],
+    "upstream_pinned_recipes": "scripts/install_game_emulator_cores.py",
+    "execution": "GitHub Actions ubuntu-24.04 single serial source clone and native build, inspected libretro ELF",
+    "max_parallel_builds_per_ref": 1,
+    "max_job_minutes": 45,
+    "max_recipe_seconds": 1800,
+    "operator_receipt": "source-build-receipt.json",
+    "short_retention_days": 3,
+    "approval_gate": "native build registry must explicitly distinguish approved vs firmware_missing/candidate",
+    "first_boot_required_after_build": true,
+    "firmware_or_ROM_downloaded": false,
+    "build_artifact_attached_for_distribution": false,
+    "normal_CI_runs_added": 0,
+    "production_weights_updated": 0,
+    "actual_workflow_runs_confirmed": 0,
+    "draft_PR_has_not_merged": true
+  },
+  "cross_emulator_controlled_comparison": {
+    "canonical_source": "skeleton/jeeves/game_emulator_cross_game_lab.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_emulator_cross_game_lab.py",
+    "operator_entrypoint": "scripts/audit_rom_cross_game_comparison.py",
+    "private_manifest_schema": "skeleton.game.operator_cross_emulator_source_manifest.v1",
+    "report_schema": "skeleton.game.cross_emulator_controlled_observation.v1",
+    "admitted_execution": [
+      "original owned single-ROM DMG execution through actual GameBoyROMEnvironment",
+      "approved real libretro core through GameEnvironmentRequest native sandbox"
+    ],
+    "game_library_min": 2,
+    "game_library_max": 30,
+    "game_wave_selection_size": 10,
+    "simultaneous_native_core_processes": 1,
+    "max_controlled_programs_per_game": 6,
+    "max_actions_per_program": 8,
+    "max_cumulative_actions_per_game": 32,
+    "maximum_pairwise_projections_per_study": 435,
+    "required_control": "idle passive first",
+    "actual_source_evidence": [
+      "exact environment/request source digest",
+      "per-program save-state start and end SHA256",
+      "actual frame SHA256 and observed frame-change rate",
+      "measured rewards scoped strictly to each game",
+      "independently repeated input sequences and identical source state",
+      "per-step measured source projection SHA",
+      "exact independent report and pairwise comparison re-verification",
+      "bounded numeric source_observation and source_next_observation per real action, with game-local reward components",
+      "source numeric examples committed by independent per-transition and candidate corpus SHA256",
+      "source visual-change flags verified against actual successive native or original frame digests"
+    ],
+    "cannot_claim": [
+      "equal game reward scale between consoles",
+      "pixel identity across systems and resolutions",
+      "game causation or game-victory when only frame changes observed",
+      "model weight or gradient updates",
+      "ten concurrently executing libretro cores",
+      "native ROM boots when installed/approved cores and media are absent"
+    ],
+    "max_inline_operator_ROM_bytes": 2097152,
+    "large_disc_route": "scripts/audit_game_emulator_disc_first_boot.py",
+    "source_integrity": "explicit local rights, size/SHA256, safe absolute source paths, and same exact validation in CLI and programmatic calls",
+    "focused_tests": [
+      "skeleton/testing/test_game_emulator_cross_game_lab.py",
+      "skeleton/testing/test_game_emulator_cross_game_operator.py"
+    ],
+    "manual_acceptance_runner": "scripts/run_game_rom_acceptance_suite.py",
+    "actual_operator_study_executed_during_authoring": false,
+    "actual_native_emulator_studies_verified": 0,
+    "production_neural_optimizer_steps": 0,
+    "private_native_savestate_hash_limit_bytes": 67108864,
+    "published_report_limit_bytes": 2097152,
+    "training_candidate": {
+      "actual_numeric_source_rows": "game count times sum of controlled program action lengths; one first-execution source row per step",
+      "candidate_digest": "candidate_numeric_dataset_sha256 binds game/environment identity, controller program, step and original numeric source transition",
+      "per_game_observation_and_reward_bounded": true,
+      "cross_game_feature_alignment_inferred": false,
+      "neural_gradient_steps_executed": 0,
+      "production_weight_promotion_authorized": false
+    }
+  }
+}

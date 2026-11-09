@@ -1,0 +1,1619 @@
+{
+  "schema_version": "skeleton.ai_game_builder_levels_shard.v1",
+  "manifest": "machine/ai_game_builder_500_levels.json",
+  "start": 126,
+  "end": 150,
+  "count": 25,
+  "levels": [
+    {
+      "id": "GBL-126",
+      "ordinal": 126,
+      "family_id": "GB13",
+      "family": "Level Design & Spatial Flow",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Design spaces for navigation, landmarks, encounter rhythm, sightlines, loops, secrets, accessibility and player guidance.",
+      "owner": "skeleton/jeeves/game_engine_navigation.py",
+      "batches": [
+        "B044",
+        "B050"
+      ],
+      "metrics": [
+        "navigation clarity",
+        "flow quality",
+        "spatial variety",
+        "softlock absence"
+      ],
+      "requirements": [
+        "Add deterministic validation and replayable generation/traversal/playtest evidence.",
+        "Attack navigation trap, visual ambiguity, empty traversal, sequence break.",
+        "Persist minimized counterexamples."
+      ],
+      "adversarial": [
+        "navigation trap",
+        "visual ambiguity",
+        "empty traversal",
+        "sequence break",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-126 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-127",
+      "ordinal": 127,
+      "family_id": "GB13",
+      "family": "Level Design & Spatial Flow",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Design spaces for navigation, landmarks, encounter rhythm, sightlines, loops, secrets, accessibility and player guidance.",
+      "owner": "skeleton/jeeves/game_engine_navigation.py",
+      "batches": [
+        "B044",
+        "B050"
+      ],
+      "metrics": [
+        "navigation clarity",
+        "flow quality",
+        "spatial variety",
+        "softlock absence"
+      ],
+      "requirements": [
+        "Improve navigation clarity, flow quality, spatial variety, softlock absence plus originality, player value, accessibility, performance and maintainability together.",
+        "Reject vanity-metric wins.",
+        "Keep champion if no Pareto-safe gain."
+      ],
+      "adversarial": [
+        "navigation trap",
+        "visual ambiguity",
+        "empty traversal",
+        "sequence break",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-127 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-128",
+      "ordinal": 128,
+      "family_id": "GB13",
+      "family": "Level Design & Spatial Flow",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Design spaces for navigation, landmarks, encounter rhythm, sightlines, loops, secrets, accessibility and player guidance.",
+      "owner": "skeleton/jeeves/game_engine_navigation.py",
+      "batches": [
+        "B044",
+        "B050"
+      ],
+      "metrics": [
+        "navigation clarity",
+        "flow quality",
+        "spatial variety",
+        "softlock absence"
+      ],
+      "requirements": [
+        "Support semantic diff, reversible edits, migration and checkpoint recovery.",
+        "Resume exact canon/rival/evaluator/artifact identity.",
+        "Prevent orphan generated content."
+      ],
+      "adversarial": [
+        "navigation trap",
+        "visual ambiguity",
+        "empty traversal",
+        "sequence break",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-128 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-129",
+      "ordinal": 129,
+      "family_id": "GB13",
+      "family": "Level Design & Spatial Flow",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Design spaces for navigation, landmarks, encounter rhythm, sightlines, loops, secrets, accessibility and player guidance.",
+      "owner": "skeleton/jeeves/game_engine_navigation.py",
+      "batches": [
+        "B044",
+        "B050"
+      ],
+      "metrics": [
+        "navigation clarity",
+        "flow quality",
+        "spatial variety",
+        "softlock absence"
+      ],
+      "requirements": [
+        "Execute 100/1000/10000 rounds with exactly three stages and no wall-clock deadline.",
+        "Prove bounded resources and checkpoint fidelity.",
+        "Detect repetition, context erosion, branch explosion and evaluator overfit."
+      ],
+      "adversarial": [
+        "navigation trap",
+        "visual ambiguity",
+        "empty traversal",
+        "sequence break",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-129 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-130",
+      "ordinal": 130,
+      "family_id": "GB13",
+      "family": "Level Design & Spatial Flow",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Design spaces for navigation, landmarks, encounter rhythm, sightlines, loops, secrets, accessibility and player guidance.",
+      "owner": "skeleton/jeeves/game_engine_navigation.py",
+      "batches": [
+        "B044",
+        "B050"
+      ],
+      "metrics": [
+        "navigation clarity",
+        "flow quality",
+        "spatial variety",
+        "softlock absence"
+      ],
+      "requirements": [
+        "Require independent exact-head evidence for promotion.",
+        "Block unresolved rights/similarity/continuity/state failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "navigation trap",
+        "visual ambiguity",
+        "empty traversal",
+        "sequence break",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-130 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-131",
+      "ordinal": 131,
+      "family_id": "GB14",
+      "family": "Procedural Generation",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Generate constrained, editable, seed-replayable layouts, worlds, encounters and content with measurable diversity and validity.",
+      "owner": "skeleton/ai/forge/world.py",
+      "batches": [
+        "B042",
+        "B043",
+        "B050"
+      ],
+      "metrics": [
+        "validity",
+        "diversity",
+        "seed determinism",
+        "constraint satisfaction"
+      ],
+      "requirements": [
+        "Specify Procedural Generation: Generate constrained, editable, seed-replayable layouts, worlds, encounters and content with measurable diversity and validity.",
+        "Declare domain inputs/outputs/invariants/anti-goals and acceptance tests.",
+        "Bind skeleton/ai/forge/world.py and B042, B043, B050."
+      ],
+      "adversarial": [
+        "unreachable generation",
+        "seed nondeterminism",
+        "mode collapse",
+        "constraint conflict",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-131 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-132",
+      "ordinal": 132,
+      "family_id": "GB14",
+      "family": "Procedural Generation",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Generate constrained, editable, seed-replayable layouts, worlds, encounters and content with measurable diversity and validity.",
+      "owner": "skeleton/ai/forge/world.py",
+      "batches": [
+        "B042",
+        "B043",
+        "B050"
+      ],
+      "metrics": [
+        "validity",
+        "diversity",
+        "seed determinism",
+        "constraint satisfaction"
+      ],
+      "requirements": [
+        "Define typed identity, state, provenance and parent-context representation.",
+        "Preserve deterministic serialization and canon links.",
+        "Define compatibility and unknown states."
+      ],
+      "adversarial": [
+        "unreachable generation",
+        "seed nondeterminism",
+        "mode collapse",
+        "constraint conflict",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-132 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-133",
+      "ordinal": 133,
+      "family_id": "GB14",
+      "family": "Procedural Generation",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Generate constrained, editable, seed-replayable layouts, worlds, encounters and content with measurable diversity and validity.",
+      "owner": "skeleton/ai/forge/world.py",
+      "batches": [
+        "B042",
+        "B043",
+        "B050"
+      ],
+      "metrics": [
+        "validity",
+        "diversity",
+        "seed determinism",
+        "constraint satisfaction"
+      ],
+      "requirements": [
+        "Create/edit only from ProjectDNA, canon, champion and rights-classified evidence.",
+        "Record transformations and source lineage.",
+        "Keep rollback-safe mutations and reference behavior."
+      ],
+      "adversarial": [
+        "unreachable generation",
+        "seed nondeterminism",
+        "mode collapse",
+        "constraint conflict",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-133 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-134",
+      "ordinal": 134,
+      "family_id": "GB14",
+      "family": "Procedural Generation",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Generate constrained, editable, seed-replayable layouts, worlds, encounters and content with measurable diversity and validity.",
+      "owner": "skeleton/ai/forge/world.py",
+      "batches": [
+        "B042",
+        "B043",
+        "B050"
+      ],
+      "metrics": [
+        "validity",
+        "diversity",
+        "seed determinism",
+        "constraint satisfaction"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate rival roles.",
+        "Challenger must produce a better artifact plus attack ledger.",
+        "Deterministic gates decide promotion."
+      ],
+      "adversarial": [
+        "unreachable generation",
+        "seed nondeterminism",
+        "mode collapse",
+        "constraint conflict",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-134 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-135",
+      "ordinal": 135,
+      "family_id": "GB14",
+      "family": "Procedural Generation",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Generate constrained, editable, seed-replayable layouts, worlds, encounters and content with measurable diversity and validity.",
+      "owner": "skeleton/ai/forge/world.py",
+      "batches": [
+        "B042",
+        "B043",
+        "B050"
+      ],
+      "metrics": [
+        "validity",
+        "diversity",
+        "seed determinism",
+        "constraint satisfaction"
+      ],
+      "requirements": [
+        "Check spatial/narrative/systemic continuity against world state, quests, mechanics, visual/audio language and project pillars.",
+        "Propagate coupled consequences.",
+        "Block accidental contradiction."
+      ],
+      "adversarial": [
+        "unreachable generation",
+        "seed nondeterminism",
+        "mode collapse",
+        "constraint conflict",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-135 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-136",
+      "ordinal": 136,
+      "family_id": "GB14",
+      "family": "Procedural Generation",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Generate constrained, editable, seed-replayable layouts, worlds, encounters and content with measurable diversity and validity.",
+      "owner": "skeleton/ai/forge/world.py",
+      "batches": [
+        "B042",
+        "B043",
+        "B050"
+      ],
+      "metrics": [
+        "validity",
+        "diversity",
+        "seed determinism",
+        "constraint satisfaction"
+      ],
+      "requirements": [
+        "Add deterministic validation and replayable generation/traversal/playtest evidence.",
+        "Attack unreachable generation, seed nondeterminism, mode collapse, constraint conflict.",
+        "Persist minimized counterexamples."
+      ],
+      "adversarial": [
+        "unreachable generation",
+        "seed nondeterminism",
+        "mode collapse",
+        "constraint conflict",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-136 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-137",
+      "ordinal": 137,
+      "family_id": "GB14",
+      "family": "Procedural Generation",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Generate constrained, editable, seed-replayable layouts, worlds, encounters and content with measurable diversity and validity.",
+      "owner": "skeleton/ai/forge/world.py",
+      "batches": [
+        "B042",
+        "B043",
+        "B050"
+      ],
+      "metrics": [
+        "validity",
+        "diversity",
+        "seed determinism",
+        "constraint satisfaction"
+      ],
+      "requirements": [
+        "Improve validity, diversity, seed determinism, constraint satisfaction plus originality, player value, accessibility, performance and maintainability together.",
+        "Reject vanity-metric wins.",
+        "Keep champion if no Pareto-safe gain."
+      ],
+      "adversarial": [
+        "unreachable generation",
+        "seed nondeterminism",
+        "mode collapse",
+        "constraint conflict",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-137 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-138",
+      "ordinal": 138,
+      "family_id": "GB14",
+      "family": "Procedural Generation",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Generate constrained, editable, seed-replayable layouts, worlds, encounters and content with measurable diversity and validity.",
+      "owner": "skeleton/ai/forge/world.py",
+      "batches": [
+        "B042",
+        "B043",
+        "B050"
+      ],
+      "metrics": [
+        "validity",
+        "diversity",
+        "seed determinism",
+        "constraint satisfaction"
+      ],
+      "requirements": [
+        "Support semantic diff, reversible edits, migration and checkpoint recovery.",
+        "Resume exact canon/rival/evaluator/artifact identity.",
+        "Prevent orphan generated content."
+      ],
+      "adversarial": [
+        "unreachable generation",
+        "seed nondeterminism",
+        "mode collapse",
+        "constraint conflict",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-138 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-139",
+      "ordinal": 139,
+      "family_id": "GB14",
+      "family": "Procedural Generation",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Generate constrained, editable, seed-replayable layouts, worlds, encounters and content with measurable diversity and validity.",
+      "owner": "skeleton/ai/forge/world.py",
+      "batches": [
+        "B042",
+        "B043",
+        "B050"
+      ],
+      "metrics": [
+        "validity",
+        "diversity",
+        "seed determinism",
+        "constraint satisfaction"
+      ],
+      "requirements": [
+        "Execute 100/1000/10000 rounds with exactly three stages and no wall-clock deadline.",
+        "Prove bounded resources and checkpoint fidelity.",
+        "Detect repetition, context erosion, branch explosion and evaluator overfit."
+      ],
+      "adversarial": [
+        "unreachable generation",
+        "seed nondeterminism",
+        "mode collapse",
+        "constraint conflict",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-139 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-140",
+      "ordinal": 140,
+      "family_id": "GB14",
+      "family": "Procedural Generation",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Generate constrained, editable, seed-replayable layouts, worlds, encounters and content with measurable diversity and validity.",
+      "owner": "skeleton/ai/forge/world.py",
+      "batches": [
+        "B042",
+        "B043",
+        "B050"
+      ],
+      "metrics": [
+        "validity",
+        "diversity",
+        "seed determinism",
+        "constraint satisfaction"
+      ],
+      "requirements": [
+        "Require independent exact-head evidence for promotion.",
+        "Block unresolved rights/similarity/continuity/state failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "unreachable generation",
+        "seed nondeterminism",
+        "mode collapse",
+        "constraint conflict",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-140 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-141",
+      "ordinal": 141,
+      "family_id": "GB15",
+      "family": "Environmental Storytelling",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Encode story and world history into space, props, composition, lighting, audio, interaction and state so players infer meaning through play.",
+      "owner": "backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py",
+      "batches": [
+        "B035",
+        "B041"
+      ],
+      "metrics": [
+        "narrative legibility",
+        "diegetic coherence",
+        "subtlety",
+        "cross-modal consistency"
+      ],
+      "requirements": [
+        "Specify Environmental Storytelling: Encode story and world history into space, props, composition, lighting, audio, interaction and state so players infer meaning through play.",
+        "Declare domain inputs/outputs/invariants/anti-goals and acceptance tests.",
+        "Bind backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py and B035, B041."
+      ],
+      "adversarial": [
+        "contradictory prop evidence",
+        "over-explicit exposition",
+        "meaningless clutter",
+        "scene/audio mismatch",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-141 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-142",
+      "ordinal": 142,
+      "family_id": "GB15",
+      "family": "Environmental Storytelling",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Encode story and world history into space, props, composition, lighting, audio, interaction and state so players infer meaning through play.",
+      "owner": "backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py",
+      "batches": [
+        "B035",
+        "B041"
+      ],
+      "metrics": [
+        "narrative legibility",
+        "diegetic coherence",
+        "subtlety",
+        "cross-modal consistency"
+      ],
+      "requirements": [
+        "Define typed identity, state, provenance and parent-context representation.",
+        "Preserve deterministic serialization and canon links.",
+        "Define compatibility and unknown states."
+      ],
+      "adversarial": [
+        "contradictory prop evidence",
+        "over-explicit exposition",
+        "meaningless clutter",
+        "scene/audio mismatch",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-142 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-143",
+      "ordinal": 143,
+      "family_id": "GB15",
+      "family": "Environmental Storytelling",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Encode story and world history into space, props, composition, lighting, audio, interaction and state so players infer meaning through play.",
+      "owner": "backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py",
+      "batches": [
+        "B035",
+        "B041"
+      ],
+      "metrics": [
+        "narrative legibility",
+        "diegetic coherence",
+        "subtlety",
+        "cross-modal consistency"
+      ],
+      "requirements": [
+        "Create/edit only from ProjectDNA, canon, champion and rights-classified evidence.",
+        "Record transformations and source lineage.",
+        "Keep rollback-safe mutations and reference behavior."
+      ],
+      "adversarial": [
+        "contradictory prop evidence",
+        "over-explicit exposition",
+        "meaningless clutter",
+        "scene/audio mismatch",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-143 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-144",
+      "ordinal": 144,
+      "family_id": "GB15",
+      "family": "Environmental Storytelling",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Encode story and world history into space, props, composition, lighting, audio, interaction and state so players infer meaning through play.",
+      "owner": "backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py",
+      "batches": [
+        "B035",
+        "B041"
+      ],
+      "metrics": [
+        "narrative legibility",
+        "diegetic coherence",
+        "subtlety",
+        "cross-modal consistency"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate rival roles.",
+        "Challenger must produce a better artifact plus attack ledger.",
+        "Deterministic gates decide promotion."
+      ],
+      "adversarial": [
+        "contradictory prop evidence",
+        "over-explicit exposition",
+        "meaningless clutter",
+        "scene/audio mismatch",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-144 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-145",
+      "ordinal": 145,
+      "family_id": "GB15",
+      "family": "Environmental Storytelling",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Encode story and world history into space, props, composition, lighting, audio, interaction and state so players infer meaning through play.",
+      "owner": "backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py",
+      "batches": [
+        "B035",
+        "B041"
+      ],
+      "metrics": [
+        "narrative legibility",
+        "diegetic coherence",
+        "subtlety",
+        "cross-modal consistency"
+      ],
+      "requirements": [
+        "Check spatial/narrative/systemic continuity against world state, quests, mechanics, visual/audio language and project pillars.",
+        "Propagate coupled consequences.",
+        "Block accidental contradiction."
+      ],
+      "adversarial": [
+        "contradictory prop evidence",
+        "over-explicit exposition",
+        "meaningless clutter",
+        "scene/audio mismatch",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-145 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-146",
+      "ordinal": 146,
+      "family_id": "GB15",
+      "family": "Environmental Storytelling",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Encode story and world history into space, props, composition, lighting, audio, interaction and state so players infer meaning through play.",
+      "owner": "backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py",
+      "batches": [
+        "B035",
+        "B041"
+      ],
+      "metrics": [
+        "narrative legibility",
+        "diegetic coherence",
+        "subtlety",
+        "cross-modal consistency"
+      ],
+      "requirements": [
+        "Add deterministic validation and replayable generation/traversal/playtest evidence.",
+        "Attack contradictory prop evidence, over-explicit exposition, meaningless clutter, scene/audio mismatch.",
+        "Persist minimized counterexamples."
+      ],
+      "adversarial": [
+        "contradictory prop evidence",
+        "over-explicit exposition",
+        "meaningless clutter",
+        "scene/audio mismatch",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-146 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-147",
+      "ordinal": 147,
+      "family_id": "GB15",
+      "family": "Environmental Storytelling",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Encode story and world history into space, props, composition, lighting, audio, interaction and state so players infer meaning through play.",
+      "owner": "backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py",
+      "batches": [
+        "B035",
+        "B041"
+      ],
+      "metrics": [
+        "narrative legibility",
+        "diegetic coherence",
+        "subtlety",
+        "cross-modal consistency"
+      ],
+      "requirements": [
+        "Improve narrative legibility, diegetic coherence, subtlety, cross-modal consistency plus originality, player value, accessibility, performance and maintainability together.",
+        "Reject vanity-metric wins.",
+        "Keep champion if no Pareto-safe gain."
+      ],
+      "adversarial": [
+        "contradictory prop evidence",
+        "over-explicit exposition",
+        "meaningless clutter",
+        "scene/audio mismatch",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-147 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-148",
+      "ordinal": 148,
+      "family_id": "GB15",
+      "family": "Environmental Storytelling",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Encode story and world history into space, props, composition, lighting, audio, interaction and state so players infer meaning through play.",
+      "owner": "backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py",
+      "batches": [
+        "B035",
+        "B041"
+      ],
+      "metrics": [
+        "narrative legibility",
+        "diegetic coherence",
+        "subtlety",
+        "cross-modal consistency"
+      ],
+      "requirements": [
+        "Support semantic diff, reversible edits, migration and checkpoint recovery.",
+        "Resume exact canon/rival/evaluator/artifact identity.",
+        "Prevent orphan generated content."
+      ],
+      "adversarial": [
+        "contradictory prop evidence",
+        "over-explicit exposition",
+        "meaningless clutter",
+        "scene/audio mismatch",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-148 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-149",
+      "ordinal": 149,
+      "family_id": "GB15",
+      "family": "Environmental Storytelling",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Encode story and world history into space, props, composition, lighting, audio, interaction and state so players infer meaning through play.",
+      "owner": "backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py",
+      "batches": [
+        "B035",
+        "B041"
+      ],
+      "metrics": [
+        "narrative legibility",
+        "diegetic coherence",
+        "subtlety",
+        "cross-modal consistency"
+      ],
+      "requirements": [
+        "Execute 100/1000/10000 rounds with exactly three stages and no wall-clock deadline.",
+        "Prove bounded resources and checkpoint fidelity.",
+        "Detect repetition, context erosion, branch explosion and evaluator overfit."
+      ],
+      "adversarial": [
+        "contradictory prop evidence",
+        "over-explicit exposition",
+        "meaningless clutter",
+        "scene/audio mismatch",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-149 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-150",
+      "ordinal": 150,
+      "family_id": "GB15",
+      "family": "Environmental Storytelling",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Encode story and world history into space, props, composition, lighting, audio, interaction and state so players infer meaning through play.",
+      "owner": "backend/gameforge/exocortex/agentic/storyteller_narrative_grounding.py",
+      "batches": [
+        "B035",
+        "B041"
+      ],
+      "metrics": [
+        "narrative legibility",
+        "diegetic coherence",
+        "subtlety",
+        "cross-modal consistency"
+      ],
+      "requirements": [
+        "Require independent exact-head evidence for promotion.",
+        "Block unresolved rights/similarity/continuity/state failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "contradictory prop evidence",
+        "over-explicit exposition",
+        "meaningless clutter",
+        "scene/audio mismatch",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "whole-game consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-150 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    }
+  ]
+}

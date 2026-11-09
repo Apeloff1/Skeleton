@@ -1,0 +1,2 @@
+# Keep blank issues available for unusual incidents and unsupported use cases.
+blank_issues_enabled: true

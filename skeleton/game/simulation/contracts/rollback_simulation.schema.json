@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:rollback_simulation:v1",
+  "title": "FLGB-10 rollback simulation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "restored_snapshot_digest",
+    "target_tick",
+    "input_chain_digest",
+    "resulting_state_digest"
+  ],
+  "properties": {
+    "restored_snapshot_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "target_tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input_chain_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "resulting_state_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
