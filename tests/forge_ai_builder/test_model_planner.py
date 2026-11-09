@@ -140,3 +140,55 @@ def test_prompt_normalizer_bounds_before_unicode_expansion_and_router():
         run(ModelPlanner(router, gate=gate, cap=grant_providers(issuer, ["alpha"]))
             .plan("x" * (MAX_RAW_PROMPT_CHARS + 1)))
     assert router.invoked == []
+
+
+def test_provider_grant_rejects_scalar_string_and_unbounded_subject():
+    _, issuer = gate_and_issuer()
+    for providers in ("alpha", b"alpha", bytearray(b"alpha")):
+        with pytest.raises(ValueError, match="bounded iterable"):
+            grant_providers(issuer, providers)
+    for subject in ("", "../admin", "forge\\nforged", "x" * 129, None):
+        with pytest.raises(ValueError, match="subject"):
+            grant_providers(issuer, ["alpha"], subject=subject)
+
+
+def test_malformed_structured_provider_result_falls_back_without_leaking():
+    from types import SimpleNamespace
+    from skeleton.frontier.runtime.model_router_contract import RoutedCall
+
+    class PoisonResponse:
+        @property
+        def structured(self):
+            raise RuntimeError("private provider payload must not leak")
+
+    class HostileRouter(FakeRouter):
+        async def execute(self, *args, **kwargs):
+            original = await super().execute(*args, **kwargs)
+            return RoutedCall(original.receipt, SimpleNamespace(response=PoisonResponse()))
+
+    gate, issuer = gate_and_issuer()
+    out = run(ModelPlanner(
+        HostileRouter(), gate=gate, cap=grant_providers(issuer, ["alpha"]),
+    ).plan(BRIEF))
+    assert out.source == "compiler"
+    assert out.fallback_reason == "parse:RuntimeError"
+    assert "private" not in out.fallback_reason
+    assert out.spec == out.compiled
+
+
+def test_oversized_structured_provider_shape_falls_back_before_copy():
+    from types import SimpleNamespace
+    from skeleton.frontier.runtime.model_router_contract import RoutedCall
+
+    class OversizedRouter(FakeRouter):
+        async def execute(self, *args, **kwargs):
+            original = await super().execute(*args, **kwargs)
+            response = SimpleNamespace(structured={str(i): i for i in range(65)})
+            return RoutedCall(original.receipt, SimpleNamespace(response=response))
+
+    gate, issuer = gate_and_issuer()
+    out = run(ModelPlanner(
+        OversizedRouter(), gate=gate, cap=grant_providers(issuer, ["alpha"]),
+    ).plan(BRIEF))
+    assert out.source == "compiler"
+    assert out.fallback_reason == "parse:PlanParseError"
