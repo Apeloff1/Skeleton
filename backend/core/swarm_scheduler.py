@@ -131,6 +131,33 @@ def run_with_executor(plan: dict, executor: Executor) -> dict:
     }
 
 
+def _persist_run(run: dict) -> None:
+    """Publish a completed run or fail closed if Mongo cannot acknowledge it.
+
+    Retention maintenance is intentionally independent of receipt publication:
+    failure to remove old historical documents cannot erase an acknowledged
+    new run or falsely change its delivery state.
+    """
+    try:
+        from core.databases import get_sync_db
+        col = get_sync_db()["swarm_schedule_runs"]
+        col.create_index([("build_id", 1), ("created_at", -1)])
+        write_result = col.insert_one(dict(run))
+        if getattr(write_result, "acknowledged", False) is not True:
+            raise RuntimeError("swarm schedule insert was not acknowledged")
+    except Exception as exc:
+        raise RuntimeError("swarm schedule result was not durably recorded") from exc
+    try:
+        total = col.estimated_document_count()
+        if total > 2000:
+            old = col.find({}, {"_id": 1}).sort("created_at", 1).limit(total - 2000)
+            ids = [doc["_id"] for doc in old]
+            if ids:
+                col.delete_many({"_id": {"$in": ids}})
+    except Exception:
+        pass
+
+
 def execute_schedule(
     build_id: str,
     phases: list[str] | None = None,
@@ -264,21 +291,7 @@ def execute_schedule(
     }
 
     if persist:
-        try:
-            from core.databases import get_sync_db
-            col = get_sync_db()["swarm_schedule_runs"]
-            col.create_index([("build_id", 1), ("created_at", -1)])
-            col.insert_one(dict(run))
-            run.pop("_id", None)
-            # keep the collection bounded
-            total = col.estimated_document_count()
-            if total > 2000:
-                old = col.find({}, {"_id": 1}).sort("created_at", 1).limit(total - 2000)
-                ids = [d["_id"] for d in old]
-                if ids:
-                    col.delete_many({"_id": {"$in": ids}})
-        except Exception:
-            pass
+        _persist_run(run)
 
     return run
 
@@ -305,21 +318,28 @@ def diff_runs(build_id: str, hash_a: str | None = None,
         return {"build_id": build_id, "error": "need at least two runs to diff",
                 "runs_available": len(runs)}
 
-    def _pick(h: str | None, fallback_idx: int) -> dict:
-        if h:
-            for r in runs:
-                if r.get("plan_hash") == h:
-                    return r
+    if hash_a is not None and (not isinstance(hash_a, str) or not hash_a):
+        raise ValueError("hash_a must be a non-empty plan receipt")
+    if hash_b is not None and (not isinstance(hash_b, str) or not hash_b):
+        raise ValueError("hash_b must be a non-empty plan receipt")
+
+    def _pick(h: str | None, fallback_idx: int) -> dict | None:
+        if h is not None:
+            return next((item for item in runs if item.get("plan_hash") == h), None)
         return runs[fallback_idx]
 
     a = _pick(hash_a, 0)
     b = _pick(hash_b, 1)
+    if a is None or b is None:
+        # Do not silently substitute the newest run for a missing source hash.
+        return {"build_id": build_id, "error": "requested plan receipt not found",
+                "runs_available": len(runs)}
     ma, mb = _run_member_map(a), _run_member_map(b)
     phases = sorted(set(ma) | set(mb))
 
     rows = []
     stable_phases = 0
-    total_seats = moved_seats = 0
+    total_seats = retained_seats = 0
     for ph in phases:
         sa, sb = set(ma.get(ph, [])), set(mb.get(ph, []))
         added = sorted(sb - sa)
@@ -330,14 +350,16 @@ def diff_runs(build_id: str, hash_a: str | None = None,
         if not added and not removed:
             stable_phases += 1
         total_seats += len(sa | sb)
-        moved_seats += len(added) + len(removed)
+        retained_seats += len(sa & sb)
         rows.append({
             "phase_id": ph, "similarity": similarity,
             "kept": kept, "added": added, "removed": removed,
             "unchanged": not added and not removed,
         })
 
-    stability = round(100 * (1 - moved_seats / max(1, total_seats)), 1)
+    # Weighted Jaccard similarity stays in [0, 100], even when an entire
+    # cohort of workers is replaced (old symmetric-difference math went negative).
+    stability = round(100 * retained_seats / total_seats, 1) if total_seats else 0.0
     return {
         "build_id": build_id,
         "run_a": {"plan_hash": a.get("plan_hash"), "seed": a.get("seed"),
@@ -353,14 +375,18 @@ def diff_runs(build_id: str, hash_a: str | None = None,
 
 
 def get_runs(build_id: str, limit: int = 10) -> list[dict]:
+    if not isinstance(build_id, str) or not 1 <= len(build_id.strip()) <= 128:
+        raise ValueError("build_id must be a bounded non-empty string")
+    if type(limit) is not int or not 1 <= limit <= 100:
+        raise ValueError("run history limit must be an integer in [1, 100]")
     try:
         from core.databases import get_sync_db
         col = get_sync_db()["swarm_schedule_runs"]
-        rows = list(col.find({"build_id": build_id}, {"_id": 0})
-                    .sort("created_at", -1).limit(max(1, min(limit, 100))))
-        return rows
-    except Exception:
-        return []
+        return list(col.find({"build_id": build_id}, {"_id": 0})
+                    .sort("created_at", -1).limit(limit))
+    except Exception as exc:
+        # Database outage is not the same as no matching historical runs.
+        raise RuntimeError("swarm schedule history unavailable") from exc
 
 
 # ── participation / coverage stats ───────────────────────────────────────
