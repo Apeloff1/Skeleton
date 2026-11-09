@@ -26,12 +26,12 @@ class CompilerStage(BaseModel):
     errors: List[Dict[str, Any]] = Field(default_factory=list)
 
 class CompilationRequest(BaseModel):
-    code: str
+    code: str = Field(..., min_length=1, max_length=500_000)
     language: LanguageType
     sanitizers: List[str] = Field(default_factory=list, max_length=50)
     optimizers: List[str] = Field(default_factory=list, max_length=50)
     optimization_level: int = Field(default=2, ge=0, le=3)
-    target_arch: str = "x86_64"
+    target_arch: str = Field(default="x86_64", min_length=1, max_length=64)
     include_ir: bool = False
     include_assembly: bool = False
     agentic_analysis: bool = True
