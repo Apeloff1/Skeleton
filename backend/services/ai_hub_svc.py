@@ -262,6 +262,25 @@ class AIHubService:
     async def auto_implement_feature(self, feature_spec: dict) -> dict:
         """Generate a construction plan; execution remains separately governed."""
 
+        allowed = {
+            "id", "name", "description", "category", "impact",
+            "implementation_difficulty",
+        }
+        if type(feature_spec) is not dict or set(feature_spec) != allowed:
+            raise ValueError("feature specification must use the canonical bounded fields")
+        limits = {
+            "id": 128, "name": 160, "description": 2000, "category": 80,
+            "impact": 16, "implementation_difficulty": 16,
+        }
+        for key, limit in limits.items():
+            value = feature_spec[key]
+            if type(value) is not str or not value.strip() or len(value) > limit:
+                raise ValueError(f"invalid feature specification field: {key}")
+        if feature_spec["impact"] not in {"low", "medium", "high", "critical"}:
+            raise ValueError("invalid feature impact")
+        if feature_spec["implementation_difficulty"] not in {"low", "medium", "high"}:
+            raise ValueError("invalid implementation difficulty")
+
         instructions = (
             "You are a software architect. Produce implementation plans, not "
             "unguarded side effects. Include architecture boundaries, APIs, UI, "
@@ -285,14 +304,23 @@ class AIHubService:
         except EngineTextError:
             return {"status": "offline", "message": "engine_unavailable"}
 
+        generated_at = datetime.now(timezone.utc).isoformat()
+        receipt = {
+            "feature_id": feature_spec["id"],
+            "feature": feature_spec["name"],
+            "implementation_plan": response,
+            "estimated_complexity": feature_spec["implementation_difficulty"],
+            "provider": "skeleton-engine",
+            "generated_at": generated_at,
+            "execution_authorized": False,
+        }
         return {
             "status": "success",
-            "feature": feature_spec.get("name"),
-            "implementation_plan": response,
-            "estimated_complexity": feature_spec.get(
-                "implementation_difficulty", "medium"
-            ),
-            "provider": "skeleton-engine",
+            **receipt,
+            "plan_digest": hashlib.sha256(
+                json.dumps(receipt, sort_keys=True, separators=(",", ":"),
+                           ensure_ascii=False).encode("utf-8")
+            ).hexdigest(),
         }
 
 
