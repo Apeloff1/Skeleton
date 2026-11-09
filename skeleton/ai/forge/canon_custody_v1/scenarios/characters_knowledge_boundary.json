@@ -1,0 +1,66 @@
+{
+  "schema": "skeleton.canon_scenario.v1",
+  "policy": "characters_knowledge_boundary",
+  "domain": "characters",
+  "topic": "knowledge_boundary",
+  "evidence_kind": "anchor",
+  "limits": {
+    "max_records": 112,
+    "max_tick_gap": 4
+  },
+  "commands": [
+    {
+      "id": "characters_knowledge_boundary:a",
+      "entity": "hero",
+      "action": "establish",
+      "value": "knowledge_boundary:origin",
+      "predecessor": "",
+      "evidence": "verified-world-event:1",
+      "world": "primary",
+      "tick": 1,
+      "expected_revision": 0
+    },
+    {
+      "id": "characters_knowledge_boundary:b",
+      "entity": "hero",
+      "action": "amend",
+      "value": "knowledge_boundary:revision",
+      "predecessor": "characters_knowledge_boundary:a",
+      "evidence": "verified-world-event:2",
+      "world": "primary",
+      "tick": 2,
+      "expected_revision": 1
+    },
+    {
+      "id": "characters_knowledge_boundary:c",
+      "entity": "hero",
+      "action": "reconcile",
+      "value": "knowledge_boundary:canon",
+      "predecessor": "characters_knowledge_boundary:b",
+      "evidence": "verified-world-event:3",
+      "world": "primary",
+      "tick": 3,
+      "expected_revision": 2
+    }
+  ],
+  "expected": {
+    "revision": 3,
+    "records": 3,
+    "all_accepted": true,
+    "world": "primary"
+  },
+  "negative_cases": [
+    "unknown-parent",
+    "duplicate-event",
+    "revision-stale",
+    "cross-world",
+    "entity-lineage-mismatch",
+    "unjustified-clock-gap",
+    "missing-evidence"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "world_provenance_authenticated": false,
+    "release_certified": false
+  }
+}

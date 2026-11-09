@@ -56,6 +56,7 @@ Commands:
     scene-circuit  Play switch puzzles and conditional gates
     scene-circuit-solve  Solve replayable circuit routes with bounded search
     scene-circuit-author  Atomically edit and preview playable circuit sources
+    scene-circuit-accept  End-to-end acceptance for authored, playable circuit puzzles
     scene-patrol-solve  Find bounded legal routes through timed guards
     scene-patrol-author  Transactionally edit and preview timed patrols
     scene-patrol  Play timed guard routes and replay-verified scene checkpoints
@@ -70,11 +71,56 @@ Commands:
     scene-survival-author  Transactionally edit survival sources and preview play
     scene-survival-route  Find replay-proven bounded survival routes
     scene-survival  Play source-bound tile hazards, earned food, shelter and replay
+    scene-weather  Deterministic authored weather and earned protection over playable survival
+    scene-weather-author  Transactional weather source editing and replay-safe previews
+    scene-weather-play  Stream-based weather gameplay with verified restartable checkpoints
+    scene-weather-board  Source-bound read-only weather board: legal moves, resources and forecast
+    scene-weather-route  Bounded canonical weather routing; never assert impossibility from exhaustion
+    scene-weather-accept  Playable weather delivery acceptance: source -> CLI -> replay -> export
+    scene-market-fork-play  Interactive player selection of replay-proven offline market futures
+    scene-market-fork-author  Transactional creator editing for replay-proven market choice forks
+    scene-market-fork-accept  End-to-end delivery certification for an authored, won market fork
+    scene-market-fork  Replay-proven alternative futures for a player-authored scene market
+    scene-market-hours  Deterministic merchant opening hours over canonical earned-currency market pla
+    scene-market-hours-play  Bounded interactive merchant-hour gameplay with restartable verified saves
+    scene-market-hours-accept  Exact-source merchant gameplay acceptance: replay, economy, board and export
+    scene-market-contract-play  JSON-line interactive market contracts with durable canonical checkpoints
+    scene-market-contract-accept  End-to-end market commission acceptance across source, play, replay and export
+    scene-market-contract  Authored timed delivery contracts on the canonical, replay-verified scene mark
+    scene-market-contract-author  Transactional, source-digest-fenced editing for authored market commissions
+    scene-market-contract-route  Bounded contract campaign route discovery with canonical replay witnesses
+    scene-market-route-accept  End-to-end acceptance of a replay-proven offline market route
+    scene-market-route  Bounded, replay-proven market route search over the canonical tile/economy red
+    scene-market-board  Player-facing market order board and deterministic non-mutating hints
     scene-market-accept  Verify game-to-export market acceptance evidence
     scene-market-play  Play offline market quests with durable checkpoints
     scene-market-author  Edit and preview source-bound trading quests
+    scene-evacuation  Deterministic, source-bound multi-person evacuation over the mission director
+    scene-evacuation-board  Legal, replay-proven evacuation choices for CLI, UI and automated play
+    scene-evacuation-author  Transactional, digest-fenced editing of authored evacuation NPC contracts
+    scene-evacuation-accept  End-to-end source, player decisions, restart, replay and export acceptance
+    scene-evacuation-solve  Bounded, fail-closed evacuation route search with canonical replay witnesses
+    scene-evacuation-play  Player-facing evacuation turns with legal action previews and checkpoints
+    scene-market-party  Cooperative source-bound market campaign with role-gated turns and replay
+    scene-market-party-author  Source-digest-fenced cooperative market role editor with replayable receipts
+    scene-market-party-play  Interactive cooperative market with bounded retries and verified checkpoints
+    scene-market-party-board  Read-only, replay-proven legal turn board for cooperative market players
+    scene-market-party-route  Replay-proven cooperative market route search with strict turn arbitration
+    scene-market-party-accept  End-to-end acceptance of cooperative player turns and portable market saves
+    scene-market-party-timeline  Bounded, replay-proven cooperative market timeline and branch editor
+    scene-market-party-league  Replay-scored cooperative market league with no synthetic rewards
+    scene-market-party-league-author  Transactional offline authoring and playable previews for market leagues
+    scene-market-party-compare  Deterministic cooperative playthrough comparison and safe branch selection
+    scene-market-party-portfolio  Portable source-bound cooperative market production portfolio
+    scene-market-party-handoff  Replay-verified cooperative campaign handoff across save, league and export
+    scene-market-party-balance  Replay-derived cooperative role balance audit for playable market games
+    scene-market-party-vault  Optimistic, source-bound offline cooperative save slots
+    scene-market-party-vault-history  Replay-verified revision history and recovery for cooperative market save slot
     scene-market  Play earned-currency trading, crafting and delivery quests
     scene-tiles  Play authored grid movement/collision and replay scene saves
+    scene-push  Source-bound push-block puzzles on the canonical scene tile runtime
+    scene-push-play  Interactive JSON-line crate puzzles with verified durable checkpoints
+    scene-push-accept  Independent source-to-play-to-restart-to-export push-puzzle acceptance
     scene-tiles-route  Solve collision-aware replayable tile game routes
     scene-achievements  Earn replay-verified authored scene milestones
     scene-npc  Play authored NPC itineraries, choices and earned scene endings
@@ -899,6 +945,144 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "scene-market":
         from skeleton.game.gameplay.scene_market import cli as market_cli
         return market_cli(rest)
+    if cmd == "scene-circuit-accept":
+        from skeleton.game.gameplay.scene_circuit_accept import cli as scene_circuit_accept_cli
+        return scene_circuit_accept_cli(rest)
+    if cmd == "scene-weather":
+        from skeleton.game.gameplay.scene_weather import cli as scene_weather_cli
+        return scene_weather_cli(rest)
+    if cmd == "scene-weather-author":
+        from skeleton.game.gameplay.scene_weather_author import cli as scene_weather_author_cli
+        return scene_weather_author_cli(rest)
+    if cmd == "scene-weather-play":
+        from skeleton.game.gameplay.scene_weather_interactive import cli as scene_weather_interactive_cli
+        return scene_weather_interactive_cli(rest)
+    if cmd == "scene-weather-board":
+        from skeleton.game.gameplay.scene_weather_board import cli as scene_weather_board_cli
+        return scene_weather_board_cli(rest)
+    if cmd == "scene-weather-route":
+        from skeleton.game.gameplay.scene_weather_route import cli as scene_weather_route_cli
+        return scene_weather_route_cli(rest)
+    if cmd == "scene-weather-accept":
+        from skeleton.game.gameplay.scene_weather_acceptance import cli as scene_weather_acceptance_cli
+        return scene_weather_acceptance_cli(rest)
+    if cmd == "scene-market-fork-play":
+        from skeleton.game.gameplay.scene_market_fork_interactive import cli as scene_market_fork_interactive_cli
+        return scene_market_fork_interactive_cli(rest)
+    if cmd == "scene-market-fork-author":
+        from skeleton.game.gameplay.scene_market_fork_author import cli as scene_market_fork_author_cli
+        return scene_market_fork_author_cli(rest)
+    if cmd == "scene-market-fork-accept":
+        from skeleton.game.gameplay.scene_market_fork_acceptance import cli as scene_market_fork_acceptance_cli
+        return scene_market_fork_acceptance_cli(rest)
+    if cmd == "scene-market-fork":
+        from skeleton.game.gameplay.scene_market_fork import cli as scene_market_fork_cli
+        return scene_market_fork_cli(rest)
+    if cmd == "scene-market-hours":
+        from skeleton.game.gameplay.scene_market_hours import cli as scene_market_hours_cli
+        return scene_market_hours_cli(rest)
+    if cmd == "scene-market-hours-play":
+        from skeleton.game.gameplay.scene_market_hours_interactive import cli as scene_market_hours_interactive_cli
+        return scene_market_hours_interactive_cli(rest)
+    if cmd == "scene-market-hours-accept":
+        from skeleton.game.gameplay.scene_market_hours_acceptance import cli as scene_market_hours_acceptance_cli
+        return scene_market_hours_acceptance_cli(rest)
+    if cmd == "scene-market-contract-play":
+        from skeleton.game.gameplay.scene_market_contract_interactive import cli as scene_market_contract_interactive_cli
+        return scene_market_contract_interactive_cli(rest)
+    if cmd == "scene-market-contract-accept":
+        from skeleton.game.gameplay.scene_market_contract_acceptance import cli as scene_market_contract_acceptance_cli
+        return scene_market_contract_acceptance_cli(rest)
+    if cmd == "scene-market-contract":
+        from skeleton.game.gameplay.scene_market_contract import cli as scene_market_contract_cli
+        return scene_market_contract_cli(rest)
+    if cmd == "scene-market-contract-author":
+        from skeleton.game.gameplay.scene_market_contract_author import cli as scene_market_contract_author_cli
+        return scene_market_contract_author_cli(rest)
+    if cmd == "scene-market-contract-route":
+        from skeleton.game.gameplay.scene_market_contract_route import cli as scene_market_contract_route_cli
+        return scene_market_contract_route_cli(rest)
+    if cmd == "scene-market-route-accept":
+        from skeleton.game.gameplay.scene_market_route_acceptance import cli as scene_market_route_acceptance_cli
+        return scene_market_route_acceptance_cli(rest)
+    if cmd == "scene-market-route":
+        from skeleton.game.gameplay.scene_market_route import cli as scene_market_route_cli
+        return scene_market_route_cli(rest)
+    if cmd == "scene-market-board":
+        from skeleton.game.gameplay.scene_market_board import cli as scene_market_board_cli
+        return scene_market_board_cli(rest)
+    if cmd == "scene-evacuation":
+        from skeleton.game.gameplay.scene_evacuation import cli as scene_evacuation_cli
+        return scene_evacuation_cli(rest)
+    if cmd == "scene-evacuation-board":
+        from skeleton.game.gameplay.scene_evacuation_board import cli as scene_evacuation_board_cli
+        return scene_evacuation_board_cli(rest)
+    if cmd == "scene-evacuation-author":
+        from skeleton.game.gameplay.scene_evacuation_author import cli as scene_evacuation_author_cli
+        return scene_evacuation_author_cli(rest)
+    if cmd == "scene-evacuation-accept":
+        from skeleton.game.gameplay.scene_evacuation_acceptance import cli as scene_evacuation_acceptance_cli
+        return scene_evacuation_acceptance_cli(rest)
+    if cmd == "scene-evacuation-solve":
+        from skeleton.game.gameplay.scene_evacuation_solver import cli as scene_evacuation_solver_cli
+        return scene_evacuation_solver_cli(rest)
+    if cmd == "scene-evacuation-play":
+        from skeleton.game.gameplay.scene_evacuation_interactive import cli as scene_evacuation_interactive_cli
+        return scene_evacuation_interactive_cli(rest)
+    if cmd == "scene-market-party":
+        from skeleton.game.gameplay.scene_market_party import cli as scene_market_party_cli
+        return scene_market_party_cli(rest)
+    if cmd == "scene-market-party-author":
+        from skeleton.game.gameplay.scene_market_party_author import cli as scene_market_party_author_cli
+        return scene_market_party_author_cli(rest)
+    if cmd == "scene-market-party-play":
+        from skeleton.game.gameplay.scene_market_party_interactive import cli as scene_market_party_interactive_cli
+        return scene_market_party_interactive_cli(rest)
+    if cmd == "scene-market-party-board":
+        from skeleton.game.gameplay.scene_market_party_board import cli as scene_market_party_board_cli
+        return scene_market_party_board_cli(rest)
+    if cmd == "scene-market-party-route":
+        from skeleton.game.gameplay.scene_market_party_route import cli as scene_market_party_route_cli
+        return scene_market_party_route_cli(rest)
+    if cmd == "scene-market-party-accept":
+        from skeleton.game.gameplay.scene_market_party_acceptance import cli as scene_market_party_acceptance_cli
+        return scene_market_party_acceptance_cli(rest)
+    if cmd == "scene-market-party-timeline":
+        from skeleton.game.gameplay.scene_market_party_timeline import cli as scene_market_party_timeline_cli
+        return scene_market_party_timeline_cli(rest)
+    if cmd == "scene-market-party-league":
+        from skeleton.game.gameplay.scene_market_party_league import cli as scene_market_party_league_cli
+        return scene_market_party_league_cli(rest)
+    if cmd == "scene-market-party-league-author":
+        from skeleton.game.gameplay.scene_market_party_league_author import cli as scene_market_party_league_author_cli
+        return scene_market_party_league_author_cli(rest)
+    if cmd == "scene-market-party-compare":
+        from skeleton.game.gameplay.scene_market_party_compare import cli as scene_market_party_compare_cli
+        return scene_market_party_compare_cli(rest)
+    if cmd == "scene-market-party-portfolio":
+        from skeleton.game.gameplay.scene_market_party_portfolio import cli as scene_market_party_portfolio_cli
+        return scene_market_party_portfolio_cli(rest)
+    if cmd == "scene-market-party-handoff":
+        from skeleton.game.gameplay.scene_market_party_handoff import cli as scene_market_party_handoff_cli
+        return scene_market_party_handoff_cli(rest)
+    if cmd == "scene-market-party-balance":
+        from skeleton.game.gameplay.scene_market_party_balance import cli as scene_market_party_balance_cli
+        return scene_market_party_balance_cli(rest)
+    if cmd == "scene-market-party-vault":
+        from skeleton.game.gameplay.scene_market_party_vault import cli as scene_market_party_vault_cli
+        return scene_market_party_vault_cli(rest)
+    if cmd == "scene-market-party-vault-history":
+        from skeleton.game.gameplay.scene_market_party_vault_history import cli as scene_market_party_vault_history_cli
+        return scene_market_party_vault_history_cli(rest)
+    if cmd == "scene-push":
+        from skeleton.game.gameplay.scene_tile_push import cli as scene_tile_push_cli
+        return scene_tile_push_cli(rest)
+    if cmd == "scene-push-play":
+        from skeleton.game.gameplay.scene_tile_push_interactive import cli as scene_tile_push_interactive_cli
+        return scene_tile_push_interactive_cli(rest)
+    if cmd == "scene-push-accept":
+        from skeleton.game.gameplay.scene_tile_push_acceptance import cli as scene_tile_push_acceptance_cli
+        return scene_tile_push_acceptance_cli(rest)
     if cmd == "scene-tiles":
         from skeleton.game.gameplay.scene_tile_walk import cli as scene_tiles_cli
         return scene_tiles_cli(rest)

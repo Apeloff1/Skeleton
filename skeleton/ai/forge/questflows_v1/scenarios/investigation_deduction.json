@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "investigation_deduction",
+  "domain": "investigation",
+  "stages": [
+    {
+      "key": "discover_deduction",
+      "evidence": "investigation:deduction:discover:proof",
+      "grants": "investigation:deduction:stage:1",
+      "risk": 4,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_deduction",
+      "evidence": "investigation:deduction:prepare:proof",
+      "grants": "investigation:deduction:stage:2",
+      "risk": 5,
+      "sequence": 1,
+      "requires_previous_grant": "investigation:deduction:stage:1"
+    },
+    {
+      "key": "execute_deduction",
+      "evidence": "investigation:deduction:execute:proof",
+      "grants": "investigation:deduction:stage:3",
+      "risk": 6,
+      "sequence": 2,
+      "requires_previous_grant": "investigation:deduction:stage:2"
+    },
+    {
+      "key": "resolve_deduction",
+      "evidence": "investigation:deduction:resolve:proof",
+      "grants": "investigation:deduction:stage:4",
+      "risk": 7,
+      "sequence": 3,
+      "requires_previous_grant": "investigation:deduction:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "investigation_deduction:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "investigation:deduction:discover:proof"
+      ]
+    },
+    {
+      "id": "investigation_deduction:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "investigation:deduction:prepare:proof"
+      ]
+    },
+    {
+      "id": "investigation_deduction:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "investigation:deduction:execute:proof"
+      ]
+    },
+    {
+      "id": "investigation_deduction:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "investigation:deduction:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

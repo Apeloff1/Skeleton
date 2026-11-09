@@ -72,3 +72,34 @@ def test_remote_receipt_stream_and_artifact_budgets_fail_closed(monkeypatch):
 
     monkeypatch.setattr(remote_bridge, "MAX_REMOTE_ARTIFACTS", 2)
     assert len(remote_bridge.entries_from_receipts([_receipt(), _receipt()])) == 1
+
+def test_remote_bridge_rejects_conflicting_receipts_and_unbounded_evidence():
+    from dataclasses import replace
+    from itertools import repeat
+    from skeleton.build.delivery.remote_bridge import MAX_REMOTE_RECEIPTS
+
+    original = _receipt()
+    with pytest.raises(DeliveryError, match="conflicting remote receipts"):
+        entries_from_receipts([original, replace(original, runner_id="other")])
+    with pytest.raises(DeliveryError, match="remote receipt count exceeds"):
+        entries_from_receipts(repeat(original, MAX_REMOTE_RECEIPTS + 1))
+    with pytest.raises(DeliveryError, match="remote receipt digest"):
+        entries_from_receipts([replace(original, receipt_digest="bad")])
+    with pytest.raises(DeliveryError, match="artifact reference"):
+        entries_from_receipts([replace(original, output_artifacts=(object(),))])
+
+
+def test_remote_bridge_rejects_distinct_sources_mapped_to_one_release_path():
+    from dataclasses import replace
+    from skeleton.ai.build.core.delivery import remote_bridge as mirrored
+
+    first = _receipt(artifact="dist/first.whl")
+    second = replace(
+        _receipt(artifact="dist/second.whl"), job_id="job2", runner_id="runner2"
+    )
+    aliases = {"dist/first.whl": "release/shared.whl",
+               "dist/second.whl": "release/shared.whl"}
+    for convert in (entries_from_receipts, mirrored.entries_from_receipts):
+        with pytest.raises(DeliveryError, match="alias collision"):
+            convert([first, second], paths=aliases)
+        assert len(convert([first, first])) == 1
