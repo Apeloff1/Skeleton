@@ -30,8 +30,11 @@ CMD ["npx", "expo", "start", "--web", "--port", "3000"]
 FROM deps AS builder
 # Expo inlines public endpoints into the exported browser bundle. These are
 # public URLs only; model credentials remain confined to the engine.
-ARG EXPO_PUBLIC_BACKEND_URL=http://localhost:8001
-ARG EXPO_PUBLIC_SKELETON_URL=http://localhost:8010
+# Leave production web endpoints unset by default: the browser must use the
+# installed application's same-origin nginx ingress, not the visitor's localhost.
+# Explicit build arguments remain supported for deliberately external deployments.
+ARG EXPO_PUBLIC_BACKEND_URL=
+ARG EXPO_PUBLIC_SKELETON_URL=
 ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL \
     EXPO_PUBLIC_SKELETON_URL=$EXPO_PUBLIC_SKELETON_URL
 COPY . .
