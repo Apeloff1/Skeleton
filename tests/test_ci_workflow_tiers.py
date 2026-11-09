@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from scripts.check_ci_workflow_tiers import ROOT, audit, events
+from scripts.check_ci_workflow_tiers import ROOT, PAUSED_RECOVERY, SCHEDULED_RECOVERY, audit, events
 
 
 class WorkflowTierTests(unittest.TestCase):
@@ -59,6 +59,21 @@ class WorkflowTierTests(unittest.TestCase):
             source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
             self.assertIn("pull_request", events(source), name)
 
+    def test_recovery_registry_preserves_owner_pause_and_ci_gates(self):
+        registry = json.loads(
+            (ROOT / "machine/ci_workflow_tiers.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(set(registry["operational_scheduled_non_pr"]), SCHEDULED_RECOVERY)
+        self.assertEqual(set(registry["operational_paused_manual_only"]), PAUSED_RECOVERY)
+        self.assertEqual(SCHEDULED_RECOVERY, {"queue-drain.yml"})
+        self.assertEqual(len(PAUSED_RECOVERY), 2)
+        queue = (ROOT / ".github/workflows/queue-drain.yml").read_text()
+        self.assertEqual(events(queue), {"workflow_dispatch", "schedule", "push"})
+        for name in PAUSED_RECOVERY:
+            with self.subTest(name=name):
+                source = (ROOT / ".github/workflows" / name).read_text()
+                self.assertEqual(events(source), {"workflow_dispatch"})
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
@@ -106,6 +121,20 @@ class WorkflowTierTests(unittest.TestCase):
             )
             self.assertEqual(audit(root), [])
             evidence.unlink()
+            queue = root / ".github/workflows/queue-drain.yml"
+            before = queue.read_text()
+            queue.write_text(before.replace("  schedule:", "  pull_request:\n  schedule:", 1))
+            self.assertTrue(any("operational-only trigger" in x for x in audit(root)))
+            queue.write_text(before.replace("permissions: {}", "permissions: write-all", 1))
+            self.assertTrue(any("operational-only trigger" in x for x in audit(root)))
+            queue.write_text(before)
+            paused = root / ".github/workflows/actions-housekeeping-cli.yml"
+            before = paused.read_text()
+            paused.write_text(before.replace("  workflow_dispatch:",
+                                             "  workflow_dispatch:\n  schedule:\n    - cron: '0 * * * *'", 1))
+            self.assertTrue(any("paused workflow gained automatic" in x for x in audit(root)))
+            paused.write_text(before)
+            self.assertEqual(audit(root), [])
             for index in range(10):
                 (
                     root / ".github/workflows" / f"automatic-extra-{index}.yml"
