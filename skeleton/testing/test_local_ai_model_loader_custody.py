@@ -78,3 +78,21 @@ class ModelLoaderCustodyTests(unittest.TestCase):
         os.link(self.path, link)
         with self.assertRaises(ValueError):
             self.qualify()
+
+    @unittest.skipUnless(hasattr(os, "O_NOFOLLOW") and hasattr(os, "O_DIRECTORY"),
+                         "requires descriptor-relative directory safeguards")
+    def test_parent_symlink_is_denied_before_model_verification(self):
+        alias = Path(self.tmp.name) / "alias"
+        alias.symlink_to(Path(self.tmp.name), target_is_directory=True)
+        with self.assertRaises(OSError):
+            self.qualify(ModelLoader(str(alias / self.path.name)))
+
+    def test_strict_license_byte_budget_and_cas_type(self):
+        with self.assertRaises(ValueError):
+            self.qualify(max_bytes=24)
+        with self.assertRaises(PermissionError):
+            self.qualify(license_accepted=1)
+        with self.assertRaises(PermissionError):
+            ModelLoader(str(self.path)).load(
+                None, expected_sha256=self.sha, license_accepted=True,
+            )
