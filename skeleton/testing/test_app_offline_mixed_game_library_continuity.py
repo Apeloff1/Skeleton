@@ -151,7 +151,8 @@ def test_cross_project_save_alias_rejected(catalog, tmp_path):
     unsigned, signed = catalog
     advanced = _advance(unsigned, tmp_path / "cross-save.json")
     invalid = replace(signed, private_save=unsigned.private_save)
-    with pytest.raises(OfflineMixedGameLibraryContinuityError, match="custody"):
+    with pytest.raises(OfflineMixedGameLibraryContinuityError,
+                       match="cross-project private save alias"):
         _audit([unsigned], [advanced], [signed], [invalid])
 
 
