@@ -453,19 +453,27 @@ def execute_build(
 ) -> dict:
     """Plan + run the live DAG for a REAL build: phases come from the canonical
     build ladder, genre/context come from the galaxy_builds record."""
-    game_ctx: dict[str, Any] = {}
+    if not isinstance(build_id, str) or not 1 <= len(build_id.strip()) <= 128:
+        raise ValueError("real-build execution requires a bounded build identifier")
     try:
         from core.databases import get_sync_db
         doc = get_sync_db()["galaxy_builds"].find_one({"build_id": build_id}, {"_id": 0})
-        if doc:
-            game_ctx = {
-                "genre": doc.get("genre") or "rpg",
-                "subgenre": doc.get("subgenre") or "",
-                "title": doc.get("title") or doc.get("name") or "",
-            }
-    except Exception:
-        pass
-    game_ctx.setdefault("genre", "rpg")
+    except Exception as exc:
+        # An unavailable authority is not permission to fabricate a game.
+        raise RuntimeError("canonical Galaxy build authority unavailable") from exc
+    if (
+        not isinstance(doc, dict) or doc.get("build_id") != build_id
+        or doc.get("deleted") is True or doc.get("revoked") is True
+        or doc.get("rights_revoked") is True
+        or doc.get("state") in {"deleted", "revoked", "archived", "withdrawn"}
+    ):
+        raise LookupError("canonical Galaxy build not found or not active")
+    genre = doc.get("genre") or "rpg"
+    subgenre = doc.get("subgenre") or ""
+    title = doc.get("title") or doc.get("name") or ""
+    if any(not isinstance(value, str) or len(value) > 256 for value in (genre, subgenre, title)):
+        raise ValueError("canonical Galaxy build has invalid context fields")
+    game_ctx = {"genre": genre, "subgenre": subgenre, "title": title}
 
     return execute_schedule(
         build_id=build_id, phases=list(BUILD_STAGES), objectives=[

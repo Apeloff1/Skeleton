@@ -49,9 +49,22 @@ class VerifyReq(BaseModel):
 
 @router.post("/verify")
 def verify(req: VerifyReq) -> dict:
-    if not req.plan.get("nodes"):
-        raise HTTPException(400, "plan has no nodes")
-    return planner.verify_plan(req.plan)
+    nodes = req.plan.get("nodes")
+    edges = req.plan.get("edges")
+    waves = req.plan.get("waves")
+    if (
+        not isinstance(nodes, list) or not 1 <= len(nodes) <= 2_048
+        or not isinstance(edges, list) or len(edges) > 10_000
+        or not isinstance(waves, list) or len(waves) > planner.MAX_PHASES
+        or any(not isinstance(node, dict) for node in nodes)
+        or any(not isinstance(edge, dict) for edge in edges)
+        or any(not isinstance(wave, dict) for wave in waves)
+    ):
+        raise HTTPException(422, "invalid bounded swarm plan structure")
+    try:
+        return planner.verify_plan(req.plan)
+    except (KeyError, TypeError, ValueError, IndexError) as exc:
+        raise HTTPException(422, "invalid swarm plan structure") from exc
 
 
 class ExecuteReq(BaseModel):
@@ -78,19 +91,29 @@ def execute(req: ExecuteReq) -> dict:
         )
     except ValueError:
         raise HTTPException(400, "invalid swarm execution request")
+    except RuntimeError as exc:
+        raise HTTPException(503, "swarm execution custody unavailable") from exc
 
 
 @router.get("/runs/{build_id}")
 def runs(build_id: str, limit: int = 10) -> dict:
-    return {"build_id": build_id, "runs": scheduler.get_runs(build_id, limit)}
+    try:
+        return {"build_id": build_id, "runs": scheduler.get_runs(build_id, limit)}
+    except ValueError as exc:
+        raise HTTPException(422, "invalid swarm schedule history query") from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, "swarm schedule history unavailable") from exc
 
 
 @router.get("/diff/{build_id}")
 def diff(build_id: str, hash_a: str | None = None, hash_b: str | None = None) -> dict:
-    """Replay/diff: compare two persisted runs of a build (same seed vs a
-    re-shuffle) and quantify platoon-assignment drift. Defaults to the two
-    most recent runs."""
-    return scheduler.diff_runs(build_id, hash_a, hash_b)
+    """Compare only the requested durable plan receipts, never substituted runs."""
+    try:
+        return scheduler.diff_runs(build_id, hash_a, hash_b)
+    except ValueError as exc:
+        raise HTTPException(422, "invalid swarm schedule diff query") from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, "swarm schedule history unavailable") from exc
 
 
 @router.get("/plan-diff")
@@ -98,7 +121,8 @@ def plan_diff(phases: int = 12, platoon_size: int = 5,
               seed_a: int = 0, seed_b: int = 1, build_id: str = "diff") -> dict:
     """Deterministic replay/diff: plan the SAME phases under two seeds and show
     how the platoon worker assignments shuffle — no live run required."""
-    phases = max(1, min(phases, 100))
+    if type(phases) is not int or not 1 <= phases <= 100:
+        raise HTTPException(422, "phase count must be between 1 and 100")
     ph = [f"p{i:02d}" for i in range(1, phases + 1)]
 
     def _workers(seed: int) -> tuple[str, dict[str, list[str]]]:
@@ -111,7 +135,7 @@ def plan_diff(phases: int = 12, platoon_size: int = 5,
     ha, wa = _workers(seed_a)
     hb, wb = _workers(seed_b)
     rows, stable = [], 0
-    total = moved = 0
+    total = retained = 0
     for p in ph:
         sa, sb = set(wa.get(p, [])), set(wb.get(p, []))
         added, removed = sorted(sb - sa), sorted(sa - sb)
@@ -119,7 +143,7 @@ def plan_diff(phases: int = 12, platoon_size: int = 5,
         if not added and not removed:
             stable += 1
         total += len(sa | sb)
-        moved += len(added) + len(removed)
+        retained += len(sa & sb)
         rows.append({
             "phase_id": p, "similarity": round(len(sa & sb) / union, 3),
             "kept": sorted(sa & sb), "added": added, "removed": removed,
@@ -129,7 +153,7 @@ def plan_diff(phases: int = 12, platoon_size: int = 5,
         "seed_a": seed_a, "seed_b": seed_b, "plan_hash_a": ha, "plan_hash_b": hb,
         "same_seed": seed_a == seed_b, "phase_count": len(ph),
         "stable_phases": stable,
-        "stability_pct": round(100 * (1 - moved / max(1, total)), 1),
+        "stability_pct": round(100 * retained / total, 1) if total else 0.0,
         "rows": rows,
     }
 
@@ -152,6 +176,10 @@ def execute_build(req: BuildReq) -> dict:
         )
     except ValueError:
         raise HTTPException(400, "invalid swarm build request")
+    except LookupError as exc:
+        raise HTTPException(404, "canonical Galaxy build not found") from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, "canonical Galaxy build authority unavailable") from exc
 
 
 @router.post("/execute/async")
