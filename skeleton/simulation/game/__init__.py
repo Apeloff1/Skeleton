@@ -31,6 +31,15 @@ from .mechanics import (
     ProgressionSystemSpec,
 )
 
+from .fixed_clock import (
+    CLOCK_SCHEMA,
+    MAX_TICKS_PER_ADVANCE,
+    ClockAdvance,
+    ClockBoundaryError,
+    ClockState,
+    advance_clock,
+)
+
 from .replay import (
     REPLAY_SCHEMA,
     REPLAY_SCHEMA_VERSION,
@@ -43,6 +52,12 @@ from .replay import (
 )
 
 __all__ = [
+    "CLOCK_SCHEMA",
+    "MAX_TICKS_PER_ADVANCE",
+    "ClockAdvance",
+    "ClockBoundaryError",
+    "ClockState",
+    "advance_clock",
     "ReplayTrace",
     "ReplayStep",
     "ReplayMismatch",
