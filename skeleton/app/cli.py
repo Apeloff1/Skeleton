@@ -81,8 +81,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="return after Compose starts without probing public application surfaces",
     )
-    up.add_argument("--verify-attempts", type=int, default=12)
-    up.add_argument("--verify-delay", type=float, default=1.0)
+    up.add_argument(
+        "--verify-attempts", type=int, default=60,
+        help="whole-application readiness attempts (default: 60 for cold dependency-ordered startup)",
+    )
+    up.add_argument("--verify-delay", type=float, default=2.0)
 
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")

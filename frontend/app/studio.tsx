@@ -13,7 +13,7 @@ import {
   ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import api from '../src/utils/apiClient';
 import BuildJourney from '../src/components/BuildJourney';
 import { watchBuildJob } from '../src/product/buildJobLifecycle';
@@ -285,7 +285,7 @@ export default function UnifiedStudio() {
           onNavigate={(route) => {
             const sep = route.includes('?') ? '&' : '?';
             const needsGame = ['/stages', '/snowball', '/forge-hub', '/construct-forge'].some((r) => route.startsWith(r));
-            router.push(needsGame && game ? `${route}${sep}game=${game}` : route);
+            router.push((needsGame && game ? `${route}${sep}game=${game}` : route) as Href);
           }}
         />
 

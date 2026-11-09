@@ -217,7 +217,7 @@ async def call_education_ai(prompt: str, system_prompt: str) -> str:
                 version="1",
                 instructions=system_prompt.strip(),
             ),
-        ).with_model("openai", "gpt-4o")
+        )
         
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
