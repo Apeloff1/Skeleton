@@ -92,6 +92,30 @@ def test_playable_launch_executes_real_runtime_session(tmp_path):
     result = plane.receipts.load_result(admitted.id)
     assert result["session_id"]
     assert result["runtime"]["active"] == 1
+    assert result["checkpointed"] is True
+
+    # A fresh control-plane process restores the authoritative session checkpoint.
+    restored = ProductControlPlane(tmp_path)
+    assert restored.native_executors.sessions.get(result["session_id"], owner="player").id == result["session_id"]
+
+
+def test_runtime_session_inventory_is_principal_scoped(tmp_path):
+    plane = ProductControlPlane(tmp_path)
+    for principal, seed in (("alice", 1), ("bob", 2)):
+        admitted = plane.admit(
+            capability_id="playables", domain="playables", action="playable.launch", principal=principal,
+            actor_weight=0, payload={"seed": seed, "resolution": 12, "thermal_count": 0},
+        )
+        assert asyncio.run(plane.execute_registered(admitted.outbox_seq)) is True
+
+    query = plane.admit(
+        capability_id="playables", domain="playables", action="runtime.sessions", principal="alice",
+        actor_weight=0, payload={"limit": 10},
+    )
+    assert asyncio.run(plane.execute_registered(query.outbox_seq)) is True
+    result = plane.receipt_result(query.id)
+    assert len(result["sessions"]) == 1
+    assert "owner" not in result["sessions"][0]
 
 
 def test_build_submit_executes_artifact_adapter_and_hides_internal_path(tmp_path, monkeypatch):

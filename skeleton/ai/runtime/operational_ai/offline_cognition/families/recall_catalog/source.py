@@ -20,6 +20,6 @@ def partition(raw,*,target_words=160,overlap=24):
     if type(raw) is not bytes or not 1<=len(raw)<=PROFILE.byte_limit:
         refuse("original source bytes required")
     return passages(raw.decode("utf-8","strict"),target_words=target_words,
-                    overlap=overlap,maximum_passages=PROFILE.context_limit)
+                    overlap=overlap,maximum_passages=min(PROFILE.context_limit,10000))
 def excerpt(raw,source,*,start,end,tenant,subject):
     return extract_span(raw,source,start=start,end=end,tenant=tenant,subject=subject)
