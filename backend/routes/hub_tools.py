@@ -25,8 +25,22 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, ConfigDict, Field
 
 router = APIRouter(tags=["hub-tools"])
+
+
+class FeatureImplementationRequest(BaseModel):
+    """Bounded feature proposal accepted by the planning-only AI boundary."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
+    name: str = Field(min_length=1, max_length=160)
+    description: str = Field(min_length=1, max_length=2000)
+    category: str = Field(min_length=1, max_length=80)
+    impact: str = Field(pattern=r"^(low|medium|high|critical)$")
+    implementation_difficulty: str = Field(pattern=r"^(low|medium|high)$")
 
 
 @router.get("/hub/expansions/installed")
@@ -177,9 +191,9 @@ async def query_sota(data: dict):
 
 
 @router.post("/ai/hub/auto-implement")
-async def auto_implement(feature_spec: dict):
-    """Generate implementation plan for a feature."""
-    return await _srv().ai_hub.auto_implement_feature(feature_spec)
+async def auto_implement(feature_spec: FeatureImplementationRequest):
+    """Generate a bounded implementation plan; this endpoint performs no edits."""
+    return await _srv().ai_hub.auto_implement_feature(feature_spec.model_dump())
 
 
 # ═══════════════════════════════════════════════════════════════════════

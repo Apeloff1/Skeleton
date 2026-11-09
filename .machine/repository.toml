@@ -358,7 +358,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "build-delivery"
-prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/ops/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
+prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/ops/", "skeleton/developer/", "skeleton/ubuntu/", "skeleton/godot_export/", "skeleton/mass_build/", "packaging/", "java-accelerators/", "deploy.py"]
 owner = "delivery-plane"
 criticality = "high"
 purpose = "Build graph, packaging, installers, release, deployment and developer delivery tooling."

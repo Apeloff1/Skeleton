@@ -125,3 +125,16 @@ def test_godot_export_and_legacy_mass_build_have_explicit_existing_owners() -> N
     assert (mass_build.zone, mass_build.owner, mass_build.lifecycle) == (
         "automation-extensions", "automation-control-plane", "support"
     )
+
+def test_godot_export_and_mass_build_are_owned_by_delivery_plane() -> None:
+    config = load_machine_config(ROOT)
+    for path in (
+        "skeleton/godot_export/export.py",
+        "skeleton/mass_build/manifest.py",
+    ):
+        placement = placement_for_path(config, path)
+        assert (placement.zone, placement.owner, placement.lifecycle) == (
+            "build-delivery",
+            "delivery-plane",
+            "canonical",
+        )
