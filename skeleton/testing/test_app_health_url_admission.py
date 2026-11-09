@@ -47,3 +47,39 @@ def test_invalid_timeout_fails_before_io(monkeypatch, budget):
     monkeypatch.setattr("skeleton.app.health._open_direct_health", forbidden)
     with pytest.raises((ValueError, TypeError), match="timeout"):
         probe_http("engine", "http://127.0.0.1:8010/health", timeout=budget)
+
+
+@pytest.mark.parametrize("origin", [
+    "http://127.0.0.1:8080\\nX-Injected: yes",
+    "http://127.0.0.1:8080\\t",
+    " http://127.0.0.1:8080",
+    "http://127.0.0.1:8080 ",
+    "http://127.0.0.1:8080\\x7f",
+])
+def test_setup_probe_rejects_malformed_origin_without_io(monkeypatch, origin):
+    from dataclasses import replace
+    from skeleton.app.assembly import load_manifest
+    from skeleton.app.health import probe_local_setup
+
+    service = replace(load_manifest().service("frontend"), public_url=origin, health_path="/setup")
+    def forbidden(*args, **kwargs):
+        pytest.fail("malformed setup origin dispatched IO")
+    monkeypatch.setattr("skeleton.app.health.build_opener", forbidden)
+    result = probe_local_setup(service)
+    assert not result.ok
+    assert result.status is None
+    assert result.url == ""
+
+
+@pytest.mark.parametrize("budget", [True, False, None, "3", float("nan"), float("inf"), 0, -1, 11])
+def test_setup_probe_rejects_invalid_timeout_before_io(monkeypatch, budget):
+    from dataclasses import replace
+    from skeleton.app.assembly import load_manifest
+    from skeleton.app.health import probe_local_setup
+
+    service = replace(load_manifest().service("frontend"), public_url="http://127.0.0.1:8080", health_path="/setup")
+    def forbidden(*args, **kwargs):
+        pytest.fail("invalid setup timeout dispatched IO")
+    monkeypatch.setattr("skeleton.app.health.build_opener", forbidden)
+    with pytest.raises(ValueError, match="timeout"):
+        probe_local_setup(service, timeout=budget)
