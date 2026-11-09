@@ -17,6 +17,14 @@ WORKFLOWS = Path(".github/workflows")
 ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
 
+# One independently guarded queue-drain lane survives the owner-directed
+# backlog pause. Housekeeping and three-hour expiry stay dispatch-only.
+SCHEDULED_RECOVERY = frozenset({"queue-drain.yml"})
+PAUSED_RECOVERY = frozenset({
+    "actions-housekeeping-cli.yml",
+    "three-hour-actions-queue-expiry.yml",
+})
+
 
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
@@ -60,7 +68,24 @@ def audit(root: Path = ROOT) -> list[str]:
             or any(not isinstance(name, str) or not name.endswith(".yml") or "/" in name
                    for group in tiers for name in group)):
         return ["CI tiers require nonempty sets of plain .yml file names"]
-    names = specialised + core + reusable
+    scheduled = policy.get("operational_scheduled_non_pr")
+    paused = policy.get("operational_paused_manual_only")
+    if (type(scheduled) is not list
+            or len(scheduled) != len(SCHEDULED_RECOVERY)
+            or any(type(name) is not str for name in scheduled)
+            or set(scheduled) != SCHEDULED_RECOVERY):
+        failures.append("scheduled operational registry must be the exact queue-drain lane")
+        scheduled = []
+    if (type(paused) is not list
+            or len(paused) != len(PAUSED_RECOVERY)
+            or any(type(name) is not str for name in paused)
+            or set(paused) != PAUSED_RECOVERY):
+        failures.append("paused operational registry must contain exactly two manual lanes")
+        paused = []
+    for name in SCHEDULED_RECOVERY | PAUSED_RECOVERY:
+        if not (root / WORKFLOWS / name).is_file():
+            failures.append(f"{name}: required operational workflow missing")
+    names = specialised + core + reusable + scheduled + paused
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
     rules = policy.get("release_rules")
@@ -70,8 +95,8 @@ def audit(root: Path = ROOT) -> list[str]:
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
     if not active:
         failures.append("unexpected active workflow count: 0")
-    # Signed evidence workflows may sit beside the compact PR set when they
-    # cannot run automatically. Only non-manual triggers consume the cap.
+    # Count every independently triggered workflow except the one independently
+    # guarded queue-drain recovery lane. All paused writers remain manual.
     automatic = 0
     for path in active:
         try:
@@ -80,6 +105,21 @@ def audit(root: Path = ROOT) -> list[str]:
             failures.append(
                 f"{path.name}: cannot inspect active workflow ({exc})"
             )
+            continue
+        if path.name == "queue-drain.yml":
+            source = path.read_text(encoding="utf-8")
+            if (found != {"workflow_dispatch", "schedule", "push"}
+                    or not re.search(
+                        r"(?m)^  push:\n    branches: \[main\]\n    paths: \['\.github/workflows/queue-drain\.yml'\]$", source
+                    )
+                    or not re.search(r"(?m)^permissions: \{\}$", source)):
+                failures.append(f"{path.name}: operational-only trigger or permission drift")
+            continue
+        if path.name in PAUSED_RECOVERY:
+            source = path.read_text(encoding="utf-8")
+            if (found != {"workflow_dispatch"}
+                    or not re.search(r"(?m)^permissions: \{\}$", source)):
+                failures.append(f"{path.name}: paused workflow gained automatic admission or permissions")
             continue
         if independently_triggered(found):
             automatic += 1
