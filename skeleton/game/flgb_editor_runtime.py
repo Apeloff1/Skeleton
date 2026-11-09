@@ -153,22 +153,22 @@ class SceneGraph:
         if len(roots)!=1: raise GameProjectError("scene graph requires exactly one root")
         for node in nodes:
             if node.parent_id is not None and node.parent_id not in by_id: raise GameProjectError("orphan scene node")
-        # Iterative parent walk: imported scene chains may exceed Python's recursion
-        # limit. Each node is finalized once, keeping validation linear in size.
-        state:dict[str,int]={}
-        for start in by_id:
-            if state.get(start)==2:
+        # Parent chains can be as deep as MAX_NODES; recursion would crash
+        # with RecursionError on otherwise valid imported worlds.
+        state={}
+        for node_id in by_id:
+            if state.get(node_id)==2:
                 continue
-            chain:list[str]=[]
-            cursor:str|None=start
+            chain=[]
+            cursor=node_id
             while cursor is not None and state.get(cursor)!=2:
                 if state.get(cursor)==1:
                     raise GameProjectError("scene graph cycle")
                 state[cursor]=1
                 chain.append(cursor)
                 cursor=by_id[cursor].parent_id
-            for node_id in chain:
-                state[node_id]=2
+            for visited in chain:
+                state[visited]=2
         entity_ids=[n.entity_id for n in nodes if n.entity_id is not None]
         if len(set(entity_ids))!=len(entity_ids): raise GameProjectError("entity attached to multiple scene nodes")
         self.nodes=tuple(sorted(nodes,key=lambda n:(n.order,n.node_id)))
