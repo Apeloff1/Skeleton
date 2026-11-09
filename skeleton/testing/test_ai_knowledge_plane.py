@@ -43,7 +43,7 @@ class Native:
 
 class KnowledgeAcceptance(unittest.TestCase):
     def setUp(self):
-        self.tmp=tempfile.TemporaryDirectory(prefix='ai-knowledge-', dir=Path.home())
+        self.tmp=tempfile.TemporaryDirectory(prefix='ai-knowledge-',dir=Path.home())
         self.root=Path(self.tmp.name)
         self.state=self.root/'state';self.state.mkdir(mode=0o700)
         self.source=self.root/'source';self.source.mkdir(mode=0o700)

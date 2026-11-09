@@ -20,6 +20,7 @@ import type { WorldStageKey } from '../src/product/worldWorkspace';
 type State = 'loading' | 'ready' | 'offline';
 const COLORS = { background:'#080A11', panel:'#111827', border:'#293247',
   text:'#F2F5FF', dim:'#A4B1C9', accent:'#A78BFA', green:'#85E5AE', amber:'#FFD28A' };
+const JOB_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 export default function WorldWorkbench() {
   const router = useRouter();
@@ -38,6 +39,7 @@ export default function WorldWorkbench() {
   const [message, setMessage] = React.useState('');
   const [systems, setSystems] = React.useState<ReturnType<typeof mountedWorldSystems>>([]);
   const [contextStatus, setContextStatus] = React.useState<'loading'|'available'|'unavailable'>('loading');
+  const [secondaryMessage, setSecondaryMessage] = React.useState('');
   const [selection, setSelection] = React.useState<WorldStageKey>('world');
   const [jobStage, setJobStage] = React.useState<WorldStageKey | null>(null);
   const [jobMessage, setJobMessage] = React.useState('');
@@ -50,6 +52,7 @@ export default function WorldWorkbench() {
     const isCurrent = () => requestId === loadRequest.current && !signal?.aborted;
     setState('loading');
     setMessage('');
+    setSecondaryMessage('');
     // Independently failing secondary surfaces must not block the game KB.
     const [knowledge, mounted, assetContext] = await Promise.allSettled([
       api.get<any>(`/api/pipeline/${encodeURIComponent(gameId)}/kb`,
@@ -65,6 +68,11 @@ export default function WorldWorkbench() {
     } else { setSystems([]); }
     setContextStatus(assetContext.status === 'fulfilled' && assetContext.value.ok && assetContext.value.data
       ? 'available' : 'unavailable');
+    const secondaryFailures = [
+      !(mounted.status === 'fulfilled' && mounted.value.ok) ? 'mounted systems' : '',
+      !(assetContext.status === 'fulfilled' && assetContext.value.ok) ? 'asset context' : '',
+    ].filter(Boolean);
+    if (secondaryFailures.length) setSecondaryMessage(`Partial evidence outage: ${secondaryFailures.join(' and ')} could not be verified.`);
     if (knowledge.status === 'fulfilled' && knowledge.value.ok && knowledge.value.data
       && !knowledge.value.data.error && Array.isArray(knowledge.value.data.artifacts)) {
       setKb(knowledge.value.data);
@@ -81,6 +89,7 @@ export default function WorldWorkbench() {
     setKb(null);
     setSystems([]);
     setContextStatus('loading');
+    setSecondaryMessage('');
     setJobMessage('');
     setSelection('world');
     const controller = new AbortController();
@@ -104,7 +113,7 @@ export default function WorldWorkbench() {
         `/api/pipeline/${encodeURIComponent(gameId)}/forge/${encodeURIComponent(stage)}/async`,
         {}, { timeoutMs: 15_000, retries: 0, signal:controller.signal });
       const id = result.data?.job_id;
-      if (!result.ok || typeof id !== 'string' || !id) {
+      if (!result.ok || typeof id !== 'string' || !JOB_ID.test(id)) {
         setJobMessage('The service did not accept this forge request. Nothing is confirmed changed.');
         return;
       }
@@ -170,6 +179,12 @@ export default function WorldWorkbench() {
           <TouchableOpacity testID="world-retry" accessibilityRole="button"
             style={styles.secondary} onPress={() => void load()}>
             <Text style={styles.secondaryText}>Retry evidence fetch</Text>
+          </TouchableOpacity>
+        </View>}
+        {!!secondaryMessage && <View style={styles.panel} testID="world-partial-evidence">
+          <Text style={styles.warning}>{secondaryMessage}</Text>
+          <TouchableOpacity accessibilityRole="button" style={styles.secondary} onPress={() => void load()}>
+            <Text style={styles.secondaryText}>Retry all evidence sources</Text>
           </TouchableOpacity>
         </View>}
         {!!jobMessage && <View style={styles.panel} testID="world-job-status">

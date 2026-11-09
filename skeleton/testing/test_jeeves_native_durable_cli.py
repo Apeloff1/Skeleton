@@ -51,7 +51,7 @@ class TestNativeDurableOperatorCLI(unittest.TestCase):
     RUN = "cli_durable_session_001"
 
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory(prefix='jeeves-durable-cli-', dir=Path.home())
+        self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.db = None
         self.gate = None
