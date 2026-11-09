@@ -42,7 +42,7 @@ class FixtureBackend:
 
 class FlightHttpAcceptance(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(prefix='ai-flight-http-')
+        self.temp=tempfile.TemporaryDirectory(prefix='ai-flight-http-',dir=Path.home())
         self.root=Path(self.temp.name)
         self.state=self.root/'private';self.state.mkdir(mode=0o700)
         establish_binding(self.state,PrincipalBinding('tenant','operator',M,T))
