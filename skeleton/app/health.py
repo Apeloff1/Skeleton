@@ -60,6 +60,9 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
             target.scheme in {"http", "https"}
             and target.hostname is not None
             and target.hostname != ""
+            # Reject ambiguous authority delimiters before urllib transport.
+            and "\\" not in target.netloc
+            and "%" not in target.netloc
             and target.username is None
             and target.password is None
             and not target.fragment
