@@ -172,11 +172,23 @@ class SessionStore:
             raise CanonError("session_world_lease_mismatch")
 
     def read(self, world_id: str, slot: str) -> dict[str, Any]:
+        """Read a consistent world/session pair under the canonical writer lease.
+
+        Previously a world revision could publish between the two reads,
+        yielding a spurious replay failure or a mixed-generation snapshot.
+        A busy writer is an explicit retryable error, not an unlocked fallback.
+        """
+        _id(world_id, "world_id")
         _id(slot, "slot")
         fd = self.worlds._directory()
         try:
-            world = self._world(fd, world_id)
-            return self._session(fd, world_id, slot, world)
+            lock_fd = self._lock(fd, world_id)
+            try:
+                os.close(lock_fd)
+                world = self._world(fd, world_id)
+                return self._session(fd, world_id, slot, world)
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
         finally:
             os.close(fd)
 
