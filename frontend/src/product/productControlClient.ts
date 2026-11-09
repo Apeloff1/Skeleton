@@ -104,6 +104,13 @@ export type ExecutionReceipt = {
 export type DispatchFailure = { outbox_seq: number; operation_id: string; executor: string; error: string };
 export type DispatchReport = { attempted: number; confirmed: number[]; deferred: number[]; unbound: number[]; failed: DispatchFailure[]; remaining: number };
 export type OperationAdmission = { operation_id: string; capability_id: string; pillar: string; outbox_seq: number; admitted_at: string; audit_hash: string };
+export type OperationLifecycle = {
+  operation_id: string; state: string; pending: boolean; pending_present: boolean;
+  executor_bound: boolean; receipt_present: boolean; admitted_audit_present: boolean;
+  executed_audit_present: boolean; failed_audit_count: number; deferred_audit_count: number;
+  anomalies: string[]; confidence: string; evidence_sha256: string;
+  receipt: ExecutionReceipt | null;
+};
 export type AdmitOperationInput = { capability_id: string; domain: string; action: string; principal: string; actor_weight: number; payload: Record<string, unknown>; quorum_approved?: boolean; idempotency_key?: string };
 
 const ROOT = '/api/admin/ops/product-control';
@@ -154,6 +161,11 @@ export function getExecutionReceipts(token = '', limit = 50, signal?: AbortSigna
 }
 export function getExecutionResult(operationId: string, token = '', signal?: AbortSignal): Promise<ApiResult<Record<string, unknown>>> {
   return api.get<Record<string, unknown>>(`${ROOT}/receipt/${encodeURIComponent(operationId)}/result${tokenQuery(token)}`, { signal, cacheKey: `product-control-result-${operationId}`, cacheTtlMs: 30_000 });
+}
+export function getOperationLifecycle(operationId: string, token = '', signal?: AbortSignal): Promise<ApiResult<OperationLifecycle>> {
+  return api.get<OperationLifecycle>(`${ROOT}/operation/${encodeURIComponent(operationId)}/lifecycle${tokenQuery(token)}`, {
+    signal, cacheKey: `product-control-lifecycle-${operationId}`, cacheTtlMs: 1_000,
+  });
 }
 export function executeProductOperation(seq: number, token = '', signal?: AbortSignal): Promise<ApiResult<{ outbox_seq: number; confirmed: boolean; status: string }>> {
   return api.post(`${ROOT}/execute/${seq}${tokenQuery(token)}`, {}, { signal, retries: 0 });
