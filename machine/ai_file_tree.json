@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "b80362482d10e791ed3db1de9bf0514d96324ae4",
+      "source_git_object_sha": "cbdd817518da7feba19955c882db588e72bba2f7",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -735,7 +735,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "e8a70fd9bad74a5991f645fcc291a902a6a0df29",
+      "source_git_object_sha": "0c4c6b06b32c10df770c978606f1c914359c8135",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -7240,8 +7240,8 @@
     },
     {
       "path": "skeleton/mass_build",
-      "owner": "build-pipeline source owner",
-      "reason": "Mass-build orchestration is a separate governed build-pipeline source, with no AI ownership cutover or release approval."
+      "owner": "delivery-plane / batch build orchestration",
+      "reason": "Git-tracked batch build execution and build-manifest tooling stay under the governed delivery plane; source is retained and never treated as AI runtime cutover or completed work-package evidence."
     },
     {
       "path": "skeleton/masterplan",
@@ -7335,8 +7335,8 @@
     },
     {
       "path": "skeleton/perf_profiler",
-      "owner": "performance instrumentation and observability",
-      "reason": "Resource profiling remains observability, not authoritative inference or model migration."
+      "owner": "platform-runtime / observability",
+      "reason": "Canonical CPU and runtime profiling instrumentation belongs to the platform observability substrate and remains outside AI-tree implementation ownership until an explicit, independently qualified cutover."
     },
     {
       "path": "skeleton/persist",
@@ -7372,11 +7372,6 @@
       "path": "skeleton/provider_contract.py",
       "owner": "provider compatibility boundary",
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
-    },
-    {
-      "path": "skeleton/provider_environment.py",
-      "owner": "environment replay and holdout simulation",
-      "reason": "Provider environment replay retains its source custody and holdout-isolation owner pending independent qualification."
     },
     {
       "path": "skeleton/providers",
@@ -7787,7 +7782,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 163,
+    "retained_outside_ai_tree_count": 157,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
