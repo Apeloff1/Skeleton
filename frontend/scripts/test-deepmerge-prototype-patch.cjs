@@ -9,11 +9,12 @@ const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 
 const frontend = path.resolve(__dirname, '..');
-const original = path.join(frontend, 'node_modules/deepmerge');
+const original = path.join(frontend, 'vendor/deepmerge');
 const patcher = fs.readFileSync(path.join(__dirname, 'patch-node-modules.js'), 'utf8');
 const verifier = fs.readFileSync(path.join(__dirname, 'verify-deepmerge-security.cjs'), 'utf8');
 const files = ['index.js', 'dist/cjs.js', 'dist/umd.js'];
-assert.equal(JSON.parse(fs.readFileSync(path.join(original, 'package.json'), 'utf8')).version, '4.3.1');
+assert.equal(JSON.parse(fs.readFileSync(path.join(original, 'package.json'), 'utf8')).version, '4.3.2');
+const guard = "if (key === '__proto__') throw new Error('[deepmerge] unsafe __proto__ key'); // skeleton GHSA-gcqx-w48m-w2h4";
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deepmerge-prototype-'));
@@ -22,6 +23,18 @@ function fixture(t) {
   const pkg = path.join(root, 'node_modules/deepmerge');
   fs.mkdirSync(path.dirname(script), { recursive: true });
   fs.cpSync(original, pkg, { recursive: true });
+  // Derive an intentionally de-guarded, test-only 4.3.1 fixture from the
+  // checked-in hardened source. This is not an upstream authenticity claim.
+  const metaPath = path.join(pkg, 'package.json');
+  const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+  delete meta.skeleton;
+  fs.writeFileSync(metaPath, JSON.stringify({ ...meta, version: '4.3.1' }));
+  for (const rel of files) {
+    const file = path.join(pkg, rel);
+    const source = fs.readFileSync(file, 'utf8');
+    assert.equal(source.split(guard).length - 1, 2, rel);
+    fs.writeFileSync(file, source.split(guard).join(''));
+  }
   fs.writeFileSync(script, patcher);
   const verifyScript = path.join(root, 'scripts/verify-deepmerge-security.cjs');
   fs.writeFileSync(verifyScript, verifier);
@@ -34,6 +47,7 @@ function fixture(t) {
   fs.mkdirSync(expo, { recursive: true });
   fs.writeFileSync(path.join(expo, 'package.json'), JSON.stringify({ name: '@expo/config', version: '12.0.14' }));
   return {
+    root,
     pkg,
     run: () => spawnSync(process.execPath, [script], { cwd: root, encoding: 'utf8', timeout: 5000 }),
     verify: () => spawnSync(process.execPath, [verifyScript], { cwd: root, encoding: 'utf8', timeout: 5000 }),
@@ -45,13 +59,34 @@ function fixture(t) {
 function maliciousTarget() { return JSON.parse('{"__proto__":{"polluted":"from-target"},"safe":1}'); }
 function maliciousSource() { return JSON.parse('{"__proto__":{"polluted":"from-source"},"safe":2}'); }
 
-test('real upstream distributions reproduce poisoning before mitigation', t => {
+test('de-guarded local fixture reproduces poisoning before mitigation', t => {
   const f = fixture(t);
   for (const rel of files) {
     const merge = f.load(rel);
     assert.equal(merge(maliciousTarget(), {}).polluted, 'from-target', rel);
     assert.equal(merge(Object.create(null), maliciousSource()).polluted, 'from-source', rel);
   }
+});
+
+test('reviewed hardened vendor is exact, accepted and fails closed on provenance drift', t => {
+  const f = fixture(t);
+  const trusted = path.join(f.root, 'vendor/deepmerge');
+  fs.mkdirSync(path.dirname(trusted), { recursive: true });
+  fs.cpSync(original, trusted, { recursive: true });
+  fs.rmSync(f.pkg, { recursive: true, force: true });
+  fs.cpSync(original, f.pkg, { recursive: true });
+  assert.equal(f.verify().status, 0, f.verify().stderr);
+  assert.equal(f.run().status, 0, 'postinstall must preserve the hardened vendor');
+  const manifest = path.join(f.pkg, 'package.json');
+  const raw = fs.readFileSync(manifest, 'utf8');
+  const modified = JSON.parse(raw);
+  delete modified.skeleton;
+  fs.writeFileSync(manifest, JSON.stringify(modified));
+  assert.notEqual(f.verify().status, 0, 'missing vendor provenance must not qualify');
+  fs.writeFileSync(manifest, raw);
+  const target = path.join(f.pkg, 'dist/cjs.js');
+  fs.appendFileSync(target, '\\n// unreviewed source drift\\n');
+  assert.notEqual(f.verify().status, 0, 'source byte mismatch must not qualify');
 });
 
 test('postinstall rejects target and source poisoning in all three distributions', t => {
@@ -91,7 +126,8 @@ test('an interrupted multi-file update can be rerun without changing hardened fi
   const f = fixture(t);
   assert.equal(f.run().status, 0);
   const hardened = f.snapshot();
-  fs.copyFileSync(path.join(original, files[0]), path.join(f.pkg, files[0]));
+  const damaged = path.join(f.pkg, files[0]);
+  fs.writeFileSync(damaged, fs.readFileSync(damaged, 'utf8').split(guard).join(''));
   assert.equal(f.run().status, 0);
   assert.deepEqual(f.snapshot(), hardened);
 });
