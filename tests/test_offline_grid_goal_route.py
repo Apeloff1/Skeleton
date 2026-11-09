@@ -36,6 +36,20 @@ class GoalRouteTests(unittest.TestCase):
         self.assertEqual(Session.restore(source, state.snapshot()).shortest_goal_route(),
                          ("east", "east"))
 
+    def test_defeated_enemy_disappears_from_render_and_replay(self):
+        source = campaign(["#####", "#S.G#", "#####"], [
+            {"id": "guard", "kind": "enemy", "x": 2, "y": 1, "hp": 2, "attack": 0}
+        ])
+        initial = Session.new(source)
+        self.assertIn("E", initial.render())
+        defeated = initial.step(Command("defeat_guard", "strike", "guard"))
+        self.assertEqual(defeated.render(), "#####\\n#@.G#\\n#####")
+        self.assertNotIn("E", defeated.render())
+        self.assertNotIn("N", defeated.render())
+        self.assertEqual(Session.restore(source, defeated.snapshot()).render(), defeated.render())
+        advanced = defeated.step(Command("advance", "move", "east"))
+        self.assertEqual((advanced.x, advanced.y), (2, 1))
+
     def test_quest_target_navigation_and_replay(self):
         source = campaign(["#######", "#S...G#", "#.....#", "#######"], [
             {"id": "guide", "kind": "npc", "x": 3, "y": 2}
