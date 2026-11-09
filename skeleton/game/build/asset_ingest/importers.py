@@ -225,7 +225,10 @@ def _obj(data: bytes) -> dict[str, Any]:
         tag, args = parts[0], parts[1:]
         try:
             if tag == "v":
-                verts.append((float(args[0]), float(args[1]), float(args[2])))
+                vertex = (float(args[0]), float(args[1]), float(args[2]))
+                if not all(math.isfinite(axis) for axis in vertex):
+                    raise AssetImportError(f"obj line {n}: non-finite vertex coordinate")
+                verts.append(vertex)
             elif tag == "vt":
                 uvs += 1
             elif tag == "vn":
