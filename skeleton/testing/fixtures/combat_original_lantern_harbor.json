@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.game.combat_session.v1",
+  "world_id": "lantern-harbor",
+  "encounter_id": "tideglass-crossing",
+  "player": {
+    "id": "mara-the-cartographer",
+    "hp": 100,
+    "stamina": 30,
+    "armor": 3,
+    "level": 2,
+    "attack_ids": [
+      "lantern-jab"
+    ],
+    "healing_items": 2
+  },
+  "enemy": {
+    "id": "saltwind-sentinel",
+    "hp": 72,
+    "stamina": 30,
+    "armor": 2,
+    "level": 1,
+    "attack_ids": [
+      "wind-lash"
+    ]
+  },
+  "attacks": [
+    {
+      "id": "lantern-jab",
+      "power": 14,
+      "stamina_cost": 3,
+      "damage_type": "physical",
+      "tier": "minor",
+      "windup_ms": 450,
+      "active_ms": 150,
+      "recovery_ms": 200,
+      "channels": [
+        "body_anim"
+      ],
+      "crit_percent": 0
+    },
+    {
+      "id": "wind-lash",
+      "power": 8,
+      "stamina_cost": 2,
+      "damage_type": "frost",
+      "tier": "minor",
+      "windup_ms": 550,
+      "active_ms": 180,
+      "recovery_ms": 250,
+      "channels": [
+        "vfx_glow"
+      ],
+      "crit_percent": 0
+    }
+  ],
+  "reward_item": "saltwind-map-fragment"
+}
