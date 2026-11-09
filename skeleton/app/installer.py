@@ -367,7 +367,7 @@ def install_application(
             # public_service_urls is intentionally a sparse *override* map.
             # On a clean install with default ports it has no "backend" key;
             # use the already resolved canonical manifest URL as the fallback.
-            backend_url = host_urls.get("backend", manifest.service("backend").public_url)
+            backend_url = host_urls["backend"] if "backend" in host_urls else manifest.service("backend").public_url
             route_status = critical_backend_route_report(backend_url, timeout=3.0)
             routes_ready = route_status["ready"] is True
             phases.append(

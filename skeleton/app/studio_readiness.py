@@ -231,7 +231,14 @@ def _server_snapshot(
         headers["Authorization"] = "Bearer " + token
     request = Request(base.rstrip("/") + endpoint, headers=headers)
     try:
-        # Local diagnostics must never send bearer tokens or private readiness\n        # requests through inherited HTTP(S)_PROXY/ALL_PROXY settings.\n        # The opener is per-request; global urllib configuration is unchanged.\n        opener = (\n            build_opener(ProxyHandler({}), _NoRedirect)\n            if loopback else build_opener(_NoRedirect)\n        )\n        with opener.open(request, timeout=timeout) as response:
+        # Local diagnostics must never send bearer tokens or private readiness
+        # requests through inherited HTTP(S)_PROXY/ALL_PROXY settings.
+        # The opener is per-request; global urllib configuration is unchanged.
+        opener = (
+            build_opener(ProxyHandler({}), _NoRedirect())
+            if loopback else build_opener(_NoRedirect())
+        )
+        with opener.open(request, timeout=timeout) as response:
             raw = response.read(max_response_bytes + 1)
         if len(raw) > max_response_bytes:
             return {"observed": False, "code": "server_inventory_exceeds_capacity"}
