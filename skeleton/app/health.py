@@ -50,6 +50,23 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
 
     if not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
         raise ValueError("health probe timeout must be finite and within (0, 30] seconds")
+    try:
+        target = urlsplit(url)
+        valid = (
+            target.scheme in {"http", "https"}
+            and target.hostname is not None
+            and target.username is None
+            and target.password is None
+            and not target.fragment
+            and target.port != 0
+        )
+    except ValueError:
+        valid = False
+    if not valid:
+        return ProbeResult(
+            service=name, url="", ok=False, status=None,
+            detail="health probe requires HTTP(S) without credentials",
+        )
     request = Request(url, headers={"User-Agent": "skeleton-app-smoke/1"})
     try:
         with _open_direct_health(request, timeout=timeout) as response:
