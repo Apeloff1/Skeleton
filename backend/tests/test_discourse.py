@@ -63,8 +63,9 @@ def private_discourse_headers() -> dict[str, str]:
 
 @pytest.mark.live_service
 class TestLive:
-    def test_panel_endpoint(self, live_base_url):
-        r = requests.get(f"{live_base_url}/api/discourse/panel", timeout=15)
+    def test_panel_endpoint(self, live_base_url, private_discourse_headers):
+        r = requests.get(f"{live_base_url}/api/discourse/panel",
+                         headers=private_discourse_headers, timeout=15)
         assert r.status_code == 200, r.text
         d = r.json()
         assert "default_panel" in d and "default_judge" in d and "available_models" in d

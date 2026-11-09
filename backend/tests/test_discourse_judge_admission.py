@@ -11,6 +11,29 @@ from routes import discourse
 ALICE = {"tenant_id": "tenant-1", "owner_id": "alice@example.test"}
 
 
+@pytest.fixture(autouse=True)
+def _source_declared_model_fixture(monkeypatch):
+    """Provider tests inject catalog authority, never fake a legacy model pin."""
+    from core.discourse_catalog import DeclaredModel, DeclaredPanel
+
+    async def resolve(*, tenant_id, actor_id, selected=None, judge_key=None, maximum=5):
+        assert tenant_id and actor_id
+        names = selected or ["m1", "m2"]
+        models = tuple(
+            DeclaredModel("fixture:" + name, "fixture", name, index == 0)
+            for index, name in enumerate(names[:maximum])
+        )
+        name = judge_key or "judge"
+        judge = DeclaredModel("fixture:" + name, "fixture", name, False)
+        return DeclaredPanel(
+            models, judge,
+            "multiple_models_one_provider" if len(models) > 1 else "single_model_self_review",
+            False, judge.key not in {model.key for model in models},
+        )
+
+    monkeypatch.setattr(discourse, "tenant_panel", resolve)
+
+
 @pytest.mark.parametrize("value", [
     "[]", "true", "null", "NaN", '{"winner_index":NaN}',
     '{"scores": [], "scores": [1]}',
@@ -69,11 +92,9 @@ def test_direct_input_rejects_unknown_selected_panel_before_model_invocation(mon
 
 
 def test_malformed_judge_scores_do_not_create_fabricated_winner(monkeypatch):
-    monkeypatch.setattr(discourse, "MODEL_CATALOG", {
-        "m1": {"provider": "a"}, "m2": {"provider": "b"}, "judge": {"provider": "c"}
-    })
 
     async def fake_route(*_args, model=None, **_kwargs):
+        model = _kwargs.get("model_id", model)
         if model == "judge":
             return {"content": '{"winner_index":true,"scores":[{},false,"x",{"index":0,"quality":NaN,"fidelity":95}]}'}
         return {"content": "valid candidate from model"}
@@ -87,11 +108,9 @@ def test_malformed_judge_scores_do_not_create_fabricated_winner(monkeypatch):
 
 
 def test_provider_exception_does_not_cancel_surviving_candidate(monkeypatch):
-    monkeypatch.setattr(discourse, "MODEL_CATALOG", {
-        "m1": {"provider": "a"}, "m2": {"provider": "b"}, "judge": {"provider": "c"}
-    })
 
     async def fake_route(*_args, model=None, **_kwargs):
+        model = _kwargs.get("model_id", model)
         if model == "m1":
             raise RuntimeError("provider unavailable")
         if model == "judge":
@@ -111,17 +130,15 @@ def test_provider_exception_does_not_cancel_surviving_candidate(monkeypatch):
     result = asyncio.run(discourse.deliberate(
         "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False, identity=ALICE
     ))
-    assert result["winner_model"] == "m2"
+    assert result["winner_model"] == "fixture:m2"
     assert result["judge_status"] == "reported_scores"
     assert result["winner_score"] > 0
 
 
 def test_boolean_judge_index_must_not_select_second_candidate(monkeypatch):
-    monkeypatch.setattr(discourse, "MODEL_CATALOG", {
-        "m1": {"provider": "a"}, "m2": {"provider": "b"}, "judge": {"provider": "c"}
-    })
 
     async def fake_route(*_args, model=None, **_kwargs):
+        model = _kwargs.get("model_id", model)
         if model == "judge":
             return {"content": '{"winner_index":true,"scores":[{"index":0,"quality":95,"fidelity":95},'
                                '{"index":1,"quality":5,"fidelity":5}]}'}
@@ -141,7 +158,7 @@ def test_boolean_judge_index_must_not_select_second_candidate(monkeypatch):
         "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False, identity=ALICE
     ))
     assert result["winner_index"] == 0
-    assert result["winner_model"] == "m1"
+    assert result["winner_model"] == "fixture:m1"
 
 
 
@@ -151,11 +168,9 @@ def test_large_integer_scores_do_not_overflow_float_conversion():
 
 
 def test_unacknowledged_log_write_is_not_reported_as_durable(monkeypatch):
-    monkeypatch.setattr(discourse, "MODEL_CATALOG", {
-        "m1": {"provider": "a"}, "judge": {"provider": "b"}
-    })
 
     async def fake_route(*_args, model=None, **_kwargs):
+        model = _kwargs.get("model_id", model)
         if model == "judge":
             return {"content": '{"winner_index":0,"scores":[{"index":0,"quality":85,"fidelity":92}]}'}
         return {"content": "candidate"}

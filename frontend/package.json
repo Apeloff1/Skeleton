@@ -39,6 +39,7 @@
     "test:localization": "node --test scripts/test-localization-contract.mjs",
     "test:dragon-wire": "node scripts/test-dragon-canonical-wire.cjs",
     "test:dragon-native-editor": "node --test scripts/test-dragon-native-puzzle-preview.mjs scripts/test-dragon-native-puzzle-history.mjs",
+    "test:discourse-jobs": "node --experimental-strip-types --test scripts/test-discourse-async-jobs.mjs",
     "test:product-journeys": "node --test scripts/test-product-journeys.mjs scripts/test-jeeves-model-inventory.mjs scripts/test-app-foundation-flows.mjs",
     "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs",
     "test:frontier-nav": "node --experimental-strip-types --test scripts/test-frontier-navigation.mjs scripts/test-frontier-surveyed-control.mjs",

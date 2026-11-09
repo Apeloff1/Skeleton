@@ -16,6 +16,27 @@ BOB = {"tenant_id": "tenant-1", "owner_id": "bob@example.test"}
 OTHER_TENANT = {"tenant_id": "tenant-2", "owner_id": "alice@example.test"}
 
 
+@pytest.fixture(autouse=True)
+def _fake_tenant_catalog(monkeypatch):
+    from core.discourse_catalog import DeclaredModel, DeclaredPanel
+
+    async def resolve(*, tenant_id, actor_id, selected=None, judge_key=None, maximum=5):
+        assert tenant_id and actor_id
+        models = tuple(
+            DeclaredModel("fixture:" + key, "fixture", key, False)
+            for key in (selected or ["model-a"])[:maximum]
+        )
+        judge_id = judge_key or "judge"
+        judge = DeclaredModel("fixture:" + judge_id, "fixture", judge_id, False)
+        return DeclaredPanel(
+            models, judge,
+            "single_model_self_review" if len(models) == 1 else "multiple_models_one_provider",
+            False, judge.key not in {item.key for item in models},
+        )
+
+    monkeypatch.setattr(discourse, "tenant_panel", resolve)
+
+
 @pytest.mark.parametrize("identity", [
     None, {}, {"dev_mode": True},
     {"tenant_id": "t", "owner_id": ""},
@@ -34,7 +55,7 @@ def test_every_private_route_requires_authorization():
     app.include_router(discourse.router)
     body = {"task": "creative", "prompt": "Create an original puzzle mechanic"}
     with TestClient(app) as client:
-        assert client.get("/api/discourse/panel").status_code == 200
+        assert client.get("/api/discourse/panel").status_code == 401
         assert client.get("/api/discourse/history").status_code == 401
         assert client.get("/api/discourse/result/" + "a" * 32).status_code == 401
         assert client.post("/api/discourse/deliberate", json=body).status_code == 401
@@ -96,13 +117,11 @@ def test_deliberation_writes_full_scope_before_reporting_durable(monkeypatch):
             return SimpleNamespace(acknowledged=True)
 
     async def fake_route(*_args, model=None, **_kwargs):
+        model = _kwargs.get("model_id", model)
         if model == "judge":
             return {"content": '{"winner_index":0,"scores":[{"index":0,"quality":80,"fidelity":90}]}'}
         return {"content": "Scoped game design proposal"}
 
-    monkeypatch.setattr(discourse, "MODEL_CATALOG", {
-        "model-a": {"provider": "local"}, "judge": {"provider": "local"},
-    })
     monkeypatch.setattr(discourse, "route_complete", fake_route)
     monkeypatch.setattr(discourse, "_db", SimpleNamespace(discourse_log=Collection()))
     result = asyncio.run(discourse.deliberate(
