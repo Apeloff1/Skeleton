@@ -425,12 +425,14 @@
         ],
         "real_data_and_state": [
           "backend/core/product_default_executors.py",
-          "backend/core/product_operations.py"
+          "backend/core/product_operations.py",
+          "backend/routes/ops.py"
         ],
         "complete_actions": [
           "backend/core/canonical_product_policy.py",
           "backend/core/product_executor_registry.py",
-          "backend/tests/test_native_product_executors.py"
+          "backend/tests/test_native_product_executors.py",
+          "frontend/src/product/productControlClient.ts"
         ],
         "authority_and_provenance": [
           "backend/core/product_operations.py",
@@ -495,26 +497,31 @@
       "evidence": {
         "product_surface": [
           "frontend/src/product/productCatalog.ts",
-          "frontend/app/control-plane.tsx"
+          "frontend/app/control-plane.tsx",
+          "frontend/app/safety.tsx"
         ],
         "real_data_and_state": [
           "backend/core/product_default_executors.py",
-          "backend/core/product_operations.py"
+          "backend/core/product_operations.py",
+          "backend/routes/governance.py"
         ],
         "complete_actions": [
           "backend/core/canonical_product_policy.py",
           "backend/core/product_executor_registry.py",
-          "backend/tests/test_native_product_executors.py"
+          "backend/tests/test_native_product_executors.py",
+          "backend/routes/governance.py"
         ],
         "authority_and_provenance": [
           "backend/core/product_operations.py",
           "backend/core/execution_receipts.py",
-          "backend/tests/test_execution_receipts.py"
+          "backend/tests/test_execution_receipts.py",
+          "backend/routes/governance.py"
         ],
         "failure_and_recovery": [
           "backend/core/product_control_plane.py",
           "backend/tests/test_execution_lifecycle_integration.py",
-          "tests/test_governance_decide_gate.py"
+          "tests/test_governance_decide_gate.py",
+          "frontend/app/safety.tsx"
         ],
         "observability": [
           "backend/core/product_control_plane.py",

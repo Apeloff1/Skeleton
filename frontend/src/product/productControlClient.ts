@@ -115,14 +115,14 @@ export type AdmitOperationInput = { capability_id: string; domain: string; actio
 
 const ROOT = '/api/admin/ops/product-control';
 const PUBLIC_ROOT = '/api/product';
-function tokenQuery(token: string): string { return token ? `?token=${encodeURIComponent(token)}` : ''; }
-function tokenQueryWith(token: string, params: Record<string, string | number>): string {
-  const query = new URLSearchParams(); if (token) query.set('token', token);
+function opsHeaders(token: string): Record<string, string> | undefined { return token ? { 'X-Ops-Token': token } : undefined; }
+function queryWith(params: Record<string, string | number>): string {
+  const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => query.set(key, String(value)));
   const encoded = query.toString(); return encoded ? `?${encoded}` : '';
 }
 export function getProductControlStatus(token = '', signal?: AbortSignal): Promise<ApiResult<ControlPlaneStatus>> {
-  return api.get<ControlPlaneStatus>(`${ROOT}/status${tokenQuery(token)}`, { signal, cacheKey: 'product-control-status', cacheTtlMs: 5_000 });
+  return api.get<ControlPlaneStatus>(`${ROOT}/status`, { signal, headers: opsHeaders(token), cacheKey: 'product-control-status', cacheTtlMs: 5_000 });
 }
 export function getProductReadiness(signal?: AbortSignal): Promise<ApiResult<PublicReadinessReport>> {
   return api.get<PublicReadinessReport>(`${PUBLIC_ROOT}/readiness`, {
@@ -132,48 +132,48 @@ export function getProductReadiness(signal?: AbortSignal): Promise<ApiResult<Pub
   });
 }
 export function getDeploymentPreflight(token = '', maxAttempts = 3, signal?: AbortSignal): Promise<ApiResult<ControlPlaneDeploymentPreflight>> {
-  return api.get<ControlPlaneDeploymentPreflight>(`${ROOT}/deployment-preflight${tokenQueryWith(token, { max_attempts: maxAttempts })}`,
-    { signal, cacheKey: 'product-control-deployment-preflight', cacheTtlMs: 2_000 });
+  return api.get<ControlPlaneDeploymentPreflight>(`${ROOT}/deployment-preflight${queryWith({ max_attempts: maxAttempts })}`,
+    { signal, headers: opsHeaders(token), cacheKey: 'product-control-deployment-preflight', cacheTtlMs: 2_000 });
 }
 export function getDeploymentTrustStatus(token = '', signal?: AbortSignal): Promise<ApiResult<DeploymentTrustStatus>> {
-  return api.get<DeploymentTrustStatus>(`${ROOT}/deployments${tokenQuery(token)}`, { signal, cacheKey: 'product-control-deployments', cacheTtlMs: 2_000 });
+  return api.get<DeploymentTrustStatus>(`${ROOT}/deployments`, { signal, headers: opsHeaders(token), cacheKey: 'product-control-deployments', cacheTtlMs: 2_000 });
 }
 export function prepareProductDeployment(input: DeploymentInput, token = '', ttlSeconds = 300, maxAttempts = 3, signal?: AbortSignal): Promise<ApiResult<PreparedDeployment>> {
-  return api.post<PreparedDeployment>(`${ROOT}/deployments/prepare${tokenQuery(token)}`,
-    { deployment: input, ttl_seconds: ttlSeconds, max_attempts: maxAttempts }, { signal, retries: 0 });
+  return api.post<PreparedDeployment>(`${ROOT}/deployments/prepare`,
+    { deployment: input, ttl_seconds: ttlSeconds, max_attempts: maxAttempts }, { signal, headers: opsHeaders(token), retries: 0 });
 }
 export function executeProductDeployment(authorizationId: string, deployment: Record<string, unknown>, token = '', maxAttempts = 3, signal?: AbortSignal): Promise<ApiResult<DeploymentExecution>> {
-  return api.post<DeploymentExecution>(`${ROOT}/deployments/execute${tokenQuery(token)}`,
-    { authorization_id: authorizationId, deployment, max_attempts: maxAttempts }, { signal, retries: 0 });
+  return api.post<DeploymentExecution>(`${ROOT}/deployments/execute`,
+    { authorization_id: authorizationId, deployment, max_attempts: maxAttempts }, { signal, headers: opsHeaders(token), retries: 0 });
 }
 export function getCurrentRelease(target: string, environment: string, token = '', signal?: AbortSignal): Promise<ApiResult<{ release: ReleaseRecord | null }>> {
-  return api.get<{ release: ReleaseRecord | null }>(`${ROOT}/deployments/current${tokenQueryWith(token, { target, environment })}`,
-    { signal, cacheKey: `product-control-release-${environment}-${target}`, cacheTtlMs: 2_000 });
+  return api.get<{ release: ReleaseRecord | null }>(`${ROOT}/deployments/current${queryWith({ target, environment })}`,
+    { signal, headers: opsHeaders(token), cacheKey: `product-control-release-${environment}-${target}`, cacheTtlMs: 2_000 });
 }
 export function getPendingProductOperations(token = '', signal?: AbortSignal): Promise<ApiResult<PendingOperationResponse>> {
-  return api.get<PendingOperationResponse>(`${ROOT}/pending${tokenQuery(token)}`, { signal, cacheKey: 'product-control-pending', cacheTtlMs: 2_000 });
+  return api.get<PendingOperationResponse>(`${ROOT}/pending`, { signal, headers: opsHeaders(token), cacheKey: 'product-control-pending', cacheTtlMs: 2_000 });
 }
 export function getProductAuditHistory(token = '', limit = 50, signal?: AbortSignal): Promise<ApiResult<{ entries: AuditEntry[] }>> {
-  return api.get<{ entries: AuditEntry[] }>(`${ROOT}/audit${tokenQueryWith(token, { limit })}`, { signal, cacheKey: `product-control-audit-${limit}`, cacheTtlMs: 2_000 });
+  return api.get<{ entries: AuditEntry[] }>(`${ROOT}/audit${queryWith({ limit })}`, { signal, headers: opsHeaders(token), cacheKey: `product-control-audit-${limit}`, cacheTtlMs: 2_000 });
 }
 export function getExecutionReceipts(token = '', limit = 50, signal?: AbortSignal): Promise<ApiResult<{ receipts: ExecutionReceipt[] }>> {
-  return api.get<{ receipts: ExecutionReceipt[] }>(`${ROOT}/receipts${tokenQueryWith(token, { limit })}`, { signal, cacheKey: `product-control-receipts-${limit}`, cacheTtlMs: 2_000 });
+  return api.get<{ receipts: ExecutionReceipt[] }>(`${ROOT}/receipts${queryWith({ limit })}`, { signal, headers: opsHeaders(token), cacheKey: `product-control-receipts-${limit}`, cacheTtlMs: 2_000 });
 }
 export function getExecutionResult(operationId: string, token = '', signal?: AbortSignal): Promise<ApiResult<Record<string, unknown>>> {
-  return api.get<Record<string, unknown>>(`${ROOT}/receipt/${encodeURIComponent(operationId)}/result${tokenQuery(token)}`, { signal, cacheKey: `product-control-result-${operationId}`, cacheTtlMs: 30_000 });
+  return api.get<Record<string, unknown>>(`${ROOT}/receipt/${encodeURIComponent(operationId)}/result`, { signal, headers: opsHeaders(token), cacheKey: `product-control-result-${operationId}`, cacheTtlMs: 30_000 });
 }
 export function getOperationLifecycle(operationId: string, token = '', signal?: AbortSignal): Promise<ApiResult<OperationLifecycle>> {
-  return api.get<OperationLifecycle>(`${ROOT}/operation/${encodeURIComponent(operationId)}/lifecycle${tokenQuery(token)}`, {
-    signal, cacheKey: `product-control-lifecycle-${operationId}`, cacheTtlMs: 1_000,
+  return api.get<OperationLifecycle>(`${ROOT}/operation/${encodeURIComponent(operationId)}/lifecycle`, {
+    signal, headers: opsHeaders(token), cacheKey: `product-control-lifecycle-${operationId}`, cacheTtlMs: 1_000,
   });
 }
 export function executeProductOperation(seq: number, token = '', signal?: AbortSignal): Promise<ApiResult<{ outbox_seq: number; confirmed: boolean; status: string }>> {
-  return api.post(`${ROOT}/execute/${seq}${tokenQuery(token)}`, {}, { signal, retries: 0 });
+  return api.post(`${ROOT}/execute/${seq}`, {}, { signal, headers: opsHeaders(token), retries: 0 });
 }
 export function executePendingProductOperations(token = '', limit = 32, signal?: AbortSignal): Promise<ApiResult<DispatchReport>> {
-  return api.post<DispatchReport>(`${ROOT}/execute-pending${tokenQueryWith(token, { limit })}`, {}, { signal, retries: 0 });
+  return api.post<DispatchReport>(`${ROOT}/execute-pending${queryWith({ limit })}`, {}, { signal, headers: opsHeaders(token), retries: 0 });
 }
 export function admitProductOperation(input: AdmitOperationInput, token = '', signal?: AbortSignal): Promise<ApiResult<OperationAdmission>> {
   const idempotencyKey = input.idempotency_key || `${input.capability_id}:${input.action}:${Date.now()}`;
-  return api.post<OperationAdmission>(`${ROOT}/admit${tokenQuery(token)}`, { ...input, idempotency_key: idempotencyKey }, { signal, idempotencyKey, retries: 2 });
+  return api.post<OperationAdmission>(`${ROOT}/admit`, { ...input, idempotency_key: idempotencyKey }, { signal, headers: opsHeaders(token), idempotencyKey, retries: 2 });
 }
