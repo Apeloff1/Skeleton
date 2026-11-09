@@ -58,6 +58,9 @@ STATUS_BLOCKED = "blocked"
 STATUSES = (STATUS_OK, STATUS_FAILED, STATUS_TIMEOUT, STATUS_DENIED, STATUS_BLOCKED)
 MAX_TOOL_NAME = 64
 MAX_AUDIT_ENTRIES = 10_000
+MAX_STDIN_BYTES = 1 * 1024 * 1024
+MAX_ENV_KEYS = 64
+MAX_ENV_VALUE_CHARS = 4096
 GENESIS_HASH = "0" * 64
 
 
@@ -92,6 +95,8 @@ class ToolSpec:
     def __post_init__(self) -> None:
         if not self.name or len(self.name) > MAX_TOOL_NAME or not self.name.replace("_", "").replace("-", "").replace(".", "").isalnum():
             raise ExecutorConfigError("tool name must be a short identifier", context={"name": self.name[:80]})
+        if type(self.allow_stdin) is not bool:
+            raise ExecutorConfigError("tool stdin admission must be an explicit boolean", context={"tool": self.name})
         if not self.executable or any(ch in self.executable for ch in "\x00\n\r"):
             raise ExecutorConfigError("tool executable is invalid", context={"tool": self.name})
         if self.arg_context not in CONTEXT_FAMILIES or (self.stdin_context is not None and self.stdin_context not in CONTEXT_FAMILIES):
@@ -130,6 +135,9 @@ class ExecutorPolicy:
     output_block_threshold: float = 0.7
 
     def __post_init__(self) -> None:
+        for name in ("require_sealed_mediator", "require_network_isolation", "scan_output"):
+            if type(getattr(self, name)) is not bool:
+                raise ExecutorConfigError("sandbox security toggles must be explicit booleans")
         if self.max_executions is not None and (
             type(self.max_executions) is not int or self.max_executions < 0
         ):
@@ -262,10 +270,14 @@ class GuardedExecutor:
             raise ExecutorConfigError("mediator must be a GeneratedCodeSandbox")
         if not isinstance(jail, FsJail):
             raise ExecutorConfigError("jail must be an FsJail")
+        if policy is not None and not isinstance(policy, ExecutorPolicy):
+            raise ExecutorConfigError("policy must be ExecutorPolicy")
+        if audit is not None and not isinstance(audit, AuditLog):
+            raise ExecutorConfigError("audit must be AuditLog")
         self._mediator = mediator
         self._jail = jail
-        self._policy = policy or ExecutorPolicy()
-        self._audit = audit or AuditLog()
+        self._policy = policy if policy is not None else ExecutorPolicy()
+        self._audit = audit if audit is not None else AuditLog()
         self._lock = threading.Lock()
         self._executions = 0
         registry: dict[str, ToolSpec] = {}
@@ -302,11 +314,21 @@ class GuardedExecutor:
         except SandboxError as exc:
             return self._finish(request, ToolOutcome(spec.name, STATUS_DENIED, exc.message))
 
+        # Snapshot mutable envelopes after bounded validation. The detector
+        # and process launcher must consume identical byte and env identities.
+        stdin = bytes(request.stdin) if request.stdin is not None else None
+        env = dict(request.env) if request.env is not None else None
+        cwd = request.cwd
+        # Bind the audit to the exact bytes actually scanned and launched.
+        # A caller may mutate its bytearray after the snapshot or while the
+        # subprocess runs; the retained receipt must not describe new bytes.
+        request = replace(request, stdin=stdin, env=env, cwd=cwd)
+
         denied = self._authorize(spec, args)
         if denied is not None:
             return self._finish(request, ToolOutcome(spec.name, STATUS_DENIED, denied))
 
-        findings, blocked = self._guard(spec, args, request.stdin)
+        findings, blocked = self._guard(spec, args, stdin)
         if blocked:
             return self._finish(request, ToolOutcome(spec.name, STATUS_BLOCKED, "input blocked by injection detector", input_findings=findings))
 
@@ -322,7 +344,7 @@ class GuardedExecutor:
             self._executions += 1
 
         try:
-            result = run_isolated([spec.executable, *launch_args], jail=self._jail, cwd=request.cwd, stdin=request.stdin, env=request.env, limits=limits)
+            result = run_isolated([spec.executable, *launch_args], jail=self._jail, cwd=cwd, stdin=stdin, env=env, limits=limits)
         except SandboxError as exc:
             return self._finish(request, ToolOutcome(spec.name, STATUS_DENIED, exc.message, input_findings=findings, network_enforced=enforced))
         outcome = self._scrub(spec, result)
@@ -344,13 +366,23 @@ class GuardedExecutor:
             check_argv(args)
         if request.cwd is not None and not isinstance(request.cwd, str):
             raise ProcessPolicyError("cwd must be a string path inside the jail")
-        if request.env is not None and not isinstance(request.env, Mapping):
-            raise ProcessPolicyError("environment must be a mapping of strings")
+        if request.env is not None:
+            if type(request.env) is not dict:
+                raise ProcessPolicyError("environment must be a plain mapping of strings")
+            if len(request.env) > MAX_ENV_KEYS:
+                raise ProcessPolicyError("environment entry budget exceeded")
+            for key, value in request.env.items():
+                if (not isinstance(key, str) or not isinstance(value, str)
+                        or not 1 <= len(key) <= 128 or len(value) > MAX_ENV_VALUE_CHARS
+                        or "\x00" in key or "\x00" in value):
+                    raise ProcessPolicyError("environment entry is malformed or oversized")
         if request.stdin is not None:
             if not spec.allow_stdin:
                 raise ProcessPolicyError("tool does not accept stdin", context={"tool": spec.name})
             if not isinstance(request.stdin, (bytes, bytearray)):
                 raise ProcessPolicyError("stdin must be bytes")
+            if len(request.stdin) > MAX_STDIN_BYTES:
+                raise ProcessPolicyError("stdin byte budget exceeded")
         return args
 
     def _authorize(self, spec: ToolSpec, args: tuple[str, ...]) -> str | None:
@@ -479,7 +511,8 @@ class GuardedExecutor:
             "reason": safe_reason,
             "argv_display": shell_quote(safe_args)[:2048],
             "stdin_sha256": (hashlib.sha256(bytes(request.stdin)).hexdigest()
-                             if isinstance(request.stdin, (bytes, bytearray)) else None),
+                             if isinstance(request.stdin, (bytes, bytearray))
+                             and len(request.stdin) <= MAX_STDIN_BYTES else None),
             "stdout_sha256": hashlib.sha256(outcome.stdout.encode("utf-8")).hexdigest() if outcome.stdout else None,
             "returncode": outcome.returncode,
             "redactions": list(outcome.redactions),

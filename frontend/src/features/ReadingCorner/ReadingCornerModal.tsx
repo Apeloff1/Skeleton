@@ -18,6 +18,7 @@ import {
   Modal, Dimensions, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { toast } from '../../components/AppToast';
 
 import { apiFetch } from '../../utils/apiController';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -27,6 +28,7 @@ interface ReadingCornerProps {
   visible: boolean;
   onClose: () => void;
   colors: any;
+  userId?: string;
 }
 
 interface Track {
@@ -87,57 +89,8 @@ const TRACK_COLORS: Record<string, string> = {
   'ai_ml_engineering': '#EC4899',
 };
 
-// Community content (mock data for now)
-const COMMUNITY_CONTENT = [
-  {
-    id: 'cc_001',
-    title: 'Building a Multiplayer Game from Scratch',
-    author: 'GameDevMaster',
-    type: 'tutorial',
-    likes: 2847,
-    reading_time: 45,
-    tags: ['multiplayer', 'networking', 'game-dev']
-  },
-  {
-    id: 'cc_002',
-    title: 'React Native Performance Deep Dive',
-    author: 'MobileNinja',
-    type: 'article',
-    likes: 1923,
-    reading_time: 30,
-    tags: ['react-native', 'performance', 'mobile']
-  },
-  {
-    id: 'cc_003',
-    title: 'Understanding Transformer Architecture',
-    author: 'AIResearcher',
-    type: 'deep-dive',
-    likes: 3456,
-    reading_time: 60,
-    tags: ['ai', 'transformers', 'deep-learning']
-  },
-  {
-    id: 'cc_004',
-    title: 'Modern CSS Techniques 2026',
-    author: 'CSSWizard',
-    type: 'article',
-    likes: 1567,
-    reading_time: 25,
-    tags: ['css', 'frontend', 'web']
-  },
-  {
-    id: 'cc_005',
-    title: 'Rust for Game Engines',
-    author: 'RustLover',
-    type: 'masterclass',
-    likes: 2134,
-    reading_time: 90,
-    tags: ['rust', 'game-engine', 'performance']
-  },
-];
-
 export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
-  visible, onClose, colors
+  visible, onClose, colors, userId = 'default_user'
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('curriculum');
   const [loading, setLoading] = useState(false);
@@ -146,6 +99,9 @@ export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const [trackDetail, setTrackDetail] = useState<any>(null);
   const [selectedModule, setSelectedModule] = useState<any>(null);
+  const [selectedManual, setSelectedManual] = useState<any>(null);
+  const [progress, setProgress] = useState({ modules_started: 0, modules_completed: 0, total_reading_time_hours: 0 });
+  const [completedModules, setCompletedModules] = useState<string[]>([]);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const [totalHours, setTotalHours] = useState(0);
   const [, setError] = useState<string | null>(null);
@@ -155,9 +111,11 @@ export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const [tracksRes, manualsRes] = await Promise.all([
+      const [tracksRes, manualsRes, progressRes, bookmarksRes] = await Promise.all([
         apiFetch(`${API_URL}/api/reading/tracks`),
-        apiFetch(`${API_URL}/api/reading/manuals`)
+        apiFetch(`${API_URL}/api/reading/manuals`),
+        apiFetch(`${API_URL}/api/reading/progress/${encodeURIComponent(userId)}`),
+        apiFetch(`${API_URL}/api/reading/bookmarks/${encodeURIComponent(userId)}`),
       ]);
       
       if (tracksRes.ok) {
@@ -174,13 +132,26 @@ export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
           language: manualsData.language_manuals || []
         });
       }
+      if (progressRes.ok) {
+        const progressData = await progressRes.json();
+        setProgress({
+          modules_started: Number(progressData.modules_started) || 0,
+          modules_completed: Number(progressData.modules_completed) || 0,
+          total_reading_time_hours: Number(progressData.total_reading_time_hours) || 0,
+        });
+        setCompletedModules((progressData.recent_modules || []).filter((item: any) => item.completed).map((item: any) => String(item.module_id)));
+      }
+      if (bookmarksRes.ok) {
+        const bookmarkData = await bookmarksRes.json();
+        setBookmarks(Array.from(new Set((bookmarkData.bookmarks || []).map((bookmark: any) => String(bookmark.module_id)))) as string[]);
+      }
     } catch (err) {
       setError('Failed to load curriculum');
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   // Fetch track detail
   const fetchTrackDetail = useCallback(async (trackId: string) => {
@@ -214,6 +185,51 @@ export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
     }
   }, []);
 
+  const fetchManualContent = useCallback(async (manualId: string) => {
+    setLoading(true);
+    try {
+      const res = await apiFetch(`${API_URL}/api/reading/manual/${encodeURIComponent(manualId)}`);
+      if (!res.ok) throw new Error(`Manual unavailable (${res.status})`);
+      setSelectedManual(await res.json());
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to open manual');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const markModuleComplete = useCallback(async () => {
+    if (!selectedModule?.module_id) return;
+    if (completedModules.includes(selectedModule.module_id)) {
+      toast.info('This module is already complete.');
+      return;
+    }
+    try {
+      const params = new URLSearchParams({
+        user_id: userId,
+        module_id: selectedModule.module_id,
+        progress_percent: '100',
+        time_spent_minutes: String(Math.max(1, Number(selectedModule.reading_time_minutes) || 1)),
+        completed: 'true',
+      });
+      const res = await apiFetch(`${API_URL}/api/reading/progress/update?${params.toString()}`, { method: 'POST' });
+      if (!res.ok) throw new Error(`Progress update failed (${res.status})`);
+      const refreshed = await apiFetch(`${API_URL}/api/reading/progress/${encodeURIComponent(userId)}`);
+      if (refreshed.ok) {
+        const data = await refreshed.json();
+        setProgress({
+          modules_started: Number(data.modules_started) || 0,
+          modules_completed: Number(data.modules_completed) || 0,
+          total_reading_time_hours: Number(data.total_reading_time_hours) || 0,
+        });
+        setCompletedModules((data.recent_modules || []).filter((item: any) => item.completed).map((item: any) => String(item.module_id)));
+      }
+      toast.success('Module marked complete');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to save progress');
+    }
+  }, [completedModules, selectedModule, userId]);
+
   useEffect(() => {
     if (visible) {
       fetchCurriculumInfo();
@@ -226,10 +242,17 @@ export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
     }
   }, [selectedTrack, fetchTrackDetail]);
 
-  const toggleBookmark = (id: string) => {
-    setBookmarks(prev => 
-      prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]
-    );
+  const toggleBookmark = async (id: string) => {
+    const saved = bookmarks.includes(id);
+    const params = new URLSearchParams({ user_id: userId, module_id: id });
+    if (!saved) params.set('position', 'module');
+    try {
+      const res = await apiFetch(`${API_URL}/api/reading/bookmark?${params.toString()}`, { method: saved ? 'DELETE' : 'POST' });
+      if (!res.ok) throw new Error(`Bookmark update failed (${res.status})`);
+      setBookmarks(previous => saved ? previous.filter(bookmark => bookmark !== id) : [...previous, id]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to update bookmark');
+    }
   };
 
   const renderTabs = () => (
@@ -514,15 +537,37 @@ export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
         )}
 
         {/* Mark Complete Button */}
-        <TouchableOpacity style={[styles.completeButton, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity
+          style={[styles.completeButton, { backgroundColor: completedModules.includes(selectedModule.module_id) ? '#10B981' : colors.primary }]}
+          onPress={markModuleComplete}
+        >
           <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-          <Text style={styles.completeButtonText}>Mark as Complete</Text>
+          <Text style={styles.completeButtonText}>{completedModules.includes(selectedModule.module_id) ? 'Completed' : 'Mark as Complete'}</Text>
         </TouchableOpacity>
       </ScrollView>
     );
   };
 
-  const renderManualsTab = () => (
+  const renderManualsTab = () => selectedManual ? (
+    <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <TouchableOpacity style={styles.backButton} onPress={() => setSelectedManual(null)}>
+        <Ionicons name="arrow-back" size={20} color={colors.primary} />
+        <Text style={[styles.backButtonText, { color: colors.primary }]}>Back to Manuals</Text>
+      </TouchableOpacity>
+      <View style={[styles.moduleHeader, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.moduleTitle, { color: colors.text }]}>{selectedManual.name || selectedManual.manual_id}</Text>
+        {selectedManual.description && <Text style={[styles.moduleReadTime, { color: colors.textMuted }]}>{selectedManual.description}</Text>}
+      </View>
+      {(selectedManual.chapters || selectedManual.sections || selectedManual.guides || []).map((section: any, index: number) => (
+        <View key={`${section.title || section.name || 'section'}-${index}`} style={[styles.moduleSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.moduleSectionTitle, { color: colors.text }]}>{section.title || section.name || `Section ${index + 1}`}</Text>
+          {Array.isArray(section.topics) && <Text style={[styles.conceptDef, { color: colors.textMuted }]}>{section.topics.join(' • ')}</Text>}
+          {Array.isArray(section.key_concepts) && <Text style={[styles.conceptDef, { color: colors.textMuted }]}>{section.key_concepts.join(' • ')}</Text>}
+          {section.pages !== undefined && <Text style={[styles.conceptDef, { color: colors.textMuted }]}>{section.pages} pages</Text>}
+        </View>
+      ))}
+    </ScrollView>
+  ) : (
     <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
       {/* Advanced Manuals */}
       <Text style={[styles.sectionTitle, { color: colors.text }]}>📘 Advanced Manuals</Text>
@@ -530,6 +575,7 @@ export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
         <TouchableOpacity
           key={manual.id}
           style={[styles.manualCard, { backgroundColor: colors.surface }]}
+          onPress={() => fetchManualContent(manual.id)}
         >
           <View style={[styles.manualIcon, { backgroundColor: colors.primary + '20' }]}>
             <Ionicons name="document-text" size={24} color={colors.primary} />
@@ -551,6 +597,7 @@ export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
           <TouchableOpacity
             key={lang.id}
             style={[styles.languageCard, { backgroundColor: colors.surface }]}
+            onPress={() => fetchManualContent(lang.id)}
           >
             <View style={[styles.langDiffDot, { backgroundColor: DIFFICULTY_COLORS[lang.difficulty || 2] }]} />
             <Text style={[styles.languageName, { color: colors.text }]}>{lang.id.toUpperCase()}</Text>
@@ -571,42 +618,11 @@ export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
         </Text>
       </View>
 
-      {COMMUNITY_CONTENT.map(content => (
-        <TouchableOpacity
-          key={content.id}
-          style={[styles.communityCard, { backgroundColor: colors.surface }]}
-        >
-          <View style={styles.communityCardHeader}>
-            <Text style={[styles.communityCardTitle, { color: colors.text }]}>{content.title}</Text>
-            <View style={[styles.contentTypeBadge, { backgroundColor: colors.primary + '20' }]}>
-              <Text style={[styles.contentTypeText, { color: colors.primary }]}>{content.type}</Text>
-            </View>
-          </View>
-          <View style={styles.communityCardMeta}>
-            <Text style={[styles.authorText, { color: colors.textMuted }]}>by {content.author}</Text>
-            <Text style={[styles.dotSeparator, { color: colors.textMuted }]}>•</Text>
-            <Text style={[styles.readTimeText, { color: colors.textMuted }]}>{content.reading_time} min</Text>
-            <Text style={[styles.dotSeparator, { color: colors.textMuted }]}>•</Text>
-            <View style={styles.likesContainer}>
-              <Ionicons name="heart" size={12} color="#EF4444" />
-              <Text style={[styles.likesText, { color: colors.textMuted }]}>{content.likes}</Text>
-            </View>
-          </View>
-          <View style={styles.communityTags}>
-            {content.tags.map(tag => (
-              <View key={tag} style={[styles.communityTag, { backgroundColor: colors.background }]}>
-                <Text style={[styles.communityTagText, { color: colors.textMuted }]}>#{tag}</Text>
-              </View>
-            ))}
-          </View>
-        </TouchableOpacity>
-      ))}
-
-      {/* Submit Content CTA */}
-      <TouchableOpacity style={[styles.submitCTA, { borderColor: colors.primary }]}>
-        <Ionicons name="add-circle" size={24} color={colors.primary} />
-        <Text style={[styles.submitCTAText, { color: colors.primary }]}>Submit Your Content</Text>
-      </TouchableOpacity>
+      <View style={[styles.emptyState, { backgroundColor: colors.surface }]}>
+        <Ionicons name="shield-checkmark-outline" size={52} color={colors.textMuted} />
+        <Text style={[styles.emptyStateText, { color: colors.text }]}>No reviewed community publications</Text>
+        <Text style={[styles.emptyStateSubtext, { color: colors.textMuted }]}>Community material will appear after a publishing and moderation service is connected.</Text>
+      </View>
     </ScrollView>
   );
 
@@ -641,48 +657,24 @@ export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
         
         <View style={styles.progressStats}>
           <View style={styles.progressStat}>
-            <Text style={[styles.progressStatValue, { color: colors.primary }]}>0</Text>
+            <Text style={[styles.progressStatValue, { color: colors.primary }]}>{progress.total_reading_time_hours.toFixed(1)}</Text>
             <Text style={[styles.progressStatLabel, { color: colors.textMuted }]}>Hours Completed</Text>
           </View>
           <View style={styles.progressStat}>
-            <Text style={[styles.progressStatValue, { color: colors.primary }]}>0</Text>
+            <Text style={[styles.progressStatValue, { color: colors.primary }]}>{progress.modules_completed}</Text>
             <Text style={[styles.progressStatLabel, { color: colors.textMuted }]}>Modules Done</Text>
           </View>
           <View style={styles.progressStat}>
-            <Text style={[styles.progressStatValue, { color: colors.primary }]}>0%</Text>
+            <Text style={[styles.progressStatValue, { color: colors.primary }]}>{progress.modules_started ? Math.round(progress.modules_completed / progress.modules_started * 100) : 0}%</Text>
             <Text style={[styles.progressStatLabel, { color: colors.textMuted }]}>Overall</Text>
           </View>
         </View>
 
         <View style={[styles.progressBar, { backgroundColor: colors.background }]}>
-          <View style={[styles.progressBarFill, { backgroundColor: colors.primary, width: '0%' }]} />
+          <View style={[styles.progressBarFill, { backgroundColor: colors.primary, width: `${progress.modules_started ? Math.min(100, progress.modules_completed / progress.modules_started * 100) : 0}%` }]} />
         </View>
       </View>
 
-      {/* Track Progress */}
-      {tracks.map(track => (
-        <View key={track.id} style={[styles.trackProgressCard, { backgroundColor: colors.surface }]}>
-          <View style={styles.trackProgressHeader}>
-            <View style={[styles.trackProgressIcon, { backgroundColor: (TRACK_COLORS[track.id] || colors.primary) + '20' }]}>
-              <Ionicons 
-                name={(TRACK_ICONS[track.id] || 'book') as any} 
-                size={20} 
-                color={TRACK_COLORS[track.id] || colors.primary} 
-              />
-            </View>
-            <View style={styles.trackProgressInfo}>
-              <Text style={[styles.trackProgressName, { color: colors.text }]}>{track.name}</Text>
-              <Text style={[styles.trackProgressMeta, { color: colors.textMuted }]}>
-                0 / {track.total_hours} hours
-              </Text>
-            </View>
-            <Text style={[styles.trackProgressPercent, { color: colors.primary }]}>0%</Text>
-          </View>
-          <View style={[styles.trackProgressBar, { backgroundColor: colors.background }]}>
-            <View style={[styles.trackProgressBarFill, { backgroundColor: TRACK_COLORS[track.id] || colors.primary, width: '0%' }]} />
-          </View>
-        </View>
-      ))}
     </ScrollView>
   );
 
@@ -727,11 +719,6 @@ export const ReadingCornerModal: React.FC<ReadingCornerProps> = ({
                 {totalHours}+ hours of learning content
               </Text>
             </View>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={[styles.searchButton, { backgroundColor: colors.background }]}>
-              <Ionicons name="search" size={20} color={colors.textMuted} />
-            </TouchableOpacity>
           </View>
         </View>
 
