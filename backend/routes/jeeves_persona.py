@@ -43,7 +43,7 @@ async def get_persona():
     """Full Jeeves persona — biography, catchphrases, mannerisms, quirks, domains, rules."""
     p = await _load_persona()
     if not p:
-        return {"error": "persona_not_seeded"}
+        raise HTTPException(status_code=503, detail="Jeeves persona data is not available.")
     return {
         "biography":         p.get("biography"),
         "catchphrases":      (p.get("catchphrases") or {}).get("data"),
@@ -69,16 +69,20 @@ async def get_persona():
 async def get_random_quote():
     """A random famous quote Jeeves adores."""
     p = await _load_persona()
+    if not p:
+        raise HTTPException(status_code=503, detail="Jeeves persona data is not available.")
     quotes = ((p.get("famous_quotes") or {}).get("data") or [])
     if not quotes:
-        return {"error": "no_quotes_seeded"}
+        raise HTTPException(status_code=503, detail="Jeeves quote data is not available.")
     return {"quote": random.choice(quotes)}
 
 
 @router.get("/knowledge/search")
-async def search_knowledge(q: str = Query("", description="search term — title/domain/summary")):
+async def search_knowledge(q: str = Query("", max_length=300, description="search term — title/domain/summary")):
     """Search the knowledge database by free-text query (case-insensitive)."""
     p = await _load_persona()
+    if not p:
+        raise HTTPException(status_code=503, detail="Jeeves persona data is not available.")
     entries = ((p.get("knowledge_database") or {}).get("data") or [])
     qq = (q or "").lower().strip()
     if not qq:
