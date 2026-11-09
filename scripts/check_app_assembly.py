@@ -18,6 +18,10 @@ try:
     from scripts.check_product_vertical_readiness import validate as validate_vertical_readiness
 except ModuleNotFoundError:  # direct ``python scripts/check_app_assembly.py`` execution
     from check_product_vertical_readiness import validate as validate_vertical_readiness
+try:
+    from scripts.check_product_surface_specification import validate as validate_surface_specification
+except ModuleNotFoundError:  # direct ``python scripts/check_app_assembly.py`` execution
+    from check_product_surface_specification import validate as validate_surface_specification
 
 ROOT = Path(__file__).resolve().parents[1]
 FAILURES: list[str] = []
@@ -1017,6 +1021,12 @@ def audit_product_vertical_readiness() -> None:
     check(report.get("contract_qualified") is True, "product vertical contract is not qualified")
 
 
+def audit_product_surface_specification() -> None:
+    """Keep every exposed route and Hub modal inside the canonical contract."""
+    errors = validate_surface_specification(ROOT)
+    check(not errors, "product surface specification failed: " + "; ".join(errors[:8]))
+
+
 def main() -> int:
     audit_manifest()
     audit_topology_alignment()
@@ -1033,6 +1043,7 @@ def main() -> int:
     audit_product_control_contract()
     audit_product_route_registry()
     audit_product_vertical_readiness()
+    audit_product_surface_specification()
 
     if FAILURES:
         print(f"App assembly audit failed: {len(FAILURES)} issue(s)", file=sys.stderr)

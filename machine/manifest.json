@@ -708,7 +708,9 @@
       "development",
       "hot",
       "production"
-    ]
+    ],
+    "surface_specification_contract": "machine/product_surface_specification.json",
+    "surface_specification_validator": "scripts/check_product_surface_specification.py"
   },
   "architecture": {
     "contract": "machine/architecture.json",
