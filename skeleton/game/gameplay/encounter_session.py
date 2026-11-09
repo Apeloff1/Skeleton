@@ -89,6 +89,8 @@ def _attack(raw: Any, player_hp: int, hostile: bool) -> dict:
         failures = audit_telegraph(telegraph) if hostile else []
         if failures:
             raise CombatSessionError("unreadable attack: " + ",".join(v.code for v in failures))
+    except CombatSessionError:
+        raise
     except (ValueError, TypeError, KeyError) as exc:
         raise CombatSessionError("invalid attack telegraph or damage type") from exc
     return dict(a)
