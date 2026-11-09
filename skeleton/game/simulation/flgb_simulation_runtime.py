@@ -219,9 +219,16 @@ class CharacterController:
 
     def move(self,delta:tuple[int,int,int],step_ns:int)->"CharacterController":
         if not isinstance(delta,tuple) or len(delta)!=3 or any(not _is_int(v) for v in delta):raise SimulationContractError("invalid movement delta")
+        if not _is_int(step_ns) or not 0 < step_ns <= 1_000_000_000:
+            raise SimulationContractError("invalid controller step_ns")
+        if any(abs(v)>MAX_COORD for v in delta):
+            raise SimulationContractError("controller delta exceeds coordinate bounds")
         max_delta=(self.max_speed_per_sec*step_ns)//1_000_000_000
         if any(abs(v)>max_delta for v in delta):raise SimulationContractError("character speed budget exceeded")
-        return CharacterController(self.entity_id,tuple(self.position[i]+delta[i] for i in range(3)),self.max_speed_per_sec,self.grounded)
+        position=tuple(self.position[i]+delta[i] for i in range(3))
+        if any(abs(v)>MAX_COORD for v in position):
+            raise SimulationContractError("controller world position overflow")
+        return CharacterController(self.entity_id,position,self.max_speed_per_sec,self.grounded)
 
 @dataclass(frozen=True)
 class Constraint:
