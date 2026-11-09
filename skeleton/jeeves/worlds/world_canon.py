@@ -472,6 +472,8 @@ class WorldStore:
                 os.close(lock_fd)
                 try:
                     existing = strict_json(self._read(fd, world_id + ".json"))
+                    if existing["id"] != world_id:
+                        raise CanonError("identity_mismatch")
                     old_digest = prove(existing).source_digest
                 except CanonError as exc:
                     if exc.code != "not_found":
