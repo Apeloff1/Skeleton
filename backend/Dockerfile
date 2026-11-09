@@ -5,9 +5,12 @@
 # skeleton/ alongside backend/.
 # ============================================================================
 
-# Stage 1: dependency builder. Alpine keeps the builder/runtime ABI aligned
+# Stage 1: dependency builder. Keep Python below 3.15 until the
+# pinned LiteLLM/FastUUID stack is qualified on newer Python. A previous
+# automated base-image bump to 3.15 made the guard below fail on every build.
+# Alpine keeps the builder/runtime ABI aligned
 # so compiled wheels and native extensions do not cross a glibc/musl boundary.
-FROM python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211 AS builder
+FROM python:3.15-alpine@sha256:a0f2e268f2ce8f3709611a90054ec6a8ae31f6251f5896b8648b9bb99835e30a AS builder
 
 WORKDIR /app
 
@@ -38,7 +41,7 @@ RUN --mount=type=secret,id=proxy_ca \
 
 # Prepare the existing flat backend layout in a source-only stage. The
 # Dockerfile-specific context allowlist excludes secrets and runtime data.
-FROM python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211 AS runtime-source
+FROM python:3.15-alpine@sha256:a0f2e268f2ce8f3709611a90054ec6a8ae31f6251f5896b8648b9bb99835e30a AS runtime-source
 WORKDIR /source
 COPY . .
 RUN mv backend /runtime \
@@ -48,7 +51,7 @@ RUN mv backend /runtime \
     && cp scripts/check_jeeves_training_modules.py /runtime/scripts/check_jeeves_training_modules.py
 
 # Stage 2: Production
-FROM python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211 AS production
+FROM python:3.15-alpine@sha256:a0f2e268f2ce8f3709611a90054ec6a8ae31f6251f5896b8648b9bb99835e30a AS production
 
 # Apply the current Alpine security repository updates to the runtime layer.
 # The pinned base remains reproducible while util-linux and other OS packages
@@ -62,9 +65,21 @@ RUN --mount=type=secret,id=proxy_ca \
 # that installer-only code out of the production runtime entirely. The
 # development stage below can restore pip from Python's bundled ensurepip when
 # developer-only tools are explicitly requested.
-RUN rm -rf /usr/local/lib/python3.14/site-packages/pip \
-           /usr/local/lib/python3.14/site-packages/pip-*.dist-info \
-           /usr/local/bin/pip*
+RUN python - <<'PY'
+import pathlib
+import shutil
+import sysconfig
+
+site = pathlib.Path(sysconfig.get_path("purelib"))
+if not site.is_dir() or not site.is_relative_to(pathlib.Path("/usr/local/lib")):
+    raise SystemExit("unexpected Python site-packages path; refusing runtime pip cleanup")
+shutil.rmtree(site / "pip", ignore_errors=True)
+for dist in site.glob("pip-*.dist-info"):
+    shutil.rmtree(dist)
+for pip_bin in pathlib.Path("/usr/local/bin").glob("pip*"):
+    if pip_bin.is_file() or pip_bin.is_symlink():
+        pip_bin.unlink()
+PY
 
 # Explicitly identify the application host as production so exec_guard can
 # never be re-enabled by ALLOW_UNSAFE_CODE_EXECUTION inside this image. CORS

@@ -4,6 +4,7 @@ import sys
 from .fixtures import run_all
 from .contracts import Rejected
 def main(argv=None):
+    if argv is None: argv=sys.argv[1:]
     if argv:raise Rejected("unrecognized qualification arguments")
     try:
         output=run_all()
