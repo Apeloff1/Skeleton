@@ -41,7 +41,7 @@ describe('first-install service observation boundary', () => {
     expect(serviceReadinessStatus({ ok: true, detail: 'ready' })).toBe('ready');
   });
   it('rejects control, untrimmed and empty probe details', () => {
-    for (const detail of ['', ' healthy', 'healthy ', 'healthy\\n', '\\u0000healthy']) {
+    for (const detail of ['', ' healthy', 'healthy ', 'healthy\n', '\u0000healthy']) {
       expect(serviceReadinessStatus({ ok: true, detail })).toBe('unknown');
     }
   });
