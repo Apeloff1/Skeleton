@@ -1399,10 +1399,17 @@ def native_world_codex_access_proof(
     try:
         source = unrank(body.index)
         result = attempt_unlock(source, body.gate_id, horizon=body.horizon)
+        if (
+            result.get("gate") != body.gate_id
+            or result.get("original_world_digest") != source.codex_digest
+            or not result.get("proof_receipt_sha256")
+        ):
+            raise HTTPException(status_code=502, detail="Optional route proof integrity failed")
         return {"ok": True, **result}
     except ValueError:
         raise HTTPException(
-            status_code=422, detail="Original optional game-world gate is not implemented"
+            status_code=422,
+            detail="Original optional route request is invalid or cannot be replayed",
         ) from None
 
 
