@@ -24,8 +24,11 @@ def strict_json(raw,*,maximum=524288):
         fail("invalid serialized input ceiling")
     if not 1<=len(raw)<=maximum:fail("JSON byte ceiling")
     try:
-        return json.loads(raw.decode("utf-8","strict"),object_pairs_hook=_pairs,
-                          parse_constant=_constant)
+        value=json.loads(raw.decode("utf-8","strict"),object_pairs_hook=_pairs,
+                         parse_constant=_constant)
+        # Reject escaped lone surrogates before treating operator evidence as valid.
+        canonical(value,maximum=maximum)
+        return value
     except (UnicodeError,TypeError,ValueError,RecursionError) as exc:
         raise Rejected("invalid UTF8 or ambiguous JSON") from exc
 
