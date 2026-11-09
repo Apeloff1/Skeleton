@@ -294,7 +294,7 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "$launch.ExitCode" in source
     assert '"unins000.exe"' in source
     assert "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" in source
-    assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in source
+    assert "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0" in source
     assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in source
     assert "dist/windows/Skeleton-Setup-*-windows-x64.exe" in source
 
@@ -466,20 +466,22 @@ def test_windows_installer_runs_actual_frozen_payload_preflight():
 
 def test_open_app_does_not_spawn_browser_when_application_is_down(monkeypatch):
     from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
 
-    monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", False, 503, "frontend offline"))
     calls = []
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: calls.append(url) or True)
     ok, detail = launcher.open_running_application()
     assert not ok
-    assert "backend offline" in detail
+    assert "frontend offline" in detail
     assert calls == []
 
 
 def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypatch):
     from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
 
-    monkeypatch.setattr(launcher, "runtime_status", lambda root: (True, "all services healthy"))
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", True, 200, "setup ready"))
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: False)
     ok, detail = launcher.open_running_application()
     assert not ok
@@ -488,7 +490,7 @@ def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypa
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: True)
     ok, detail = launcher.open_running_application()
     assert ok
-    assert "all services healthy" in detail
+    assert "Setup UI opened" in detail
 
 def test_windows_ci_sparse_checkout_contains_every_installer_root():
     source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
@@ -502,15 +504,16 @@ def test_windows_ci_sparse_checkout_contains_every_installer_root():
 
 def test_open_app_uses_configured_frontend_port(monkeypatch, tmp_path):
     from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
 
     (tmp_path / ".env").write_text("FRONTEND_PORT=3300\n", encoding="utf-8")
-    monkeypatch.setattr(launcher, "runtime_status", lambda root: (True, "healthy"))
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", True, 200, "setup ready"))
     opened = []
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: opened.append(url) or True)
 
     success, detail = launcher.open_running_application(tmp_path)
     assert success
-    assert opened == ["http://localhost:3300"]
+    assert opened == ["http://localhost:3300/setup"]
     assert "http://localhost:3300" in detail
 
 

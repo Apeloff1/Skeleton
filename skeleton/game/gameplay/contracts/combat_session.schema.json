@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:game:combat_session:v1",
+  "title": "Original offline deterministic combat encounter source",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "world_id",
+    "encounter_id",
+    "player",
+    "enemy",
+    "attacks"
+  ],
+  "properties": {
+    "schema": {
+      "const": "skeleton.game.combat_session.v1"
+    },
+    "world_id": {
+      "$ref": "#/$defs/id"
+    },
+    "encounter_id": {
+      "$ref": "#/$defs/id"
+    },
+    "reward_item": {
+      "$ref": "#/$defs/id"
+    },
+    "player": {
+      "$ref": "#/$defs/actor"
+    },
+    "enemy": {
+      "$ref": "#/$defs/actor"
+    },
+    "attacks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "$ref": "#/$defs/attack"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "hp",
+        "stamina",
+        "armor",
+        "level",
+        "attack_ids"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "hp": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "stamina": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "armor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "healing_items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "attack_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      }
+    },
+    "attack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "power",
+        "stamina_cost",
+        "damage_type",
+        "tier",
+        "windup_ms",
+        "active_ms",
+        "recovery_ms",
+        "channels"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "power": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "stamina_cost": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "damage_type": {
+          "enum": [
+            "physical",
+            "fire",
+            "frost",
+            "lightning",
+            "poison",
+            "shadow",
+            "true"
+          ]
+        },
+        "tier": {
+          "enum": [
+            "minor",
+            "major",
+            "lethal"
+          ]
+        },
+        "windup_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "active_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "recovery_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "channels": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "body_anim",
+              "ground_decal",
+              "audio",
+              "ui_cast_bar",
+              "vfx_glow"
+            ]
+          }
+        },
+        "crit_percent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 50
+        }
+      }
+    }
+  }
+}
