@@ -213,6 +213,9 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
         def read(self, _size):
             return b"ok"
 
+        def geturl(self):
+            return "http://localhost:8010/api/v1/health/live"
+
     seen = {}
 
     def fake_urlopen(request, timeout):
@@ -765,6 +768,9 @@ def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
         def read(self, _size):
             return b"redirect"
 
+        def geturl(self):
+            return "http://localhost:8001/api/health"
+
     monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: RedirectResponse())
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert not result.ok
@@ -787,6 +793,9 @@ def test_health_probe_transport_forbids_redirects_and_proxy_environment(monkeypa
 
         def read(self, _size):
             return b"ok"
+
+        def geturl(self):
+            return "http://localhost:8001/api/health"
 
     class Opener:
         def open(self, request, *, timeout):

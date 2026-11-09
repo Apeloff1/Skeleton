@@ -12,8 +12,8 @@ const PATCHES = Object.freeze({
   'image-size': { fixed: { 2: '2.0.3' }, advisory: 'GHSA-5p2g-fcmc-qvqq / GHSA-w3rx-r6r6-pgpr' },
   'brace-expansion': { fixed: { 1: '1.1.21', 2: '2.1.7', 3: '3.0.9', 5: '5.0.12' }, advisory: 'GHSA-q2hr-2g5m-vwhr' },
   'decode-uri-component': { fixed: { 0: '0.5.1' }, severity: 'high', advisory: 'GHSA-vcc3-ghjq-m6fr / GHSA-qr28-fpjm-wq7f' },
-  'minimatch': { fixed: { 11: '11.0.1' }, severity: 'moderate', advisory: 'GHSA-g3hv-75wg-m249' },
   'undici': { fixed: { 6: '6.29.1', 7: '7.30.1', 8: '8.12.2' }, advisory: 'GHSA-xjj6-f33q-929c / GHSA-2m5v-pch6-74hx / GHSA-qrxm-fqhp-jwvm' },
+  'zod': { fixed: { 4: '4.6.6' }, severity: 'high', advisory: 'GHSA-mrhx-c7xc-m3w5' },
 });
 // Range policies distinguish published fixed releases from exact versions that
 // were independently reviewed outside an affected range. The latter are NOT a
@@ -22,9 +22,10 @@ const PATCHES = Object.freeze({
 const RANGES = Object.freeze({
   'follow-redirects': { affectedFrom: '1.16.0', affectedUpTo: '1.16.1', fixed: { 1: '1.16.2' }, reviewedOutside: [], severity: 'high', advisory: 'GHSA-mrwp-f3q8-3g9p' },
   'glob': { affectedFrom: '9.0.0', affectedUpTo: '14.0.1', fixed: { 14: '14.0.2' }, reviewedOutside: ['7.2.3'], severity: 'moderate', advisory: 'GHSA-3g3m-2fjr-6pw4' },
+  'minimatch': { affectedFrom: '7.0.0', affectedUpTo: '11.0.0', fixed: { 11: '11.0.1' }, reviewedOutside: ['3.1.5'], severity: 'moderate', advisory: 'GHSA-g3hv-75wg-m249' },
   'http-cache-semantics': { affectedUpTo: '4.2.0', reviewedOutside: ['4.3.0'], advisory: 'GHSA-ch52-4w7c-c8xp' },
   'node-forge': { affectedUpTo: '1.4.0', reviewedOutside: ['1.4.2'], advisory: 'GHSA-86w9-cpqp-85rv' },
-  'deepmerge': { affectedFrom: '4.2.0', affectedUpTo: '4.3.1', reviewedOutside: [], severity: 'low', advisory: 'GHSA-gcqx-w48m-w2h4' },
+  'deepmerge': { affectedFrom: '4.2.0', affectedUpTo: '4.3.1', reviewedOutside: ['4.3.2'], severity: 'low', advisory: 'GHSA-gcqx-w48m-w2h4' },
 });
 // GHSA-vfj7-8cjw-p6xm was officially withdrawn on 2026-10-23. This status
 // applies only to that advisory and does not dismiss other braces findings.
@@ -148,7 +149,7 @@ function auditLock(source) {
   return {
     schema: 'skeleton.frontend.yarn.security-custody.v1',
     advisory_snapshot: '2026-11-02',
-    scope: 'eleven explicitly tracked packages and listed advisories only; not complete Dependabot, live audit, production bundle inventory, or release certification',
+    scope: 'twelve explicitly tracked packages and listed advisories only; not complete Dependabot, live audit, production bundle inventory, or release certification',
     lockfile_entries: entries.length,
     findings, outstanding: outstanding.map(x => x.name),
     release_accepted: outstanding.length === 0,

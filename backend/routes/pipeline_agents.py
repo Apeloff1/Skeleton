@@ -655,7 +655,7 @@ async def generate_agent_responses(user_message: str, chat_id: str, user_id: str
                     version="1",
                     instructions=system_prompt.strip(),
                 ),
-            ).with_model("openai", "gpt-4o")
+            )
             
             response_text = await chat.send_message(UserMessage(text=user_message))
             
