@@ -583,7 +583,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "70d5bbfd7213cf2a9b19ee7f5ee6875f61edee1b",
+      "source_git_object_sha": "7d075832d19ca878887db2bb1f37528037463523",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "731609c17eb88524e0eec50e1f7db04fddffe637",
+      "source_git_object_sha": "966bbe8c5794ad478c801e27b177035ae7ee16ed",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1644,7 +1644,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "d20dc1cf5b3410e78a2a2cc665a7d33dda1e1731",
+      "source_git_object_sha": "1d502dad477e068307996d73bc88b7fd8e913b24",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -4537,7 +4537,7 @@
       "source": "backend/core/swarm_planner.py",
       "destination": "skeleton/ai/compat/backend_core/swarm_planner.py",
       "kind": "file",
-      "source_git_object_sha": "0387783abf2ebd830aa20654a24f815073a8adc5",
+      "source_git_object_sha": "de61d33c0d71ccbb3519383d1ee78e3a2e6ffb98",
       "role": "Legacy swarm planner staged for convergence into canonical planning owners.",
       "work_package_refs": [
         "WP-W11",
@@ -4559,7 +4559,7 @@
       "source": "backend/core/swarm_scheduler.py",
       "destination": "skeleton/ai/compat/backend_core/swarm_scheduler.py",
       "kind": "file",
-      "source_git_object_sha": "bba85badab3b1ba1fe426d8a3b18e9c62ccd8cc0",
+      "source_git_object_sha": "28bc2d19506e948525a1df374fd66dd81d7a461d",
       "role": "Legacy swarm scheduler staged for convergence into canonical scheduling/orchestration owners.",
       "work_package_refs": [
         "WP-W12",
@@ -5027,7 +5027,7 @@
       "source": "backend/gameforge/knowledge",
       "destination": "skeleton/ai/research/legacy/gameforge/knowledge",
       "kind": "tree",
-      "source_git_object_sha": "39fe2b55156976d19a9db8ecb96a491d45c26cea",
+      "source_git_object_sha": "99ae29925580ed6cc8715bbcafb9a386ce696256",
       "role": "Legacy knowledge/free-API ingestion retained as untrusted research evidence.",
       "work_package_refs": [
         "WP-W08",
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "3eee887a11b2acee992c6bdf7c29c259a7c4e63a"
+      "source_git_object_sha": "1256eba56b57dafa77e7c2ce49045353971d6750"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
