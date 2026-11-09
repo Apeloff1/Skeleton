@@ -73,40 +73,33 @@ def test_remote_receipt_stream_and_artifact_budgets_fail_closed(monkeypatch):
     monkeypatch.setattr(remote_bridge, "MAX_REMOTE_ARTIFACTS", 2)
     assert len(remote_bridge.entries_from_receipts([_receipt(), _receipt()])) == 1
 
-def test_farm_requires_distinct_attestation_evidence():
+def test_remote_bridge_rejects_conflicting_receipts_and_unbounded_evidence():
     from dataclasses import replace
+    from itertools import repeat
+    from skeleton.build.delivery.remote_bridge import MAX_REMOTE_RECEIPTS
 
-    good = [_farm("w1"), _farm("w2")]
-    forged = [good[0], replace(good[1], attestation_evidence=good[0].attestation_evidence)]
-    for bad in (forged,
-                [good[0], replace(good[1], attestation_evidence="")],
-                [good[0], replace(good[1], environment_digest="invalid")],
-                [good[0], replace(good[1], output_digest="invalid")]):
-        with pytest.raises(DeliveryError, match="attestation evidence"):
-            entry_from_reproducible(bad, path="artifact.whl", kind="wheel", size=3)
-        with pytest.raises(DeliveryError):
-            witness_metadata(bad)
-    with pytest.raises(DeliveryError):
-        witness_metadata([])
+    original = _receipt()
+    with pytest.raises(DeliveryError, match="conflicting remote receipts"):
+        entries_from_receipts([original, replace(original, runner_id="other")])
+    with pytest.raises(DeliveryError, match="remote receipt count exceeds"):
+        entries_from_receipts(repeat(original, MAX_REMOTE_RECEIPTS + 1))
+    with pytest.raises(DeliveryError, match="remote receipt digest"):
+        entries_from_receipts([replace(original, receipt_digest="bad")])
+    with pytest.raises(DeliveryError, match="artifact reference"):
+        entries_from_receipts([replace(original, output_artifacts=(object(),))])
 
 
-def test_farm_bridge_rejects_ambiguous_identity_and_oversized_manifest_metadata():
+def test_remote_bridge_rejects_distinct_sources_mapped_to_one_release_path():
     from dataclasses import replace
-    from skeleton.ai.build.core.delivery import farm_bridge as mirrored
+    from skeleton.ai.build.core.delivery import remote_bridge as mirrored
 
-    good = [_farm("w1"), _farm("w2")]
-    for module in (None, mirrored):
-        entry = entry_from_reproducible if module is None else module.entry_from_reproducible
-        metadata = witness_metadata if module is None else module.witness_metadata
-        for bad in (
-            [good[0], replace(good[1], worker_id="w2,forged")],
-            [good[0], replace(good[1], attestation_evidence="ev\nforged")],
-        ):
-            with pytest.raises(DeliveryError):
-                entry(bad, path="artifact.whl", kind="wheel", size=3)
-        long_witnesses = [
-            replace(_farm(f"w{i}"), attestation_evidence="ev-" + str(i) + "x" * 100)
-            for i in range(8)
-        ]
-        with pytest.raises(DeliveryError, match="metadata exceeds manifest bound"):
-            metadata(long_witnesses)
+    first = _receipt(artifact="dist/first.whl")
+    second = replace(
+        _receipt(artifact="dist/second.whl"), job_id="job2", runner_id="runner2"
+    )
+    aliases = {"dist/first.whl": "release/shared.whl",
+               "dist/second.whl": "release/shared.whl"}
+    for convert in (entries_from_receipts, mirrored.entries_from_receipts):
+        with pytest.raises(DeliveryError, match="alias collision"):
+            convert([first, second], paths=aliases)
+        assert len(convert([first, first])) == 1
