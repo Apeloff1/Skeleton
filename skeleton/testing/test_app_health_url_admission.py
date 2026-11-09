@@ -50,11 +50,11 @@ def test_invalid_timeout_fails_before_io(monkeypatch, budget):
 
 
 @pytest.mark.parametrize("origin", [
-    "http://127.0.0.1:8080\\nX-Injected: yes",
-    "http://127.0.0.1:8080\\t",
+    "http://127.0.0.1:8080\nX-Injected: yes",
+    "http://127.0.0.1:8080\t",
     " http://127.0.0.1:8080",
     "http://127.0.0.1:8080 ",
-    "http://127.0.0.1:8080\\x7f",
+    "http://127.0.0.1:8080\x7f",
 ])
 def test_setup_probe_rejects_malformed_origin_without_io(monkeypatch, origin):
     from dataclasses import replace
@@ -83,3 +83,18 @@ def test_setup_probe_rejects_invalid_timeout_before_io(monkeypatch, budget):
     monkeypatch.setattr("skeleton.app.health.build_opener", forbidden)
     with pytest.raises(ValueError, match="timeout"):
         probe_local_setup(service, timeout=budget)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("timeout", True), ("timeout", None), ("timeout", "3"),
+    ("timeout", float("nan")), ("timeout", float("inf")),
+    ("delay", False), ("delay", None), ("delay", "1"),
+    ("delay", float("nan")), ("delay", float("-inf")),
+])
+def test_wait_budget_validation_precedes_probe(monkeypatch, field, value):
+    from skeleton.app.health import wait_for_application
+    def forbidden(*args, **kwargs):
+        pytest.fail("invalid wait budget dispatched IO")
+    monkeypatch.setattr("skeleton.app.health.probe_application", forbidden)
+    with pytest.raises(ValueError, match=field):
+        wait_for_application(**{field: value})
