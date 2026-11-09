@@ -207,6 +207,13 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                 elif isinstance(node, ast.ImportFrom):
                     if node.module:
                         imports.append((node.module, node.level))
+                        # A from-import may bind the public API adapter as a
+                        # member: "from skeleton import api as adapter". The
+                        # package import alone is not an architecture violation,
+                        # but the imported adapter is; preserve one finding.
+                        if (node.level == 0 and node.module == "skeleton"
+                                and any(alias.name == "api" for alias in node.names)):
+                            imports.append(("skeleton.api", 0))
                     elif node.level:
                         imports.extend((alias.name, node.level) for alias in node.names)
                 else:

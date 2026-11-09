@@ -8,6 +8,8 @@ on:
       - "skeleton/jeeves/**"
       - "skeleton/ai/agents/jeeves/**"
       - "skeleton/ai/runtime/production_fabric/product/cli.py"
+      - "scripts/check_architecture_boundaries.py"
+      - "tests/test_architecture_boundaries.py"
       - "skeleton/testing/test_ai_flight_http.py"
       - "skeleton/testing/test_ai_knowledge_plane.py"
       - "skeleton/testing/test_ai_flight_context_admission.py"
