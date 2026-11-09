@@ -191,6 +191,14 @@ jobs:
       # .github/workflows/ci.yml. Repeating them here queued a second runner
       # on every backend pull request.
       # Deep suite remains available on explicit specialized dispatch.
+      - name: GGUF descriptor-bound source and parent-replacement regression
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m py_compile skeleton/native/gguf_preflight.py tests/test_native_gguf_preflight.py
+          python -m unittest discover -s tests -p 'test_native_gguf_preflight.py' -v
       - name: Jeeves game development, fidelity and continuous production contracts
         if: steps.scope.outputs.full == 'true' && github.event_name == 'workflow_dispatch'
         working-directory: .
