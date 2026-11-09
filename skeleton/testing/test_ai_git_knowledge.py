@@ -25,7 +25,7 @@ class GitKnowledge(unittest.TestCase):
         return r.stdout.decode().strip()
 
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(prefix='git-kb-',dir='/home/oai')
+        self.temp=tempfile.TemporaryDirectory(prefix='git-kb-',dir=Path.home())
         self.root=Path(self.temp.name)
         self.repo=self.root/'repository';self.repo.mkdir(mode=0o700)
         self.git('init','-q');self.git('config','user.email','fixture@example.invalid')
@@ -110,7 +110,7 @@ class GitKnowledge(unittest.TestCase):
                 GitSource(self.repo,commit=commit)
 
     def test_invalid_secret_matches_but_no_echo(self):
-        for raw in (b'-----BEGIN PRIVATE KEY-----\nABC\n',
+        for raw in (b'-----BEGIN ' + b'PRIVATE KEY' + b'-----\nABC\n',
                     b'ghp_' + b'x'*30,b'AKIA' + b'X'*16,
                     b'api_key="'+b'q'*40+b'"'):
             with self.subTest(raw=raw[:8]),self.assertRaises(GitSourceError):
