@@ -483,63 +483,153 @@ def execute_build(
     )
 
 
-# ── async job runner (lifts the live phase cap) ──────────────────────────
+# ── bounded async job supervisor ────────────────────────────────────────
+# A process-local admission quota protects online availability. It is NOT a
+# restart-safe queue; durable job records are persisted before acceptance.
+MAX_PARALLEL_ASYNC_JOBS = 32
+MAX_RETAINED_JOB_SNAPSHOTS = 256
 _JOBS: dict[str, dict] = {}
+_ACTIVE_JOBS: set[str] = set()
 _JOBS_LOCK = threading.Lock()
 
 
-def _set_job(job_id: str, **fields):
+def _set_job(job_id: str, **fields) -> None:
+    """Publish a job snapshot only after durable Mongo acknowledgement if needed."""
     with _JOBS_LOCK:
-        job = _JOBS.setdefault(job_id, {"job_id": job_id})
-        job.update(fields)
-    try:
-        from core.databases import get_sync_db
-        col = get_sync_db()["swarm_schedule_jobs"]
-        col.update_one({"job_id": job_id}, {"$set": dict(_JOBS[job_id])}, upsert=True)
-    except Exception:
-        pass
+        candidate = dict(_JOBS.get(job_id, {"job_id": job_id}))
+        candidate.update(fields)
+    if candidate.get("durable"):
+        try:
+            from core.databases import get_sync_db
+            receipt = get_sync_db()["swarm_schedule_jobs"].update_one(
+                {"job_id": job_id}, {"$set": candidate}, upsert=True,
+            )
+            if getattr(receipt, "acknowledged", False) is not True:
+                raise RuntimeError("job update was not acknowledged")
+        except Exception as exc:
+            with _JOBS_LOCK:
+                _JOBS[job_id] = {
+                    **candidate, "status": "error",
+                    "error": "job_status_not_durable",
+                }
+            raise RuntimeError("swarm job status was not durably recorded") from exc
+    with _JOBS_LOCK:
+        _JOBS[job_id] = candidate
+        if len(_JOBS) > MAX_RETAINED_JOB_SNAPSHOTS:
+            finished = sorted(
+                ((key, value.get("finished_at", 0)) for key, value in _JOBS.items()
+                 if key not in _ACTIVE_JOBS and value.get("status") in {"done", "error"}),
+                key=lambda entry: entry[1],
+            )
+            for key, _stamp in finished[:max(0, len(_JOBS) - MAX_RETAINED_JOB_SNAPSHOTS)]:
+                _JOBS.pop(key, None)
 
 
 def get_job(job_id: str) -> dict | None:
+    if (
+        not isinstance(job_id, str)
+        or len(job_id) != 16
+        or any(char not in "0123456789abcdef" for char in job_id)
+    ):
+        return None
     with _JOBS_LOCK:
         if job_id in _JOBS:
             return dict(_JOBS[job_id])
     try:
         from core.databases import get_sync_db
-        return get_sync_db()["swarm_schedule_jobs"].find_one({"job_id": job_id}, {"_id": 0})
-    except Exception:
-        return None
+        return get_sync_db()["swarm_schedule_jobs"].find_one(
+            {"job_id": job_id}, {"_id": 0},
+        )
+    except Exception as exc:
+        # An outage cannot be reported as a non-existent historical job.
+        raise RuntimeError("swarm job history unavailable") from exc
 
 
 def start_async(kind: str, **kwargs) -> str:
-    """Kick a planner execution on a background thread; returns a job_id.
+    """Admit one bounded job, then launch the existing background executor.
 
-    kind = 'execute' (free phases) or 'build' (real build ladder, no phase cap).
+    kind='execute' runs requested phases; kind='build' runs the real build
+    ladder. The process is a bounded runner, not a durable restart scheduler.
     """
-    job_id = uuid.uuid4().hex[:16]
-    _set_job(job_id, status="running", kind=kind, build_id=kwargs.get("build_id"),
-             created_at=time.time(), result=None, error=None)
+    if kind not in {"execute", "build"}:
+        raise ValueError("unsupported swarm async job kind")
+    build_id = kwargs.get("build_id")
+    if not isinstance(build_id, str) or not 1 <= len(build_id.strip()) <= 128:
+        raise ValueError("swarm async job requires bounded build_id")
+    persist = kwargs.get("persist", True)
+    if type(persist) is not bool:
+        raise ValueError("swarm async persistence must be boolean")
+    durable = kind == "build" or persist
+    rounds = kwargs.get("rounds", 2)
+    if type(rounds) is not int or not 1 <= rounds <= 10:
+        raise ValueError("swarm async rounds must be in [1, 10]")
 
-    def _worker():
+    with _JOBS_LOCK:
+        if len(_ACTIVE_JOBS) >= MAX_PARALLEL_ASYNC_JOBS:
+            raise RuntimeError("swarm async admission is at capacity")
+        job_id = None
+        for _ in range(8):
+            candidate = uuid.uuid4().hex[:16]
+            if candidate not in _JOBS and candidate not in _ACTIVE_JOBS:
+                job_id = candidate
+                break
+        if job_id is None:
+            raise RuntimeError("swarm async job identity allocation failed")
+        _ACTIVE_JOBS.add(job_id)
+
+    try:
+        _set_job(
+            job_id, status="running", kind=kind, build_id=build_id,
+            durable=durable, created_at=time.time(), result=None, error=None,
+        )
+    except Exception:
+        with _JOBS_LOCK:
+            _ACTIVE_JOBS.discard(job_id)
+        raise
+
+    def worker() -> None:
         try:
             if kind == "build":
                 res = execute_build(
-                    build_id=kwargs["build_id"], seed=kwargs.get("seed", 0),
-                    platoon_size=kwargs.get("platoon_size", 5), rounds=kwargs.get("rounds", 2),
+                    build_id=build_id, seed=kwargs.get("seed", 0),
+                    platoon_size=kwargs.get("platoon_size", 5),
+                    rounds=rounds,
                 )
             else:
-                # Async free-form execution bypasses the online cap per call.
-                # Never mutate MAX_LIVE_PHASES: background jobs may overlap
-                # request threads and tests, so process-global cap changes race.
-                res = execute_schedule(
-                    **kwargs,
-                    live_phase_cap=None,
-                )
-            _set_job(job_id, status="done", finished_at=time.time(),
-                     result={k: res[k] for k in ("plan_hash", "coverage", "verification",
-                                                 "execution", "participation")})
+                # Do not mutate MAX_LIVE_PHASES: independent threads may
+                # overlap, and the planner remains independently verified.
+                res = execute_schedule(**kwargs, live_phase_cap=None)
+            _set_job(
+                job_id, status="done", finished_at=time.time(),
+                result={key: res[key] for key in (
+                    "plan_hash", "coverage", "verification", "execution",
+                    "participation",
+                )},
+            )
         except Exception:
-            _set_job(job_id, status="error", finished_at=time.time(), error="schedule_failed")
+            try:
+                _set_job(
+                    job_id, status="error", finished_at=time.time(),
+                    error="schedule_failed",
+                )
+            except Exception:
+                # _set_job already marks the local snapshot as undurable.
+                pass
+        finally:
+            with _JOBS_LOCK:
+                _ACTIVE_JOBS.discard(job_id)
 
-    threading.Thread(target=_worker, daemon=True).start()
+    try:
+        threading.Thread(target=worker, daemon=True).start()
+    except Exception as exc:
+        with _JOBS_LOCK:
+            _ACTIVE_JOBS.discard(job_id)
+        try:
+            _set_job(
+                job_id, status="error", finished_at=time.time(),
+                error="worker_start_failed",
+            )
+        except Exception:
+            pass
+        raise RuntimeError("swarm async worker could not start") from exc
     return job_id
