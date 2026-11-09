@@ -89,27 +89,20 @@ def _imports_forbidden_kernel_dependency(module: str) -> bool:
     return root in _KERNEL_FORBIDDEN_ROOTS or module == "skeleton.api" or module.startswith("skeleton.api.")
 
 
-def _resolved_import(module: str, level: int, source: Path, repo_root: Path) -> str:
-    """Resolve import-from relative to its declaring package, not its basename.
+def _imports_api(module: str, level: int, importing_module: str) -> bool:
+    """Resolve Python relative imports before enforcing the API layer boundary.
 
-    ``from .api`` in ``skeleton/ai/feature/cli.py`` is a sibling import,
-    whereas ``from ..api`` in ``skeleton/agents/worker.py`` is an upward
-    dependency on the public ``skeleton.api`` adapter.
+    A sibling `from .api` in a deeply nested package is not `skeleton.api`.
+    Root-bound `from ..api` and `from .. import api` are still blocked.
     """
     if level == 0:
-        return module
-    try:
-        package = source.relative_to(repo_root).parent.parts
-    except ValueError:
-        return ""
-    if level > len(package):
-        return ""  # Invalid ascent is a Python import error, not an API edge.
-    parent = package[: len(package) - level + 1]
-    return ".".join((*parent, *(module.split(".") if module else ())))
-
-
-def _imports_api(module: str) -> bool:
-    return module == "skeleton.api" or module.startswith("skeleton.api.")
+        return module == "skeleton.api" or module.startswith("skeleton.api.")
+    package = importing_module.split(".")[:-1]
+    if not package or level > len(package):
+        return False
+    resolved = ".".join([*package[: len(package) - level + 1], module] if module
+                        else package[: len(package) - level + 1])
+    return resolved == "skeleton.api" or resolved.startswith("skeleton.api.")
 
 
 def _matches_module(module: str, forbidden: str) -> bool:
@@ -212,7 +205,17 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                 if isinstance(node, ast.Import):
                     imports.extend((alias.name, 0) for alias in node.names)
                 elif isinstance(node, ast.ImportFrom):
-                    imports.append((node.module or "", node.level))
+                    if node.module:
+                        imports.append((node.module, node.level))
+                        # A from-import may bind the public API adapter as a
+                        # member: "from skeleton import api as adapter". The
+                        # package import alone is not an architecture violation,
+                        # but the imported adapter is; preserve one finding.
+                        if (node.level == 0 and node.module == "skeleton"
+                                and any(alias.name == "api" for alias in node.names)):
+                            imports.append(("skeleton.api", 0))
+                    elif node.level:
+                        imports.extend((alias.name, node.level) for alias in node.names)
                 else:
                     continue
 
@@ -226,25 +229,17 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                             )
                         )
 
-                    resolved = _resolved_import(module, level, path, repo_root)
-                    # From-import can name an adapter via its imported member:
-                    # ``from skeleton import api`` and ``from .. import api``.
-                    # Resolve the actual package first to avoid classifying
-                    # unrelated sibling ``.api`` modules as public adapters.
-                    imported_targets = [resolved]
-                    if isinstance(node, ast.ImportFrom) and resolved:
-                        imported_targets.extend(
-                            f"{resolved}.{alias.name}"
-                            for alias in node.names
-                            if alias.name != "*"
-                        )
                     if (
                         in_skeleton
                         and not in_api
                         and not production_exempt
                         and not api_composition_root
                         and not _is_staged_api_mirror(rel, repo_root)
-                        and any(_imports_api(target) for target in imported_targets)
+                        and _imports_api(
+                            module,
+                            level,
+                            ".".join(path.relative_to(repo_root).with_suffix("").parts),
+                        )
                     ):
                         violations.append(
                             Violation(

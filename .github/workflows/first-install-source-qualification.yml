@@ -22,6 +22,8 @@ on:
       - 'skeleton/testing/test_app_offline_delivery_archive.py'
       - 'skeleton/app/offline_delivery_archive.py'
       - 'skeleton/testing/test_app_studio_journey.py'
+      - 'skeleton/testing/test_studio_package_verifier_contract.py'
+      - 'skeleton/testing/test_app_offline_signed_game_library_audit.py'
       - 'skeleton/testing/test_dual_runtime_verify.py'
       - 'skeleton/ai/game_builder/dual_runtime_verify.py'
       - 'skeleton/ai/game_builder/original_game_studio.py'
@@ -75,6 +77,7 @@ jobs:
           python -m compileall -q skeleton/app
           python -m compileall -q skeleton/testing/test_app_install_source_contracts.py skeleton/testing/test_app_assembly.py skeleton/testing/test_app_installer.py skeleton/testing/test_app_installer_epoch.py
           python -m compileall -q scripts/check_app_assembly.py scripts/check_app_compose_parity.py
+          python -m compileall -q skeleton/testing/test_studio_package_verifier_contract.py skeleton/testing/test_app_offline_signed_game_library_audit.py
       - name: Qualify actual first-install assembly and required source inputs
         run: python scripts/check_app_assembly.py
       - name: Run focused host-portable first-install regressions
@@ -89,6 +92,8 @@ jobs:
             skeleton/testing/test_app_offline_install_quarantine.py \
             skeleton/testing/test_app_offline_delivery_archive.py \
             skeleton/testing/test_dual_runtime_verify.py \
+            skeleton/testing/test_studio_package_verifier_contract.py \
+            skeleton/testing/test_app_offline_signed_game_library_audit.py \
             skeleton/testing/test_app_studio_journey.py \
             skeleton/testing/test_app_offline_install_preflight.py \
             skeleton/testing/test_app_offline_install_reconciliation.py \

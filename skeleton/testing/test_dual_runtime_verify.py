@@ -406,13 +406,20 @@ def _studio_verification_fixture(tmp_path):
             "rights_reviewed": False,
             "human_playtested": False,
             "platform_hardware_tested": False,
+            "code_signed": False,
         },
         "not_a_legal_opinion": True,
     }
     for path in studio_paths:
-        obj = consumer if path == "studio/consumer_gate.json" else {
-            "schema": "skeleton.game_builder.original_studio_test_metadata.v1",
-        }
+        if path == "studio/consumer_gate.json":
+            obj = consumer
+        elif path == "studio/pipeline.json":
+            obj = {
+                "schema": "skeleton.game_builder.studio_pipeline.v1",
+                "not_automatically_published": True,
+            }
+        else:
+            obj = {"schema": "skeleton.game_builder.original_studio_test_metadata.v1"}
         file_data[path] = (
             json.dumps(obj, sort_keys=True, separators=(",", ":"), allow_nan=False)
             + "\n"
@@ -484,3 +491,101 @@ def test_studio_schema_rejects_missing_or_false_release_evidence(tmp_path, chang
     pin = sha256((root / "release.json").read_bytes()).hexdigest()
     with pytest.raises(DualRuntimeVerificationError):
         verify_exported_package(root, expected_manifest_sha256=pin, authorized=True)
+
+
+def _release_evidence_sources():
+    """A minimally valid, still release-blocked Studio receipt set."""
+    from skeleton.ai.game_builder.dual_runtime_verify import _canonical_bytes
+
+    return {
+        "studio/pipeline.json": _canonical_bytes({
+            "schema": "skeleton.game_builder.studio_pipeline.v1",
+            "not_automatically_published": True,
+        }),
+        "studio/consumer_gate.json": _canonical_bytes({
+            "schema": "skeleton.game_builder.consumer_review.v1",
+            "status": "release-blocked",
+            "not_a_legal_opinion": True,
+            "evidence": {
+                "approved_for_publication": False,
+                "rights_reviewed": False,
+                "human_playtested": False,
+                "platform_hardware_tested": False,
+                "code_signed": False,
+            },
+        }),
+        "studio/mirror_room.json": _canonical_bytes({
+            "schema": "skeleton.game_builder.studio_mirror_room.v1",
+        }),
+    }
+
+
+def test_shared_studio_release_evidence_archive_gate():
+    """Archive and package inspection must share the same evidence validator."""
+    from skeleton.ai.game_builder.dual_runtime_verify import (
+        verify_studio_release_evidence,
+    )
+    from skeleton.app.offline_delivery_archive import (
+        verify_studio_release_evidence as archive_gate,
+    )
+
+    assert archive_gate is verify_studio_release_evidence
+    assert verify_studio_release_evidence(_release_evidence_sources()) is None
+
+
+@pytest.mark.parametrize("change", [
+    "missing-consumer",
+    "claimed-publication",
+    "claimed-rights",
+    "claimed-device",
+    "claimed-code-signing",
+    "missing-signing-hold",
+    "invalid-pipeline-flag",
+    "duplicate-mirror-keys",
+    "nonfinite-consumer",
+    "oversized-mirror",
+    "nonbytes-receipt",
+])
+def test_shared_studio_release_evidence_rejects_unsafe_claims(change):
+    """No hash-valid offline ZIP may independently promote release authority."""
+    from skeleton.ai.game_builder.dual_runtime_verify import (
+        DualRuntimeVerificationError,
+        _canonical_bytes,
+        verify_studio_release_evidence,
+    )
+
+    files = _release_evidence_sources()
+    consumer = json.loads(files["studio/consumer_gate.json"])
+    pipeline = json.loads(files["studio/pipeline.json"])
+    if change == "missing-consumer":
+        del files["studio/consumer_gate.json"]
+    elif change == "claimed-publication":
+        consumer["evidence"]["approved_for_publication"] = True
+    elif change == "claimed-rights":
+        consumer["evidence"]["rights_reviewed"] = True
+    elif change == "claimed-device":
+        consumer["evidence"]["platform_hardware_tested"] = True
+    elif change == "claimed-code-signing":
+        consumer["evidence"]["code_signed"] = True
+    elif change == "missing-signing-hold":
+        del consumer["evidence"]["code_signed"]
+    elif change == "invalid-pipeline-flag":
+        pipeline["not_automatically_published"] = 1
+    elif change == "duplicate-mirror-keys":
+        files["studio/mirror_room.json"] = b'{"a":1,"a":2}'
+    elif change == "nonfinite-consumer":
+        files["studio/consumer_gate.json"] = b'{"evidence":NaN}'
+    elif change == "oversized-mirror":
+        files["studio/mirror_room.json"] = b'{"x":"' + b"x" * 65536 + b'"}'
+    elif change == "nonbytes-receipt":
+        files["studio/mirror_room.json"] = "{}"
+    if change in {
+        "claimed-publication", "claimed-rights", "claimed-device",
+        "claimed-code-signing", "missing-signing-hold",
+    }:
+        files["studio/consumer_gate.json"] = _canonical_bytes(consumer)
+    if change == "invalid-pipeline-flag":
+        files["studio/pipeline.json"] = _canonical_bytes(pipeline)
+
+    with pytest.raises(DualRuntimeVerificationError):
+        verify_studio_release_evidence(files)
