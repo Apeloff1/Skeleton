@@ -97,8 +97,57 @@ class LaptopFlow:
             raise CanonError("review_stale_source")
         return True
 
+    def preview_edit(self, world_id: str, expected_digest: str, operation: Any) -> dict[str, Any]:
+        """Reviewable, side-effect-free typed edit with exact source CAS.
+
+        The candidate is never approved or published by preview. A reviewer must
+        subsequently submit the identical operation against the original digest.
+        """
+        _id(world_id, "world_id")
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                current = self._world(fd, world_id)
+                if digest(current) != expected_digest:
+                    raise CanonError("stale_source")
+                candidate = edit(current, operation)
+                candidate_digest = digest(candidate)
+                if candidate_digest == expected_digest:
+                    raise CanonError("review_requires_change")
+                before = {kind: {item["id" if kind != "endings" else "scene"]: item
+                         for item in current[kind]}
+                          for kind in ("scenes", "choices", "endings")}
+                after = {kind: {item["id" if kind != "endings" else "scene"]: item
+                        for item in candidate[kind]}
+                         for kind in ("scenes", "choices", "endings")}
+                changes = {}
+                for kind in ("scenes", "choices", "endings"):
+                    changes[kind] = {
+                        "added": sorted(after[kind].keys() - before[kind].keys()),
+                        "removed": sorted(before[kind].keys() - after[kind].keys()),
+                        "modified": sorted(k for k in before[kind].keys() & after[kind].keys()
+                                           if before[kind][k] != after[kind][k]),
+                    }
+                return {
+                    "schema": "jeeves.world.review_preview.v1",
+                    "world_id": world_id,
+                    "source_digest": expected_digest,
+                    "candidate_digest": candidate_digest,
+                    "operation_digest": digest(operation),
+                    "changes": changes,
+                    "proof": prove(candidate).as_dict(),
+                    "reviewed": False,
+                    "published": False,
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
     def review(self, world_id: str, expected_digest: str, operation: Any,
-               review_note: str) -> dict[str, Any]:
+               review_note: str, *, expected_candidate_digest: str | None = None,
+               expected_operation_digest: str | None = None) -> dict[str, Any]:
         """Publish an explicitly reviewed edit under one canonical writer lease.
 
         Source CAS, proof, and review custody share a single lock. A concurrent
@@ -116,8 +165,18 @@ class LaptopFlow:
                 current = self._world(fd, world_id)
                 if digest(current) != expected_digest:
                     raise CanonError("stale_source")
+                if expected_operation_digest is not None:
+                    if (not isinstance(expected_operation_digest, str) or
+                            len(expected_operation_digest) != 64 or
+                            expected_operation_digest != digest(operation)):
+                        raise CanonError("review_operation_mismatch")
                 revised = edit(current, operation)
                 new_digest = digest(revised)
+                if expected_candidate_digest is not None:
+                    if (not isinstance(expected_candidate_digest, str) or
+                            len(expected_candidate_digest) != 64 or
+                            expected_candidate_digest != new_digest):
+                        raise CanonError("review_candidate_mismatch")
                 if new_digest == expected_digest:
                     raise CanonError("review_requires_change")
                 proof = prove(revised).as_dict()
@@ -125,8 +184,15 @@ class LaptopFlow:
                     "schema": REVIEW_SCHEMA, "world_id": world_id,
                     "source_digest": new_digest, "review_note": review_note,
                 }
-                # A previously approved digest is invalid after the source
-                # publication. Review is committed only after canonical bytes.
+                # Revoke earlier approvals before changing source bytes.
+                # Otherwise an A -> B -> A retry could borrow a previously
+                # valid review if the next source/review pair is interrupted.
+                try:
+                    os.unlink(self._names(world_id)[0], dir_fd=fd)
+                except FileNotFoundError:
+                    pass
+                else:
+                    os.fsync(fd)
                 self.worlds._write(fd, world_id + ".json", canonical(revised))
                 self.worlds._write(fd, self._names(world_id)[0], canonical(review))
                 return {
@@ -205,9 +271,8 @@ class LaptopFlow:
         try:
             self._validate_review(review, world)
         except CanonError as exc:
-            # An interrupted source publication may leave a valid review of
-            # the previous revision. Treat that as absent authorization, not
-            # as an approval and not as an unhandled compiler exception.
+            # A successfully written world with an interrupted review write
+            # has no approval, even if an old review remains on disk.
             if exc.code == "review_stale_source":
                 raise CanonError("review_required") from None
             raise
