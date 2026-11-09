@@ -129,11 +129,24 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
     """
     from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
-    if not math.isfinite(timeout) or not 0 < timeout <= 10:
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not math.isfinite(timeout)
+        or not 0 < timeout <= 10
+    ):
         raise ValueError("setup probe timeout must be finite and within (0, 10] seconds")
     # Reject invalid targets here as well as in the Windows launcher, so a
     # future caller cannot accidentally turn this local probe into an SSRF.
     try:
+        # urllib can silently strip controls from a URL. Reject before parsing
+        # to prevent a malformed setup origin from becoming a different target.
+        if (
+            not isinstance(service.public_url, str)
+            or not service.public_url
+            or any(ord(ch) <= 32 or ord(ch) == 127 for ch in service.public_url)
+        ):
+            raise ValueError("invalid setup origin")
         parts = urlsplit(service.public_url)
         local = (
             parts.scheme == "http"
