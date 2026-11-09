@@ -69,7 +69,7 @@ class RefactorSuggestionRequest(BaseModel):
 
 async def call_llm(system: str, prompt: str) -> str:
     if not LLM_AVAILABLE:
-        return "LLM not available"
+        raise HTTPException(status_code=503, detail="AI engine is unavailable")
     try:
         chat = EngineChat(
             instruction_policy=InstructionPolicy(
@@ -80,8 +80,8 @@ async def call_llm(system: str, prompt: str) -> str:
         )
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
-    except Exception:
-        return "llm_request_failed"
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="AI collaboration request could not be completed") from exc
 
 # ============================================================================
 # AI PAIR PROGRAMMING
