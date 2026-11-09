@@ -256,6 +256,53 @@ def attempt_unlock(source:CodexAddress,gate_id:str, *,
     state=create_passage_state(source)
     demands=inspect_gate(source,state,gate_id)
     script=[]
+
+    def result(*,found:bool,actions:list[str],reason:str,
+               final:PassageState|None=None)->dict:
+        """Emit a source-bound, independently checkable planning receipt."""
+        replay_verified=False
+        arrived=None
+        replay_digest=None
+        if found:
+            if final is None or not actions or actions[-1]!=gate_id:
+                raise ValueError("world-access witness is incomplete")
+            independently=replay_access(source,tuple(actions))
+            if independently!=final or gate_id not in independently.traversed:
+                raise ValueError("world-access witness cannot replay the actual story")
+            replay_verified=True
+            arrived=[final.world.player.base.realm,
+                     final.world.player.base.x,
+                     final.world.player.base.y]
+            replay_digest=final.access_digest
+        receipt=_sha([
+            SCHEMA,source.codex_digest,gate_id,horizon,found,reason,
+            tuple(actions),replay_digest,
+        ])
+        return {
+            "schema":SCHEMA,
+            "gate":gate_id,
+            "found_within_budget":found,
+            "proof_status":"proven" if found else "inconclusive",
+            "actions":actions if found else [],
+            "elapsed_actions":len(actions) if found else 0,
+            "reason":reason,
+            "requested_horizon":horizon,
+            "arrived":arrived,
+            "actual_replay_digest":replay_digest,
+            "independent_replay_verified":replay_verified,
+            "proof_receipt_sha256":receipt,
+            "original_world_digest":source.codex_digest,
+            "gate_requirements":{
+                "source_axis":demands.source_axis,
+                "companion_axis":demands.companion_axis,
+                "required_mastery":list(demands.required_mastery),
+                "required_era":demands.required_era,
+                "earliest_turn":demands.earliest_turn,
+                "period":demands.period,
+                "season_window":demands.season_window,
+            },
+            "not_a_global_unwinnability_claim":True,
+        }
     if demands.required_era>0:
         for _ in range(demands.required_era*4):
             script.append("study_era_length")
@@ -266,35 +313,17 @@ def attempt_unlock(source:CodexAddress,gate_id:str, *,
         for _ in range(max(0,need-have)):
             script.append("study_"+name)
     if len(script)>=horizon:
-        return {
-            "schema":SCHEMA,"gate":gate_id,"found_within_budget":False,
-            "actions":[],"reason":"preconditions_exceed_bounded_horizon",
-            "not_a_global_unwinnability_claim":True,
-        }
+        return result(found=False,actions=[],
+                      reason="preconditions_exceed_bounded_horizon")
     for action in script:state=take_access_action(source,state,action)
     while len(script)<horizon-1:
         gate=inspect_gate(source,state,gate_id)
         if gate.accessible_now:
             script.append(gate_id)
             state=take_access_action(source,state,gate_id)
-            independently=replay_access(source,tuple(script))
-            if independently!=state:
-                raise ValueError("world-access witness cannot replay the actual story")
-            return {
-                "schema":SCHEMA,"gate":gate_id,
-                "found_within_budget":True,
-                "actions":script,"elapsed_actions":len(script),
-                "arrived":[state.world.player.base.realm,
-                           state.world.player.base.x,
-                           state.world.player.base.y],
-                "actual_replay_digest":state.access_digest,
-                "not_a_global_unwinnability_claim":True,
-                "original_world_digest":source.codex_digest,
-            }
+            return result(found=True,actions=script,reason="route_replayed",
+                          final=state)
         script.append("wait_world")
         state=take_access_action(source,state,"wait_world")
-    return {
-        "schema":SCHEMA,"gate":gate_id,"found_within_budget":False,
-        "actions":[],"reason":"not_reachable_under_current_horizon_or_calendar",
-        "not_a_global_unwinnability_claim":True,
-    }
+    return result(found=False,actions=[],
+                  reason="not_reachable_under_current_horizon_or_calendar")
