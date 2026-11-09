@@ -47,6 +47,8 @@ class EvidenceBundle:
     def seal(self,*,required):
         if type(required) not in (set,frozenset,tuple,list):
             fail("explicit bounded domain list required")
+        if not 1<=len(required)<=40 or any(type(item) is not str for item in required):
+            fail("required domain names must be bounded strings")
         required=set(required)
         if not required or not required.issubset(set(domains())):
             fail("unknown or empty required assurance domain set")
@@ -56,11 +58,11 @@ class EvidenceBundle:
                 fail("incomplete evidence controls")
             if self._identity is None:fail("evidence bundle is empty")
             envelope={"schema":"ai-reliability-bundle.v1",
-                "identity":self._identity,"observed_ns":self._valid_at,
+                "identity":list(self._identity),"observed_ns":self._valid_at,
                 "receipts":{name:self._rows[name]["receipt"]["record_sha256"]
                     for name in sorted(self._rows)}}
             digest=sha256(canonical(envelope))
-            identity_sha=sha256(canonical(self._identity))
+            identity_sha=sha256(canonical(list(self._identity)))
             self._sealed=True
             return BundleReceipt(tuple(sorted(self._rows)),identity_sha,digest)
 
