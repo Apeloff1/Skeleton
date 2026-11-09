@@ -29,6 +29,33 @@ class SessionSnapshotLeaseTests(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.temp.name, "lease_world.lock")))
         self.assertEqual(self.sessions.read("lease_world", "slot_a"), first)
 
+    def test_snapshot_read_rejects_stale_world_cas(self):
+        from skeleton.jeeves.worlds.world_canon import digest
+        world = self.worlds.read("lease_world")
+        current = digest(world)
+        self.assertEqual(self.sessions.read("lease_world", "slot_a",
+                                            expected_world_digest=current)["revision"], 0)
+        with self.assertRaises(CanonError) as raised:
+            self.sessions.read("lease_world", "slot_a",
+                               expected_world_digest="0" * 64)
+        self.assertEqual(raised.exception.code, "session_world_lease_mismatch")
+        self.assertFalse(os.path.exists(os.path.join(self.temp.name, "lease_world.lock")))
+
+    def test_snapshot_read_requires_source_guard_under_lease(self):
+        seen = []
+        def approve(fd, world_id):
+            seen.append((world_id, os.path.exists(os.path.join(self.temp.name,
+                                                              world_id + ".lock"))))
+        self.sessions.read("lease_world", "slot_a", source_guard=approve)
+        self.assertEqual(seen, [("lease_world", True)])
+        def reject(fd, world_id):
+            raise CanonError("source_not_approved")
+        with self.assertRaises(CanonError) as raised:
+            self.sessions.read("lease_world", "slot_a", source_guard=reject)
+        self.assertEqual(raised.exception.code, "source_not_approved")
+        self.assertFalse(os.path.exists(os.path.join(self.temp.name, "lease_world.lock")))
+        self.assertEqual(self.sessions.read("lease_world", "slot_a")["revision"], 0)
+
     def test_busy_writer_fails_closed_without_removing_foreign_lock(self):
         path = os.path.join(self.temp.name, "lease_world.lock")
         with open(path, "xb") as handle:
