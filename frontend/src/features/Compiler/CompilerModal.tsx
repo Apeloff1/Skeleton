@@ -135,6 +135,7 @@ export function CompilerModal({
   const [agenticActions, setAgenticActions] = useState<AgenticAction[]>([]);
   const [microTests, setMicroTests] = useState<MicroTestResult[]>([]);
   const [perfSuggestions, setPerfSuggestions] = useState<PerformanceSuggestion[]>([]);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   // Animation
   useEffect(() => {
@@ -229,6 +230,14 @@ export function CompilerModal({
   // Run Analysis - Connected to Real Backend API
   const runFullAnalysis = useCallback(async () => {
     setIsAnalyzing(true);
+    setAnalysisError(null);
+    setDiagnostics([]);
+    setSanitizerResults([]);
+    setMicroTests([]);
+    setPerfSuggestions([]);
+    setAgenticActions([]);
+    setMemorySafetyResult(null);
+    setIrModule(null);
     
     try {
       // Get the backend URL from environment
@@ -260,6 +269,9 @@ export function CompilerModal({
       }
       
       const result = await response.json();
+      if (result?.disabled || result?.ok === false || result?.success === false) {
+        throw new Error(result?.error || 'The compiler rejected this analysis request.');
+      }
       
       // Process sanitizer results from backend
       if (result.sanitizer_results) {
@@ -272,18 +284,21 @@ export function CompilerModal({
             message: issue.message,
             code: issue.code || '',
             suggestion: issue.suggestion,
-            fixIt: issue.suggestion ? {
-              description: issue.suggestion,
-              replacement: '',
-              range: { start: 0, end: 0 },
-            } : undefined,
+            fixIt: issue.fix_it && typeof issue.fix_it.replacement === 'string' &&
+              Number.isInteger(issue.fix_it.range?.start) && Number.isInteger(issue.fix_it.range?.end)
+              ? {
+                  description: issue.fix_it.description || issue.suggestion || 'Apply sanitizer fix',
+                  replacement: issue.fix_it.replacement,
+                  range: issue.fix_it.range,
+                }
+              : undefined,
           }))
         );
         setSanitizerResults(processedSanitizers);
       }
       
       // Process micro test results from backend
-      if (result.micro_test_results) {
+      if (result.micro_test_results?.executed === true && Array.isArray(result.micro_test_results.tests)) {
         const processedTests: MicroTestResult[] = result.micro_test_results.tests.map((test: any) => ({
           name: test.name,
           passed: test.status === 'passed',
@@ -409,60 +424,73 @@ export function CompilerModal({
       
     } catch (error) {
       console.error('Analysis error:', error);
-      
-      // Fallback to mock data on error
-      const mockDiagnostics: Diagnostic[] = [
-        {
-          id: 'd1',
-          severity: 'warning',
-          source: 'compiler',
-          message: 'Unused variable declaration',
-          line: 3,
-          column: 5,
-          category: 'unused',
-          explanation: 'This variable is declared but never used in the code.',
-          suggestions: ['Remove the unused variable', 'Use the variable in your logic'],
-          fixIts: [{ description: 'Remove variable', isPreferred: true, changes: [] }],
-        },
-      ];
-      
-      const mockTests: MicroTestResult[] = [
-        { name: 'test_basic_input', passed: true, duration: 2.3, coverage: 85 },
-        { name: 'test_edge_case_empty', passed: true, duration: 1.1, coverage: 90 },
-        { name: 'test_large_input', passed: false, duration: 150, error: 'Timeout exceeded' },
-      ];
-      
-      const mockPerfSuggestions: PerformanceSuggestion[] = [
-        {
-          type: 'complexity',
-          location: { line: 12, column: 1 },
-          currentMetric: 'O(n²)',
-          expectedImprovement: 'O(n log n)',
-          suggestion: 'Use a sorting algorithm instead of nested comparison',
-        },
-      ];
-      
-      setDiagnostics(mockDiagnostics);
-      setMicroTests(mockTests);
-      setPerfSuggestions(mockPerfSuggestions);
-      
-      if (agenticEnabled) {
-        setAgenticActions([
-          {
-            type: 'performance_suggestion',
-            confidence: 0.92,
-            description: 'Backend unavailable - using cached analysis',
-            impact: 'minimal',
-            autoApplicable: false,
-          },
-        ]);
-      }
+      const message = error instanceof Error ? error.message : 'The compiler service did not return an analysis.';
+      setAnalysisError(message);
+      toast.error(`Analysis failed: ${message}`);
     }
     
     setIsAnalyzing(false);
     saveConfig();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, language, enabledSanitizers, agenticEnabled, memorySafetyEnabled, optimizationLevel, optimizationPasses]);
+
+  const commitFixedCode = useCallback((nextCode: string, label: string) => {
+    if (!onApplyFix) {
+      toast.error('Open this compiler from an editable source file to apply fixes.');
+      return;
+    }
+    if (nextCode === code) {
+      toast.warn('The proposed fix does not change the current source.');
+      return;
+    }
+    onApplyFix(nextCode);
+    toast.success(label);
+  }, [code, onApplyFix]);
+
+  const applyOffsetFix = useCallback((fix: NonNullable<SanitizerResult['fixIt']>) => {
+    const { start, end } = fix.range;
+    if (start < 0 || end < start || end > code.length) {
+      toast.error('The compiler returned an invalid source range. Run analysis again.');
+      return;
+    }
+    commitFixedCode(`${code.slice(0, start)}${fix.replacement}${code.slice(end)}`, 'Sanitizer fix applied');
+  }, [code, commitFixedCode]);
+
+  const applyDiagnosticFix = useCallback((fix: NonNullable<Diagnostic['fixIts']>[number]) => {
+    if (!fix.changes.length) {
+      toast.error('This diagnostic is advisory and has no source edit.');
+      return;
+    }
+    const lineOffsets = [0];
+    for (let index = 0; index < code.length; index += 1) if (code[index] === '\n') lineOffsets.push(index + 1);
+    const edits = fix.changes.map(change => {
+      const { startLine, startCol, endLine, endCol } = change.range;
+      const start = lineOffsets[startLine - 1] === undefined ? -1 : lineOffsets[startLine - 1] + Math.max(0, startCol - 1);
+      const end = lineOffsets[endLine - 1] === undefined ? -1 : lineOffsets[endLine - 1] + Math.max(0, endCol - 1);
+      return { start, end, newText: change.newText };
+    }).sort((a, b) => b.start - a.start);
+    if (edits.some(edit => edit.start < 0 || edit.end < edit.start || edit.end > code.length) ||
+        edits.some((edit, index) => index > 0 && edit.end > edits[index - 1].start)) {
+      toast.error('The compiler returned overlapping or invalid edits. Run analysis again.');
+      return;
+    }
+    let nextCode = code;
+    edits.forEach(edit => { nextCode = `${nextCode.slice(0, edit.start)}${edit.newText}${nextCode.slice(edit.end)}`; });
+    commitFixedCode(nextCode, 'Diagnostic fix applied');
+  }, [code, commitFixedCode]);
+
+  const applyAgenticAction = useCallback((action: AgenticAction) => {
+    if (!action.before || action.after === undefined) {
+      toast.error('This AI action is advisory and has no verified source patch.');
+      return;
+    }
+    const first = code.indexOf(action.before);
+    if (first < 0 || code.indexOf(action.before, first + action.before.length) >= 0) {
+      toast.error('The AI patch anchor is missing or ambiguous. Run analysis again.');
+      return;
+    }
+    commitFixedCode(`${code.slice(0, first)}${action.after}${code.slice(first + action.before.length)}`, 'AI fix applied');
+  }, [code, commitFixedCode]);
 
   // Render severity badge
   const renderSeverityBadge = (severity: DiagnosticSeverity | string) => {
@@ -519,6 +547,16 @@ export function CompilerModal({
           </>
         )}
       </TouchableOpacity>
+
+      {analysisError && (
+        <View style={[styles.analysisError, { backgroundColor: '#EF444415', borderColor: '#EF4444' }]}>
+          <Ionicons name="alert-circle" size={18} color="#EF4444" />
+          <View style={styles.analysisErrorCopy}>
+            <Text style={[styles.analysisErrorTitle, { color: '#EF4444' }]}>Analysis unavailable</Text>
+            <Text style={[styles.analysisErrorText, { color: colors.textSecondary }]}>{analysisError}</Text>
+          </View>
+        </View>
+      )}
       
       {/* Micro Tests */}
       {microTests.length > 0 && (
@@ -588,8 +626,8 @@ export function CompilerModal({
                 <Text style={[styles.confidenceText, { color: '#10B981' }]}>{Math.round(action.confidence * 100)}% confidence</Text>
               </View>
               <Text style={[styles.actionDesc, { color: colors.text }]}>{action.description}</Text>
-              {action.autoApplicable && (
-                <TouchableOpacity style={[styles.applyButton, { backgroundColor: '#8B5CF6' }]}>
+              {action.autoApplicable && action.before !== undefined && action.after !== undefined && (
+                <TouchableOpacity style={[styles.applyButton, { backgroundColor: '#8B5CF6' }]} onPress={() => applyAgenticAction(action)}>
                   <Ionicons name="flash" size={14} color="#FFF" />
                   <Text style={styles.applyButtonText}>Apply Fix</Text>
                 </TouchableOpacity>
@@ -671,7 +709,7 @@ export function CompilerModal({
                 </View>
               )}
               {result.fixIt && (
-                <TouchableOpacity style={[styles.fixItButton, { backgroundColor: '#10B981' }]}>
+                <TouchableOpacity style={[styles.fixItButton, { backgroundColor: '#10B981' }]} onPress={() => applyOffsetFix(result.fixIt!)}>
                   <Ionicons name="flash" size={14} color="#FFF" />
                   <Text style={styles.fixItButtonText}>Apply Fix-It</Text>
                 </TouchableOpacity>
@@ -819,6 +857,7 @@ export function CompilerModal({
                   <TouchableOpacity 
                     key={j} 
                     style={[styles.fixItBtn, { backgroundColor: fix.isPreferred ? '#10B981' : colors.surfaceAlt }]}
+                    onPress={() => applyDiagnosticFix(fix)}
                   >
                     <Ionicons name="flash" size={14} color={fix.isPreferred ? '#FFF' : colors.text} />
                     <Text style={[styles.fixItBtnText, { color: fix.isPreferred ? '#FFF' : colors.text }]}>{fix.description}</Text>
@@ -1321,6 +1360,10 @@ const styles = StyleSheet.create({
   // Analyze Button
   analyzeButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 12, gap: 8, marginBottom: 16 },
   analyzeButtonText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
+  analysisError: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 16 },
+  analysisErrorCopy: { flex: 1, gap: 3 },
+  analysisErrorTitle: { fontSize: 14, fontWeight: '700' },
+  analysisErrorText: { fontSize: 12, lineHeight: 17 },
   
   // Results
   resultSection: { borderRadius: 12, padding: 14, marginBottom: 16 },

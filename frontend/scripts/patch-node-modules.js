@@ -283,8 +283,16 @@ function patchDeepmergePrototypePoisoning() {
     }
   }
   const version = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '');
-  if (version !== '4.3.1') {
+  if (!new Set(['4.3.1', '4.3.2']).has(version)) {
     throw new Error(`[patch-node-modules] deepmerge ${version} requires security patch review`);
+  }
+  if (version === '4.3.2') {
+    const metadata = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    if (metadata.skeleton?.upstreamVersion !== '4.3.1'
+        || metadata.skeleton?.advisory !== 'GHSA-gcqx-w48m-w2h4'
+        || metadata.skeleton?.hardened !== true) {
+      throw new Error('[patch-node-modules] hardened deepmerge provenance is missing');
+    }
   }
   const expoMetadata = path.join(ROOT, 'node_modules/@expo/config/package.json');
   if (fs.existsSync(expoMetadata)) {
@@ -438,25 +446,27 @@ function patchWorkletsStaticRendering() {
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
 
-  // Expo 54 / Reanimated 4.1.x currently resolves worklets 0.5.1. The app
-  // entry installs the RAF fallback before Expo Router loads, so this version
+  // Expo 54 / Reanimated 4.1.x resolves worklets 0.5.1 and Expo 55 /
+  // Reanimated 4.2.x resolves worklets 0.7.4. The app entry installs the RAF
+  // fallback before Expo Router loads, and 0.7.4 also includes its own
+  // mockedRequestAnimationFrame fallback, so these reviewed versions
   // does not require a node_modules rewrite. Keep this exact-version and
   // entry-contract check fail-closed: any dependency drift still requires
   // explicit review.
-  if (version === '0.5.1') {
+  if (new Set(['0.5.1', '0.7.4']).has(version)) {
     const entryPath = path.join(ROOT, 'index.js');
     if (!fs.existsSync(entryPath)) {
-      throw new Error('[patch-node-modules] worklets 0.5.1 requires the static-render entry shim');
+      throw new Error(`[patch-node-modules] worklets ${version} requires the static-render entry shim`);
     }
     const entry = fs.readFileSync(entryPath, 'utf8');
     if (
       !entry.includes("typeof globalThis.requestAnimationFrame !== 'function'") ||
       !entry.includes("typeof globalThis.cancelAnimationFrame !== 'function'")
     ) {
-      throw new Error('[patch-node-modules] worklets 0.5.1 static-render entry shim drifted');
+      throw new Error(`[patch-node-modules] worklets ${version} static-render entry shim drifted`);
     }
     skipped++;
-    console.log('[patch-node-modules] ✓ static-render protected by frontend/index.js (worklets 0.5.1)');
+    console.log(`[patch-node-modules] ✓ static-render protected by frontend/index.js (worklets ${version})`);
     return;
   }
 
@@ -503,7 +513,7 @@ function patchReactNativeRnGetPolyfillsExport() {
 
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version !== '0.81.5') {
+  if (!new Set(['0.81.5', '0.83.10']).has(version)) {
     throw new Error(
       `[patch-node-modules] react-native ${version} requires rn-get-polyfills export review`,
     );
@@ -521,6 +531,15 @@ function patchReactNativeRnGetPolyfillsExport() {
 
   const exportKey = './rn-get-polyfills';
   const expectedTarget = './rn-get-polyfills.js';
+  // React Native 0.83 exposes this file through its reviewed conditional
+  // wildcard export. Resolve it through Node as an end-to-end contract check.
+  if (version === '0.83.10' && pkg.exports['./*']) {
+    if (require.resolve('react-native/rn-get-polyfills', { paths: [ROOT] }) !== targetPath) {
+      throw new Error('[patch-node-modules] React Native wildcard polyfills export did not resolve');
+    }
+    skipped++;
+    return;
+  }
   if (Object.prototype.hasOwnProperty.call(pkg.exports, exportKey)) {
     if (pkg.exports[exportKey] !== expectedTarget) {
       throw new Error('[patch-node-modules] React Native rn-get-polyfills export changed shape');
@@ -539,9 +558,9 @@ function patchExpoStaticIndexPath() {
   const pkgPath = path.join(ROOT, 'node_modules/@expo/cli/package.json');
   if (!fs.existsSync(pkgPath)) return;
   const version = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version;
-  // SDK 54 shipped both CLI versions with the same guarded static-index path.
-  // Future releases still require an explicit exact-version and source review.
-  if (!new Set(['54.0.27', '54.0.28']).has(version)) {
+  // SDK 54 and the reviewed SDK 55 CLI retain the same guarded static-index
+  // path. Future releases still require an explicit source review.
+  if (!new Set(['54.0.27', '54.0.28', '55.0.37']).has(version)) {
     throw new Error(`[patch-node-modules] Expo CLI ${version} requires static path review`);
   }
   const target = path.join(ROOT, 'node_modules/@expo/cli/build/src/export/exportStaticAsync.js');
