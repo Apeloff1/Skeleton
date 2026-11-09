@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
+import { toast } from '../../components/AppToast';
 const API_URL = Constants.expoConfig?.extra?.apiUrl || CANONICAL_API_BASE || '';
 
 interface SOTAModalProps {
@@ -35,6 +36,7 @@ export const SOTAModal: React.FC<SOTAModalProps> = ({
   const [code, setCode] = useState(currentCode || '');
   const [task, setTask] = useState('');
   const [info, setInfo] = useState<any>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -65,6 +67,7 @@ export const SOTAModal: React.FC<SOTAModalProps> = ({
     if (!selectedFeature) return;
     setLoading(true);
     setResult(null);
+    setError('');
 
     try {
       let endpoint = '';
@@ -99,12 +102,25 @@ export const SOTAModal: React.FC<SOTAModalProps> = ({
         body: JSON.stringify(body)
       });
       const data = await res.json();
+      if (!res.ok || data?.error) {
+        throw new Error(data?.detail || data?.error || `Request failed (${res.status})`);
+      }
       setResult(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error('SOTA feature error:', e);
+      const message = e?.message || 'The AI feature did not return a result.';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const resultText = () => {
+    const value = result?.predictions?.next_code ??
+      result?.refactored_analysis ?? result?.final_output ??
+      result?.analysis ?? result?.completions ?? result;
+    return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
   };
 
   const renderFeatureContent = () => {
@@ -116,6 +132,13 @@ export const SOTAModal: React.FC<SOTAModalProps> = ({
           <Ionicons name="arrow-back" size={20} color={colors.text} />
           <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
         </TouchableOpacity>
+
+        {!!error && (
+          <View style={[styles.errorBox, { borderColor: '#EF4444', backgroundColor: '#EF444415' }]}>
+            <Ionicons name="alert-circle" size={18} color="#EF4444" />
+            <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
+          </View>
+        )}
 
         {/* Code Input */}
         <Text style={[styles.inputLabel, { color: colors.text }]}>Code</Text>
@@ -164,12 +187,7 @@ export const SOTAModal: React.FC<SOTAModalProps> = ({
             <Text style={[styles.resultTitle, { color: colors.text }]}>Result</Text>
             <ScrollView style={styles.resultScroll} nestedScrollEnabled>
               <Text style={[styles.resultText, { color: colors.text }]}>
-                {result.predictions?.next_code ||
-                 result.refactored_analysis ||
-                 result.final_output ||
-                 result.analysis ||
-                 result.completions ||
-                 JSON.stringify(result, null, 2)}
+                {resultText()}
               </Text>
             </ScrollView>
           </View>
@@ -375,6 +393,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  errorBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 14 },
+  errorText: { flex: 1, fontSize: 13, lineHeight: 18 },
   resultContainer: {
     marginTop: 16,
     padding: 14,

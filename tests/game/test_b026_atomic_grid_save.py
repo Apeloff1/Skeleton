@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.game.offline_grid_campaign import _write_save
+from scripts.game.offline_grid_campaign import _write_new_save as _write_save
 
 
 class AtomicGridSaveTests(unittest.TestCase):
