@@ -17,15 +17,6 @@ WORKFLOWS = Path(".github/workflows")
 ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
 
-# Scheduled Actions recovery has its own three-slot budget. It never consumes
-# PR CI admission or waives a check. The identity is intentionally hard-coded:
-# changing registry metadata cannot exempt an arbitrary future workflow.
-SCHEDULED_RECOVERY = frozenset({
-    "actions-housekeeping-cli.yml",
-    "queue-drain.yml",
-    "three-hour-actions-queue-expiry.yml",
-})
-
 
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
@@ -69,17 +60,7 @@ def audit(root: Path = ROOT) -> list[str]:
             or any(not isinstance(name, str) or not name.endswith(".yml") or "/" in name
                    for group in tiers for name in group)):
         return ["CI tiers require nonempty sets of plain .yml file names"]
-    recovery = policy.get("operational_scheduled_non_pr")
-    if (type(recovery) is not list
-            or len(recovery) != len(SCHEDULED_RECOVERY)
-            or any(type(name) is not str for name in recovery)
-            or set(recovery) != SCHEDULED_RECOVERY):
-        failures.append("operational recovery registry must be the exact three scheduled lanes")
-        recovery = []
-    for name in SCHEDULED_RECOVERY:
-        if not (root / WORKFLOWS / name).is_file():
-            failures.append(f"{name}: required scheduled recovery workflow missing")
-    names = specialised + core + reusable + recovery
+    names = specialised + core + reusable
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
     rules = policy.get("release_rules")
@@ -89,9 +70,8 @@ def audit(root: Path = ROOT) -> list[str]:
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
     if not active:
         failures.append("unexpected active workflow count: 0")
-    # Scheduled queue-maintenance has three separately bounded non-PR lanes.
-    # All other independently triggered workflows continue to consume the
-    # unchanged 20-workflow CI capacity cap, including security/release lanes.
+    # Signed evidence workflows may sit beside the compact PR set when they
+    # cannot run automatically. Only non-manual triggers consume the cap.
     automatic = 0
     for path in active:
         try:
@@ -100,18 +80,6 @@ def audit(root: Path = ROOT) -> list[str]:
             failures.append(
                 f"{path.name}: cannot inspect active workflow ({exc})"
             )
-            continue
-        if path.name in SCHEDULED_RECOVERY and path.name in recovery:
-            # These are privilege-bounded scheduled maintenance, not source
-            # validation. Reject any PR admission or change to their triggers,
-            # default branch, explicit path filter, or root permission ceiling.
-            source = path.read_text(encoding="utf-8")
-            if (found != {"workflow_dispatch", "schedule", "push"}
-                    or not re.search(
-                        r"(?m)^  push:\n    branches: \[main\]\n    paths:", source
-                    )
-                    or not re.search(r"(?m)^permissions: \{\}$", source)):
-                failures.append(f"{path.name}: operational-only trigger or permission drift")
             continue
         if independently_triggered(found):
             automatic += 1
