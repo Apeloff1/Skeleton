@@ -1,5 +1,7 @@
 """Canonical game-domain contracts for Skeleton."""
 
+from .fixed_clock import FixedClock, FixedClockError
+
 from .composition import (
     CANONICAL_KIND_ORDER,
     COMPOSITION_CONTRACT_VERSION,
@@ -43,6 +45,8 @@ from .replay import (
 )
 
 __all__ = [
+    "FixedClock",
+    "FixedClockError",
     "ReplayTrace",
     "ReplayStep",
     "ReplayMismatch",
