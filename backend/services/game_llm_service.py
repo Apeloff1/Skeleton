@@ -203,10 +203,23 @@ class GameLLMService:
 
         if outcalls.is_internal():
             simulated = await outcalls.generate_text(user_prompt, system_prompt)
-            # Try to return JSON if the prompt asked for it, otherwise text
-            if "{" in system_prompt or "{" in user_prompt:
-                return {"success": True, "response": simulated, "fallback": False, "is_json_mock": True, "rag_chars": len(rag_block)}
-            return {"success": True, "response": simulated, "fallback": False, "rag_chars": len(rag_block)}
+            if not isinstance(simulated, str) or not simulated.strip():
+                return {
+                    "success": False,
+                    "error": "internal_generation_empty",
+                    "error_code": "empty_model_output",
+                    "provider": "internal-outcall",
+                    "fallback": False,
+                }
+            return {
+                "success": True,
+                "response": simulated.strip(),
+                "provider": "internal-outcall",
+                "model": "managed-internal",
+                "execution_mode": "internal",
+                "fallback": False,
+                "rag_chars": len(rag_block),
+            }
 
         if not self.available:
             return {
@@ -223,9 +236,17 @@ class GameLLMService:
                 prompt=user_prompt,
                 session_id=session_id,
             )
+            if not isinstance(response, str) or not response.strip():
+                return {
+                    "success": False,
+                    "error": "empty_model_output",
+                    "error_code": "empty_model_output",
+                    "provider": self.provider,
+                    "fallback": False,
+                }
             return {
                 "success": True,
-                "response": response,
+                "response": response.strip(),
                 "provider": self.provider,
                 "model": self.model,
                 "fallback": False,

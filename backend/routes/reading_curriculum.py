@@ -19,7 +19,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from datetime import datetime
 from pathlib import Path
@@ -1051,13 +1051,15 @@ async def get_manual_detail(manual_id: str):
 
 @router.post("/progress/update")
 async def update_reading_progress(
-    user_id: str,
-    module_id: str,
-    progress_percent: float,
-    time_spent_minutes: int,
+    user_id: str = Query(..., min_length=1, max_length=128),
+    module_id: str = Query(..., min_length=1, max_length=128),
+    progress_percent: float = Query(..., ge=0, le=100),
+    time_spent_minutes: int = Query(..., ge=0, le=1440),
     completed: bool = False
 ):
     """Update user's reading progress"""
+    existing = await reading_db.progress.find_one({"user_id": user_id, "module_id": module_id}, {"completed": 1})
+    credited_minutes = 0 if completed and existing and existing.get("completed") else time_spent_minutes
     await reading_db.progress.update_one(
         {"user_id": user_id, "module_id": module_id},
         {
@@ -1066,7 +1068,7 @@ async def update_reading_progress(
                 "completed": completed,
                 "last_read": datetime.utcnow()
             },
-            "$inc": {"total_time_minutes": time_spent_minutes}
+            "$inc": {"total_time_minutes": credited_minutes}
         },
         upsert=True
     )
@@ -1106,10 +1108,10 @@ async def get_user_reading_progress(user_id: str):
 
 @router.post("/bookmark")
 async def add_bookmark(
-    user_id: str,
-    module_id: str,
-    position: str,
-    note: Optional[str] = None
+    user_id: str = Query(..., min_length=1, max_length=128),
+    module_id: str = Query(..., min_length=1, max_length=128),
+    position: str = Query(..., min_length=1, max_length=128),
+    note: Optional[str] = Query(default=None, max_length=1000),
 ):
     """Add a bookmark to a reading module"""
     bookmark = {
@@ -1123,6 +1125,16 @@ async def add_bookmark(
     
     await reading_db.bookmarks.insert_one(bookmark)
     return {"created": True, "bookmark": bookmark}
+
+
+@router.delete("/bookmark")
+async def delete_bookmark(
+    user_id: str = Query(..., min_length=1, max_length=128),
+    module_id: str = Query(..., min_length=1, max_length=128),
+):
+    """Delete the current user's bookmarks for a module."""
+    result = await reading_db.bookmarks.delete_many({"user_id": user_id, "module_id": module_id})
+    return {"deleted": result.deleted_count > 0, "deleted_count": result.deleted_count}
 
 
 @router.get("/bookmarks/{user_id}")

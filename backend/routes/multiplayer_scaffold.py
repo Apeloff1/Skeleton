@@ -15,18 +15,34 @@ import os
 import re
 import uuid
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 
 from core.databases import client as _MONGO
+from routes.gameforge_auth import get_current_user
 
 router = APIRouter(prefix="/api/multiplayer", tags=["multiplayer"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
 _col = _db.multiplayer_scaffolds
 PROJ = {"_id": 0}
+log = logging.getLogger(__name__)
+
+
+def _require_reader(user: dict) -> dict:
+    if user.get("role") not in {"viewer", "editor", "admin"}:
+        raise HTTPException(403, detail="An authenticated studio account is required")
+    return user
+
+
+def _require_writer(user: dict) -> dict:
+    _require_reader(user)
+    if user.get("role") not in {"editor", "admin"}:
+        raise HTTPException(403, detail="Editor permission is required to generate multiplayer source")
+    return user
 
 
 def _now() -> str:
@@ -109,21 +125,29 @@ def _server_js(model: str, max_players: int, tick: int, snap: int, game: str) ->
     return f"""// {game} — authoritative multiplayer server  (model: {model})
 // Fixed tick = {tick}Hz, snapshots = {snap}Hz, max players/room = {max_players}
 // Run:  npm i ws  &&  node server/index.js
-const {{ WebSocketServer }} = require('ws');
+const {{ randomUUID }} = require('crypto');
+const {{ WebSocketServer, WebSocket }} = require('ws');
 const {{ createRoom, joinRoom, leaveRoom, rooms }} = require('./lobby');
 const PORT = process.env.PORT || 8080;
 const TICK_MS = {interval};
 const SNAP_MS = {snap_interval};
 const MAX_PLAYERS = {max_players};
+const MAX_INPUTS_PER_CLIENT = 64;
+const WORLD_LIMIT = 1000;
+const SPEED_PER_TICK = 6;
 
-const wss = new WebSocketServer({{ port: PORT }});
+const wss = new WebSocketServer({{ port: PORT, maxPayload: 16 * 1024, perMessageDeflate: false }});
 console.log('[net] {game} server on :' + PORT + ' (' + '{model}' + ')');
 
 wss.on('connection', (ws) => {{
-  ws.id = Math.random().toString(36).slice(2, 10);
+  ws.id = randomUUID();
   ws.inputs = [];
+  ws.lastSeq = 0;
+  ws.isAlive = true;
+  ws.on('pong', () => {{ ws.isAlive = true; }});
   ws.on('message', (raw) => {{
-    let msg; try {{ msg = JSON.parse(raw); }} catch {{ return; }}
+    let msg; try {{ msg = JSON.parse(raw.toString('utf8')); }} catch {{ return sendError(ws, 'invalid_json'); }}
+    if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return sendError(ws, 'invalid_message');
     switch (msg.t) {{
       case 'join': {{
         const room = joinRoom(msg.room, ws, MAX_PLAYERS);
@@ -133,7 +157,12 @@ wss.on('connection', (ws) => {{
         break;
       }}
       case 'input':  // buffered, applied on the next authoritative tick
-        ws.inputs.push({{ id: ws.id, seq: msg.seq, data: msg.data, at: Date.now() }});
+        if (!ws.room) return sendError(ws, 'join_required');
+        if (!Number.isSafeInteger(msg.seq) || msg.seq <= ws.lastSeq) return sendError(ws, 'invalid_sequence');
+        if (!validInput(msg.data)) return sendError(ws, 'invalid_input');
+        if (ws.inputs.length >= MAX_INPUTS_PER_CLIENT) return sendError(ws, 'input_backpressure');
+        ws.lastSeq = msg.seq;
+        ws.inputs.push({{ id: ws.id, seq: msg.seq, data: msg.data }});
         break;
       case 'ping':
         ws.send(JSON.stringify({{ t: 'pong', at: msg.at }}));
@@ -146,43 +175,75 @@ wss.on('connection', (ws) => {{
 // ── Authoritative simulation: advance world from buffered inputs ──
 function stepRoom(room) {{
   for (const ws of room.members) {{
-    for (const inp of ws.inputs) applyInput(room.state, inp);  // TODO: your game rules
+    for (const inp of ws.inputs) applyInput(room.state, inp);
     ws.inputs.length = 0;
   }}
   room.tick++;
 }}
 function applyInput(state, input) {{
-  // TODO: mutate `state` for player `input.id` using `input.data`.
-  state.players[input.id] = state.players[input.id] || {{ x: 0, y: 0 }};
+  const player = state.players[input.id] || {{ x: 0, y: 0, lastSeq: 0, actions: 0 }};
+  const horizontal = Number(Boolean(input.data.right)) - Number(Boolean(input.data.left));
+  const vertical = Number(Boolean(input.data.down)) - Number(Boolean(input.data.up));
+  player.x = clamp(player.x + horizontal * SPEED_PER_TICK, -WORLD_LIMIT, WORLD_LIMIT);
+  player.y = clamp(player.y + vertical * SPEED_PER_TICK, -WORLD_LIMIT, WORLD_LIMIT);
+  player.lastSeq = input.seq;
+  if (input.data.action) player.actions++;
+  state.players[input.id] = player;
 }}
+function validInput(data) {{
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const keys = Object.keys(data);
+  return keys.length <= 5 && keys.every(k => ['up','down','left','right','action'].includes(k) && typeof data[k] === 'boolean');
+}}
+function clamp(value, min, max) {{ return Math.max(min, Math.min(max, value)); }}
+function sendError(ws, code) {{ if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({{ t: 'error', code }})); }}
 
 setInterval(() => {{ for (const room of rooms.values()) stepRoom(room); }}, TICK_MS);
 setInterval(() => {{
   for (const room of rooms.values()) {{
     const snap = JSON.stringify({{ t: 'snap', tick: room.tick, state: room.state }});
-    for (const ws of room.members) {{ try {{ ws.send(snap); }} catch {{}} }}
+    for (const ws of room.members) {{ if (ws.readyState === WebSocket.OPEN) ws.send(snap); }}
   }}
 }}, SNAP_MS);
+const heartbeat = setInterval(() => {{
+  for (const ws of wss.clients) {{
+    if (!ws.isAlive) {{ ws.terminate(); continue; }}
+    ws.isAlive = false; ws.ping();
+  }}
+}}, 30000);
+wss.on('close', () => clearInterval(heartbeat));
+function shutdown() {{ clearInterval(heartbeat); wss.close(() => process.exit(0)); }}
+process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown);
 """
 
 
 def _lobby_js(max_players: int) -> str:
     return f"""// Lobby + matchmaking — create/join/leave rooms, cap {max_players}/room
+const {{ randomUUID }} = require('crypto');
 const rooms = new Map();
 function createRoom(id) {{
   const room = {{ id, members: [], tick: 0, state: {{ players: {{}} }} }};
   rooms.set(id, room); return room;
 }}
 function joinRoom(id, ws, cap) {{
-  let room = rooms.get(id) || createRoom(id || Math.random().toString(36).slice(2, 8));
+  const roomId = normalizedRoomId(id) || randomUUID();
+  if (ws.room && ws.room !== roomId) leaveRoom(ws);
+  let room = rooms.get(roomId) || createRoom(roomId);
   if (room.members.length >= cap) return null;
-  room.members.push(ws); return room;
+  if (!room.members.includes(ws)) room.members.push(ws);
+  room.state.players[ws.id] = room.state.players[ws.id] || {{ x: 0, y: 0, lastSeq: 0, actions: 0 }};
+  return room;
 }}
 function leaveRoom(ws) {{
   const room = rooms.get(ws.room); if (!room) return;
   room.members = room.members.filter(m => m !== ws);
   delete room.state.players[ws.id];
   if (room.members.length === 0) rooms.delete(room.id);
+}}
+function normalizedRoomId(value) {{
+  if (typeof value !== 'string') return '';
+  const room = value.trim();
+  return /^[A-Za-z0-9_-]{{1,64}}$/.test(room) ? room : '';
 }}
 module.exports = {{ createRoom, joinRoom, leaveRoom, rooms }};
 """
@@ -201,10 +262,11 @@ export type ServerMsg =
   | {{ t: 'joined'; id: string; room: string; players: string[] }}
   | {{ t: 'snap'; tick: number; state: WorldState }}
   | {{ t: 'full' }}
+  | {{ t: 'error'; code: 'invalid_json' | 'invalid_message' | 'join_required' | 'invalid_sequence' | 'invalid_input' | 'input_backpressure' }}
   | {{ t: 'pong'; at: number }};
 
 export interface InputData {{ up?: boolean; down?: boolean; left?: boolean; right?: boolean; action?: boolean; }}
-export interface PlayerState {{ x: number; y: number; [k: string]: unknown; }}
+export interface PlayerState {{ x: number; y: number; lastSeq: number; actions: number; [k: string]: unknown; }}
 export interface WorldState {{ players: Record<string, PlayerState>; }}
 """
 
@@ -237,6 +299,7 @@ export class NetClient {{
   private handle(m: ServerMsg) {
     if (m.t === 'joined') this.id = m.id;
     if (m.t === 'snap') { this.reconcile(m.state, m.tick); this.onSnapshot?.(this.state, m.tick); }
+    if (m.t === 'error') console.warn('[net] server rejected message:', m.code);
   }
 """
     if model == "authoritative":
@@ -251,10 +314,17 @@ export class NetClient {{
   predict(data: InputData) {{ this.pending.push({{ seq: this.seq, data }}); applyLocal(this.state, this.id, data); }}
   private reconcile(server: WorldState, tick: number) {{
     this.state = structuredClone(server);
+    const acknowledged = server.players[this.id]?.lastSeq || 0;
+    this.pending = this.pending.filter(p => p.seq > acknowledged);
     for (const p of this.pending) applyLocal(this.state, this.id, p.data); // re-simulate ({tick}Hz)
   }}
 }}
-function applyLocal(s: WorldState, id: string, _d: InputData) {{ s.players[id] = s.players[id] || {{ x: 0, y: 0 }}; }}
+function applyLocal(s: WorldState, id: string, d: InputData) {{
+  const p = s.players[id] || {{ x: 0, y: 0, lastSeq: 0, actions: 0 }};
+  p.x += (Number(Boolean(d.right)) - Number(Boolean(d.left))) * 6;
+  p.y += (Number(Boolean(d.down)) - Number(Boolean(d.up))) * 6;
+  s.players[id] = p;
+}}
 """
     elif model == "lockstep":
         extra = """  // Deterministic lockstep: queue inputs per turn; step only when all peers' inputs arrived.
@@ -295,11 +365,39 @@ Point the client at `ws://localhost:8080` and call `netClient.connect(url, roomI
 - `shared/protocol.ts` — the wire protocol (single source of truth)
 - `client/netClient.ts` — connect, send inputs, apply the **{model}** sync strategy
 
-## Next steps
-1. Implement `applyInput` (server) with your real game rules.
-2. {"Make your game step deterministic (fixed-point) so rollback/lockstep stays in sync." if model in ("rollback", "lockstep") else "Add interpolation buffering on the client for smooth rendering."}
-3. Add reconnection + auth tokens before shipping to production.
+## Operational boundary
+The generated runtime includes a bounded authoritative movement/action simulation,
+sequence rejection, input backpressure, payload limits, heartbeat cleanup and room
+capacity enforcement. Replace the reference movement rule only when your game's
+typed deterministic simulation is ready. Authentication, durable matchmaking,
+cross-process rooms and abuse controls remain deployment integrations and are
+declared in `capabilities.json`; this package does not claim production readiness.
 """
+
+
+def _capabilities(model: str) -> str:
+    return json.dumps({
+        "schema": "skeleton.multiplayer-capabilities.v1",
+        "readiness": "operational_reference",
+        "sync_model": model,
+        "implemented": [
+            "authoritative_fixed_tick", "bounded_input_queue", "monotonic_sequences",
+            "payload_limit", "heartbeat_cleanup", "room_capacity", "snapshot_broadcast",
+            "reference_movement_and_action_rules",
+        ],
+        "deployment_required": [
+            "authenticated_session_tokens", "durable_matchmaking", "distributed_room_authority",
+            "rate_limit_gateway", "observability_and_alerting", "load_and_fault_qualification",
+        ],
+    }, indent=2)
+
+
+def _package_json() -> str:
+    return json.dumps({
+        "name": "skeleton-multiplayer-runtime", "private": True, "version": "1.0.0",
+        "engines": {"node": ">=22"}, "scripts": {"start": "node server/index.js"},
+        "dependencies": {"ws": "^8.18.0"},
+    }, indent=2)
 
 
 class ScaffoldBody(BaseModel):
@@ -312,8 +410,9 @@ class ScaffoldBody(BaseModel):
 
 
 @router.post("/scaffold")
-async def scaffold(body: ScaffoldBody):
+async def scaffold(body: ScaffoldBody, user=Depends(get_current_user)):
     """Generate a complete, parameterised multiplayer starter for a game."""
+    _require_writer(user)
     model = (body.model or "").strip().lower()
     if model not in MODELS:
         model = recommend_model(body.genre)
@@ -328,6 +427,8 @@ async def scaffold(body: ScaffoldBody):
         {"path": "shared/protocol.ts",   "lang": "typescript", "content": _protocol_ts(model)},
         {"path": "client/netClient.ts",  "lang": "typescript", "content": _client_ts(model, tick)},
         {"path": "README.md",            "lang": "markdown",   "content": _readme(model, mp, tick, snap, game)},
+        {"path": "capabilities.json",    "lang": "json",       "content": _capabilities(model)},
+        {"path": "package.json",         "lang": "json",       "content": _package_json()},
     ]
     doc = {
         "scaffold_id": uuid.uuid4().hex,
@@ -338,17 +439,20 @@ async def scaffold(body: ScaffoldBody):
     try:
         await _col.update_one({"pid": body.pid} if body.pid else {"scaffold_id": doc["scaffold_id"]},
                               {"$set": dict(doc)}, upsert=True)
-    except Exception:
-        pass
+    except Exception as exc:
+        log.exception("multiplayer scaffold persistence failed")
+        raise HTTPException(503, detail="Scaffold persistence is unavailable; no success was recorded") from exc
     return {
         "scaffold_id": doc["scaffold_id"], "game": game, "model": model,
         "model_label": MODELS[model]["label"], "max_players": mp,
         "tick_rate": tick, "snapshot_rate": snap, "file_count": len(files), "files": files,
+        "readiness": "operational_reference",
     }
 
 
 @router.get("/scaffold/{pid}")
-async def get_scaffold(pid: str):
+async def get_scaffold(pid: str = Path(min_length=1, max_length=200), user=Depends(get_current_user)):
+    _require_reader(user)
     doc = await _col.find_one({"pid": pid}, PROJ, sort=[("created_at", -1)])
     if not doc:
         raise HTTPException(404, "no scaffold for this game yet")
@@ -360,10 +464,11 @@ class ZipBody(ScaffoldBody):
 
 
 @router.post("/scaffold/zip")
-async def scaffold_zip(body: ZipBody):
+async def scaffold_zip(body: ZipBody, user=Depends(get_current_user)):
     """📦 Generate the scaffold and return it as a downloadable .zip (base64)."""
     import io, zipfile, base64
-    built = await scaffold(body)
+    _require_writer(user)
+    built = await scaffold(body, user)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for f in built["files"]:
