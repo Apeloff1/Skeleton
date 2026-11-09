@@ -33,18 +33,23 @@ export const PhysicsAcademyModal = memo(function PhysicsAcademyModal({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [info, setInfo] = useState<any>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (visible) fetchInfo();
   }, [visible]);
 
   const fetchInfo = async () => {
+    setError('');
     try {
       const res = await apiFetch(`${API_URL}/api/physics/info`);
+      if (!res.ok) throw new Error(`Physics Academy is unavailable (HTTP ${res.status}).`);
       const data = await res.json();
+      if (!data || typeof data.total_hours !== 'number' || typeof data.total_modules !== 'number') throw new Error('Physics Academy returned invalid course information.');
       setInfo(data);
     } catch (e) {
       console.error('Failed to fetch physics info:', e);
+      setError(e instanceof Error ? e.message : 'Physics Academy information could not be loaded.');
     }
   };
 
@@ -68,6 +73,7 @@ export const PhysicsAcademyModal = memo(function PhysicsAcademyModal({
     if (!topic.trim()) return;
     setLoading(true);
     setResult(null);
+    setError('');
 
     try {
       const res = await apiFetch(`${API_URL}/api/jeeves/teach-physics`, {
@@ -82,9 +88,12 @@ export const PhysicsAcademyModal = memo(function PhysicsAcademyModal({
         })
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(typeof data?.detail === 'string' ? data.detail : `Lesson request failed (HTTP ${res.status}).`);
+      if (!data || typeof data.lesson !== 'string' || !data.lesson.trim()) throw new Error('Jeeves returned an empty physics lesson.');
       setResult(data);
     } catch (e) {
       console.error('Physics learning error:', e);
+      setError(e instanceof Error ? e.message : 'The physics lesson could not be generated.');
     } finally {
       setLoading(false);
     }
@@ -106,6 +115,11 @@ export const PhysicsAcademyModal = memo(function PhysicsAcademyModal({
           </View>
 
           <ScrollView style={localStyles.content} showsVerticalScrollIndicator={false}>
+            {!!error && (
+              <TouchableOpacity style={[localStyles.infoBanner, { backgroundColor: '#EF444420' }]} onPress={info ? learnTopic : fetchInfo}>
+                <Text style={[localStyles.infoText, { color: '#EF4444' }]}>{error} Tap to retry.</Text>
+              </TouchableOpacity>
+            )}
             {/* Info Banner */}
             {info && (
               <View style={[localStyles.infoBanner, { backgroundColor: '#3B82F615' }]}>
