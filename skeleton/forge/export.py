@@ -133,6 +133,42 @@ def _write_report_new(path: Path, text: str) -> None:
         if (not stat.S_ISREG(linked.st_mode)
                 or linked.st_nlink != 1 or linked.st_size != len(data)):
             raise ValueError("report file changed during publication")
+        # A same-size rewrite is invisible to the inode/size checks above.
+        # Reopen the published entry relative to the held parent and compare
+        # the actual bounded bytes before returning a successful receipt.
+        # No direct path open or following of a substituted symbolic link.
+        read_fd = os.open(
+            path.name,
+            os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=dfd,
+        )
+        try:
+            read_before = os.fstat(read_fd)
+            if (not stat.S_ISREG(read_before.st_mode)
+                    or read_before.st_nlink != 1
+                    or read_before.st_size != len(data)
+                    or (read_before.st_dev, read_before.st_ino) !=
+                    (created.st_dev, created.st_ino)):
+                raise ValueError("report identity changed during verification")
+            with os.fdopen(read_fd, "rb", closefd=False) as handle:
+                observed = handle.read(len(data) + 1)
+            read_after = os.fstat(read_fd)
+            if (observed != data
+                    or (read_before.st_size, read_before.st_mtime_ns,
+                        read_before.st_ctime_ns) !=
+                    (read_after.st_size, read_after.st_mtime_ns,
+                     read_after.st_ctime_ns)):
+                raise ValueError("report contents changed during verification")
+            reachable = os.stat(
+                path.name, dir_fd=dfd, follow_symlinks=False,
+            )
+            if (reachable.st_dev, reachable.st_ino) != (
+                    read_after.st_dev, read_after.st_ino):
+                raise ValueError("report path replaced during verification")
+        finally:
+            os.close(read_fd)
+        _verify_report_parent(parent, dfd)
         completed = True
     finally:
         try:
