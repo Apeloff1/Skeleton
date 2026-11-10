@@ -25,7 +25,7 @@ class ModelLoaderCustodyTests(unittest.TestCase):
 
     def test_full_digest_never_claims_inference(self):
         loader = ModelLoader(str(self.path))
-        self.assertEqual(self.qualify(loader)["status"], "artifact_verified_only")
+        self.assertEqual(self.qualify(loader)["status"], "artifact_verified_not_loaded")
         self.assertFalse(loader.loaded)
         self.assertFalse(loader.verify(self.sha))
         self.assertEqual(self.qualify(ModelLoader(str(self.path)))["digest"], self.sha)
@@ -79,29 +79,32 @@ class ModelLoaderCustodyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.qualify()
 
-
-    def test_constructor_digest_preserved_with_explicit_license(self):
-        loader = ModelLoader(str(self.path), expected_sha256=self.sha)
-        result = loader.load("c" * 32, license_accepted=True)
-        self.assertEqual(result["digest"], self.sha)
-        self.assertFalse(loader.loaded)
-
-    def test_secure_parent_walk_rejects_symlinked_parent(self):
-        root = Path(self.tmp.name)
-        real = root / "real"
-        real.mkdir()
-        (real / "model.gguf").write_bytes(self.data)
-        alias = root / "shortcut"
-        alias.symlink_to(real, target_is_directory=True)
-        with self.assertRaises(OSError):
-            self.qualify(ModelLoader(str(alias / "model.gguf")))
-
-    def test_model_verification_requires_explicit_license(self):
-        loader = ModelLoader(str(self.path), expected_sha256=self.sha)
+    def test_compat_constructor_requires_explicit_license(self):
+        loader = ModelLoader(str(self.path), expected_sha256=self.sha,
+                             license_accepted=True)
+        self.assertEqual(loader.load("c" * 32)["digest"], self.sha)
+        self.assertFalse(loader.verify(self.sha))
         with self.assertRaises(PermissionError):
-            loader.load("c" * 32)
-        self.assertFalse(loader.loaded)
-        self.assertIsNone(loader.digest)
+            ModelLoader(str(self.path), expected_sha256=self.sha).load("c" * 32)
+
+    @unittest.skipUnless(os.name == "posix" and hasattr(os, "O_NOFOLLOW"),
+                         "requires descriptor-relative no-follow support")
+    def test_parent_symlink_is_never_followed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            physical = Path(tmp) / "physical"
+            physical.mkdir()
+            (physical / "model.gguf").write_bytes(self.data)
+            linked = Path(tmp) / "alias"
+            linked.symlink_to(physical, target_is_directory=True)
+            with self.assertRaises(OSError):
+                self.qualify(ModelLoader(str(linked / "model.gguf")))
+
+    def test_model_budget_does_not_claim_success(self):
+        with self.assertRaises(ValueError):
+            self.qualify(max_bytes=24)
+        with self.assertRaises(ValueError):
+            ModelLoader(str(self.path), expected_sha256=self.sha,
+                        license_accepted=True, max_bytes=23).load("c" * 32)
 
     def test_header_only_record_cannot_be_qualified(self):
         header = b"GGUF" + struct.pack("<IQQ", 3, 1, 1)

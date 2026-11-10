@@ -30,7 +30,7 @@ class ModelLoaderCustodyTests(unittest.TestCase):
             digest = hashlib.sha256(payload).hexdigest()
             loader = ModelLoader(str(path), expected_sha256=digest)
             result = loader.load(self.CAS, license_accepted=True)
-            self.assertEqual(result["status"], "artifact_verified_only")
+            self.assertEqual(result["status"], "artifact_verified_not_loaded")
             self.assertEqual(result["digest"], digest)
             self.assertFalse(loader.loaded)
             self.assertFalse(loader.verify(digest))

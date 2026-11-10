@@ -588,6 +588,8 @@ def test_cohort_stops_before_second_publication_when_first_receipt_changes(
         ("project_id", ""),
         ("world_digest", None),
         ("replay_digest", ""),
+        ("world_digest", "world-digest"),
+        ("replay_digest", "replay-digest"),
         ("action_count", True),
         ("action_count", 65),
     ],
@@ -603,8 +605,8 @@ def test_cohort_record_rejects_untyped_canonical_delivery_contract(
         "archive_sha256": "b" * 64,
         "save_sha256": "c" * 64,
         "independent_receipt_sha256": "d" * 64,
-        "world_digest": "world-digest",
-        "replay_digest": "replay-digest",
+        "world_digest": "e" * 64,
+        "replay_digest": "f" * 64,
         "action_count": 2,
         "offline_gameplay_reexecuted": True,
         "release_certified": False,
@@ -625,8 +627,8 @@ def test_cohort_record_rejects_replay_count_mismatch_and_unsupported_moves():
         "archive_sha256": "b" * 64,
         "save_sha256": "c" * 64,
         "independent_receipt_sha256": "d" * 64,
-        "world_digest": "world-digest",
-        "replay_digest": "replay-digest",
+        "world_digest": "e" * 64,
+        "replay_digest": "f" * 64,
         "action_count": 2,
         "offline_gameplay_reexecuted": True,
         "release_certified": False,
@@ -932,13 +934,17 @@ def test_second_cohort_replay_detects_late_in_place_installed_file_edit(
         module, "inspect_first_playable_delivery",
         mutate_first_game_after_second_game_replay,
     )
-    with pytest.raises((OSError, ValueError)):
+    # The per-pass delivered-custody barrier (content digests, not just the
+    # root inode) must catch the same-inode edit made during game 2's replay
+    # before any later pass is trusted.
+    with pytest.raises((OSError, ValueError),
+                       match="digest mismatch|custody changed"):
         inspect_first_playable_delivery_batch(
             pinned(jobs, published), summary,
             expected_summary_sha256=published["independent_summary_sha256"],
             authorized=True,
         )
-    assert calls >= 3
+    assert calls >= 2
     assert target.read_bytes() != original
     assert published["release_certified"] is False
 

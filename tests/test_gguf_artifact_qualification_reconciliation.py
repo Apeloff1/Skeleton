@@ -34,7 +34,7 @@ class GuardedGGUFArtifactTests(unittest.TestCase):
     @unittest.skipUnless(hasattr(os, "O_NOFOLLOW"), "secure no-follow open required")
     def test_full_header_and_full_digest_never_claim_model_loaded(self):
         model, receipt = self.qualify()
-        self.assertEqual(receipt["status"], "artifact_verified_only")
+        self.assertEqual(receipt["status"], "artifact_verified_not_loaded")
         self.assertEqual(receipt["bytes"], len(self.data))
         self.assertEqual(receipt["digest"], hashlib.sha256(self.data).hexdigest())
         self.assertFalse(model.loaded)
@@ -64,7 +64,7 @@ class GuardedGGUFArtifactTests(unittest.TestCase):
     def test_single_link_and_symlink_custody(self):
         alias = self.path.with_suffix(".alias")
         os.link(self.path, alias)
-        with self.assertRaisesRegex(ValueError, "single-link"):
+        with self.assertRaisesRegex(ValueError, "non-hardlinked"):
             self.qualify()
         alias.unlink()
         alias.symlink_to(self.path)
