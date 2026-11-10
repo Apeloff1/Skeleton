@@ -15,6 +15,10 @@ const suite = resolve(__dirname, 'test-app-foundation-flows.mjs');
 function launch(overrides, removed = []) {
   const env = { ...process.env, SKELETON_E2E_REQUIRE_FULL_LIVE: '1', ...overrides };
   for (const key of removed) delete env[key];
+  // node --test sets NODE_TEST_CONTEXT=child-v8 in its worker. If a nested
+  // subprocess inherits it, Node silently skips executing the intended tests
+  // and exits 0. Strip the harness marker to run the real child as a fresh job.
+  delete env.NODE_TEST_CONTEXT;
   return spawnSync(process.execPath, ['--test', suite], {
     env, encoding: 'utf8', timeout: 20_000, maxBuffer: 1024 * 1024,
   });
