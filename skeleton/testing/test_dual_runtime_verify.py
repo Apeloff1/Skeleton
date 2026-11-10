@@ -493,9 +493,21 @@ def _studio_verification_fixture(tmp_path):
         "not_a_legal_opinion": True,
     }
     for path in studio_paths:
-        obj = consumer if path == "studio/consumer_gate.json" else {
-            "schema": "skeleton.game_builder.original_studio_test_metadata.v1",
-        }
+        if path == "studio/consumer_gate.json":
+            obj = consumer
+        elif path == "studio/pipeline.json":
+            # This is an admitted source-only studio package. Mirror the
+            # current verifier's project-bound, no-publication source contract.
+            obj = {
+                "schema": "skeleton.game_builder.studio_pipeline.v1",
+                "project_id": original.manifest["project_id"],
+                "not_automatically_published": True,
+                "original_game_claim": "generated-or-user-authored-geometry",
+            }
+        else:
+            obj = {
+                "schema": "skeleton.game_builder.original_studio_test_metadata.v1",
+            }
         file_data[path] = (
             json.dumps(obj, sort_keys=True, separators=(",", ":"), allow_nan=False)
             + "\n"
