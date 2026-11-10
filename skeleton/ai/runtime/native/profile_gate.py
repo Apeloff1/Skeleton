@@ -11,6 +11,7 @@ This module does not sign work off and does not claim a completion checkbox.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Any, Callable
 
 
@@ -80,27 +81,40 @@ class ProfileGate:
             raise ProfileGateError("min_samples must be an integer >= 8")
         if not isinstance(min_speedup, (int, float)) or isinstance(min_speedup, bool):
             raise ProfileGateError("min_speedup must be numeric")
-        if float(min_speedup) < 1.0:
-            raise ProfileGateError("min_speedup must be at least 1")
+        try:
+            speedup = float(min_speedup)
+        except (OverflowError, ValueError) as exc:
+            raise ProfileGateError("min_speedup must be finite") from exc
+        if not math.isfinite(speedup) or speedup < 1.0:
+            raise ProfileGateError("min_speedup must be finite and at least 1")
         self.expected_abi = expected_abi
         self.protocol = protocol
         self.min_samples = min_samples
-        self.min_speedup = float(min_speedup)
+        self.min_speedup = speedup
 
     def decide(self, profile: AccelerationProfile | None) -> GateDecision:
         if profile is None:
             return GateDecision("scalar", "profile-missing")
         if not isinstance(profile, AccelerationProfile):
             raise ProfileGateError("profile must be an AccelerationProfile")
+        if not isinstance(profile.name, str) or not profile.name.strip():
+            return GateDecision("scalar", "profile-name-invalid")
         if profile.protocol != self.protocol:
             return GateDecision("scalar", "protocol-mismatch")
         if profile.abi_version != self.expected_abi:
             return GateDecision("scalar", "abi-mismatch")
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in
+               (profile.abi_version, profile.samples, profile.baseline_ns, profile.candidate_ns)):
+            return GateDecision("scalar", "profile-numeric-invalid")
         if profile.samples < self.min_samples:
             return GateDecision("scalar", "sample-thin")
         if profile.baseline_ns <= 0 or profile.candidate_ns <= 0:
             return GateDecision("scalar", "timing-invalid")
-        if profile.speedup() < self.min_speedup:
+        # Compare with bounded integer arithmetic, never float-divide attacker-supplied
+        # profile timings. Reject implausibly large telemetry before native admission.
+        if max(profile.baseline_ns, profile.candidate_ns, profile.samples) > (1 << 63) - 1:
+            return GateDecision("scalar", "profile-numeric-out-of-range")
+        if profile.baseline_ns / profile.candidate_ns < self.min_speedup:
             return GateDecision("scalar", "speedup-unproven")
         return GateDecision("native", "profile-justified")
 

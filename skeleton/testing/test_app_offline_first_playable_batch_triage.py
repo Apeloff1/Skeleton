@@ -143,6 +143,9 @@ def test_unpinned_partial_publication_requires_quarantine(
 ):
     jobs = jobs_for(original_games, tmp_path)
     Path(jobs[0].archive).write_bytes(b"untrusted")
+    # Model a genuine interrupted publication: the publisher writes owner-only
+    # files, so a group/world-readable leftover would be (correctly) "unsafe".
+    Path(jobs[0].archive).chmod(0o600)
     result = triage_first_playable_delivery_batch(
         jobs, tmp_path / "cohort.json", authorized=True,
     )

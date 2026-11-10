@@ -1,0 +1,79 @@
+{
+  "schema": "skeleton.faction_ballot_scenario.v1",
+  "policy_id": "arcane_ward_maintenance",
+  "domain": "arcane",
+  "topic": "ward_maintenance",
+  "delegates": [
+    "delegate_1",
+    "delegate_2",
+    "delegate_3",
+    "delegate_4",
+    "delegate_5",
+    "delegate_6",
+    "delegate_7"
+  ],
+  "quorum": 3,
+  "approval": 2,
+  "commands": [
+    {
+      "id": "arcane_ward_maintenance:open",
+      "action": "open",
+      "proposal": "arcane_ward_maintenance",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 0
+    },
+    {
+      "id": "arcane_ward_maintenance:vote:0",
+      "action": "cast",
+      "proposal": "arcane_ward_maintenance",
+      "delegate": "delegate_1",
+      "choice": "yes",
+      "expected_version": 1
+    },
+    {
+      "id": "arcane_ward_maintenance:vote:1",
+      "action": "cast",
+      "proposal": "arcane_ward_maintenance",
+      "delegate": "delegate_2",
+      "choice": "yes",
+      "expected_version": 2
+    },
+    {
+      "id": "arcane_ward_maintenance:vote:2",
+      "action": "cast",
+      "proposal": "arcane_ward_maintenance",
+      "delegate": "delegate_3",
+      "choice": "yes",
+      "expected_version": 3
+    },
+    {
+      "id": "arcane_ward_maintenance:finalize",
+      "action": "finalize",
+      "proposal": "arcane_ward_maintenance",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 4
+    }
+  ],
+  "expected": {
+    "phase": "approved",
+    "voted": 3,
+    "yes": 3,
+    "final_version": 5
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate-event",
+    "duplicate-delegate",
+    "insufficient-quorum",
+    "mismatched-proposal",
+    "terminal-phase"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "real_world_election": false,
+    "production_authority": false,
+    "release_certified": false
+  }
+}
