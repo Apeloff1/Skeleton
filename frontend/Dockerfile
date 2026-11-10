@@ -44,11 +44,10 @@ ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL \
     CI=1 \
     EXPO_NO_TELEMETRY=1
 COPY . .
+# An exported-directory log line is not proof that the Expo process exited.
+# Bound the child process and fail closed if Expo never returns.
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    # BuildKit cannot distinguish a successful export log from a child \
-    # process that never terminates. Bound the actual process and refuse \
-    # incomplete exports rather than reporting a synthetic pass. \
     timeout -k 15s 720s yarn export:web \
     && echo "frontend-export-process-exited" \
     && (test -f /app/dist/setup.html || test -f /app/dist/setup/index.html) \
