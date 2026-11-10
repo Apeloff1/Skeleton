@@ -14,6 +14,15 @@ import re
 import sys
 from pathlib import Path
 
+try:
+    from scripts.check_product_vertical_readiness import validate as validate_vertical_readiness
+except ModuleNotFoundError:  # direct ``python scripts/check_app_assembly.py`` execution
+    from check_product_vertical_readiness import validate as validate_vertical_readiness
+try:
+    from scripts.check_product_surface_specification import validate as validate_surface_specification
+except ModuleNotFoundError:  # direct ``python scripts/check_app_assembly.py`` execution
+    from check_product_surface_specification import validate as validate_surface_specification
+
 ROOT = Path(__file__).resolve().parents[1]
 FAILURES: list[str] = []
 CHECKS = 0
@@ -1061,6 +1070,22 @@ def audit_preinstall_docker_sources() -> None:
         check(path in required, f"installed assembly omits required Docker input: {path}")
 
 
+def audit_product_vertical_readiness() -> None:
+    """Make the S-grade vertical contract part of the canonical assembly gate."""
+    errors, report = validate_vertical_readiness(ROOT)
+    check(not errors, "product vertical readiness contract failed: " + "; ".join(errors[:8]))
+    check(report.get("target_grade") == "S", "product vertical readiness target drift")
+    check(report.get("vertical_count") == 7, "canonical product vertical count drift")
+    check(report.get("operation_count") == 21, "canonical governed operation count drift")
+    check(report.get("contract_qualified") is True, "product vertical contract is not qualified")
+
+
+def audit_product_surface_specification() -> None:
+    """Keep every exposed route and Hub modal inside the canonical contract."""
+    errors = validate_surface_specification(ROOT)
+    check(not errors, "product surface specification failed: " + "; ".join(errors[:8]))
+
+
 def main() -> int:
     audit_preinstall_docker_sources()
     audit_manifest()
@@ -1077,6 +1102,8 @@ def main() -> int:
     audit_public_product_readiness_contract()
     audit_product_control_contract()
     audit_product_route_registry()
+    audit_product_vertical_readiness()
+    audit_product_surface_specification()
 
     if FAILURES:
         print(f"App assembly audit failed: {len(FAILURES)} issue(s)", file=sys.stderr)
