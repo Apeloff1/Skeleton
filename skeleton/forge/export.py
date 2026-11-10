@@ -76,8 +76,32 @@ def _safe_directory(path: Path) -> Path:
     return target
 
 
+def _verify_report_parent(parent: Path, dfd: int) -> None:
+    """Require the original open directory to remain reachable by its path."""
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    current = os.open("/", flags)
+    try:
+        try:
+            for component in parent.parts[1:]:
+                child = os.open(component, flags, dir_fd=current)
+                os.close(current)
+                current = child
+            before, after = os.fstat(dfd), os.fstat(current)
+        except OSError as exc:
+            raise ValueError("report parent changed during publication") from exc
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            raise ValueError("report parent changed during publication")
+    finally:
+        os.close(current)
+
+
 def _write_report_new(path: Path, text: str) -> None:
-    """Publish a bounded text receipt without following or clobbering paths."""
+    """Publish bounded create-only receipts with post-write path revalidation.
+
+    Never interpret a written fd as proof that the original path still points
+    to it. A renamed or symlink-substituted parent must not produce a
+    successful report receipt. On any failure, unlink only our own inode.
+    """
     if type(text) is not str:
         raise ValueError("report must be textual JSON")
     data = text.encode("utf-8")
@@ -86,29 +110,43 @@ def _write_report_new(path: Path, text: str) -> None:
     path = Path(path)
     if path.name in ("", ".", ".."):
         raise ValueError("invalid report filename")
-    _, dfd = _open_directory(path.parent)
-    created = False
+    parent, dfd = _open_directory(path.parent)
+    created: os.stat_result | None = None
+    completed = False
     try:
         fd = os.open(
             path.name,
             os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
             | getattr(os, "O_CLOEXEC", 0),
-            0o600,
-            dir_fd=dfd,
+            0o600, dir_fd=dfd,
         )
-        created = True
-        try:
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(data)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.fsync(dfd)
-        except BaseException:
-            if created:
-                os.unlink(path.name, dir_fd=dfd)
-            raise
+        created = os.fstat(fd)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.fsync(dfd)
+        _verify_report_parent(parent, dfd)
+        linked = os.stat(path.name, dir_fd=dfd, follow_symlinks=False)
+        if (linked.st_dev, linked.st_ino) != (created.st_dev, created.st_ino):
+            raise ValueError("report path changed during publication")
+        if (not stat.S_ISREG(linked.st_mode)
+                or linked.st_nlink != 1 or linked.st_size != len(data)):
+            raise ValueError("report file changed during publication")
+        completed = True
     finally:
-        os.close(dfd)
+        try:
+            if not completed and created is not None:
+                try:
+                    linked = os.stat(path.name, dir_fd=dfd, follow_symlinks=False)
+                    if (linked.st_dev, linked.st_ino) == (
+                        created.st_dev, created.st_ino
+                    ):
+                        os.unlink(path.name, dir_fd=dfd)
+                except FileNotFoundError:
+                    pass
+        finally:
+            os.close(dfd)
 
 
 def _regular_output(path: Path) -> bool:
