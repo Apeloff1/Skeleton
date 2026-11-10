@@ -28,7 +28,9 @@ class ProbeBackend:
 
 class QualificationTests(unittest.TestCase):
     def setUp(self):
-        self.tmp=tempfile.TemporaryDirectory()
+        # GGUF descriptor custody checks every ancestor; /tmp is 01777.
+        # Use a per-test 0700 directory under the non-group-writable home.
+        self.tmp=tempfile.TemporaryDirectory(dir=Path.home())
         self.state=Path(self.tmp.name)/'private'
         self.state.mkdir(mode=0o700)
         self.out=Path(self.tmp.name)/'reports';self.out.mkdir(mode=0o700)
