@@ -72,6 +72,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify immutable exact tested source
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
 
       - name: Generate ephemeral stack credentials
         run: |
@@ -96,9 +104,21 @@ jobs:
       - name: Validate compose configuration
         run: docker compose -f docker-compose.yml config --quiet
 
-      - name: Build stack images
-        timeout-minutes: 30
-        run: docker compose -f docker-compose.yml build skeleton backend frontend
+      # Separate the expensive Expo export from backend image assembly. The
+      # previous combined build repeatedly timed out *after* Expo printed
+      # "Exported: dist", leaving no actionable stage-completion evidence.
+      # Each Docker build must still succeed; neither is advisory/skippable.
+      - name: Build frontend production image
+        timeout-minutes: 20
+        env:
+          BUILDKIT_PROGRESS: plain
+        run: docker compose -f docker-compose.yml build frontend
+
+      - name: Build engine and backend images
+        timeout-minutes: 15
+        env:
+          BUILDKIT_PROGRESS: plain
+        run: docker compose -f docker-compose.yml build skeleton backend
 
       - name: Start stack
         run: docker compose -f docker-compose.yml up -d mongo skeleton backend frontend
@@ -133,13 +153,22 @@ jobs:
         working-directory: frontend
         env:
           SKELETON_E2E_MAX_CHECKS: "150"
+          SKELETON_E2E_REQUIRE_FULL_LIVE: "1"
         run: |
           set -euo pipefail
           suite=scripts/test-app-foundation-flows.mjs
-          if [ ! -f "$suite" ]; then
-            echo "::notice::$suite is not on this ref yet (lands with #4098); Tier 2 skipped."
-            exit 0
-          fi
+          test -s "$suite" || {
+            echo "::error::Tier 2 test suite missing or empty"
+            exit 1
+          }
+          test -n "${SKELETON_E2E_OPERATOR_TOKEN_FILE:-}" || {
+            echo "::error::Authorized operator token file not provided"
+            exit 1
+          }
+          test -s "$SKELETON_E2E_OPERATOR_TOKEN_FILE" || {
+            echo "::error::Authorized operator token file missing or empty"
+            exit 1
+          }
           node --test --test-reporter=spec "$suite"
 
       - name: Install Playwright (isolated, no lockfile changes)

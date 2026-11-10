@@ -493,7 +493,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "quality"
-prefixes = ["skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/"]
+prefixes = ["skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/", "skeleton/perfgate/", "skeleton/qualification/"]
 owner = "quality-plane"
 criticality = "high"
 purpose = "Evaluation, quality analysis, artifact assurance and reusable gate-plane implementation."
