@@ -61,14 +61,19 @@ def _latest_run(
         rid = run.get("id")
         attempt = run.get("run_attempt")
         created = run.get("created_at")
+        updated = run.get("updated_at")
         if (type(rid) is not int or rid <= 0
                 or type(attempt) is not int or attempt < 1
-                or not isinstance(created, str)):
+                or not isinstance(created, str)
+                or not isinstance(updated, str)
+                or len(created) < 20 or len(updated) < 20):
             continue
-        candidates.append((created, rid, attempt, run))
+        # A retry of an older run can finish after a newer run; choosing only
+        # by creation date would trust an earlier success over a later failure.
+        candidates.append((updated, created, rid, attempt, run))
     if not candidates:
         return None
-    return max(candidates, key=lambda row: row[:3])[3]
+    return max(candidates, key=lambda row: row[:4])[4]
 
 
 def inspect(
