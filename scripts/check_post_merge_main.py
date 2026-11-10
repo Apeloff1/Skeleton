@@ -161,15 +161,26 @@ def inspect(
             if job is None or job.get("status") != "completed" or job.get("conclusion") != "success":
                 reasons.append("essential_job_not_success:" + name + ":" + required)
         if name == "Merge Readiness":
-            shards = [job for job in jobs
-                      if isinstance(job, Mapping) and
-                      isinstance(job.get("name"), str) and
-                      job["name"].startswith("Canonical Domain Suite (")]
-            if not shards:
-                reasons.append("canonical_domain_suite_evidence_missing")
-            for job in shards:
+            # All eight domain shards are part of the canonical current-head
+            # qualification. One green shard is never proof of a green suite.
+            required_shards = {
+                "Canonical Domain Suite (" + str(index) + ")"
+                for index in range(8)
+            }
+            seen_shards = set()
+            for job in jobs:
+                if (not isinstance(job, Mapping)
+                        or not isinstance(job.get("name"), str)
+                        or not job["name"].startswith("Canonical Domain Suite (")):
+                    continue
+                shard = job["name"]
+                seen_shards.add(shard)
+                if shard not in required_shards:
+                    reasons.append("unexpected_canonical_domain_shard:" + shard)
                 if job.get("status") != "completed" or job.get("conclusion") != "success":
-                    reasons.append("canonical_domain_suite_not_success:" + job["name"])
+                    reasons.append("canonical_domain_suite_not_success:" + shard)
+            for missing in sorted(required_shards - seen_shards):
+                reasons.append("canonical_domain_suite_evidence_missing:" + missing)
 
     reasons = list(dict.fromkeys(reasons))
     return {
