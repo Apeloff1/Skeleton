@@ -15,6 +15,8 @@
 
 services:
   # ==========================================================================
+  # Local first-install APIs are loopback-only. Remote access requires an
+  # independently authenticated TLS ingress, never an implicit 0.0.0.0 bind.
   # Skeleton API (hexagonal v16 rewrite)
   # ==========================================================================
   skeleton:
@@ -123,9 +125,8 @@ services:
       # Explicit trusted browser origin; never build share links from Host headers.
       - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost:${FRONTEND_PORT:-3000}}
       - DEBUG=${DEBUG:-false}
-      # Match the actual published UI port on a fresh install; otherwise
-      # backend CORS silently rejects browser requests when FRONTEND_PORT is
-      # customized. Never replace an operator's explicit CORS_ORIGINS policy.
+      # Keep browser admission aligned with the published frontend port. A
+      # tester may need a non-default port when another local app owns 3000.
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-3000},http://127.0.0.1:${FRONTEND_PORT:-3000}}
       # Runtime model-provider credentials are engine-owned after Stage-5 cutover.
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a high-entropy value}
