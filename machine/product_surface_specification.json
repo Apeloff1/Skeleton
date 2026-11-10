@@ -3272,13 +3272,15 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "ae421b65a91aa34ade7437f46dde55b913a9ff2eb82d434398703ba0b9f911a5",
-      "interaction_count": 4,
+      "source_sha256": "4d587da5da7a7a3ee278f76b71220afa9b2e74dbbbc472d5f4dda8fc69d5bfb7",
+      "interaction_count": 8,
       "backend_surfaces": [
-        "/api/discourse/deliberate"
+        "/api/discourse/deliberate/async",
+        "/api/discourse/jobs",
+        "/api/discourse/result/"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 5,
+      "accessibility_signal_count": 11,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3289,7 +3291,14 @@
       },
       "validation_evidence": [
         "frontend/app/discourse.tsx",
-        "scripts/check_product_surface_specification.py"
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/features/discourse/discourseJob.ts"
+      ],
+      "backend_delegates": [
+        {
+          "source": "frontend/src/features/discourse/discourseJob.ts",
+          "source_sha256": "3464b10ada43668c96514a3bda38b23c35b2c289958a627ef98c3c27efedb98a"
+        }
       ]
     },
     {
@@ -4130,7 +4139,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "957a47d014f91f515aef4635557db4f5fbda12473da56cf2607c5d0edbf0499a",
+      "source_sha256": "ddbcf86e38d991b442319c04b6af0b4a1b727708a9e66c758fbd2bfcd082090b",
       "interaction_count": 2,
       "backend_surfaces": [],
       "navigation_targets": [],

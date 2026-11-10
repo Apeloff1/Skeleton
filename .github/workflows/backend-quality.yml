@@ -677,3 +677,47 @@ jobs:
             backend/tests/test_discourse_judge_admission.py \
             backend/tests/test_code_intelligence_engine_boundary.py \
             backend/tests/test_engine_text_route_cutovers.py
+
+  discourse_surface_contracts:
+    # Source proof only: no remote provider, no fabricated independent consensus.
+    name: Exact-head Discourse jobs and product surface contracts (review only)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      PYTHONNOUSERSITE: "1"
+    steps:
+      - name: Checkout exact product candidate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Prove exact product source identity
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Set up Node for bounded source-only TypeScript test
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Install isolated source test dependencies
+        run: python -m pip install --disable-pip-version-check --no-input "pytest>=8,<9"
+      - name: Enforce full Expo route and delegated API contract
+        run: |
+          set -euo pipefail
+          python scripts/check_product_surface_specification.py
+          python -m pytest -q --maxfail=8 --noconftest \
+            tests/test_product_surface_specification.py \
+            tests/test_product_surface_delegated_backend_20261110.py
+      - name: Exercise authenticated Discourse job source with negative fixtures
+        run: node --test frontend/scripts/test-discourse-async-jobs.mjs
