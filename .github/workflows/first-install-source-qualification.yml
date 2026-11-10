@@ -26,6 +26,11 @@ on:
       - 'frontend/scripts/test-guarded-expo-export.cjs'
       - 'tests/test_repo_machine_live_taxonomy.py'
       - 'tests/test_app_foundation_e2e_build_isolation.py'
+      - 'tests/test_app_foundation_e2e_admission.py'
+      - 'scripts/check_app_foundation_e2e_admission.py'
+      - 'frontend/scripts/test-app-foundation-e2e-admission.cjs'
+      - 'frontend/scripts/test-app-foundation-flows.mjs'
+      - '.github/workflows/app-foundation-e2e.yml'
       - 'tests/test_ops_router_source_contract.py'
       - 'tests/test_product_surface_specification.py'
       - 'skeleton/testing/test_ai_flight_process.py'
@@ -295,8 +300,10 @@ jobs:
           set -euo pipefail
           # Repository and backend both have a tests package: do not import
           # same-name modules in one pytest collection namespace.
+          python scripts/check_app_foundation_e2e_admission.py
           python -m pytest -q --maxfail=12 --noconftest \
             tests/test_repo_machine_live_taxonomy.py \
+            tests/test_app_foundation_e2e_admission.py \
             tests/test_app_foundation_e2e_build_isolation.py \
             tests/test_ops_router_source_contract.py \
             tests/test_product_surface_specification.py \
@@ -314,4 +321,6 @@ jobs:
             backend/tests/test_code_intelligence_engine_boundary.py \
             backend/tests/test_engine_text_route_cutovers.py
       - name: Exercise bounded Expo export supervisor with live child-process fixtures
-        run: node --test frontend/scripts/test-guarded-expo-export.cjs
+        run: |
+          node --test frontend/scripts/test-guarded-expo-export.cjs
+          node --test frontend/scripts/test-app-foundation-e2e-admission.cjs
