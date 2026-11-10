@@ -81,8 +81,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="return after Compose starts without probing public application surfaces",
     )
-    up.add_argument("--verify-attempts", type=int, default=12)
-    up.add_argument("--verify-delay", type=float, default=1.0)
+    up.add_argument(
+        "--verify-attempts", type=int, default=60,
+        help="whole-application readiness attempts (default: 60 for cold dependency-ordered startup)",
+    )
+    up.add_argument("--verify-delay", type=float, default=2.0)
 
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
@@ -284,6 +287,10 @@ def _parser() -> argparse.ArgumentParser:
                    help="read-only pinned 2-8 game consumer first-run replay; release blocked")
     sub.add_parser("studio-journey", add_help=False,
                    help="build and replay-verify a real original browser/Godot game (studio-journey --help)")
+    sub.add_parser("play-dialogue", add_help=False,
+                   help="play and save a source-bound offline dialogue (play-dialogue --help)")
+    sub.add_parser("play-combat", add_help=False,
+                   help="play and replay-verify a deterministic offline encounter (play-combat --help)")
     sub.add_parser("chat", add_help=False, help="open durable native/GGUF terminal chat (chat --help)")
     sub.add_parser("serve-local-ai", add_help=False, help="open the authenticated offline AI workspace (serve-local-ai --help)")
     sub.add_parser("down", help="stop the assembled application")
@@ -569,6 +576,12 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "studio-journey":
         from skeleton.app.studio_journey import main as journey_main
         return journey_main(arguments[1:])
+    if arguments and arguments[0] == "play-dialogue":
+        from skeleton.app.dialogue_cli import main as dialogue_main
+        return dialogue_main(arguments[1:])
+    if arguments and arguments[0] == "play-combat":
+        from skeleton.app.combat_cli import main as combat_main
+        return combat_main(arguments[1:])
     if arguments and arguments[0] == "chat":
         from skeleton.app.offline_chat_cli import main as chat_main
         return chat_main(arguments[1:])
