@@ -20,7 +20,10 @@ class SaveSlotError(ValueError):
 
 
 def _encode(snapshot: object) -> bytes:
-    payload = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    try:
+        payload = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SaveSlotError("invalid replay snapshot") from exc
     if len(payload) > MAX_SAVE_BYTES:
         raise SaveSlotError("save exceeds byte budget")
     return payload
@@ -48,9 +51,11 @@ def _open_parent(path: Path) -> tuple[int, Path]:
     parent = _directory(path)
     if parent != path.parent.absolute():
         raise SaveSlotError("save parent must not contain symlinks")
-    if not hasattr(os, "supports_dir_fd") or os.open not in os.supports_dir_fd:
+    if (not hasattr(os, "supports_dir_fd") or not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY")
+            or not all(fn in os.supports_dir_fd for fn in
+                       (os.open, os.stat, os.rename, os.unlink))):
         raise SaveSlotError("descriptor-relative saves unavailable on this platform")
-    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     dfd = os.open(parent, flags)
     if os.stat(parent).st_ino != os.fstat(dfd).st_ino or os.stat(parent).st_dev != os.fstat(dfd).st_dev:
         os.close(dfd)
