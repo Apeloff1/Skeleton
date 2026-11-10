@@ -13,6 +13,8 @@ on:
       - 'skeleton/ai/runtime/operational_ai/model/**'
       - 'skeleton/ai/runtime/operational_ai/deployment/qualification/**'
       - 'skeleton/app/local_ai.py'
+      - 'skeleton/app/studio_readiness.py'
+      - 'skeleton/testing/test_app_studio_readiness_proxy_custody.py'
       - 'skeleton/testing/test_ai_real_model_qualification.py'
       - 'skeleton/testing/test_ai_next_model.py'
       - 'skeleton/testing/test_ai_native_endurance.py'
@@ -135,6 +137,9 @@ jobs:
             skeleton/testing/test_delivery_regex.py \
             skeleton/testing/test_mongo_memento_repository.py \
             skeleton/testing/test_sealed_*.py
+
+      - name: Private studio readiness proxy and credential custody regressions
+        run: python -m pytest -q skeleton/testing/test_app_studio_readiness_proxy_custody.py
 
       - name: Consumer share and Chroma custody regressions
         env:
