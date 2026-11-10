@@ -1,14 +1,9 @@
 name: Actions Housekeeping CLI
 
 on:
+  # Manual during owner-directed PR backlog reconciliation. The separate
+  # hourly queue-drain recovery lane remains automatic and unchanged.
   workflow_dispatch:
-  schedule:
-    # Twice-daily safety sweep; separate queue drain is hourly.
-    - cron: '23 4,16 * * *'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/actions-housekeeping-cli.yml'
 
 concurrency:
   # v2 intentionally escapes any pre-existing queued v1 housekeeping run so

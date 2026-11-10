@@ -53,6 +53,22 @@ class Fixture(unittest.TestCase):
     def snap(self,cursor=None,limit=32):
         return self.svc.reader.read('job1',cursor,limit=limit)
 
+
+    def test_hand_constructed_query_cannot_bypass_route_shape_checks(self):
+        for q in (
+            StreamQuery('job1',None,True,0),
+            StreamQuery('job1',None,'32',0),
+            StreamQuery('job1',None,65,0),
+            StreamQuery('job1',None,32,True),
+            StreamQuery('job1',None,32,-1),
+            StreamQuery('job1',None,32,2001),
+            StreamQuery('job1','',32,0),
+            StreamQuery('job1',False,32,0),
+            StreamQuery('../other',None,32,0),
+        ):
+            with self.subTest(query=q), self.assertRaises(StreamError):
+                self.svc.read(q)
+
     def test_first_event_is_verified_submission(self):
         one=self.snap()
         self.assertEqual(one.state,'queued')
@@ -199,6 +215,14 @@ class Fixture(unittest.TestCase):
     def test_invalid_scope_or_secret(self):
         for token in ('tiny','a'*513,'a'*40+'\n'):
             with self.subTest(token=token[:5]),self.assertRaises(InvalidCursor):CursorAuthority(token,self.id.key())
+
+    def test_invalid_falsy_policy_cannot_silently_use_defaults(self):
+        # Falsy 0, False, {}, [] used to evade typed policy admission.
+        for policy in (0, False, "", {}, [], object()):
+            with self.subTest(policy=type(policy).__name__), self.assertRaises(StreamError):
+                EventStream(self.ledger, BEARER, policy=policy)
+        accepted=EventStream(self.ledger, BEARER, policy=StreamPolicy(max_events=1))
+        self.assertEqual(accepted.policy.max_events,1)
 
     def test_read_only_no_model_generation(self):
         before=self.ledger.state_count()

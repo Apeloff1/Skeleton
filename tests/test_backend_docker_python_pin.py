@@ -6,7 +6,7 @@ import unittest
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 DOCKER=ROOT/"backend"/"Dockerfile"
-PIN="python:3.14.10-alpine3.24@sha256:04357e8d728ac6a88a12b808f9b377762f937271ecaf5b99feb242c04de1ffc1"
+PIN="python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72"
 
 class BackendDockerPythonPin(unittest.TestCase):
     def test_all_backend_stages_use_same_supported_pinned_abi(self):

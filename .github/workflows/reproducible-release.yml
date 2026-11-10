@@ -1,8 +1,8 @@
 name: Reproducible Release
 
-# Exact-head reproducibility proof is explicitly dispatched; a tag alone is
-# never release qualification or permission to publish artifacts.
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:

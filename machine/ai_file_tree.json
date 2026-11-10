@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "a06aff1d4ffe6c2b5c76486a82448a428cc1ca9b",
+      "source_git_object_sha": "d0dbf6733ea03c9f00be717842a8fd84ad9d5b80",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -583,7 +583,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "70d5bbfd7213cf2a9b19ee7f5ee6875f61edee1b",
+      "source_git_object_sha": "7d075832d19ca878887db2bb1f37528037463523",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -735,7 +735,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "0c4c6b06b32c10df770c978606f1c914359c8135",
+      "source_git_object_sha": "210885ccab579802f44bd6ba1dbb69a2b47af6e8",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "71fa3ec7bed9f343b545255a4dfc2fe619125e24",
+      "source_git_object_sha": "5cd3cb340b5597a6f6e9e97491a353d474fd4c7b",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "4256c9b1e2b57a6435d668933c2f19f3c8d4e180",
+      "source_git_object_sha": "966bbe8c5794ad478c801e27b177035ae7ee16ed",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1544,7 +1544,7 @@
       "source": "skeleton/native",
       "destination": "skeleton/ai/runtime/native",
       "kind": "tree",
-      "source_git_object_sha": "db3581ca674125faaad65303a87d0570469db002",
+      "source_git_object_sha": "d5b2f3205175fa2344d66ea191735cf29d9f5ae7",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
         "VOL-032",
@@ -1644,7 +1644,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "d20dc1cf5b3410e78a2a2cc665a7d33dda1e1731",
+      "source_git_object_sha": "1d502dad477e068307996d73bc88b7fd8e913b24",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -1681,7 +1681,7 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "0eaeac6586a9ae37ab3fa7d84b765abbd8ef44a2",
+      "source_git_object_sha": "6a5b9f465d8ee295492a734232d63fba923f66e9",
       "role": "Incremental build graph, resource-bounded parallel scheduling, deterministic asset invalidation, build observability, release/remote build controls, and network audit support autonomous AI work.",
       "work_package_refs": [
         "WP-W27",
@@ -2713,7 +2713,7 @@
       "source": "skeleton/forge/creator",
       "destination": "skeleton/ai/forge/creator",
       "kind": "tree",
-      "source_git_object_sha": "7cfc48c5d0ba128aaa99e0804138e5ea70ad8427",
+      "source_git_object_sha": "78bfd4f83ea74946ed8779493e319e253ebd0338",
       "role": "Canonical engine-neutral intent compilation, persistent design graph, typed command surface, transactional preview, semantic diff, reversible generated-state history, approval boundaries, and work leases under skeleton/forge/creator; mirrored exactly into AI Forge.",
       "work_package_refs": [
         "WP-W12",
@@ -2777,7 +2777,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "88339e1cdedacc799473d504b85782a23e74191c",
+      "source_git_object_sha": "ea2f401f7501951ad534b37848b6425417a2549e",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -4537,7 +4537,7 @@
       "source": "backend/core/swarm_planner.py",
       "destination": "skeleton/ai/compat/backend_core/swarm_planner.py",
       "kind": "file",
-      "source_git_object_sha": "0387783abf2ebd830aa20654a24f815073a8adc5",
+      "source_git_object_sha": "de61d33c0d71ccbb3519383d1ee78e3a2e6ffb98",
       "role": "Legacy swarm planner staged for convergence into canonical planning owners.",
       "work_package_refs": [
         "WP-W11",
@@ -4559,7 +4559,7 @@
       "source": "backend/core/swarm_scheduler.py",
       "destination": "skeleton/ai/compat/backend_core/swarm_scheduler.py",
       "kind": "file",
-      "source_git_object_sha": "bba85badab3b1ba1fe426d8a3b18e9c62ccd8cc0",
+      "source_git_object_sha": "28bc2d19506e948525a1df374fd66dd81d7a461d",
       "role": "Legacy swarm scheduler staged for convergence into canonical scheduling/orchestration owners.",
       "work_package_refs": [
         "WP-W12",
@@ -5027,7 +5027,7 @@
       "source": "backend/gameforge/knowledge",
       "destination": "skeleton/ai/research/legacy/gameforge/knowledge",
       "kind": "tree",
-      "source_git_object_sha": "39fe2b55156976d19a9db8ecb96a491d45c26cea",
+      "source_git_object_sha": "e746337edcead75de6741dc9105ad8a28314ceb2",
       "role": "Legacy knowledge/free-API ingestion retained as untrusted research evidence.",
       "work_package_refs": [
         "WP-W08",
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "3eee887a11b2acee992c6bdf7c29c259a7c4e63a"
+      "source_git_object_sha": "1256eba56b57dafa77e7c2ce49045353971d6750"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
@@ -5654,7 +5654,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_execution_sandbox_tree_exactly_mirrored",
-      "source_git_object_sha": "a19734e6dc90b85d3c26c3a322105fbc88d44f04"
+      "source_git_object_sha": "1e412ea4ee0d79c490bf8c8b2938d963378f2b64"
     },
     {
       "id": "AIFT-STORAGE",
@@ -6260,7 +6260,7 @@
       "source": "skeleton/inference",
       "destination": "skeleton/ai/runtime/inference/core",
       "kind": "tree",
-      "source_git_object_sha": "70cd31a539451c77ae15d23e406cda647a795631",
+      "source_git_object_sha": "3665807155ebd8a31aee9303cff4b5d670f02d97",
       "role": "Core inference session, provider-bridge, replay, and async-runtime compatibility plane staged beneath the canonical inference runtime without colliding with native local/neural/KV engines.",
       "work_package_refs": [
         "WP-W05",
@@ -7240,8 +7240,8 @@
     },
     {
       "path": "skeleton/mass_build",
-      "owner": "Mass-build orchestration and artifact assembly",
-      "reason": "Canonical bulk construction stays in the independently governed build pipeline until explicit AI ownership and safety cutover"
+      "owner": "delivery-plane / batch build orchestration",
+      "reason": "Git-tracked batch build execution and build-manifest tooling stay under the governed delivery plane; source is retained and never treated as AI runtime cutover or completed work-package evidence."
     },
     {
       "path": "skeleton/masterplan",
@@ -7335,8 +7335,8 @@
     },
     {
       "path": "skeleton/perf_profiler",
-      "owner": "Performance instrumentation and resource profiling",
-      "reason": "Hardware and runtime profiling remain independent observability surfaces pending measured authority and safety cutover"
+      "owner": "platform-runtime / observability",
+      "reason": "Canonical CPU and runtime profiling instrumentation belongs to the platform observability substrate and remains outside AI-tree implementation ownership until an explicit, independently qualified cutover."
     },
     {
       "path": "skeleton/persist",
@@ -7782,7 +7782,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 162,
+    "retained_outside_ai_tree_count": 157,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,

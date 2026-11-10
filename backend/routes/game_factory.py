@@ -1881,7 +1881,7 @@ Output the FINAL COMPILED GAME PROJECT:
 # =============================================================================
 
 async def call_llm(system_prompt: str, user_prompt: str, session_id: str = None) -> dict:
-    """Call LLM with fallback to mock data."""
+    """Run a factory turn through engine-owned model routing."""
     if not LLM_AVAILABLE:
         return {"success": False, "response": None, "error": "LLM not available"}
 
@@ -1893,10 +1893,21 @@ async def call_llm(system_prompt: str, user_prompt: str, session_id: str = None)
                 version="1",
                 instructions=system_prompt.strip(),
             ),
-        ).with_model("openai", "gpt-4o")
+        )
 
         response = await chat.send_message(UserMessage(text=user_prompt))
-        return {"success": True, "response": response, "error": None}
+        text = response.text.strip()
+        if not text:
+            return {"success": False, "response": None, "error": "empty_model_response"}
+        return {
+            "success": True,
+            "response": text,
+            "error": None,
+            "operation_id": response.operation_id,
+            "execution_id": response.execution_id,
+            "context_digest": response.context_digest,
+            "provider_receipts": list(response.provider_receipts),
+        }
     except Exception:
         return {"success": False, "response": None, "error": "llm_request_failed"}
 

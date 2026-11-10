@@ -412,6 +412,27 @@ def test_preflight_denial_receipt_is_published_before_protection_check() -> None
     assert "if-no-files-found: error" in reconcile
 
 
+def test_bounded_root_squash_batch_revalidates_every_mutation() -> None:
+    """Higher throughput must not bypass the live target, review or stack fences."""
+    reconcile = _line_block(_workflow_text(), "reconcile:")
+    assert 'AUTOMERGE_MODE: "direct"' in reconcile
+    assert 'AUTOMERGE_MERGE_METHOD: "squash"' in reconcile
+    assert 'AUTOMERGE_MAX_MERGES: "8"' in reconcile
+    assert 'AUTOMERGE_MAX_STACK_MERGES: "1"' in reconcile
+    assert 'AUTOMERGE_STOP_AFTER_STACK_MUTATION: "true"' in reconcile
+    assert 'AUTOMERGE_REQUIRED_APPROVALS: "1"' in reconcile
+    assert 'AUTOMERGE_REQUIRE_RESOLVED_THREADS: "true"' in reconcile
+    assert 'AUTOMERGE_REQUIRE_NO_CHANGES_REQUESTED: "true"' in reconcile
+    assert 'if [[ "$protected" != "true" ]]; then' in reconcile
+
+    engine = (PACKAGE / "automerge_engine.py").read_text(encoding="utf-8")
+    assert "iteration = build_iteration(client, policy, now=now)" in engine
+    assert "_revalidate_selection(" in engine
+    assert "expected_default_head=iteration.base_head" in engine
+    assert "if config.stop_after_stack_mutation:" in engine
+    assert "final_head = client.branch_head(policy.default_branch)" in engine
+
+
 def test_review_gate_downgrades_are_rejected_by_static_checker() -> None:
     text = _workflow_text()
     downgraded = text.replace(

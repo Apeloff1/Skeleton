@@ -107,23 +107,22 @@ async def call_ai(prompt: str, system_prompt: str, max_tokens: int = 8192) -> st
         • Surfaces a *user-safe* error message (no stack, no secrets) while
           logging the underlying detail for operators.
     """
-    if not EMERGENT_LLM_KEY:
-        # Hard fail loudly — generation cannot work without a key.
-        log.error("call_ai: EMERGENT_LLM_KEY is empty")
-        raise HTTPException(status_code=503, detail="AI provider is not configured")
-
+    if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or not 1 <= max_tokens <= 131_072:
+        raise HTTPException(status_code=422, detail="max_tokens is outside the supported range")
+    invocation_id = uuid.uuid4().hex
     attempts = max(1, AI_MAX_RETRIES + 1)
     last_err: Optional[Exception] = None
     for attempt in range(1, attempts + 1):
         try:
             chat = EngineChat(
-                session_id=f"codedock-app-{uuid.uuid4().hex[:8]}",
+                session_id=f"codedock-app-{invocation_id[:16]}",
+                turn_idempotency_key=f"code-to-app:{invocation_id}",
                 instruction_policy=InstructionPolicy(
                     policy_id="backend.code-to-app.generation",
                     version="1",
                     instructions=system_prompt.strip(),
                 ),
-            ).with_model("openai", "gpt-4o")
+            ).with_max_tokens(max_tokens)
             response = await asyncio.wait_for(
                 chat.send_message(UserMessage(text=prompt)),
                 timeout=AI_TIMEOUT_S,
@@ -135,9 +134,7 @@ async def call_ai(prompt: str, system_prompt: str, max_tokens: int = 8192) -> st
         except Exception as e:  # noqa: BLE001 - we want to log + retry
             last_err = e
             log.warning("call_ai: error on attempt %d/%d: %s", attempt, attempts, e)
-        # No backoff sleep — gpt-4o errors are usually permanent for the
-        # current payload; the second attempt is mostly to dodge a flaky
-        # network blip.
+        # A same-request retry reconciles transient engine transport failures.
     # All attempts exhausted. Return a tidy 502 so the FE shows a
     # RetryBanner rather than dumping a stack trace.
     raise HTTPException(

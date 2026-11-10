@@ -17,7 +17,8 @@ import { safeGetItem, safeSetItem } from '../src/utils/safeStorage';
 async function getVisitorId(): Promise<string> {
   let id = await safeGetItem('mkt_visitor_id');
   if (!id) {
-    id = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const randomId = globalThis.crypto?.randomUUID?.();
+    id = `v_${randomId || `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`}`;
     await safeSetItem('mkt_visitor_id', id);
   }
   return id;
@@ -39,44 +40,53 @@ export default function LiveOps() {
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [earning, setEarning] = React.useState<string | null>(null);
 
   const loadPass = React.useCallback(async (vid: string) => {
     const r = await api.get<any>(`/api/liveops/pass?visitor_id=${encodeURIComponent(vid)}`, { timeoutMs: 12000 });
-    if (r.ok && r.data) {
-      setXp(r.data.xp || 0); setTier(r.data.tier || 1);
-      setNextXp(r.data.next_xp ?? null); setTiers(r.data.tiers || []);
-    }
+    if (!r.ok || !r.data || !Array.isArray(r.data.tiers)) throw new Error(r.error || 'Battle-pass state is unavailable');
+    setXp(Number(r.data.xp) || 0); setTier(Number(r.data.tier) || 1);
+    setNextXp(r.data.next_xp == null ? null : Number(r.data.next_xp)); setTiers(r.data.tiers);
   }, []);
 
   const refreshAll = React.useCallback(async (vid: string) => {
+    setError(null);
     const s = await api.get<{ season: Season }>('/api/liveops/season', { timeoutMs: 12000 });
-    if (s.ok && s.data) setSeason(s.data.season);
+    if (!s.ok || !s.data?.season) throw new Error(s.error || 'Live season is unavailable');
+    setSeason(s.data.season);
     await loadPass(vid);
   }, [loadPass]);
 
   React.useEffect(() => {
     (async () => {
-      const v = await getVisitorId(); setVisitor(v);
-      const s = await api.get<{ season: Season }>('/api/liveops/season', { timeoutMs: 12000 });
-      if (s.ok && s.data) setSeason(s.data.season);
-      await loadPass(v);
-      setLoading(false);
+      try {
+        const v = await getVisitorId(); setVisitor(v);
+        await refreshAll(v);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Live-Ops could not load');
+      } finally { setLoading(false); }
     })();
-  }, [loadPass]);
+  }, [refreshAll]);
 
   const earn = React.useCallback(async (action: string) => {
-    if (!visitor) return;
+    if (!visitor || earning) return;
     haptics.selection();
-    const r = await api.post<any>('/api/liveops/xp', { visitor_id: visitor, action }, { timeoutMs: 10000 });
-    if (r.ok && r.data?.ok) {
+    setEarning(action); setError(null);
+    try {
+      const r = await api.post<any>('/api/liveops/xp', { visitor_id: visitor, action }, { timeoutMs: 10000 });
+      if (!r.ok || !r.data?.ok) throw new Error(r.error || 'The XP action was rejected');
       setXp(r.data.xp); setTier(r.data.tier);
       const unlocked = r.data.unlocked_rewards || [];
       setToast(r.data.tier_up ? `🎉 Tier ${r.data.tier}! Unlocked: ${unlocked.join(', ')}` : `+${r.data.gained} XP`);
       if (r.data.tier_up) haptics.notify('success');
-      loadPass(visitor);
+      await loadPass(visitor);
       setTimeout(() => setToast(null), 2600);
-    }
-  }, [visitor, haptics, loadPass]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'XP could not be recorded');
+      haptics.notify('error');
+    } finally { setEarning(null); }
+  }, [visitor, earning, haptics, loadPass]);
 
   const progress = nextXp ? Math.min(1, xp / nextXp) : 1;
 
@@ -88,12 +98,13 @@ export default function LiveOps() {
       </View>
 
       {toast ? <View testID="lo-toast" style={styles.toast}><Text style={styles.toastTxt}>{toast}</Text></View> : null}
+      {error ? <View style={styles.error}><Text style={styles.errorTxt}>{error}</Text></View> : null}
 
       {loading ? <ActivityIndicator color="#A78BFA" style={{ marginTop: 50 }} /> : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
           refreshControl={<RefreshControl refreshing={refreshing} tintColor="#A78BFA"
-            onRefresh={async () => { if (!visitor) return; setRefreshing(true); await refreshAll(visitor); setRefreshing(false); }} />}
+            onRefresh={async () => { if (!visitor) return; setRefreshing(true); try { await refreshAll(visitor); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Refresh failed'); } finally { setRefreshing(false); } }} />}
         >
           {season ? (
             <View testID="lo-season" style={styles.seasonCard}>
@@ -117,9 +128,9 @@ export default function LiveOps() {
           <View style={styles.progressTrack}><View testID="lo-progress" style={[styles.progressFill, { width: `${progress * 100}%` }]} /></View>
 
           <View style={styles.earnRow}>
-            <TouchableOpacity testID="lo-earn-play" style={styles.earnBtn} onPress={() => earn('play')}><Text style={styles.earnTxt}>▶ Play +5</Text></TouchableOpacity>
-            <TouchableOpacity testID="lo-earn-share" style={styles.earnBtn} onPress={() => earn('share')}><Text style={styles.earnTxt}>🔗 Share +4</Text></TouchableOpacity>
-            <TouchableOpacity testID="lo-earn-vote" style={styles.earnBtn} onPress={() => earn('vote')}><Text style={styles.earnTxt}>▲ Vote +3</Text></TouchableOpacity>
+            <TouchableOpacity testID="lo-earn-play" disabled={!!earning} style={[styles.earnBtn, earning && styles.disabled]} onPress={() => earn('play')}><Text style={styles.earnTxt}>{earning === 'play' ? '…' : '▶ Play +5'}</Text></TouchableOpacity>
+            <TouchableOpacity testID="lo-earn-share" disabled={!!earning} style={[styles.earnBtn, earning && styles.disabled]} onPress={() => earn('share')}><Text style={styles.earnTxt}>{earning === 'share' ? '…' : '🔗 Share +4'}</Text></TouchableOpacity>
+            <TouchableOpacity testID="lo-earn-vote" disabled={!!earning} style={[styles.earnBtn, earning && styles.disabled]} onPress={() => earn('vote')}><Text style={styles.earnTxt}>{earning === 'vote' ? '…' : '▲ Vote +3'}</Text></TouchableOpacity>
           </View>
 
           <Text style={styles.sectionTitle}>Rewards track</Text>
@@ -146,6 +157,7 @@ const styles = StyleSheet.create({
   backBtn: { paddingVertical: 6, paddingRight: 12 }, backTxt: { color: '#94a3b8', fontSize: 15 },
   title: { flex: 1, color: '#f1f5f9', fontSize: 20, fontWeight: '800' },
   toast: { backgroundColor: '#2E1B5B', margin: 12, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#8B5CF6' }, toastTxt: { color: '#e0e7ff', fontWeight: '700' },
+  error: { backgroundColor: '#3F1218', margin: 12, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#EF4444' }, errorTxt: { color: '#FCA5A5', fontWeight: '700' },
   seasonCard: { backgroundColor: '#141414', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#2E1B5B', marginBottom: 20 },
   seasonName: { color: '#f5d0fe', fontSize: 20, fontWeight: '800' }, seasonMeta: { color: '#a78bfa', fontSize: 13, marginTop: 4 },
   eventRow: { marginTop: 12, gap: 8 },
@@ -157,6 +169,7 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: '#A78BFA', borderRadius: 8 },
   earnRow: { flexDirection: 'row', gap: 8, marginVertical: 16 },
   earnBtn: { flex: 1, backgroundColor: '#262626', borderRadius: 10, paddingVertical: 11, alignItems: 'center' }, earnTxt: { color: '#e2e8f0', fontWeight: '700', fontSize: 13 },
+  disabled: { opacity: 0.55 },
   sectionTitle: { color: '#cbd5e1', fontSize: 15, fontWeight: '800', marginBottom: 10, marginTop: 4 },
   tierRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#141414', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#262626' },
   tierUnlocked: { borderColor: '#8B5CF6', backgroundColor: '#160f24' },

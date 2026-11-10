@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -124,11 +125,23 @@ def test_automation_model_redacts_prompt_secrets_before_network(monkeypatch) -> 
             ).encode("utf-8")
         )
 
-    class _FakeOpener:
-        def open(self, request, timeout):
-            return fake_urlopen(request, timeout)
+    def fake_build_opener(*handlers):
+        # The repository provider is direct-only; ambient proxies and
+        # followable redirects must never receive the bearer token.
+        assert any(
+            isinstance(handler, urllib.request.ProxyHandler)
+            and handler.proxies == {}
+            for handler in handlers
+        )
+        assert any(
+            isinstance(handler, urllib.request.HTTPRedirectHandler)
+            and type(handler).__name__ == "_RejectRedirects"
+            for handler in handlers
+        )
+        return SimpleNamespace(open=fake_urlopen)
 
-    monkeypatch.setattr("urllib.request.build_opener", lambda *_handlers: _FakeOpener())
+    monkeypatch.setenv("HTTPS_PROXY", "http://untrusted.invalid:9999")
+    monkeypatch.setattr("urllib.request.build_opener", fake_build_opener)
     client = FreeModelClient()
 
     result = client.chat("system sk-1234567890abcdefghijkl", "token=supersecretvalue")
@@ -146,13 +159,31 @@ def test_automation_model_sanitizes_network_failure(monkeypatch) -> None:
     def fail(*_args, **_kwargs):
         raise URLError("Bearer abcdefghijklmnopqrstuvwxyz")
 
-    monkeypatch.setattr("urllib.request.urlopen", fail)
+    monkeypatch.setattr(
+        "urllib.request.build_opener",
+        lambda *handlers: SimpleNamespace(open=fail),
+    )
     client = FreeModelClient()
 
     with pytest.raises(ModelError) as exc:
         client.chat("rules", "work")
 
     assert "abcdefghijklmnopqrstuvwxyz" not in str(exc.value)
+
+
+def test_automation_model_reject_redirect_adapter_stays_fail_closed() -> None:
+    from skeleton.automation.free_model import _RejectRedirects
+
+    request = urllib.request.Request(
+        "https://provider.example/v1/chat/completions",
+        headers={"Authorization": "Bearer fake-model-key"},
+    )
+    handler = _RejectRedirects()
+    assert handler.redirect_request(
+        request, None, 302, "Found",
+        {"Location": "https://unexpected.example/steal"},
+        "https://unexpected.example/steal",
+    ) is None
 
 
 def test_jeeves_openai_requires_shared_receipt(monkeypatch) -> None:
