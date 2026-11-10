@@ -20,6 +20,17 @@ from typing import Any
 from .project import IGNORED_DIRS
 
 SCHEMA = "skeleton.godot_export.provenance/v1"
+
+
+def _safe_identity(value: object, limit: int, field: str) -> bool:
+    """Reject control characters that can forge provenance text/CI evidence."""
+    return (
+        type(value) is str and 1 <= len(value) <= limit
+        and value == value.strip()
+        and all(ord(char) >= 32 and ord(char) != 127 for char in value)
+    )
+
+
 MAX_ARTIFACT_BYTES = 100 * 1024 * 1024
 MAX_SOURCE_FILES = 100_000
 MAX_SOURCE_BYTES = 4 * 1024 * 1024 * 1024
@@ -303,13 +314,13 @@ class Artifact:
     size: int
 
     def __post_init__(self) -> None:
-        if type(self.preset) is not str or not 1 <= len(self.preset) <= 128:
+        if not _safe_identity(self.preset, 128, "preset"):
             raise ValueError("invalid artifact preset")
         _relative(self.path)
         if (not isinstance(self.sha256, str) or len(self.sha256) != 64
                 or any(ch not in "0123456789abcdef" for ch in self.sha256)):
             raise ValueError("invalid artifact sha256")
-        if type(self.size) is not int or not 0 <= self.size <= MAX_ARTIFACT_BYTES:
+        if type(self.size) is not int or not 0 < self.size <= MAX_ARTIFACT_BYTES:
             raise ValueError("invalid artifact size")
 
 
@@ -323,9 +334,9 @@ class Manifest:
     artifacts: list[Artifact] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        if not isinstance(self.project, str) or not 1 <= len(self.project) <= 256:
+        if not _safe_identity(self.project, 256, "project"):
             raise ValueError("invalid project identity")
-        if not isinstance(self.engine, str) or not 1 <= len(self.engine) <= 256:
+        if not _safe_identity(self.engine, 256, "engine"):
             raise ValueError("invalid engine identity")
         if not isinstance(self.tree, str) or len(self.tree) != 64 or any(
                 c not in "0123456789abcdef" for c in self.tree):
@@ -342,6 +353,11 @@ class Manifest:
         ids = [(a.preset, a.path) for a in self.artifacts]
         if len(ids) != len(set(ids)):
             raise ValueError("duplicated artifact inventory entry")
+        # Distinct presets cannot independently attest one identical output
+        # path as if they were different built artifacts.
+        paths = [item.path for item in self.artifacts]
+        if len(paths) != len(set(paths)):
+            raise ValueError("artifact path reused by multiple presets")
 
     def to_dict(self) -> dict[str, Any]:
         self.__post_init__()
