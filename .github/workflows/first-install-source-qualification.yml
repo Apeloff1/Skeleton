@@ -68,6 +68,7 @@ on:
       - 'skeleton/testing/test_app_compose_parity.py'
       - 'skeleton/testing/test_windows_installer.py'
       - 'scripts/check_app_assembly.py'
+      - 'tests/test_app_assembly_vertical_surface_custody.py'
       - 'scripts/check_app_compose_parity.py'
 
 permissions:
@@ -114,7 +115,7 @@ jobs:
           python -m compileall -q skeleton/app
           python -m compileall -q skeleton/ai/runtime/game_project_cli.py scripts/game/game_project.py skeleton/testing/test_packaging_contract.py skeleton/testing/test_game_project_cli_custody.py skeleton/testing/test_game_project_cli_input_budget.py
           python -m compileall -q skeleton/testing/test_app_install_source_contracts.py skeleton/testing/test_app_assembly.py skeleton/testing/test_app_installer.py skeleton/testing/test_app_installer_epoch.py
-          python -m compileall -q scripts/check_app_assembly.py scripts/check_app_compose_parity.py
+          python -m compileall -q scripts/check_app_assembly.py scripts/check_app_compose_parity.py tests/test_app_assembly_vertical_surface_custody.py
           python -m compileall -q skeleton/testing/test_studio_package_verifier_contract.py skeleton/testing/test_app_offline_signed_game_library_audit.py
       - name: Qualify actual first-install assembly and required source inputs
         run: python scripts/check_app_assembly.py
@@ -123,6 +124,7 @@ jobs:
           python -m pytest -q --maxfail=1 \
             skeleton/testing/test_app_install_source_contracts.py \
             skeleton/testing/test_app_assembly.py \
+            tests/test_app_assembly_vertical_surface_custody.py \
             skeleton/testing/test_app_installer.py \
             skeleton/testing/test_app_installer_epoch.py \
             skeleton/testing/test_app_compose_parity.py \
