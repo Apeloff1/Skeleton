@@ -120,5 +120,15 @@ class SaveSlotTests(unittest.TestCase):
             self.assertFalse(create.exists())
 
 
+    def test_unserializable_snapshot_rejected_without_file_publication(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slot = root / "save.json"
+            with self.assertRaises(SaveSlotError):
+                write_slot(slot, {"unsupported": object()})
+            self.assertFalse(slot.exists())
+            self.assertEqual(list(root.glob(".campaign-*")), [])
+
+
 if __name__ == "__main__":
     unittest.main()
