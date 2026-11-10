@@ -255,6 +255,8 @@ def tree_digest(root: Path) -> str:
                 raise ValueError("source directory changed after scan") from exc
             try:
                 if directory_identity(os.fstat(dfd)) != fingerprint:
+                    if not relative_dir:
+                        raise ValueError("source root changed during tree digest")
                     raise ValueError("source directory changed after scan")
             finally:
                 os.close(dfd)
