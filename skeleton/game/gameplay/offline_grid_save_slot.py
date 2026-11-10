@@ -275,13 +275,17 @@ def read_slot(path: Path) -> object:
         if len(data) > MAX_SAVE_BYTES:
             raise SaveSlotError("save exceeds byte budget")
         after = os.fstat(fd)
-        reachable = os.stat(path.name, dir_fd=dfd, follow_symlinks=False)
-        directory = os.stat(parent, follow_symlinks=False)
+        try:
+            reachable = os.stat(path.name, dir_fd=dfd, follow_symlinks=False)
+            directory = os.stat(parent, follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise SaveSlotError("save path disappeared during read") from exc
         held_dir = os.fstat(dfd)
-        fingerprint = lambda info: (
-            info.st_dev, info.st_ino, info.st_size,
-            info.st_mtime_ns, info.st_ctime_ns,
-        )
+        def fingerprint(info: os.stat_result) -> tuple[int, int, int, int, int]:
+            return (
+                info.st_dev, info.st_ino, info.st_size,
+                info.st_mtime_ns, info.st_ctime_ns,
+            )
         if (fingerprint(before) != fingerprint(after)
                 or (reachable.st_dev, reachable.st_ino) !=
                    (after.st_dev, after.st_ino)
