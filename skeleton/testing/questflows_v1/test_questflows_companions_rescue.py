@@ -1,4 +1,4 @@
-"""Regression suite for the rescue workflow contract."""
+"""Regression suite for the questflow rescue contract (unique pytest module)."""
 from __future__ import annotations
 
 import pytest
