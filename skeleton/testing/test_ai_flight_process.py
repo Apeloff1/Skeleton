@@ -57,7 +57,7 @@ class ProcessFlights(unittest.TestCase):
     def tearDown(self):
         self.gate.close();self.db.close();self.temp.cleanup()
     def run_child(self,script,worker='w1'):
-        env=dict(os.environ,PYTHONPATH=str(Path(__file__).resolve().parents[2])+os.pathsep+os.environ.get('PYTHONPATH',''))
+        env=dict(os.environ,PYTHONFAULTHANDLER='1',PYTHONPATH=str(Path(__file__).resolve().parents[2])+os.pathsep+os.environ.get('PYTHONPATH',''))
         return subprocess.run([sys.executable,'-c',script,str(self.root),worker],
                               capture_output=True,text=True,timeout=15,env=env)
 
