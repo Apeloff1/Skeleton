@@ -127,6 +127,12 @@ def audit(root: Path = ROOT) -> list[str]:
             ):
                 if invariant not in source:
                     failures.append(f"{name}: immutable SHA admission or checkout attestation missing")
+            expected_group = (
+                "group: " + name.removesuffix("-qualification.yml")
+                + "-${{ inputs.candidate_sha }}"
+            )
+            if (expected_group not in source or "cancel-in-progress: false" not in source):
+                failures.append(f"{name}: manual candidate concurrency must preserve independent immutable evidence")
         except (OSError, UnicodeError, ValueError) as exc:
             failures.append(f"{name}: cannot inspect manual source qualification ({exc})")
         for case in cases:
