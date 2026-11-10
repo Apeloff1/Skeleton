@@ -7,6 +7,9 @@ from typing import Iterable
 
 from .manifest import ModError, ModManifest
 
+MAX_RESOLVE_MODS = 2048
+MAX_RESOLVE_REFERENCES = MAX_RESOLVE_MODS * 64
+
 
 class ResolveError(ModError):
     def __init__(self, problems: list[str]) -> None:
@@ -33,10 +36,27 @@ def resolve_load_order(mods: Iterable[ModManifest]) -> LoadPlan:
     """
     problems: list[str] = []
     by_id: dict[str, ModManifest] = {}
-    for m in mods:
-        if m.mod_id in by_id:
-            problems.append(f"duplicate mod {m.mod_id}")
-        by_id[m.mod_id] = m
+    try:
+        for count, m in enumerate(mods, 1):
+            if count > MAX_RESOLVE_MODS:
+                raise ResolveError(["mod count exceeds resolver bound"])
+            if type(m) is not ModManifest:
+                raise ResolveError(["invalid mod manifest in resolver input"])
+            if m.mod_id in by_id:
+                problems.append(f"duplicate mod {m.mod_id}")
+            by_id[m.mod_id] = m
+    except ResolveError:
+        raise
+    except Exception:
+        # Inventory iterators may fail after yielding otherwise valid mods.
+        # Convert that failure into a typed, fail-closed admission result.
+        raise ResolveError(["mod inventory iterator failed"]) from None
+    # Directly constructed ModManifest values can bypass from_dict limits.
+    # Bound the total graph edge inventory before materializing adjacency.
+    references = sum(len(m.depends) + len(m.optional) + len(m.conflicts)
+                     + len(m.load_after) + len(m.load_before) for m in by_id.values())
+    if references > MAX_RESOLVE_REFERENCES:
+        raise ResolveError(["mod dependency graph exceeds resolver bound"])
     edges: dict[str, set[str]] = {k: set() for k in by_id}
     conflicts: set[tuple[str, ...]] = set()
     for m in by_id.values():

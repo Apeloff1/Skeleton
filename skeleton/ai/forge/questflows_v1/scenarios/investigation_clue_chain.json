@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "investigation_clue_chain",
+  "domain": "investigation",
+  "stages": [
+    {
+      "key": "discover_clue_chain",
+      "evidence": "investigation:clue_chain:discover:proof",
+      "grants": "investigation:clue_chain:stage:1",
+      "risk": 1,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_clue_chain",
+      "evidence": "investigation:clue_chain:prepare:proof",
+      "grants": "investigation:clue_chain:stage:2",
+      "risk": 2,
+      "sequence": 1,
+      "requires_previous_grant": "investigation:clue_chain:stage:1"
+    },
+    {
+      "key": "execute_clue_chain",
+      "evidence": "investigation:clue_chain:execute:proof",
+      "grants": "investigation:clue_chain:stage:3",
+      "risk": 3,
+      "sequence": 2,
+      "requires_previous_grant": "investigation:clue_chain:stage:2"
+    },
+    {
+      "key": "resolve_clue_chain",
+      "evidence": "investigation:clue_chain:resolve:proof",
+      "grants": "investigation:clue_chain:stage:4",
+      "risk": 4,
+      "sequence": 3,
+      "requires_previous_grant": "investigation:clue_chain:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "investigation_clue_chain:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "investigation:clue_chain:discover:proof"
+      ]
+    },
+    {
+      "id": "investigation_clue_chain:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "investigation:clue_chain:prepare:proof"
+      ]
+    },
+    {
+      "id": "investigation_clue_chain:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "investigation:clue_chain:execute:proof"
+      ]
+    },
+    {
+      "id": "investigation_clue_chain:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "investigation:clue_chain:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

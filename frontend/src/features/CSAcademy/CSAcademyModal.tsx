@@ -33,18 +33,23 @@ export const CSAcademyModal = memo(function CSAcademyModal({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [info, setInfo] = useState<any>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (visible) fetchInfo();
   }, [visible]);
 
   const fetchInfo = async () => {
+    setError('');
     try {
       const res = await apiFetch(`${API_URL}/api/cs/info`);
+      if (!res.ok) throw new Error(`CS Academy is unavailable (HTTP ${res.status}).`);
       const data = await res.json();
+      if (!data || typeof data.total_hours !== 'number' || typeof data.total_modules !== 'number') throw new Error('CS Academy returned invalid course information.');
       setInfo(data);
     } catch (e) {
       console.error('Failed to fetch CS info:', e);
+      setError(e instanceof Error ? e.message : 'CS Academy information could not be loaded.');
     }
   };
 
@@ -69,6 +74,7 @@ export const CSAcademyModal = memo(function CSAcademyModal({
     if (!topic.trim()) return;
     setLoading(true);
     setResult(null);
+    setError('');
 
     try {
       const res = await apiFetch(`${API_URL}/api/jeeves/teach-cs`, {
@@ -84,9 +90,12 @@ export const CSAcademyModal = memo(function CSAcademyModal({
         })
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(typeof data?.detail === 'string' ? data.detail : `Lesson request failed (HTTP ${res.status}).`);
+      if (!data || typeof data.lesson !== 'string' || !data.lesson.trim()) throw new Error('Jeeves returned an empty CS lesson.');
       setResult(data);
     } catch (e) {
       console.error('CS learning error:', e);
+      setError(e instanceof Error ? e.message : 'The CS lesson could not be generated.');
     } finally {
       setLoading(false);
     }
@@ -108,6 +117,11 @@ export const CSAcademyModal = memo(function CSAcademyModal({
           </View>
 
           <ScrollView style={localStyles.content} showsVerticalScrollIndicator={false}>
+            {!!error && (
+              <TouchableOpacity style={[localStyles.infoBanner, { backgroundColor: '#EF444420' }]} onPress={info ? learnTopic : fetchInfo}>
+                <Text style={[localStyles.infoText, { color: '#EF4444' }]}>{error} Tap to retry.</Text>
+              </TouchableOpacity>
+            )}
             {/* Info Banner */}
             {info && (
               <View style={[localStyles.infoBanner, { backgroundColor: '#10B98115' }]}>

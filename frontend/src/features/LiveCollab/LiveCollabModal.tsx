@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
+import { toast } from '../../components/AppToast';
 const API_URL = Constants.expoConfig?.extra?.apiUrl || CANONICAL_API_BASE || '';
 
 interface LiveCollabModalProps {
@@ -37,6 +38,7 @@ export const LiveCollabModal: React.FC<LiveCollabModalProps> = ({
   const [error, setError] = useState('');
   const [aiRole, setAiRole] = useState<'copilot' | 'driver' | 'navigator' | 'reviewer'>('copilot');
   const [info, setInfo] = useState<any>(null);
+  const [requestError, setRequestError] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -74,6 +76,7 @@ export const LiveCollabModal: React.FC<LiveCollabModalProps> = ({
     if (!mode) return;
     setLoading(true);
     setResult(null);
+    setRequestError('');
 
     try {
       let endpoint = '';
@@ -108,9 +111,16 @@ export const LiveCollabModal: React.FC<LiveCollabModalProps> = ({
         body: JSON.stringify(body)
       });
       const data = await res.json();
+      const content = data?.response ?? data?.suggestions ?? data?.debug_analysis ?? data?.explanation;
+      if (!res.ok || data?.error || content === 'LLM not available' || content === 'llm_request_failed') {
+        throw new Error(data?.detail || data?.error || content || `Request failed (${res.status})`);
+      }
       setResult(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Collab error:', e);
+      const message = e?.message || 'The collaboration service did not return a result.';
+      setRequestError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -189,6 +199,13 @@ export const LiveCollabModal: React.FC<LiveCollabModalProps> = ({
                   <Ionicons name="arrow-back" size={20} color={colors.text} />
                   <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
                 </TouchableOpacity>
+
+                {!!requestError && (
+                  <View style={[styles.errorBox, { borderColor: '#EF4444', backgroundColor: '#EF444415' }]}>
+                    <Ionicons name="alert-circle" size={18} color="#EF4444" />
+                    <Text style={[styles.errorText, { color: colors.text }]}>{requestError}</Text>
+                  </View>
+                )}
 
                 {/* Mode Header */}
                 <View style={[styles.modeHeader, { backgroundColor: modes.find(m => m.id === mode)?.color + '15' }]}>
@@ -459,6 +476,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  errorBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 14 },
+  errorText: { flex: 1, fontSize: 13, lineHeight: 18 },
   resultContainer: {
     marginTop: 16,
     padding: 14,

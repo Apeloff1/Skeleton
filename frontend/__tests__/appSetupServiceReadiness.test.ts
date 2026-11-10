@@ -34,4 +34,16 @@ describe('first-install service observation boundary', () => {
   it('does not accept a healthy-looking message without an affirmative probe', () => {
     expect(serviceReadinessStatus({ ok: false, detail: 'healthy' })).toBe('blocked');
   });
+  it('does not treat contradictory success and pending/error text as verified health', () => {
+    for (const detail of ['observation pending: private mongo', 'timeout', 'network_error', 'service identity mismatch']) {
+      expect(serviceReadinessStatus({ ok: true, detail })).toBe('unknown');
+    }
+    expect(serviceReadinessStatus({ ok: true, detail: 'ready' })).toBe('ready');
+  });
+  it('rejects control, untrimmed and empty probe details', () => {
+    for (const detail of ['', ' healthy', 'healthy ', 'healthy\n', '\u0000healthy']) {
+      expect(serviceReadinessStatus({ ok: true, detail })).toBe('unknown');
+    }
+  });
+
 });

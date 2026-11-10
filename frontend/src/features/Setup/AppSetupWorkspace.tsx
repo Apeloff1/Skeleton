@@ -25,7 +25,7 @@ export default function AppSetupWorkspace() {
   const refresh = useCallback(async () => {
     request.current?.abort(); const current = new AbortController(); request.current = current; setBusy(true); setSnapshot(null); setError('');
     try { const value = await readAppReadiness(current.signal); if (!current.signal.aborted && value.accountEpoch === getAuthEpoch()) setSnapshot(value); }
-    catch (err) { if (!current.signal.aborted) setError('READINESS_UNOBSERVED: Services could not be verified. The setup guide remains available; run the host doctor command and retry.'); }
+    catch { if (!current.signal.aborted) setError('READINESS_UNOBSERVED: Services could not be verified. Setup remains available; run the host doctor command and retry.'); }
     finally { if (request.current === current) setBusy(false); }
   }, []);
   useEffect(() => { void refresh(); return () => request.current?.abort(); }, [refresh]);
