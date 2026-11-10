@@ -59,6 +59,15 @@ def fixture():
         "branch_after": deepcopy(status),
         "runs": runs,
         "jobs_by_run": jobs,
+        "protection_detail": {
+            "enforce_admins": {"enabled": True},
+            "required_pull_request_reviews": {
+                "required_approving_review_count": 1,
+                "dismiss_stale_reviews": True,
+            },
+            "required_status_checks": {"strict": True},
+            "required_conversation_resolution": {"enabled": True},
+        },
     }
 
 
@@ -95,6 +104,37 @@ class ExactMainEvidenceTests(unittest.TestCase):
         result = verify(data)
         self.assertIn("main_required_check_not_configured:App Foundation E2E",
                       result["blocking_reasons"])
+
+    def test_protection_detail_cannot_be_omitted_or_approximated(self):
+        data = fixture()
+        del data["protection_detail"]
+        self.assertIn(
+            "main_protection_detail_unverified",
+            verify(data)["blocking_reasons"],
+        )
+
+    def test_admin_review_strict_and_conversation_holds_are_required(self):
+        mutations = (
+            ("enforce_admins", {"enabled": False},
+             "main_admin_bypass_not_fenced"),
+            ("required_pull_request_reviews", {
+                "required_approving_review_count": 0,
+                "dismiss_stale_reviews": True,
+            }, "main_independent_review_not_required"),
+            ("required_pull_request_reviews", {
+                "required_approving_review_count": 1,
+                "dismiss_stale_reviews": False,
+            }, "main_stale_review_dismissal_missing"),
+            ("required_status_checks", {"strict": False},
+             "main_up_to_date_required_status_checks_missing"),
+            ("required_conversation_resolution", {"enabled": False},
+             "main_conversation_resolution_not_required"),
+        )
+        for key, value, reason in mutations:
+            with self.subTest(key=key, reason=reason):
+                data = fixture()
+                data["protection_detail"][key] = value
+                self.assertIn(reason, verify(data)["blocking_reasons"])
 
     def test_pending_cancelled_skipped_and_failed_are_all_blocks(self):
         for status, conclusion in [
