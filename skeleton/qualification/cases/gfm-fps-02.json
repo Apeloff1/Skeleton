@@ -1,0 +1,15 @@
+{
+  "id": "GFM-FPS-02",
+  "gate": "fps",
+  "title": "Low-end device 30 fps profile holds",
+  "todo_ref": "P3: GPU/VRAM/power and low-end device scaling",
+  "severity": "sev2",
+  "params": {
+    "profiles": [
+      30
+    ],
+    "sim_hz": 60,
+    "min_ratio": 0.9
+  },
+  "requires_hardware": true
+}

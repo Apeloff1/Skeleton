@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "weather exposure event",
+  "description": "Deterministic world mechanic command with bounded nonnegative amount and logical tick.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "action",
+    "amount",
+    "tick"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "gain",
+        "spend",
+        "recover",
+        "decay",
+        "observe"
+      ]
+    },
+    "amount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 120
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "$comment": "weather_exposure capacity 120; nominal gain 10, loss 8; supports replay-safe receipt identity."
+}

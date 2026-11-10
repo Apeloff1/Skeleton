@@ -55,6 +55,8 @@ on:
       - 'skeleton/testing/test_delivery_*.py'
       - 'skeleton/testing/test_sealed_*.py'
       - 'pyproject.toml'
+      - 'scripts/check_ai_file_tree.py'
+      - 'tests/test_ai_tree_syntax_membership_fail_closed.py'
       - '.github/workflows/sealed-context-guard.yml'
   push:
     branches:
@@ -85,6 +87,8 @@ jobs:
       - name: Compile changed production boundaries
         run: |
           python -m compileall -q skeleton/context skeleton/persistence skeleton/ai/runtime/inference backend/core/conversations.py
+      - name: Verify AI-tree syntax and tracked-member integrity regressions
+        run: python -m pytest -q tests/test_ai_tree_syntax_membership_fail_closed.py
       - name: Verify canonical metadata and AI-tree parity
         run: |
           python scripts/check_root_package_metadata_parity.py

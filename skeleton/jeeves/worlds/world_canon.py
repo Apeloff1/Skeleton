@@ -86,6 +86,10 @@ def _keys(value: Any, required: set[str], optional: set[str] = frozenset()) -> d
 def _text(value: Any, field: str, limit: int = 400) -> str:
     if type(value) is not str or not value or len(value) > limit:
         raise CanonError("invalid_text", field)
+    # Lone UTF-16 surrogates are valid Python str values but cannot be
+    # serialized as UTF-8. Reject at the typed boundary, not during publish.
+    if any(0xD800 <= ord(ch) <= 0xDFFF for ch in value):
+        raise CanonError("invalid_unicode_scalar", field)
     if unicodedata.normalize("NFC", value) != value:
         raise CanonError("noncanonical_unicode", field)
     if any(ord(ch) < 32 and ch not in "\n\t" for ch in value):
@@ -335,63 +339,16 @@ _PLAYER_JS = r"""
 "use strict";
 const model = JSON.parse(document.getElementById("world-data").textContent);
 const world = model.world;
-const sourceDigest = model.proof.source_digest;
 const byId = new Map(world.scenes.map(s => [s.id, s]));
 const ending = new Map(world.endings.map(e => [e.scene, e.label]));
-const byChoice = new Map(world.choices.map(c => [c.id, c]));
 let current = world.start;
 let flags = new Set();
 let trace = [];
-let receiptDraft = "";
-let receiptStatus = "";
 const root = document.getElementById("play");
 function element(tag, text) {
   const node = document.createElement(tag);
   node.textContent = text;
   return node;
-}
-function replayTrace(ids) {
-  if (!Array.isArray(ids) || ids.length > 512) throw Error("invalid_session_trace");
-  let scene = world.start;
-  const acquired = new Set();
-  for (const id of ids) {
-    if (typeof id !== "string" || !/^[a-z][a-z0-9_-]{0,47}$/.test(id))
-      throw Error("invalid_session_choice");
-    const choice = byChoice.get(id);
-    if (!choice || ending.has(scene) || choice.from !== scene ||
-        !choice.requires.every(f => acquired.has(f)))
-      throw Error("invalid_session_transition");
-    choice.grants.forEach(f => acquired.add(f));
-    scene = choice.to;
-  }
-  return {schema: "jeeves.world.session.v1", source_digest: sourceDigest,
-    scene, flags: Array.from(acquired).sort(), trace: ids.slice(),
-    ended: ending.has(scene)};
-}
-function exportReceipt() {
-  return JSON.stringify(replayTrace(trace));
-}
-function importReceipt(text) {
-  if (typeof text !== "string" || new TextEncoder().encode(text).length > 65536)
-    throw Error("session_too_large");
-  const receipt = JSON.parse(text);
-  if (!receipt || Array.isArray(receipt) || typeof receipt !== "object" ||
-      Object.keys(receipt).sort().join(",") !==
-      "ended,flags,scene,schema,source_digest,trace")
-    throw Error("invalid_session_fields");
-  if (receipt.schema !== "jeeves.world.session.v1" ||
-      receipt.source_digest !== sourceDigest) throw Error("session_stale_source");
-  const expected = replayTrace(receipt.trace);
-  if (JSON.stringify(receipt.trace) !== JSON.stringify(expected.trace) ||
-      JSON.stringify(receipt.flags) !== JSON.stringify(expected.flags) ||
-      receipt.scene !== expected.scene || receipt.ended !== expected.ended)
-    throw Error("session_state_mismatch");
-  current = expected.scene;
-  flags = new Set(expected.flags);
-  trace = expected.trace;
-  receiptDraft = text;
-  receiptStatus = "Session restored";
-  render();
 }
 function render() {
   root.replaceChildren();
@@ -406,49 +363,35 @@ function render() {
       current = world.start; flags = new Set(); trace = []; render();
     });
     root.append(restart);
-  } else {
-    const choices = world.choices.filter(c => c.from === current &&
-      c.requires.every(f => flags.has(f)));
-    for (const choice of choices) {
-      const button = element("button", choice.label);
-      button.addEventListener("click", () => {
-        for (const flag of choice.grants) flags.add(flag);
-        trace.push(choice.id);
-        current = choice.to;
-        render();
-      });
-      root.append(button);
-    }
+    return;
   }
-  const label = element("label", "Portable session receipt");
-  const field = document.createElement("textarea");
-  field.id = "session-receipt";
-  field.rows = 5;
-  field.cols = 48;
-  field.value = receiptDraft;
-  field.addEventListener("input", () => { receiptDraft = field.value; });
-  label.append(field);
-  root.append(label);
-  const save = element("button", "Export session");
-  save.addEventListener("click", () => {
-    receiptDraft = exportReceipt();
-    receiptStatus = "Session exported";
-    render();
-  });
-  root.append(save);
-  const load = element("button", "Restore session");
-  const status = element("p", "");
-  status.setAttribute("role", "status");
-  status.textContent = receiptStatus;
-  load.addEventListener("click", () => {
-    try { importReceipt(receiptDraft); }
-    catch (error) {
-      receiptStatus = "Restore rejected: " + error.message;
+  const choices = world.choices.filter(c => c.from === current &&
+    c.requires.every(f => flags.has(f)));
+  choices.forEach((choice, index) => {
+    const button = element("button", (index < 9 ? (index + 1) + ". " : "") + choice.label);
+    button.dataset.choiceIndex = String(index);
+    button.addEventListener("click", () => {
+      for (const flag of choice.grants) flags.add(flag);
+      trace.push(choice.id);
+      current = choice.to;
       render();
-    }
+    });
+    root.append(button);
   });
-  root.append(load, status);
 }
+// Digit shortcuts operate on the CURRENT rendered scene, never stale choices.
+// Native buttons remain the accessible mouse, keyboard and assistive-tech path.
+document.addEventListener("keydown", event => {
+  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey ||
+      event.repeat || event.target?.isContentEditable ||
+      ["INPUT", "TEXTAREA", "SELECT"].includes(event.target?.tagName)) return;
+  if (!/^[1-9]$/.test(event.key)) return;
+  const button = root.querySelector('button[data-choice-index="' + (Number(event.key) - 1) + '"]');
+  if (button && !button.disabled) {
+    event.preventDefault();
+    button.click();
+  }
+});
 render();
 """.strip()
 
@@ -480,22 +423,48 @@ class WorldStore:
     than quietly falling back to symlink-following path operations.
     """
     def __init__(self, root: str | os.PathLike[str]) -> None:
-        if not hasattr(os, "O_NOFOLLOW") or os.open not in os.supports_dir_fd:
+        if (not all(hasattr(os, attr) for attr in ("O_NOFOLLOW", "O_DIRECTORY"))
+                or os.open not in os.supports_dir_fd
+                or os.mkdir not in os.supports_dir_fd):
             raise CanonError("platform_not_supported")
-        path = Path(root)
-        if path.is_symlink():
-            raise CanonError("symlink_root")
-        path.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if path.is_symlink():
-            raise CanonError("symlink_root")
-        self.root = path
+        self.root = Path(os.path.abspath(root))
+        # Create the requested root one directory descriptor at a time.
+        # Calling Path.mkdir(parents=True) first could follow a symlinked
+        # ancestor and create private world material outside the intended root.
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        fd = os.open("/", flags)
+        try:
+            for part in self.root.parts[1:]:
+                try:
+                    os.mkdir(part, mode=0o700, dir_fd=fd)
+                except FileExistsError:
+                    pass
+                child = os.open(part, flags, dir_fd=fd)
+                os.close(fd)
+                fd = child
+            if not stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise CanonError("not_directory")
+        except OSError as exc:
+            raise CanonError("symlink_or_untrusted_root") from exc
+        finally:
+            os.close(fd)
 
     def _directory(self) -> int:
-        fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-        if not stat.S_ISDIR(os.fstat(fd).st_mode):
+        # Every reopen traverses descriptor-anchored, no-follow components;
+        # a later ancestor replacement cannot redirect a read or publication.
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        fd = os.open("/", flags)
+        try:
+            for part in self.root.parts[1:]:
+                child = os.open(part, flags, dir_fd=fd)
+                os.close(fd)
+                fd = child
+            if not stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise CanonError("not_directory")
+            return fd
+        except BaseException:
             os.close(fd)
-            raise CanonError("not_directory")
-        return fd
+            raise
 
     @staticmethod
     def _read(fd: int, name: str) -> bytes:
@@ -506,12 +475,29 @@ class WorldStore:
             raise CanonError("not_found", name) from None
         try:
             info = os.fstat(handle)
-            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_SOURCE_BYTES:
+            if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
+                    info.st_size > MAX_SOURCE_BYTES):
                 raise CanonError("unsafe_source_file", name)
             with os.fdopen(os.dup(handle), "rb") as stream:
                 data = stream.read(MAX_SOURCE_BYTES + 1)
             if len(data) > MAX_SOURCE_BYTES:
                 raise CanonError("source_too_large")
+            # The opened descriptor must still be the directory's current
+            # source. Reject rename/replacement races instead of accepting
+            # bytes from an unlinked or superseded source inode.
+            try:
+                current = os.stat(name, dir_fd=fd, follow_symlinks=False)
+            except OSError as exc:
+                raise CanonError("source_replaced_during_read", name) from exc
+            after = os.fstat(handle)
+            fields = ("st_dev", "st_ino", "st_mode", "st_nlink",
+                      "st_size", "st_mtime_ns", "st_ctime_ns")
+            identity = lambda s: tuple(getattr(s, field) for field in fields)
+            if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1
+                    or len(data) != info.st_size
+                    or identity(info) != identity(after)
+                    or identity(after) != identity(current)):
+                raise CanonError("source_replaced_during_read", name)
             return data
         finally:
             os.close(handle)
