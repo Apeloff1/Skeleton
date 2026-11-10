@@ -1399,10 +1399,17 @@ def native_world_codex_access_proof(
     try:
         source = unrank(body.index)
         result = attempt_unlock(source, body.gate_id, horizon=body.horizon)
+        if (
+            result.get("gate") != body.gate_id
+            or result.get("original_world_digest") != source.codex_digest
+            or not result.get("proof_receipt_sha256")
+        ):
+            raise HTTPException(status_code=502, detail="Optional route proof integrity failed")
         return {"ok": True, **result}
     except ValueError:
         raise HTTPException(
-            status_code=422, detail="Original optional game-world gate is not implemented"
+            status_code=422,
+            detail="Original optional route request is invalid or cannot be replayed",
         ) from None
 
 
@@ -2809,17 +2816,8 @@ async def crawler_run(
 async def crawler_control(
     body: CrawlerControlRequest,
     session_id: str = URLPath(min_length=1, max_length=128),
-    scope: dict = Depends(_crawler_scope),
-    user: dict = Depends(get_current_user),
+    scope: dict = Depends(_crawler_write_scope),
 ) -> dict:
-    if body.action == "resume" and user.get("role") not in {"editor", "admin"}:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "code": "crawler_write_denied",
-                "message": "Editor permission is required to resume capture.",
-            },
-        )
     return {
         "ok": True,
         "session": await _crawler_result(
@@ -2830,9 +2828,9 @@ async def crawler_control(
 
 @router.post("/crawler/sessions/{session_id}/automation")
 async def crawler_automation(
-    session_id: str,
     body: CrawlerAutomationRequest,
-    scope: dict = Depends(_crawler_scope),
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_write_scope),
     user: dict = Depends(get_current_user),
 ) -> dict:
     return {
@@ -2893,7 +2891,7 @@ async def crawler_research_search(
 
 @router.get("/crawler/sessions/{session_id}/search")
 async def crawler_search(
-    session_id: str,
+    session_id: str = URLPath(min_length=1, max_length=128),
     query: str = Query(min_length=1, max_length=512),
     limit: int = Query(default=8, ge=1, le=8),
     scope: dict = Depends(_crawler_scope),
@@ -2920,7 +2918,7 @@ async def crawler_sources(
 async def crawler_delete(
     body: CrawlerWriteRequest,
     session_id: str = URLPath(min_length=1, max_length=128),
-    scope: dict = Depends(_crawler_scope),
+    scope: dict = Depends(_crawler_write_scope),
 ) -> dict:
     return await _crawler_result(crawler_application.delete(scope, session_id, body.model_dump()))
 
@@ -2975,7 +2973,7 @@ async def crawler_source_use(
     body: CrawlerSourceUseRequest,
     session_id: str = URLPath(min_length=1, max_length=128),
     source_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
-    scope: dict = Depends(_crawler_scope),
+    scope: dict = Depends(_crawler_write_scope),
     user: dict = Depends(get_current_user),
 ) -> dict:
     return await _crawler_result(
