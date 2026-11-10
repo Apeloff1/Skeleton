@@ -669,3 +669,69 @@ def test_zero_byte_export_cannot_mint_ship_artifact_receipt(tmp_path):
         provenance.build(
             source, "Godot 4.7", "SHIP", {"Linux": empty}, base=tmp_path,
         )
+
+
+def test_provenance_cli_refuses_duplicate_artifact_presets(tmp_path, capsys):
+    from skeleton.godot_export import cli
+
+    root, artifact, _manifest = _bound_project_manifest(tmp_path)
+    target = tmp_path / "should-not-exist.json"
+    assert cli.main([
+        "provenance", str(root),
+        "--artifact", f"Linux={artifact}",
+        "--artifact", f"Linux={artifact}",
+        "--verdict", "SHIP",
+        "--base", str(tmp_path), "--out", str(target),
+    ]) == 2
+    assert __import__("json").loads(capsys.readouterr().out) == {
+        "error": "duplicate --artifact preset",
+    }
+    assert not target.exists()
+
+
+def test_provenance_cli_rejects_empty_ship_inventory_without_artifact(tmp_path, capsys):
+    from skeleton.godot_export import cli
+
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / "project.godot").write_text("[application]\n")
+    target = tmp_path / "manifest.json"
+    assert cli.main([
+        "provenance", str(root), "--verdict", "SHIP",
+        "--out", str(target),
+    ]) == 2
+    assert __import__("json").loads(capsys.readouterr().out) == {
+        "error": "SHIP provenance requires real artifacts",
+    }
+    assert not target.exists()
+    # A NO-SHIP inventory remains a legitimate negative record.
+    assert cli.main([
+        "provenance", str(root), "--verdict", "NO-SHIP",
+    ]) == 0
+    assert '"verdict": "NO-SHIP"' in capsys.readouterr().out
+
+
+def test_provenance_cli_reports_malformed_source_without_exposing_path(tmp_path, capsys):
+    from skeleton.godot_export import cli
+
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / "project.godot").write_text("[application]\n")
+    private = tmp_path / "private-should-not-leak.bin"
+    private.write_bytes(b"secret fixture")
+    alias = root / "linked.bin"
+    alias.symlink_to(private)
+    out = tmp_path / "manifest.json"
+    assert cli.main([
+        "provenance", str(root),
+        "--artifact", f"Linux={alias}",
+        "--base", str(root),
+        "--verdict", "SHIP",
+        "--out", str(out),
+    ]) == 2
+    response = capsys.readouterr().out
+    assert __import__("json").loads(response) == {
+        "error": "unsafe or invalid provenance inputs",
+    }
+    assert "private-should-not-leak" not in response
+    assert not out.exists()
