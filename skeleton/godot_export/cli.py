@@ -44,16 +44,29 @@ def _provenance(a: argparse.Namespace) -> int:
     for spec in a.artifact:
         preset, sep, path = spec.partition("=")
         if not sep or not preset or not path:
-            print(json.dumps({"error": f"bad --artifact {spec!r}, want PRESET=PATH"}))
+            print(json.dumps({"error": "invalid --artifact; expected PRESET=PATH"}))
+            return 2
+        # A duplicate key previously overwrote the earlier artifact before
+        # admission, concealing an ambiguous release receipt.
+        if preset in arts:
+            print(json.dumps({"error": "duplicate --artifact preset"}))
             return 2
         arts[preset] = Path(path)
-    m = provenance.build(a.project, a.engine, a.verdict, arts, a.base)
-    text = m.dumps()
+    if a.verdict == "SHIP" and not arts:
+        print(json.dumps({"error": "SHIP provenance requires real artifacts"}))
+        return 2
+    try:
+        m = provenance.build(a.project, a.engine, a.verdict, arts, a.base)
+        text = m.dumps()
+    except (ValueError, OSError, UnicodeError, RecursionError):
+        # Invalid source paths, credentials or malformed contents must not
+        # be reflected into publicly visible workflow logs.
+        print(json.dumps({"error": "unsafe or invalid provenance inputs"}))
+        return 2
     if a.out:
         try:
             provenance.write_manifest_file_new(a.out, m)
         except (ValueError, OSError, UnicodeError, RecursionError):
-            # Fail closed without leaking private artifact paths or source JSON.
             print(json.dumps({"error": "unsafe or occupied provenance manifest output"}))
             return 2
     else:
