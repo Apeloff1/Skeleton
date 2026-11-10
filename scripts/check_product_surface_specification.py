@@ -105,7 +105,7 @@ def _delegated_backend_paths(
             not isinstance(relative, str)
             or not relative.startswith("frontend/src/features/")
             or not relative.endswith(".ts")
-            or "\\\\" in relative
+            or "\\" in relative
             or any(part in {"", ".", ".."} for part in relative.split("/"))
             or relative in visited
             or not isinstance(digest, str)
@@ -121,7 +121,7 @@ def _delegated_backend_paths(
         module = os.path.relpath(candidate.with_suffix(""), source.parent).replace(os.sep, "/")
         if not module.startswith("."):
             module = "./" + module
-        if not re.search(r"\\bfrom\\s+['\\\"]" + re.escape(module) + r"['\\\"]", source_text):
+        if not re.search(r"\bfrom\s+['\"]" + re.escape(module) + r"['\"]", source_text):
             errors.append(f"{sid}: delegated backend source not statically imported: {relative}")
             continue
         if not isinstance(evidence, list) or relative not in evidence:
