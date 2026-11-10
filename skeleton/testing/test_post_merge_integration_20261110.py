@@ -19,6 +19,9 @@ from skeleton.build.delivery import remote_bridge as canonical
 from skeleton.build.delivery._util import DeliveryError
 from skeleton.build.remote_build import RemoteArtifactRef, VerifiedRemoteReceipt
 from skeleton.game.gameplay.offline_grid_save_slot import SaveSlotError, read_slot, write_slot
+from skeleton.game.gameplay.offline_grid_campaign import Campaign
+from skeleton.game.gameplay.grid_playthrough_route import verify_playthrough
+from skeleton.game.gameplay.flgb_gameplay_runtime import GameplayContractError
 from skeleton.install.first_run_probe_gate import SERVICE_ORDER, ServiceState
 from skeleton.install.wizard_10000x import FirstRunWizard10000x
 from skeleton.local_ai.model_loader import ModelLoader
@@ -133,6 +136,64 @@ class PostMergeOfflineIntegrations(unittest.TestCase):
             self.assertFalse(loader.verify(digest))
             with self.assertRaises(ValueError):
                 loader.load("c" * 32, expected_sha256="0" * 64, license_accepted=True)
+
+    @unittest.skipUnless(os.name == "posix" and hasattr(os, "O_NOFOLLOW"),
+                         "requires POSIX descriptor guards")
+    def test_solver_report_replays_as_real_cli_campaign_save(self):
+        """Drive route solver → verified receipt → CLI actions → durable save."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = Path(__file__).resolve().parents[2] / (
+                "skeleton/game/gameplay/content/lantern_harbor.json"
+            )
+            campaign = Campaign.load(json.loads(source.read_bytes()))
+            code, stdout, stderr = invoke(
+                "solve", "--goal-ending", "wanderer",
+                "--max-nodes", "1024", "--max-depth", "64",
+            )
+            self.assertEqual(code, 0, stderr)
+            report = json.loads(stdout)
+            self.assertEqual(report["status"], "solved")
+            self.assertEqual(report["goal_ending"], "wanderer")
+            self.assertEqual(report["source_digest"], campaign.source_digest)
+            self.assertEqual(verify_playthrough(campaign, report), report)
+
+            actions = root / "route.json"
+            save = root / "route-save.json"
+            actions.write_text(
+                json.dumps(report["commands"]), encoding="utf-8",
+            )
+            code, stdout, stderr = invoke(
+                "run", "--commands", str(actions), "--out-save", str(save),
+            )
+            self.assertEqual(code, 0, stderr)
+            persisted = read_slot(save)
+            self.assertEqual(json.loads(stdout)["save"], persisted)
+            self.assertEqual(persisted, report["save"])
+            self.assertEqual(persisted["state_digest"], report["state_digest"])
+            self.assertEqual(persisted["ending"], "wanderer")
+
+    @unittest.skipUnless(os.name == "posix" and hasattr(os, "O_NOFOLLOW"),
+                         "requires POSIX descriptor guards")
+    def test_solver_receipt_detects_tampering_before_durable_save(self):
+        source = Path(__file__).resolve().parents[2] / (
+            "skeleton/game/gameplay/content/lantern_harbor.json"
+        )
+        campaign = Campaign.load(json.loads(source.read_bytes()))
+        code, stdout, stderr = invoke(
+            "solve", "--goal-ending", "wanderer",
+            "--max-nodes", "1024", "--max-depth", "64",
+        )
+        self.assertEqual(code, 0, stderr)
+        report = json.loads(stdout)
+        self.assertEqual(report["status"], "solved")
+        forged = dict(report, checksum="0" * 64)
+        with self.assertRaises(GameplayContractError):
+            verify_playthrough(campaign, forged)
+        mutated = dict(report)
+        mutated["commands"] = []
+        with self.assertRaises(GameplayContractError):
+            verify_playthrough(campaign, mutated)
 
     def test_canonical_and_mirrored_remote_receipts_have_same_custody(self):
         first = receipt("job1", "dist/first.whl")
