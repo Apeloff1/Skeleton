@@ -34,7 +34,7 @@ class AppFoundationBuildIsolationTests(unittest.TestCase):
         builder = source.split("FROM deps AS builder", 1)[1].split("FROM nginx:", 1)[0]
         self.assertIn("CI=1", builder)
         self.assertIn("EXPO_NO_TELEMETRY=1", builder)
-        self.assertIn("yarn export:web", builder)
+        self.assertIn("timeout -k 15s 720s yarn export:web", builder)
         self.assertIn('echo "frontend-export-process-exited"', builder)
         self.assertIn("test -f /app/dist/setup.html || test -f /app/dist/setup/index.html", builder)
         self.assertIn('echo "frontend-setup-artifact-verified"', builder)
