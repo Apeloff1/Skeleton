@@ -170,9 +170,11 @@ def check_condition(cond: Mapping[str, Any], facts: Mapping[str, Any]) -> bool:
 # utility curves
 # ---------------------------------------------------------------------------
 def curve(kind: str, x: float) -> float:
-    if type(x) not in (int, float) or not math.isfinite(x):
-        raise ValidationError("utility input must be finite")
-    x = max(0.0, min(1.0, float(x)))
+    # A malformed utility sample must not silently become a valid action
+    # score through clamping (especially adversarial negative inputs).
+    if type(x) not in (int, float) or not math.isfinite(x) or not 0 <= x <= 1:
+        raise ValidationError("utility input must be finite and within [0, 1]")
+    x = float(x)
     if kind == "linear":
         return x
     if kind == "inverse":
