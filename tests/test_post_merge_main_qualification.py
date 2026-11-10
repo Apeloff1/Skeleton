@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from unittest.mock import patch
 import json
 from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.check_post_merge_main import ESSENTIAL_JOBS, inspect, main
+from scripts.check_post_merge_main import ESSENTIAL_JOBS, EvidenceError, _paged_items, inspect, main
 
 
 HEAD = "a" * 40
@@ -183,6 +184,63 @@ class ExactMainEvidenceTests(unittest.TestCase):
             data = fixture()
             data[key]["commit"]["sha"] = OTHER
             self.assertIn(reason, verify(data)["blocking_reasons"])
+
+    def test_paged_runs_do_not_silently_stop_at_first_hundred(self):
+        first = [{"id": n} for n in range(1, 101)]
+        last = [{"id": 101}]
+
+        def respond(_repo, suffix, _token):
+            return {
+                "total_count": 101,
+                "workflow_runs": last if suffix.endswith("page=2") else first,
+            }
+
+        with patch("scripts.check_post_merge_main._get_json", side_effect=respond) as api:
+            result = _paged_items(
+                "Apeloff1/Skeleton", "/actions/runs?event=push",
+                "workflow_runs", None,
+            )
+        self.assertEqual(len(result), 101)
+        self.assertEqual([r["id"] for r in result], list(range(1, 102)))
+        self.assertEqual(api.call_count, 2)
+
+    def test_paged_inventory_churn_is_not_evidence(self):
+        first = [{"id": n} for n in range(1, 101)]
+        last = [{"id": 101}]
+        def respond(_repo, suffix, _token):
+            return {
+                "total_count": 102 if suffix.endswith("page=2") else 101,
+                "jobs": last if suffix.endswith("page=2") else first,
+            }
+        with patch("scripts.check_post_merge_main._get_json", side_effect=respond):
+            with self.assertRaisesRegex(EvidenceError, "changed"):
+                _paged_items("Apeloff1/Skeleton", "/actions/runs/10/jobs", "jobs", None)
+
+    def test_duplicate_jobs_across_pages_are_rejected(self):
+        first = [{"id": n} for n in range(1, 101)]
+        repeated = [{"id": 100}]
+        def respond(_repo, suffix, _token):
+            return {
+                "total_count": 101,
+                "jobs": repeated if suffix.endswith("page=2") else first,
+            }
+        with patch("scripts.check_post_merge_main._get_json", side_effect=respond):
+            with self.assertRaisesRegex(EvidenceError, "duplicate"):
+                _paged_items("Apeloff1/Skeleton", "/actions/runs/10/jobs", "jobs", None)
+
+    def test_missing_pagination_page_is_not_assumed_complete(self):
+        first = [{"id": n} for n in range(1, 101)]
+        def respond(_repo, suffix, _token):
+            return {
+                "total_count": 101,
+                "workflow_runs": [] if suffix.endswith("page=2") else first,
+            }
+        with patch("scripts.check_post_merge_main._get_json", side_effect=respond):
+            with self.assertRaisesRegex(EvidenceError, "missing"):
+                _paged_items(
+                    "Apeloff1/Skeleton", "/actions/runs?event=push",
+                    "workflow_runs", None,
+                )
 
     def test_offline_snapshot_never_claims_real_post_merge_qualification(self):
         data = fixture()
