@@ -4,10 +4,18 @@ A production model may never be substituted with this test-only FakeWorker.
 Tests run against source-bound transforms and real temporary SQLite metadata.
 """
 from __future__ import annotations
+import importlib
 import tempfile
 from .contracts import Scope,CognitionError,hash_bytes
 from .profiles import read_profile
-from .approved_imports import resolve_module as _module
+
+BASE="skeleton.ai.runtime.operational_ai.offline_cognition.families"
+
+def _module(family,operation):
+    from skeleton.ai.runtime.operational_ai.offline_cognition.catalog import FAMILIES
+    if family not in FAMILIES:
+        raise CognitionError("unregistered capability family")
+    return importlib.import_module(BASE+"."+family+"."+operation)
 
 def exercise(family,operation,*,attack=False):
     p=read_profile(family)

@@ -14,10 +14,8 @@ from skeleton.app.offline_policy_chain_progress import (
 )
 from skeleton.app.offline_source_trust_policy import SCHEMA as POLICY_SCHEMA
 from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
-# Explicit transitive fixture closure; sharded pytest runs do not import the
-# neighboring migration test modules into fixture discovery automatically.
-from skeleton.testing.test_app_offline_archive_signature import signed
-from skeleton.testing.test_app_offline_signed_progress_migration import migration
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
 

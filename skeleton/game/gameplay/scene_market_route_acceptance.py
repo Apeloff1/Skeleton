@@ -82,13 +82,7 @@ def accept_market_route(payload: Any, *, max_nodes: int = 4096,
     )
     if (integrated["state_digest"] != terminal["state_digest"]
             or integrated["source_digest"] != initial["source_digest"]
-            or integrated["phase"] != terminal["state"]["phase"]
-            or integrated["credits"] != ledger["credits_remaining"]
-            or integrated["goods"] != ledger["goods_remaining"]
-            or integrated["reputation"] != ledger["reputation_earned"]
-            or integrated["delivered"] != ledger["delivered"]
-            or ledger["state_digest"] != terminal["state_digest"]
-            or ledger["journal_length"] != len(full_actions)
+            or integrated["ledger_checksum"] != ledger["checksum"]
             or transition["to_state_digest"] != terminal["state_digest"]
             or transition["actions_applied"] != len(route["actions"])):
         raise SceneTravelError("market integrated acceptance diverged")

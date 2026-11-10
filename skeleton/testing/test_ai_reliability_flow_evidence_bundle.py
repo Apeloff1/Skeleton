@@ -2,7 +2,7 @@
 import unittest
 from skeleton.testing.reliability_fabric_test_support import scenario
 from skeleton.ai.runtime.operational_ai.reliability_fabric.flows.evidence_bundle import EvidenceBundle
-from skeleton.ai.runtime.operational_ai.reliability_fabric.contracts import Rejected, canonical, sha256
+from skeleton.ai.runtime.operational_ai.reliability_fabric.contracts import Rejected
 class BundleTests(unittest.TestCase):
     def test_two_boundaries_share_actor_model_and_time(self):
         item=EvidenceBundle()
@@ -18,15 +18,17 @@ class BundleTests(unittest.TestCase):
             item.add("tokenizer_custody",scenario("tokenizer_custody",subject="other"))
         with self.assertRaises(Rejected):
             item.seal(required=("native_identity","tokenizer_custody"))
-    def test_sealed_bundle_identity_digest_uses_canonical_json_array(self):
+    def test_seal_requires_bounded_distinct_domain_names(self):
         item=EvidenceBundle()
         item.add("native_identity",scenario("native_identity"))
-        scoped=item.snapshot()["identity"]
-        self.assertIsInstance(scoped,tuple)
-        sealed=item.seal(required=("native_identity",))
-        self.assertEqual(sealed.identity_sha256,sha256(canonical(list(scoped))))
-        self.assertEqual(item.snapshot()["identity"],scoped)
-        self.assertFalse(sealed.release_certified)
+        for bad in ([],[1],["native_identity"]*41):
+            with self.subTest(required=repr(bad)):
+                with self.assertRaises(Rejected):
+                    item.seal(required=bad)
+        sealed=item.seal(required=["native_identity"])
+        self.assertEqual(sealed.domains,("native_identity",))
+        self.assertEqual(len(sealed.identity_sha256),64)
+
     def test_sealed_bundle_is_not_mutable(self):
         item=EvidenceBundle()
         item.add("native_identity",scenario("native_identity"))

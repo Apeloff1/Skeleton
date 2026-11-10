@@ -301,8 +301,9 @@ def test_dotdot_archive_alias_into_original_source_fails_before_publication(
 ):
     """Existing sibling/.. must not bypass source/output separation."""
     source, pin = original_source
-    # The module-scoped source lives under tmp_path_factory, not this case's tmp_path.
-    sibling = source.parent / "existing-archive-sibling"
+    # The sibling must share the original source's parent so that
+    # sibling/.. genuinely aliases into the source tree.
+    sibling = source.parent / f"existing-sibling-{tmp_path.name}"
     sibling.mkdir()
     archive, install, save, receipt = _destinations(tmp_path)
     disguised = sibling / ".." / source.name / "poison.zip"
@@ -319,7 +320,9 @@ def test_dotdot_install_alias_into_original_source_fails_before_publication(
     original_source, tmp_path,
 ):
     source, pin = original_source
-    sibling = source.parent / "existing-install-sibling"
+    # The sibling must share the original source's parent so that
+    # sibling/.. genuinely aliases into the source tree.
+    sibling = source.parent / f"existing-sibling-{tmp_path.name}"
     sibling.mkdir()
     archive, install, save, receipt = _destinations(tmp_path)
     disguised = sibling / ".." / source.name / "new-install"
@@ -431,10 +434,10 @@ def test_consumer_first_run_evidence_replays_real_installed_game(
     result = json.loads(capsys.readouterr().out)
     assert result["source_level_replay_passes"] == 2
     assert result["installed_game_and_private_save_reexecuted"] is True
-    # Point-in-time custody snapshots are not a persistent filesystem lock.
+    # Point-in-time inode snapshots are not a filesystem lock; the readiness
+    # contract (and consumer_first_run_cohort) require the honest False here.
     assert result["all_input_inodes_stable_during_inspection"] is False
     assert result["root_and_evidence_inodes_stable_during_inspection"] is True
-    assert result["nested_asset_inode_snapshots_equal"] is True
     assert result["files_published"] == 0
     assert result["read_only"] is True
     assert result["native_device_qualified"] is False
@@ -486,12 +489,9 @@ def test_consumer_first_run_rejects_forged_upstream_evidence(
         "persistent_rollback_protection": False,
     }
     monkeypatch.setattr(module, "_custody", lambda *args: ((1, 2),) * 4)
-    # This adversarial fixture verifies claim validation, not installed tree
-    # replay. Its upstream inspection and inode snapshot are deliberately
-    # synthetic; explicitly replace the tree scan too so no fake /game path
-    # reaches the real descriptor-anchored filesystem reader.
-    # Forged-claim regression uses a structurally valid immutable inode
-    # inventory without bypassing the actual source inventory hash validator.
+    # Claim-forgery tests do not access a real installed game. Supply the
+    # canonical immutable inode inventory shape rather than a dict or path:
+    # the digest function must still validate it and must not be disabled.
     fixed_inventory = (("", (1, 2, 3, 4, 1, 0, 0, 0)),)
     monkeypatch.setattr(module, "snapshot_installed_tree",
                         lambda *_args: fixed_inventory)

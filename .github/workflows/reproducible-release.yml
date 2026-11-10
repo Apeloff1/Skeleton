@@ -128,8 +128,6 @@ jobs:
               "skeleton/native/asm/aarch64.S",
               "skeleton/native/asm/x86_64.S",
               "skeleton/native/asm/README.md",
-              "skeleton/app/cli.py",
-              "skeleton/ai/runtime/game_project_cli.py",
           }
           with ZipFile(wheels[0]) as artifact:
               entries = set(artifact.namelist())

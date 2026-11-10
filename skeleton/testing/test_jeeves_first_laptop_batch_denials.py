@@ -10,13 +10,18 @@ from skeleton.jeeves.native_fabric.laptop_ops.batch.runner import (
     evaluate_bundle, evaluate_json,
 )
 from skeleton.jeeves.native_fabric.laptop_ops.contracts import LaptopGateHold
-from skeleton.jeeves.native_fabric.laptop_ops.runner import list_domains, registry
+from skeleton.jeeves.native_fabric.laptop_ops.runner import list_domains
+
+import importlib
 
 class TestAll160NegativeMutations(unittest.TestCase):
     def test_160_single_stage_failures_never_count_as_source_acceptance(self):
         total = 0
         for domain in list_domains():
-            module = registry(domain)
+            module = importlib.import_module(
+                "skeleton.jeeves.native_fabric.laptop_ops.domains."
+                + domain + ".registry"
+            )
             for stage in module.STAGES:
                 with self.subTest(domain=domain, stage=stage):
                     modified = negative_bundle(domain, stage)

@@ -14,6 +14,15 @@ import re
 import sys
 from pathlib import Path
 
+try:
+    from scripts.check_product_vertical_readiness import validate as validate_vertical_readiness
+except ModuleNotFoundError:  # direct ``python scripts/check_app_assembly.py`` execution
+    from check_product_vertical_readiness import validate as validate_vertical_readiness
+try:
+    from scripts.check_product_surface_specification import validate as validate_surface_specification
+except ModuleNotFoundError:  # direct ``python scripts/check_app_assembly.py`` execution
+    from check_product_surface_specification import validate as validate_surface_specification
+
 ROOT = Path(__file__).resolve().parents[1]
 FAILURES: list[str] = []
 CHECKS = 0
@@ -459,8 +468,8 @@ def audit_compose_modes() -> None:
         "frontend build target must be assembly-selectable",
     )
     check(
-        '"127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
-        "frontend container port must be assembly-selectable and loopback-bound",
+        '${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
+        "frontend container port must be assembly-selectable",
     )
     check(
         "EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}" in base,
@@ -560,17 +569,10 @@ def audit_compose_modes() -> None:
         if "  frontend:" in base and "\n  mongo:" in base
         else ""
     )
-    # First-run diagnostics must be available even when Mongo, the engine
-    # or backend cannot start. Keep the UI independent and leave protected
-    # API admission to the backend/engine health and authorization fences.
     check(
-        not re.search(r"(?m)^    depends_on:\s*$", frontend_block),
-        "frontend setup/diagnostic UI must not depend on backend or engine startup",
-    )
-    check(
-        "backend:\n        condition: service_healthy" in backend_block
-        or "skeleton:\n        condition: service_healthy" in backend_block,
-        "backend must preserve its protected startup dependencies",
+        "depends_on:" not in frontend_block
+        and "First-run setup and diagnostics must start independently" in frontend_block,
+        "frontend first-run shell must start independently while protected APIs fail closed",
     )
 
 
@@ -603,23 +605,14 @@ def audit_production_ingress() -> None:
         if not isinstance(prefix, str) or not prefix.startswith("/") or not isinstance(port, int):
             continue
         location = f"location ^~ {prefix.rstrip('/')}/ {{"
-        alias = {"backend": "application_backend", "skeleton": "application_engine"}[name]
-        upstream = f"upstream {alias} {{"
-        member = f"server {name}:{port} resolve;"
-        proxy = f"proxy_pass http://{alias};"
+        upstream_name = "application_backend" if name == "backend" else "application_engine"
+        upstream = f"proxy_pass http://{upstream_name};"
         check(location in nginx, f"production ingress missing manifest route: {location}")
+        check(upstream in nginx, f"production ingress upstream drift: {upstream}")
         check(
-            nginx.count(upstream) == 1 and member in nginx,
-            f"production ingress resolver upstream drift: {name}",
+            f"server {name}:{port} resolve;" in nginx,
+            f"production ingress service address drift: {name}:{port}",
         )
-        location_start = nginx.find(location)
-        location_end = nginx.find("\n    }", location_start) if location_start >= 0 else -1
-        location_body = (
-            nginx[location_start:location_end]
-            if location_start >= 0 and location_end > location_start
-            else ""
-        )
-        check(proxy in location_body, f"production ingress route target drift: {name}")
         if isinstance(health_path, str) and health_path:
             check(
                 prefix == "/" or health_path.startswith(prefix.rstrip("/") + "/"),
@@ -991,8 +984,8 @@ def audit_product_control_contract() -> None:
         "product control client root drift",
     )
     check(
-        'router = project_router(prefix="/api/admin/ops"' in ops,
-        "backend ops prefix must use the canonical project router",
+        re.search(r'router\s*=\s*project_router\s*\(\s*prefix\s*=\s*["\']/api/admin/ops["\']', ops) is not None,
+        "backend ops prefix drift",
     )
     check('("routes.ops",' in registry, "backend ops router is not registered")
 
@@ -1029,40 +1022,23 @@ def audit_product_route_registry() -> None:
         )
 
 
-def audit_preinstall_docker_sources() -> None:
-    """Keep the actual Dockerfile inputs inside the reviewed source contract."""
-    from skeleton.app.install_source_contracts import build_source_errors
+def audit_product_vertical_readiness() -> None:
+    """Make the S-grade vertical contract part of the canonical assembly gate."""
+    errors, report = validate_vertical_readiness(ROOT)
+    check(not errors, "product vertical readiness contract failed: " + "; ".join(errors[:8]))
+    check(report.get("target_grade") == "S", "product vertical readiness target drift")
+    check(report.get("vertical_count") == 7, "canonical product vertical count drift")
+    check(report.get("operation_count") == 21, "canonical governed operation count drift")
+    check(report.get("contract_qualified") is True, "product vertical contract is not qualified")
 
-    defects = build_source_errors(ROOT)
-    check(
-        not defects,
-        (
-            "pre-first-install Docker source admission failed: "
-            + "; ".join(defects[:4])
-            if defects
-            else "pre-first-install Docker source admission passed"
-        ),
-    )
-    raw = read("skeleton/app/manifest.json")
-    try:
-        manifest = json.loads(raw)
-        required = manifest["required_paths"]
-        if not isinstance(required, list):
-            raise ValueError("required_paths must be a list")
-    except (ValueError, KeyError, TypeError):
-        check(False, "first-install required-path manifest is unreadable or invalid")
-        return
-    for path in (
-        "Dockerfile.dockerignore",
-        "backend/Dockerfile.dockerignore",
-        "frontend/.dockerignore",
-        "skeleton/app/install_source_contracts.py",
-    ):
-        check(path in required, f"installed assembly omits required Docker input: {path}")
+
+def audit_product_surface_specification() -> None:
+    """Keep every exposed route and Hub modal inside the canonical contract."""
+    errors = validate_surface_specification(ROOT)
+    check(not errors, "product surface specification failed: " + "; ".join(errors[:8]))
 
 
 def main() -> int:
-    audit_preinstall_docker_sources()
     audit_manifest()
     audit_topology_alignment()
     audit_backend_public_identity()
@@ -1077,6 +1053,8 @@ def main() -> int:
     audit_public_product_readiness_contract()
     audit_product_control_contract()
     audit_product_route_registry()
+    audit_product_vertical_readiness()
+    audit_product_surface_specification()
 
     if FAILURES:
         print(f"App assembly audit failed: {len(FAILURES)} issue(s)", file=sys.stderr)

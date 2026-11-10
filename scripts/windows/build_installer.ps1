@@ -83,7 +83,6 @@ if (-not $SourceManifest.required_paths) {
 }
 $RuntimePaths = @(
     ".dockerignore",
-    "Dockerfile.dockerignore",
     ".env.example",
     "Dockerfile",
     "README.md",
@@ -149,9 +148,22 @@ if ($LASTEXITCODE -ne 0) {
 # Inspect ZIP metadata before Expand-Archive touches NTFS. Linux-valid Git
 # paths can collide on Windows, use reserved names, or exceed the installer's
 # portable path budget; rejecting them after extraction is too late.
-$ArchivePreflight = Join-Path $RepoRoot "scripts\windows\check_payload_zip.py"
+# The ZIP admission policy is part of the archived source contract. Never
+# validate one revision's payload with a different working-tree script.
+# Materialize the exact committed checker outside the untrusted ZIP before
+# extracting any archive member.
+$ArchivePreflight = Join-Path $BuildRoot "check_payload_zip.py"
+$ArchivePreflightText = & git -C $RepoRoot show "$($SourceCommit):scripts/windows/check_payload_zip.py"
+if ($LASTEXITCODE -ne 0 -or -not $ArchivePreflightText) {
+    throw "Archived SourceRef has no Windows payload ZIP preflight checker"
+}
+[IO.File]::WriteAllText(
+    $ArchivePreflight,
+    (($ArchivePreflightText -join "`n") + "`n"),
+    [Text.UTF8Encoding]::new($false)
+)
 if (-not (Test-Path -LiteralPath $ArchivePreflight -PathType Leaf)) {
-    throw "Windows payload ZIP preflight tool is missing"
+    throw "Unable to stage SourceRef ZIP preflight checker"
 }
 $DefaultInstallRoot = "C:\Users\" + ("x" * 32) + "\AppData\Local\Programs\Skeleton"
 & python $ArchivePreflight --archive $ArchivePath --install-root $DefaultInstallRoot

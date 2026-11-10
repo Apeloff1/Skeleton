@@ -122,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
                       input_stream=sys.stdin, output_stream=sys.stdout,
                       require_complete=args.require_complete)
             return 0
-        elif command == "verify":
+        if command == "verify":
             result = verify_patrol(_read(args.report, MAX_REPORT_BYTES),
                                    require_complete=args.require_complete)
         elif command == "resume":

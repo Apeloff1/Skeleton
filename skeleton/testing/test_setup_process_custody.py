@@ -469,28 +469,16 @@ def test_existing_env_path_swap_during_read_is_rejected(tmp_path, monkeypatch):
     if os.name != "nt":
         replacement.chmod(0o600)
     original_lstat = os.lstat
-    original_open = os.open
-    opened_env_descriptor = False
-    admitted_lstats = 0
-
-    def track_env_open(path, *args, **kwargs):
-        nonlocal opened_env_descriptor
-        descriptor = original_open(path, *args, **kwargs)
-        if Path(path) == env:
-            opened_env_descriptor = True
-        return descriptor
+    visits = 0
 
     def swap_after_admission(path, *args, **kwargs):
-        nonlocal admitted_lstats
-        # Count only after the actual .env descriptor was opened. Additional
-        # setup preflight identity probes must not move the injection point.
-        if Path(path) == env and opened_env_descriptor:
-            admitted_lstats += 1
-            if admitted_lstats == 2:
+        nonlocal visits
+        if Path(path) == env:
+            visits += 1
+            if visits == 4:
                 os.replace(replacement, env)
         return original_lstat(path, *args, **kwargs)
 
-    monkeypatch.setattr(os, "open", track_env_open)
     monkeypatch.setattr(os, "lstat", swap_after_admission)
     with pytest.raises(ValueError, match="identity changed during read"):
         ensure_runtime_environment(root)

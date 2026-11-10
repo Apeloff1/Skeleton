@@ -12,7 +12,6 @@ from io import BytesIO, TextIOWrapper
 import json
 import os
 from pathlib import Path
-import sys
 from types import SimpleNamespace
 import tempfile
 import unittest
@@ -275,9 +274,7 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                       for t in tasks(2)],
         }).encode())
         stdin = TextIOWrapper(BytesIO(raw), encoding="utf-8")
-        # Real terminal text streams expose a binary buffer; StringIO does
-        # not, and can trigger a fixture-only AttributeError on CLI paths.
-        # Preserve an in-memory sink without changing production publication.
+        # Real CLI text streams expose .buffer; StringIO is fixture-only and breaks native reads.
         stdout = TextIOWrapper(BytesIO(), encoding="utf-8", write_through=True)
         stderr = TextIOWrapper(BytesIO(), encoding="utf-8", write_through=True)
         with (
@@ -288,8 +285,7 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                        return_value=(nullcontext(), self.worker, object())) as active,
             mock.patch("skeleton.jeeves.agent.native_batch_cli.inspect_native_jeeves",
                        return_value=SimpleNamespace(source_bridge_ready=True)),
-            # Only the synthetic fixture overrides native source custody;
-            # production NativeSourceFence and publication stay fail closed.
+            # Only the synthetic test fixture bypasses native-source certification.
             mock.patch("skeleton.jeeves.agent.native_batch_cli.NativeSourceFence"),
         ):
             arguments = [
@@ -300,58 +296,16 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
             ]
             if approve:
                 arguments.append("--approve-native")
-            # Test-only tracing records *source locations*, never exception
-            # messages, private prompts, model bytes or arbitrary locals.
-            # Production intentionally redacts native failure details.
-            source_exceptions = []
-            root = Path(__file__).resolve().parents[2]
-            def trace_source_exception(frame, event, value):
-                if event == "exception" and isinstance(value[1], AttributeError):
-                    location = Path(frame.f_code.co_filename)
-                    try:
-                        relative = location.relative_to(root)
-                    except ValueError:
-                        return trace_source_exception
-                    innermost = value[2]
-                    while innermost is not None and innermost.tb_next is not None:
-                        innermost = innermost.tb_next
-                    if innermost is not None:
-                        origin = innermost.tb_frame
-                        origin_label = (
-                            f"{Path(origin.f_code.co_filename).name}:"
-                            f"{innermost.tb_lineno}:{origin.f_code.co_name}"
-                        )
-                    else:
-                        origin_label = "unavailable"
-                    source_exceptions.append(
-                        f"{relative}:{frame.f_lineno}:{frame.f_code.co_name}"
-                        f" [origin={origin_label}]"
-                    )
-                return trace_source_exception
-            previous_trace = sys.gettrace()
-            sys.settrace(trace_source_exception)
-            try:
-                status = batch_cli(arguments)
-            finally:
-                sys.settrace(previous_trace)
+            status = batch_cli(arguments)
         stdout.flush()
         stderr.flush()
-        return (
-            status,
-            stdout.buffer.getvalue().decode("utf-8", "strict"),
-            stderr.buffer.getvalue().decode("utf-8", "strict")
-            + ((" [test-only AttributeError source locations: "
-                + ", ".join(source_exceptions[-5:]) + "]")
-               if status != 0 and approve and source_exceptions else ""),
-            active.call_count,
-        )
+        return (status, stdout.buffer.getvalue().decode("utf-8", "strict"),
+                stderr.buffer.getvalue().decode("utf-8", "strict"), active.call_count)
 
-    def test_synthetic_worker_cannot_forge_installed_native_source(self):
+    def test_unqualified_synthetic_worker_cannot_claim_native_source(self):
         with self.assertRaises(ContractViolation):
-            NativeSourceFence(
-                self.worker, object(),
-                expected_tenant="local", expected_subject="operator",
-            )
+            NativeSourceFence(self.worker, object(), expected_tenant="local",
+                              expected_subject="operator")
 
     def test_cli_real_path_commits_synthetic_source_only_batch(self):
         status, stdout, stderr, calls = self._cli()

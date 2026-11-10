@@ -77,9 +77,7 @@ def test_acceptance_rejects_unreviewed_source_and_missing_slot(tmp_path):
     flow.worlds.publish(altered, expected_digest=digest(source))
     with pytest.raises(CanonError) as stale:
         flow.acceptance("lighthouse")
-    # The reviewed artifact's approval is revoked after a source edit.
-    # A missing/currently invalid approval must not be treated as evidence.
-    assert stale.value.code == "review_required"
+    assert stale.value.code == "review_stale_source"
 
 def test_acceptance_holds_world_lease_through_all_ending_replays(tmp_path, monkeypatch):
     flow = ready(tmp_path)

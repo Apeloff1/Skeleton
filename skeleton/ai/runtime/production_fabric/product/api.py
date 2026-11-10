@@ -1,14 +1,11 @@
-"""Compatibility API facade for the canonical offline production dispatcher.
+"""Compatibility exports for the single, pure offline production dispatcher.
 
-Do not define a second LocalAPI class here. CLI and imported product callers
-must observe the *same* bounded request-validation, identity, and journal
-contract as product.dispatcher; no provider or network endpoint is owned here.
+The authoritative LocalAPI class lives in dispatcher.py. Re-export that exact
+class rather than defining a second implementation with divergent identity.
+Keep legacy module attributes available for existing integrations.
 """
-
-# Retain the historical helper names for callers that imported this module,
-# but keep the dispatcher as the sole class/logic owner.
-from ..contracts.canonical import loads, dumps
-from ..contracts.errors import ContractError, FabricError
-from ..contracts.identity import identifier
-from ..planning.engine import ProductionEngine
-from .dispatcher import LocalAPI
+from ..contracts.canonical import dumps as dumps, loads as loads
+from ..contracts.errors import ContractError as ContractError, FabricError as FabricError
+from ..contracts.identity import identifier as identifier
+from ..planning.engine import ProductionEngine as ProductionEngine
+from .dispatcher import LocalAPI as LocalAPI

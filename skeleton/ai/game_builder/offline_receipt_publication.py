@@ -166,11 +166,8 @@ def publish_verified_receipt(
         # Never unlink the published name: another process may already have
         # observed it. Preserve it for owner-controlled quarantine/recovery;
         # a retry must fail the existing-name no-clobber check.
-        if isinstance(exc, ReceiptPublicationError):
+        if isinstance(exc, (ReceiptPublicationError, PermissionError)):
             raise
-        # OSError subclasses such as PermissionError must be normalized to
-        # the published contract while preserving the original exception as
-        # a cause; never retry, unlink, or mask an uncertain hardlink commit.
         if isinstance(exc, DualRuntimeVerificationError):
             raise ReceiptPublicationError("receipt destination changed during publication") from exc
         if isinstance(exc, OSError):

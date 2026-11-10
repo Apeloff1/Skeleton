@@ -144,18 +144,14 @@ def test_tamper_stale_revision_and_lock_fail_closed(tmp_path):
     source = world()
     WorldStore(tmp_path).publish(source, create=True)
     store = AtlasStore(tmp_path)
-    # Save never accepts an already-approved payload: persist the unapproved
-    # draft, then approve through the operator-only CAS review transition.
-    draft = crossing(source)
-    first = store.save("voyage", draft, expected_world_digest=digest(source), create=True)
-    approved = store.approve("voyage", expected_atlas_digest=first,
-                             review_note="Reviewed source.")
-    store.compile("voyage", expected_atlas_digest=approved)
+    spec = review_atlas(crossing(source), source, "Reviewed source.")
+    store.save("voyage", spec, expected_world_digest=digest(source), create=True)
+    store.compile("voyage", expected_atlas_digest=digest(spec))
     html = tmp_path / "voyage.atlas.playable.html"
     html.write_text("tampered")
     with pytest.raises(CanonError, match="atlas_playable_mismatch"):
         store.verify("voyage")
-    store.compile("voyage", expected_atlas_digest=approved)
+    store.compile("voyage", expected_atlas_digest=digest(spec))
     (tmp_path / "voyage.lock").write_text("busy")
     with pytest.raises(CanonError, match="lease_busy"):
         store.verify("voyage")
@@ -171,13 +167,9 @@ def test_symlink_artifact_never_verified(tmp_path):
     source = world()
     WorldStore(tmp_path).publish(source, create=True)
     store = AtlasStore(tmp_path)
-    # Save never accepts an already-approved payload: persist the unapproved
-    # draft, then approve through the operator-only CAS review transition.
-    draft = crossing(source)
-    first = store.save("voyage", draft, expected_world_digest=digest(source), create=True)
-    approved = store.approve("voyage", expected_atlas_digest=first,
-                             review_note="Reviewed source.")
-    store.compile("voyage", expected_atlas_digest=approved)
+    spec = review_atlas(crossing(source), source, "Reviewed source.")
+    store.save("voyage", spec, expected_world_digest=digest(source), create=True)
+    store.compile("voyage", expected_atlas_digest=digest(spec))
     artifact = tmp_path / "voyage.atlas.playable.html"
     artifact.unlink()
     artifact.symlink_to(tmp_path / "voyage.json")

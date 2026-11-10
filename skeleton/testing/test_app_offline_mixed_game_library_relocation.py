@@ -19,11 +19,10 @@ from skeleton.testing.test_app_offline_signed_game_library_relocation import (
     _pair as _signed_pair,
 )
 from skeleton.testing.test_app_offline_policy_chain_delivery import chain_delivery
-# Isolated pytest shards require the entire transitive signed-game fixture chain.
-from skeleton.testing.test_app_offline_archive_signature import signed
-from skeleton.testing.test_app_offline_signed_progress_migration import migration
-from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
-from skeleton.testing.test_app_offline_policy_signed_delivery import delivered
+from skeleton.testing.test_app_offline_policy_chain_delivery import delivered  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_policy_signed_delivery import policy_migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
 
@@ -110,7 +109,7 @@ def test_same_installed_root_cannot_count_as_relocation(relocated):
 
 def test_cross_mode_old_new_root_alias_rejected(relocated):
     old_unsigned, new_unsigned, old_signed, _ = relocated
-    with pytest.raises(OfflineMixedGameLibraryRelocationError, match="distinct|signed/unsigned custody path alias"):
+    with pytest.raises(OfflineMixedGameLibraryRelocationError, match="distinct"):
         _call((old_unsigned, new_unsigned, old_signed,
                replace(old_signed, installed_source=new_unsigned.installed_source)))
 

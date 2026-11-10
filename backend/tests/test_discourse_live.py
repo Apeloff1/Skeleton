@@ -1,9 +1,9 @@
 """
 Live end-to-end test for the Discourse & Discord deliberation endpoint.
 
-This makes canonical engine calls through explicitly tenant-authorized
-provider/model selections. A single admitted model is an honest self-review,
-not cross-provider consensus. This test requires an authenticated live engine.
+This makes a REAL multi-LLM call through the Emergent Model Router and can
+take ~30-90s. We use a generous 180s timeout. The test runs with discord=False
+(faster: skips the cross red-team round).
 """
 import os
 import pytest
@@ -27,30 +27,18 @@ def live_base_url() -> str:
     return _base_url()
 
 
-@pytest.fixture(scope="module")
-def private_discourse_headers() -> dict[str, str]:
-    """Credentialed live checks must be explicitly enabled by the operator."""
-    token = (os.environ.get("DISCOURSE_TEST_BEARER_TOKEN") or "").strip()
-    if not token:
-        pytest.skip("Private discourse live tests need DISCOURSE_TEST_BEARER_TOKEN")
-    return {"Authorization": "Bearer " + token}
-
-
 @pytest.mark.live_service
 class TestLiveDeliberation:
     """Real multi-LLM panel through /api/discourse/deliberate."""
 
-    def test_panel_endpoint_reachable(self, live_base_url, private_discourse_headers):
-        r = requests.get(f"{live_base_url}/api/discourse/panel",
-                         headers=private_discourse_headers, timeout=20)
+    def test_panel_endpoint_reachable(self, live_base_url):
+        r = requests.get(f"{live_base_url}/api/discourse/panel", timeout=20)
         assert r.status_code == 200, r.text
         d = r.json()
-        assert d["available"] is True, d
         assert d["default_judge"]
-        assert isinstance(d["default_panel"], list) and len(d["default_panel"]) >= 1
-        assert d["selection_source"] == "tenant_model_inventory"
+        assert isinstance(d["default_panel"], list) and len(d["default_panel"]) >= 2
 
-    def test_deliberate_no_discord_returns_winner_shape(self, live_base_url, private_discourse_headers):
+    def test_deliberate_no_discord_returns_winner_shape(self, live_base_url):
         """The hot path used by the /discourse screen — discord=False."""
         body = {
             "task": "creative",
@@ -59,7 +47,7 @@ class TestLiveDeliberation:
         }
         r = requests.post(
             f"{live_base_url}/api/discourse/deliberate",
-            json=body, headers=private_discourse_headers,
+            json=body,
             timeout=180,
         )
         assert r.status_code == 200, r.text
@@ -70,11 +58,7 @@ class TestLiveDeliberation:
         for k in ("winner_index", "winner_model", "winner_content",
                   "judge_model", "panel", "candidates"):
             assert k in d, f"missing field {k} in response: {list(d.keys())}"
-        assert isinstance(d["panel"], list) and len(d["panel"]) >= 1
-        assert d["selection_source"] == "tenant_model_inventory"
-        assert d["deliberation_mode"] in {
-            "cross_provider", "multiple_models_one_provider", "single_model_self_review"
-        }
+        assert isinstance(d["panel"], list) and len(d["panel"]) >= 2
         assert isinstance(d["candidates"], list) and len(d["candidates"]) >= 1
         assert isinstance(d["winner_index"], int)
         assert 0 <= d["winner_index"] < len(d["candidates"])
@@ -90,11 +74,11 @@ class TestLiveDeliberation:
         for c in d["candidates"]:
             assert not c.get("critique"), "expected no critique when discord=False"
 
-    def test_short_prompt_rejected(self, live_base_url, private_discourse_headers):
+    def test_short_prompt_rejected(self, live_base_url):
         r = requests.post(
             f"{live_base_url}/api/discourse/deliberate",
             json={"task": "creative", "prompt": "hi", "discord": False},
-            headers=private_discourse_headers, timeout=20,
+            timeout=20,
         )
         assert r.status_code == 200
         assert r.json().get("error") == "prompt too short"

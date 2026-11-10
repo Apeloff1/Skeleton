@@ -6,7 +6,6 @@ exhaustion preserve the last verified save without granting resources.
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import re
 import sys
@@ -162,7 +161,6 @@ def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton scene-survival-play")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo")
-    sub.add_parser("demo-script", help="replay the original authored route without reading stdin")
     play = sub.add_parser("play")
     play.add_argument("--source-json", required=True)
     resume = sub.add_parser("resume")
@@ -176,15 +174,6 @@ def cli(argv: Sequence[str]) -> int:
         if args.command == "demo":
             source, _ = original_survival()
             result = play_survival(source=source)
-        elif args.command == "demo-script":
-            source, actions = original_survival()
-            # The fixture actions still pass through real legal-action checks,
-            # replay verification and terminal export, never a fabricated win.
-            scripted = io.StringIO("".join(
-                json.dumps(action, sort_keys=True, separators=(",", ":")) + "\n"
-                for action in actions
-            ))
-            result = play_survival(source=source, input_stream=scripted)
         else:
             options = {
                 "expected_source_digest": args.expected_source_digest,

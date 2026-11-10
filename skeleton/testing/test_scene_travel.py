@@ -101,11 +101,11 @@ def test_invalid_actions_never_mutate_existing_session(action) -> None:
 
 
 @pytest.mark.parametrize("tamper", [
-    lambda s: s["state"].update(scene_id="not-an-authored-scene"),
+    lambda s: s["state"].update(scene_id="sanctuary"),
     lambda s: s["state"]["inventory"].append("master_key"),
     lambda s: s["journal"][0].update(receipt="0" * 64),
     lambda s: s["journal"].reverse(),
-    lambda s: s["save"].update(parent_save_digest="0" * 64),
+    lambda s: s["save"].update(parent_save_digest=None),
     lambda s: s.update(source_digest="0" * 64),
     lambda s: s.update(event_bus_digest="0" * 64),
 ])

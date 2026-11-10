@@ -1,25 +1,8 @@
 name: Windows Installer
 
-# Automatically qualify source-changing installer PRs on hosted Windows.
-# Real laptop/WSL2/Docker device acceptance and release signing remain separate.
+# Restored as an explicit release check; automatic Windows builds remain disabled.
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/windows-installer.yml'
-      - 'scripts/windows/**'
-      - 'packaging/**'
-      - 'skeleton/app/installer.py'
-      - 'skeleton/app/assembly.py'
-      - 'skeleton/app/first_install.py'
-      - 'skeleton/app/install_source_contracts.py'
-      - 'skeleton/testing/test_windows_installer.py'
-      - 'skeleton/__main__.py'
-      - 'backend/Dockerfile'
-      - 'Dockerfile.dockerignore'
-      - '.env.example'
 
 permissions:
   contents: read
@@ -50,7 +33,6 @@ jobs:
           sparse-checkout: |
             /.github/workflows/windows-installer.yml
             /.dockerignore
-            /Dockerfile.dockerignore
             /.env.example
             /Dockerfile
             /README.md
@@ -232,7 +214,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Skeleton-Windows-Installer-${{ github.event.pull_request.head.sha || github.sha }}
+          name: Skeleton-Windows-Installer-${{ github.sha }}
           path: |
             dist/windows/Skeleton-Setup-*-windows-x64.exe
             dist/windows/Skeleton-Setup-*-windows-x64.exe.sha256

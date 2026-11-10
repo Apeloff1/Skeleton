@@ -57,12 +57,8 @@ def test_foreign_progress_rejected_before_install_reservation(tmp_path, capsys):
     foreign_source, foreign_manifest = _journey(
         tmp_path, capsys, "foreign-world", 987,
     )
-    # Never overwrite the already-published primary save: the fixture must
-    # create an independent second private destination for the foreign game.
-    foreign_root = tmp_path / "foreign-private"
-    foreign_root.mkdir(mode=0o700)
     foreign_save, foreign_pin, _ = _save(
-        foreign_root, capsys, foreign_source, foreign_manifest,
+        tmp_path, capsys, foreign_source, foreign_manifest,
     )
     destination = tmp_path / "never-reserved"
     migrated = tmp_path / "never-published.json"

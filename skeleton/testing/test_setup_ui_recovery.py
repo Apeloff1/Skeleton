@@ -7,7 +7,6 @@ qualification and never count setup liveness as authenticated game readiness.
 from __future__ import annotations
 
 from dataclasses import replace
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -53,16 +52,6 @@ def _run_install(tmp_path: Path, monkeypatch, *, independent: bool, recovery_ok:
         )
         monkeypatch.setenv("SKELETON_LOCAL_MODEL_DIR", str(tmp_path / "local-models"))
     else:
-        # A mocked setup receipt must still be backed by an actual stable
-        # private source. The installer deliberately rejects missing .env
-        # before Compose, even when its bootstrap function is test-doubled.
-        env = tmp_path / ".env"
-        env.write_text(
-            "JWT_SECRET=" + "a" * 64 + "\nAI_PROVIDER=local\n",
-            encoding="utf-8",
-        )
-        if os.name != "nt":
-            env.chmod(0o600)
         monkeypatch.setattr(
             installer, "ensure_runtime_environment",
             lambda *args, **kwargs: SetupResult(

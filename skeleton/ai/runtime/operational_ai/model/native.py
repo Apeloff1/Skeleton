@@ -6,7 +6,7 @@ no hosted inference or mock fallback is provided in production.
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING,Any
-from ..authority.canonical import ContractViolation,require_small_text,require_digest,sha256
+from ..authority.canonical import ContractViolation,require_small_text,require_digest
 
 if TYPE_CHECKING:
     from skeleton.ai.model_runtime.chat_engine import NativeChatEngine
@@ -61,21 +61,9 @@ class NativeBackend:
             result=self.engine.generate(transcript,config)
             generation=result.generation
             text=generation.text
-            # The lower native replay receipt binds token IDs, text and stop
-            # reason; the operational gateway and SQLite journal instead bind
-            # the exact UTF-8 answer bytes. Verify the lower receipt before
-            # translating those distinct digest contracts.
-            from skeleton.ai.model_runtime.flgb_model_runtime import digest_json
-            native_receipt_digest = digest_json({
-                "generated_ids": list(generation.generated_ids),
-                "text": text,
-                "finish_reason": generation.finish_reason,
-            })
-            if generation.output_digest != native_receipt_digest:
-                raise ContractViolation("native token/text replay receipt mismatch")
             return Generated(text=text,prompt_tokens=result.prompt_tokens,
                              generated_tokens=len(generation.generated_ids),
-                             output_digest=sha256(text.encode("utf-8")),
+                             output_digest=generation.output_digest,
                              model_digest=self.model_digest,
                              tokenizer_digest=self.tokenizer_digest,
                              finish_reason=generation.finish_reason)

@@ -115,9 +115,7 @@ def test_exact_source_compile_and_replay(tmp_path):
 def test_unapproved_or_stale_source_fails_closed(tmp_path):
     store = fixture(tmp_path, leave_unapproved=True)
     reject("studio_assembly_review_required", lambda: store.inspect("harbor"))
-    # An incomplete lease is rejected at the schema boundary before the
-    # missing operator review is even consulted.
-    reject("studio_assembly_invalid_lease", lambda: store.compile(
+    reject("studio_assembly_review_required", lambda: store.compile(
         "harbor", {"world": "0" * 64}))
     first = store.testimony.inspect("harbor")["testimony"]
     store.testimony.approve("harbor", expected_digest=digest(first), review_note="Reviewed")

@@ -81,8 +81,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="return after Compose starts without probing public application surfaces",
     )
-    up.add_argument("--verify-attempts", type=int, default=12)
-    up.add_argument("--verify-delay", type=float, default=1.0)
+    up.add_argument(
+        "--verify-attempts", type=int, default=60,
+        help="whole-application readiness attempts (default: 60 for cold dependency-ordered startup)",
+    )
+    up.add_argument("--verify-delay", type=float, default=2.0)
 
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
@@ -284,6 +287,10 @@ def _parser() -> argparse.ArgumentParser:
                    help="read-only pinned 2-8 game consumer first-run replay; release blocked")
     sub.add_parser("studio-journey", add_help=False,
                    help="build and replay-verify a real original browser/Godot game (studio-journey --help)")
+    sub.add_parser("play-dialogue", add_help=False,
+                   help="play and save a source-bound offline dialogue (play-dialogue --help)")
+    sub.add_parser("play-combat", add_help=False,
+                   help="play and replay-verify a deterministic offline encounter (play-combat --help)")
     sub.add_parser("chat", add_help=False, help="open durable native/GGUF terminal chat (chat --help)")
     sub.add_parser("serve-local-ai", add_help=False, help="open the authenticated offline AI workspace (serve-local-ai --help)")
     sub.add_parser("down", help="stop the assembled application")
@@ -315,20 +322,7 @@ def _print_status(
     full: bool = False,
     timeout: float = 3.0,
 ) -> int:
-    try:
-        manifest = runtime_manifest()
-    except (OSError, ValueError, UnicodeError):
-        # Diagnostic output must not leak operator secrets or throw a traceback
-        # when the .env source is oversized, linked, malformed or replaced.
-        if as_json:
-            print(json.dumps({
-                "ok": False,
-                "code": "runtime_configuration_unavailable",
-                "message": "Cannot safely read runtime configuration or host port settings",
-            }, sort_keys=True))
-        else:
-            print("Runtime configuration unavailable; inspect app check --runtime")
-        return 2
+    manifest = runtime_manifest()
     payload = manifest_payload(manifest)
     live_results = ()
     live_ok: bool | None = None
@@ -417,12 +411,6 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     """Run the application assembly CLI and return a process-style exit code."""
 
     arguments = list(argv or ())
-    # The canonical game-project CLI owns its specialized, source-bound
-    # parser, exclusive save publication, replay and terminal controls.
-    # Do not parse arbitrary game-project options as app assembly commands.
-    if arguments and arguments[0] == "game-project":
-        from skeleton.ai.runtime.game_project_cli import main as game_project_main
-        return game_project_main(arguments[1:])
     # The same pinned Jeeves candidate optimizer owns multidomain specialization.
     if arguments and arguments[0] == "training-modules":
         from skeleton.ai.training.jeeves_parallel_mirrors import main as training_main
@@ -569,6 +557,12 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "studio-journey":
         from skeleton.app.studio_journey import main as journey_main
         return journey_main(arguments[1:])
+    if arguments and arguments[0] == "play-dialogue":
+        from skeleton.app.dialogue_cli import main as dialogue_main
+        return dialogue_main(arguments[1:])
+    if arguments and arguments[0] == "play-combat":
+        from skeleton.app.combat_cli import main as combat_main
+        return combat_main(arguments[1:])
     if arguments and arguments[0] == "chat":
         from skeleton.app.offline_chat_cli import main as chat_main
         return chat_main(arguments[1:])
@@ -1129,11 +1123,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 if check.required and not check.ok:
                     print(f"[FAIL] {check.detail}; {check.remediation}")
             return 1
-        try:
-            manifest = runtime_manifest(manifest, root=root)
-        except (OSError, ValueError, UnicodeError):
-            print("application start aborted: runtime configuration changed or is unsafe")
-            return 2
+        manifest = runtime_manifest(manifest, root=root)
         mode = "production" if bool(args.production) else "development"
         try:
             startup_command = compose_command(
@@ -1182,20 +1172,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if command == "smoke":
         from skeleton.app.health import probes_ok, wait_for_application
 
-        try:
-            manifest = runtime_manifest(manifest, root=root)
-        except (OSError, ValueError, UnicodeError):
-            message = "runtime configuration unsafe or unreadable; health probes were not sent"
-            if bool(args.as_json):
-                print(json.dumps({
-                    "ok": False,
-                    "code": "runtime_configuration_unavailable",
-                    "message": message,
-                    "results": [],
-                }, sort_keys=True))
-            else:
-                print("application smoke blocked: " + message)
-            return 2
+        manifest = runtime_manifest(manifest, root=root)
         timeout = float(args.timeout)
         attempts = int(args.attempts)
         delay = float(args.delay)

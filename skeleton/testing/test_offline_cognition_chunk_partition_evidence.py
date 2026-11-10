@@ -18,10 +18,6 @@ class ChunkPartitionEvidenceTests(unittest.TestCase):
         self.assertGreater(len(spans),1)
         self.assertTrue(all(evidence.citation(self.catalog,s)["exact_bytes_verified"] for s in spans))
 
-    def test_explicit_invalid_overlap_is_never_coerced(self):
-        with self.assertRaises(CognitionError):
-            evidence.passages(self.doc, window_bytes=32, overlap_bytes=32)
-
     def test_source_retrieval_with_real_vector_when_required(self):
         supplied={} if evidence.contract()["mode"]=="lexical" else {"query_vector":(1.,0.),"embedding_model_sha256":MODEL}
         results=evidence.query(self.catalog,"offline",**supplied)

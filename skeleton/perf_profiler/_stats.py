@@ -37,7 +37,7 @@ def _load() -> ModuleType:
             sys.modules.pop(spec.name, None)
             raise
         return module
-    return importlib.import_module("skeleton.ai.runtime.observability.profiler")
+    return importlib.import_module(_MODULE_NAME)
 
 
 _upstream = _load()

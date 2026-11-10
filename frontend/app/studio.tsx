@@ -13,10 +13,11 @@ import {
   ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import api from '../src/utils/apiClient';
 import BuildJourney from '../src/components/BuildJourney';
 import { watchBuildJob } from '../src/product/buildJobLifecycle';
+import { validProjectId } from '../src/product/worldWorkspace';
 
 
 type Step = {
@@ -25,20 +26,63 @@ type Step = {
   quality?: { score?: number } | null;
 };
 
+const JOB_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+const STAGE_KEY = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+function validSteps(value: unknown): Step[] | null {
+  if (!Array.isArray(value) || value.length > 100) return null;
+  const seen = new Set<string>();
+  const result: Step[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') return null;
+    const item = raw as Record<string, unknown>;
+    if (typeof item.key !== 'string' || !STAGE_KEY.test(item.key) || seen.has(item.key)
+      || typeof item.label !== 'string' || !item.label.trim() || item.label.length > 160
+      || typeof item.icon !== 'string' || item.icon.length > 32) return null;
+    for (const flag of ['done', 'locked', 'is_next', 'skipped', 'skippable']) {
+      if (item[flag] !== undefined && typeof item[flag] !== 'boolean') return null;
+    }
+    seen.add(item.key);
+    result.push(item as unknown as Step);
+  }
+  return result;
+}
+
+function validOptions(value: unknown): any[] | null {
+  if (!Array.isArray(value) || value.length > 50) return null;
+  for (const group of value) {
+    if (!group || typeof group !== 'object' || typeof group.area !== 'string' || group.area.length > 160
+      || !Array.isArray(group.choices) || group.choices.length > 50) return null;
+    for (const choice of group.choices) {
+      if (!choice || typeof choice !== 'object' || typeof choice.option !== 'string'
+        || !choice.option.trim() || choice.option.length > 2_000) return null;
+    }
+  }
+  return value;
+}
+
 export default function UnifiedStudio() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ game?: string }>();
-  const [game, setGame] = React.useState(typeof params.game === 'string' ? params.game : '');
+  const params = useLocalSearchParams<{ game?: string|string[] }>();
+  const requestedGame = Array.isArray(params.game) ? params.game[0] : params.game;
+  const [game, setGame] = React.useState(validProjectId(requestedGame));
 
   // Seamless handoff: if no build was passed, auto-pick the most recent one.
   React.useEffect(() => {
     if (game) return;
     (async () => {
       const r = await api.get<any>(`/api/playable/list?limit=1`, { timeoutMs: 12000 });
+      if (!r.ok || !r.data) {
+        setLoadError('Recent builds could not be loaded. Choose a build or retry.');
+        return;
+      }
       const items = r.data?.items || r.data?.playables || r.data?.games || [];
-      if (items[0]?.playable_id) {
-        setGame(items[0].playable_id);
+      const recentId = validProjectId(items[0]?.playable_id);
+      if (recentId) {
+        setGame(recentId);
         if (items[0].title) setTitle(String(items[0].title));
+      } else if (items.length) {
+        setLoadError('The recent-build response was invalid. Choose a build explicitly.');
       }
     })();
   }, [game]);
@@ -85,9 +129,23 @@ export default function UnifiedStudio() {
         }
       }
       const d = result.data;
-      const stages: Step[] = Array.isArray(d.steps) ? d.steps.filter((s: Step) => s.key !== 'mode') : [];
+      const parsedStages = validSteps(d.steps);
+      if (!parsedStages) {
+        setLoadError('The build returned an invalid stage ledger. No actions were enabled.');
+        setSteps([]);
+        setNextKey(null);
+        return;
+      }
+      const stages = parsedStages.filter((s: Step) => s.key !== 'mode');
+      const proposedNext = d.next || stages.find((s: Step) => s.is_next)?.key || null;
+      if (proposedNext !== null && (typeof proposedNext !== 'string' || !stages.some(stage => stage.key === proposedNext))) {
+        setLoadError('The build returned a next-stage identity outside its stage ledger.');
+        setSteps(stages);
+        setNextKey(null);
+        return;
+      }
       setSteps(stages);
-      setNextKey(d.next || stages.find((s: Step) => s.is_next)?.key || null);
+      setNextKey(proposedNext);
       if (d.title) setTitle(String(d.title));
       const genre = String(d.genre || d.mode || 'rpg');
       const stageIdx = stages.filter((s) => s.done).length;
@@ -146,7 +204,7 @@ export default function UnifiedStudio() {
       const r = await api.post<any>(`/api/pipeline/${encodeURIComponent(game)}/forge/${encodeURIComponent(key)}/async`, {},
         { timeoutMs: 15000, signal: controller.signal });
       const jobId = r.data?.job_id;
-      if (!r.ok || typeof jobId !== 'string' || !jobId) {
+      if (!r.ok || typeof jobId !== 'string' || !JOB_ID.test(jobId)) {
         setJobMessage('The build stage could not start. Check the service and retry.');
         return;
       }
@@ -178,13 +236,24 @@ export default function UnifiedStudio() {
     if (openStage === key) { setOpenStage(null); return; }
     setOpenStage(key);
     if (!opts[key] && game) {
-      const r = await api.get<any>(`/api/snowball/${game}/options/${key}`, { timeoutMs: 12000 });
-      setOpts((p) => ({ ...p, [key]: r.data?.options || [] }));
+      const r = await api.get<any>(`/api/snowball/${encodeURIComponent(game)}/options/${encodeURIComponent(key)}`, { timeoutMs: 12000 });
+      const options = r.ok ? validOptions(r.data?.options) : null;
+      if (!options) {
+        setJobMessage('Stage alternatives could not be verified. The current stage remains unchanged.');
+        setOpts((p) => ({ ...p, [key]: [] }));
+      } else {
+        setOpts((p) => ({ ...p, [key]: options }));
+      }
     }
   }, [openStage, opts, game]);
 
   const applyOption = React.useCallback(async (stage: string, area: string, choice: any) => {
     if (!game || running || applying || pollRef.current) return;
+    if (!STAGE_KEY.test(stage) || typeof area !== 'string' || area.length > 160
+      || !choice || typeof choice.option !== 'string' || !choice.option.trim() || choice.option.length > 2_000) {
+      setJobMessage('This refinement option is invalid and was not submitted.');
+      return;
+    }
     const controller = new AbortController();
     pollRef.current = controller;
     setApplying(stage);
@@ -195,7 +264,7 @@ export default function UnifiedStudio() {
       const r = await api.post<any>(`/api/pipeline/${encodeURIComponent(game)}/refine/${encodeURIComponent(stage)}/async`,
         { instruction }, { timeoutMs: 15000, signal: controller.signal });
       const jobId = r.data?.job_id;
-      if (!r.ok || typeof jobId !== 'string' || !jobId) {
+      if (!r.ok || typeof jobId !== 'string' || !JOB_ID.test(jobId)) {
         setJobMessage('Could not start refinement. The prior stage is unchanged.');
         return;
       }
@@ -226,11 +295,21 @@ export default function UnifiedStudio() {
   const buildApk = React.useCallback(async () => {
     if (!game) return;
     setApkBusy(true);
-    const r = await api.post<any>(`/api/galaxy-studio/vault/zip-to-apk/${game}`, {}, { timeoutMs: 20000 });
-    if (!r.ok) { setApkBusy(false); Alert.alert('APK build', r.data?.error || 'Could not start the APK build.'); return; }
-    Alert.alert('APK build started', 'Packaging your build into an installable APK. This continues in the background.');
-    setApkBusy(false);
-  }, [game]);
+    try {
+      const r = await api.post<any>(`/api/galaxy-studio/vault/zip-to-apk/${encodeURIComponent(game)}`, {}, { timeoutMs: 20000 });
+      const status = r.data?.status;
+      if (!r.ok || r.data?.disabled || !['running', 'already_running', 'apk_building'].includes(status)) {
+        Alert.alert('APK build', r.data?.error || r.data?.detail || 'The APK build was not accepted.');
+        return;
+      }
+      Alert.alert('APK packaging accepted', 'Packaging is queued or running. Open APK Build to observe the authoritative result.', [
+        { text: 'Later', style: 'cancel' },
+        { text: 'Open status', onPress: () => router.push(`/apk-build?game=${encodeURIComponent(game)}` as never) },
+      ]);
+    } finally {
+      setApkBusy(false);
+    }
+  }, [game, router]);
 
   const built = steps.filter((s) => s.done).length;
   const total = steps.length;
@@ -285,7 +364,7 @@ export default function UnifiedStudio() {
           onNavigate={(route) => {
             const sep = route.includes('?') ? '&' : '?';
             const needsGame = ['/stages', '/snowball', '/forge-hub', '/construct-forge'].some((r) => route.startsWith(r));
-            router.push(needsGame && game ? `${route}${sep}game=${game}` : route);
+            router.push((needsGame && game ? `${route}${sep}game=${game}` : route) as Href);
           }}
         />
 

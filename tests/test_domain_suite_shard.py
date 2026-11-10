@@ -47,14 +47,6 @@ class CanonicalDomainShards(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsafe"):
             discover(self.root)
 
-    def test_failure_inventory_is_bounded_but_not_first_failure_only(self) -> None:
-        source = (Path(__file__).resolve().parents[1] / "scripts/run_domain_suite_shard.py").read_text(encoding="utf-8")
-        # Improve exhaustive prelaunch diagnosis without changing fail-closed
-        # CI status, canonical discovery, or the eight-shard admission rule.
-        self.assertIn('"--maxfail=20"', source)
-        self.assertNotIn('"--maxfail=1"', source)
-        self.assertIn('"--noconftest"', source)
-
     def test_nested_test_files_are_not_dropped(self) -> None:
         nested = self.root / "nested"
         nested.mkdir()

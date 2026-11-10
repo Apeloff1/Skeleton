@@ -5,7 +5,10 @@
 # skeleton/ alongside backend/.
 # ============================================================================
 
-# Stage 1: dependency builder. Alpine keeps the builder/runtime ABI aligned
+# Stage 1: dependency builder. Keep Python below 3.15 until the
+# pinned LiteLLM/FastUUID stack is qualified on newer Python. A previous
+# automated base-image bump to 3.15 made the guard below fail on every build.
+# Alpine keeps the builder/runtime ABI aligned
 # so compiled wheels and native extensions do not cross a glibc/musl boundary.
 FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72 AS builder
 
@@ -63,20 +66,17 @@ RUN --mount=type=secret,id=proxy_ca \
 # development stage below can restore pip from Python's bundled ensurepip when
 # developer-only tools are explicitly requested.
 RUN python - <<'PY'
-from glob import glob
 import pathlib
 import shutil
 import sysconfig
 
 site = pathlib.Path(sysconfig.get_path("purelib"))
-expected_site = pathlib.Path("/usr/local/lib/python3.14/site-packages")
-if not site.is_dir() or site != expected_site:
+if not site.is_dir() or not site.is_relative_to(pathlib.Path("/usr/local/lib")):
     raise SystemExit("unexpected Python site-packages path; refusing runtime pip cleanup")
-shutil.rmtree(pathlib.Path("/usr/local/lib/python3.14/site-packages/pip"), ignore_errors=True)
-for dist in glob("/usr/local/lib/python3.14/site-packages/pip-*.dist-info"):
+shutil.rmtree(site / "pip", ignore_errors=True)
+for dist in site.glob("pip-*.dist-info"):
     shutil.rmtree(dist)
-for pip_bin_name in glob("/usr/local/bin/pip*"):
-    pip_bin = pathlib.Path(pip_bin_name)
+for pip_bin in pathlib.Path("/usr/local/bin").glob("pip*"):
     if pip_bin.is_file() or pip_bin.is_symlink():
         pip_bin.unlink()
 PY

@@ -207,12 +207,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ):
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
-    try:
-        args = parser.parse_args(argv)
-    except SystemExit as exc:
-        # Argparse writes usage and raises; the public app CLI promises an
-        # integer failure result instead of escaping this admission boundary.
-        return int(exc.code) if type(exc.code) is int else 2
+    args = parser.parse_args(argv)
     try:
         if not args.trusted_local_operator:
             raise PermissionError("trusted local operator acknowledgement required")

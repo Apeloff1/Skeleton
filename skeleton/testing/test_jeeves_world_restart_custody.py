@@ -256,9 +256,6 @@ def test_session_lease_failure_does_not_delete_another_writers_lock(tmp_path, mo
     from skeleton.jeeves.worlds import session as session_module
 
     _compiled(tmp_path)
-    # Construct the store before wrapping os.open: WorldStore must validate
-    # the real native dir_fd capability, not the instrumentation wrapper.
-    flow = LaptopFlow(tmp_path)
     lock = tmp_path / "lighthouse.lock"
     lock.write_bytes(b"foreign-writer-lease")
     original_open = session_module.os.open
@@ -270,7 +267,7 @@ def test_session_lease_failure_does_not_delete_another_writers_lock(tmp_path, mo
 
     monkeypatch.setattr(session_module.os, "open", deny_lock)
     with pytest.raises(CanonError) as exc:
-        flow.create_session("lighthouse", "blocked")
+        LaptopFlow(tmp_path).create_session("lighthouse", "blocked")
     assert exc.value.code == "lease_unavailable"
     assert lock.read_bytes() == b"foreign-writer-lease"
     assert not (tmp_path / "lighthouse.blocked.session.json").exists()

@@ -1,0 +1,15 @@
+{
+  "id": "GFM-PERF-02",
+  "gate": "perf",
+  "title": "Save/resume latency budget",
+  "todo_ref": "P3: save-resume and resource budgets",
+  "severity": "sev3",
+  "params": {
+    "metric": "save_resume",
+    "budgets_ms": {
+      "p95": 500
+    },
+    "min_samples": 50
+  },
+  "requires_hardware": false
+}

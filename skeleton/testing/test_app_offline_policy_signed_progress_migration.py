@@ -12,9 +12,8 @@ from skeleton.app.offline_policy_signed_progress_migration import (
     migrate_policy_signed_progress, preflight_policy_signed_progress,
 )
 from skeleton.app.offline_source_trust_policy import SCHEMA
-# Explicit recursive fixture dependencies for isolated test shards.
-from skeleton.testing.test_app_offline_archive_signature import signed
 from skeleton.testing.test_app_offline_signed_progress_migration import migration
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 
 @pytest.fixture

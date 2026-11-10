@@ -14,7 +14,7 @@ def _read_operation_file(path: str) -> bytes:
     """Bounded descriptor-relative review read; reject symlinks in every component."""
     if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
         raise CanonError("operation_secure_open_unavailable")
-    if not path or "\x00" in path:
+    if not path or "\\x00" in path:
         raise CanonError("operation_invalid_path")
     absolute = os.path.isabs(path)
     parts = path.split(os.sep)

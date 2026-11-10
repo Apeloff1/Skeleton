@@ -106,7 +106,7 @@ def test_source_and_authoring_fail_closed():
 def test_missing_win_or_duplicate_replay_is_rejected():
     world, season = authored()
     first, _ = games(world)
-    with pytest.raises(HarborError, match="victory not earned"):
+    with pytest.raises(HarborError, match="finish not earned"):
         build_season(world, season, [export_bundle(world, demo_actions()[:3])])
     with pytest.raises(HarborError, match="duplicate season game replay"):
         build_season(world, season, [first, first])
@@ -193,7 +193,7 @@ def test_fixture_driven_season_next_and_terminal_play(tmp_path):
     assert b"TRIAL finished gold" in live.stdout
     assert b"CHECKPOINT " in live.stdout
     first, second = games(world)
-    with pytest.raises(HarborError, match="victory not earned"):
+    with pytest.raises(HarborError, match="finish not earned"):
         build_season(world, season, [first, second])
     shelter_actions = [{"op": "wait"}] + demo_actions()
     shelter_actions[-1] = {"op": "choose", "choice": "shelter"}

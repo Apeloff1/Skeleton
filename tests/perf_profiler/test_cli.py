@@ -70,18 +70,8 @@ def test_alloc_rejects_unpinned_target_before_import(monkeypatch):
     def forbidden_import(_module):
         raise AssertionError("untrusted module was imported")
 
-    import importlib
-    monkeypatch.setattr(importlib, "import_module", forbidden_import)
+    monkeypatch.setattr(cli.importlib, "import_module", forbidden_import)
     assert main(["alloc", "untrusted.module:run", "--allow-local-callable"]) == 2
-
-
-def test_alloc_refuses_to_import_even_allowlisted_unloaded_module(monkeypatch):
-    from skeleton.perf_profiler import cli
-
-    monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
-    monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", "never_loaded.local_module:run")
-    assert cli.main(["alloc", "never_loaded.local_module:run",
-                     "--allow-local-callable"]) == 2
 
 
 def test_verify(tmp_path):

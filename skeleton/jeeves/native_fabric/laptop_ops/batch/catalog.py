@@ -5,12 +5,13 @@ device proof. The inventory must be structurally complete before admission.
 """
 from __future__ import annotations
 
+import importlib
 from skeleton.jeeves.native_fabric.laptop_ops.contracts import (
     LaptopGateHold, fingerprint,
 )
 from skeleton.jeeves.native_fabric.laptop_ops.predicates import required_keys
 from skeleton.jeeves.native_fabric.laptop_ops.runner import (
-    domain_coverage, list_domains, registry,
+    domain_coverage, list_domains,
 )
 from .limits import DOMAIN_COUNT, STAGES_PER_DOMAIN
 
@@ -28,7 +29,10 @@ def manifest() -> dict[str, object]:
     declaration: list[dict[str, object]] = []
     for domain in domains:
         try:
-            module = registry(domain)
+            module = importlib.import_module(
+                "skeleton.jeeves.native_fabric.laptop_ops.domains."
+                + domain + ".registry"
+            )
             names = module.STAGES
             kinds = module.STAGE_TYPES
             docs = module.contracts()

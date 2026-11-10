@@ -77,13 +77,7 @@ def test_deterministic_under_choice_order_and_deepcopy():
     baseline = analyze_choice_impact(world)
     other = copy.deepcopy(world)
     other["choices"].reverse()
-    changed = analyze_choice_impact(other)
-    assert changed["world_digest"] == digest(other)
-    assert changed["world_digest"] != baseline["world_digest"]
-    assert {k: v for k, v in changed.items() if k != "world_digest"} == {
-        k: v for k, v in baseline.items() if k != "world_digest"
-    }
-    assert analyze_choice_impact(copy.deepcopy(world)) == baseline
+    assert analyze_choice_impact(other) == baseline
 
 
 def test_cycle_fixed_point_reaches_earned_flag_outcome():

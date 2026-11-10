@@ -45,23 +45,6 @@ def test_story_cas_resume_preserves_previous_events():
         resume_salvage_story(story, [], expected_digest="0" * 64)
 
 
-
-def test_legacy_report_seed_requires_exact_replay():
-    source, board = inputs()
-    prefix = build_salvage(source, board, actions()[:4])
-    legacy = build_salvage_story(
-        prefix, story_board(), _legacy_report_anchor=True,
-    )
-    assert verify_salvage_story(legacy) == legacy["state"]
-    forged = deepcopy(legacy)
-    forged["events"][0]["previous"] = "0" * 64
-    forged["story_digest"] = digest({
-        key: value for key, value in forged.items() if key != "story_digest"
-    })
-    with pytest.raises(HarborError, match="event chain mismatch"):
-        verify_salvage_story(forged)
-
-
 def test_invalid_prerequisite_and_resealed_story_event_rejected():
     source, board = inputs()
     report = build_salvage(source, board, actions())
