@@ -388,7 +388,7 @@ class Manifest:
                    [Artifact(**a) for a in artifacts])
 
 
-def read_manifest_file(path: Path) -> Manifest:
+def _read_manifest_bytes(path: Path) -> bytes:
     """Read the real, current manifest through bounded no-follow descriptors.
 
     Path.read_text() previously loaded an unbounded file *before* Manifest.loads
@@ -458,15 +458,88 @@ def read_manifest_file(path: Path) -> Manifest:
                     raise ValueError("provenance manifest path changed during read")
             finally:
                 os.close(fresh)
-            try:
-                decoded = bytes(data).decode("utf-8", "strict")
-            except UnicodeError as exc:
-                raise ValueError("invalid provenance manifest UTF-8") from exc
-            return Manifest.loads(decoded)
+            return bytes(data)
         finally:
             os.close(file_fd)
     finally:
         os.close(dfd)
+
+
+def read_manifest_file(path: Path) -> Manifest:
+    """Reject unsafe manifest paths, then parse strictly bounded UTF-8 JSON."""
+    data = _read_manifest_bytes(path)
+    try:
+        text = data.decode("utf-8", "strict")
+    except UnicodeError as exc:
+        raise ValueError("invalid provenance manifest UTF-8") from exc
+    return Manifest.loads(text)
+
+
+def write_manifest_file_new(path: Path, manifest: Manifest) -> None:
+    """Write a new deterministic manifest with no-clobber descriptor custody.
+
+    No symlink or existing entry can be replaced. Publication requires an
+    exact byte-for-byte readback through the same bounded, ancestor-anchored
+    reader as verification. Caller-owned output directories must already
+    exist; this operation never creates arbitrary directory trees.
+    """
+    if not isinstance(manifest, Manifest):
+        raise ValueError("provenance writer requires a typed manifest")
+    data = manifest.dumps().encode("utf-8")
+    if len(data) > MAX_MANIFEST_BYTES:
+        raise ValueError("provenance manifest exceeds byte bound")
+    raw = Path(path)
+    if ".." in raw.parts or not raw.name:
+        raise ValueError("unsafe provenance manifest output path")
+    if (os.name != "posix" or not hasattr(os, "O_NOFOLLOW")
+            or not hasattr(os, "O_DIRECTORY")):
+        raise ValueError("secure manifest publication unavailable on this host")
+    absolute = Path(os.path.abspath(os.fspath(raw)))
+    parts = absolute.parts
+    dflags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    dfd = os.open("/", dflags)
+    created: os.stat_result | None = None
+    completed = False
+    try:
+        for component in parts[1:-1]:
+            child = os.open(component, dflags, dir_fd=dfd)
+            os.close(dfd)
+            dfd = child
+        fd = os.open(
+            parts[-1],
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+            | getattr(os, "O_CLOEXEC", 0),
+            0o600, dir_fd=dfd,
+        )
+        created = os.fstat(fd)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.fsync(dfd)
+        observed = _read_manifest_bytes(path)
+        if observed != data:
+            raise ValueError("provenance manifest contents changed during publication")
+        linked = os.stat(parts[-1], dir_fd=dfd, follow_symlinks=False)
+        if (not stat.S_ISREG(linked.st_mode)
+                or linked.st_nlink != 1
+                or (linked.st_dev, linked.st_ino) !=
+                (created.st_dev, created.st_ino)):
+            raise ValueError("provenance manifest path changed during publication")
+        completed = True
+    finally:
+        try:
+            if created is not None and not completed:
+                try:
+                    linked = os.stat(parts[-1], dir_fd=dfd, follow_symlinks=False)
+                    if (linked.st_dev, linked.st_ino) == (
+                        created.st_dev, created.st_ino
+                    ):
+                        os.unlink(parts[-1], dir_fd=dfd)
+                except FileNotFoundError:
+                    pass
+        finally:
+            os.close(dfd)
 
 
 def build(root: Path, engine: str, verdict: str, artifacts: dict[str, Path], base: Path | None = None) -> Manifest:
