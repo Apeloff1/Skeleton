@@ -324,7 +324,16 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
                 entry["ok"], entry["reason"] = False, "artifact-custody-failed"
         entry["log_tail"] = log[-1500:]
         if entry["ok"] and preset == "Linux":
-            entry["boot"] = _boot_exported(target, boot_frames, timeout)
+            try:
+                entry["boot"] = _boot_exported(target, boot_frames, timeout)
+            except (OSError, ValueError) as exc:
+                # Return an explicit failure receipt rather than allowing a
+                # path/permission/exec race to escape report production.
+                entry["boot"] = {
+                    "returncode": None, "timed_out": False,
+                    "errors": ["boot custody failure: " + type(exc).__name__],
+                    "passed": False, "log_tail": "",
+                }
             entry["ok"] = entry["boot"]["passed"]
             if not entry["ok"]:
                 entry["reason"] = "boot-failed"
