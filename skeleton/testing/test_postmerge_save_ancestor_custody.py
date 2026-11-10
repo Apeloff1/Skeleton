@@ -107,6 +107,8 @@ class SaveSlotAncestorCustodyTests(unittest.TestCase):
                 b'{"tick":-Infinity}',
                 b'{"tick":1e99999}',
                 b'{"tick":-1e99999}',
+                b'{"tick":1e-99999}',
+                b'{"tick":-1e-99999}',
                 b'{"tick":1} trailing',
                 b'{"tick": "\xff"}',
                 b'{"tick":',
@@ -229,6 +231,12 @@ class SaveSlotAncestorCustodyTests(unittest.TestCase):
                     read_slot(slot)
             self.assertFalse(slot.exists())
 
+
+    def test_exact_zero_exponents_remain_valid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            slot = Path(tmp) / "slot.json"
+            slot.write_bytes(b'{"tick":0e-99999,"offset":-0e-99999}')
+            self.assertEqual(read_slot(slot), {"tick": 0.0, "offset": -0.0})
 
     def test_streamed_encoder_stops_before_oversized_snapshot_is_walked(self):
         from skeleton.game.gameplay import offline_grid_save_slot as module
