@@ -10,6 +10,9 @@ ARG NODE_VERSION=24
 FROM node:${NODE_VERSION}-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS deps
 WORKDIR /app
 COPY package.json yarn.lock* ./
+# Yarn resolves the security-reviewed file:vendor/deepmerge override at install time.
+# Only the specific vendored package is exposed to the dependency stage.
+COPY vendor/deepmerge/ ./vendor/deepmerge/
 COPY index.js ./index.js
 COPY scripts/patch-node-modules.js ./scripts/patch-node-modules.js
 COPY scripts/verify-no-release-npm-security.js scripts/verify-deepmerge-security.cjs ./scripts/
