@@ -194,6 +194,17 @@ jobs:
             skeleton/testing/test_packaging_contract.py \
             skeleton/testing/test_game_project_cli_custody.py \
             skeleton/testing/test_game_project_cli_input_budget.py
+      - name: Stress real two-process native flight claim fencing
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          python -c 'import sqlite3; print("Native contention SQLite:", sqlite3.sqlite_version)'
+          for attempt in $(seq 1 12); do
+            echo "::group::Cross-process claim attempt ${attempt}/12"
+            python -m pytest -q --noconftest \
+              skeleton/testing/test_ai_flight_process.py::ProcessFlights::test_two_processes_cannot_claim_same_session
+            echo "::endgroup::"
+          done
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py
