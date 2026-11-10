@@ -22,7 +22,7 @@ from .project import IGNORED_DIRS
 SCHEMA = "skeleton.godot_export.provenance/v1"
 
 
-def _safe_identity(value: object, limit: int, field: str) -> bool:
+def _safe_identity(value: object, limit: int) -> bool:
     """Reject control characters that can forge provenance text/CI evidence."""
     return (
         type(value) is str and 1 <= len(value) <= limit
@@ -314,7 +314,7 @@ class Artifact:
     size: int
 
     def __post_init__(self) -> None:
-        if not _safe_identity(self.preset, 128, "preset"):
+        if not _safe_identity(self.preset, 128):
             raise ValueError("invalid artifact preset")
         _relative(self.path)
         if (not isinstance(self.sha256, str) or len(self.sha256) != 64
@@ -334,9 +334,9 @@ class Manifest:
     artifacts: list[Artifact] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        if not _safe_identity(self.project, 256, "project"):
+        if not _safe_identity(self.project, 256):
             raise ValueError("invalid project identity")
-        if not _safe_identity(self.engine, 256, "engine"):
+        if not _safe_identity(self.engine, 256):
             raise ValueError("invalid engine identity")
         if not isinstance(self.tree, str) or len(self.tree) != 64 or any(
                 c not in "0123456789abcdef" for c in self.tree):
