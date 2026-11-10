@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "5cd3cb340b5597a6f6e9e97491a353d474fd4c7b",
+      "source_git_object_sha": "c17c39ce784ae05ddae2a0efdc0b468887870fd1",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "9941875f5a5f10922ff63dfe39bffe0f09bea01d",
+      "source_git_object_sha": "604551f6ce80fe74cfbf93dc073e306d9aa14fa6",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "1256eba56b57dafa77e7c2ce49045353971d6750"
+      "source_git_object_sha": "c89e6b1a7ce867884256703ce44c1830c89aa429"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
@@ -7377,6 +7377,11 @@
       "path": "skeleton/provider_contract.py",
       "owner": "provider compatibility boundary",
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
+    },
+    {
+      "path": "skeleton/provider_environment.py",
+      "owner": "deterministic game-environment and replay adapter",
+      "reason": "Canonical bounded deterministic game-environment source stays outside provider-credential AI tree; holdout/replay custody is retained here until a separately reviewed mirror and ownership cutover"
     },
     {
       "path": "skeleton/providers",

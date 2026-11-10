@@ -61,14 +61,14 @@ def agent_component(*, max_speed: float = 4.0, max_force: float = 16.0, behavior
         raise ValidationError("unknown behavior", context={"behavior": behavior})
     for name, value in (("max_speed",max_speed),("max_force",max_force),("response",response),
                         ("radius",radius)):
-        if (type(value) not in (float, int) or not math.isfinite(value)
-                or not 0 < value <= 100000):
+        if (type(value) not in (float, int) or not 0 < value <= 100000
+                or not math.isfinite(value)):
             raise ValidationError(f"{name} must be finite and bounded positive")
     if target is not None and (type(target) is not int or target < 0):
         raise ValidationError("target must be an entity identifier or None")
     g = list(islice(goal, 3)) if goal is not None else None
     if g is not None and (len(g) != 2 or any(type(x) not in (int, float)
-                                               or not math.isfinite(x) or abs(x) > 1e6 for x in g)):
+                                               or abs(x) > 1e6 or not math.isfinite(x) for x in g)):
         raise ValidationError("goal must contain two bounded finite coordinates")
     return {"max_speed": float(max_speed), "max_force": float(max_force), "behavior": behavior, "target": target,
             "goal": [q(g[0]), q(g[1])] if g else None, "radius": float(radius), "wander": 0.0, "response": float(response)}
@@ -170,9 +170,13 @@ def check_condition(cond: Mapping[str, Any], facts: Mapping[str, Any]) -> bool:
 # utility curves
 # ---------------------------------------------------------------------------
 def curve(kind: str, x: float) -> float:
-    if type(x) not in (int, float) or not math.isfinite(x):
-        raise ValidationError("utility input must be finite")
-    x = max(0.0, min(1.0, float(x)))
+    # A malformed utility sample must not silently become a valid action
+    # score through clamping (especially adversarial negative inputs).
+    # Bound native integers before converting them to C doubles for
+    # math.isfinite: very large Python ints otherwise raise OverflowError.
+    if type(x) not in (int, float) or not 0 <= x <= 1 or not math.isfinite(x):
+        raise ValidationError("utility input must be finite and within [0, 1]")
+    x = float(x)
     if kind == "linear":
         return x
     if kind == "inverse":
@@ -196,8 +200,8 @@ def choose_utility(options: list[Mapping[str, Any]], needs: Mapping[str, float])
         if not isinstance(opt, Mapping) or type(opt.get("action")) is not str:
             raise ValidationError("utility option requires an action identity")
         weight = opt.get("weight", 1.0)
-        if type(weight) not in (float, int) or not math.isfinite(weight) or not 0 <= weight <= 100:
-            raise ValidationError("utility weight must be finite and nonnegative")
+        if type(weight) not in (float, int) or not 0 <= weight <= 100 or not math.isfinite(weight):
+            raise ValidationError("utility weight must be finite and between 0 and 100")
         s = float(weight) * curve(str(opt.get("curve", "linear")), needs.get(opt.get("need", ""), 0.0))
         if s > score + 1e-12:  # ties keep declaration order
             best, score = opt.get("action"), s
@@ -258,7 +262,8 @@ def steering(behavior: str, pos: tuple[float, float], vel: tuple[float, float], 
 # systems
 # ---------------------------------------------------------------------------
 def sense(ctx: SystemContext, view_radius: float) -> None:
-    if not math.isfinite(view_radius) or view_radius <= 0:
+    if (type(view_radius) not in (int, float)
+            or not 0 < view_radius <= 100000 or not math.isfinite(view_radius)):
         raise ValidationError("invalid finite perception radius")
     positions = {e: (tf["x"], tf["y"]) for e, tf in ctx.query("transform")}
     if len(positions) > MAX_ENTITY_SENSE:
@@ -268,8 +273,8 @@ def sense(ctx: SystemContext, view_radius: float) -> None:
     grid: dict[tuple[int,int], list[tuple[int, float, float]]] = {}
     for item, (xx, yy) in positions.items():
         if (type(xx) not in (int, float) or type(yy) not in (int, float)
-                or not math.isfinite(xx) or not math.isfinite(yy)
-                or abs(xx) > 1_000_000_000 or abs(yy) > 1_000_000_000):
+                or abs(xx) > 1_000_000_000 or abs(yy) > 1_000_000_000
+                or not math.isfinite(xx) or not math.isfinite(yy)):
             raise ValidationError("invalid finite perception coordinates")
         cell = (math.floor(xx / view_radius), math.floor(yy / view_radius))
         grid.setdefault(cell, []).append((item, xx, yy))
@@ -379,7 +384,7 @@ def steer(ctx: SystemContext) -> None:
 
 def install_ai(scheduler: TickScheduler, world: LiveWorld, *, view_radius: float = 8.0, before: Iterable[str] = ()) -> tuple[str, str, str]:
     """Add ``ai.sense`` → ``ai.think`` → ``ai.steer`` (put them before physics)."""
-    if type(view_radius) not in (int, float) or not math.isfinite(view_radius) or not 0 < view_radius <= 100000:
+    if type(view_radius) not in (int, float) or not 0 < view_radius <= 100000 or not math.isfinite(view_radius):
         raise ValidationError("invalid bounded perception radius")
     register_ai(world)
     b = tuple(islice(before, 65))

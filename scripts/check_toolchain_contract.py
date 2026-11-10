@@ -462,9 +462,20 @@ def main() -> int:
         "CI frontend must consume the canonical pinned Node version",
         failures,
     )
+    # Expo's direct Yarn wrapper can hang after exporting dist. The reviewed
+    # supervisor invokes the same pinned Expo CLI, verifies non-stale HTML,
+    # bounds the export and reaps the process; it is strictly stronger than
+    # a bare `yarn export:web` command. Preserve that actual CI authority.
     require_all(
         ci,
-        ("yarn lint:ci", "yarn typecheck", "yarn export:web"),
+        (
+            "yarn lint:ci",
+            "yarn typecheck",
+            "node --test scripts/test-guarded-expo-export.cjs",
+            "node scripts/guarded-expo-export.cjs",
+            "test -s dist/index.html",
+            "test -s dist/setup.html || test -s dist/setup/index.html",
+        ),
         "CI frontend scripts drifted",
         failures,
     )

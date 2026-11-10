@@ -3079,8 +3079,9 @@ async def _run_background_build_inner(
     # a generation budget, not permission to inflate the artifact with filler.
     from core import build_vault as _bv
 
-    current_files = await asyncio.to_thread(_bv.get_file_count, build_id)
-    build["_bg_floor_target"] = current_files
+    # Completion attests only source produced by completed phases; there is
+    # no synthetic file floor. Keep the observed count in file_count below.
+    build["_bg_floor_target"] = 0
     build["_bg_floor_in_progress"] = False
     _check_build_continuation(build)
     await _await_build_io(build, _flush_to_vault, build, True)

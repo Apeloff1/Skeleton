@@ -574,3 +574,48 @@ jobs:
           tests/test_arm64_workflow_trigger_scope.py
           tests/test_ci_java_accelerator_dependencies.py
           tests/test_backend_quality_plan_fast_path.py
+
+  e2e_source_admission:
+    # The source-only guard runs on draft PRs; live E2E remains a separate hold.
+    # Reuse Backend Quality instead of adding an independent Actions subscriber.
+    name: Exact-head E2E source admission (no live readiness claim)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      PYTHONPATH: "."
+    steps:
+      - name: Checkout exact source without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact immutable SHA before checks
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up Python for source admission
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Set up Node for negative live E2E fixtures
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Install bounded test imports
+        run: python -m pip install --disable-pip-version-check --no-input "PyYAML>=6,<7" "pytest>=8,<9"
+      - name: Check E2E source and adversarial admission
+        run: |
+          set -euo pipefail
+          python scripts/check_app_foundation_e2e_admission.py
+          python -m pytest -q --noconftest tests/test_app_foundation_e2e_admission.py tests/test_app_foundation_e2e_build_isolation.py
+      - name: Verify bounded Expo supervisor and Node negative subprocesses
+        run: |
+          set -euo pipefail
+          node --test frontend/scripts/test-guarded-expo-export.cjs
+          node --test frontend/scripts/test-app-foundation-e2e-admission.cjs
