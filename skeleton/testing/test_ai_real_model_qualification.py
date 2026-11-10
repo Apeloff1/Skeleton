@@ -28,6 +28,7 @@ class ProbeBackend:
 
 class QualificationTests(unittest.TestCase):
     def setUp(self):
+        # CI and operator hosts choose their own private, OS-approved temp root.
         self.tmp=tempfile.TemporaryDirectory(prefix='skeleton-ai-qualification-')
         self.state=Path(self.tmp.name)/'private'
         self.state.mkdir(mode=0o700)
