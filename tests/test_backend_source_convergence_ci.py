@@ -19,9 +19,19 @@ SOURCE = (ROOT / ".github/workflows/backend-quality.yml").read_text(encoding="ut
 
 
 def mutate(old: str, new: str) -> list[str]:
-    if SOURCE.count(old) < 1:
-        raise AssertionError(f"source fixture missing: {old[:64]}")
-    return guard.validate_text(SOURCE.replace(old, new, 1))
+    # Other existing workflow jobs use similar action/ref/environment strings.
+    # Mutate the actual backend qualification job, never an unrelated lane.
+    if old == "  ruff:":
+        if SOURCE.count(old) != 1:
+            raise AssertionError("canonical ruff fixture missing")
+        return guard.validate_text(SOURCE.replace(old, new, 1))
+    marker = "\n  backend_source_convergence:"
+    if SOURCE.count(marker) != 1:
+        raise AssertionError("expected exactly one backend source job")
+    before, backend = SOURCE.split(marker, 1)
+    if backend.count(old) < 1:
+        raise AssertionError(f"backend source fixture missing: {old[:64]}")
+    return guard.validate_text(before + marker + backend.replace(old, new, 1))
 
 
 class BackendConvergenceAdmission(unittest.TestCase):
