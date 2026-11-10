@@ -23,6 +23,7 @@ from skeleton.build.delivery.artifact_manifest import MAX_ARTIFACT_BYTES, Artifa
 DEFAULT_EPOCH = 315532800  # 1980-01-01, the earliest timestamp zip supports
 EXECUTABLE_SUFFIXES = (".sh",)
 MAX_PACKAGE_FILES = 20000
+MAX_PACKAGE_PATH_BYTES = 4096  # bounded UTF-8 archive member names
 MAX_PACKAGE_EPOCH = (1 << 32) - 1  # portable gzip mtime field
 
 
@@ -65,6 +66,10 @@ def _normalize_files(files: Mapping[str, bytes], prefix: str | None) -> list[tup
         path = normalize_relpath(raw)
         if root:
             path = normalize_relpath(f"{root}/{path}")
+        # The combined archive member is the real authority, not its
+        # independently validated prefix and relative filename.
+        if len(path.encode("utf-8")) > MAX_PACKAGE_PATH_BYTES:
+            raise DeliveryError("combined package member path exceeds byte limit")
         if path in out:
             raise DeliveryError(f"duplicate path after normalization: {path}")
         out[path] = bytes(data)

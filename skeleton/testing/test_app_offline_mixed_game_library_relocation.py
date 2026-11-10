@@ -109,7 +109,9 @@ def test_same_installed_root_cannot_count_as_relocation(relocated):
 
 def test_cross_mode_old_new_root_alias_rejected(relocated):
     old_unsigned, new_unsigned, old_signed, _ = relocated
-    with pytest.raises(OfflineMixedGameLibraryRelocationError, match="distinct"):
+    # The early cross-mode path-alias fence correctly blocks before any source
+    # inode reads; the later distinct-root fence is also a valid denial.
+    with pytest.raises(OfflineMixedGameLibraryRelocationError, match="distinct|path alias"):
         _call((old_unsigned, new_unsigned, old_signed,
                replace(old_signed, installed_source=new_unsigned.installed_source)))
 

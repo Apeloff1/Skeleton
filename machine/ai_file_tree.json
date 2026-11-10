@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "9941875f5a5f10922ff63dfe39bffe0f09bea01d",
+      "source_git_object_sha": "2b45bf3e5ad984656aecb4bf684cbf4cd7951356",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1681,7 +1681,7 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "222237a6f52566db10098b071e8e45e3374eb4e5",
+      "source_git_object_sha": "7a4c6ee98b5f9f16997042afa8b1e931f6c7928a",
       "role": "Incremental build graph, resource-bounded parallel scheduling, deterministic asset invalidation, build observability, release/remote build controls, and network audit support autonomous AI work.",
       "work_package_refs": [
         "WP-W27",

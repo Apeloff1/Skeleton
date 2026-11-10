@@ -85,6 +85,16 @@ class QualificationTests(unittest.TestCase):
         with self.assertRaises(QualificationError):
             publish_private_report(self.out,'report.json',proof)
 
+    def test_writable_nonsticky_report_ancestor_rejected(self):
+        root=Path(self.tmp.name)/'shared'
+        root.mkdir(mode=0o700)
+        os.chmod(root,0o777)
+        child=root/'private'
+        child.mkdir(mode=0o700)
+        with self.assertRaises(QualificationError):
+            publish_private_report(child,'receipt.json',{'status':'fixture-only'})
+        self.assertFalse((child/'receipt.json').exists())
+
     def test_report_name_traversal_refused(self):
         proof=probe_first_boot(self.plan,activation=self.factory)
         for name in ('../escape.json','/tmp/x.json','.json','bad.txt'):

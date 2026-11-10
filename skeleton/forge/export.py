@@ -103,7 +103,7 @@ def _artifact_digest(path: Path) -> str:
         fields = ("st_dev", "st_ino", "st_mode", "st_nlink", "st_size",
                   "st_mtime_ns", "st_ctime_ns")
         if any(getattr(after, name) != getattr(st, name) for name in fields):
-            raise ValueError("artifact changed during hashing")
+            raise ValueError("artifact changed or replaced during hashing")
         try:
             linked = path.lstat()
         except OSError as exc:

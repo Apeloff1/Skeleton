@@ -195,3 +195,6 @@ def test_package_combined_prefix_and_file_path_are_bounded():
         name = "pkg.zip" if build in (build_zip, mirrored.build_zip) else "pkg.tar.gz"
         with pytest.raises(DeliveryError):
             build(name, {"a" * 100: b"x"}, prefix="b" * 4050)
+        # Count UTF-8 bytes after prefix composition, not just code points.
+        with pytest.raises(DeliveryError, match="combined package member"):
+            build(name, {"é" * 2050: b"x"}, prefix="p")
