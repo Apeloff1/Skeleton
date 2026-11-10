@@ -38,7 +38,15 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertIn("os.environ.get('GH_ACTOR') != 'Apeloff1'", canary)
         self.assertIn("os.environ.get('GH_EVENT') != 'workflow_dispatch'", canary)
         readiness = (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
-        self.assertIn("skeleton/testing --tb=short", readiness)
+        # The full canonical suite now executes in eight exhaustive shards.
+        # Verify the admission invokes the real splitter and remains blocked
+        # on all shards; do not replace this with a mock or skip-based gate.
+        self.assertIn("python scripts/run_domain_suite_shard.py --index", readiness)
+        self.assertIn("needs: domain_suite", readiness)
+        runner = (ROOT / "scripts/run_domain_suite_shard.py").read_text(encoding="utf-8")
+        self.assertIn('options.get("testpaths") != ["skeleton/testing"]', runner)
+        self.assertIn('"--tb=short"', runner)
+        self.assertIn('"--maxfail=1"', runner)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
     def test_backlog_housekeeping_is_manual_without_weakening_recovery(self):
