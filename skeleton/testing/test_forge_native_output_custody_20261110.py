@@ -1,0 +1,146 @@
+"""Forge export custody: bounded output inventory and no-clobber reports.
+
+These tests explicitly avoid launching Godot and do not qualify real boot,
+export templates, native binaries or release provenance.
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from skeleton.forge import export as forge_export
+from skeleton.forge.eras import compile_era
+from skeleton.forge.godot_emit import emit_godot
+from skeleton.godot_export import provenance
+
+
+pytestmark = pytest.mark.skipif(
+    os.name != "posix" or not hasattr(os, "O_NOFOLLOW"),
+    reason="requires descriptor-relative POSIX file custody",
+)
+
+
+def test_native_artifact_digest_is_byte_compatible(tmp_path):
+    target = tmp_path / "game.pck"
+    payload = b"canonical-native-output" * 64
+    target.write_bytes(payload)
+    assert forge_export._artifact_digest(target) == hashlib.sha256(payload).hexdigest()
+
+
+def test_native_digest_uses_its_explicit_cap_not_manifest_cap(tmp_path):
+    target = tmp_path / "game.pck"
+    payload = b"z" * 80
+    target.write_bytes(payload)
+    with patch.object(forge_export, "MAX_OUTPUT_BYTES", 128):
+        with patch.object(provenance, "MAX_ARTIFACT_BYTES", 64):
+            assert forge_export._artifact_digest(target) == hashlib.sha256(payload).hexdigest()
+        with patch.object(forge_export, "MAX_OUTPUT_BYTES", 70):
+            with pytest.raises(ValueError, match="oversized"):
+                forge_export._artifact_digest(target)
+
+
+def test_native_digest_rejects_swapped_ancestor_even_when_bytes_match(tmp_path):
+    parent = tmp_path / "output"
+    parent.mkdir()
+    target = parent / "game.pck"
+    payload = b"native" * 2048
+    target.write_bytes(payload)
+    replacement = tmp_path / "waiting"
+    replacement.mkdir()
+    (replacement / "game.pck").write_bytes(payload)
+    detached = tmp_path / "detached"
+    original = os.read
+    swapped = False
+
+    def swap_when_read(fd, count):
+        nonlocal swapped
+        data = original(fd, count)
+        if data and not swapped:
+            swapped = True
+            parent.rename(detached)
+            replacement.rename(parent)
+        return data
+
+    with patch.object(forge_export.os, "read", side_effect=swap_when_read):
+        with pytest.raises(ValueError, match="ancestor path"):
+            forge_export._artifact_digest(target)
+    assert swapped
+    assert (parent / "game.pck").read_bytes() == payload
+
+
+def test_create_only_report_refuses_clobber(tmp_path):
+    path = tmp_path / "reports" / "native.json"
+    forge_export._write_report_new(path, '{"status":"NO-SHIP"}')
+    first = path.read_bytes()
+    with pytest.raises(FileExistsError):
+        forge_export._write_report_new(path, '{"status":"SHIP"}')
+    assert path.read_bytes() == first
+    assert path.stat().st_nlink == 1
+
+
+def test_report_cannot_follow_existing_symlink(tmp_path):
+    secret = tmp_path / "other.json"
+    secret.write_text('{"retained":"yes"}', encoding="utf-8")
+    alias = tmp_path / "report.json"
+    alias.symlink_to(secret)
+    with pytest.raises(FileExistsError):
+        forge_export._write_report_new(alias, '{"status":"SHIP"}')
+    assert secret.read_text(encoding="utf-8") == '{"retained":"yes"}'
+
+
+def test_report_cannot_follow_intermediate_symlink(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    alias = tmp_path / "alias"
+    alias.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(OSError):
+        forge_export._write_report_new(alias / "native.json", '{"status":"SHIP"}')
+    assert not (outside / "native.json").exists()
+
+
+def test_report_byte_budget_and_write_failure_cleanup(tmp_path):
+    report = tmp_path / "report.json"
+    with patch.object(forge_export, "MAX_REPORT_BYTES", 8):
+        with pytest.raises(ValueError, match="byte budget"):
+            forge_export._write_report_new(report, "X" * 50)
+    assert not report.exists()
+    with patch.object(forge_export.os, "fsync", side_effect=OSError("disk full")):
+        with pytest.raises(OSError, match="disk full"):
+            forge_export._write_report_new(report, "{}")
+    assert not report.exists()
+
+
+def test_native_output_inventory_stops_at_file_cap(tmp_path, monkeypatch):
+    """A fake runner creates too many files; no real Godot invocation occurs."""
+    emitted = emit_godot(compile_era("extraction_now"), title="bounded-export")
+    monkeypatch.setattr(
+        forge_export, "resolve_binary",
+        lambda binary=None: ("/bin/true", "test-only", False),
+    )
+    exported = False
+
+    def fake_run(command, cwd, timeout):
+        nonlocal exported
+        if "--export-release" in command:
+            exported = True
+            target = Path(command[-1])
+            target.parent.mkdir(parents=True, exist_ok=True)
+            for index in range(forge_export.MAX_OUTPUT_FILES + 1):
+                (target.parent / f"output-{index}.bin").write_bytes(b"fixture")
+        return 0, "", False
+
+    monkeypatch.setattr(forge_export, "_run", fake_run)
+    result = forge_export.export_build(
+        emitted, tmp_path / "native", presets=("Linux",),
+    )
+    assert exported
+    assert result["passed"] is False
+    assert result["release_certified"] is False
+    entry = result["presets"]["Linux"]
+    assert entry["ok"] is False
+    assert entry["reason"] == "unsafe-or-unbounded-artifacts"
+    assert entry["artefacts"] == []
