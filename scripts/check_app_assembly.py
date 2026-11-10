@@ -493,6 +493,17 @@ def audit_compose_modes() -> None:
         "SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}" in base,
         "backend internal Skeleton endpoint default drift",
     )
+    check(
+        "CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-3000},"
+        "http://127.0.0.1:${FRONTEND_PORT:-3000}}" in base,
+        "backend browser CORS default must follow the published frontend port",
+    )
+    env_template = read(".env.example")
+    check(
+        "\nCORS_ORIGINS=\n" in env_template,
+        "first-install env template must defer browser origin to Compose port selection",
+    )
+
 
     skeleton_block = (
         base.split("  skeleton:", 1)[1].split("\n  backend:", 1)[0]
