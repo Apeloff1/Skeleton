@@ -372,7 +372,11 @@ jobs:
         run: node --test scripts/test-reconciled-stability.cjs
       - name: Long-session lifecycle and network regressions (from fast Merge Readiness)
         run: node --test scripts/test-long-session-stability.cjs scripts/test-marathon-pressure.cjs scripts/test-session-transition-pressure.cjs scripts/test-offline-cache-integrity.cjs scripts/test-memory-pressure-runtime.cjs scripts/test-operation-stream-endurance.cjs scripts/test-persistent-preferences-endurance.cjs scripts/test-build-observer-endurance.cjs scripts/test-timer-resume-endurance.cjs scripts/test-connectivity-probe.cjs scripts/test-native-mirror-memory.cjs scripts/test-month-cycle-ledger.cjs scripts/test-month-cycle-recovery.cjs scripts/test-month-cycle-integration.cjs scripts/test-month-cycle-foreground.cjs
-      - run: yarn export:web
+      - run: |
+          node --test scripts/test-guarded-expo-export.cjs
+          node scripts/guarded-expo-export.cjs
+          test -s dist/index.html
+          test -s dist/setup.html || test -s dist/setup/index.html
   docker:
     name: "Docker Build"
     runs-on: ubuntu-latest
