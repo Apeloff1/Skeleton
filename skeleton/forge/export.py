@@ -19,7 +19,7 @@ CLI (used by ``.github/workflows/godot-playtest.yml``)::
 from __future__ import annotations
 
 import argparse
-from contextlib import closing
+from contextlib import ExitStack
 import json
 import os
 import sys
@@ -281,7 +281,8 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
     for preset in presets:
         relative = Path(PRESET_OUTPUTS[preset])
         parent, output_dfd = _open_directory(out / relative.parent)
-        with closing(output_dfd):
+        with ExitStack() as cleanup:
+            cleanup.callback(os.close, output_dfd)
             target = parent / relative.name
             if target.exists() or target.is_symlink():
                 raise ValueError("Godot export target already exists; refusing overwrite")
