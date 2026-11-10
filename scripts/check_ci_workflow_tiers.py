@@ -116,6 +116,17 @@ def audit(root: Path = ROOT) -> list[str]:
             source = (root / WORKFLOWS / name).read_text(encoding="utf-8")
             if events(source) != {"workflow_dispatch"}:
                 failures.append(f"{name}: source qualification must be manually dispatched, not automatically subscribed")
+            # Manually dispatchable source qualification is never an authority
+            # for whichever branch tip happened to be selected at runtime.
+            for invariant in (
+                "candidate_sha:",
+                "required: true",
+                'ref: ${{ inputs.candidate_sha }}',
+                '[[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]',
+                'test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"',
+            ):
+                if invariant not in source:
+                    failures.append(f"{name}: immutable SHA admission or checkout attestation missing")
         except (OSError, UnicodeError, ValueError) as exc:
             failures.append(f"{name}: cannot inspect manual source qualification ({exc})")
         for case in cases:
