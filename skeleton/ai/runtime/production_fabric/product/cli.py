@@ -7,7 +7,7 @@ from ..contracts.canonical import loads
 from ..contracts.errors import FabricError
 from ..persistence.journal import Journal
 from ..planning.engine import ProductionEngine
-from .dispatcher import LocalAPI
+from .api import LocalAPI
 
 def main(argv: list[str] | None=None) -> int:
     parser = argparse.ArgumentParser(description='Skeleton deterministic offline production fabric')
