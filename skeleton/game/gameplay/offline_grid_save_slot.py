@@ -120,6 +120,54 @@ def _open_parent(path: Path) -> tuple[int, Path]:
         raise SaveSlotError("save parent must not contain symlinks or inaccessible components") from exc
 
 
+
+def create_slot(path: Path, snapshot: object) -> None:
+    """Create-only save under the same directory-descriptor custody as slots.
+
+    The hard link uses the *same* opened directory for source and destination,
+    and never replaces an existing directory entry, including a symlink.
+    """
+    path = Path(path)
+    payload = _encode(snapshot) + b"\n"
+    if len(payload) > MAX_SAVE_BYTES:
+        raise SaveSlotError("save exceeds byte budget")
+    if not hasattr(os, "link") or os.link not in os.supports_dir_fd:
+        raise SaveSlotError("descriptor-relative create-only saves unavailable")
+    dfd, parent = _open_parent(path)
+    temporary = ".campaign-" + secrets.token_hex(16) + ".tmp"
+    created = False
+    try:
+        _check_slot(path.name, dfd)
+        fd = os.open(
+            temporary,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+            dir_fd=dfd,
+        )
+        created = True
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        before = os.fstat(dfd)
+        after = os.stat(parent, follow_symlinks=False)
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            raise SaveSlotError("save parent changed before publication")
+        # Atomic no-clobber publication, not os.rename.
+        os.link(
+            temporary, path.name,
+            src_dir_fd=dfd, dst_dir_fd=dfd,
+            follow_symlinks=False,
+        )
+        os.fsync(dfd)
+    finally:
+        try:
+            if created:
+                os.unlink(temporary, dir_fd=dfd)
+        finally:
+            os.close(dfd)
+
+
 def write_slot(path: Path, snapshot: object) -> None:
     """Publish one complete snapshot, fsyncing file and directory.
 
