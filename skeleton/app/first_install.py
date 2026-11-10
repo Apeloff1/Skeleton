@@ -92,6 +92,8 @@ def first_install_report(
 ) -> dict[str, object]:
     """Return bounded, redacted host/configuration and optional live findings."""
 
+    if type(live) is not bool:
+        raise TypeError("live inspection must be an explicit boolean")
     if type(studio) is not bool:
         raise TypeError("studio inspection must be an explicit boolean")
     if (
@@ -178,8 +180,16 @@ def first_install_report(
             status is not None
             and status.get("engine") == "skeleton-engine"
             and isinstance(status.get("providers"), list)
+            and len(status["providers"]) <= 32
+            and all(type(name) is str and 0 < len(name) <= 64
+                    for name in status["providers"])
+            # Provider readiness must be witnessed for the configured identity,
+            # not inferred from another healthy provider or an empty catalogue.
+            and provider in status["providers"]
             and type(status.get("llm_available")) is bool
             and status.get("availability_observed") is True
+            and status.get("active") == provider
+            and configured
         ):
             ai.update(
                 available=status["llm_available"],

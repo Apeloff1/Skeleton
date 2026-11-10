@@ -80,7 +80,7 @@ def test_doctor_reports_observed_local_guard_problem_not_missing_weights(monkeyp
     report = _doctor(monkeypatch, tmp_path, {"critical_routes": {
         "ok": True, "report_available": True, "missing": [],
     }}, providers={
-        "engine": "skeleton-engine", "active": "local", "providers": [],
+        "engine": "skeleton-engine", "active": "local", "providers": ["local"],
         "llm_available": False, "availability_observed": True, "active_readiness_code": code,
     })
     assert report["ai"]["readiness_code"] == code
@@ -95,7 +95,7 @@ def test_doctor_reports_observed_local_guard_problem_not_missing_weights(monkeyp
 ])
 def test_doctor_ignores_untrusted_or_contradictory_guard_codes(monkeypatch, tmp_path, overrides):
     payload = {
-        "engine": "skeleton-engine", "active": "local", "providers": [],
+        "engine": "skeleton-engine", "active": "local", "providers": ["local"],
         "llm_available": False, "availability_observed": True, "active_readiness_code": "local_guard_unavailable",
     }
     payload.update(overrides)
@@ -104,6 +104,37 @@ def test_doctor_ignores_untrusted_or_contradictory_guard_codes(monkeypatch, tmp_
     }}, providers=payload)
     assert "readiness_code" not in report["ai"]
     assert "do-not-print" not in str(report)
+
+
+@pytest.mark.parametrize("overrides", [
+    {"providers": []},
+    {"providers": ["openai"]},
+    {"providers": ["local"] * 33},
+    {"providers": ["local", 123]},
+    {"active": "openai"},
+    {"active": "local ", "providers": ["local"]},
+])
+def test_doctor_never_certifies_unmatched_or_malformed_provider_inventory(
+    monkeypatch, tmp_path, overrides,
+):
+    payload = {
+        "engine": "skeleton-engine", "active": "local", "providers": ["local"],
+        "llm_available": True, "availability_observed": True,
+    }
+    payload.update(overrides)
+    report = _doctor(monkeypatch, tmp_path, {"critical_routes": {
+        "ok": True, "report_available": True, "missing": [],
+    }}, providers=payload)
+    assert report["ai"]["observed"] is False
+    assert report["ai"]["available"] is None
+    assert "readiness_code" not in report["ai"]
+
+
+def test_doctor_requires_explicit_live_boolean(tmp_path):
+    from skeleton.app.first_install import first_install_report
+
+    with pytest.raises(TypeError, match="explicit boolean"):
+        first_install_report(tmp_path, live=1)
 
 
 def test_first_install_rejects_contradictory_ready_with_missing_routes(monkeypatch, tmp_path):
