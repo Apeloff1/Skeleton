@@ -143,6 +143,8 @@ def _digest_beneath(
         os.close(fd)
 
 
+MAX_MANIFEST_BYTES = 8 * 1024 * 1024
+
 MAX_SOURCE_ENTRIES = 2 * MAX_SOURCE_FILES
 MAX_SOURCE_DEPTH = 64
 
@@ -355,7 +357,7 @@ class Manifest:
         if type(text) is not str:
             raise ValueError("invalid provenance JSON")
         try:
-            if len(text.encode("utf-8", "strict")) > 8 * 1024 * 1024:
+            if len(text.encode("utf-8", "strict")) > MAX_MANIFEST_BYTES:
                 raise ValueError("provenance manifest exceeds byte bound")
         except UnicodeError as exc:
             raise ValueError("invalid provenance JSON") from exc
@@ -384,6 +386,86 @@ class Manifest:
             raise ValueError("invalid artifact fields")
         return cls(d["project"], d["tree"], d["engine"], d["verdict"], d.get("git"),
                    [Artifact(**a) for a in artifacts])
+
+
+def read_manifest_file(path: Path) -> Manifest:
+    """Read the real, current manifest through bounded no-follow descriptors.
+
+    Path.read_text() previously loaded an unbounded file *before* Manifest.loads
+    could enforce its byte limit, and could follow an intermediate symlink.
+    Require regular single-link files, stable metadata and a reachable parent.
+    A read fixture is not evidence of a verified Godot export.
+    """
+    raw = Path(path)
+    if ".." in raw.parts or not raw.name:
+        raise ValueError("unsafe provenance manifest path")
+    if (os.name != "posix" or not hasattr(os, "O_NOFOLLOW")
+            or not hasattr(os, "O_DIRECTORY")):
+        raise ValueError("secure manifest reading unavailable on this host")
+    absolute = Path(os.path.abspath(os.fspath(raw)))
+    parts = absolute.parts
+    dir_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+    dfd = os.open("/", dir_flags)
+    try:
+        for component in parts[1:-1]:
+            child = os.open(component, dir_flags, dir_fd=dfd)
+            os.close(dfd)
+            dfd = child
+        file_fd = os.open(parts[-1], file_flags, dir_fd=dfd)
+        try:
+            before = os.fstat(file_fd)
+            if (not stat.S_ISREG(before.st_mode)
+                    or before.st_nlink != 1
+                    or before.st_size > MAX_MANIFEST_BYTES):
+                raise ValueError("unsafe or oversized provenance manifest")
+            data = bytearray()
+            while True:
+                chunk = os.read(
+                    file_fd,
+                    min(1024 * 1024, MAX_MANIFEST_BYTES + 1 - len(data)),
+                )
+                if not chunk:
+                    break
+                data.extend(chunk)
+                if len(data) > MAX_MANIFEST_BYTES:
+                    raise ValueError("provenance manifest exceeds byte bound")
+            after = os.fstat(file_fd)
+            linked = os.stat(parts[-1], dir_fd=dfd, follow_symlinks=False)
+            fingerprint = lambda info: (
+                info.st_dev, info.st_ino, info.st_mode, info.st_nlink,
+                info.st_size, info.st_mtime_ns, info.st_ctime_ns,
+            )
+            if (len(data) != before.st_size
+                    or fingerprint(before) != fingerprint(after)
+                    or fingerprint(after) != fingerprint(linked)):
+                raise ValueError("provenance manifest changed during read")
+            fresh = os.open("/", dir_flags)
+            try:
+                for component in parts[1:-1]:
+                    child = os.open(component, dir_flags, dir_fd=fresh)
+                    os.close(fresh)
+                    fresh = child
+                held_parent = os.fstat(dfd)
+                current_parent = os.fstat(fresh)
+                if (held_parent.st_dev, held_parent.st_ino) != (
+                    current_parent.st_dev, current_parent.st_ino
+                ):
+                    raise ValueError("provenance manifest parent changed during read")
+                current = os.stat(parts[-1], dir_fd=fresh, follow_symlinks=False)
+                if fingerprint(current) != fingerprint(after):
+                    raise ValueError("provenance manifest path changed during read")
+            finally:
+                os.close(fresh)
+            try:
+                decoded = bytes(data).decode("utf-8", "strict")
+            except UnicodeError as exc:
+                raise ValueError("invalid provenance manifest UTF-8") from exc
+            return Manifest.loads(decoded)
+        finally:
+            os.close(file_fd)
+    finally:
+        os.close(dfd)
 
 
 def build(root: Path, engine: str, verdict: str, artifacts: dict[str, Path], base: Path | None = None) -> Manifest:
