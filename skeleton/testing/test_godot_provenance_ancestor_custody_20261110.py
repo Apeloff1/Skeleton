@@ -207,6 +207,88 @@ def test_source_root_changed_after_scan_cannot_qualify(tmp_path):
     assert switched
 
 
+
+def test_directory_replaced_by_symlink_between_listing_and_open(tmp_path):
+    root = tmp_path / "project"
+    original = root / "nested"
+    original.mkdir(parents=True)
+    (original / "game.gd").write_text("extends Node\n")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "game.gd").write_text("extends Node\n")
+    moved = root / "detached"
+    actual_open = provenance._open_tree_directory
+    swapped = False
+
+    def swap_before_reopen(root_fd, parts):
+        nonlocal swapped
+        if parts == ("nested",) and not swapped:
+            original.rename(moved)
+            original.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        return actual_open(root_fd, parts)
+
+    with patch.object(
+        provenance, "_open_tree_directory", side_effect=swap_before_reopen,
+    ):
+        with pytest.raises(ValueError, match="source directory changed"):
+            provenance.tree_digest(root)
+    assert swapped
+
+
+def test_empty_directory_identity_rechecked_before_certification(tmp_path):
+    root = tmp_path / "project"
+    original = root / "empty"
+    original.mkdir(parents=True)
+    replacement = root / "replacement"
+    replacement.mkdir()
+    detached = root / "detached"
+    original_open = provenance._open_tree_directory
+    opens = 0
+
+    def replace_after_listing(root_fd, parts):
+        nonlocal opens
+        if parts == ("empty",):
+            opens += 1
+            if opens == 2:
+                original.rename(detached)
+                replacement.rename(original)
+        return original_open(root_fd, parts)
+
+    with patch.object(
+        provenance, "_open_tree_directory", side_effect=replace_after_listing,
+    ):
+        with pytest.raises(ValueError, match="source directory changed"):
+            provenance.tree_digest(root)
+    assert opens == 2
+    assert detached.is_dir()
+
+
+def test_rejects_directory_mutation_after_it_was_enumerated(tmp_path):
+    root = tmp_path / "project"
+    root.mkdir()
+    nested = root / "nested"
+    nested.mkdir()
+    original_open = provenance._open_tree_directory
+    visits = 0
+
+    def mutate_at_final_check(root_fd, parts):
+        nonlocal visits
+        if parts == ("nested",):
+            visits += 1
+            if visits == 2:
+                (nested / "late.gd").write_text("extends Node\n")
+        return original_open(root_fd, parts)
+
+    with patch.object(
+        provenance, "_open_tree_directory", side_effect=mutate_at_final_check,
+    ):
+        with pytest.raises(ValueError, match="source directory changed"):
+            provenance.tree_digest(root)
+    assert visits == 2
+
+
+
 def test_manifest_sha_cannot_be_qualified_from_detached_parent(tmp_path):
     root = tmp_path / "project"
     target_dir = root / "artifacts"
