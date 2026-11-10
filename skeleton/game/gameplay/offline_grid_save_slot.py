@@ -61,16 +61,30 @@ def _decode(payload: bytes) -> object:
 
 
 def _encode(snapshot: object) -> bytes:
+    """Encode incrementally under the save budget, not after a huge allocation.
+
+    A hostile or buggy caller may supply a snapshot much larger than a legal
+    save. json.dumps() would first materialize that entire string. Streaming
+    JSONEncoder chunks allows bounded publication admission before allocation
+    grows beyond MAX_SAVE_BYTES, while preserving canonical serialization.
+    """
+    buf = bytearray()
     try:
-        payload = json.dumps(
-            snapshot, sort_keys=True, separators=(",", ":"), allow_nan=False,
-        ).encode("utf-8")
+        encoder = json.JSONEncoder(
+            sort_keys=True, separators=(",", ":"), allow_nan=False,
+        )
+        for text in encoder.iterencode(snapshot):
+            piece = text.encode("utf-8")
+            if len(piece) > MAX_SAVE_BYTES - len(buf):
+                raise SaveSlotError("save exceeds byte budget")
+            buf.extend(piece)
+    except SaveSlotError:
+        raise
     except (TypeError, ValueError, OverflowError, RecursionError) as exc:
         raise SaveSlotError("invalid replay snapshot") from exc
-    if len(payload) > MAX_SAVE_BYTES:
-        raise SaveSlotError("save exceeds byte budget")
-    # Python json.dumps may render heterogeneous dict keys to identical text.
-    # Do not publish a record that the strict reader would reject on restore.
+    payload = bytes(buf)
+    # Mixed key types can render the same textual key: refuse any record that
+    # cannot round-trip through the strict duplicate-key JSON reader.
     _decode(payload)
     return payload
 
