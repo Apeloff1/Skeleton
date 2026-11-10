@@ -153,16 +153,40 @@ class PostMergeOfflineIntegrations(unittest.TestCase):
                         [first, replace(first, runner_id="different")],
                     )
 
-    def test_compose_application_ports_have_literal_loopback_defaults(self):
+    def test_compose_application_ports_are_bound_to_the_right_services(self):
+        """A loopback bind elsewhere in Compose cannot qualify this service."""
+        import re
+
         root = Path(__file__).resolve().parents[2]
-        compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
-        for service_port in (
-            "SKELETON_PORT:-8010}:8001",
-            "BACKEND_PORT:-8001}:8001",
-            "FRONTEND_PORT:-3000}:",
-        ):
-            self.assertIn("127.0.0.1:", compose)
-            self.assertIn(service_port, compose)
+        lines = (root / "docker-compose.yml").read_text(encoding="utf-8").splitlines()
+        expected = {
+            "skeleton": '      - "127.0.0.1:${SKELETON_PORT:-8010}:8001"',
+            "backend": '      - "127.0.0.1:${BACKEND_PORT:-8001}:8001"',
+            "frontend": '      - "127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"',
+        }
+        service_starts = {
+            line.removeprefix("  ").removesuffix(":"): i
+            for i, line in enumerate(lines)
+            if re.fullmatch(r"  [a-z][a-z0-9_-]*:", line)
+        }
+        for name, bind in expected.items():
+            with self.subTest(name=name):
+                self.assertIn(name, service_starts)
+                start = service_starts[name]
+                end = next(
+                    (i for i in sorted(service_starts.values()) if i > start),
+                    len(lines),
+                )
+                section = lines[start:end]
+                self.assertEqual(section.count("    ports:"), 1)
+                port_start = section.index("    ports:") + 1
+                binds = []
+                for line in section[port_start:]:
+                    if line.startswith("    ") and not line.startswith("      "):
+                        break
+                    if line.startswith("      - "):
+                        binds.append(line)
+                self.assertEqual(binds, [bind])
 
 
 if __name__ == "__main__":
