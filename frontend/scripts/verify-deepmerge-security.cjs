@@ -12,7 +12,25 @@ function verifyDeepmergePrototypeGuard() {
     throw new Error('deepmerge resolves to an unreviewed package');
   }
   const pkg = JSON.parse(fs.readFileSync(metadata, 'utf8'));
-  if (pkg.version !== '4.3.1') throw new Error('deepmerge version requires security review');
+  // Accept only the independently guarded legacy package, or the exact
+  // repository-vendored hardened version and its pinned provenance.
+  const legacy = pkg.version === '4.3.1';
+  const vendor = pkg.version === '4.3.2' &&
+    pkg.skeleton?.upstreamVersion === '4.3.1' &&
+    pkg.skeleton?.advisory === 'GHSA-gcqx-w48m-w2h4' &&
+    pkg.skeleton?.hardened === true;
+  if (!legacy && !vendor) throw new Error('deepmerge version or provenance requires security review');
+  if (vendor) {
+    const trustedRoot = path.resolve(__dirname, '../vendor/deepmerge');
+    for (const rel of ['package.json', 'index.js', 'dist/cjs.js', 'dist/umd.js']) {
+      const trusted = path.join(trustedRoot, rel);
+      const installed = path.join(expectedRoot, rel);
+      if (!fs.lstatSync(trusted).isFile() || !fs.lstatSync(installed).isFile() ||
+          !fs.readFileSync(trusted).equals(fs.readFileSync(installed))) {
+        throw new Error('installed deepmerge differs from reviewed local vendor bytes');
+      }
+    }
+  }
   const root = expectedRoot;
   for (const dir of [root, path.join(root, 'dist')]) {
     if (!fs.lstatSync(dir).isDirectory()) throw new Error('deepmerge package directory is unsafe');

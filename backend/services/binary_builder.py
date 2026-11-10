@@ -923,8 +923,17 @@ async def package_build(build: dict, kinds: list[str] | None = None) -> dict:
     for r in results:
         if isinstance(r, Exception):
             errors.append(f"{type(r).__name__}: {r}")
-        else:
+        elif isinstance(r, dict) and r.get("artifact_id") and r.get("path"):
             artifacts.append(r)
+            if r.get("kind") == "apk" and not r.get("is_installable"):
+                errors.append(
+                    "APK package is an inspection archive, not an installable application; "
+                    "configure the Android build toolchain and rebuild."
+                )
+        elif isinstance(r, dict):
+            errors.append(str(r.get("error") or "packager returned no artifact"))
+        else:
+            errors.append("packager returned an invalid result")
     return {"artifacts": artifacts, "errors": errors}
 
 

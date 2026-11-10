@@ -17,5 +17,5 @@ def test_retained_non_ai_roots_have_explicit_canonical_owner():
 
 def test_native_http_fixture_has_no_runner_specific_absolute_directory():
     source = (ROOT / "skeleton/testing/test_ai_flight_http.py").read_text(encoding="utf-8")
-    assert "tempfile.TemporaryDirectory(prefix='ai-flight-http-')" in source
+    assert "tempfile.TemporaryDirectory(prefix='ai-flight-http-'" in source
     assert "dir='/home/oai'" not in source

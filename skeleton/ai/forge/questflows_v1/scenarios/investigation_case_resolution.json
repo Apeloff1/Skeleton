@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "investigation_case_resolution",
+  "domain": "investigation",
+  "stages": [
+    {
+      "key": "discover_case_resolution",
+      "evidence": "investigation:case_resolution:discover:proof",
+      "grants": "investigation:case_resolution:stage:1",
+      "risk": 5,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_case_resolution",
+      "evidence": "investigation:case_resolution:prepare:proof",
+      "grants": "investigation:case_resolution:stage:2",
+      "risk": 6,
+      "sequence": 1,
+      "requires_previous_grant": "investigation:case_resolution:stage:1"
+    },
+    {
+      "key": "execute_case_resolution",
+      "evidence": "investigation:case_resolution:execute:proof",
+      "grants": "investigation:case_resolution:stage:3",
+      "risk": 7,
+      "sequence": 2,
+      "requires_previous_grant": "investigation:case_resolution:stage:2"
+    },
+    {
+      "key": "resolve_case_resolution",
+      "evidence": "investigation:case_resolution:resolve:proof",
+      "grants": "investigation:case_resolution:stage:4",
+      "risk": 8,
+      "sequence": 3,
+      "requires_previous_grant": "investigation:case_resolution:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "investigation_case_resolution:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "investigation:case_resolution:discover:proof"
+      ]
+    },
+    {
+      "id": "investigation_case_resolution:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "investigation:case_resolution:prepare:proof"
+      ]
+    },
+    {
+      "id": "investigation_case_resolution:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "investigation:case_resolution:execute:proof"
+      ]
+    },
+    {
+      "id": "investigation_case_resolution:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "investigation:case_resolution:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

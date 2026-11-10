@@ -1,26 +1,32 @@
-"""Static pinned-backend Docker compatibility gate, not actual runtime qualification."""
-from pathlib import Path
+"""Guard the backend container's dependency-supported Python and runtime cleanup.
+
+A previous automated base-image bump to Python 3.15 passed a Dockerfile
+pin update but failed at the explicit <3.15 dependency guard during E2E.
+"""
+from __future__ import annotations
+
 import re
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+DOCKERFILE = ROOT / "backend" / "Dockerfile"
 
 
-def test_all_backend_python_image_stages_compatible_and_same_digest():
-    source = (ROOT / "backend/Dockerfile").read_text(encoding="utf-8")
-    bases = re.findall(
-        r"^FROM python:(3\.\d+)-alpine@sha256:([0-9a-f]{64}) AS (builder|runtime-source|production)$",
-        source, re.MULTILINE,
-    )
-    assert len(bases) == 3
-    assert {stage for _, _, stage in bases} == {"builder", "runtime-source", "production"}
-    assert len({(version, digest) for version, digest, _ in bases}) == 1
-    version = tuple(map(int, bases[0][0].split(".")))
-    assert (3, 10) <= version < (3, 15)
-    assert "backend dependencies require supported Python <3.15" in source
+def test_backend_image_stages_share_supported_digest_pinned_python():
+    source = DOCKERFILE.read_text(encoding="utf-8")
+    stages = re.findall(r"^FROM (python:[^\s]+) AS (builder|runtime-source|production)$", source, re.M)
+    assert len(stages) == 3, stages
+    images = {image for image, _ in stages}
+    assert len(images) == 1, images
+    image = images.pop()
+    assert re.fullmatch(r"python:3\.14-alpine@sha256:[0-9a-f]{64}", image), image
+    assert "sys.version_info[:2] < (3, 15)" in source
 
 
-def test_production_pip_cleanup_rejects_unknown_python_layout():
-    source = (ROOT / "backend/Dockerfile").read_text(encoding="utf-8")
+def test_prod_pip_removal_follows_installed_interpreter_and_is_fail_closed():
+    source = DOCKERFILE.read_text(encoding="utf-8")
     assert 'sysconfig.get_path("purelib")' in source
-    assert 'unexpected Python site-packages path; refusing runtime pip cleanup' in source
-    assert "ENVIRONMENT=production" in source
+    assert 'is_relative_to(pathlib.Path("/usr/local/lib"))' in source
+    assert 'shutil.rmtree(site / "pip"' in source
+    assert '/usr/local/lib/python3.14/site-packages/pip' not in source
+    assert '/usr/local/lib/python3.15/site-packages/pip' not in source

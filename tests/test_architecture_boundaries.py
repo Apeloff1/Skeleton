@@ -177,30 +177,63 @@ def test_missing_canonical_root_fails_closed_when_required(tmp_path: Path) -> No
     )
 
 
-def test_local_api_sibling_relative_import_is_not_upward_dependency(tmp_path: Path) -> None:
+def test_deep_package_sibling_api_is_not_root_api(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
     _write(
-        tmp_path, "skeleton/ai/runtime/production_fabric/product/cli.py",
-        "from .api import LocalAPI\n",
+        root,
+        "skeleton/ai/runtime/production_fabric/product/cli.py",
+        "from .api import LocalAPI\nfrom . import api\n",
     )
-    assert collect_violations(tmp_path) == []
+
+    assert collect_violations(root) == []
 
 
-def test_parent_alias_reaching_skeleton_api_is_rejected(tmp_path: Path) -> None:
-    _write(tmp_path, "skeleton/agents/worker.py", "from .. import api\n")
-    violations = collect_violations(tmp_path)
+def test_deep_package_relative_import_cannot_bypass_root_api(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(
+        root,
+        "skeleton/ai/runtime/production_fabric/product/cli.py",
+        "from .....api import LocalAPI\n",
+    )
+
+    violations = collect_violations(root)
     assert len(violations) == 1
-    assert "skeleton.api" in violations[0].message
+    assert "must not depend upward on skeleton.api" in violations[0].message
 
 
-def test_absolute_package_alias_reaching_skeleton_api_is_rejected(tmp_path: Path) -> None:
-    _write(tmp_path, "skeleton/agents/worker.py", "from skeleton import api\n")
-    violations = collect_violations(tmp_path)
+def test_relative_from_parent_import_api_is_checked(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(root, "skeleton/agents/task.py", "from .. import api\n")
+
+    violations = collect_violations(root)
     assert len(violations) == 1
-    assert "skeleton.api" in violations[0].message
+    assert "must not depend upward on skeleton.api" in violations[0].message
+
+def test_deep_package_sibling_api_is_not_root_api(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(
+        root,
+        "skeleton/ai/runtime/production_fabric/product/cli.py",
+        "from .api import LocalAPI\nfrom . import api\n",
+    )
+    assert collect_violations(root) == []
 
 
-def test_deep_relative_api_import_reaching_skeleton_api_is_rejected(tmp_path: Path) -> None:
-    _write(tmp_path, "skeleton/ai/runtime/worker.py", "from ...api import routes\n")
-    violations = collect_violations(tmp_path)
+def test_deep_package_relative_import_cannot_bypass_root_api(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(
+        root,
+        "skeleton/ai/runtime/production_fabric/product/cli.py",
+        "from .....api import LocalAPI\n",
+    )
+    violations = collect_violations(root)
     assert len(violations) == 1
-    assert "skeleton.api" in violations[0].message
+    assert "must not depend upward on skeleton.api" in violations[0].message
+
+
+def test_relative_from_parent_import_api_is_checked(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(root, "skeleton/agents/task.py", "from .. import api\n")
+    violations = collect_violations(root)
+    assert len(violations) == 1
+    assert "must not depend upward on skeleton.api" in violations[0].message
