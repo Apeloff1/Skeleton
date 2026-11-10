@@ -2199,7 +2199,7 @@
       "source": "skeleton/pr_automation",
       "destination": "skeleton/ai/build/pr_automation",
       "kind": "tree",
-      "source_git_object_sha": "3df606ef721a256881d0656737c77649b47f522b",
+      "source_git_object_sha": "5ebd1c49e3adf6b9260debec0fd62f17f1150b90",
       "role": "Automerge, runner, queue, policy, evidence, and hygiene logic is autonomous repository-engineering/build-control code.",
       "work_package_refs": [
         "WP-W15",
@@ -7377,6 +7377,11 @@
       "path": "skeleton/provider_contract.py",
       "owner": "provider compatibility boundary",
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
+    },
+    {
+      "path": "skeleton/provider_environment.py",
+      "owner": "deterministic game-environment and replay adapter",
+      "reason": "Canonical bounded deterministic game-environment source stays outside provider-credential AI tree; holdout/replay custody is retained here until a separately reviewed mirror and ownership cutover"
     },
     {
       "path": "skeleton/providers",

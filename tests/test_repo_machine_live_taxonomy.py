@@ -46,6 +46,20 @@ def test_all_skeleton_top_level_directories_have_machine_placement() -> None:
     assert unclassified == []
 
 
+def test_performance_and_qualification_roots_are_quality_owned() -> None:
+    """New standalone evidence packages never inherit AI runtime ownership."""
+    config = load_machine_config(ROOT)
+    for relative in (
+        "skeleton/perfgate/__init__.py",
+        "skeleton/qualification/__init__.py",
+    ):
+        assert (ROOT / relative).is_file()
+        placement = placement_for_path(config, relative)
+        assert (placement.zone, placement.owner, placement.lifecycle) == (
+            "quality", "quality-plane", "canonical"
+        )
+
+
 def test_profiler_runtime_is_owned_by_platform_observability() -> None:
     config = load_machine_config(ROOT)
     placement = placement_for_path(config, "skeleton/perf_profiler/runtime.py")
