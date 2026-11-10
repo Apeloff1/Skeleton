@@ -1,0 +1,259 @@
+#!/usr/bin/env python3
+"""Read-only post-merge exact-main workflow evidence, never release approval.
+
+Only completed, successful *push* runs for the current canonical main SHA can
+contribute to this report. Required real jobs must also succeed. The tool
+does not merge, change protection, cancel jobs, or infer first-install
+readiness from static checks.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from typing import Any, Mapping, Sequence
+from urllib.parse import quote
+from urllib.request import Request, urlopen
+
+
+SHA = re.compile(r"^[0-9a-f]{40}$")
+REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+MAX_RESPONSE_BYTES = 4 * 1024 * 1024
+ESSENTIAL_JOBS: Mapping[str, tuple[str, ...]] = {
+    "Workflow Input Security": ("Workflow input shell boundary",),
+    "Merge Readiness": (
+        "PR Automation Tests", "Unit", "Integration Smoke",
+    ),
+    "Repository Hygiene Gate": ("Changed-files hygiene",),
+    "Malware Gate": ("Reject malware, executable and active-content payloads",),
+    "Secret scanning": ("Gitleaks",),
+    "App Foundation E2E": ("App Foundation E2E (stack + Playwright)",),
+}
+
+
+class EvidenceError(ValueError):
+    """No authority can be inferred from malformed or incomplete evidence."""
+
+
+def _sha(payload: Mapping[str, Any]) -> str | None:
+    if not isinstance(payload, Mapping):
+        return None
+    commit = payload.get("commit")
+    value = commit.get("sha") if isinstance(commit, Mapping) else None
+    return value if isinstance(value, str) and SHA.fullmatch(value) else None
+
+
+def _latest_run(
+    name: str, head: str, runs: Sequence[Mapping[str, Any]],
+) -> Mapping[str, Any] | None:
+    candidates = []
+    for run in runs:
+        if not isinstance(run, Mapping):
+            continue
+        if run.get("name") != name or run.get("event") != "push":
+            continue
+        if run.get("head_sha") != head:
+            continue
+        rid = run.get("id")
+        attempt = run.get("run_attempt")
+        created = run.get("created_at")
+        if (type(rid) is not int or rid <= 0
+                or type(attempt) is not int or attempt < 1
+                or not isinstance(created, str)):
+            continue
+        candidates.append((created, rid, attempt, run))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda row: row[:3])[3]
+
+
+def inspect(
+    *,
+    head: str,
+    branch_before: Mapping[str, Any],
+    branch_after: Mapping[str, Any],
+    runs: Sequence[Mapping[str, Any]],
+    jobs_by_run: Mapping[str, Sequence[Mapping[str, Any]]],
+) -> dict[str, Any]:
+    """Produce an auditable, fail-closed report with deterministic reasons."""
+    if not isinstance(head, str) or SHA.fullmatch(head) is None:
+        raise EvidenceError("invalid exact-main SHA")
+    reasons: list[str] = []
+    if _sha(branch_before) != head:
+        reasons.append("main_head_before_not_exact")
+    if _sha(branch_after) != head:
+        reasons.append("main_head_after_changed")
+    if branch_before.get("protected") is not True or branch_after.get("protected") is not True:
+        reasons.append("main_branch_unprotected")
+    # A protected label alone does not prove that named checks bind all writers.
+    protection = branch_after.get("protection")
+    required_status = protection.get("required_status_checks") if isinstance(protection, Mapping) else None
+    checks = set()
+    enforcement = None
+    if isinstance(required_status, Mapping):
+        enforcement = required_status.get("enforcement_level")
+        for field in ("contexts", "checks"):
+            values = required_status.get(field)
+            if isinstance(values, list):
+                for item in values:
+                    if type(item) is str:
+                        checks.add(item)
+                    elif isinstance(item, Mapping) and type(item.get("context")) is str:
+                        checks.add(item["context"])
+    if enforcement != "everyone":
+        reasons.append("main_required_checks_not_enforced_for_everyone")
+    for name in ESSENTIAL_JOBS:
+        if name not in checks:
+            reasons.append("main_required_check_not_configured:" + name)
+
+    evidence: dict[str, dict[str, Any]] = {}
+    for name, jobs_required in ESSENTIAL_JOBS.items():
+        run = _latest_run(name, head, runs)
+        if run is None:
+            reasons.append("exact_main_push_workflow_missing:" + name)
+            evidence[name] = {"state": "missing"}
+            continue
+        run_id = run["id"]
+        status, conclusion = run.get("status"), run.get("conclusion")
+        evidence[name] = {
+            "run_id": run_id, "attempt": run["run_attempt"],
+            "status": status, "conclusion": conclusion,
+        }
+        if status != "completed" or conclusion != "success":
+            reasons.append("exact_main_workflow_not_success:" + name)
+            continue
+        jobs = jobs_by_run.get(str(run_id))
+        if not isinstance(jobs, list):
+            reasons.append("exact_main_job_inventory_missing:" + name)
+            continue
+        names: dict[str, Mapping[str, Any]] = {}
+        duplicate_names = set()
+        for job in jobs:
+            if not isinstance(job, Mapping) or not isinstance(job.get("name"), str):
+                continue
+            if job["name"] in names:
+                duplicate_names.add(job["name"])
+            names[job["name"]] = job
+        if duplicate_names:
+            reasons.append("ambiguous_duplicate_job_identity:" + name)
+        for required in jobs_required:
+            job = names.get(required)
+            if job is None or job.get("status") != "completed" or job.get("conclusion") != "success":
+                reasons.append("essential_job_not_success:" + name + ":" + required)
+        if name == "Merge Readiness":
+            shards = [job for job in jobs
+                      if isinstance(job, Mapping) and
+                      isinstance(job.get("name"), str) and
+                      job["name"].startswith("Canonical Domain Suite (")]
+            if not shards:
+                reasons.append("canonical_domain_suite_evidence_missing")
+            for job in shards:
+                if job.get("status") != "completed" or job.get("conclusion") != "success":
+                    reasons.append("canonical_domain_suite_not_success:" + job["name"])
+
+    reasons = list(dict.fromkeys(reasons))
+    return {
+        "schema": "skeleton.post-merge-main-evidence.v1",
+        "exact_main_sha": head,
+        "current_main_unchanged": _sha(branch_before) == head == _sha(branch_after),
+        "workflow_evidence": evidence,
+        "blocking_reasons": reasons,
+        "exact_main_workflow_gates_qualified": not reasons,
+        "first_install_certified": False,
+        "production_release_approved": False,
+    }
+
+
+def _get_json(repo: str, suffix: str, token: str | None) -> dict[str, Any]:
+    url = "https://api.github.com/repos/" + "/".join(quote(p, safe="") for p in repo.split("/")) + suffix
+    headers = {"Accept": "application/vnd.github+json",
+               "X-GitHub-Api-Version": "2022-11-28",
+               "User-Agent": "skeleton-readonly-exact-main-audit"}
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    request = Request(url, headers=headers)
+    with urlopen(request, timeout=15) as response:
+        content = response.read(MAX_RESPONSE_BYTES + 1)
+    if len(content) > MAX_RESPONSE_BYTES:
+        raise EvidenceError("GitHub response exceeded byte budget")
+    value = json.loads(content)
+    if not isinstance(value, dict):
+        raise EvidenceError("unexpected GitHub evidence response")
+    return value
+
+
+def live_snapshot(repo: str, head: str | None = None) -> dict[str, Any]:
+    if not REPO.fullmatch(repo):
+        raise EvidenceError("repository must be owner/name")
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    before = _get_json(repo, "/branches/main", token)
+    expected = _sha(before)
+    if expected is None or (head is not None and head != expected):
+        raise EvidenceError("current main head does not match requested SHA")
+    runs_response = _get_json(
+        repo, "/actions/runs?head_sha=" + expected + "&event=push&per_page=100", token,
+    )
+    runs = runs_response.get("workflow_runs")
+    total = runs_response.get("total_count")
+    if (not isinstance(runs, list) or type(total) is not int
+            or total < 0 or total != len(runs)):
+        raise EvidenceError("exact-main run inventory is incomplete or paginated")
+    jobs_by_run: dict[str, list[dict[str, Any]]] = {}
+    for name in ESSENTIAL_JOBS:
+        match = _latest_run(name, expected, runs)
+        if match is None or match.get("conclusion") != "success" or match.get("status") != "completed":
+            continue
+        run_id = match["id"]
+        result = _get_json(repo, "/actions/runs/" + str(run_id) + "/jobs?per_page=100", token)
+        jobs = result.get("jobs")
+        count = result.get("total_count")
+        if not isinstance(jobs, list) or type(count) is not int or count != len(jobs):
+            raise EvidenceError("exact-main job inventory is incomplete")
+        jobs_by_run[str(run_id)] = jobs
+    after = _get_json(repo, "/branches/main", token)
+    return {
+        "head": expected, "branch_before": before, "branch_after": after,
+        "runs": runs, "jobs_by_run": jobs_by_run,
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--repo", default="Apeloff1/Skeleton")
+    parser.add_argument("--sha", help="Require this exact main commit")
+    parser.add_argument("--snapshot", help="Offline JSON evidence fixture (no network)")
+    args = parser.parse_args(argv)
+    try:
+        if args.snapshot:
+            from pathlib import Path
+            source = Path(args.snapshot)
+            with source.open("rb") as stream:
+                raw = stream.read(MAX_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_RESPONSE_BYTES:
+                raise EvidenceError("offline evidence exceeds byte budget")
+            snapshot = json.loads(raw)
+            if not isinstance(snapshot, dict):
+                raise EvidenceError("offline evidence must be an object")
+            if args.sha and args.sha != snapshot.get("head"):
+                raise EvidenceError("offline main SHA mismatch")
+        else:
+            snapshot = live_snapshot(args.repo, args.sha)
+        report = inspect(**snapshot)
+    except (EvidenceError, OSError, ValueError, TypeError, KeyError) as exc:
+        # Never echo API credentials or remote response text in public logs.
+        print(json.dumps({
+            "schema": "skeleton.post-merge-main-evidence.v1",
+            "exact_main_workflow_gates_qualified": False,
+            "first_install_certified": False,
+            "production_release_approved": False,
+            "blocking_reasons": ["evidence_fetch_or_shape_failure:" + type(exc).__name__],
+        }, sort_keys=True))
+        return 2
+    print(json.dumps(report, sort_keys=True, separators=(",", ":")))
+    return 0 if report["exact_main_workflow_gates_qualified"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
