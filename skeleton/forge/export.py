@@ -19,6 +19,7 @@ CLI (used by ``.github/workflows/godot-playtest.yml``)::
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import json
 import os
 import sys
@@ -279,71 +280,75 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
     cumulative_output_bytes = 0
     for preset in presets:
         relative = Path(PRESET_OUTPUTS[preset])
-        parent = _safe_directory(out / relative.parent)
-        target = parent / relative.name
-        if target.exists() or target.is_symlink():
-            raise ValueError("Godot export target already exists; refusing overwrite")
-        code, log, timed_out = _run(
-            [path, "--headless", "--path", str(project), "--export-release", preset, str(target)],
-            project, timeout,
-        )
-        entry: Dict[str, Any] = {"output": str(target), "returncode": code, "timed_out": timed_out}
-        if "No export template found" in log:
-            entry.update(ok=False, reason="templates-missing")
-        else:
-            entry["ok"] = code == 0 and _regular_output(target) and not timed_out
-            if not entry["ok"]:
-                entry["reason"] = "export-failed"
-        # A huge output directory must not be fully enumerated and sorted.
-        artefacts: list[Path] = []
-        too_many = False
-        with os.scandir(parent) as entries:
-            for item in entries:
-                if len(artefacts) == MAX_OUTPUT_FILES:
-                    too_many = True
-                    break
-                artefacts.append(Path(item.path))
-        artefacts.sort()
-        if too_many or any(not _regular_output(item) for item in artefacts):
-            entry["ok"], entry["reason"] = False, "unsafe-or-unbounded-artifacts"
-            artefacts = []
-        entry["artefacts"] = [str(item.relative_to(out)) for item in artefacts]
-        entry["bytes"] = sum(item.lstat().st_size for item in artefacts)
-        entry["sha256"] = {}
-        # A per-artifact bound alone could admit 64 × 2 GiB across multiple
-        # presets. Count the whole invocation before hashing expensive output
-        # or running an exported executable. Reject rather than truncating the
-        # inventory or permitting an unqualified partial pass.
-        if entry["bytes"] > MAX_EXPORT_TOTAL_BYTES - cumulative_output_bytes:
-            entry["ok"] = False
-            entry["reason"] = "cumulative-output-byte-budget-exceeded"
+        parent, output_dfd = _open_directory(out / relative.parent)
+        with closing(output_dfd):
+            target = parent / relative.name
+            if target.exists() or target.is_symlink():
+                raise ValueError("Godot export target already exists; refusing overwrite")
+            code, log, timed_out = _run(
+                [path, "--headless", "--path", str(project), "--export-release", preset, str(target)],
+                project, timeout,
+            )
+            _verify_report_parent(parent, output_dfd)
+            entry: Dict[str, Any] = {"output": str(target), "returncode": code, "timed_out": timed_out}
+            if "No export template found" in log:
+                entry.update(ok=False, reason="templates-missing")
+            else:
+                entry["ok"] = code == 0 and _regular_output(target) and not timed_out
+                if not entry["ok"]:
+                    entry["reason"] = "export-failed"
+            # A huge output directory must not be fully enumerated and sorted.
+            artefacts: list[Path] = []
+            too_many = False
+            with os.scandir(parent) as entries:
+                for item in entries:
+                    if len(artefacts) == MAX_OUTPUT_FILES:
+                        too_many = True
+                        break
+                    artefacts.append(Path(item.path))
+            artefacts.sort()
+            if too_many or any(not _regular_output(item) for item in artefacts):
+                entry["ok"], entry["reason"] = False, "unsafe-or-unbounded-artifacts"
+                artefacts = []
+            entry["artefacts"] = [str(item.relative_to(out)) for item in artefacts]
+            entry["bytes"] = sum(item.lstat().st_size for item in artefacts)
+            entry["sha256"] = {}
+            # A per-artifact bound alone could admit 64 × 2 GiB across multiple
+            # presets. Count the whole invocation before hashing expensive output
+            # or running an exported executable. Reject rather than truncating the
+            # inventory or permitting an unqualified partial pass.
+            if entry["bytes"] > MAX_EXPORT_TOTAL_BYTES - cumulative_output_bytes:
+                entry["ok"] = False
+                entry["reason"] = "cumulative-output-byte-budget-exceeded"
+                report["presets"][preset] = entry
+                return {
+                    **report,
+                    "status": "failed",
+                    "reason": "output-byte-budget",
+                    "passed": False,
+                    "out_dir": str(out),
+                }
+            cumulative_output_bytes += entry["bytes"]
+            if entry["ok"]:
+                try:
+                    entry["sha256"] = {str(item.relative_to(out)): _artifact_digest(item)
+                                       for item in artefacts}
+                    if preset == "Linux" and not _regular_output(target.with_suffix(".pck")):
+                        raise ValueError("missing Linux game resource pack")
+                    if preset == "Web" and not _regular_output(target.with_suffix(".wasm")):
+                        raise ValueError("missing Web engine WASM payload")
+                except (OSError, ValueError):
+                    entry["ok"], entry["reason"] = False, "artifact-custody-failed"
+            _verify_report_parent(parent, output_dfd)
+            entry["log_tail"] = log[-1500:]
+            if entry["ok"] and preset == "Linux":
+                entry["boot"] = _boot_exported(target, boot_frames, timeout)
+                entry["ok"] = entry["boot"]["passed"]
+                if not entry["ok"]:
+                    entry["reason"] = "boot-failed"
+            _verify_report_parent(parent, output_dfd)
+            all_ok = all_ok and entry["ok"]
             report["presets"][preset] = entry
-            return {
-                **report,
-                "status": "failed",
-                "reason": "output-byte-budget",
-                "passed": False,
-                "out_dir": str(out),
-            }
-        cumulative_output_bytes += entry["bytes"]
-        if entry["ok"]:
-            try:
-                entry["sha256"] = {str(item.relative_to(out)): _artifact_digest(item)
-                                   for item in artefacts}
-                if preset == "Linux" and not _regular_output(target.with_suffix(".pck")):
-                    raise ValueError("missing Linux game resource pack")
-                if preset == "Web" and not _regular_output(target.with_suffix(".wasm")):
-                    raise ValueError("missing Web engine WASM payload")
-            except (OSError, ValueError):
-                entry["ok"], entry["reason"] = False, "artifact-custody-failed"
-        entry["log_tail"] = log[-1500:]
-        if entry["ok"] and preset == "Linux":
-            entry["boot"] = _boot_exported(target, boot_frames, timeout)
-            entry["ok"] = entry["boot"]["passed"]
-            if not entry["ok"]:
-                entry["reason"] = "boot-failed"
-        all_ok = all_ok and entry["ok"]
-        report["presets"][preset] = entry
     return {**report, "status": "passed" if all_ok else "failed", "passed": all_ok,
             "out_dir": str(out)}
 
