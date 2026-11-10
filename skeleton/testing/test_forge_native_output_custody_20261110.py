@@ -250,6 +250,79 @@ def test_report_final_component_symlink_swap_cannot_read_other_file(tmp_path):
     assert saved.read_bytes() == b'{"status":"NO-SHIP"}'
 
 
+def test_native_export_refuses_aggregate_bytes_before_hash_and_boot(
+    tmp_path, monkeypatch,
+):
+    emitted = emit_godot(compile_era("extraction_now"), title="byte-limited")
+    monkeypatch.setattr(
+        forge_export, "resolve_binary",
+        lambda binary=None: ("/bin/true", "mock-only", False),
+    )
+    monkeypatch.setattr(forge_export, "MAX_EXPORT_TOTAL_BYTES", 12)
+    calls = []
+    def fake_run(command, cwd, timeout):
+        calls.append(command)
+        if "--export-release" in command:
+            target = Path(command[-1])
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"0123456789")
+            target.with_suffix(".pck").write_bytes(b"abcdefghij")
+        return 0, "", False
+
+    monkeypatch.setattr(forge_export, "_run", fake_run)
+    with patch.object(
+        forge_export, "_artifact_digest",
+        side_effect=AssertionError("must reject before expensive SHA hashing"),
+    ), patch.object(
+        forge_export, "_boot_exported",
+        side_effect=AssertionError("must not boot over-budget image"),
+    ):
+        report = forge_export.export_build(
+            emitted, tmp_path / "native", presets=("Linux",),
+        )
+    assert report["passed"] is False
+    assert report["release_certified"] is False
+    assert report["reason"] == "output-byte-budget"
+    assert report["presets"]["Linux"]["bytes"] == 20
+    assert report["presets"]["Linux"]["reason"] == (
+        "cumulative-output-byte-budget-exceeded"
+    )
+    assert len([call for call in calls if "--export-release" in call]) == 1
+
+
+def test_cumulative_budget_covers_all_requested_presets(tmp_path, monkeypatch):
+    emitted = emit_godot(compile_era("extraction_now"), title="multi-preset")
+    monkeypatch.setattr(
+        forge_export, "resolve_binary",
+        lambda binary=None: ("/bin/true", "mock-only", False),
+    )
+    monkeypatch.setattr(forge_export, "MAX_EXPORT_TOTAL_BYTES", 24)
+    def fake_run(command, cwd, timeout):
+        if "--export-release" in command:
+            target = Path(command[-1])
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"12345678")
+            required = ".pck" if "game.x86_64" in target.name else ".wasm"
+            target.with_suffix(required).write_bytes(b"abcdefgh")
+        return 0, "", False
+
+    monkeypatch.setattr(forge_export, "_run", fake_run)
+    monkeypatch.setattr(
+        forge_export, "_boot_exported",
+        lambda executable, frames, timeout: {"passed": True},
+    )
+    report = forge_export.export_build(
+        emitted, tmp_path / "native", presets=("Linux", "Web"),
+    )
+    assert report["passed"] is False
+    assert report["release_certified"] is False
+    assert report["presets"]["Linux"]["ok"] is True
+    assert report["presets"]["Web"]["ok"] is False
+    assert report["presets"]["Web"]["reason"] == (
+        "cumulative-output-byte-budget-exceeded"
+    )
+
+
 def test_native_output_inventory_stops_at_file_cap(tmp_path, monkeypatch):
     """A fake runner creates too many files; no real Godot invocation occurs."""
     emitted = emit_godot(compile_era("extraction_now"), title="bounded-export")
