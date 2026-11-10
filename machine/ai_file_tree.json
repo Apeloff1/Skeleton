@@ -7374,6 +7374,11 @@
       "reason": "Generated capability organ pack (INDEX.csv + caps) stays canonical at the legacy source; excluded from staged-mirror parity until explicit per-pack cutover. Relocation does not create completion authority."
     },
     {
+      "path": "skeleton/provider_environment.py",
+      "owner": "game-environment simulation and deterministic replay",
+      "reason": "The deterministic game-world adapter and holdout/replay buffers remain outside credential-provider AI tree authority; this module has no model credential custody or provider runtime ownership."
+    },
+    {
       "path": "skeleton/provider_contract.py",
       "owner": "provider compatibility boundary",
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
