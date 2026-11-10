@@ -50,7 +50,9 @@ def _has_symlink(root: Path, rel: PurePosixPath) -> bool:
     return False
 
 
-def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
+def _digest_beneath(
+    root: Path, relative: str, *, max_bytes: int = MAX_ARTIFACT_BYTES,
+) -> tuple[str, int]:
     """Read a bounded artifact via anchored descriptors, detecting path swaps.
 
     The parent directory descriptor remains open until digest publication so
@@ -58,6 +60,8 @@ def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
     The trusted source root itself requires separate operator custody.
     """
     parts = _relative(relative)
+    if type(max_bytes) is not int or not 1 <= max_bytes <= 2 * 1024 * 1024 * 1024:
+        raise ValueError("invalid bounded artifact digest limit")
     if not all(hasattr(os, k) for k in ("O_NOFOLLOW", "O_DIRECTORY")) or os.name != "posix":
         raise ValueError("secure artifact verification unavailable on this host")
     dflags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
@@ -79,16 +83,16 @@ def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
         try:
             before = os.fstat(file_fd)
             if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
-                    or before.st_size > MAX_ARTIFACT_BYTES):
+                    or before.st_size > max_bytes):
                 raise ValueError("artifact is not an allowed bounded regular file")
             digest = hashlib.sha256()
             size = 0
             while True:
-                data = os.read(file_fd, min(1024 * 1024, MAX_ARTIFACT_BYTES + 1 - size))
+                data = os.read(file_fd, min(1024 * 1024, max_bytes + 1 - size))
                 if not data:
                     break
                 size += len(data)
-                if size > MAX_ARTIFACT_BYTES:
+                if size > max_bytes:
                     raise ValueError("artifact exceeds bound")
                 digest.update(data)
             after = os.fstat(file_fd)
