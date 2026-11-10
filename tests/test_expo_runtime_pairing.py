@@ -52,7 +52,7 @@ class ExpoPairingContract(unittest.TestCase):
 
     def test_unknown_sdk_fails_closed(self) -> None:
         data = manifest()
-        data["dependencies"]["expo"] = "~55.0.0"
+        data["dependencies"]["expo"] = "~56.0.0"
         self.assertTrue(any("no reviewed compatibility matrix" in error for error in validate(data)))
 
     def test_missing_or_invalid_dependencies_fail_closed(self) -> None:

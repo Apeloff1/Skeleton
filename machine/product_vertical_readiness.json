@@ -1,0 +1,776 @@
+{
+  "schema_version": "skeleton.product_vertical_readiness.v1",
+  "registry_version": "2.0.0",
+  "status": "active",
+  "architecture_tag": "arch-map/v3.7",
+  "purpose": "Fail-closed acceptance registry for every canonical user-facing product vertical. It sets an S-grade contract without asserting runtime readiness.",
+  "sources": {
+    "architecture": "machine/architecture.json",
+    "construction": "machine/ai_app_construction.json",
+    "product_kernel": "backend/core/product_kernel.py",
+    "product_policy": "backend/core/canonical_product_policy.py",
+    "product_catalog": "frontend/src/product/productCatalog.ts",
+    "runtime_readiness": "backend/core/capability_readiness.py"
+  },
+  "grade_contract": {
+    "target": "S",
+    "required_dimensions": [
+      "product_surface",
+      "real_data_and_state",
+      "complete_actions",
+      "authority_and_provenance",
+      "failure_and_recovery",
+      "observability",
+      "vertical_validation"
+    ],
+    "laws": [
+      "every canonical product vertical has exactly one entry",
+      "every governed operation has policy and executor evidence",
+      "evidence paths are repository-owned and exact-head validated",
+      "static contract qualification never implies runtime readiness",
+      "missing or malformed evidence fails closed"
+    ]
+  },
+  "verticals": [
+    {
+      "vertical_id": "studio",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "create"
+      },
+      "backend_surface": "/api/gameforge-studio",
+      "governed_operations": [
+        "project.create",
+        "build.submit",
+        "pipeline.inspect"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/studio.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "backend/tests/test_execution_lifecycle_integration.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_game_learning_studio_project_creation.py",
+          "backend/tests/test_execution_lifecycle_integration.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      },
+      "horizontal_capabilities": [
+        "identity_authority",
+        "tenant_isolation",
+        "idempotency",
+        "budgets_backpressure",
+        "cancellation",
+        "retries_reconciliation",
+        "durable_persistence",
+        "crash_recovery",
+        "streaming_realtime",
+        "observability",
+        "evaluation_assurance",
+        "accessibility",
+        "localization",
+        "offline_degraded",
+        "export_portability",
+        "retention_deletion",
+        "security_privacy",
+        "deployment_release"
+      ]
+    },
+    {
+      "vertical_id": "world-forge",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "create"
+      },
+      "backend_surface": "/api/worldforge",
+      "governed_operations": [
+        "world.create",
+        "world.systems.compose",
+        "asset.forge"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/world-workbench.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "tests/test_original_world_simulator.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_world_system_composer.py",
+          "tests/test_original_world_simulator.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      },
+      "horizontal_capabilities": [
+        "identity_authority",
+        "tenant_isolation",
+        "idempotency",
+        "budgets_backpressure",
+        "cancellation",
+        "retries_reconciliation",
+        "durable_persistence",
+        "crash_recovery",
+        "streaming_realtime",
+        "observability",
+        "evaluation_assurance",
+        "accessibility",
+        "localization",
+        "offline_degraded",
+        "export_portability",
+        "retention_deletion",
+        "security_privacy",
+        "deployment_release"
+      ]
+    },
+    {
+      "vertical_id": "playables",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "play"
+      },
+      "backend_surface": "/api/playable",
+      "governed_operations": [
+        "playable.launch",
+        "runtime.sessions",
+        "progress.inspect"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/playable.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "backend/tests/test_playable_review_authority.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_playable_engine_bridge.py",
+          "backend/tests/test_playable_review_authority.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      },
+      "horizontal_capabilities": [
+        "identity_authority",
+        "tenant_isolation",
+        "idempotency",
+        "budgets_backpressure",
+        "cancellation",
+        "retries_reconciliation",
+        "durable_persistence",
+        "crash_recovery",
+        "streaming_realtime",
+        "observability",
+        "evaluation_assurance",
+        "accessibility",
+        "localization",
+        "offline_degraded",
+        "export_portability",
+        "retention_deletion",
+        "security_privacy",
+        "deployment_release"
+      ]
+    },
+    {
+      "vertical_id": "jeeves",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "learn"
+      },
+      "backend_surface": "/api/jeeves",
+      "governed_operations": [
+        "jeeves.reason",
+        "jeeves.plan",
+        "agents.review"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/jeeves-hub.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "backend/tests/test_jeeves_local_engine_selection.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_jeeves_control_plane.py",
+          "backend/tests/test_jeeves_local_engine_selection.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      },
+      "horizontal_capabilities": [
+        "identity_authority",
+        "tenant_isolation",
+        "idempotency",
+        "budgets_backpressure",
+        "cancellation",
+        "retries_reconciliation",
+        "durable_persistence",
+        "crash_recovery",
+        "streaming_realtime",
+        "observability",
+        "evaluation_assurance",
+        "accessibility",
+        "localization",
+        "offline_degraded",
+        "export_portability",
+        "retention_deletion",
+        "security_privacy",
+        "deployment_release"
+      ]
+    },
+    {
+      "vertical_id": "academy",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "learn"
+      },
+      "backend_surface": "/api/academy",
+      "governed_operations": [
+        "academy.continue",
+        "academy.practice",
+        "academy.progress"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/mega-academy.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "backend/tests/test_dragon_academy_routes.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_academy_legacy_compat.py",
+          "backend/tests/test_dragon_academy_routes.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      },
+      "horizontal_capabilities": [
+        "identity_authority",
+        "tenant_isolation",
+        "idempotency",
+        "budgets_backpressure",
+        "cancellation",
+        "retries_reconciliation",
+        "durable_persistence",
+        "crash_recovery",
+        "streaming_realtime",
+        "observability",
+        "evaluation_assurance",
+        "accessibility",
+        "localization",
+        "offline_degraded",
+        "export_portability",
+        "retention_deletion",
+        "security_privacy",
+        "deployment_release"
+      ]
+    },
+    {
+      "vertical_id": "operations",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "operate"
+      },
+      "backend_surface": "/api/ops",
+      "governed_operations": [
+        "ops.agents",
+        "ops.runtime",
+        "ops.deployments"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/control-plane.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py",
+          "backend/routes/ops.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py",
+          "frontend/src/product/productControlClient.ts"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      },
+      "horizontal_capabilities": [
+        "identity_authority",
+        "tenant_isolation",
+        "idempotency",
+        "budgets_backpressure",
+        "cancellation",
+        "retries_reconciliation",
+        "durable_persistence",
+        "crash_recovery",
+        "streaming_realtime",
+        "observability",
+        "evaluation_assurance",
+        "accessibility",
+        "localization",
+        "offline_degraded",
+        "export_portability",
+        "retention_deletion",
+        "security_privacy",
+        "deployment_release"
+      ]
+    },
+    {
+      "vertical_id": "governance",
+      "target_grade": "S",
+      "qualification_state": "contract_qualified",
+      "runtime_ready_claim": false,
+      "owner": {
+        "plane": "application-api",
+        "kernel": "backend/core/product_kernel.py",
+        "pillar": "operate"
+      },
+      "backend_surface": "/api/governance",
+      "governed_operations": [
+        "governance.policy",
+        "governance.audit",
+        "governance.safety"
+      ],
+      "evidence": {
+        "product_surface": [
+          "frontend/src/product/productCatalog.ts",
+          "frontend/app/control-plane.tsx",
+          "frontend/app/safety.tsx"
+        ],
+        "real_data_and_state": [
+          "backend/core/product_default_executors.py",
+          "backend/core/product_operations.py",
+          "backend/routes/governance.py"
+        ],
+        "complete_actions": [
+          "backend/core/canonical_product_policy.py",
+          "backend/core/product_executor_registry.py",
+          "backend/tests/test_native_product_executors.py",
+          "backend/routes/governance.py"
+        ],
+        "authority_and_provenance": [
+          "backend/core/product_operations.py",
+          "backend/core/execution_receipts.py",
+          "backend/tests/test_execution_receipts.py",
+          "backend/routes/governance.py"
+        ],
+        "failure_and_recovery": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_execution_lifecycle_integration.py",
+          "tests/test_governance_decide_gate.py",
+          "frontend/app/safety.tsx"
+        ],
+        "observability": [
+          "backend/core/product_control_plane.py",
+          "backend/tests/test_control_plane_transparency.py"
+        ],
+        "vertical_validation": [
+          "backend/tests/test_governance.py",
+          "tests/test_governance_decide_gate.py"
+        ]
+      },
+      "runtime_readiness": {
+        "source": "backend/core/capability_readiness.py",
+        "rule": "resolve from current policy, executor, replay safety, provenance and dependency evidence; never infer from this static registry"
+      },
+      "horizontal_capabilities": [
+        "identity_authority",
+        "tenant_isolation",
+        "idempotency",
+        "budgets_backpressure",
+        "cancellation",
+        "retries_reconciliation",
+        "durable_persistence",
+        "crash_recovery",
+        "streaming_realtime",
+        "observability",
+        "evaluation_assurance",
+        "accessibility",
+        "localization",
+        "offline_degraded",
+        "export_portability",
+        "retention_deletion",
+        "security_privacy",
+        "deployment_release"
+      ]
+    }
+  ],
+  "horizontal_contract": {
+    "applicability": "required_for_every_vertical",
+    "capabilities": [
+      {
+        "capability_id": "identity_authority",
+        "owner": "backend/core/auth_security.py",
+        "evidence": [
+          "backend/core/auth_security.py",
+          "backend/core/product_operations.py"
+        ],
+        "validation": [
+          "backend/tests/test_auth_security.py"
+        ]
+      },
+      {
+        "capability_id": "tenant_isolation",
+        "owner": "backend/core/tenant_storage_boundary.py",
+        "evidence": [
+          "backend/core/tenant_storage_boundary.py",
+          "frontend/src/product/tenantStorageBoundary.ts"
+        ],
+        "validation": [
+          "backend/tests/test_tenant_storage_boundary.py"
+        ]
+      },
+      {
+        "capability_id": "idempotency",
+        "owner": "backend/core/product_operations.py",
+        "evidence": [
+          "backend/core/product_operations.py",
+          "backend/core/core_v1/idempotency.py"
+        ],
+        "validation": [
+          "backend/tests/test_product_operations.py",
+          "backend/tests/test_ai_chat_context_idempotency.py"
+        ]
+      },
+      {
+        "capability_id": "budgets_backpressure",
+        "owner": "backend/core/durable_outbox.py",
+        "evidence": [
+          "backend/core/durable_outbox.py",
+          "skeleton/intelligence/admission.py"
+        ],
+        "validation": [
+          "backend/tests/test_durable_outbox.py"
+        ]
+      },
+      {
+        "capability_id": "cancellation",
+        "owner": "backend/core/operation_stream_transport.py",
+        "evidence": [
+          "backend/core/operation_stream_transport.py",
+          "frontend/src/services/operationStreamSession.ts"
+        ],
+        "validation": [
+          "backend/tests/test_operation_stream_transport.py",
+          "tests/test_ai_local_inference_cancellation.py"
+        ]
+      },
+      {
+        "capability_id": "retries_reconciliation",
+        "owner": "backend/core/engine_client.py",
+        "evidence": [
+          "backend/core/engine_client.py",
+          "frontend/src/utils/requestRecoveryPolicy.ts"
+        ],
+        "validation": [
+          "tests/application/test_runtime_lifecycle_retryable_contract.py",
+          "tests/application/test_retry_policy_contract.py"
+        ]
+      },
+      {
+        "capability_id": "durable_persistence",
+        "owner": "backend/core/product_operations.py",
+        "evidence": [
+          "backend/core/product_operations.py",
+          "skeleton/persistence/mongo_projection.py"
+        ],
+        "validation": [
+          "backend/tests/test_product_operations.py"
+        ]
+      },
+      {
+        "capability_id": "crash_recovery",
+        "owner": "backend/core/product_control_plane.py",
+        "evidence": [
+          "backend/core/product_control_plane.py",
+          "backend/core/execution_evidence.py"
+        ],
+        "validation": [
+          "backend/tests/test_execution_lifecycle_integration.py"
+        ]
+      },
+      {
+        "capability_id": "streaming_realtime",
+        "owner": "backend/core/operation_stream_transport.py",
+        "evidence": [
+          "backend/core/operation_stream_transport.py",
+          "frontend/src/services/operationStream.ts"
+        ],
+        "validation": [
+          "backend/tests/test_operation_stream_transport.py"
+        ]
+      },
+      {
+        "capability_id": "observability",
+        "owner": "backend/core/observability.py",
+        "evidence": [
+          "backend/core/observability.py",
+          "backend/core/product_control_plane.py"
+        ],
+        "validation": [
+          "backend/tests/test_control_plane_transparency.py"
+        ]
+      },
+      {
+        "capability_id": "evaluation_assurance",
+        "owner": "backend/core/system_assurance.py",
+        "evidence": [
+          "backend/core/system_assurance.py",
+          "backend/core/capability_readiness.py"
+        ],
+        "validation": [
+          "backend/tests/test_system_assurance.py"
+        ]
+      },
+      {
+        "capability_id": "accessibility",
+        "owner": "frontend/src/accessibility/runtime.ts",
+        "evidence": [
+          "frontend/src/accessibility/runtime.ts",
+          "frontend/src/accessibility/index.ts"
+        ],
+        "validation": [
+          "frontend/scripts/test-accessibility-contract.mjs"
+        ]
+      },
+      {
+        "capability_id": "localization",
+        "owner": "skeleton/game/platform/localization.py",
+        "evidence": [
+          "skeleton/game/platform/localization.py",
+          "skeleton/game/platform/contracts/localization.schema.json"
+        ],
+        "validation": [
+          "frontend/scripts/test-localization-contract.mjs"
+        ]
+      },
+      {
+        "capability_id": "offline_degraded",
+        "owner": "frontend/src/services/offlineCache.ts",
+        "evidence": [
+          "frontend/src/services/offlineCache.ts",
+          "frontend/src/components/OfflineBanner.tsx"
+        ],
+        "validation": [
+          "frontend/scripts/test-offline-cache-integrity.cjs"
+        ]
+      },
+      {
+        "capability_id": "export_portability",
+        "owner": "frontend/src/product/privateAtlasExport.ts",
+        "evidence": [
+          "frontend/src/product/privateAtlasExport.ts",
+          "skeleton/game/build/platform_export.py"
+        ],
+        "validation": [
+          "frontend/scripts/test-private-atlas-export.cjs"
+        ]
+      },
+      {
+        "capability_id": "retention_deletion",
+        "owner": "frontend/src/utils/storageRetentionPolicy.ts",
+        "evidence": [
+          "frontend/src/utils/storageRetentionPolicy.ts",
+          "skeleton/shells/retention.py"
+        ],
+        "validation": [
+          "frontend/scripts/test-storage-retention.mjs"
+        ]
+      },
+      {
+        "capability_id": "security_privacy",
+        "owner": "backend/core/auth_security.py",
+        "evidence": [
+          "backend/core/auth_security.py",
+          "backend/core/tenant_storage_boundary.py"
+        ],
+        "validation": [
+          "backend/tests/test_route_privacy.py",
+          "backend/tests/test_auth_security.py"
+        ]
+      },
+      {
+        "capability_id": "deployment_release",
+        "owner": "backend/core/deployment_gateway.py",
+        "evidence": [
+          "backend/core/deployment_gateway.py",
+          "backend/core/deployment_authorization.py"
+        ],
+        "validation": [
+          "backend/tests/test_deployment_gateway.py",
+          "backend/tests/test_deployment_authorization.py"
+        ]
+      }
+    ],
+    "laws": [
+      "every canonical vertical declares every horizontal capability",
+      "each horizontal capability has one canonical owner",
+      "every capability includes implementation and executable validation evidence",
+      "horizontal contract qualification never implies live runtime readiness",
+      "evidence content is bound into the qualification attestation"
+    ]
+  }
+}
