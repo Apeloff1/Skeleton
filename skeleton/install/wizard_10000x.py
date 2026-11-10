@@ -5,13 +5,18 @@ Fail-closed.
 """
 from __future__ import annotations
 import hashlib
-from typing import Mapping
+from typing import Callable, Mapping
+from skeleton.install.first_run_probe_gate import FirstRunReadiness, check_first_run
 from skeleton.install.loopback_readiness import SERVICES, loopback_probe
 
 class WizardError(Exception):
     pass
 
 class FirstRunWizard10000x:
+    def check_services(self, probes: Mapping[str, Callable[[], bool]]) -> FirstRunReadiness:
+        """Observe bounded dependency probes while keeping first-run setup accessible."""
+        return check_first_run(probes)
+
     def observe_local_services(self, endpoints: Mapping[str, str]) -> dict[str, object]:
         """Report bounded live observations without certifying an install or game."""
         if not isinstance(endpoints, Mapping) or set(endpoints) - SERVICES:
