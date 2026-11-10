@@ -1,0 +1,113 @@
+name: Source-bound native and installer custody qualification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/windows/check_payload_zip.py"
+      - "scripts/windows/test_payload_zip.py"
+      - "scripts/windows/build_installer.ps1"
+      - "scripts/windows/test_installer_source_ref_preflight.py"
+      - "skeleton/local_ai/model_loader.py"
+      - "skeleton/testing/test_local_ai_model_loader_custody.py"
+      - "skeleton/inference/flgb_runtime.py"
+      - "skeleton/ai/runtime/inference/core/flgb_runtime.py"
+      - "skeleton/testing/test_inference_stream_event_type_fencing.py"
+      - "skeleton/app/studio_readiness.py"
+      - "skeleton/testing/test_app_studio_private_token_custody.py"
+      - "tests/test_consumer_loopback_compose.py"
+      - "machine/ai_file_tree.json"
+      - ".github/workflows/source-bound-custody-qualification.yml"
+
+permissions:
+  contents: read
+
+# PRs may supersede their own source-only evidence; immutable main SHA
+# runs remain independently observable and are never cancelled.
+concurrency:
+  group: source-bound-custody-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  source_custody:
+    name: Exact-source offline custody and negative contract tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact pull request head without retained credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Prove immutable checkout identity
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          observed=$(git rev-parse HEAD)
+          test "$observed" = "$EXPECTED_SHA" || {
+            echo "source custody hold: checkout SHA mismatch" >&2
+            exit 1
+          }
+      - name: Setup canonical Python version
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install source-only testing dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9" "pydantic>=2.14.1,<3"
+          "pydantic-settings>=2.15,<3" "fastapi>=0.142.2,<1"
+          "PyYAML>=6,<7" "httpx>=0.28.1,<1"
+          "cryptography>=50.0.2" "numpy>=2,<3"
+      - name: Compile all touched source and test contracts
+        run: |
+          python -m compileall -q \
+            scripts/windows/check_payload_zip.py \
+            scripts/windows/test_payload_zip.py \
+            scripts/windows/test_installer_source_ref_preflight.py \
+            skeleton/local_ai/model_loader.py \
+            skeleton/inference/flgb_runtime.py \
+            skeleton/ai/runtime/inference/core/flgb_runtime.py \
+            skeleton/app/studio_readiness.py \
+            skeleton/testing/test_local_ai_model_loader_custody.py \
+            skeleton/testing/test_inference_stream_event_type_fencing.py \
+            skeleton/testing/test_app_studio_private_token_custody.py \
+            tests/test_consumer_loopback_compose.py
+      - name: Verify closed inference mirror and exact source tree custody
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          root = Path(".")
+          source = root / "skeleton/inference/flgb_runtime.py"
+          mirror = root / "skeleton/ai/runtime/inference/core/flgb_runtime.py"
+          if source.read_bytes() != mirror.read_bytes():
+              raise SystemExit("inference source mirror drift")
+          manifest = json.loads((root / "machine/ai_file_tree.json").read_text("utf-8"))
+          rows = [x for x in manifest["mappings"] if x["id"] == "AIFT-INFERENCE"]
+          if len(rows) != 1 or rows[0]["source"] != "skeleton/inference":
+              raise SystemExit("missing canonical inference owner")
+          actual = subprocess.check_output(
+              ["git", "rev-parse", "HEAD:skeleton/inference"], text=True,
+          ).strip()
+          if rows[0]["source_git_object_sha"] != actual:
+              raise SystemExit("inference source tree SHA does not match checkout")
+          PY
+      - name: Run isolated hostile-input and first-install custody regressions
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m pytest -q --maxfail=1 --noconftest \
+            scripts/windows/test_payload_zip.py \
+            scripts/windows/test_installer_source_ref_preflight.py \
+            tests/test_consumer_loopback_compose.py \
+            skeleton/testing/test_local_ai_model_loader_custody.py \
+            skeleton/testing/test_inference_stream_event_type_fencing.py \
+            skeleton/testing/test_app_studio_private_token_custody.py
+      - name: Preserve hardware and release qualification holds
+        run: |
+          echo "Source-only custody succeeded or failed independently."
+          echo "No real GGUF execution, Windows installer, device, rights or release certification."

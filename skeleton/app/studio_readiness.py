@@ -180,15 +180,25 @@ def _private_token(path: Path) -> str:
     descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
     with os.fdopen(descriptor, "rb") as stream:
         details = os.fstat(stream.fileno())
+        named = os.lstat(path)
         if (
             not stat.S_ISREG(details.st_mode)
+            or not stat.S_ISREG(named.st_mode)
+            or (details.st_dev, details.st_ino) != (named.st_dev, named.st_ino)
             or details.st_size > 8192
-            or (os.name != "nt" and (details.st_mode & 0o077 or details.st_uid != os.geteuid()))
+            or (os.name != "nt" and (
+                details.st_nlink != 1
+                or details.st_mode & 0o077
+                or details.st_uid != os.geteuid()
+            ))
         ):
             raise ValueError(
                 "auth token must be an operator-owned private regular file of at most 8192 bytes"
             )
         raw = stream.read(8193)
+        current = os.lstat(path)
+        if (current.st_dev, current.st_ino) != (details.st_dev, details.st_ino) or not stat.S_ISREG(current.st_mode):
+            raise ValueError("auth token file identity changed during read")
     token = raw.decode("ascii").removesuffix("\n").removesuffix("\r")
     if not 16 <= len(token) <= 8192 or any(not (char.isalnum() or char in "._~-+") for char in token):
         raise ValueError("auth token file must contain one bounded bearer token")

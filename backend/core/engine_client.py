@@ -163,7 +163,9 @@ def _positive_float(value: object, field: str, *, maximum: float) -> float:
         raise EngineProtocolError(f"{field} must be numeric")
     try:
         result = float(value)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
+        # A hostile bignum may overflow float conversion before range checks.
+        # Reject it as a typed protocol refusal without entering HTTPX.
         raise EngineProtocolError(f"{field} must be numeric") from exc
     if result <= 0 or result > maximum or result != result:
         raise EngineProtocolError(f"{field} is outside allowed range")
@@ -348,21 +350,22 @@ class EngineClientConfig:
     @classmethod
     def from_env(cls) -> "EngineClientConfig | None":
         raw_url = os.getenv("SKELETON_INTERNAL_URL")
-        if raw_url is None or not raw_url.strip():
+        if raw_url is None or raw_url == "":
             return None
+        if not raw_url.strip():
+            raise EngineProtocolError("engine base_url must be normalized")
         raw_token = os.getenv("SKL_ENGINE_SERVICE_TOKEN")
         if raw_token is None or not raw_token.strip():
             raise EngineProtocolError("engine service token is required when engine URL is configured")
         try:
             return cls(
-                base_url=raw_url.strip(),
-                service_token=raw_token.strip(),
-                service_principal=(
-                    os.getenv(
-                        "SKL_ENGINE_SERVICE_PRINCIPAL",
-                        "codedock-backend",
-                    ).strip()
-                    or "codedock-backend"
+                # Never trim or repair operator-provided bearer authority.
+                # The typed constructor rejects ambiguity before HTTPX startup.
+                base_url=raw_url,
+                service_token=raw_token,
+                service_principal=os.getenv(
+                    "SKL_ENGINE_SERVICE_PRINCIPAL",
+                    "codedock-backend",
                 ),
                 request_timeout_s=float(os.getenv("SKELETON_ENGINE_REQUEST_TIMEOUT_S", "15")),
                 poll_interval_s=float(os.getenv("SKELETON_ENGINE_POLL_INTERVAL_S", "0.05")),
