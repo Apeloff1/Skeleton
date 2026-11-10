@@ -114,6 +114,60 @@ def test_report_byte_budget_and_write_failure_cleanup(tmp_path):
     assert not report.exists()
 
 
+
+def test_report_parent_swap_after_fsync_cannot_publish_receipt(tmp_path):
+    import stat
+
+    root = tmp_path / "reports"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    detached = tmp_path / "detached"
+    target = root / "run.json"
+    original_fsync = os.fsync
+    swapped = False
+
+    def swap_after_directory_flush(fd):
+        nonlocal swapped
+        original_fsync(fd)
+        if not swapped and stat.S_ISDIR(os.fstat(fd).st_mode):
+            root.rename(detached)
+            root.symlink_to(outside, target_is_directory=True)
+            swapped = True
+
+    with patch.object(
+        forge_export.os, "fsync", side_effect=swap_after_directory_flush,
+    ):
+        with pytest.raises(ValueError, match="report parent changed"):
+            forge_export._write_report_new(target, '{"status":"SHIP"}')
+    assert swapped
+    assert not (outside / "run.json").exists()
+    assert not (detached / "run.json").exists()
+
+
+def test_report_cleanup_does_not_unlink_competing_entry(tmp_path):
+    root = tmp_path / "reports"
+    root.mkdir()
+    target = root / "run.json"
+    saved = root / "saved.json"
+    original = forge_export._verify_report_parent
+
+    def substitute_before_final_check(parent, dfd):
+        target.rename(saved)
+        target.write_text('{"competitor":"must-survive"}', encoding="utf-8")
+        original(parent, dfd)
+
+    with patch.object(
+        forge_export, "_verify_report_parent",
+        side_effect=substitute_before_final_check,
+    ):
+        with pytest.raises(ValueError, match="report path changed"):
+            forge_export._write_report_new(target, '{"status":"SHIP"}')
+    assert target.read_text(encoding="utf-8") == '{"competitor":"must-survive"}'
+    assert saved.read_text(encoding="utf-8") == '{"status":"SHIP"}'
+
+
+
 def test_native_output_inventory_stops_at_file_cap(tmp_path, monkeypatch):
     """A fake runner creates too many files; no real Godot invocation occurs."""
     emitted = emit_godot(compile_era("extraction_now"), title="bounded-export")
