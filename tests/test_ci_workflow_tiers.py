@@ -38,7 +38,14 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertIn("os.environ.get('GH_ACTOR') != 'Apeloff1'", canary)
         self.assertIn("os.environ.get('GH_EVENT') != 'workflow_dispatch'", canary)
         readiness = (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
-        self.assertIn("skeleton/testing --tb=short", readiness)
+        # Merge Readiness must run the exhaustive eight-shard canonical suite.
+        self.assertIn("python scripts/run_domain_suite_shard.py --index", readiness)
+        self.assertIn("needs: domain_suite", readiness)
+        runner = (ROOT / "scripts/run_domain_suite_shard.py").read_text(encoding="utf-8")
+        self.assertIn('options.get("testpaths") != ["skeleton/testing"]', runner)
+        self.assertIn('"--tb=short"', runner)
+        # Shards retain the reviewed bounded 20-failure diagnostic evidence.
+        self.assertIn('"--maxfail=20"', runner)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
     def test_event_parser(self):
