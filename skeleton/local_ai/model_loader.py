@@ -17,6 +17,7 @@ from .fail_closed import guard_cas
 _CHUNK = 1024 * 1024
 _GGUF_MAGIC = b"GGUF"
 _GGUF_HEADER_SIZE = 24
+_MIN_GGUF_BYTES = _GGUF_HEADER_SIZE + 1
 _SUPPORTED_GGUF_VERSIONS = frozenset({2, 3})
 
 
@@ -70,6 +71,8 @@ class ModelLoader:
              max_bytes: int | None = None) -> dict:
         self.digest = None
         self.loaded = False
+        if not isinstance(cas, str):
+            raise PermissionError("CAS must be a bounded string")
         guard_cas(cas)
         expected_sha256 = self.expected_sha256 if expected_sha256 is None else expected_sha256
         license_accepted = self.license_accepted if license_accepted is None else license_accepted
@@ -79,17 +82,19 @@ class ModelLoader:
         if (not isinstance(expected_sha256, str) or len(expected_sha256) != 64
                 or any(c not in "0123456789abcdef" for c in expected_sha256)):
             raise ValueError("expected full SHA-256 digest required")
-        if type(max_bytes) is not int or not _GGUF_HEADER_SIZE <= max_bytes <= 64 * 1024**3:
+        if type(max_bytes) is not int or not _MIN_GGUF_BYTES <= max_bytes <= 64 * 1024**3:
             raise ValueError("invalid model byte budget")
         if self.model_path is None:
             raise FileNotFoundError("GGUF model path is required")
         # Refuse symlinked ancestry, special nodes, and final-component races.
+        if ".." in self.model_path.parts or self.model_path.name in ("", ".", ".."):
+            raise ValueError("GGUF path cannot traverse parent components")
         fd, parent_fd = _open_guarded_model(self.model_path)
         try:
             before = os.fstat(fd)
             if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
                 raise ValueError("model must be a regular non-hardlinked file")
-            if not _GGUF_HEADER_SIZE <= before.st_size <= max_bytes:
+            if not _MIN_GGUF_BYTES <= before.st_size <= max_bytes:
                 raise ValueError("model size outside admitted budget")
             path_stat = os.lstat(self.model_path)
             if (path_stat.st_dev, path_stat.st_ino) != (before.st_dev, before.st_ino):
@@ -129,6 +134,8 @@ class ModelLoader:
             finally:
                 os.close(current_fd)
                 os.close(current_parent_fd)
+            if total != before.st_size or path_after.st_nlink != 1:
+                raise OSError("model read or link count changed during verification")
             if header[:4] != _GGUF_MAGIC:
                 raise ValueError("not a GGUF artifact")
             version, tensors, metadata = struct.unpack_from("<IQQ", header, 4)
