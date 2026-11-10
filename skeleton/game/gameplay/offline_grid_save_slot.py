@@ -42,6 +42,13 @@ def _finite_float(value: str) -> float:
     result = float(value)
     if not math.isfinite(result):
         raise SaveSlotError("non-finite save value")
+    # Reject valid-looking JSON exponents whose nonzero mantissa silently
+    # underflows to zero in binary floating point. Replay interpretation must
+    # not change a nonzero authored number into a different state value.
+    if result == 0.0:
+        mantissa = value.split("e", 1)[0].split("E", 1)[0]
+        if any(digit in "123456789" for digit in mantissa):
+            raise SaveSlotError("save floating-point value underflows")
     return result
 
 
