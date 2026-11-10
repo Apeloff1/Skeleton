@@ -175,3 +175,32 @@ def test_missing_canonical_root_fails_closed_when_required(tmp_path: Path) -> No
         item.path == tmp_path / "backend" and item.message == "missing canonical source root"
         for item in violations
     )
+
+
+def test_local_api_sibling_relative_import_is_not_upward_dependency(tmp_path: Path) -> None:
+    _write(
+        tmp_path, "skeleton/ai/runtime/production_fabric/product/cli.py",
+        "from .api import LocalAPI\n",
+    )
+    assert collect_violations(tmp_path) == []
+
+
+def test_parent_alias_reaching_skeleton_api_is_rejected(tmp_path: Path) -> None:
+    _write(tmp_path, "skeleton/agents/worker.py", "from .. import api\n")
+    violations = collect_violations(tmp_path)
+    assert len(violations) == 1
+    assert "skeleton.api" in violations[0].message
+
+
+def test_absolute_package_alias_reaching_skeleton_api_is_rejected(tmp_path: Path) -> None:
+    _write(tmp_path, "skeleton/agents/worker.py", "from skeleton import api\n")
+    violations = collect_violations(tmp_path)
+    assert len(violations) == 1
+    assert "skeleton.api" in violations[0].message
+
+
+def test_deep_relative_api_import_reaching_skeleton_api_is_rejected(tmp_path: Path) -> None:
+    _write(tmp_path, "skeleton/ai/runtime/worker.py", "from ...api import routes\n")
+    violations = collect_violations(tmp_path)
+    assert len(violations) == 1
+    assert "skeleton.api" in violations[0].message
