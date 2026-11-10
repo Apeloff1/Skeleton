@@ -16,8 +16,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: godot-provenance-source-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: godot-provenance-source-${{ inputs.candidate_sha }}
+  cancel-in-progress: false
 
 jobs:
   offline-source:
