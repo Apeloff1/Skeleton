@@ -182,6 +182,32 @@ class AtomicSampleGenerationTests(unittest.TestCase):
         match = next(r for r in retained if r.example_id == sampled.example_id)
         self.assertNotEqual(match.payload["sequence"][0], 123456)
 
+    def test_oversized_handcrafted_record_is_not_copied(self) -> None:
+        from collections.abc import Mapping
+
+        class TrappedMapping(Mapping):
+            def __len__(self) -> int:
+                return MAX_ENCODED_ITEMS + 1
+
+            def __iter__(self):
+                raise AssertionError("must not copy unbounded mapping")
+
+            def __getitem__(self, key):
+                raise KeyError(key)
+
+        key = training_key(self.split)
+        forged = ReplayRecord(
+            key, self.ident.key(), "a" * 64, TrappedMapping(),
+        )
+        with self.assertRaisesRegex(ValueError, "item budget"):
+            self.replay.add(forged)
+        self.assertEqual(len(self.replay), 0)
+
+    def test_invalid_exact_environment_resolution_is_fail_closed(self) -> None:
+        registry = ExactEnvironmentRegistry()
+        with self.assertRaisesRegex(RuntimeError, "identity"):
+            registry.resolve(None)
+
     def test_buffer_rejects_post_insert_digest_forgery(self) -> None:
         key = training_key(self.split)
         record = make_record(key, self.ident, {"nested": {"safe": True}})
