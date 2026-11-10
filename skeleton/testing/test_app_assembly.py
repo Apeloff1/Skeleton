@@ -1024,3 +1024,22 @@ def test_fresh_install_cors_defaults_preserve_operator_override(tmp_path):
     ensure_runtime_environment(tmp_path)
     values = (tmp_path / ".env").read_text(encoding="utf-8")
     assert f"CORS_ORIGINS={manual}" in values
+
+
+def test_frontend_compose_port_is_loopback_bound_and_assembly_selectable():
+    from pathlib import Path
+
+    compose = (Path(__file__).resolve().parents[2] / "docker-compose.yml").read_text(encoding="utf-8")
+    expected = "\"127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\""
+    assert expected in compose
+    assert "\"${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\"" not in compose
+    assert "\"0.0.0.0:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\"" not in compose
+    assert "\"[::]:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\"" not in compose
+
+
+def test_assembly_auditor_requires_loopback_not_unrestricted_frontend_port():
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[2] / "scripts/check_app_assembly.py").read_text(encoding="utf-8")
+    assert "safe_frontend_port in base" in source
+    assert "unsafe_frontend_port not in base" in source
