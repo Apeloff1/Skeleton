@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - skeleton/godot_export/provenance.py
+      - skeleton/godot_export/cli.py
       - skeleton/forge/export.py
       - skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py
       - skeleton/testing/test_forge_native_output_custody_20261110.py
@@ -12,6 +13,7 @@ on:
     branches: [main]
     paths:
       - skeleton/godot_export/provenance.py
+      - skeleton/godot_export/cli.py
       - skeleton/forge/export.py
       - skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py
       - skeleton/testing/test_forge_native_output_custody_20261110.py
@@ -48,7 +50,7 @@ jobs:
       - name: Compile Godot and Forge source custody modules
         run: >-
           python -m compileall -q skeleton/godot_export/provenance.py
-          skeleton/forge/export.py
+          skeleton/godot_export/cli.py skeleton/forge/export.py
           skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py
           skeleton/testing/test_forge_native_output_custody_20261110.py
       - name: Offline source regressions and existing custody suites
