@@ -10,6 +10,8 @@ ARG NODE_VERSION=24
 FROM node:${NODE_VERSION}-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS deps
 WORKDIR /app
 COPY package.json yarn.lock* ./
+# Yarn resolves the reviewed file:vendor/deepmerge override during dependency installation.
+COPY vendor/deepmerge/ ./vendor/deepmerge/
 COPY index.js ./index.js
 COPY scripts/patch-node-modules.js ./scripts/patch-node-modules.js
 COPY scripts/verify-no-release-npm-security.js scripts/verify-deepmerge-security.cjs ./scripts/
@@ -46,7 +48,7 @@ RUN --mount=type=secret,id=proxy_ca \
 # Stage 4: Production (Nginx)
 # Use the minimal official nginx runtime to reduce the production package/CVE
 # surface. Keep the multi-platform index immutable for reproducible rebuilds.
-FROM nginx:1.31-alpine-slim@sha256:f45171d36c76a8b2f5ef97108a3a8a2294248a6578a0a180edc2d78f7d2edc26 AS production
+FROM nginx:1.31-alpine-slim@sha256:9c68ad4f28e7dee4b9484a7859bf451da39ef661bcd038ef62e87593fcd91c86 AS production
 
 # The official image starts as root so it can prepare runtime directories.
 # Grant the nginx user access to the real /run directory used for nginx.pid,

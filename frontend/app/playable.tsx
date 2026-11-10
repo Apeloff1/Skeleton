@@ -188,24 +188,37 @@ function PlayableContent() {
 
   const loadPipeline = React.useCallback(async (pid: string) => {
     const pr = await api.get<any>(`/api/playable/${pid}/pipeline`, { timeoutMs: 12_000 });
-    if (pr.ok && pr.data && !pr.data.error) setPipeline(pr.data);
+    if (!pr.ok || !pr.data || pr.data.error) {
+      setPipeline(null);
+      setError(pr.error || pr.data?.error || 'Pipeline evidence is unavailable. Retry by reopening this playable.');
+      return;
+    }
+    setPipeline(pr.data);
   }, []);
 
   const forgeStage = React.useCallback(async (st: any) => {
     const pid = game?.playable_id;
     if (!pid || !st.forge) return;
     setForging(st.key);
-    const r = await api.post<any>(`/api/pipeline/${pid}/forge/${st.forge}/async`, {}, { timeoutMs: 15_000 });
-    if (r.ok && r.data?.job_id) {
+    try {
+      const r = await api.post<any>(`/api/pipeline/${pid}/forge/${st.forge}/async`, {}, { timeoutMs: 15_000 });
+      if (!r.ok || typeof r.data?.job_id !== 'string') throw new Error(r.error || 'The forge job was not admitted.');
       const jid = r.data.job_id;
+      let terminal = false;
       for (let i = 0; i < 30; i++) {
         await new Promise(res => setTimeout(res, 3500));
-        const jr = await api.get<any>(`/api/playable/job/${jid}`, { timeoutMs: 12_000 });
-        if (jr.data?.job_status === 'done' || jr.data?.job_status === 'error') break;
+        const jr = await api.get<any>(`/api/playable/job/${encodeURIComponent(jid)}`, { timeoutMs: 12_000 });
+        if (!jr.ok) throw new Error(jr.error || 'Forge job observation failed.');
+        if (jr.data?.job_status === 'error') throw new Error(jr.data?.error || 'The forge job failed.');
+        if (jr.data?.job_status === 'done') { terminal = true; break; }
       }
+      if (!terminal) throw new Error('The forge job is still pending. Reopen this playable to observe its authoritative status.');
       await loadPipeline(pid);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The forge stage failed.');
+    } finally {
+      setForging(null);
     }
-    setForging(null);
   }, [game?.playable_id, loadPipeline]);
   const [board, setBoard] = React.useState<any[]>([]);
   const [boardAssetsOnly, setBoardAssetsOnly] = React.useState(false);
@@ -227,7 +240,8 @@ function PlayableContent() {
 
   const loadRecent = React.useCallback(async () => {
     const r = await api.get<{ playables: ListItem[] }>('/api/playable/list?limit=10');
-    if (r.ok && r.data) setRecent(r.data.playables || []);
+    if (!r.ok || !Array.isArray(r.data?.playables)) { setRecent([]); setError(r.error || 'Recent playables are unavailable.'); return; }
+    setRecent(r.data.playables.slice(0, 10));
   }, []);
 
   const loadLineage = React.useCallback(async (id: string) => {
@@ -241,12 +255,14 @@ function PlayableContent() {
   const loadBoard = React.useCallback(async () => {
     const r = await api.get<{ leaderboard: any[] }>(
       `/api/playable/leaderboard?limit=15${boardAssetsOnly ? '&assets=complete' : ''}`, { timeoutMs: 12_000 });
-    if (r.ok && r.data) setBoard(r.data.leaderboard || []);
+    if (!r.ok || !Array.isArray(r.data?.leaderboard)) { setBoard([]); setError(r.error || 'Leaderboard evidence is unavailable.'); return; }
+    setBoard(r.data.leaderboard.slice(0, 15));
   }, [boardAssetsOnly]);
 
   const loadImportBuilds = React.useCallback(async () => {
     const r = await api.get<{ builds: any[] }>('/api/playable/import/builds?limit=40', { timeoutMs: 12_000 });
-    if (r.ok && r.data) setImportBuilds(r.data.builds || []);
+    if (!r.ok || !Array.isArray(r.data?.builds)) { setImportBuilds([]); setError(r.error || 'Importable builds are unavailable.'); return; }
+    setImportBuilds(r.data.builds.slice(0, 40));
   }, []);
 
   React.useEffect(() => { loadRecent(); loadBoard(); loadImportBuilds(); }, [loadRecent, loadBoard, loadImportBuilds]);
