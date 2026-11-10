@@ -42,7 +42,8 @@ ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL \
 COPY . .
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    yarn export:web \
+    node --test scripts/test-guarded-expo-export.cjs \
+    && node scripts/guarded-expo-export.cjs \
     && (test -f /app/dist/setup.html || test -f /app/dist/setup/index.html)
 
 # Stage 4: Production (Nginx)
