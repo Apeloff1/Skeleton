@@ -6,6 +6,35 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/first-install-source-qualification.yml'
+      # Every exercised source contract must retrigger exact-head qualification.
+      - '.machine/repository.toml'
+      - 'machine/ai_file_tree.json'
+      - 'scripts/check_ai_file_tree.py'
+      - 'backend/core/lazy_registry.py'
+      - 'backend/routes/discourse.py'
+      - 'backend/routes/galaxy_studio.py'
+      - 'backend/tests/live_service_tests.json'
+      - 'backend/tests/test_live_service_test_boundaries.py'
+      - 'backend/tests/test_free_api_dns_pin.py'
+      - 'backend/tests/test_galaxy_file_budget.py'
+      - 'backend/tests/test_storage_lazy_registry.py'
+      - 'backend/tests/test_discourse_judge_admission.py'
+      - 'backend/tests/test_code_intelligence_engine_boundary.py'
+      - 'backend/tests/test_engine_text_route_cutovers.py'
+      - 'backend/scripts/check_live_service_test_boundaries.py'
+      - 'frontend/scripts/guarded-expo-export.cjs'
+      - 'frontend/scripts/test-guarded-expo-export.cjs'
+      - 'tests/test_repo_machine_live_taxonomy.py'
+      - 'tests/test_app_foundation_e2e_build_isolation.py'
+      - 'tests/test_ops_router_source_contract.py'
+      - 'tests/test_product_surface_specification.py'
+      - 'skeleton/testing/test_ai_flight_process.py'
+      - 'skeleton/testing/test_ai_real_model_qualification.py'
+      - 'skeleton/testing/test_harbor_crafting_patrol_guidance.py'
+      - 'skeleton/testing/test_app_offline_mixed_game_library_relocation.py'
+      - 'skeleton/game/gameplay/harbor_crafting_patrol*.py'
+      - 'skeleton/ai/runtime/operational_ai/**'
+      - 'skeleton/app/offline_mixed_game_library_relocation.py'
       - '.env.example'
       - 'Dockerfile'
       - 'Dockerfile.dockerignore'
@@ -148,6 +177,10 @@ jobs:
             skeleton/testing/test_dual_runtime_verify.py \
             skeleton/testing/test_studio_package_verifier_contract.py \
             skeleton/testing/test_app_offline_signed_game_library_audit.py \
+            skeleton/testing/test_app_offline_mixed_game_library_relocation.py \
+            skeleton/testing/test_harbor_crafting_patrol_guidance.py \
+            skeleton/testing/test_ai_real_model_qualification.py \
+            skeleton/testing/test_ai_flight_process.py \
             skeleton/testing/test_app_studio_journey.py \
             skeleton/testing/test_app_offline_install_preflight.py \
             skeleton/testing/test_app_offline_install_reconciliation.py \
@@ -269,6 +302,12 @@ jobs:
           python -m pytest -q --maxfail=12 --noconftest --import-mode=importlib \
             backend/tests/test_live_service_test_boundaries.py \
             backend/tests/test_queue_drain_workflow.py \
-            backend/tests/test_workflow_concurrency_gate.py
+            backend/tests/test_workflow_concurrency_gate.py \
+            backend/tests/test_free_api_dns_pin.py \
+            backend/tests/test_galaxy_file_budget.py \
+            backend/tests/test_storage_lazy_registry.py \
+            backend/tests/test_discourse_judge_admission.py \
+            backend/tests/test_code_intelligence_engine_boundary.py \
+            backend/tests/test_engine_text_route_cutovers.py
       - name: Exercise bounded Expo export supervisor with live child-process fixtures
         run: node --test frontend/scripts/test-guarded-expo-export.cjs
