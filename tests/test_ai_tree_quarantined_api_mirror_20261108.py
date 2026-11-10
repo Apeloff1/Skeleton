@@ -15,6 +15,7 @@ def test_governed_tree_file_contracts():
         ("skeleton/forge", "skeleton/ai/forge", "game_builder.py"),
         ("skeleton/forge", "skeleton/ai/forge", "canon_custody_v1/artifacts_consumption_history.py"),
         ("skeleton/audio", "skeleton/ai/runtime/extensions/audio", "original_synthesis.py"),
+        ("skeleton/audio", "skeleton/ai/runtime/extensions/audio", "fixtures/footstep.json"),
     ):
         assert (ROOT/mirror/rel).read_bytes()==(ROOT/canonical/rel).read_bytes()
 
