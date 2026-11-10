@@ -50,7 +50,12 @@ def _provenance(a: argparse.Namespace) -> int:
     m = provenance.build(a.project, a.engine, a.verdict, arts, a.base)
     text = m.dumps()
     if a.out:
-        a.out.write_text(text, encoding="utf-8")
+        try:
+            provenance.write_manifest_file_new(a.out, m)
+        except (ValueError, OSError, UnicodeError, RecursionError):
+            # Fail closed without leaking private artifact paths or source JSON.
+            print(json.dumps({"error": "unsafe or occupied provenance manifest output"}))
+            return 2
     else:
         sys.stdout.write(text)
     return 0
