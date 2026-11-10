@@ -145,5 +145,82 @@ class CreateOnlyCampaignCustodyTests(unittest.TestCase):
             self.assertIn("non-finite save value", err.getvalue())
 
 
+    def test_cli_commands_cannot_escape_through_symlink_ancestor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside = root / "outside"
+            outside.mkdir()
+            actions = outside / "actions.json"
+            actions.write_text("[]", encoding="utf-8")
+            alias = root / "alias"
+            alias.symlink_to(outside, target_is_directory=True)
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                result = campaign_main([
+                    "run", "--commands", str(alias / "actions.json"),
+                ])
+            self.assertEqual(result, 2)
+            self.assertFalse((outside / "save.json").exists())
+
+    def test_cli_source_cannot_escape_through_symlink_ancestor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            original = Path(__file__).resolve().parents[2] / (
+                "skeleton/game/gameplay/content/lantern_harbor.json"
+            )
+            outside = root / "outside"
+            outside.mkdir()
+            source = outside / "source.json"
+            source.write_bytes(original.read_bytes())
+            alias = root / "alias"
+            alias.symlink_to(outside, target_is_directory=True)
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                result = campaign_main(["inspect", "--source", str(alias / "source.json")])
+            self.assertEqual(result, 2)
+
+    def test_cli_rejects_duplicate_commands_and_nonfinite_numbers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            actions = root / "actions.json"
+            for content in (
+                b'[{"kind":"wait","kind":"move"}]',
+                b'[{"kind":"wait","target":1e99999}]',
+                b'[{"kind":"wait","target":NaN}]',
+            ):
+                with self.subTest(content=content):
+                    actions.write_bytes(content)
+                    err = io.StringIO()
+                    with contextlib.redirect_stderr(err):
+                        result = campaign_main(["run", "--commands", str(actions)])
+                    self.assertEqual(result, 2)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "requires POSIX FIFO")
+    def test_racing_fifo_substitution_cannot_hang_read_slot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            save = root / "slot.json"
+            save.write_bytes(b'{"tick":1}')
+            prior = root / "prior.json"
+            actual_open = os.open
+            swapped = False
+
+            def swap_open(file, flags, *args, **kwargs):
+                nonlocal swapped
+                if file == "slot.json" and not swapped:
+                    self.assertTrue(flags & os.O_NONBLOCK,
+                                    "guarded reader must never block on a FIFO")
+                    save.rename(prior)
+                    os.mkfifo(save)
+                    swapped = True
+                return actual_open(file, flags, *args, **kwargs)
+
+            with patch.object(os, "open", side_effect=swap_open):
+                with self.assertRaises(SaveSlotError):
+                    read_slot(save)
+            self.assertTrue(swapped)
+            self.assertEqual(prior.read_bytes(), b'{"tick":1}')
+
+
 if __name__ == "__main__":
     unittest.main()
