@@ -41,12 +41,11 @@ def fixture():
             for job in required
         ]
         if name == "Merge Readiness":
-            jobs[str(run_id)].extend([
-                {"name": "Canonical Domain Suite (1)",
-                 "status": "completed", "conclusion": "success"},
-                {"name": "Canonical Domain Suite (2)",
-                 "status": "completed", "conclusion": "success"},
-            ])
+            jobs[str(run_id)].extend(
+                {"name": f"Canonical Domain Suite ({shard})",
+                 "status": "completed", "conclusion": "success"}
+                for shard in range(8)
+            )
         for job in jobs[str(run_id)]:
             job.update({
                 "run_id": run_id,
@@ -187,7 +186,40 @@ class ExactMainEvidenceTests(unittest.TestCase):
             j for j in jobs if not j["name"].startswith("Canonical Domain Suite (")
         ]
         result = verify(data)
-        self.assertIn("canonical_domain_suite_evidence_missing", result["blocking_reasons"])
+        for shard in range(8):
+            self.assertIn(
+                f"canonical_domain_suite_evidence_missing:Canonical Domain Suite ({shard})",
+                result["blocking_reasons"],
+            )
+
+    def test_even_one_missing_domain_shard_must_block(self):
+        data = fixture()
+        run = next(x for x in data["runs"] if x["name"] == "Merge Readiness")
+        evidence = data["jobs_by_run"][str(run["id"])]
+        evidence[:] = [j for j in evidence
+                       if j["name"] != "Canonical Domain Suite (7)"]
+        result = verify(data)
+        self.assertIn(
+            "canonical_domain_suite_evidence_missing:Canonical Domain Suite (7)",
+            result["blocking_reasons"],
+        )
+
+    def test_unknown_extra_domain_shard_never_counts(self):
+        data = fixture()
+        run = next(x for x in data["runs"] if x["name"] == "Merge Readiness")
+        extra = {
+            "name": "Canonical Domain Suite (8)",
+            "status": "completed", "conclusion": "success",
+            "run_id": run["id"],
+            "head_sha": HEAD,
+            "run_attempt": 1,
+        }
+        data["jobs_by_run"][str(run["id"])].append(extra)
+        result = verify(data)
+        self.assertIn(
+            "unexpected_canonical_domain_shard:Canonical Domain Suite (8)",
+            result["blocking_reasons"],
+        )
 
     def test_duplicate_job_identity_fails_closed(self):
         data = fixture()
