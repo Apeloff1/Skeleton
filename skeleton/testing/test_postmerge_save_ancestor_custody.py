@@ -104,6 +104,8 @@ class SaveSlotAncestorCustodyTests(unittest.TestCase):
                 b'{"tick":NaN}',
                 b'{"tick":Infinity}',
                 b'{"tick":-Infinity}',
+                b'{"tick":1e99999}',
+                b'{"tick":-1e99999}',
                 b'{"tick":1} trailing',
                 b'{"tick": "\xff"}',
                 b'{"tick":',
