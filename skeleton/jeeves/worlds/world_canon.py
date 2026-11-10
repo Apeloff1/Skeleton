@@ -317,8 +317,12 @@ _PLAYER_JS = r"""
 "use strict";
 const model = JSON.parse(document.getElementById("world-data").textContent);
 const world = model.world;
+const sourceDigest = model.proof.source_digest;
 const byId = new Map(world.scenes.map(s => [s.id, s]));
 const ending = new Map(world.endings.map(e => [e.scene, e.label]));
+const byChoice = new Map(world.choices.map(c => [c.id, c]));
+const storageKey = "skeleton:world-save:v1:" + world.id + ":" + sourceDigest;
+const MAX_SAVE_BYTES = 16384;
 let current = world.start;
 let flags = new Set();
 let trace = [];
@@ -327,6 +331,69 @@ function element(tag, text) {
   const node = document.createElement(tag);
   node.textContent = text;
   return node;
+}
+function status(message) {
+  const note = element("p", message);
+  note.setAttribute("role", "status");
+  root.append(note);
+}
+function replay(steps) {
+  if (!Array.isArray(steps) || steps.length > 4096 ||
+      steps.some(id => typeof id !== "string" || id.length > 128)) {
+    throw Error("invalid_save_trace");
+  }
+  let scene = world.start;
+  const acquired = new Set();
+  for (const id of steps) {
+    if (ending.has(scene)) throw Error("save_after_ending");
+    const choice = byChoice.get(id);
+    if (!choice || choice.from !== scene ||
+        !choice.requires.every(flag => acquired.has(flag))) {
+      throw Error("invalid_save_transition");
+    }
+    for (const flag of choice.grants) acquired.add(flag);
+    scene = choice.to;
+  }
+  return {scene, acquired};
+}
+function boundedBytes(payload) {
+  if (payload.length > MAX_SAVE_BYTES ||
+      new TextEncoder().encode(payload).length > MAX_SAVE_BYTES) {
+    throw Error("save_budget_exceeded");
+  }
+}
+function save() {
+  try {
+    const payload = JSON.stringify({
+      schema: "jeeves.world.browser_save.v1",
+      source_digest: sourceDigest, trace
+    });
+    boundedBytes(payload);
+    localStorage.setItem(storageKey, payload);
+    status("Progress saved on this device.");
+  } catch (_error) {
+    status("Save unavailable. Your current game remains playable.");
+  }
+}
+function restore() {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw === null) throw Error("save_missing");
+    boundedBytes(raw);
+    const data = JSON.parse(raw);
+    if (!data || Array.isArray(data) || Object.keys(data).sort().join(",") !==
+        "schema,source_digest,trace" ||
+        data.schema !== "jeeves.world.browser_save.v1" ||
+        data.source_digest !== sourceDigest) throw Error("save_source_mismatch");
+    const restored = replay(data.trace);
+    trace = data.trace.slice();
+    flags = restored.acquired;
+    current = restored.scene;
+    render();
+    status("Saved progress restored.");
+  } catch (_error) {
+    status("No valid save for this exact world revision.");
+  }
 }
 function render() {
   root.replaceChildren();
@@ -341,21 +408,37 @@ function render() {
       current = world.start; flags = new Set(); trace = []; render();
     });
     root.append(restart);
-    return;
-  }
-  const choices = world.choices.filter(c => c.from === current &&
-    c.requires.every(f => flags.has(f)));
-  choices.forEach((choice, index) => {
-    const button = element("button", (index < 9 ? (index + 1) + ". " : "") + choice.label);
-    button.dataset.choiceIndex = String(index);
-    button.addEventListener("click", () => {
-      for (const flag of choice.grants) flags.add(flag);
-      trace.push(choice.id);
-      current = choice.to;
-      render();
+  } else {
+    const choices = world.choices.filter(c => c.from === current &&
+      c.requires.every(f => flags.has(f)));
+    choices.forEach((choice, index) => {
+      const button = element("button", (index < 9 ? (index + 1) + ". " : "") + choice.label);
+      button.dataset.choiceIndex = String(index);
+      button.addEventListener("click", () => {
+        for (const flag of choice.grants) flags.add(flag);
+        trace.push(choice.id);
+        current = choice.to;
+        render();
+      });
+      root.append(button);
     });
-    root.append(button);
+  }
+  const saveButton = element("button", "Save progress");
+  saveButton.addEventListener("click", save);
+  root.append(saveButton);
+  const restoreButton = element("button", "Restore saved progress");
+  restoreButton.addEventListener("click", restore);
+  root.append(restoreButton);
+  const clearButton = element("button", "Delete saved progress");
+  clearButton.addEventListener("click", () => {
+    try {
+      localStorage.removeItem(storageKey);
+      status("Saved progress deleted.");
+    } catch (_error) {
+      status("Save storage unavailable.");
+    }
   });
+  root.append(clearButton);
 }
 // Digit shortcuts operate on the CURRENT rendered scene, never stale choices.
 // Native buttons remain the accessible mouse, keyboard and assistive-tech path.
