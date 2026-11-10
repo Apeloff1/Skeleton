@@ -194,6 +194,12 @@ class PostMergeOfflineIntegrations(unittest.TestCase):
         mutated["commands"] = []
         with self.assertRaises(GameplayContractError):
             verify_playthrough(campaign, mutated)
+        stale_source = json.loads(source.read_bytes())
+        stale_source["title"] = stale_source["title"] + " modified"
+        another_campaign = Campaign.load(stale_source)
+        self.assertNotEqual(another_campaign.source_digest, campaign.source_digest)
+        with self.assertRaises(GameplayContractError):
+            verify_playthrough(another_campaign, report)
 
     def test_canonical_and_mirrored_remote_receipts_have_same_custody(self):
         first = receipt("job1", "dist/first.whl")
