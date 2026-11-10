@@ -6,9 +6,12 @@ A committed slot is either the previous complete JSON record or the new one.
 """
 from __future__ import annotations
 
+import ctypes
+import errno
 import json
 import math
 import os
+import sys
 from pathlib import Path
 import stat
 import secrets
@@ -121,19 +124,53 @@ def _open_parent(path: Path) -> tuple[int, Path]:
 
 
 
-def create_slot(path: Path, snapshot: object) -> None:
-    """Create-only save under the same directory-descriptor custody as slots.
+def _rename_noreplace(dfd: int, source: str, destination: str) -> None:
+    """Atomically publish an inode without overwriting any existing name.
 
-    The hard link uses the *same* opened directory for source and destination,
-    and never replaces an existing directory entry, including a symlink.
+    Python's os.rename() can replace a destination and os.link() briefly
+    produces a two-link inode; a crash in that window makes our single-link
+    replay contract unreadable. Use operating-system no-replace rename under
+    the same opened parent descriptor. Never emulate this with a stat/check.
+    """
+    if sys.platform.startswith("linux"):
+        symbol, flag = "renameat2", 1  # Linux RENAME_NOREPLACE
+    elif sys.platform == "darwin":
+        symbol, flag = "renameatx_np", 0x00000004  # macOS RENAME_EXCL
+    else:
+        raise SaveSlotError("atomic create-only publication unavailable")
+    try:
+        function = getattr(ctypes.CDLL(None, use_errno=True), symbol)
+    except (AttributeError, OSError) as exc:
+        raise SaveSlotError("atomic create-only publication unavailable") from exc
+    function.argtypes = [
+        ctypes.c_int, ctypes.c_char_p, ctypes.c_int,
+        ctypes.c_char_p, ctypes.c_uint,
+    ]
+    function.restype = ctypes.c_int
+    ctypes.set_errno(0)
+    if function(
+        dfd, os.fsencode(source), dfd, os.fsencode(destination), flag,
+    ) == 0:
+        return
+    code = ctypes.get_errno()
+    if code == errno.EEXIST:
+        raise FileExistsError(code, "save destination already exists", destination)
+    if code in (errno.ENOSYS, errno.EOPNOTSUPP, errno.ENOTSUP, errno.EINVAL):
+        raise SaveSlotError("atomic create-only publication unsupported")
+    raise OSError(code, os.strerror(code), destination)
+
+
+def create_slot(path: Path, snapshot: object) -> None:
+    """Create-only crash-consistent publication using native no-replace rename.
+
+    The destination is created in one atomic filesystem operation, and the
+    temporary name vanishes in that same operation. Existing slots are never
+    overwritten, even if a competing writer publishes between checks.
     """
     path = Path(path)
     payload = _encode(snapshot) + b"\n"
     if len(payload) > MAX_SAVE_BYTES:
         raise SaveSlotError("save exceeds byte budget")
-    if (not hasattr(os, "supports_dir_fd") or not hasattr(os, "link")
-            or os.link not in os.supports_dir_fd):
-        raise SaveSlotError("descriptor-relative create-only saves unavailable")
     dfd, parent = _open_parent(path)
     temporary = ".campaign-" + secrets.token_hex(16) + ".tmp"
     created = False
@@ -154,12 +191,8 @@ def create_slot(path: Path, snapshot: object) -> None:
         after = os.stat(parent, follow_symlinks=False)
         if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
             raise SaveSlotError("save parent changed before publication")
-        # Atomic no-clobber publication, not os.rename.
-        os.link(
-            temporary, path.name,
-            src_dir_fd=dfd, dst_dir_fd=dfd,
-            follow_symlinks=False,
-        )
+        _rename_noreplace(dfd, temporary, path.name)
+        created = False
         os.fsync(dfd)
     finally:
         try:
