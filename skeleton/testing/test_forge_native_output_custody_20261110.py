@@ -241,9 +241,21 @@ def test_report_final_component_symlink_swap_cannot_read_other_file(tmp_path):
             swapped = True
         return original_open(file, flags, *args, **kwargs)
 
-    with patch.object(forge_export.os, "open", side_effect=substitute_before_read):
-        with pytest.raises(OSError):
-            forge_export._write_report_new(target, '{"status":"NO-SHIP"}')
+    # Patching os.open changes its Python object identity. Preserve the
+    # descriptor-relative capability advertisement for the fake function;
+    # otherwise this regression fails at admission instead of reaching the
+    # attacker-controlled O_NOFOLLOW final-component open.
+    with patch.object(
+        forge_export.os, "open", side_effect=substitute_before_read,
+    ) as guarded_open:
+        with patch.object(
+            forge_export.os, "supports_dir_fd",
+            set(os.supports_dir_fd) | {guarded_open},
+        ):
+            with pytest.raises(OSError):
+                forge_export._write_report_new(
+                    target, '{"status":"NO-SHIP"}',
+                )
     assert swapped
     assert private.read_text(encoding="utf-8") == "sensitive canary"
     assert target.is_symlink()
