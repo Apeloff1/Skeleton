@@ -432,10 +432,11 @@ def read_manifest_file(path: Path) -> Manifest:
                     raise ValueError("provenance manifest exceeds byte bound")
             after = os.fstat(file_fd)
             linked = os.stat(parts[-1], dir_fd=dfd, follow_symlinks=False)
-            fingerprint = lambda info: (
-                info.st_dev, info.st_ino, info.st_mode, info.st_nlink,
-                info.st_size, info.st_mtime_ns, info.st_ctime_ns,
-            )
+            def fingerprint(info: os.stat_result) -> tuple[int, ...]:
+                return (
+                    info.st_dev, info.st_ino, info.st_mode, info.st_nlink,
+                    info.st_size, info.st_mtime_ns, info.st_ctime_ns,
+                )
             if (len(data) != before.st_size
                     or fingerprint(before) != fingerprint(after)
                     or fingerprint(after) != fingerprint(linked)):
