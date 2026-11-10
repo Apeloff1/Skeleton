@@ -206,3 +206,20 @@ def test_normalized_operator_environment_still_produces_exact_origin(monkeypatch
     assert result.base_url == "http://skeleton:8001"
     assert result.service_token == _TOKEN
     assert result.service_principal == "codedock-backend"
+
+@pytest.mark.parametrize(("setting", "value"), [
+    ("SKELETON_INTERNAL_URL", " \t "),
+    ("SKELETON_INTERNAL_URL", "\n"),
+    ("SKL_ENGINE_SERVICE_PRINCIPAL", ""),
+    ("SKL_ENGINE_SERVICE_PRINCIPAL", " \t "),
+])
+def test_explicitly_configured_blank_authorities_fail_closed(
+    monkeypatch, setting, value,
+):
+    """Never silently disable a configured engine or replace its principal."""
+    monkeypatch.setenv("SKELETON_INTERNAL_URL", "http://skeleton:8001")
+    monkeypatch.setenv("SKL_ENGINE_SERVICE_TOKEN", _TOKEN)
+    monkeypatch.setenv("SKL_ENGINE_SERVICE_PRINCIPAL", "codedock-backend")
+    monkeypatch.setenv(setting, value)
+    with pytest.raises(engine.EngineProtocolError):
+        engine.EngineClientConfig.from_env()

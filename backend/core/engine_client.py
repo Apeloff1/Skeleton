@@ -164,12 +164,18 @@ def _positive_float(value: object, field: str, *, maximum: float) -> float:
     try:
         result = float(value)
     except (TypeError, ValueError, OverflowError) as exc:
-        # A hostile bignum may overflow float conversion before range checks.
-        # Reject it as a typed protocol refusal without entering HTTPX.
         raise EngineProtocolError(f"{field} must be numeric") from exc
-    if result <= 0 or result > maximum or result != result:
+    if not math.isfinite(result) or result <= 0 or result > maximum:
         raise EngineProtocolError(f"{field} is outside allowed range")
     return result
+
+
+def _header_text(value: object, field: str, *, maximum: int) -> str:
+    """Accept finite printable ASCII in delegated authority request headers."""
+    text = _text(value, field, maximum=maximum)
+    if not text.isascii() or any(not 33 <= ord(ch) <= 126 for ch in text):
+        raise EngineProtocolError(f"{field} contains invalid HTTP header characters")
+    return text
 
 
 def _positive_int(value: object, field: str, *, maximum: int) -> int:
@@ -192,7 +198,6 @@ def _json_object(value: object, field: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise EngineProtocolError(f"{field} must be an object")
     return dict(value)
-
 
 
 def _engine_origin(raw: str) -> str:
@@ -250,18 +255,6 @@ def _engine_origin(raw: str) -> str:
     return scheme + "://" + authority
 
 
-def _header_text(value: object, name: str, *, maximum: int) -> str:
-    if (
-        not isinstance(value, str)
-        or not 1 <= len(value) <= maximum
-        or value != value.strip()
-        or any(not 33 <= ord(char) <= 126 for char in value)
-    ):
-        raise EngineProtocolError(name + " must be normalized printable ASCII")
-    return value
-
-
-
 @dataclass(frozen=True, slots=True)
 class EngineClientConfig:
     """Bounded application-side engine transport configuration."""
@@ -281,11 +274,16 @@ class EngineClientConfig:
         object.__setattr__(self, "base_url", base)
         token = self.service_token
         if token is not None:
-            if not isinstance(token, str) or len(token) < 32:
+            if (
+                not isinstance(token, str)
+                or token != token.strip()
+                or not 32 <= len(token) <= 4096
+                or not token.isascii()
+                or any(not 33 <= ord(ch) <= 126 for ch in token)
+            ):
                 raise EngineProtocolError(
                     "engine service token must be normalized and at least 32 characters"
                 )
-            _header_text(token, "engine service token", maximum=4096)
             object.__setattr__(self, "service_token", token)
         object.__setattr__(
             self,
@@ -359,14 +357,13 @@ class EngineClientConfig:
             raise EngineProtocolError("engine service token is required when engine URL is configured")
         try:
             return cls(
-                # Never trim or repair operator-provided bearer authority.
-                # The typed constructor rejects ambiguity before HTTPX startup.
+                # Do not silently strip malformed URL/header bytes.
+                # Invalid operator settings must fail at the same authority
+                # boundary as direct EngineClientConfig construction.
                 base_url=raw_url,
                 service_token=raw_token,
-                service_principal=os.getenv(
-                    "SKL_ENGINE_SERVICE_PRINCIPAL",
-                    "codedock-backend",
-                ),
+                # An explicitly configured empty/whitespace principal must be rejected.
+                service_principal=os.getenv("SKL_ENGINE_SERVICE_PRINCIPAL", "codedock-backend"),
                 request_timeout_s=float(os.getenv("SKELETON_ENGINE_REQUEST_TIMEOUT_S", "15")),
                 poll_interval_s=float(os.getenv("SKELETON_ENGINE_POLL_INTERVAL_S", "0.05")),
                 execution_timeout_s=float(os.getenv("SKELETON_ENGINE_EXECUTION_TIMEOUT_S", "120")),
@@ -1173,7 +1170,9 @@ class EngineClient:
         }
         if trace_id is not None:
             headers["x-trace-id"] = _header_text(
-                trace_id, "trace_id", maximum=512,
+                trace_id,
+                "trace_id",
+                maximum=512,
             )
         return headers
 
@@ -1207,8 +1206,8 @@ class EngineClient:
                     timeout=timeout,
                     transport=self._transport,
                     follow_redirects=False,
-                    # Internal service credentials must never transit an
-                    # ambient HTTP_PROXY, HTTPS_PROXY or ALL_PROXY.
+                    # Never let HTTP_PROXY/HTTPS_PROXY route delegated engine
+                    # credentials to an unrelated network gateway.
                     trust_env=False,
                 ) as client:
                     async with client.stream(
