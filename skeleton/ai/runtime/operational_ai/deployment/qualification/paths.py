@@ -4,6 +4,7 @@ import json, os, stat
 from pathlib import Path
 from .contracts import QualificationError
 from ...model.gguf.file_guard import open_trusted_root
+from ...model.gguf.manifest import GGUFManifestError
 
 
 def publish_private_report(root: Path, filename: str, payload: dict) -> None:
@@ -16,7 +17,12 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
                          allow_nan=False,ensure_ascii=True)+chr(10)).encode('utf8')
     if len(encoded) > 16_384:
         raise QualificationError('qualification receipt oversized')
-    fdroot = open_trusted_root(root)
+    try:
+        fdroot = open_trusted_root(root)
+    except GGUFManifestError as exc:
+        # Preserve the fail-closed permission check at the source boundary;
+        # callers of the qualification API receive its documented error type.
+        raise QualificationError("qualification report directory is unsafe") from exc
     try:
         if os.fstat(fdroot).st_mode & 0o077:
             raise QualificationError('qualification report directory must be private')

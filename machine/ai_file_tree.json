@@ -1681,7 +1681,7 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "6a5b9f465d8ee295492a734232d63fba923f66e9",
+      "source_git_object_sha": "222237a6f52566db10098b071e8e45e3374eb4e5",
       "role": "Incremental build graph, resource-bounded parallel scheduling, deterministic asset invalidation, build observability, release/remote build controls, and network audit support autonomous AI work.",
       "work_package_refs": [
         "WP-W27",
