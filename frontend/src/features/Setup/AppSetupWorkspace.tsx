@@ -23,15 +23,15 @@ export default function AppSetupWorkspace() {
   const [notice, setNotice] = useState('');
   const request = useRef<AbortController | null>(null);
   const refresh = useCallback(async () => {
-    request.current?.abort(); const current = new AbortController(); request.current = current; setBusy(true); setError('');
+    request.current?.abort(); const current = new AbortController(); request.current = current; setBusy(true); setSnapshot(null); setError('');
     try { const value = await readAppReadiness(current.signal); if (!current.signal.aborted && value.accountEpoch === getAuthEpoch()) setSnapshot(value); }
-    catch (err) { if (!current.signal.aborted) setError(err instanceof Error ? err.message : 'Readiness could not be checked.'); }
+    catch { if (!current.signal.aborted) setError('READINESS_UNOBSERVED: Services could not be verified. Setup remains available; run the host doctor command and retry.'); }
     finally { if (request.current === current) setBusy(false); }
   }, []);
   useEffect(() => { void refresh(); return () => request.current?.abort(); }, [refresh]);
   useEffect(() => subscribeAuthChanges(() => {
     request.current?.abort(); setSnapshot(null); setBusy(false);
-    setError('Your account changed. Check readiness again for the current account.');
+    setError('ACCOUNT_CHANGED: Your account changed. Check readiness again for the current account.');
   }), []);
   const button = (label: string, onPress: () => void, disabled = false) => <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[s.button, disabled && s.disabled]}><Text style={s.buttonText}>{label}</Text></TouchableOpacity>;
   return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
