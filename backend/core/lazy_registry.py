@@ -108,6 +108,7 @@ _LOADERS = {
     'core.deployment_receipts': lambda: importlib.import_module('core.deployment_receipts'),
     'core.dialogue_runtime': lambda: importlib.import_module('core.dialogue_runtime'),
     'core.director_agent': lambda: importlib.import_module('core.director_agent'),
+    'core.discourse_catalog': lambda: importlib.import_module('core.discourse_catalog'),
     'core.discourse_engine': lambda: importlib.import_module('core.discourse_engine'),
     'core.discovery_engine': lambda: importlib.import_module('core.discovery_engine'),
     'core.dragon_conversation_binding': lambda: importlib.import_module('core.dragon_conversation_binding'),

@@ -22,6 +22,8 @@ from .playable_world import (
 SCHEMA = "skeleton.game_builder.dual_runtime_verification.v1"
 _MAX_FILES = 128
 _MAX_BYTES = 2_100_000
+# Studio source has a separate finite producer budget; base games stay at 2.1 MB.
+_MAX_STUDIO_BYTES = 16_100_000
 _MAX_MANIFEST = 65_536
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
 _COMPONENT = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\Z")
@@ -361,6 +363,7 @@ def verify_exported_package(
         # source package. Do not accept an empty label upgrade that omits the
         # original independent mirror/consumer evidence.
         studio = schema == "skeleton.game_builder.studio_package.v1"
+        byte_budget = _MAX_STUDIO_BYTES if studio else _MAX_BYTES
         digest = manifest.get("manifest_digest")
         body = {key: value for key, value in manifest.items()
                 if key != "manifest_digest"}
@@ -389,7 +392,9 @@ def verify_exported_package(
         files: dict[str, bytes] = {}
         total = len(release)
         for path, expected_digest in sorted(declared.items()):
-            payload = _read(fd, path, _MAX_BYTES - total)
+            if total >= byte_budget:
+                raise DualRuntimeVerificationError("package source byte budget exceeded")
+            payload = _read(fd, path, byte_budget - total)
             total += len(payload)
             if sha256(payload).hexdigest() != expected_digest:
                 raise DualRuntimeVerificationError("package file digest mismatch")
@@ -398,6 +403,14 @@ def verify_exported_package(
             raise DualRuntimeVerificationError("package changed during verification")
         if studio:
             verify_studio_release_evidence(files)
+            # A studio label is insufficient: bind the canonical authored source
+            # and publication-denial claims to this exact project identity.
+            pipeline = _json(files["studio/pipeline.json"], _MAX_MANIFEST)
+            if (pipeline.get("schema") != "skeleton.game_builder.studio_pipeline.v1"
+                    or pipeline.get("not_automatically_published") is not True
+                    or pipeline.get("original_game_claim") != "generated-or-user-authored-geometry"
+                    or pipeline.get("project_id") != manifest.get("project_id")):
+                raise DualRuntimeVerificationError("invalid studio source custody")
         if files["godot/proof.json"] != files["proof/verified_solution.json"]:
             raise DualRuntimeVerificationError("browser and Godot proofs differ")
         native = _json(files["godot/world.json"], _MAX_BYTES)
@@ -421,9 +434,9 @@ def verify_exported_package(
             raise DualRuntimeVerificationError("winning replay does not reproduce")
         # The replay must not attest a package whose non-manifest files were
         # replaced after the first digest pass. This is a bounded second
-        # read of at most _MAX_BYTES across the same pinned directory tree.
+        # read bounded to the declared schema budget across the same pinned tree.
         for path, expected_digest in sorted(declared.items()):
-            if sha256(_read(fd, path, _MAX_BYTES)).hexdigest() != expected_digest:
+            if sha256(_read(fd, path, byte_budget)).hexdigest() != expected_digest:
                 raise DualRuntimeVerificationError("package source changed during replay")
         if _inventory(fd) != expected:
             raise DualRuntimeVerificationError("package entries changed during replay")

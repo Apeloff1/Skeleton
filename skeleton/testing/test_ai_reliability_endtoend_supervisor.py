@@ -3,10 +3,27 @@ import unittest
 from skeleton.testing.reliability_fabric_test_support import scenario,FakeWorker
 from skeleton.ai.runtime.operational_ai.reliability_fabric.flows.preflight import REQUIRED_INFERENCE
 from skeleton.ai.runtime.operational_ai.reliability_fabric.flows.assured_supervisor import AssuredSupervisor
-from skeleton.ai.runtime.operational_ai.reliability_fabric.contracts import Rejected
+from skeleton.ai.runtime.operational_ai.reliability_fabric.contracts import Rejected, canonical, sha256
+from skeleton.ai.runtime.operational_ai.reliability_fabric.flows.evidence_bundle import EvidenceBundle
 
 def evidence():
     return {name:scenario(name,subject="owner") for name in REQUIRED_INFERENCE}
+
+def test_evidence_bundle_uses_roundtrip_safe_identity_without_claiming_native_device():
+    records = evidence()
+    bundle = EvidenceBundle()
+    for name, record in records.items():
+        bundle.add(name, record)
+    receipt = bundle.seal(required=REQUIRED_INFERENCE)
+    identity = next(iter(records.values()))["identity"]
+    fields = [
+        identity["tenant"], identity["subject"],
+        identity["model_sha256"], identity["scope"],
+    ]
+    assert receipt.identity_sha256 == sha256(canonical(fields))
+    assert receipt.source_only is True
+    assert receipt.release_certified is False
+
 
 class AssuredSupervisorTests(unittest.TestCase):
     def setUp(self):
