@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { snapshot, supervise } = require('./guarded-expo-export.cjs');
+const { snapshot, supervise, pinnedExpoInvocation } = require('./guarded-expo-export.cjs');
 
 function root(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'expo-guard-'));
@@ -33,6 +33,27 @@ function run(dir, mode) {
     pollMs: 20, terminateMs: 1000,
   });
 }
+
+test('default production invocation uses the pinned Expo CLI, not a Yarn wrapper', t => {
+  const dir = root(t);
+  assert.throws(() => pinnedExpoInvocation(dir), /pinned Expo CLI missing/);
+  const cli = path.join(dir, 'node_modules', 'expo', 'bin', 'cli');
+  fs.mkdirSync(path.dirname(cli), { recursive: true });
+  fs.writeFileSync(cli, '#!/usr/bin/env node\n');
+  const invocation = pinnedExpoInvocation(dir);
+  assert.equal(invocation.command, process.execPath);
+  assert.deepEqual(invocation.args, [cli, 'export', '--platform', 'web']);
+  assert.equal(invocation.args.includes('export:web'), false);
+});
+
+test('a symbolic-link Expo entrypoint is rejected', t => {
+  const dir = root(t);
+  const bin = path.join(dir, 'node_modules', 'expo', 'bin');
+  fs.mkdirSync(bin, { recursive: true });
+  fs.writeFileSync(path.join(bin, 'real-cli'), '#!/usr/bin/env node\n');
+  fs.symlinkSync('real-cli', path.join(bin, 'cli'));
+  assert.throws(() => pinnedExpoInvocation(dir), /unsafe Expo CLI entrypoint/);
+});
 
 test('normal 0 exit requires an actual export marker and setup HTML', async t => {
   const r = await run(root(t), 'normal');
