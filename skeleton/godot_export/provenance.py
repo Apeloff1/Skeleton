@@ -262,11 +262,14 @@ def tree_digest(root: Path) -> str:
         # Source root itself must still be reachable from the identical path.
         check_fd = os.open("/", flags)
         try:
-            for component in absolute.parts[1:]:
-                next_fd = os.open(component, flags, dir_fd=check_fd)
-                os.close(check_fd)
-                check_fd = next_fd
-            current = os.fstat(check_fd)
+            try:
+                for component in absolute.parts[1:]:
+                    next_fd = os.open(component, flags, dir_fd=check_fd)
+                    os.close(check_fd)
+                    check_fd = next_fd
+                current = os.fstat(check_fd)
+            except OSError as exc:
+                raise ValueError("source root changed during tree digest") from exc
             if directory_identity(current) != directory_identity(initial):
                 raise ValueError("source root changed during tree digest")
         finally:
