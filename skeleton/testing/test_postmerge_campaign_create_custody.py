@@ -24,12 +24,59 @@ SUPPORTS = (
     and hasattr(os, "O_NOFOLLOW")
     and hasattr(os, "supports_dir_fd")
     and all(fn in os.supports_dir_fd
-            for fn in (os.open, os.stat, os.rename, os.unlink, os.link))
+            for fn in (os.open, os.stat, os.rename, os.unlink))
 )
 
 
 @unittest.skipUnless(SUPPORTS, "requires descriptor-relative POSIX file operations")
 class CreateOnlyCampaignCustodyTests(unittest.TestCase):
+    def test_atomic_create_slot_has_exactly_one_link(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slot = root / "atomic.json"
+            create_slot(slot, {"tick": 10})
+            stat_result = os.stat(slot, follow_symlinks=False)
+            self.assertEqual(stat_result.st_nlink, 1)
+            self.assertEqual(read_slot(slot), {"tick": 10})
+            self.assertEqual(list(root.glob(".campaign-*.tmp")), [])
+
+    def test_publish_failure_never_leaks_temporary_or_destination(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "atomic.json"
+            with patch(
+                "skeleton.game.gameplay.offline_grid_save_slot._rename_noreplace",
+                side_effect=SaveSlotError("native no-replace unavailable"),
+            ):
+                with self.assertRaisesRegex(SaveSlotError, "native no-replace"):
+                    create_slot(target, {"tick": 10})
+            self.assertFalse(target.exists())
+            self.assertEqual(list(root.glob(".campaign-*.tmp")), [])
+
+    def test_competing_create_wins_without_clobber(self):
+        from skeleton.game.gameplay import offline_grid_save_slot as module
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "atomic.json"
+            native = module._rename_noreplace
+
+            def competing_writer(dfd, source, dest):
+                with os.fdopen(
+                    os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                            0o600, dir_fd=dfd), "wb",
+                ) as stream:
+                    stream.write(b'{"tick":99}')
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                return native(dfd, source, dest)
+
+            with patch.object(module, "_rename_noreplace", side_effect=competing_writer):
+                with self.assertRaises(FileExistsError):
+                    create_slot(target, {"tick": 10})
+            self.assertEqual(read_slot(target), {"tick": 99})
+            self.assertEqual(list(root.glob(".campaign-*.tmp")), [])
+
     def test_no_clobber_preserves_previous_save(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
