@@ -19,6 +19,15 @@ INDEX = Path("machine/ci_workflow_tiers.json")
 # Explicit event-subscriber inventory: no extra independent Actions admission.
 MAX_INDEPENDENT_WORKFLOWS = 26
 
+# Owner-directed backlog pause: only the bounded queue-drain recovery lane
+# remains scheduled. Historical cleanup is independently dispatch-only.
+SCHEDULED_RECOVERY = frozenset({"queue-drain.yml"})
+PAUSED_RECOVERY = frozenset({
+    "actions-housekeeping-cli.yml",
+    "three-hour-actions-queue-expiry.yml",
+})
+OWNER_MANUAL_RECOVERY = frozenset({"owner-historical-actions-cleanup.yml"})
+
 
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
@@ -69,6 +78,20 @@ def audit(root: Path = ROOT) -> list[str]:
             or any(not isinstance(name, str) or not name.endswith(".yml") or "/" in name
                    for group in tiers for name in group)):
         return ["CI tiers require nonempty sets of plain .yml file names"]
+    scheduled = policy.get("operational_scheduled_non_pr")
+    paused = policy.get("operational_paused_manual_only")
+    if (type(scheduled) is not list or len(scheduled) != len(SCHEDULED_RECOVERY)
+            or any(type(name) is not str for name in scheduled)
+            or set(scheduled) != SCHEDULED_RECOVERY):
+        failures.append("scheduled operational registry must retain only queue-drain")
+    if (type(paused) is not list or len(paused) != len(PAUSED_RECOVERY)
+            or any(type(name) is not str for name in paused)
+            or set(paused) != PAUSED_RECOVERY):
+        failures.append("paused operational registry must retain both manual lanes")
+    for name in SCHEDULED_RECOVERY | PAUSED_RECOVERY | OWNER_MANUAL_RECOVERY:
+        if not (root / WORKFLOWS / name).is_file():
+            failures.append(f"{name}: required operational workflow missing")
+
     names = specialised + core + reusable
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
@@ -101,12 +124,26 @@ def audit(root: Path = ROOT) -> list[str]:
     automatic_files: set[str] = set()
     for path in active:
         try:
-            found = events(path.read_text(encoding="utf-8"))
+            source = path.read_text(encoding="utf-8")
+            found = events(source)
         except (OSError, UnicodeError, ValueError) as exc:
             failures.append(
                 f"{path.name}: cannot inspect active workflow ({exc})"
             )
             continue
+        if path.name in PAUSED_RECOVERY | OWNER_MANUAL_RECOVERY:
+            if (found != {"workflow_dispatch"}
+                    or not re.search(r"(?m)^permissions: \{\}$", source)):
+                failures.append(f"{path.name}: paused owner cleanup gained automatic trigger or permissions")
+        if path.name == "queue-drain.yml":
+            if (found != {"workflow_dispatch", "schedule", "push"}
+                    or not re.search(
+                        r"(?m)^  push:\n    branches: \[main\]\n    paths: \['\.github/workflows/queue-drain\.yml'\]$",
+                        source,
+                    )
+                    or not re.search(r"(?m)^permissions: \{\}$", source)):
+                failures.append("queue-drain.yml: operational-only trigger or permission drift")
+
         if independently_triggered(found):
             automatic += 1
             automatic_files.add(path.name)

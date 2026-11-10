@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from scripts.check_ci_workflow_tiers import ROOT, audit, events
+from scripts.check_ci_workflow_tiers import ROOT, PAUSED_RECOVERY, SCHEDULED_RECOVERY, audit, events
 
 
 class WorkflowTierTests(unittest.TestCase):
@@ -55,6 +55,28 @@ class WorkflowTierTests(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 events(invalid)
 
+    def test_owner_pause_retains_exact_trigger_custody(self):
+        policy = json.loads((ROOT / "machine/ci_workflow_tiers.json").read_text())
+        self.assertEqual(set(policy["operational_scheduled_non_pr"]), SCHEDULED_RECOVERY)
+        self.assertEqual(set(policy["operational_paused_manual_only"]), PAUSED_RECOVERY)
+        self.assertEqual(SCHEDULED_RECOVERY, {"queue-drain.yml"})
+        self.assertEqual(len(PAUSED_RECOVERY), 2)
+        automatic = set(policy["automatic_event_workflows"])
+        for name in PAUSED_RECOVERY | {"owner-historical-actions-cleanup.yml"}:
+            with self.subTest(name=name):
+                source = (ROOT / ".github/workflows" / name).read_text()
+                self.assertEqual(events(source), {"workflow_dispatch"})
+                self.assertIn("permissions: {}", source)
+                self.assertNotIn(name, automatic)
+        for name in ("engine-transport-source-qualification.yml",
+                     "masterplan-421-dossier-integrity.yml",
+                     "source-bound-custody-qualification.yml"):
+            self.assertIn(name, automatic)
+            source = (ROOT / ".github/workflows" / name).read_text()
+            self.assertEqual(events(source), set(policy["automatic_event_triggers"][name]))
+        queue = (ROOT / ".github/workflows/queue-drain.yml").read_text()
+        self.assertEqual(events(queue), {"workflow_dispatch", "schedule", "push"})
+
     def test_windows_installer_pr_admission_keeps_manual_and_exact_head_custody(self):
         workflow = (ROOT / ".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
         self.assertEqual(events(workflow), {"workflow_dispatch", "pull_request"})
@@ -86,6 +108,23 @@ class WorkflowTierTests(unittest.TestCase):
             for name in registry["specialized_manual_only"] + registry["required_reusable_workflows"]:
                 source = ROOT / ".github/workflows-archive" / name
                 (root / ".github/workflows-archive" / name).write_text(source.read_text())
+            self.assertEqual(audit(root), [])
+            paused_path = root / ".github/workflows/actions-housekeeping-cli.yml"
+            paused_original = paused_path.read_text()
+            paused_path.write_text(paused_original.replace(
+                "  workflow_dispatch:", "  pull_request:\\n  workflow_dispatch:", 1
+            ).replace("\\\\n", "\\n"))
+            self.assertTrue(any("paused owner cleanup gained automatic trigger" in p
+                                for p in audit(root)))
+            paused_path.write_text(paused_original)
+            queue_path = root / ".github/workflows/queue-drain.yml"
+            queue_original = queue_path.read_text()
+            queue_path.write_text(queue_original.replace(
+                "    paths: ['.github/workflows/queue-drain.yml']",
+                "    paths: ['.github/workflows/changed-scope.yml']", 1
+            ))
+            self.assertTrue(any("operational-only trigger" in p for p in audit(root)))
+            queue_path.write_text(queue_original)
             self.assertEqual(audit(root), [])
             reusable = root / ".github/workflows" / registry["required_reusable_workflows"][0]
             reusable_original = reusable.read_text()

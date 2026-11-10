@@ -31,13 +31,13 @@
     "ci.yml"
   ],
   "automatic_event_workflows": [
-    "actions-housekeeping-cli.yml",
     "app-foundation-e2e.yml",
     "artifact-policy.yml",
     "automation-traffic-manager.yml",
     "automerge-control-plane.yml",
     "backend-quality.yml",
     "dependency-review.yml",
+    "engine-transport-source-qualification.yml",
     "first-install-source-qualification.yml",
     "game-frontier-validation.yml",
     "jeeves-integrated-source-qualification.yml",
@@ -45,8 +45,8 @@
     "jeeves-native-sqlite-source-qualification.yml",
     "local-first-engine-source-qualification.yml",
     "malware-gate.yml",
+    "masterplan-421-dossier-integrity.yml",
     "merge-readiness.yml",
-    "owner-historical-actions-cleanup.yml",
     "queue-drain.yml",
     "release-images.yml",
     "repository-hygiene-gate.yml",
@@ -54,16 +54,11 @@
     "sealed-context-guard.yml",
     "secret-scanning.yml",
     "security-alert-inventory.yml",
-    "three-hour-actions-queue-expiry.yml",
+    "source-bound-custody-qualification.yml",
     "windows-installer.yml",
     "workflow-input-security.yml"
   ],
   "automatic_event_triggers": {
-    "actions-housekeeping-cli.yml": [
-      "workflow_dispatch",
-      "schedule",
-      "push"
-    ],
     "app-foundation-e2e.yml": [
       "pull_request",
       "push",
@@ -87,6 +82,9 @@
       "workflow_dispatch"
     ],
     "dependency-review.yml": [
+      "pull_request"
+    ],
+    "engine-transport-source-qualification.yml": [
       "pull_request"
     ],
     "first-install-source-qualification.yml": [
@@ -114,14 +112,14 @@
       "workflow_dispatch",
       "schedule"
     ],
+    "masterplan-421-dossier-integrity.yml": [
+      "pull_request",
+      "workflow_dispatch"
+    ],
     "merge-readiness.yml": [
       "workflow_dispatch",
       "pull_request",
       "push"
-    ],
-    "owner-historical-actions-cleanup.yml": [
-      "issue_comment",
-      "workflow_dispatch"
     ],
     "queue-drain.yml": [
       "workflow_dispatch",
@@ -155,10 +153,9 @@
       "push",
       "schedule"
     ],
-    "three-hour-actions-queue-expiry.yml": [
-      "schedule",
+    "source-bound-custody-qualification.yml": [
       "workflow_dispatch",
-      "push"
+      "pull_request"
     ],
     "windows-installer.yml": [
       "workflow_dispatch",
@@ -168,5 +165,12 @@
       "pull_request",
       "push"
     ]
-  }
+  },
+  "operational_scheduled_non_pr": [
+    "queue-drain.yml"
+  ],
+  "operational_paused_manual_only": [
+    "actions-housekeeping-cli.yml",
+    "three-hour-actions-queue-expiry.yml"
+  ]
 }
