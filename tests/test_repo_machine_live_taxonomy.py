@@ -157,3 +157,21 @@ def test_godot_export_and_mass_build_are_owned_by_delivery_plane() -> None:
             "delivery-plane",
             "canonical",
         )
+
+
+def test_game_provider_environment_remains_explicitly_source_retained() -> None:
+    """A deterministic game-world adapter cannot become credential-provider authority."""
+    import json
+
+    source = "skeleton/provider_environment.py"
+    candidate = ROOT / source
+    assert candidate.is_file() and not candidate.is_symlink()
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    records = [
+        item for item in manifest["retained_outside_ai_tree"]
+        if item.get("path") == source
+    ]
+    assert len(records) == 1
+    assert "game-environment" in records[0]["owner"]
+    assert "outside credential-provider AI tree" in records[0]["reason"]
+    assert all(item.get("source") != source for item in manifest["mappings"])
