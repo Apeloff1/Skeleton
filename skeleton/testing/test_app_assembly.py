@@ -348,7 +348,8 @@ def test_product_control_client_matches_mounted_backend_routes():
     registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
 
     assert "const ROOT = '/api/admin/ops/product-control';" in client
-    assert 'router = project_router(prefix="/api/admin/ops"' in ops
+    from scripts.check_app_assembly import has_canonical_ops_router
+    assert has_canonical_ops_router(ops)
     assert '("routes.ops",' in registry
 
     required_routes = (
