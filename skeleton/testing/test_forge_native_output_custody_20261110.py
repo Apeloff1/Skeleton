@@ -522,3 +522,62 @@ def test_hash_rejects_file_growth_after_inventory_admission(tmp_path, monkeypatc
     assert entry["ok"] is False
     assert entry["reason"] == "artifact-custody-failed"
     assert entry["sha256"] == {}
+
+
+def test_export_parent_fd_is_closed_after_failed_engine_call(tmp_path, monkeypatch):
+    emitted = emit_godot(compile_era("extraction_now"), title="fd-failure")
+    monkeypatch.setattr(
+        forge_export, "resolve_binary",
+        lambda binary=None: ("/bin/true", "fixture-only", False),
+    )
+    original_open = forge_export._open_directory
+    captured = []
+
+    def record_directory(path):
+        target, dfd = original_open(path)
+        captured.append(dfd)
+        return target, dfd
+
+    def child_crash(command, cwd, timeout):
+        if "--export-release" in command:
+            raise RuntimeError("synthetic exporter exception")
+        return 0, "", False
+
+    monkeypatch.setattr(forge_export, "_open_directory", record_directory)
+    monkeypatch.setattr(forge_export, "_run", child_crash)
+    with pytest.raises(RuntimeError, match="exporter exception"):
+        forge_export.export_build(emitted, tmp_path / "native", presets=("Linux",))
+    assert captured
+    with pytest.raises(OSError):
+        os.fstat(captured[-1])
+
+
+def test_export_parent_fd_is_closed_after_normal_failed_export(tmp_path, monkeypatch):
+    emitted = emit_godot(compile_era("extraction_now"), title="fd-fail-closed")
+    monkeypatch.setattr(
+        forge_export, "resolve_binary",
+        lambda binary=None: ("/bin/true", "fixture-only", False),
+    )
+    original_open = forge_export._open_directory
+    captured = []
+
+    def record_directory(path):
+        target, dfd = original_open(path)
+        captured.append(dfd)
+        return target, dfd
+
+    def fail_export(command, cwd, timeout):
+        return (22, "synthetic export failure", False) if (
+            "--export-release" in command
+        ) else (0, "", False)
+
+    monkeypatch.setattr(forge_export, "_open_directory", record_directory)
+    monkeypatch.setattr(forge_export, "_run", fail_export)
+    result = forge_export.export_build(
+        emitted, tmp_path / "native", presets=("Linux",),
+    )
+    assert result["passed"] is False
+    assert result["presets"]["Linux"]["ok"] is False
+    assert captured
+    with pytest.raises(OSError):
+        os.fstat(captured[-1])
