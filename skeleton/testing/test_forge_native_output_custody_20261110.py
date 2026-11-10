@@ -445,3 +445,80 @@ def test_native_export_rejects_parent_replacement_after_hash_before_boot(
         with pytest.raises(ValueError, match="report parent changed"):
             forge_export.export_build(emitted, out, presets=("Linux",))
     assert hashed and switched
+
+
+def _two_artifact_fake_export(tmp_path, monkeypatch):
+    """Qualify only Forge's source policy, never a simulated native boot."""
+    emitted = emit_godot(compile_era("extraction_now"), title="inventory-identity")
+    monkeypatch.setattr(
+        forge_export, "resolve_binary",
+        lambda binary=None: ("/bin/true", "fixture-only", False),
+    )
+
+    def run(command, cwd, timeout):
+        if "--export-release" in command:
+            target = Path(command[-1])
+            target.write_bytes(b"executable-contents")
+            target.with_suffix(".pck").write_bytes(b"resource-pack-contents")
+        return 0, "", False
+
+    monkeypatch.setattr(forge_export, "_run", run)
+    return emitted
+
+
+def test_hash_rejects_same_byte_artifact_inode_replacement(tmp_path, monkeypatch):
+    emitted = _two_artifact_fake_export(tmp_path, monkeypatch)
+    original = forge_export._artifact_digest
+    replaced = False
+
+    def replace_before_hash(item):
+        nonlocal replaced
+        if not replaced:
+            old = item.with_name(item.name + ".old")
+            item.rename(old)
+            item.write_bytes(old.read_bytes())
+            replaced = True
+        return original(item)
+
+    monkeypatch.setattr(forge_export, "_artifact_digest", replace_before_hash)
+    with patch.object(
+        forge_export, "_boot_exported",
+        side_effect=AssertionError("unverified artifact must never boot"),
+    ):
+        result = forge_export.export_build(
+            emitted, tmp_path / "native", presets=("Linux",),
+        )
+    assert replaced
+    entry = result["presets"]["Linux"]
+    assert result["passed"] is False
+    assert entry["ok"] is False
+    assert entry["reason"] == "artifact-custody-failed"
+    assert entry["sha256"] == {}
+
+
+def test_hash_rejects_file_growth_after_inventory_admission(tmp_path, monkeypatch):
+    emitted = _two_artifact_fake_export(tmp_path, monkeypatch)
+    original = forge_export._artifact_digest
+    grown = False
+
+    def grow_before_hash(item):
+        nonlocal grown
+        if not grown:
+            item.write_bytes(item.read_bytes() + b"-unexpected-size-growth")
+            grown = True
+        return original(item)
+
+    monkeypatch.setattr(forge_export, "_artifact_digest", grow_before_hash)
+    with patch.object(
+        forge_export, "_boot_exported",
+        side_effect=AssertionError("unverified artifact must never boot"),
+    ):
+        result = forge_export.export_build(
+            emitted, tmp_path / "native", presets=("Linux",),
+        )
+    assert grown
+    entry = result["presets"]["Linux"]
+    assert result["passed"] is False
+    assert entry["ok"] is False
+    assert entry["reason"] == "artifact-custody-failed"
+    assert entry["sha256"] == {}
