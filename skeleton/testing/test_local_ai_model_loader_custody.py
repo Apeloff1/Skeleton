@@ -105,3 +105,9 @@ class ModelLoaderCustodyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ModelLoader(str(self.path), expected_sha256=self.sha,
                         license_accepted=True, max_bytes=23).load("c" * 32)
+
+    def test_header_only_record_cannot_be_qualified(self):
+        header = b"GGUF" + struct.pack("<IQQ", 3, 1, 1)
+        self.path.write_bytes(header)
+        with self.assertRaises(ValueError):
+            self.qualify(expected_sha256=hashlib.sha256(header).hexdigest())
