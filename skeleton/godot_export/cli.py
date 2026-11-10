@@ -57,8 +57,13 @@ def _provenance(a: argparse.Namespace) -> int:
 
 
 def _verify(a: argparse.Namespace) -> int:
-    m = provenance.Manifest.loads(a.manifest.read_text(encoding="utf-8"))
-    problems = provenance.verify(m, a.base, a.project)
+    try:
+        manifest = provenance.read_manifest_file(a.manifest)
+        problems = provenance.verify(manifest, a.base, a.project)
+    except (ValueError, OSError, UnicodeError, RecursionError):
+        # Do not leak attacker-controlled paths or malformed JSON contents
+        # into public CI logs. A malformed receipt is never a successful one.
+        problems = ["unsafe or malformed provenance manifest"]
     print(json.dumps({"ok": not problems, "problems": problems}))
     return 0 if not problems else 1
 
