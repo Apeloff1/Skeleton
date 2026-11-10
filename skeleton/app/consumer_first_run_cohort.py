@@ -202,12 +202,14 @@ def inspect_consumer_first_run_cohort(
             "installed_tree_snapshot_sha256": nested_digests[index],
             "release_certified": False,
         })
+        # Run the specific parent/nested custody checks first so a rejection
+        # names the exact substitution; the aggregate check still follows.
+        require_all_nested_custody()
         if (_delivered_custody(checked) != before
                 or _save_identity(summary) != summary_before):
             raise ConsumerFirstRunCohortError(
                 "another installed game or summary changed during replay"
             )
-        require_all_nested_custody()
 
     # Reinspect the complete canonical cohort after the final consumer game;
     # a later replay must not mask tampering with an earlier installed game.

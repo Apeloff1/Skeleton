@@ -112,3 +112,53 @@ def test_cli_provenance_and_verify(built, capsys):
     assert json.loads(capsys.readouterr().out)["ok"] is False
     assert cli.main(["provenance", str(root), "--artifact", "nopath", "--verdict", "SHIP"]) == 2
     assert cli.main(["provenance", str(root), "--verdict", "NO-SHIP"]) == 0
+
+
+def test_verify_refuses_parent_traversal_and_symlinked_artifacts(built, tmp_path):
+    from dataclasses import replace
+    root, out = built
+    real = out / "gfd_fixture.x86_64"
+    m = provenance.build(root, "4.7.2", "SHIP", {"Linux": real})
+    forged = replace(m.artifacts[0], path="../outside.bin")
+    m.artifacts = [forged]
+    assert any("unsafe artifact path" in p for p in provenance.verify(m, root))
+    outside = tmp_path / "outside.bin"
+    outside.write_bytes(real.read_bytes())
+    linked = out / "linked.bin"
+    linked.symlink_to(outside)
+    m.artifacts = [replace(forged, path="build/linux/linked.bin")]
+    assert any("symlink artifact path" in p for p in provenance.verify(m, root))
+    with pytest.raises(ValueError, match="symlink"):
+        provenance.build(root, "4.7.2", "SHIP", {"Linux": linked})
+
+
+def test_tree_digest_refuses_symlinked_source(built, tmp_path):
+    root, _ = built
+    outside = tmp_path / "outside.gd"
+    outside.write_text("extends Node")
+    (root / "scripts" / "linked.gd").symlink_to(outside)
+    with pytest.raises(ValueError, match="symlink"):
+        provenance.tree_digest(root)
+
+
+def test_provenance_build_refuses_symlinked_parent_directory(built, tmp_path):
+    root, out = built
+    linked_dir = root / "linked-build"
+    linked_dir.symlink_to(out, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        provenance.build(root, "4.7.2", "SHIP", {"Linux": linked_dir / "gfd_fixture.x86_64"})
+
+
+def test_manifest_loads_rejects_traversal_duplicate_and_oversized_evidence(built):
+    root, out = built
+    m = provenance.build(root, "4.7.2", "SHIP", {"Linux": out / "gfd_fixture.x86_64"})
+    doc = json.loads(m.dumps())
+    doc["artifacts"][0]["path"] = "../outside"
+    with pytest.raises(ValueError, match="unsafe artifact path"):
+        provenance.Manifest.loads(json.dumps(doc))
+    doc = json.loads(m.dumps())
+    doc["artifacts"].append(dict(doc["artifacts"][0]))
+    with pytest.raises(ValueError, match="duplicated"):
+        provenance.Manifest.loads(json.dumps(doc))
+    with pytest.raises(ValueError, match="byte bound"):
+        provenance.Manifest.loads(" " * (8 * 1024 * 1024 + 1))

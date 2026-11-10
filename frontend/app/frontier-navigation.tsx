@@ -107,7 +107,7 @@ export default function FrontierNavigation() {
         </Text>
         <GameFrontierNavigationPanel />
         <GameFrontierSurveyedControlPanel />
-        {/* Additive editor review: navigation and surveyed controls stay present. */}
+        {/* Additive editor review; optional GPS and surveyed controls remain intact. */}
         <GameFrontierCockpitPanel projectId={projectId} />
       </ScrollView>
     </SafeAreaView>

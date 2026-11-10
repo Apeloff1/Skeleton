@@ -171,8 +171,8 @@ async def call_ai(prompt: str, system_prompt: str = None) -> str:
             )
         )
         return response.text
-    except EngineTextError:
-        return "llm_request_failed"
+    except EngineTextError as exc:
+        raise HTTPException(status_code=502, detail="AI toolkit request could not be completed") from exc
 
 
 def analyze_code_structure(code: str, language: str) -> Dict[str, Any]:

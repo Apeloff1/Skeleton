@@ -33,13 +33,23 @@ function localGuardIssue(data: Record<string, unknown> | null): { message: strin
   return null;
 }
 
-/** A missing observation is never a positive readiness verdict. A failed observed
- * probe is blocked, while an absent private-service probe remains unknown. */
-export function serviceReadinessStatus(item: { ok?: unknown; detail?: unknown } | undefined): ReadinessCheck['status'] {
-  if (!item || typeof item !== 'object' || typeof item.ok !== 'boolean'
-      || typeof item.detail !== 'string' || item.detail.length > 2000) return 'unknown';
-  if (item.ok === true) return 'ready';
-  return item.detail.startsWith('observation pending') ? 'unknown' : 'blocked';
+/** Preserve the distinction between observed health, explicit failure, and missing
+ * evidence. No truthy object or pending observation may unlock first-install. */
+export function serviceReadinessStatus(
+  item: { ok?: unknown; detail?: unknown } | undefined | null,
+): ReadinessCheck['status'] {
+  if (!item || typeof item !== 'object' || Array.isArray(item)
+      || typeof item.ok !== 'boolean'
+      || typeof item.detail !== 'string'
+      || !item.detail || item.detail.length > 2000
+      || item.detail !== item.detail.trim()
+      || /[\u0000-\u001f\u007f]/.test(item.detail)) return 'unknown';
+  if (item.detail.startsWith('observation pending')) return 'unknown';
+  if (item.ok === true) {
+    // Actual service probes report an explicit, bounded healthy verdict.
+    return item.detail === 'healthy' || item.detail === 'ready' ? 'ready' : 'unknown';
+  }
+  return 'blocked';
 }
 
 /** Each verdict belongs to its observed owner; service health never implies AI readiness. */
@@ -70,9 +80,9 @@ export async function readAppReadiness(signal?: AbortSignal): Promise<AppReadine
     checks.push({ id: name, label: name === 'backend' ? 'Application service' : name === 'mongo' ? 'Database service' : 'AI engine service',
       status: serviceStatus,
       message: serviceStatus === 'ready' ? 'The service responded to its health check.'
-        : serviceStatus === 'unknown' ? 'SERVICE_UNOBSERVED: This service was not independently verified; no readiness claim is available.'
+        : serviceStatus === 'unknown' ? 'SERVICE_UNOBSERVED: Independent readiness evidence is missing. Keep setup accessible and retry diagnostics.'
         : name === 'mongo' ? 'The application database could not be observed as healthy. Account sign-in and durable work need this service; inspect it before retrying.'
-        : 'SERVICE_UNAVAILABLE: The service health probe failed. Inspect host diagnostics before retrying.',
+        : 'SERVICE_UNAVAILABLE: This service failed its observed health check. Check host diagnostics before retrying.',
       action: 'python -m skeleton app status --live' });
   }
   const authData = account.observed !== false ? account : null;
