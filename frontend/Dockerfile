@@ -50,8 +50,9 @@ RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
     timeout -k 15s 720s yarn export:web \
     && echo "frontend-export-process-exited" \
-    && (test -f /app/dist/setup.html || test -f /app/dist/setup/index.html) \
-    && echo "frontend-setup-artifact-verified"
+    && test -s /app/dist/index.html \
+    && (test -s /app/dist/setup.html || test -s /app/dist/setup/index.html) \
+    && echo "frontend-index-and-setup-artifacts-verified"
 
 # Stage 4: Production (Nginx)
 # Use the minimal official nginx runtime to reduce the production package/CVE
