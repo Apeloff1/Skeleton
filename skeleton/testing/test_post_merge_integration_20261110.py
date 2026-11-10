@@ -171,7 +171,7 @@ class PostMergeOfflineIntegrations(unittest.TestCase):
             self.assertEqual(json.loads(stdout)["save"], persisted)
             self.assertEqual(persisted, report["save"])
             self.assertEqual(persisted["state_digest"], report["state_digest"])
-            self.assertEqual(persisted["ending"], "wanderer")
+            self.assertEqual(persisted["state"]["ending"], "wanderer")
 
     @unittest.skipUnless(os.name == "posix" and hasattr(os, "O_NOFOLLOW"),
                          "requires POSIX descriptor guards")
