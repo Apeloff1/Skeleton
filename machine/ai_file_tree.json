@@ -7379,6 +7379,11 @@
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
     },
     {
+      "path": "skeleton/provider_environment.py",
+      "owner": "game-environment simulation and deterministic replay",
+      "reason": "The deterministic game-world adapter and holdout/replay buffers remain outside credential-provider AI tree authority; this module has no model credential custody or provider runtime ownership."
+    },
+    {
       "path": "skeleton/providers",
       "owner": "integration contract owner",
       "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
