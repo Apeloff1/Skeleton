@@ -21,6 +21,8 @@ from urllib.request import Request, urlopen
 SHA = re.compile(r"^[0-9a-f]{40}$")
 REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
+MAX_API_PAGES = 10
+MAX_PAGE_ITEMS = 100
 ESSENTIAL_JOBS: Mapping[str, tuple[str, ...]] = {
     "Workflow Input Security": ("Workflow input shell boundary",),
     "Merge Readiness": (
@@ -189,6 +191,49 @@ def _get_json(repo: str, suffix: str, token: str | None) -> dict[str, Any]:
     return value
 
 
+def _paged_items(
+    repo: str,
+    path: str,
+    key: str,
+    token: str | None,
+) -> list[dict[str, Any]]:
+    """Read a bounded consistent GitHub Actions inventory, never truncate it.
+
+    A changing total_count or repeated IDs is an evidence race, not permission
+    to use an arbitrary first page as a qualifying run inventory.
+    """
+    items: list[dict[str, Any]] = []
+    expected_total: int | None = None
+    seen: set[int] = set()
+    for page in range(1, MAX_API_PAGES + 1):
+        separator = "&" if "?" in path else "?"
+        result = _get_json(
+            repo, path + separator + "per_page=" + str(MAX_PAGE_ITEMS)
+            + "&page=" + str(page), token,
+        )
+        total = result.get("total_count")
+        batch = result.get(key)
+        if type(total) is not int or total < 0 or not isinstance(batch, list):
+            raise EvidenceError("GitHub Actions inventory has invalid shape")
+        if expected_total is None:
+            expected_total = total
+        if total != expected_total or len(batch) > MAX_PAGE_ITEMS:
+            raise EvidenceError("GitHub Actions inventory changed during pagination")
+        for item in batch:
+            if not isinstance(item, dict):
+                raise EvidenceError("GitHub Actions item must be an object")
+            ident = item.get("id")
+            if type(ident) is not int or ident <= 0 or ident in seen:
+                raise EvidenceError("GitHub Actions inventory duplicate or invalid ID")
+            seen.add(ident)
+            items.append(item)
+        if len(items) == total:
+            return items
+        if len(items) > total or not batch:
+            raise EvidenceError("GitHub Actions inventory has missing or duplicated pages")
+    raise EvidenceError("GitHub Actions inventory exceeded bounded pagination")
+
+
 def live_snapshot(repo: str, head: str | None = None) -> dict[str, Any]:
     if not REPO.fullmatch(repo):
         raise EvidenceError("repository must be owner/name")
@@ -197,26 +242,20 @@ def live_snapshot(repo: str, head: str | None = None) -> dict[str, Any]:
     expected = _sha(before)
     if expected is None or (head is not None and head != expected):
         raise EvidenceError("current main head does not match requested SHA")
-    runs_response = _get_json(
-        repo, "/actions/runs?head_sha=" + expected + "&event=push&per_page=100", token,
+    runs = _paged_items(
+        repo, "/actions/runs?head_sha=" + expected + "&event=push",
+        "workflow_runs", token,
     )
-    runs = runs_response.get("workflow_runs")
-    total = runs_response.get("total_count")
-    if (not isinstance(runs, list) or type(total) is not int
-            or total < 0 or total != len(runs)):
-        raise EvidenceError("exact-main run inventory is incomplete or paginated")
     jobs_by_run: dict[str, list[dict[str, Any]]] = {}
     for name in ESSENTIAL_JOBS:
         match = _latest_run(name, expected, runs)
         if match is None or match.get("conclusion") != "success" or match.get("status") != "completed":
             continue
         run_id = match["id"]
-        result = _get_json(repo, "/actions/runs/" + str(run_id) + "/jobs?per_page=100", token)
-        jobs = result.get("jobs")
-        count = result.get("total_count")
-        if not isinstance(jobs, list) or type(count) is not int or count != len(jobs):
-            raise EvidenceError("exact-main job inventory is incomplete")
-        jobs_by_run[str(run_id)] = jobs
+        jobs_by_run[str(run_id)] = _paged_items(
+            repo, "/actions/runs/" + str(run_id) + "/jobs",
+            "jobs", token,
+        )
     after = _get_json(repo, "/branches/main", token)
     return {
         "head": expected, "branch_before": before, "branch_after": after,
