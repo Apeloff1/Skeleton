@@ -26,7 +26,9 @@ def test_cycles_and_oversized_bool_tree_rejected():
 
 
 def test_utility_nonfinite_and_invalid_weights_rejected():
-    for bad in (float("nan"),float("inf"),-1):
+    # Oversized Python integers must fail as ValidationError, not escape as
+    # a conversion OverflowError from math.isfinite.
+    for bad in (float("nan"),float("inf"),-1,10**1000):
         with pytest.raises(ValidationError):
             curve("linear",bad)
         with pytest.raises(ValidationError):
