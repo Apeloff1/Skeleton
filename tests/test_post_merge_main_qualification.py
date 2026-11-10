@@ -35,6 +35,7 @@ def fixture():
             "id": run_id, "name": name, "event": "push",
             "head_sha": HEAD, "status": "completed", "conclusion": "success",
             "run_attempt": 1, "created_at": f"2026-11-10T01:{i:02d}:00Z",
+            "updated_at": f"2026-11-10T01:{i:02d}:30Z",
         })
         jobs[str(run_id)] = [
             {"name": job, "status": "completed", "conclusion": "success"}
@@ -130,6 +131,7 @@ class ExactMainEvidenceTests(unittest.TestCase):
         later.update({
             "id": 60000, "run_attempt": 2,
             "created_at": "2026-11-10T02:00:00Z",
+            "updated_at": "2026-11-10T02:01:00Z",
             "conclusion": "failure",
         })
         data["runs"].append(later)
@@ -137,6 +139,38 @@ class ExactMainEvidenceTests(unittest.TestCase):
         self.assertEqual(result["workflow_evidence"]["Workflow Input Security"]["run_id"], 60000)
         self.assertIn("exact_main_workflow_not_success:Workflow Input Security",
                       result["blocking_reasons"])
+
+    def test_old_run_retry_newer_update_supersedes_new_run_success(self):
+        data = fixture()
+        current = next(r for r in data["runs"] if r["name"] == "Workflow Input Security")
+        older = dict(current)
+        older.update({
+            "id": 49000,
+            "created_at": "2026-11-09T01:00:00Z",
+            "updated_at": "2026-11-10T03:00:00Z",
+            "run_attempt": 2,
+            "conclusion": "failure",
+        })
+        data["runs"].append(older)
+        result = verify(data)
+        self.assertEqual(
+            result["workflow_evidence"]["Workflow Input Security"]["run_id"],
+            49000,
+        )
+        self.assertIn(
+            "exact_main_workflow_not_success:Workflow Input Security",
+            result["blocking_reasons"],
+        )
+
+    def test_run_without_updated_timestamp_cannot_supply_evidence(self):
+        data = fixture()
+        current = next(r for r in data["runs"] if r["name"] == "Workflow Input Security")
+        current.pop("updated_at")
+        result = verify(data)
+        self.assertIn(
+            "exact_main_push_workflow_missing:Workflow Input Security",
+            result["blocking_reasons"],
+        )
 
     def test_required_e2e_job_skipped_is_not_accepted(self):
         data = fixture()
