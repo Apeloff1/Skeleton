@@ -62,6 +62,14 @@ def _provenance(a: argparse.Namespace) -> int:
 
 
 def _verify(a: argparse.Namespace) -> int:
+    # A matching artifact hash alone does not prove which project produced it.
+    # The CLI's "ok" result must bind artifact bytes AND the source tree.
+    # Preserve a JSON error response (rather than argparse SystemExit) for
+    # callers that previously omitted the optional --project argument.
+    if a.project is None:
+        problems = ["project source tree was not supplied for verification"]
+        print(json.dumps({"ok": False, "problems": problems}))
+        return 1
     try:
         manifest = provenance.read_manifest_file(a.manifest)
         problems = provenance.verify(manifest, a.base, a.project)
