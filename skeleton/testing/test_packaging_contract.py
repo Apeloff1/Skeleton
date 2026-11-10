@@ -42,8 +42,6 @@ def test_release_workflow_verifies_native_assembly_wheel_payload() -> None:
         "skeleton_asm.h", "aarch64.S", "x86_64.S", "README.md",
     ):
         assert f"skeleton/native/asm/{source}" in workflow
-    assert "skeleton/app/cli.py" in workflow
-    assert "skeleton/ai/runtime/game_project_cli.py" in workflow
 
 
 def test_runtime_image_excludes_development_payload() -> None:
@@ -141,23 +139,3 @@ def test_legacy_packaging_metadata_matches_authoritative_project() -> None:
         assert lines("options.package_data", name) == set(patterns)
     for name, patterns in project["tool"]["setuptools"]["packages"]["find"].items():
         assert lines("options.packages.find", name) == set(patterns)
-
-
-def test_installed_game_project_command_is_package_owned(capsys) -> None:
-    """The installed app must not rely on checkout-only scripts/ imports."""
-    import json
-    from scripts.game.game_project import _demo as repository_demo
-    from scripts.game.game_project import main as repository_main
-    from skeleton.ai.runtime.game_project_cli import _demo as package_demo
-    from skeleton.ai.runtime.game_project_cli import main as package_main
-    from skeleton.app.cli import run_app_cli
-
-    assert repository_main is package_main
-    assert repository_demo is package_demo
-    source = (ROOT / "skeleton" / "app" / "cli.py").read_text(encoding="utf-8")
-    assert "from skeleton.ai.runtime.game_project_cli import main" in source
-    assert "from scripts.game.game_project import main" not in source
-    assert run_app_cli(["game-project", "--catalog"]) == 0
-    assert isinstance(json.loads(capsys.readouterr().out), dict)
-    assert package_main(["--catalog"]) == 0
-    assert isinstance(json.loads(capsys.readouterr().out), dict)

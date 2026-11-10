@@ -5,7 +5,6 @@ import argparse
 import json
 import re
 import sys
-from io import StringIO
 from collections.abc import Sequence
 from typing import Any
 
@@ -131,7 +130,6 @@ def cli(argv: Sequence[str]) -> int:
         prog="python -m skeleton scene-survival-campaign-play")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo")
-    sub.add_parser("demo-script")
     play = sub.add_parser("play")
     play.add_argument("--source-json", required=True)
     resume = sub.add_parser("resume")
@@ -145,22 +143,6 @@ def cli(argv: Sequence[str]) -> int:
         if args.command == "demo":
             source, _ = original_campaign()
             result = play_campaign(source)
-        elif args.command == "demo-script":
-            # Only the canonical built-in campaign is scriptable: no arbitrary
-            # source, stdin, terminal commands, or implicit winning shortcut.
-            source, actions = original_campaign()
-            if not actions or len(actions) > MAX_TURNS:
-                raise SceneTravelError("invalid bounded campaign demo script")
-            script = "".join(
-                json.dumps(action, sort_keys=True, separators=(",", ":"),
-                           ensure_ascii=True, allow_nan=False) + "\n"
-                for action in actions
-            )
-            if len(script.encode("utf-8")) > len(actions) * MAX_INPUT_BYTES:
-                raise SceneTravelError("campaign demo script exceeds input budget")
-            result = play_campaign(
-                source, input_stream=StringIO(script), max_turns=len(actions),
-            )
         else:
             options = {
                 "expected_source_digest": args.expected_source_digest,

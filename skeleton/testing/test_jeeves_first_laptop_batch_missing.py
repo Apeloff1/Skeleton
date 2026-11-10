@@ -10,7 +10,9 @@ from skeleton.jeeves.native_fabric.laptop_ops.batch.runner import (
     evaluate_bundle, evaluate_json,
 )
 from skeleton.jeeves.native_fabric.laptop_ops.contracts import LaptopGateHold
-from skeleton.jeeves.native_fabric.laptop_ops.runner import list_domains, registry
+from skeleton.jeeves.native_fabric.laptop_ops.runner import list_domains
+
+import importlib
 
 class TestIncompleteBundleSafety(unittest.TestCase):
     def test_one_of_twenty_missing_domains_is_rejected(self):
@@ -24,7 +26,10 @@ class TestIncompleteBundleSafety(unittest.TestCase):
     def test_one_of_160_missing_stage_names_is_rejected(self):
         total = 0
         for domain in list_domains():
-            module = registry(domain)
+            module = importlib.import_module(
+                "skeleton.jeeves.native_fabric.laptop_ops.domains."
+                + domain + ".registry"
+            )
             for stage in module.STAGES:
                 with self.subTest(domain=domain, stage=stage):
                     sample = successful_bundle()

@@ -21,9 +21,18 @@ def query(catalog,text,*,limit=10,query_vector=None,embedding_model_sha256=None)
                             embedding_model_sha256=embedding_model_sha256)
 
 def passages(document,*,window_bytes=2048,overlap_bytes=None):
-    # A caller selecting a smaller window without an overlap has not requested
-    # the 128-byte default. The bounded core chooses a safe window-relative
-    # overlap; explicitly supplied invalid overlaps still fail closed.
+    """Choose a bounded overlap for smaller source windows by default.
+
+    Explicit overlap is never silently clamped: the shared original-byte
+    partitioner retains its full finite window/overlap validation. The
+    default preserves 128-byte overlap for ordinary 2048-byte passages
+    and scales down to a quarter-window for source/quote slices.
+    """
+    if overlap_bytes is None:
+        if type(window_bytes) is int and 16 <= window_bytes <= 65536:
+            overlap_bytes=min(128,window_bytes//4)
+        else:
+            overlap_bytes=128
     return partition(document,window_bytes=window_bytes,overlap_bytes=overlap_bytes)
 
 def citation(catalog,span,*,quoted_text=None):

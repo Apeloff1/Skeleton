@@ -115,7 +115,7 @@ def test_malformed_authored_courses_fail_closed(mutation):
 
 
 @pytest.mark.parametrize("mutation", [
-    lambda r: r.update({"medal": "counterfeit"}),
+    lambda r: r.update({"medal": "gold"}),
     lambda r: r.update({"finish_tick": 1}),
     lambda r: r["visits"][0].update({"tick": 0}),
     lambda r: r["visits"][0].update({"event_digest": "0" * 64}),

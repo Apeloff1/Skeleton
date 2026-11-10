@@ -58,10 +58,8 @@ def test_original_prompt_ending_closure_and_replay():
     (lambda a: a["arcs"][0].update(beats=[]), "arcs_missing_resolution"),
     (lambda a: a["arcs"][0]["beats"][0].update(choice="unknown"),
      "arcs_unknown_choice"),
-    (lambda a: a["arcs"][0]["beats"].insert(0, {
-        "id": "bad_stage", "choice": "pursue_goal",
-        "stage": "unreviewed", "text": "Invalid chronology.",
-    }), "arcs_invalid_stage"),
+    (lambda a: a["arcs"][0]["beats"][0].update(stage="unreviewed"),
+     "arcs_invalid_stage"),
     (lambda a: a["arcs"][0]["beats"].append(
         copy.deepcopy(a["arcs"][0]["beats"][0])), "arcs_duplicate_beat"),
     (lambda a: a.update(approved="yes"), "arcs_invalid_approval"),

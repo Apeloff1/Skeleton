@@ -14,7 +14,7 @@ Subcommands (exit 0 = pass, 1 = gate failed / invalid evidence, 2 = usage error)
 from __future__ import annotations
 
 import argparse
-import importlib as importlib  # Stable diagnostics hook; no runtime-selected imports.
+import importlib
 import json
 import math
 import os
@@ -57,16 +57,9 @@ def _resolve(target: str) -> Callable[[], Any]:
         r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*:[A-Za-z_][A-Za-z0-9_]*", target
     ):
         raise UsageError("target must be a bounded 'package.module:function' identifier")
-    # The operator's environment allowlist does not grant authority to import
-    # new modules by name. Profiling is limited to already-loaded local code.
-    # This intentionally prevents runtime-selected imports from being a plugin
-    # loader or a backdoor into otherwise unreferenced code.
-    module = sys.modules.get(module_name)
-    if module is None:
-        raise UsageError("trusted callable module must already be loaded")
     try:
-        fn = getattr(module, attr)
-    except AttributeError as exc:
+        fn = getattr(importlib.import_module(module_name), attr)
+    except (ImportError, AttributeError) as exc:
         raise UsageError(f"cannot resolve {target}: {exc}") from exc
     if not callable(fn):
         raise UsageError(f"{target} is not callable")

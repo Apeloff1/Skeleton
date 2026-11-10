@@ -431,7 +431,6 @@ def test_generic_secret_rotation_keeps_persistent_mongodb_credentials(tmp_path):
 def test_first_install_build_output_is_discarded_instead_of_retained_in_memory(tmp_path, monkeypatch):
     from skeleton.app.installer import install_application
 
-    (tmp_path / ".env").write_text("FRONTEND_PORT=3000\n", encoding="utf-8")
     report = PreloadReport(
         root=tmp_path, platform="Windows", python="bundled",
         checks=(PreloadCheck("host:ready", True, "ready"),),

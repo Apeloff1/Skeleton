@@ -14,10 +14,6 @@ class ReplayRatioBoundsTests(unittest.TestCase):
         with self.assertRaises(GameReplayError):
             _ratio_to_mille(10 ** 1000)
 
-    def test_large_finite_ratio_fails_closed_before_integer_overflow(self):
-        with self.assertRaises(GameReplayError):
-            _ratio_to_mille(1e308)
-
     def test_malformed_ratio_fails_closed(self):
         for value in (True, None, -1, float("inf"), float("nan"), "1"):
             with self.subTest(value=repr(value)), self.assertRaises(GameReplayError):

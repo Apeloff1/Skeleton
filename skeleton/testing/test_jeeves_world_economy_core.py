@@ -85,7 +85,7 @@ def test_edits_reset_review_and_reprove():
     assert updated["review_note"] == ""
     assert replay_economy(updated, world, ["pursue_goal"])["balances"] == {
         "rations": 0}
-    with pytest.raises(CanonError, match="economy_empty_resources"):
+    with pytest.raises(CanonError, match="economy_invalid_resource_map"):
         edit_economy(source, world, {
             "action": "remove_resource", "value": {"id": "rations"}})
     with pytest.raises(CanonError, match="economy_unknown_effect"):

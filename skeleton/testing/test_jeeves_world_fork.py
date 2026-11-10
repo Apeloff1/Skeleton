@@ -89,6 +89,7 @@ def test_proposal_is_bound_to_parent_lease_and_immutable_review(tmp_path):
         ("world_digest", "0" * 64),
         ("choice_id", "sail"),
         ("initial_session_digest", "1" * 64),
+        ("prompt", "changed without re-review"),
     ):
         bad = copy.deepcopy(proposal)
         bad[key] = value

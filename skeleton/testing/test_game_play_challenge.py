@@ -60,9 +60,6 @@ def test_losing_and_disqualified_runs_never_enter_winning_rank():
     winner = _winning_session(capsule)
     strict = default_challenge_policy()
     strict["max_frames"] = max(1, winner["frame_count"] - 1)
-    # A narrowed frame ceiling must also narrow dependent valid policy bounds.
-    strict["max_jump_frames"] = strict["max_frames"]
-    strict["max_left_frames"] = strict["max_frames"]
     if winner["frame_count"] > 1:
         disqualified = pack_play_score(capsule, winner, strict)
         assert not disqualified["result"]["eligible"]
@@ -95,7 +92,7 @@ def test_policy_is_strict_and_rejects_untrusted_fields(bad):
 @pytest.mark.parametrize("mutate", [
     lambda p: p["result"].update(eligible=True),
     lambda p: p["result"].update(victory_frame=1),
-    lambda p: p["result"]["metrics"].update(jump_frames=999),
+    lambda p: p["result"]["metrics"].update(jump_frames=0),
     lambda p: p["result"].update(frame_count=True),
     lambda p: p["session"].update(trace_sha256="0" * 64),
     lambda p: p["session"]["controls"][0].update(right=True),

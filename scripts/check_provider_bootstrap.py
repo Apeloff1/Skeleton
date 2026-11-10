@@ -478,29 +478,11 @@ def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
 
 def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     """Track actual COPY custody through static named-stage inheritance."""
-    # A Dockerfile heredoc body is opaque to the Docker instruction parser.
-    # In particular, Python 'from ... import ...' is not a new FROM stage.
-    instructions = []
-    heredoc_end = None
-    for line in docker.replace("\\\n", " ").splitlines():
-        stripped = line.strip()
-        if heredoc_end is not None:
-            if stripped == heredoc_end:
-                heredoc_end = None
-            continue
-        if not stripped or stripped.startswith("#"):
-            continue
-        instruction = " ".join(stripped.split())
-        instructions.append(instruction)
-        marker = re.search(
-            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))",
-            instruction,
-        )
-        if marker:
-            heredoc_end = next(value for value in marker.groups() if value)
-    if heredoc_end is not None:
-        # An unterminated source stage cannot establish materialization.
-        return instructions, []
+    instructions = [
+        " ".join(line.strip().split())
+        for line in docker.replace("\\\n", " ").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
     stages, named = [], {}
     current = None
     for index, instruction in enumerate(instructions):

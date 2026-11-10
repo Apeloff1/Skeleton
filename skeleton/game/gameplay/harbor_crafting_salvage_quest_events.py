@@ -83,8 +83,7 @@ def _trigger(quest: dict[str, Any], overlay: dict[str, Any], world: dict[str, An
 
 
 def build_salvage_story(report: Any, board: Any, *,
-                        require_all: bool = False,
-                        _legacy_report_anchor: bool = False) -> dict[str, Any]:
+                        require_all: bool = False) -> dict[str, Any]:
     verify_salvage(report)
     authored = validate_story_board(board, report)
     source = report["source"]
@@ -94,13 +93,9 @@ def build_salvage_story(report: Any, board: Any, *,
     completed: list[str] = []
     events: list[dict[str, Any]] = []
     reputation = 0
-    # Keep immutable source+board ownership stable across report extensions.
-    # Historical v1 reports remain independently reverified below.
-    seed = {"source": report["source_digest"],
-            "board": digest(authored), "genesis": True}
-    if _legacy_report_anchor:
-        seed["report"] = report["report_digest"]
-    previous = digest(seed)
+    previous = digest({"source": report["source_digest"],
+                       "board": digest(authored), "report": report["report_digest"],
+                       "genesis": True})
     for index, raw in enumerate(report["actions"]):
         action = normalize_salvage_action(raw)
         core = ({"op": "choose", "choice": "signal"} if action["op"] == "rescue"
@@ -150,14 +145,7 @@ def verify_salvage_story(story: Any, *, require_all: bool = False) -> dict[str, 
         raise HarborError("salvage story report digest mismatch")
     rebuilt = build_salvage_story(story["report"], story["board"], require_all=require_all)
     if rebuilt != story:
-        # Permit legacy v1 custody only after complete independent replay;
-        # no hash repair, implicit approval or borrowed event identity.
-        legacy = build_salvage_story(
-            story["report"], story["board"], require_all=require_all,
-            _legacy_report_anchor=True,
-        )
-        if legacy != story:
-            raise HarborError("salvage story event chain mismatch")
+        raise HarborError("salvage story event chain mismatch")
     return deepcopy(story["state"])
 
 

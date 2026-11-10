@@ -10,9 +10,8 @@ from skeleton.app.cli import run_app_cli
 from skeleton.app.offline_signed_quarantine_progress import (
     SignedQuarantineProgressRecoveryError, recover_signed_quarantine_progress,
 )
-# Explicit transitive pytest fixtures for isolated canonical domain shards.
-from skeleton.testing.test_app_offline_archive_signature import signed
 from skeleton.testing.test_app_offline_signed_progress_migration import migration
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 
 @pytest.fixture

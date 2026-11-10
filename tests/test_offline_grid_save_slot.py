@@ -92,5 +92,33 @@ class SaveSlotTests(unittest.TestCase):
                 write_slot(root / "alias" / "save.json", {"tick": 1})
 
 
+    def test_create_only_out_save_cannot_clobber_existing_slot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "create-only.json"
+            cmd = [sys.executable, "-m", "scripts.game.offline_grid_campaign",
+                   "play", "--out-save", str(target)]
+            first = subprocess.run(cmd, input="quit\n", text=True,
+                                   capture_output=True, timeout=30)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            original = target.read_bytes()
+            second = subprocess.run(cmd, input="quit\n", text=True,
+                                    capture_output=True, timeout=30)
+            self.assertNotEqual(second.returncode, 0)
+            self.assertEqual(target.read_bytes(), original)
+
+    def test_mutually_exclusive_save_publications_fail_before_any_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            slot = Path(tmp) / "replace.json"
+            create = Path(tmp) / "create.json"
+            process = subprocess.run(
+                [sys.executable, "-m", "scripts.game.offline_grid_campaign",
+                 "play", "--save-slot", str(slot), "--out-save", str(create)],
+                input="quit\n", text=True, capture_output=True, timeout=30,
+            )
+            self.assertNotEqual(process.returncode, 0)
+            self.assertFalse(slot.exists())
+            self.assertFalse(create.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

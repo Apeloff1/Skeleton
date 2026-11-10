@@ -10,27 +10,7 @@ from skeleton.app.cli import run_app_cli
 
 
 @pytest.fixture
-def package(tmp_path, capsys, monkeypatch):
-    # Preserve the strict verifier. If generated original source fails its
-    # own independent replay, report the fixed verifier category rather than
-    # only the CLI's intentionally redacted exception type.
-    from skeleton.app import studio_journey
-    from skeleton.ai.game_builder.dual_runtime_verify import (
-        DualRuntimeVerificationError,
-    )
-
-    real_verify = studio_journey.verify_exported_package
-
-    def verified_source(*args, **kwargs):
-        try:
-            return real_verify(*args, **kwargs)
-        except DualRuntimeVerificationError as error:
-            pytest.fail(
-                "generated original game rejected by independent verifier: "
-                + str(error)
-            )
-
-    monkeypatch.setattr(studio_journey, "verify_exported_package", verified_source)
+def package(tmp_path, capsys):
     source = tmp_path / "original"
     assert run_app_cli([
         "studio-journey", "--onboard", "--project-id", "quarantine-original",

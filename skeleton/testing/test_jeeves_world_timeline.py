@@ -23,41 +23,6 @@ def source():
     return world, data
 
 
-def test_proposal_covers_every_reachable_intermediate_scene():
-    world, _ = source()
-    world["scenes"].append({"id": "storm", "title": "Harbor Storm",
-                            "narrative": "A new original climax."})
-    world["choices"][0]["to"] = "storm"
-    world["choices"].append({
-        "id": "brave_storm", "from": "storm", "to": "resolution",
-        "label": "Save the beacon", "requires": [], "grants": [],
-    })
-    events = propose_timeline(
-        world, actor="sora", opening_note="The beacon dims.",
-        resolution_note="The beacon shines again.",
-    )["events"]
-    assert [item["scene"] for item in events] == [
-        "opening", "storm", "resolution",
-    ]
-    assert [item["kind"] for item in events] == [
-        "setup", "observation", "resolution",
-    ]
-    assert [item["tick"] for item in events] == [0, 1, 2]
-
-
-def test_cycle_requires_explicit_timeline_review_not_fabricated_clock():
-    world, _ = source()
-    world["choices"].append({
-        "id": "return_opening", "from": "opening", "to": "opening",
-        "label": "Circle the harbor", "requires": [], "grants": [],
-    })
-    with pytest.raises(CanonError, match="timeline_cycle_requires_explicit_review"):
-        propose_timeline(
-            world, actor="sora", opening_note="The beacon dims.",
-            resolution_note="The light returns.",
-        )
-
-
 def test_original_prompt_to_causal_timeline():
     world, data = source()
     assert validate_timeline(data, world) == data

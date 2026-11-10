@@ -34,8 +34,6 @@ def inputs():
 
 def game_journal(source, actions):
     root = create_journal(export_bundle(source, []))
-    if not actions:
-        return root
     return append_journal(
         root, actions, expected_journal_digest=root["journal_digest"],
     )

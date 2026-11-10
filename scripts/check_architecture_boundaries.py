@@ -90,18 +90,18 @@ def _imports_forbidden_kernel_dependency(module: str) -> bool:
 
 
 def _imports_api(module: str, level: int, importing_module: str) -> bool:
-    """Resolve Python relative imports before enforcing the API layer boundary.
+    """Resolve relative imports before checking the canonical API boundary.
 
-    A sibling `from .api` in a deeply nested package is not `skeleton.api`.
-    Root-bound `from ..api` and `from .. import api` are still blocked.
+    A deep sibling module named "api" is not the root skeleton.api package.
+    Imports that resolve to skeleton.api remain prohibited.
     """
     if level == 0:
         return module == "skeleton.api" or module.startswith("skeleton.api.")
     package = importing_module.split(".")[:-1]
     if not package or level > len(package):
         return False
-    resolved = ".".join([*package[: len(package) - level + 1], module] if module
-                        else package[: len(package) - level + 1])
+    owner = package[: len(package) - level + 1]
+    resolved = ".".join([*owner, module] if module else owner)
     return resolved == "skeleton.api" or resolved.startswith("skeleton.api.")
 
 

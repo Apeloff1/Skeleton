@@ -65,9 +65,7 @@ def test_solver_produces_real_victory_with_all_missions_or_fails_closed():
     report = solve_missions(source(), board())
     assert report["bundle"]["state"]["ending"] == "beacon"
     assert verify_mission_report(report, require_all=True)["points"] == 60
-    # An incompatible requested ending is rejected at admission before any
-    # solver attempt can manufacture a partial reward certificate.
-    with pytest.raises(HarborError, match="choice conflicts with requested ending"):
+    with pytest.raises(HarborError, match="not fully earned"):
         solve_missions(source(), board(), choice="shelter")
 
 
@@ -93,7 +91,7 @@ def test_bad_authored_boards_rejected(change):
     lambda r: r["journal"][-1]["completed"].append("forged"),
     lambda r: r["completed"].append("forged"),
     lambda r: r.update({"points": 999}),
-    lambda r: r["journal"][2]["progress"]["salvage"].__setitem__(0, 999),
+    lambda r: r["journal"][2]["progress"]["salvage"].__setitem__(0, 2),
     lambda r: r["board"]["missions"][0].update({"points": 100}),
     lambda r: r["bundle"]["events"][0]["action"].update({"direction": "west"}),
     lambda r: r.update({"source_digest": "f" * 64}),

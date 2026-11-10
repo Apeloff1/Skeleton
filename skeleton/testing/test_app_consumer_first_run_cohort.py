@@ -255,7 +255,10 @@ def _isolated_installs(delivered_games, tmp_path):
 def _replace_nested_asset_with_identical_bytes(tmp_path, installed):
     """Same-byte replacement must still invalidate the inode inventory."""
     target = Path(installed) / "godot" / "scripts" / "main.gd"
-    replacement = tmp_path / "new-main.gd"
+    # Stage beside the target so only the nested directory changes; staging
+    # in tmp_path would also mutate the install's parent directory and trip
+    # the (earlier) parent-custody check instead of the nested-inode check.
+    replacement = target.with_name(".swap-main.gd")
     replacement.write_bytes(target.read_bytes())
     replacement.chmod(target.stat().st_mode & 0o777)
     os.replace(replacement, target)
@@ -281,10 +284,7 @@ def test_late_cross_game_nested_asset_inode_swap_rejected(
         return result
 
     monkeypatch.setattr(module, "inspect_consumer_first_run", swap_after_later_game)
-    # The same-byte nested swap can be denied sooner by the independent
-    # parent-inode fence. Either specific custody rejection is fail-closed.
-    with pytest.raises(ConsumerFirstRunCohortError,
-                       match="nested|consumer evidence parent inode changed"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -309,7 +309,7 @@ def test_first_cohort_replay_nested_inode_swap_rejected(
         module, "inspect_first_playable_delivery_batch",
         swap_after_canonical_replay,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="nested|consumer evidence parent inode changed"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -361,7 +361,7 @@ def test_final_cohort_replay_nested_inode_swap_rejected(
         module, "inspect_first_playable_delivery_batch",
         swap_after_final_canonical_replay,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="nested|consumer evidence parent inode changed"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="nested"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -397,7 +397,7 @@ def test_late_original_source_nested_swap_rejected_when_requested(
         module, "inspect_consumer_first_run",
         swap_earlier_source_after_later_game,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="original source|consumer evidence parent inode changed"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="original source"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -436,7 +436,7 @@ def test_late_cross_game_evidence_parent_swap_preserving_file_inode_rejected(
     monkeypatch.setattr(
         module, "inspect_consumer_first_run", swap_parent_after_later_game,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="parent inode|another installed game or summary changed"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="parent inode"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],
@@ -475,7 +475,7 @@ def test_late_cohort_summary_parent_swap_preserving_file_inode_rejected(
         module, "inspect_consumer_first_run",
         swap_summary_parent_after_later_game,
     )
-    with pytest.raises(ConsumerFirstRunCohortError, match="summary parent|another installed game or summary changed"):
+    with pytest.raises(ConsumerFirstRunCohortError, match="summary parent"):
         inspect_consumer_first_run_cohort(
             jobs, summary,
             expected_summary_sha256=published["independent_summary_sha256"],

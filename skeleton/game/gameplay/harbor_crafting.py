@@ -355,12 +355,7 @@ def verify_bundle(bundle: Any, *, require_win: bool = False) -> dict[str, Any]:
     for event in bundle["events"]:
         _keys(event, {"sequence", "action", "before", "after", "previous", "source", "digest"}, "event")
         actions.append(normalize_action(event["action"]))
-    try:
-        state, expected_events = run(world, actions)
-    except HarborError as exc:
-        # An invalid replay action cannot be accepted merely by resealing
-        # the bundle checksum; it is an untrusted event-chain mismatch.
-        raise HarborError("replay event chain mismatch") from exc
+    state, expected_events = run(world, actions)
     if expected_events != bundle["events"]:
         raise HarborError("replay event chain mismatch")
     if state != bundle["state"] or digest(state) != bundle["terminal_digest"]:

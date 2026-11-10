@@ -44,8 +44,10 @@ export default function Safety() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string>('');
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
+    setError('');
     const [o, r, ap, a] = await Promise.all([
       api.get<Overview>('/api/governance/overview', { timeoutMs: 12000 }),
       api.get<{ reports: Report[] }>('/api/governance/reports?status=open', { timeoutMs: 12000 }),
@@ -56,23 +58,33 @@ export default function Safety() {
     if (r.ok && r.data) setReports(r.data.reports || []);
     if (ap.ok && ap.data) setAppeals(ap.data.appeals || []);
     if (a.ok && a.data) setAudit(a.data.entries || []);
+    const failures = [o, r, ap, a].filter((result) => !result.ok);
+    if (failures.length) {
+      setError(failures[0].error || `${failures.length} governance data source(s) are unavailable.`);
+      if (!o.ok) setOv(null);
+      if (!r.ok) setReports([]);
+      if (!ap.ok) setAppeals([]);
+      if (!a.ok) setAudit([]);
+    }
     setLoading(false); setRefreshing(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const moderate = useCallback(async (rid: string, action: string) => {
-    setBusy(rid);
-    const r = await api.post(`/api/governance/moderate/${rid}`, { action, actor: 'moderator' }, { timeoutMs: 12000 });
+    setBusy(rid); setError('');
+    const r = await api.post(`/api/governance/moderate/${rid}`, { action }, { timeoutMs: 12000 });
     setBusy('');
-    if (r.ok) load();
+    if (r.ok) await load();
+    else setError(r.error || 'The moderation decision was not saved.');
   }, [load]);
 
   const resolveAppeal = useCallback(async (aid: string, action: string) => {
-    setBusy(aid);
-    const r = await api.post(`/api/governance/appeal/${aid}/resolve`, { action, actor: 'moderator' }, { timeoutMs: 12000 });
+    setBusy(aid); setError('');
+    const r = await api.post(`/api/governance/appeal/${aid}/resolve`, { action }, { timeoutMs: 12000 });
     setBusy('');
-    if (r.ok) load();
+    if (r.ok) await load();
+    else setError(r.error || 'The appeal decision was not saved.');
   }, [load]);
 
   return (
@@ -86,6 +98,7 @@ export default function Safety() {
           contentContainerStyle={{ padding: S.lg, paddingBottom: S.xxxl }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={C.brand} />}
         >
+          {error ? <View style={styles.errorCard}><Text accessibilityRole="alert" style={styles.errorText}>{error}</Text></View> : null}
           {ov ? (
             <View style={styles.kpiGrid}>
               <Kpi label="Games" value={ov.games} accent={C.brand2} testID="safety-kpi-games" />
@@ -194,6 +207,8 @@ const styles = StyleSheet.create({
   kpiLabel: { color: C.textMute, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginTop: 4, textTransform: 'uppercase' },
   section: { color: C.textDim, fontSize: 13, fontWeight: '800', letterSpacing: 1.5, marginTop: S.xl, marginBottom: S.md },
   empty: { color: C.textMute, textAlign: 'center', marginVertical: S.lg },
+  errorCard: { backgroundColor: '#2B1117', borderColor: C.error, borderWidth: 1, borderRadius: R.md, padding: S.md },
+  errorText: { color: '#F6A7B5', fontSize: 13, lineHeight: 18 },
   cleanCard: { backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 1, borderColor: C.border, padding: S.xl, alignItems: 'center' },
   cleanEmoji: { fontSize: 32, marginBottom: S.sm }, cleanTxt: { color: C.textMute, fontSize: 14 },
   card: { backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 1, borderColor: C.border, padding: S.md, marginBottom: S.md },

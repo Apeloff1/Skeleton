@@ -27,9 +27,21 @@ def certify(root: Path, opts: Options, runner: GodotRunner | None = None) -> Cer
         runner = GodotRunner(opts.godot)
     rep = CertificationReport(str(root), meta={"engine": bool(runner), "export": opts.export})
     if runner is not None:
-        rep.extend([binary.check_version(runner, opts.pin, root)])
-        if opts.godot and Path(opts.godot).is_file():
-            rep.extend([binary.check_sha(Path(opts.godot), opts.pin)])
+        version_result = binary.check_version(runner, opts.pin, root)
+        rep.extend([version_result])
+        # Never execute untrusted project import/export against a mismatched engine.
+        if not version_result.passed:
+            return rep
+        if opts.pin.sha256 is not None:
+            # A hash pin must be checked against a real explicit executable, not
+            # silently skipped for a PATH alias or a missing binary.
+            if not opts.godot or not Path(opts.godot).is_file():
+                rep.extend([binary.CaseResult("GFB-02", False, "pinned engine executable unavailable")])
+                return rep
+            hash_result = binary.check_sha(Path(opts.godot), opts.pin)
+            rep.extend([hash_result])
+            if not hash_result.passed:
+                return rep
         imp = import_cert.certify(root, runner, opts.timeout)
     else:
         imp = import_cert.static_only(root)

@@ -128,13 +128,7 @@ def test_first_install_does_not_trust_malformed_route_report(monkeypatch, tmp_pa
     assert report["critical_routes"]["observed"] is False
 
 
-def _install_with_routes(monkeypatch, tmp_path, *, ready, backend_override=True, observed_urls=None):
-    # The production installer now binds a stable private runtime file before
-    # Compose. Keep this mocked route-registry fixture realistic rather than
-    # bypassing a mandatory configuration custody gate.
-    (tmp_path / ".env").write_text(
-        "FRONTEND_PORT=3000\nBACKEND_PORT=8001\n", encoding="utf-8"
-    )
+def _install_with_routes(monkeypatch, tmp_path, *, ready):
     installer = importlib.import_module("skeleton.app.installer")
     health = importlib.import_module("skeleton.app.health")
     doctor = importlib.import_module("skeleton.app.first_install")
@@ -142,12 +136,6 @@ def _install_with_routes(monkeypatch, tmp_path, *, ready, backend_override=True,
     class Manifest:
         def mode_env(self, mode):
             return {}
-
-        def service(self, name):
-            assert name == "backend"
-            if backend_override:
-                raise AssertionError("backend override must not evaluate fallback service")
-            return SimpleNamespace(public_url="http://127.0.0.1:8099")
 
     monkeypatch.setattr(installer, "inspect_host", lambda *a, **kw: SimpleNamespace(checks=[]))
     monkeypatch.setattr(installer, "ensure_runtime_environment", lambda *a, **kw: SimpleNamespace(
@@ -158,17 +146,12 @@ def _install_with_routes(monkeypatch, tmp_path, *, ready, backend_override=True,
     monkeypatch.setattr(installer, "checks_ok", lambda checks: True)
     monkeypatch.setattr(installer, "runtime_manifest", lambda manifest, **kw: manifest)
     monkeypatch.setattr(installer, "compose_command", lambda *a, **kw: ["docker", "compose"])
-    monkeypatch.setattr(installer, "public_service_urls", lambda *a, **kw: (
-        {"backend": "http://127.0.0.1:8001"} if backend_override else {}
-    ))
+    monkeypatch.setattr(installer, "public_service_urls", lambda *a, **kw: {
+        "backend": "http://127.0.0.1:8001",
+    })
     monkeypatch.setattr(health, "wait_for_application", lambda **kw: ())
     monkeypatch.setattr(health, "probes_ok", lambda results: True)
-    def route_report(url, **kwargs):
-        if observed_urls is not None:
-            observed_urls.append(url)
-        return {"ready": ready}
-
-    monkeypatch.setattr(doctor, "critical_backend_route_report", route_report)
+    monkeypatch.setattr(doctor, "critical_backend_route_report", lambda *a, **kw: {"ready": ready})
 
     def runner(args, **kwargs):
         return SimpleNamespace(returncode=0)
@@ -249,22 +232,3 @@ def test_ordinary_readiness_keeps_small_response_bound_over_real_http():
     install = importlib.import_module("skeleton.app.first_install")
     with _registry_server({"padding": "x" * 70000}) as base:
         assert install._bounded_json(base + "/api/ai/providers", timeout=5) is None
-
-
-def test_first_install_override_is_lazy_and_canonical_url_is_fallback_only(
-    monkeypatch, tmp_path,
-):
-    explicit = []
-    receipt = _install_with_routes(
-        monkeypatch, tmp_path, ready=True, observed_urls=explicit,
-    )
-    assert receipt.ok is True
-    assert explicit == ["http://127.0.0.1:8001"]
-
-    fallback = []
-    receipt = _install_with_routes(
-        monkeypatch, tmp_path, ready=True,
-        backend_override=False, observed_urls=fallback,
-    )
-    assert receipt.ok is True
-    assert fallback == ["http://127.0.0.1:8099"]

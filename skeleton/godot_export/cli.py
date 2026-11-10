@@ -3,14 +3,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import stat
 import sys
 from pathlib import Path
 
 from . import binary, cases, provenance
 from .certify import Options, certify_many
-from .artifact_custody import ExportCustodyError, export_and_inspect
-from .runner import GodotRunner
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -39,18 +36,6 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("manifest", type=Path)
     pv.add_argument("--base", type=Path, required=True)
     pv.add_argument("--project", type=Path, default=None)
-    e = sub.add_parser("custody-export",
-                       help="pin Godot and atomically publish a source-inspected desktop export")
-    e.add_argument("--project", type=Path, required=True)
-    e.add_argument("--preset", required=True)
-    e.add_argument("--output", type=Path, required=True)
-    e.add_argument("--platform", required=True, choices=("windows", "linux"))
-    e.add_argument("--engine-bin", type=Path, required=True,
-                   help="absolute path to a trusted Godot executable")
-    e.add_argument("--engine-sha256", required=True,
-                   help="required SHA-256 of the exact trusted Godot executable")
-    e.add_argument("--engine-version", default=binary.DEFAULT_PIN_VERSION)
-    e.add_argument("--timeout", type=int, default=600)
     return ap
 
 
@@ -78,69 +63,8 @@ def _verify(a: argparse.Namespace) -> int:
     return 0 if not problems else 1
 
 
-
-def _custody_export(a: argparse.Namespace) -> int:
-    """An operator-facing source receipt, never a launch or release verdict."""
-    def held(reason: str) -> int:
-        print(json.dumps({
-            "schema": "skeleton.godot_export.custody_cli.v1",
-            "status": "held", "reason": reason,
-            "launch_tested": False, "device_qualified": False,
-            "release_certified": False,
-        }, sort_keys=True))
-        return 2
-
-    pin = a.engine_sha256
-    if (type(pin) is not str or len(pin) != 64 or
-            any(c not in "0123456789abcdef" for c in pin)):
-        return held("engine-pin-invalid")
-    executable = a.engine_bin
-    if not executable.is_absolute():
-        return held("engine-binary-must-be-absolute")
-    try:
-        before = executable.lstat()
-        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or
-                not 0 < before.st_size <= (1 << 30)):
-            return held("engine-binary-invalid")
-        found = binary.sha256_file(executable)
-        after = executable.lstat()
-        if (found != pin or
-                (before.st_dev, before.st_ino, before.st_size,
-                 before.st_mtime_ns, before.st_ctime_ns) !=
-                (after.st_dev, after.st_ino, after.st_size,
-                 after.st_mtime_ns, after.st_ctime_ns)):
-            return held("engine-binary-pin-or-identity-mismatch")
-        runner = GodotRunner(str(executable))
-        result = binary.check_version(
-            runner, binary.Pin(version=a.engine_version, sha256=pin), a.project,
-        )
-        if not result.passed:
-            return held("engine-version-mismatch")
-        evidence = export_and_inspect(
-            runner, a.project, a.preset, a.output, a.platform,
-            timeout=a.timeout,
-        )
-    except (OSError, ValueError, ExportCustodyError):
-        return held("source-or-artifact-custody-rejected")
-    print(json.dumps({
-        "schema": "skeleton.godot_export.custody_cli.v1",
-        "status": "source-artifact-inspected",
-        "artifact": {
-            "path": evidence.path, "platform": evidence.platform,
-            "size": evidence.size, "sha256": evidence.sha256,
-            "godot_exit_code": evidence.godot_exit_code,
-        },
-        "godot_executable_sha256": pin,
-        "launch_tested": False, "device_qualified": False,
-        "release_certified": False,
-    }, sort_keys=True))
-    return 0
-
-
 def main(argv: list[str] | None = None) -> int:
     a = build_parser().parse_args(argv)
-    if a.cmd == "custody-export":
-        return _custody_export(a)
     if a.cmd == "cases":
         for c in cases.CASES.values():
             print(f"{c.id}\tSev{int(c.severity)}\t{c.title}\t{','.join(c.todo)}")

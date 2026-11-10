@@ -420,13 +420,6 @@ def cli(argv: Sequence[str]) -> int:
     for command in ("verify", "export"):
         sub.add_parser(command).add_argument("--session-json", required=True)
     sub.add_parser("import").add_argument("--bundle-json", required=True)
-    for command in ("ledger", "ledger-export"):
-        sub.add_parser(command).add_argument("--session-json", required=True)
-    sub.add_parser("ledger-import").add_argument("--bundle-json", required=True)
-    sub.add_parser("feasibility").add_argument("--source-json", required=True)
-    reconcile = sub.add_parser("ledger-reconcile")
-    reconcile.add_argument("--before-json", required=True)
-    reconcile.add_argument("--after-json", required=True)
     args = parser.parse_args(list(argv))
     try:
         if args.command == "demo":
@@ -436,23 +429,6 @@ def cli(argv: Sequence[str]) -> int:
             result = simulate_market(_json(args.source_json), _json(args.actions_json))
         elif args.command == "resume":
             result = resume_market(_json(args.session_json), _json(args.actions_json))
-        elif args.command == "ledger-reconcile":
-            from skeleton.game.gameplay.scene_market_reconciliation import reconcile_market
-            result = reconcile_market(
-                _json(args.before_json), _json(args.after_json),
-            )
-        elif args.command == "ledger":
-            from skeleton.game.gameplay.scene_market_ledger import audit_market_ledger
-            result = audit_market_ledger(_json(args.session_json))
-        elif args.command == "ledger-export":
-            from skeleton.game.gameplay.scene_market_ledger import export_market_ledger
-            result = export_market_ledger(_json(args.session_json))
-        elif args.command == "ledger-import":
-            from skeleton.game.gameplay.scene_market_ledger import import_market_ledger
-            result = import_market_ledger(_json(args.bundle_json))
-        elif args.command == "feasibility":
-            from skeleton.game.gameplay.scene_market_feasibility import analyze_market_feasibility
-            result = analyze_market_feasibility(_json(args.source_json))
         elif args.command == "verify":
             result = verify_market(_json(args.session_json))
         elif args.command == "export":

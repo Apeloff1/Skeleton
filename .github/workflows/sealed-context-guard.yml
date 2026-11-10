@@ -8,14 +8,6 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'skeleton/ai/runtime/inference/local.py'
-      # Runtime model/qualification changes also alter guarded local-first execution.
-      - 'skeleton/ai/model_runtime/**'
-      - 'skeleton/ai/runtime/operational_ai/model/**'
-      - 'skeleton/ai/runtime/operational_ai/deployment/qualification/**'
-      - 'skeleton/app/local_ai.py'
-      - 'skeleton/testing/test_ai_real_model_qualification.py'
-      - 'skeleton/testing/test_ai_next_model.py'
-      - 'skeleton/testing/test_ai_native_endurance.py'
       - 'skeleton/ai/runtime/inference/guarded_service.py'
       - 'skeleton/ai/runtime/inference/canonical_snapshot_reader.py'
       - 'skeleton/ai/runtime/inference/engine_submission_snapshot.py'
@@ -63,6 +55,8 @@ on:
       - 'skeleton/testing/test_delivery_*.py'
       - 'skeleton/testing/test_sealed_*.py'
       - 'pyproject.toml'
+      - 'scripts/check_ai_file_tree.py'
+      - 'tests/test_ai_tree_syntax_membership_fail_closed.py'
       - '.github/workflows/sealed-context-guard.yml'
   push:
     branches:
@@ -93,6 +87,8 @@ jobs:
       - name: Compile changed production boundaries
         run: |
           python -m compileall -q skeleton/context skeleton/persistence skeleton/ai/runtime/inference backend/core/conversations.py
+      - name: Verify AI-tree syntax and tracked-member integrity regressions
+        run: python -m pytest -q tests/test_ai_tree_syntax_membership_fail_closed.py
       - name: Verify canonical metadata and AI-tree parity
         run: |
           python scripts/check_root_package_metadata_parity.py
