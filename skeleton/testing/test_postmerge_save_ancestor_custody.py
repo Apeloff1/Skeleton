@@ -230,5 +230,33 @@ class SaveSlotAncestorCustodyTests(unittest.TestCase):
             self.assertFalse(slot.exists())
 
 
+    def test_streamed_encoder_stops_before_oversized_snapshot_is_walked(self):
+        from skeleton.game.gameplay import offline_grid_save_slot as module
+
+        class MalformedHugeList(list):
+            def __iter__(self):
+                yield "a" * 128
+                raise AssertionError("unbounded serialization walked further")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            slot = Path(tmp) / "slot.json"
+            with patch.object(module, "MAX_SAVE_BYTES", 64):
+                with self.assertRaisesRegex(SaveSlotError, "byte budget"):
+                    write_slot(slot, MalformedHugeList())
+            self.assertFalse(slot.exists())
+            self.assertEqual(list(Path(tmp).glob(".campaign-*.tmp")), [])
+
+    def test_writer_uses_bounded_streaming_not_monolithic_json_dumps(self):
+        from skeleton.game.gameplay import offline_grid_save_slot as module
+
+        with tempfile.TemporaryDirectory() as tmp:
+            slot = Path(tmp) / "slot.json"
+            with patch.object(module.json, "dumps",
+                              side_effect=AssertionError("monolithic JSON encoding")):
+                write_slot(slot, {"tick": 4, "flags": ["safe"]})
+            self.assertEqual(read_slot(slot), {"tick": 4, "flags": ["safe"]})
+
+
+
 if __name__ == "__main__":
     unittest.main()
