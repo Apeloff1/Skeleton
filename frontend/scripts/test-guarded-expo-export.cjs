@@ -18,7 +18,12 @@ function script(mode) {
       'fs.writeFileSync("dist/setup.html","<html>setup</html>");');
   const marker = mode === 'missing-marker' ? '' : 'console.log("Exported: dist");';
   const end = mode === 'hang' || mode === 'missing-setup' ?
-    'setInterval(()=>{},1000);' : mode === 'failure' ? 'process.exit(7);' : '';
+    'setInterval(()=>{},1000);' :
+    mode === 'sigterm-143' ?
+    'process.on("SIGTERM",()=>process.exit(143));setInterval(()=>{},1000);' :
+    mode === 'early-143' ?
+    'setTimeout(()=>process.exit(143),100);' :
+    mode === 'failure' ? 'process.exit(7);' : '';
   return files + marker + end;
 }
 function run(dir, mode) {
@@ -39,6 +44,16 @@ test('stalled exporter requires stable output and actual process reaping', async
   const r = await run(root(t), 'hang');
   assert.equal(r.mode, 'supervised-post-export-exit');
 });
+test('Yarn-style SIGTERM exit 143 is allowed only after verified supervised reaping', async t => {
+  const r = await run(root(t), 'sigterm-143');
+  assert.equal(r.mode, 'supervised-post-export-exit');
+  assert.equal(r.files, 2);
+});
+
+test('an unsupervised 143 exit after a marker is not qualifying', async t => {
+  await assert.rejects(run(root(t), 'early-143'), /exited unsuccessfully|export failed after completion marker/);
+});
+
 test('a nonzero exporter exit cannot be masked by output marker', async t => {
   await assert.rejects(run(root(t), 'failure'), /exited unsuccessfully/);
 });
