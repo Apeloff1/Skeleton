@@ -21,7 +21,7 @@ SOURCE = (ROOT / ".github/workflows/backend-quality.yml").read_text(encoding="ut
 def mutate(old: str, new: str) -> list[str]:
     # Other existing workflow jobs use similar action/ref/environment strings.
     # Mutate the actual backend qualification job, never an unrelated lane.
-    if old == "  ruff:":
+    if old in ("  ruff:", "  backend_source_convergence:"):
         if SOURCE.count(old) != 1:
             raise AssertionError("canonical ruff fixture missing")
         return guard.validate_text(SOURCE.replace(old, new, 1))
@@ -57,9 +57,8 @@ class BackendConvergenceAdmission(unittest.TestCase):
 
     def test_read_permission_must_remain(self):
         self.assertTrue(mutate(
-            "    name: Exact-head backend security and source convergence (review only)\n",
-            "    name: Exact-head backend security and source convergence (review only)\n"
-            "    permissions:\n      contents: write\n"))
+            "    permissions:\n      contents: read",
+            "    permissions:\n      contents: write"))
 
     def test_checkout_ref_can_not_fall_back_to_main(self):
         self.assertTrue(mutate("ref: " + guard.REF, "ref: main"))
