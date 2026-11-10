@@ -105,6 +105,29 @@ class CreateOnlyCampaignCustodyTests(unittest.TestCase):
                     create_slot(slot, {"tick": 1})
             self.assertFalse(slot.exists())
 
+    def test_create_only_cli_round_trip_into_strict_resume(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            commands = root / "commands.json"
+            commands.write_text("[]", encoding="utf-8")
+            save = root / "created.json"
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                status = campaign_main([
+                    "run", "--commands", str(commands),
+                    "--out-save", str(save),
+                ])
+            self.assertEqual(status, 0, stderr.getvalue())
+            created = read_slot(save)
+            self.assertEqual(created, __import__("json").loads(stdout.getvalue())["save"])
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
+                status = campaign_main([
+                    "run", "--commands", str(commands),
+                    "--resume", str(save),
+                ])
+            self.assertEqual(status, 0, stderr.getvalue())
+            self.assertEqual(read_slot(save), created)
+
     def test_resume_without_replacement_rejects_overflowing_json_exponent(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
