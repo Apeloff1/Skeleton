@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
@@ -50,6 +51,56 @@ def test_manifest_payload_is_json_serializable():
     assert '"architecture"' in encoded
     assert '"construction"' in encoded
     assert '"machine/ai_app_construction.json"' in encoded
+
+
+def test_backend_image_python_guard_accepts_current_pinned_abi():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    assert backend_python_image_errors(source) == ()
+    actual = next(
+        item for item in preflight(root) if item.code == "image:backend-python"
+    )
+    assert actual.ok
+
+
+def test_backend_image_python_315_bump_is_rejected_before_setup():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    bumped = source.replace("FROM python:3.14-alpine@", "FROM python:3.15-alpine@")
+    assert bumped != source
+    errors = backend_python_image_errors(bumped)
+    assert any("violates its dependency guard" in error for error in errors)
+
+
+def test_backend_image_stage_version_drift_is_rejected():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    bumped = source.replace(
+        "FROM python:3.14-alpine@", "FROM python:3.15-alpine@", 1
+    )
+    errors = backend_python_image_errors(bumped)
+    assert any("share the same pinned" in error for error in errors)
+
+
+def test_backend_image_guard_removal_is_rejected():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    changed = source.replace(
+        "sys.version_info[:2] < (3, 15)", "sys.version_info[:2] >= (3, 10)"
+    )
+    assert changed != source
+    assert any(
+        "upper-bound guard is missing" in error
+        for error in backend_python_image_errors(changed)
+    )
 
 
 def test_structural_preflight_passes_for_repository_checkout():
@@ -163,6 +214,9 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
         def read(self, _size):
             return b"ok"
 
+        def geturl(self):
+            return "http://localhost:8010/api/v1/health/live"
+
     seen = {}
 
     def fake_urlopen(request, timeout):
@@ -170,7 +224,7 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
         seen["timeout"] = timeout
         return _Response()
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", fake_urlopen)
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", fake_urlopen)
     service = load_manifest().service("skeleton")
 
     result = probe_url(service, timeout=1.25)
@@ -235,7 +289,19 @@ def test_product_control_client_matches_mounted_backend_routes():
     registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
 
     assert "const ROOT = '/api/admin/ops/product-control';" in client
-    assert 'router = project_router(prefix="/api/admin/ops"' in ops
+    ops_tree = ast.parse(ops)
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "project_router"
+        and any(
+            keyword.arg == "prefix"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "/api/admin/ops"
+            for keyword in node.keywords
+        )
+        for node in ast.walk(ops_tree)
+    )
     assert '("routes.ops",' in registry
 
     required_routes = (
@@ -679,7 +745,7 @@ def test_probe_rejects_redirect_to_login_page_even_if_target_is_200(monkeypatch)
         def read(self, _size):
             return b"login page"
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: RedirectResponse())
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert not result.ok
     assert result.detail == "health endpoint redirected"
@@ -693,7 +759,7 @@ def test_probe_does_not_publish_sensitive_network_exception(monkeypatch):
     def unavailable(*_args, **_kwargs):
         raise URLError("private operator credential in daemon response")
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", unavailable)
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", unavailable)
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert result.ok is False
     assert "URLError" in result.detail
@@ -715,10 +781,71 @@ def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
         def read(self, _size):
             return b"redirect"
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+        def geturl(self):
+            return "http://localhost:8001/api/health"
+
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: RedirectResponse())
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert not result.ok
     assert result.status == 302
+
+def test_health_probe_transport_forbids_redirects_and_proxy_environment(monkeypatch):
+    from urllib.request import HTTPRedirectHandler, ProxyHandler
+    from skeleton.app.health import probe_http
+
+    seen = {}
+
+    class DirectResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _size):
+            return b"ok"
+
+        def geturl(self):
+            return "http://localhost:8001/api/health"
+
+    class Opener:
+        def open(self, request, *, timeout):
+            seen["url"] = request.full_url
+            seen["timeout"] = timeout
+            return DirectResponse()
+
+    def fake_build_opener(*handlers):
+        proxies = [h for h in handlers if isinstance(h, ProxyHandler)]
+        assert len(proxies) == 1
+        assert proxies[0].proxies == {}
+        redirects = [h for h in handlers if isinstance(h, HTTPRedirectHandler)]
+        assert len(redirects) == 1
+        assert redirects[0].redirect_request(None, None, 302, "redirect", {}, "https://elsewhere.invalid") is None
+        return Opener()
+
+    monkeypatch.setattr("skeleton.app.health.build_opener", fake_build_opener)
+    result = probe_http("backend", "http://localhost:8001/api/health", timeout=1.75)
+
+    assert result.ok is True
+    assert seen == {"url": "http://localhost:8001/api/health", "timeout": 1.75}
+
+
+def test_direct_health_probe_rejects_302_before_network_follow(monkeypatch):
+    from urllib.error import HTTPError
+    from skeleton.app.health import probe_http
+
+    def redirect(_request, *, timeout):
+        raise HTTPError("http://localhost:8001/api/health", 302, "go", {}, None)
+
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", redirect)
+    result = probe_http("backend", "http://localhost:8001/api/health")
+
+    assert not result.ok
+    assert result.status == 302
+    assert result.detail == "health endpoint redirected"
+
 
 def test_full_profile_uses_custom_chroma_published_port(tmp_path):
     from skeleton.app.assembly import public_service_urls
@@ -831,3 +958,69 @@ def test_app_preflight_rejects_invalid_replica_set_host_list(tmp_path, monkeypat
     entry = next(c for c in checks if c.code == "env:MONGO_URL")
     assert not entry.ok
     assert "secret" not in entry.message
+
+
+def test_python_image_preflight_rejects_unsupported_clean_install_source(tmp_path):
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    bumped = source.replace("FROM python:3.14-alpine@", "FROM python:3.15-alpine@")
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend/Dockerfile").write_text(bumped, encoding="utf-8")
+
+    checks = preflight(tmp_path)
+    image_check = next(check for check in checks if check.code == "image:backend-python")
+    assert image_check.ok is False
+    assert "violates its dependency guard" in image_check.message
+    assert not checks_ok(checks)
+
+
+def test_python_image_guard_in_comment_does_not_count():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    changed = source.replace("RUN python -c '", "# RUN python -c '", 1)
+    assert changed != source
+    errors = backend_python_image_errors(changed)
+    assert any("upper-bound guard is missing" in error for error in errors)
+
+
+def test_python_image_unpinned_stage_is_rejected():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    changed = source.replace(
+        "FROM python:3.14-alpine@sha256:", "FROM python:3.14-alpine@", 1
+    )
+    assert changed != source
+    errors = backend_python_image_errors(changed)
+    assert any("digest-pinned Alpine stage" in error for error in errors)
+
+
+def test_fresh_install_backend_cors_tracks_selected_frontend_port():
+    """A custom published frontend port cannot be blocked by stale CORS defaults."""
+    root = find_repo_root(Path(__file__))
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    template = (root / ".env.example").read_text(encoding="utf-8")
+
+    assert (
+        "CORS_ORIGINS=${CORS_ORIGINS:-"
+        "http://localhost:${FRONTEND_PORT:-3000},"
+        "http://127.0.0.1:${FRONTEND_PORT:-3000}}"
+    ) in compose
+    assert "\nCORS_ORIGINS=\n" in template
+    assert "\nCORS_ORIGINS=http://localhost:3000" not in template
+
+
+def test_fresh_install_cors_defaults_preserve_operator_override(tmp_path):
+    from skeleton.app.setup_runtime import ensure_runtime_environment
+
+    # Operator policies and upgrades must not be expanded automatically.
+    manual = "https://operator.example.invalid"
+    (tmp_path / ".env").write_text(
+        f"CORS_ORIGINS={manual}\n", encoding="utf-8"
+    )
+    ensure_runtime_environment(tmp_path)
+    values = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert f"CORS_ORIGINS={manual}" in values

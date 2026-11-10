@@ -146,7 +146,14 @@ class BoundedRecordBuffer:
         return len(_canonical(dict(record.payload)))
 
     def _append(self, record: ReplayRecord) -> None:
-        if not isinstance(record, ReplayRecord) or type(record.payload_digest) is not str:
+        if (not isinstance(record, ReplayRecord)
+                or type(record.example_id) is not str
+                or not 1 <= len(record.example_id) <= 256
+                or type(record.environment_key) is not str
+                or not 1 <= len(record.environment_key) <= 512
+                or type(record.payload_digest) is not str
+                or re.fullmatch(r"[0-9a-f]{64}", record.payload_digest) is None
+                or not isinstance(record.payload, Mapping)):
             raise ValueError("invalid replay record descriptor")
         # Snapshot and verify before admitting; callers cannot poison retention
         # or sampling after insertion by mutating the source dictionary.
@@ -185,6 +192,8 @@ class HoldoutBuffer(BoundedRecordBuffer):
         self.split = split
 
     def add(self, record: ReplayRecord) -> None:
+        if not isinstance(record, ReplayRecord):
+            raise ValueError("invalid holdout record")
         if not self.split.is_holdout(record.example_id):
             raise HoldoutLeakError("non-holdout example routed to holdout buffer")
         self._append(record)
@@ -198,6 +207,8 @@ class DeterministicReplayBuffer(BoundedRecordBuffer):
         self.split = split
 
     def add(self, record: ReplayRecord) -> None:
+        if not isinstance(record, ReplayRecord):
+            raise ValueError("invalid replay record")
         if self.split.is_holdout(record.example_id):
             raise HoldoutLeakError("holdout example routed to training replay")
         self._append(record)
@@ -235,7 +246,11 @@ def route_records(
 ) -> None:
     if replay.split is not holdout.split:
         raise ValueError("replay and holdout must share one split")
-    for record in records:
+    for index, record in enumerate(records):
+        if index >= 100000:
+            raise ValueError("replay route batch exceeded bounded admission")
+        if not isinstance(record, ReplayRecord):
+            raise ValueError("invalid routed record")
         (holdout if replay.split.is_holdout(record.example_id) else replay).add(record)
 
 
