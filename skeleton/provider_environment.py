@@ -130,9 +130,14 @@ class ExactEnvironmentRegistry:
         self._lock = threading.RLock()
 
     def register(self, identity: EnvironmentIdentity, adapter: EnvironmentAdapter) -> None:
+        if not isinstance(identity, EnvironmentIdentity):
+            raise TypeError("registry requires exact EnvironmentIdentity")
         if not isinstance(adapter, EnvironmentAdapter):
             raise TypeError("adapter does not implement EnvironmentAdapter")
-        if adapter.simulation_id != identity.simulation_id or adapter.seed != identity.seed:
+        if (type(adapter.simulation_id) is not str
+                or type(adapter.seed) is not int
+                or adapter.simulation_id != identity.simulation_id
+                or adapter.seed != identity.seed):
             raise EnvironmentMismatchError("adapter does not match declared identity")
         with self._lock:
             if identity.key() not in self._items and len(self._items) >= self.max_environments:
@@ -142,11 +147,22 @@ class ExactEnvironmentRegistry:
             self._items[identity.key()] = (identity, adapter)
 
     def resolve(self, identity: EnvironmentIdentity) -> EnvironmentAdapter:
+        if not isinstance(identity, EnvironmentIdentity):
+            raise TypeError("resolution requires exact EnvironmentIdentity")
         with self._lock:
             entry = self._items.get(identity.key())
-        if entry is None:
-            raise EnvironmentMismatchError(f"no exact environment for {identity.key()}")
-        return entry[1]
+            if entry is None:
+                raise EnvironmentMismatchError(f"no exact environment for {identity.key()}")
+            registered, adapter = entry
+            # A previously admitted adapter is mutable. Refuse a lookup if
+            # its identifier or seed has drifted since the registration.
+            if (registered != identity
+                    or type(adapter.simulation_id) is not str
+                    or type(adapter.seed) is not int
+                    or adapter.simulation_id != identity.simulation_id
+                    or adapter.seed != identity.seed):
+                raise EnvironmentMismatchError("registered adapter identity changed")
+            return adapter
 
 
 @dataclass(frozen=True, slots=True)
