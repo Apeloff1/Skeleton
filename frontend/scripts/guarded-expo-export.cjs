@@ -43,11 +43,27 @@ function snapshot(dir) {
     .update(entries.sort().join('\n')).digest('hex') };
 }
 
+function pinnedExpoInvocation(cwd) {
+  // Launch the installed, lockfile-resolved CLI directly. Yarn wraps Expo in
+  // another process, and its signal handling can misreport an expected,
+  // supervisor-issued shutdown as a failed export.
+  const cli = path.join(cwd, 'node_modules', 'expo', 'bin', 'cli');
+  let stat;
+  try { stat = fs.lstatSync(cli); } catch {
+    throw Error('pinned Expo CLI missing');
+  }
+  if (!stat.isFile() || stat.isSymbolicLink()) throw Error('unsafe Expo CLI entrypoint');
+  return { command: process.execPath, args: [cli, 'export', '--platform', 'web'] };
+}
+
 async function supervise(opts = {}) {
   const cwd = path.resolve(opts.cwd || path.join(__dirname, '..'));
   const out = path.join(cwd, 'dist');
   if (fs.existsSync(out)) throw Error('stale dist is not qualifying evidence');
-  const child = spawn(opts.command || 'yarn', opts.args || ['export:web'], {
+  const invocation = opts.command
+    ? { command: opts.command, args: opts.args || [] }
+    : pinnedExpoInvocation(cwd);
+  const child = spawn(invocation.command, invocation.args, {
     cwd, stdio: ['ignore', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
     env: { ...process.env, CI: '1', EXPO_NO_TELEMETRY: '1' },
@@ -111,7 +127,7 @@ async function supervise(opts = {}) {
         const supervisedExit = (code === 0 && signal === null)
           || (code === null && signal === 'SIGTERM')
           || (code === 143 && signal === null);
-        if (!supervisedExit) throw Error('unexpected exporter exit');
+        if (!supervisedExit) throw Error('unexpected exporter exit code=' + String(code) + ' signal=' + String(signal));
         return { ...third, mode: 'supervised-post-export-exit' };
       }
       await sleep(opts.pollMs ?? 100);
@@ -122,7 +138,7 @@ async function supervise(opts = {}) {
   }
 }
 
-module.exports = { snapshot, supervise };
+module.exports = { snapshot, supervise, pinnedExpoInvocation };
 
 if (require.main === module) {
   supervise().then(r => {
