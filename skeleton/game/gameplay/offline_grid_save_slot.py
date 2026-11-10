@@ -19,13 +19,45 @@ class SaveSlotError(ValueError):
     """A slot cannot be safely published or restored."""
 
 
+def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    record: dict[str, object] = {}
+    for name, value in pairs:
+        if name in record:
+            raise SaveSlotError("duplicate save record key")
+        record[name] = value
+    return record
+
+
+def _reject_constant(_value: str) -> object:
+    raise SaveSlotError("non-finite save value")
+
+
+def _decode(payload: bytes) -> object:
+    """Strict input matching the writer: no duplicate keys or NaN/Infinity."""
+    try:
+        return json.loads(
+            payload,
+            object_pairs_hook=_unique_object,
+            parse_constant=_reject_constant,
+        )
+    except SaveSlotError:
+        raise
+    except (ValueError, UnicodeError, RecursionError) as exc:
+        raise SaveSlotError("invalid replay snapshot encoding") from exc
+
+
 def _encode(snapshot: object) -> bytes:
     try:
-        payload = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
-    except (TypeError, ValueError, OverflowError) as exc:
+        payload = json.dumps(
+            snapshot, sort_keys=True, separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
         raise SaveSlotError("invalid replay snapshot") from exc
     if len(payload) > MAX_SAVE_BYTES:
         raise SaveSlotError("save exceeds byte budget")
+    # Python json.dumps may render heterogeneous dict keys to identical text.
+    # Do not publish a record that the strict reader would reject on restore.
+    _decode(payload)
     return payload
 
 
@@ -130,6 +162,6 @@ def read_slot(path: Path) -> object:
             data = stream.read(MAX_SAVE_BYTES + 1)
         if len(data) > MAX_SAVE_BYTES:
             raise SaveSlotError("save exceeds byte budget")
-        return json.loads(data)
+        return _decode(data)
     finally:
         os.close(fd)
