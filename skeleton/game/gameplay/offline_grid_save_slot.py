@@ -7,6 +7,7 @@ A committed slot is either the previous complete JSON record or the new one.
 from __future__ import annotations
 
 import json
+import math
 import os
 from pathlib import Path
 import stat
@@ -32,6 +33,15 @@ def _reject_constant(_value: str) -> object:
     raise SaveSlotError("non-finite save value")
 
 
+def _finite_float(value: str) -> float:
+    # RFC-8259 number syntax permits extreme exponents that Python's
+    # json.loads converts to Infinity even with parse_constant set.
+    result = float(value)
+    if not math.isfinite(result):
+        raise SaveSlotError("non-finite save value")
+    return result
+
+
 def _decode(payload: bytes) -> object:
     """Strict input matching the writer: no duplicate keys or NaN/Infinity."""
     try:
@@ -39,6 +49,7 @@ def _decode(payload: bytes) -> object:
             payload,
             object_pairs_hook=_unique_object,
             parse_constant=_reject_constant,
+            parse_float=_finite_float,
         )
     except SaveSlotError:
         raise
