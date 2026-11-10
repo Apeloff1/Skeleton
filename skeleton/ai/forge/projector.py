@@ -15,15 +15,22 @@ class ProjectExistsError(FileExistsError):
 
 _INTERNAL = {"forge_manifest.json", "context_ledger.json", "context_tensor.json", "build_report.md"}
 _DEVICES = {"con", "nul", "aux", "prn"} | {f"com{i}" for i in range(1, 10)} | {f"lpt{i}" for i in range(1, 10)}
+MAX_PROJECT_FILES = 500_000
+MAX_PROJECT_PATH_CHARS = 4096
+MAX_PROJECT_TEXT_CHARS = 100 * 1024 * 1024
 
 
 def _validate(files: Mapping[str, str]) -> dict[str, str]:
     if not isinstance(files, Mapping):
         raise ValueError("Godot files must be a mapping")
+    if len(files) > MAX_PROJECT_FILES:
+        raise ValueError("generated project file count exceeds source budget")
     checked: dict[str, str] = {}
     aliases: set[str] = set()
     for name, body in files.items():
-        if not isinstance(name, str) or not name or "\\" in name or any(ord(c) < 32 for c in name):
+        if (not isinstance(name, str) or not name
+                or len(name) > MAX_PROJECT_PATH_CHARS
+                or "\\" in name or any(ord(c) < 32 for c in name)):
             raise ValueError("invalid generated source path")
         parts = name.split("/")
         if (PurePosixPath(name).is_absolute() or ":" in name
@@ -34,6 +41,8 @@ def _validate(files: Mapping[str, str]) -> dict[str, str]:
             raise ValueError(f"ambiguous or reserved generated path: {name!r}")
         if not isinstance(body, str):
             raise ValueError(f"source must be text: {name!r}")
+        if len(body) > MAX_PROJECT_TEXT_CHARS:
+            raise ValueError(f"generated source exceeds file text budget: {name!r}")
         checked[name] = body
         aliases.add(name.casefold())
     if "project.godot" not in checked:
