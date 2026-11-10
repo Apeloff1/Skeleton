@@ -24,6 +24,7 @@ import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 import { ttsSpeak, ttsStop } from './tts';
 import { useSettings } from '../../state/settingsStore';
 import { speakCinematic, stopCinematic } from '../../utils/cinematicVoice';
+import { apiFetch } from '../../utils/apiController';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -55,7 +56,8 @@ export type JeevesContext =
 async function _loadMannerisms(): Promise<void> {
   if (_mannerismsLoaded) return;
   try {
-    const r = await fetch(`${BACKEND}/api/jeeves/persona/vocal_mannerisms`);
+    const r = await apiFetch(`${BACKEND}/api/jeeves/persona/vocal_mannerisms`, { retry: true });
+    if (!r.ok) throw new Error(`Jeeves mannerisms unavailable (HTTP ${r.status})`);
     const j = await r.json();
     if (j && typeof j === 'object') {
       Object.entries(j).forEach(([ctx, m]: [string, any]) => {
@@ -84,7 +86,8 @@ export async function jeevesCatchphrase(context: JeevesContext = 'lesson'): Prom
     // First call: populate cache from full persona (one round trip).
     if (!_catchphraseCache[context]) {
       try {
-        const rAll = await fetch(`${BACKEND}/api/jeeves/persona/catchphrases`);
+        const rAll = await apiFetch(`${BACKEND}/api/jeeves/persona/catchphrases`, { retry: true });
+        if (!rAll.ok) throw new Error(`Jeeves catchphrases unavailable (HTTP ${rAll.status})`);
         const all = await rAll.json();
         if (all && typeof all === 'object') {
           Object.entries(all).forEach(([k, v]) => {
@@ -97,9 +100,10 @@ export async function jeevesCatchphrase(context: JeevesContext = 'lesson'): Prom
       const list = _catchphraseCache[context];
       return list[Math.floor(Math.random() * list.length)];
     }
-    const r = await fetch(`${BACKEND}/api/jeeves/catchphrase?context=${encodeURIComponent(context)}`);
+    const r = await apiFetch(`${BACKEND}/api/jeeves/catchphrase?context=${encodeURIComponent(context)}`, { retry: true });
+    if (!r.ok) throw new Error(`Jeeves catchphrase unavailable (HTTP ${r.status})`);
     const j = await r.json();
-    return String(j?.phrase || '');
+    return typeof j?.phrase === 'string' && j.phrase.length <= 500 ? j.phrase : '';
   } catch {
     return '';
   }
@@ -108,9 +112,12 @@ export async function jeevesCatchphrase(context: JeevesContext = 'lesson'): Prom
 /** Get a famous quote that Jeeves adores. */
 export async function getRandomQuote(): Promise<{ author: string; quote: string } | null> {
   try {
-    const r = await fetch(`${BACKEND}/api/jeeves/quote/random`);
+    const r = await apiFetch(`${BACKEND}/api/jeeves/quote/random`, { retry: true });
+    if (!r.ok) throw new Error(`Jeeves quote unavailable (HTTP ${r.status})`);
     const j = await r.json();
-    return j?.quote || null;
+    const value = j?.quote;
+    return value && typeof value.author === 'string' && typeof value.quote === 'string' &&
+      value.author.length <= 200 && value.quote.length <= 2000 ? value : null;
   } catch {
     return null;
   }
