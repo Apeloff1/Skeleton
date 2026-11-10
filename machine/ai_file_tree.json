@@ -278,7 +278,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "502ea2af6d42ff58dc2a4f1b5e01b2c3e98a336f",
+      "source_git_object_sha": "c2ad7951bc3b6d2be1631f080f77b585e3cb9abf",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "75d874f67a6ed1dcfb2745b97a4663d88895ff09",
+      "source_git_object_sha": "920188b9e275b40716e77afea5a4b5c35dd75760",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "488e8aad7192e6dcb55bcec06ab9bba8399746cf",
+      "source_git_object_sha": "604551f6ce80fe74cfbf93dc073e306d9aa14fa6",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "1256eba56b57dafa77e7c2ce49045353971d6750"
+      "source_git_object_sha": "c89e6b1a7ce867884256703ce44c1830c89aa429"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
@@ -7380,8 +7380,8 @@
     },
     {
       "path": "skeleton/provider_environment.py",
-      "owner": "deterministic game-environment and replay adapter",
-      "reason": "Canonical bounded deterministic game-environment source stays outside provider-credential AI tree; holdout/replay custody is retained here until a separately reviewed mirror and ownership cutover"
+      "owner": "game-environment simulation and deterministic replay",
+      "reason": "The deterministic game-world adapter and holdout/replay buffers remain outside credential-provider AI tree authority; this module has no model credential custody or provider runtime ownership."
     },
     {
       "path": "skeleton/providers",
