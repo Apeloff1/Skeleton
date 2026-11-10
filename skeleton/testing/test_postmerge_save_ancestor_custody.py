@@ -95,5 +95,43 @@ class SaveSlotAncestorCustodyTests(unittest.TestCase):
             self.assertFalse((root / "slot.json").exists())
 
 
+    def test_strict_reader_rejects_duplicate_keys_and_nonfinite_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slot = root / "slot.json"
+            invalid = (
+                b'{"tick":1,"tick":2}',
+                b'{"tick":NaN}',
+                b'{"tick":Infinity}',
+                b'{"tick":-Infinity}',
+                b'{"tick":1} trailing',
+                b'{"tick": "\xff"}',
+                b'{"tick":',
+            )
+            for payload in invalid:
+                with self.subTest(payload=payload):
+                    slot.write_bytes(payload)
+                    with self.assertRaises(SaveSlotError):
+                        read_slot(slot)
+
+    def test_serialization_never_publishes_ambiguous_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            slot = Path(tmp) / "slot.json"
+            write_slot(slot, {"tick": 5})
+            previous = slot.read_bytes()
+            invalid = (
+                {"tick": float("nan")},
+                {"tick": float("inf")},
+                {1: "integer-key", "1": "text-key"},
+            )
+            for snapshot in invalid:
+                with self.subTest(snapshot=snapshot):
+                    with self.assertRaises(SaveSlotError):
+                        write_slot(slot, snapshot)
+                    self.assertEqual(slot.read_bytes(), previous)
+            self.assertEqual(read_slot(slot), {"tick": 5})
+            self.assertEqual(list(Path(tmp).glob(".campaign-*.tmp")), [])
+
+
 if __name__ == "__main__":
     unittest.main()
