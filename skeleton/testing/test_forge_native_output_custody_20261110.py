@@ -168,6 +168,88 @@ def test_report_cleanup_does_not_unlink_competing_entry(tmp_path):
 
 
 
+def test_report_same_size_tampering_before_readback_fails_closed(tmp_path):
+    root = tmp_path / "reports"
+    root.mkdir()
+    target = root / "receipt.json"
+    original_verify = forge_export._verify_report_parent
+    modified = False
+
+    def mutate_after_parent_validation(parent, dfd):
+        nonlocal modified
+        original_verify(parent, dfd)
+        if not modified:
+            # Same inode and byte count, but not the bytes the author wrote.
+            target.write_bytes(b'{"status":"NO-SHIP"}')
+            modified = True
+
+    with patch.object(
+        forge_export, "_verify_report_parent",
+        side_effect=mutate_after_parent_validation,
+    ):
+        with pytest.raises(ValueError, match="contents changed"):
+            forge_export._write_report_new(target, '{"status":"SUCCESS"}')
+    assert modified
+    assert not target.exists()
+
+
+def test_report_revalidates_parent_after_readback(tmp_path):
+    root = tmp_path / "reports"
+    root.mkdir()
+    target = root / "receipt.json"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    old = tmp_path / "detached"
+    original_verify = forge_export._verify_report_parent
+    calls = 0
+
+    def swap_before_second_validation(parent, dfd):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            root.rename(old)
+            root.symlink_to(outside, target_is_directory=True)
+        return original_verify(parent, dfd)
+
+    with patch.object(
+        forge_export, "_verify_report_parent",
+        side_effect=swap_before_second_validation,
+    ):
+        with pytest.raises(ValueError, match="parent changed"):
+            forge_export._write_report_new(target, '{"status":"NO-SHIP"}')
+    assert calls == 2
+    assert not (outside / "receipt.json").exists()
+    assert not (old / "receipt.json").exists()
+
+
+def test_report_final_component_symlink_swap_cannot_read_other_file(tmp_path):
+    target = tmp_path / "receipt.json"
+    private = tmp_path / "private.txt"
+    private.write_text("sensitive canary", encoding="utf-8")
+    saved = tmp_path / "saved.json"
+    original_open = os.open
+    swapped = False
+
+    def substitute_before_read(file, flags, *args, **kwargs):
+        nonlocal swapped
+        if (file == target.name and kwargs.get("dir_fd") is not None
+                and flags & os.O_RDONLY == os.O_RDONLY
+                and not (flags & os.O_WRONLY)
+                and not swapped):
+            target.rename(saved)
+            target.symlink_to(private)
+            swapped = True
+        return original_open(file, flags, *args, **kwargs)
+
+    with patch.object(forge_export.os, "open", side_effect=substitute_before_read):
+        with pytest.raises(OSError):
+            forge_export._write_report_new(target, '{"status":"NO-SHIP"}')
+    assert swapped
+    assert private.read_text(encoding="utf-8") == "sensitive canary"
+    assert target.is_symlink()
+    assert saved.read_bytes() == b'{"status":"NO-SHIP"}'
+
+
 def test_native_output_inventory_stops_at_file_cap(tmp_path, monkeypatch):
     """A fake runner creates too many files; no real Godot invocation occurs."""
     emitted = emit_godot(compile_era("extraction_now"), title="bounded-export")
