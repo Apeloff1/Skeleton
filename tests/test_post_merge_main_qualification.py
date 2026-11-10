@@ -47,6 +47,12 @@ def fixture():
                 {"name": "Canonical Domain Suite (2)",
                  "status": "completed", "conclusion": "success"},
             ])
+        for job in jobs[str(run_id)]:
+            job.update({
+                "run_id": run_id,
+                "run_attempt": 1,
+                "head_sha": HEAD,
+            })
     return {
         "head": HEAD,
         "branch_before": deepcopy(status),
@@ -149,6 +155,23 @@ class ExactMainEvidenceTests(unittest.TestCase):
         result = verify(data)
         self.assertIn("exact_main_job_inventory_missing:Malware Gate",
                       result["blocking_reasons"])
+
+    def test_job_origin_must_match_run_sha_and_attempt(self):
+        for field, wrong in (
+            ("run_id", 999999),
+            ("head_sha", OTHER),
+            ("run_attempt", 2),
+        ):
+            with self.subTest(field=field):
+                data = fixture()
+                target = next(r for r in data["runs"]
+                              if r["name"] == "App Foundation E2E")
+                data["jobs_by_run"][str(target["id"])][0][field] = wrong
+                result = verify(data)
+                self.assertIn(
+                    "exact_main_job_origin_mismatch:App Foundation E2E",
+                    result["blocking_reasons"],
+                )
 
     def test_domain_shards_must_exist_and_all_succeed(self):
         data = fixture()
