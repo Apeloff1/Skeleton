@@ -115,16 +115,21 @@ def test_governed_storage_and_release_cockpit_retain_existing_owners() -> None:
 
 
 def test_godot_export_and_legacy_mass_build_have_explicit_existing_owners() -> None:
+    """Every nested legacy path resolves to its explicitly governed delivery root."""
     config = load_machine_config(ROOT)
-    godot = placement_for_path(config, "skeleton/godot_export/runner.py")
-    mass_build = placement_for_path(config, "skeleton/mass_build/B081/contract.py")
+    for candidate, canonical in (
+        ("skeleton/godot_export/runner.py", "skeleton/godot_export/export.py"),
+        ("skeleton/mass_build/B081/contract.py", "skeleton/mass_build/manifest.py"),
+    ):
+        observed = placement_for_path(config, candidate)
+        expected = placement_for_path(config, canonical)
+        assert (observed.zone, observed.owner, observed.lifecycle) == (
+            expected.zone, expected.owner, expected.lifecycle
+        )
+        assert (observed.zone, observed.owner, observed.lifecycle) == (
+            "build-delivery", "delivery-plane", "canonical"
+        )
 
-    assert (godot.zone, godot.owner, godot.lifecycle) == (
-        "game-simulation-extensions", "simulation-runtime", "canonical"
-    )
-    assert (mass_build.zone, mass_build.owner, mass_build.lifecycle) == (
-        "automation-extensions", "automation-control-plane", "support"
-    )
 
 def test_godot_export_and_mass_build_are_owned_by_delivery_plane() -> None:
     config = load_machine_config(ROOT)
