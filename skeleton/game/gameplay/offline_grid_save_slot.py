@@ -131,7 +131,8 @@ def create_slot(path: Path, snapshot: object) -> None:
     payload = _encode(snapshot) + b"\n"
     if len(payload) > MAX_SAVE_BYTES:
         raise SaveSlotError("save exceeds byte budget")
-    if not hasattr(os, "link") or os.link not in os.supports_dir_fd:
+    if (not hasattr(os, "supports_dir_fd") or not hasattr(os, "link")
+            or os.link not in os.supports_dir_fd):
         raise SaveSlotError("descriptor-relative create-only saves unavailable")
     dfd, parent = _open_parent(path)
     temporary = ".campaign-" + secrets.token_hex(16) + ".tmp"
