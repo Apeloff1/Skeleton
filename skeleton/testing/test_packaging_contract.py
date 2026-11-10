@@ -67,10 +67,22 @@ def test_production_images_drop_installer_toolchain() -> None:
     # pip 26.2+ carries vendored runtime code and an embedded CycloneDX SBOM.
     # Production images install dependencies first and then remove that entire
     # installer-only surface rather than suppressing scanner findings.
-    for dockerfile in (root_dockerfile, production):
-        assert "/usr/local/lib/python3.14/site-packages/pip" in dockerfile
-        assert "/usr/local/lib/python3.14/site-packages/pip-*.dist-info" in dockerfile
-        assert "/usr/local/bin/pip*" in dockerfile
+    # The glibc runtime uses its reviewed fixed Python 3.14 path.
+    assert "/usr/local/lib/python3.14/site-packages/pip" in root_dockerfile
+    assert "/usr/local/lib/python3.14/site-packages/pip-*.dist-info" in root_dockerfile
+    assert "/usr/local/bin/pip*" in root_dockerfile
+
+    # The Alpine backend uses a guarded sysconfig path because the interpreter
+    # owns the live site-packages layout. A hardcoded glibc path would mask a
+    # no-op cleanup after Python is updated.
+    assert 'site = pathlib.Path(sysconfig.get_path("purelib"))' in production
+    assert 'not site.is_relative_to(pathlib.Path("/usr/local/lib"))' in production
+    assert 'shutil.rmtree(site / "pip", ignore_errors=True)' in production
+    assert 'for dist in site.glob("pip-*.dist-info"):' in production
+    assert 'shutil.rmtree(dist)' in production
+    assert 'pathlib.Path("/usr/local/bin").glob("pip*")' in production
+    assert "pip_bin.unlink()" in production
+    assert "unexpected Python site-packages path; refusing runtime pip cleanup" in production
 
     assert "python -m ensurepip --upgrade" not in production
     assert "python -m ensurepip --upgrade" in development
