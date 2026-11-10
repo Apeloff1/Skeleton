@@ -39,6 +39,7 @@ PRESET_OUTPUTS: Dict[str, str] = {
 DEFAULT_TIMEOUT_S = 300.0
 MAX_OUTPUT_BYTES = 2 * 1024 * 1024 * 1024
 MAX_OUTPUT_FILES = 64
+MAX_EXPORT_TOTAL_BYTES = 4 * 1024 * 1024 * 1024
 MAX_REPORT_BYTES = 4 * 1024 * 1024
 
 
@@ -275,6 +276,7 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
         return {**report, "status": "failed", "reason": "import"}
 
     all_ok = True
+    cumulative_output_bytes = 0
     for preset in presets:
         relative = Path(PRESET_OUTPUTS[preset])
         parent = _safe_directory(out / relative.parent)
@@ -308,6 +310,22 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
         entry["artefacts"] = [str(item.relative_to(out)) for item in artefacts]
         entry["bytes"] = sum(item.lstat().st_size for item in artefacts)
         entry["sha256"] = {}
+        # A per-artifact bound alone could admit 64 × 2 GiB across multiple
+        # presets. Count the whole invocation before hashing expensive output
+        # or running an exported executable. Reject rather than truncating the
+        # inventory or permitting an unqualified partial pass.
+        if entry["bytes"] > MAX_EXPORT_TOTAL_BYTES - cumulative_output_bytes:
+            entry["ok"] = False
+            entry["reason"] = "cumulative-output-byte-budget-exceeded"
+            report["presets"][preset] = entry
+            return {
+                **report,
+                "status": "failed",
+                "reason": "output-byte-budget",
+                "passed": False,
+                "out_dir": str(out),
+            }
+        cumulative_output_bytes += entry["bytes"]
         if entry["ok"]:
             try:
                 entry["sha256"] = {str(item.relative_to(out)): _artifact_digest(item)
