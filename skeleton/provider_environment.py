@@ -165,6 +165,8 @@ class ExactEnvironmentRegistry:
             self._items[identity.key()] = (identity, adapter)
 
     def resolve(self, identity: EnvironmentIdentity) -> EnvironmentAdapter:
+        if not isinstance(identity, EnvironmentIdentity):
+            raise EnvironmentMismatchError("exact environment identity required")
         with self._lock:
             entry = self._items.get(identity.key())
         if entry is None:
@@ -228,6 +230,8 @@ class BoundedRecordBuffer:
                 or re.fullmatch(r"[0-9a-f]{64}", record.payload_digest) is None
                 or not isinstance(record.payload, Mapping)):
             raise ValueError("invalid replay record descriptor")
+        if len(record.payload) > MAX_ENCODED_ITEMS:
+            raise ValueError("replay item budget exhausted")
         # Snapshot and verify before admitting; callers cannot poison retention
         # or sampling after insertion by mutating the source dictionary.
         normalized = json.loads(_canonical(dict(record.payload)))
@@ -354,6 +358,8 @@ def replay_episode(
             raise ValueError("deterministic episode step budget exhausted")
         if not isinstance(action, Mapping):
             raise ValueError("invalid action source")
+        if len(action) > MAX_ENCODED_ITEMS:
+            raise ValueError("replay action item budget exhausted")
         safe_action = json.loads(_canonical(dict(action)))
         adapter.step(safe_action)
         states.append(_digest(dict(adapter.state)))
