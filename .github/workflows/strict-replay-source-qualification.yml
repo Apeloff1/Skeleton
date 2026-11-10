@@ -1,19 +1,10 @@
 name: Strict Replay Source Qualification
 
+# The same exact source suite runs as a required Merge Readiness
+# quality_security step; avoid duplicate automatic PR/push admissions.
+# This workflow remains independently dispatchable for source qualification.
 on:
-  pull_request:
-    paths:
-      - skeleton/provider_environment.py
-      - skeleton/simulation/replay_checkpoint.py
-      - tests/test_postmerge_environment_checkpoint_custody.py
-      - .github/workflows/strict-replay-source-qualification.yml
-  push:
-    branches: [main]
-    paths:
-      - skeleton/provider_environment.py
-      - skeleton/simulation/replay_checkpoint.py
-      - tests/test_postmerge_environment_checkpoint_custody.py
-      - .github/workflows/strict-replay-source-qualification.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
