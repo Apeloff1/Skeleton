@@ -334,6 +334,65 @@ class Session:
             health, tuple(sorted(enemies.items())), (*self._events, _canonical(event)),
         )
 
+    def shortest_route_to(self, x: int, y: int) -> tuple[str, ...] | None:
+        """Bounded immutable navigation to a specified walkable tile.
+
+        Used for quest item/NPC navigation as well as the campaign goal.
+        Boolean coordinates, off-map targets, walls and occupied enemy
+        destinations fail closed; no commands are issued by route planning.
+        """
+        from collections import deque
+
+        rows = self.campaign.spec["rows"]
+        width, height = len(rows[0]), len(rows)
+        if type(x) is not int or type(y) is not int:
+            _fail("route coordinates must be integers")
+        if not (0 <= x < width and 0 <= y < height) or rows[y][x] == "#":
+            _fail("route destination is not walkable")
+        living = dict(self.enemies)
+        blockers = {
+            (obj["x"], obj["y"])
+            for obj in self.campaign.spec["objects"]
+            if obj["kind"] == "enemy" and living.get(obj["id"], 0) > 0
+        }
+        goal = (x, y)
+        start = (self.x, self.y)
+        if goal in blockers:
+            return None
+        if start == goal:
+            return ()
+        frontier = deque([start])
+        visited = {start}
+        predecessor: dict[tuple[int, int], tuple[tuple[int, int], str]] = {}
+        while frontier:
+            px, py = frontier.popleft()
+            for direction in ("north", "east", "south", "west"):
+                dx, dy = DIRECTIONS[direction]
+                point = (px + dx, py + dy)
+                nx, ny = point
+                if (point in visited or point in blockers
+                    or not (0 <= nx < width and 0 <= ny < height)
+                    or rows[ny][nx] == "#"):
+                    continue
+                visited.add(point)
+                predecessor[point] = ((px, py), direction)
+                if point == goal:
+                    route = []
+                    cursor = point
+                    while cursor != start:
+                        parent, move = predecessor[cursor]
+                        route.append(move)
+                        cursor = parent
+                    return tuple(reversed(route))
+                frontier.append(point)
+        return None
+
+    def shortest_goal_route(self) -> tuple[str, ...] | None:
+        """Return the shortest live obstacle-aware route to the goal tile."""
+        rows = self.campaign.spec["rows"]
+        gx, gy = next((row.index("G"), y) for y, row in enumerate(rows) if "G" in row)
+        return self.shortest_route_to(gx, gy)
+
     @property
     def state_digest(self) -> str:
         return dig(self._state())
@@ -381,7 +440,10 @@ class Session:
             if obj["kind"] == "enemy":
                 if dict(self.enemies)[obj["id"]] > 0:
                     rows[obj["y"]][obj["x"]] = "E"
+                # A defeated enemy leaves no phantom sprite.
+            elif obj["kind"] == "item":
+                rows[obj["y"]][obj["x"]] = "*"
             else:
-                rows[obj["y"]][obj["x"]] = "*" if obj["kind"] == "item" else "N"
+                rows[obj["y"]][obj["x"]] = "N"
         rows[self.y][self.x] = "@"
         return "\n".join("".join(row) for row in rows)
