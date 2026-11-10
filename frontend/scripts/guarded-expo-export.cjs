@@ -70,9 +70,9 @@ async function supervise(opts = {}) {
   child.stderr.on('data', c => read(c, process.stderr));
   function kill(sig) {
     if (child.pid && process.platform !== 'win32') {
-      try { process.kill(-child.pid, sig); return; } catch {}
+      try { process.kill(-child.pid, sig); return true; } catch {}
     }
-    try { child.kill(sig); } catch {}
+    try { return child.kill(sig); } catch { return false; }
   }
   async function reap() {
     await Promise.race([done, sleep(opts.terminateMs ?? 5000)]);
@@ -97,11 +97,21 @@ async function supervise(opts = {}) {
         if (exited && code !== 0) throw Error('export failed after completion marker');
         const second = snapshot(out);
         if (first.digest !== second.digest) throw Error('export output is not stable');
-        kill('SIGTERM');
+        // Reject any spontaneous nonzero exit before taking ownership of
+        // process shutdown. A Yarn shell converts SIGTERM into exit code 143;
+        // this is qualifying ONLY after we sent SIGTERM to a live process.
+        if (exited) {
+          if (code !== 0 || signal) throw Error('export failed after completion marker');
+          return { ...second, mode: 'normal-exit' };
+        }
+        if (!kill('SIGTERM')) throw Error('export termination was not delivered');
         await reap();
         const third = snapshot(out);
         if (second.digest !== third.digest) throw Error('export changed during cleanup');
-        if (code !== 0 && signal !== 'SIGTERM') throw Error('unexpected exporter exit');
+        const supervisedExit = (code === 0 && signal === null)
+          || (code === null && signal === 'SIGTERM')
+          || (code === 143 && signal === null);
+        if (!supervisedExit) throw Error('unexpected exporter exit');
         return { ...third, mode: 'supervised-post-export-exit' };
       }
       await sleep(opts.pollMs ?? 100);
