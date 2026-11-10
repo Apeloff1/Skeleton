@@ -1,23 +1,11 @@
 name: Godot Provenance Source Qualification
 
+# The exact source test suite is required inside the Merge Readiness
+# quality_security lane; independent PR/push subscriptions would exceed the
+# bounded 20-workflow admission policy. Retain separately dispatchable
+# source qualification for independent operator evidence.
 on:
-  pull_request:
-    paths:
-      - skeleton/godot_export/provenance.py
-      - skeleton/godot_export/cli.py
-      - skeleton/forge/export.py
-      - skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py
-      - skeleton/testing/test_forge_native_output_custody_20261110.py
-      - .github/workflows/godot-provenance-source-qualification.yml
-  push:
-    branches: [main]
-    paths:
-      - skeleton/godot_export/provenance.py
-      - skeleton/godot_export/cli.py
-      - skeleton/forge/export.py
-      - skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py
-      - skeleton/testing/test_forge_native_output_custody_20261110.py
-      - .github/workflows/godot-provenance-source-qualification.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
