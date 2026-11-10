@@ -75,13 +75,14 @@ def _encode(snapshot: object) -> bytes:
     return payload
 
 
-def _check_slot(name: str, dfd: int) -> None:
+def _check_slot(name: str, dfd: int) -> os.stat_result | None:
     try:
         info = os.stat(name, dir_fd=dfd, follow_symlinks=False)
     except FileNotFoundError:
-        return
+        return None
     if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
         raise SaveSlotError("save slot must be a regular single-link file")
+    return info
 
 
 def _open_parent(path: Path) -> tuple[int, Path]:
@@ -240,28 +241,57 @@ def write_slot(path: Path, snapshot: object) -> None:
 
 
 def read_slot(path: Path) -> object:
+    """Read a stable regular file from one anchored directory generation.
+
+    The pre-open inode must equal the descriptor actually opened. After the
+    bounded read, both the file metadata and the reachable pathname must
+    still identify that same object. No attacker-controlled FIFO, link swap
+    or in-place mutation can silently replace this accepted snapshot.
+    """
     path = Path(path)
-    dfd, _ = _open_parent(path)
+    dfd, parent = _open_parent(path)
+    fd: int | None = None
     try:
-        _check_slot(path.name, dfd)
-        # O_NONBLOCK prevents a stat/open race from hanging on an attacker-
-        # substituted FIFO; fstat below must still admit only regular files.
+        entry_before = _check_slot(path.name, dfd)
+        # O_NONBLOCK prevents FIFO replacement from hanging the caller while
+        # O_NOFOLLOW refuses a final-component symlink. fstat admits regular
+        # files only, even after an adversarial stat/open race.
         fd = os.open(
             path.name,
             os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
             | getattr(os, "O_CLOEXEC", 0),
             dir_fd=dfd,
         )
-    finally:
-        os.close(dfd)
-    try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size > MAX_SAVE_BYTES:
-            raise SaveSlotError("invalid save slot")
+        before = os.fstat(fd)
+        if (entry_before is None
+                or not stat.S_ISREG(before.st_mode)
+                or before.st_nlink != 1
+                or before.st_size > MAX_SAVE_BYTES
+                or (entry_before.st_dev, entry_before.st_ino) !=
+                   (before.st_dev, before.st_ino)):
+            raise SaveSlotError("save slot changed during open")
         with os.fdopen(fd, "rb", closefd=False) as stream:
             data = stream.read(MAX_SAVE_BYTES + 1)
         if len(data) > MAX_SAVE_BYTES:
             raise SaveSlotError("save exceeds byte budget")
+        after = os.fstat(fd)
+        reachable = os.stat(path.name, dir_fd=dfd, follow_symlinks=False)
+        directory = os.stat(parent, follow_symlinks=False)
+        held_dir = os.fstat(dfd)
+        fingerprint = lambda info: (
+            info.st_dev, info.st_ino, info.st_size,
+            info.st_mtime_ns, info.st_ctime_ns,
+        )
+        if (fingerprint(before) != fingerprint(after)
+                or (reachable.st_dev, reachable.st_ino) !=
+                   (after.st_dev, after.st_ino)
+                or (directory.st_dev, directory.st_ino) !=
+                   (held_dir.st_dev, held_dir.st_ino)):
+            raise SaveSlotError("save slot changed during read")
         return _decode(data)
     finally:
-        os.close(fd)
+        try:
+            if fd is not None:
+                os.close(fd)
+        finally:
+            os.close(dfd)
