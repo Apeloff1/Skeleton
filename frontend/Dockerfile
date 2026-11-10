@@ -46,7 +46,10 @@ ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL \
 COPY . .
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    yarn export:web \
+    # BuildKit cannot distinguish a successful export log from a child \
+    # process that never terminates. Bound the actual process and refuse \
+    # incomplete exports rather than reporting a synthetic pass. \
+    timeout -k 15s 720s yarn export:web \
     && echo "frontend-export-process-exited" \
     && (test -f /app/dist/setup.html || test -f /app/dist/setup/index.html) \
     && echo "frontend-setup-artifact-verified"
