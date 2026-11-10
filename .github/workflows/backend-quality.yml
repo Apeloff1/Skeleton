@@ -721,3 +721,51 @@ jobs:
             tests/test_product_surface_delegated_backend_20261110.py
       - name: Exercise authenticated Discourse job source with negative fixtures
         run: node --test frontend/scripts/test-discourse-async-jobs.mjs
+
+  godot_source_custody:
+    # Source-only; no Godot engine launch, Windows installer or signed release.
+    name: Exact-head Godot/Forge export provenance and ancestor custody (review only)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      PYTHONNOUSERSITE: "1"
+    steps:
+      - name: Checkout exact Godot provenance candidate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Prove immutable Godot tested revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install reviewed offline source test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-cache-dir
+          pytest==8.4.2 cryptography==50.0.2
+      - name: Compile verified Godot and Forge custody modules
+        run: >-
+          python -m compileall -q skeleton/godot_export/provenance.py
+          skeleton/godot_export/cli.py skeleton/forge/export.py
+          skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py
+          skeleton/testing/test_forge_native_output_custody_20261110.py
+      - name: Exercise hostile provenance, symlink, ancestor and export fixtures
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py \
+            skeleton/testing/test_forge_native_output_custody_20261110.py \
+            skeleton/testing/test_godot_export_provenance.py \
+            skeleton/testing/test_godot_export_provenance_negative.py \
+            skeleton/testing/test_forge_export_quarantine.py
