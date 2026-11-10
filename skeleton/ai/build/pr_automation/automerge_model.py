@@ -13,6 +13,7 @@ from enum import StrEnum
 import hashlib
 import json
 import re
+import unicodedata
 from typing import Any, Iterable, Sequence
 
 
@@ -50,7 +51,23 @@ def has_explicit_merge_hold(title: object, body: object) -> bool:
             continue
         if type(value) is not str or len(value) > 131072:
             return True
-        if _EXPLICIT_MERGE_HOLD_RE.search(value):
+        # GitHub's author-supplied Markdown is attacker-controlled. Count
+        # transport bytes, not only code points, before any normalization.
+        try:
+            if len(value.encode("utf-8", errors="strict")) > 131072:
+                return True
+        except UnicodeError:
+            return True
+        # Invisible joiners and controls can separate a textual veto while
+        # rendering indistinguishably. Any such text remains review-held.
+        if any(unicodedata.category(ch) == "Cf" or
+               (unicodedata.category(ch) == "Cc" and ch not in "\n\r\t")
+               for ch in value):
+            return True
+        normalized = unicodedata.normalize("NFKC", value)
+        if len(normalized) > 131072:
+            return True
+        if _EXPLICIT_MERGE_HOLD_RE.search(normalized):
             return True
     return False
 

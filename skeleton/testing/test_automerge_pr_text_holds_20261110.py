@@ -87,3 +87,20 @@ def test_snapshot_rejects_non_boolean_holds():
     candidate = snapshot()
     with pytest.raises(ValueError, match="exact boolean"):
         replace(candidate, explicit_merge_hold=1)
+
+@pytest.mark.parametrize(("title", "body"), [
+    ("ＤＯ　ＮＯＴ　ＭＥＲＧＥ", ""),
+    ("fix", "ＮＯ＿ＡＵＴＯ－ＭＥＲＧＥ until independent review"),
+    ("No\u200b merge", ""),
+    ("fix", "Do\u200cnot merge"),
+    ("fix", "Review\u200d only"),
+    ("fix", "normal message\x00embedded unauthorized text"),
+    ("fix", "\ud800"),
+    ("fix", "🧪" * 40000),
+])
+def test_unicode_obfuscation_or_unbounded_utf8_remains_held(title, body):
+    assert has_explicit_merge_hold(title, body)
+
+
+def test_regular_multiline_unicode_text_is_not_merge_permission():
+    assert not has_explicit_merge_hold("fix(ci): improve tests", "Valid 🧪 details\nAdditional checks")
