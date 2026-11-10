@@ -365,3 +365,83 @@ def test_native_output_inventory_stops_at_file_cap(tmp_path, monkeypatch):
     assert entry["ok"] is False
     assert entry["reason"] == "unsafe-or-unbounded-artifacts"
     assert entry["artefacts"] == []
+
+
+def test_native_export_rejects_parent_replacement_during_engine_run(
+    tmp_path, monkeypatch,
+):
+    """A completed mock command cannot attest a substituted output subtree."""
+    emitted = emit_godot(compile_era("extraction_now"), title="race-export")
+    monkeypatch.setattr(
+        forge_export, "resolve_binary",
+        lambda binary=None: ("/bin/true", "fixture-only", False),
+    )
+    out = tmp_path / "native"
+    swapped = False
+
+    def fake_run(command, cwd, timeout):
+        nonlocal swapped
+        if "--export-release" in command:
+            old_parent = Path(command[-1]).parent
+            old_parent.rename(out / "detached")
+            old_parent.mkdir()
+            (old_parent / "game.x86_64").write_bytes(b"replaced")
+            swapped = True
+        return 0, "", False
+
+    monkeypatch.setattr(forge_export, "_run", fake_run)
+    with pytest.raises(ValueError, match="report parent changed"):
+        forge_export.export_build(
+            emitted, out, presets=("Linux",),
+        )
+    assert swapped
+    assert not (out / "detached" / "game.x86_64").exists()
+
+
+def test_native_export_rejects_parent_replacement_after_hash_before_boot(
+    tmp_path, monkeypatch,
+):
+    """Keep the original descriptor until the final source and boot checks."""
+    emitted = emit_godot(compile_era("extraction_now"), title="hash-race")
+    monkeypatch.setattr(
+        forge_export, "resolve_binary",
+        lambda binary=None: ("/bin/true", "fixture-only", False),
+    )
+    out = tmp_path / "native"
+    replacement = tmp_path / "replacement"
+    replacement.mkdir()
+    native_digest = forge_export._artifact_digest
+    hashed = False
+    switched = False
+
+    def fake_run(command, cwd, timeout):
+        if "--export-release" in command:
+            target = Path(command[-1])
+            target.write_bytes(b"replay-safe-executable")
+            target.with_suffix(".pck").write_bytes(b"replay-safe-pack")
+            (replacement / target.name).write_bytes(b"replay-safe-executable")
+            (replacement / target.with_suffix(".pck").name).write_bytes(
+                b"replay-safe-pack",
+            )
+        return 0, "", False
+
+    def hash_then_replace(path):
+        nonlocal hashed, switched
+        digest = native_digest(path)
+        hashed = True
+        if not switched:
+            original_parent = Path(path).parent
+            original_parent.rename(out / "detached")
+            replacement.rename(original_parent)
+            switched = True
+        return digest
+
+    monkeypatch.setattr(forge_export, "_run", fake_run)
+    monkeypatch.setattr(forge_export, "_artifact_digest", hash_then_replace)
+    with patch.object(
+        forge_export, "_boot_exported",
+        side_effect=AssertionError("boot of substituted output must not happen"),
+    ):
+        with pytest.raises(ValueError, match="report parent changed"):
+            forge_export.export_build(emitted, out, presets=("Linux",))
+    assert hashed and switched
