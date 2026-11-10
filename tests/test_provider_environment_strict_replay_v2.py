@@ -4,7 +4,6 @@ The tests use real records and buffer APIs; no external provider/network access.
 """
 from __future__ import annotations
 
-import math
 import unittest
 from unittest.mock import patch
 
@@ -12,7 +11,6 @@ from skeleton.provider_environment import (
     MAX_ENCODED_ITEMS,
     MAX_PAYLOAD_DEPTH,
     MAX_RECORD_BYTES,
-    BoundedRecordBuffer,
     DeterministicReplayBuffer,
     EnvironmentIdentity,
     ExactEnvironmentRegistry,
@@ -20,6 +18,8 @@ from skeleton.provider_environment import (
     HoldoutSplit,
     ReplayRecord,
     _canonical,
+    _digest,
+    _index_digest,
     make_record,
     route_records,
 )
@@ -148,6 +148,31 @@ class AtomicSampleGenerationTests(unittest.TestCase):
         ):
             second = self.replay.sample(12, seed=1)
         self.assertEqual(first, second)
+
+    def test_large_buffer_index_has_no_1mib_digest_cliff(self) -> None:
+        # 6,000 allowed 240-character identities are larger than the 1 MiB
+        # per-record JSON budget when combined into a single index array.
+        rows = tuple(
+            ReplayRecord(
+                f"{i:06d}-" + ("a" * 233),
+                "environment",
+                "b" * 64,
+                {"i": i},
+            )
+            for i in range(6000)
+        )
+        result = _index_digest(rows)
+        self.assertEqual(len(result), 64)
+        self.assertEqual(result, _index_digest(iter(rows)))
+        with self.assertRaises(ValueError):
+            _digest([(r.example_id, r.payload_digest) for r in rows])
+
+    def test_streamed_index_hash_matches_legacy_for_small_buffers(self) -> None:
+        self.populate()
+        rows = self.replay.records()
+        expected = _digest([(r.example_id, r.payload_digest) for r in rows])
+        self.assertEqual(_index_digest(rows), expected)
+        self.assertEqual(self.replay.digest(), expected)
 
     def test_sampling_cannot_mutate_retained_payload(self) -> None:
         self.populate()
