@@ -320,3 +320,112 @@ def test_manifest_sha_cannot_be_qualified_from_detached_parent(tmp_path):
     (new_dir / "native.bin").write_bytes(b"modified" * 256)
     problems = provenance.verify(manifest, root, root)
     assert any("mismatch" in issue or "changed" in issue for issue in problems)
+
+
+def _manifest_fixture() -> provenance.Manifest:
+    return provenance.Manifest(
+        "example", "a" * 64, "Godot 4.x", "NO-SHIP",
+    )
+
+
+def test_bounded_manifest_file_roundtrip_preserves_schema(tmp_path):
+    path = tmp_path / "manifest.json"
+    fixture = _manifest_fixture()
+    path.write_text(fixture.dumps(), encoding="utf-8")
+    loaded = provenance.read_manifest_file(path)
+    assert loaded.to_dict() == fixture.to_dict()
+    assert loaded.dumps() == path.read_text(encoding="utf-8")
+
+
+def test_manifest_byte_bound_rejects_before_unbounded_read(tmp_path):
+    path = tmp_path / "manifest.json"
+    path.write_bytes(b"X" * 1000)
+    with patch.object(provenance, "MAX_MANIFEST_BYTES", 64):
+        with patch.object(
+            provenance.os, "read",
+            side_effect=AssertionError("oversized manifest must not be read"),
+        ):
+            with pytest.raises(ValueError, match="oversized"):
+                provenance.read_manifest_file(path)
+
+
+def test_manifest_reader_rejects_symlinked_intermediate_parent(tmp_path):
+    external = tmp_path / "external"
+    external.mkdir()
+    (external / "manifest.json").write_text(_manifest_fixture().dumps())
+    alias = tmp_path / "alias"
+    alias.symlink_to(external, target_is_directory=True)
+    with pytest.raises(OSError):
+        provenance.read_manifest_file(alias / "manifest.json")
+
+
+def test_manifest_reader_rejects_parent_swap_after_read(tmp_path):
+    parent = tmp_path / "safe"
+    parent.mkdir()
+    (parent / "manifest.json").write_text(_manifest_fixture().dumps())
+    external = tmp_path / "external"
+    external.mkdir()
+    (external / "manifest.json").write_text(_manifest_fixture().dumps())
+    detached = tmp_path / "detached"
+    original_read = os.read
+    swapped = False
+
+    def replace_parent_during_read(fd, count):
+        nonlocal swapped
+        data = original_read(fd, count)
+        if data and not swapped:
+            parent.rename(detached)
+            parent.symlink_to(external, target_is_directory=True)
+            swapped = True
+        return data
+
+    with patch.object(provenance.os, "read", side_effect=replace_parent_during_read):
+        with pytest.raises((OSError, ValueError)):
+            provenance.read_manifest_file(parent / "manifest.json")
+    assert swapped
+    assert (detached / "manifest.json").is_file()
+
+
+def test_manifest_reader_rejects_same_size_data_mutation(tmp_path):
+    path = tmp_path / "manifest.json"
+    text = _manifest_fixture().dumps()
+    path.write_text(text, encoding="utf-8")
+    original_read = os.read
+    changed = False
+
+    def rewrite_after_read(fd, count):
+        nonlocal changed
+        data = original_read(fd, count)
+        if data and not changed:
+            changed = True
+            path.write_text(text.replace("NO-SHIP", "UN-SHIP"), encoding="utf-8")
+        return data
+
+    with patch.object(provenance.os, "read", side_effect=rewrite_after_read):
+        with pytest.raises(ValueError, match="changed during read"):
+            provenance.read_manifest_file(path)
+    assert changed
+
+
+def test_cli_verify_fails_closed_on_oversized_manifest(tmp_path, capsys):
+    from skeleton.godot_export.cli import main as godot_main
+    path = tmp_path / "manifest.json"
+    path.write_bytes(b"X" * 2048)
+    with patch.object(provenance, "MAX_MANIFEST_BYTES", 128):
+        status = godot_main([
+            "verify", str(path), "--base", str(tmp_path),
+        ])
+    observed = capsys.readouterr().out
+    assert status != 0
+    result = __import__("json").loads(observed)
+    assert result["ok"] is False
+    assert result["problems"] == ["unsafe or malformed provenance manifest"]
+
+
+def test_manifest_special_fifo_fails_without_blocking(tmp_path):
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO unavailable")
+    target = tmp_path / "manifest.json"
+    os.mkfifo(target)
+    with pytest.raises(ValueError, match="unsafe"):
+        provenance.read_manifest_file(target)
