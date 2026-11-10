@@ -80,6 +80,11 @@ def inspect(
     """Produce an auditable, fail-closed report with deterministic reasons."""
     if not isinstance(head, str) or SHA.fullmatch(head) is None:
         raise EvidenceError("invalid exact-main SHA")
+    if (not isinstance(branch_before, Mapping)
+            or not isinstance(branch_after, Mapping)
+            or not isinstance(runs, list)
+            or not isinstance(jobs_by_run, Mapping)):
+        raise EvidenceError("malformed exact-main evidence shape")
     reasons: list[str] = []
     if _sha(branch_before) != head:
         reasons.append("main_head_before_not_exact")
@@ -241,6 +246,14 @@ def main(argv: list[str] | None = None) -> int:
         else:
             snapshot = live_snapshot(args.repo, args.sha)
         report = inspect(**snapshot)
+        if args.snapshot:
+            # Synthetic fixtures are useful for testing the decision function,
+            # but must never become a green operational or release receipt.
+            report["evidence_mode"] = "offline_fixture"
+            report["exact_main_workflow_gates_qualified"] = False
+            report["blocking_reasons"].append("offline_fixture_not_authoritative")
+        else:
+            report["evidence_mode"] = "live_github_api"
     except (EvidenceError, OSError, ValueError, TypeError, KeyError) as exc:
         # Never echo API credentials or remote response text in public logs.
         print(json.dumps({
