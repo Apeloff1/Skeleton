@@ -38,8 +38,13 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11.16"
-      - name: Install test harness only
-        run: python -m pip install --disable-pip-version-check --no-cache-dir pytest==8.4.2
+      - name: Install minimal pinned source-test dependencies
+        # skeleton/testing/conftest.py imports signed-offline fixtures when
+        # collecting targeted Godot modules. Keep the real Ed25519 fixture
+        # available; never bypass it by disabling the test plugin registry.
+        run: >-
+          python -m pip install --disable-pip-version-check --no-cache-dir
+          pytest==8.4.2 cryptography==50.0.2
       - name: Compile Godot and Forge source custody modules
         run: >-
           python -m compileall -q skeleton/godot_export/provenance.py
