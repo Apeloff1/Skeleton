@@ -15,8 +15,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: strict-replay-source-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: strict-replay-source-${{ inputs.candidate_sha }}
+  cancel-in-progress: false
 
 jobs:
   offline-source:
