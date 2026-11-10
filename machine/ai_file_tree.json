@@ -583,7 +583,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "70d5bbfd7213cf2a9b19ee7f5ee6875f61edee1b",
+      "source_git_object_sha": "7d075832d19ca878887db2bb1f37528037463523",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1681,7 +1681,7 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "0eaeac6586a9ae37ab3fa7d84b765abbd8ef44a2",
+      "source_git_object_sha": "6a5b9f465d8ee295492a734232d63fba923f66e9",
       "role": "Incremental build graph, resource-bounded parallel scheduling, deterministic asset invalidation, build observability, release/remote build controls, and network audit support autonomous AI work.",
       "work_package_refs": [
         "WP-W27",
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "3eee887a11b2acee992c6bdf7c29c259a7c4e63a"
+      "source_git_object_sha": "1256eba56b57dafa77e7c2ce49045353971d6750"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
@@ -5654,7 +5654,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_execution_sandbox_tree_exactly_mirrored",
-      "source_git_object_sha": "a19734e6dc90b85d3c26c3a322105fbc88d44f04"
+      "source_git_object_sha": "1e412ea4ee0d79c490bf8c8b2938d963378f2b64"
     },
     {
       "id": "AIFT-STORAGE",

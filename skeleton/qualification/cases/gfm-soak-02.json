@@ -1,0 +1,14 @@
+{
+  "id": "GFM-SOAK-02",
+  "gate": "soak",
+  "title": "Month-long workcycle soak",
+  "todo_ref": "P3: resilient months-long workcycles",
+  "severity": "sev1",
+  "params": {
+    "min_hours": 720.0,
+    "max_rss_mb_per_hour": 0.5,
+    "max_error_rate": 0.0005,
+    "max_restarts": 0
+  },
+  "requires_hardware": true
+}
