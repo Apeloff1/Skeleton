@@ -7339,6 +7339,11 @@
       "reason": "The stdlib allocation, frame and load-time profiling CLI measures both game and AI surfaces but does not own inference, providers or canonical AI state; retain shared application tooling until an explicit owner migration is verified."
     },
     {
+      "path": "skeleton/perfgate",
+      "owner": "performance assurance / benchmarking",
+      "reason": "Finite performance budgets, soak workloads, baseline statistics and diagnostic gates are independent quality evidence, not an AI model-runtime owner or migration authority."
+    },
+    {
       "path": "skeleton/persist",
       "owner": "persistence compatibility boundary",
       "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
@@ -7377,6 +7382,11 @@
       "path": "skeleton/providers",
       "owner": "integration contract owner",
       "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
+    },
+    {
+      "path": "skeleton/qualification",
+      "owner": "independent qualification and evidence",
+      "reason": "Source-bound performance, FPS, replay, retention, promotion and soak qualification gates validate product behavior without becoming model execution, deployment or release authority."
     },
     {
       "path": "skeleton/quality/scatter10240",
