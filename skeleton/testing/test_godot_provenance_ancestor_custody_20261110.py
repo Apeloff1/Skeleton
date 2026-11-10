@@ -289,6 +289,22 @@ def test_rejects_directory_mutation_after_it_was_enumerated(tmp_path):
 
 
 
+def test_symlink_manifest_result_preserves_unsafe_and_symlink_contract(tmp_path):
+    root = tmp_path / "project"
+    output = root / "output"
+    output.mkdir(parents=True)
+    (root / "project.godot").write_text("[application]\n", encoding="utf-8")
+    artifact = output / "game.pck"
+    artifact.write_bytes(b"fixed-output")
+    manifest = provenance.build(root, "4.7", "SHIP", {"Linux": artifact})
+    artifact.unlink()
+    artifact.symlink_to(root / "project.godot")
+    problems = provenance.verify(manifest, root)
+    assert len(problems) == 1
+    assert "unsafe" in problems[0]
+    assert "symlink artifact path" in problems[0]
+
+
 def test_manifest_sha_cannot_be_qualified_from_detached_parent(tmp_path):
     root = tmp_path / "project"
     target_dir = root / "artifacts"
