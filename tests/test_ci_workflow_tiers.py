@@ -112,8 +112,8 @@ class WorkflowTierTests(unittest.TestCase):
             paused_path = root / ".github/workflows/actions-housekeeping-cli.yml"
             paused_original = paused_path.read_text()
             paused_path.write_text(paused_original.replace(
-                "  workflow_dispatch:", "  pull_request:\\n  workflow_dispatch:", 1
-            ).replace("\\\\n", "\\n"))
+                "  workflow_dispatch:", "  pull_request:\n  workflow_dispatch:", 1
+            ))
             self.assertTrue(any("paused owner cleanup gained automatic trigger" in p
                                 for p in audit(root)))
             paused_path.write_text(paused_original)
