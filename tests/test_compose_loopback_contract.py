@@ -5,7 +5,19 @@ from pathlib import Path
 import re
 import unittest
 
-from tests.test_compose_local_bindings import EXPECTED, violations
+EXPECTED = {
+    "skeleton": '127.0.0.1:${SKELETON_PORT:-8010}:8001',
+    "backend": '127.0.0.1:${BACKEND_PORT:-8001}:8001',
+    "frontend": '127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}',
+    "mongo": '127.0.0.1:${MONGO_PORT:-27017}:27017',
+    "chroma": '127.0.0.1:${CHROMA_PORT:-8000}:8000',
+}
+
+
+def violations(source: str) -> list[str]:
+    """Independently ensure one exact host publication per governed service."""
+    return [name for name, expected in EXPECTED.items()
+            if source.count(f'"{expected}"') != 1]
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ROOT / "docker-compose.yml"
