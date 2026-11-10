@@ -135,6 +135,17 @@ def inspect(
         if not isinstance(jobs, list):
             reasons.append("exact_main_job_inventory_missing:" + name)
             continue
+        # A workflow-level pass does not confer authority on a job from an
+        # ancestor commit, another run, or a superseded retry attempt.
+        for job in jobs:
+            if (not isinstance(job, Mapping)
+                    or type(job.get("run_id")) is not int
+                    or job.get("run_id") != run_id
+                    or type(job.get("run_attempt")) is not int
+                    or job.get("run_attempt") != run["run_attempt"]
+                    or job.get("head_sha") != head):
+                reasons.append("exact_main_job_origin_mismatch:" + name)
+                break
         names: dict[str, Mapping[str, Any]] = {}
         duplicate_names = set()
         for job in jobs:
