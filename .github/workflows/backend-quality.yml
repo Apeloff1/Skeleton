@@ -14,6 +14,9 @@ on:
       - "scripts/quality-gates.sh"
       - "scripts/check_repository_python_sast.py"
       - "scripts/check_quality_gate_parity.py"
+      - "scripts/check_ci_workflow_tiers.py"
+      - "machine/ci_workflow_tiers.json"
+      - "tests/test_ci_workflow_tiers.py"
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -34,6 +37,9 @@ on:
       - "scripts/check_context_execution_boundary.py"
       - "scripts/check_instruction_policy_boundary.py"
       - "scripts/check_quality_gate_parity.py"
+      - "scripts/check_ci_workflow_tiers.py"
+      - "machine/ci_workflow_tiers.json"
+      - "tests/test_ci_workflow_tiers.py"
       - "scripts/check_repository_python_sast.py"
       - "scripts/container_digest_refresh.py"
       - "scripts/quality-gates.sh"
@@ -475,7 +481,12 @@ jobs:
       - name: Verify specialized CI tier contract
         if: steps.scope.outputs.full == 'true'
         working-directory: .
-        run: python scripts/check_ci_workflow_tiers.py
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: |
+          python scripts/check_ci_workflow_tiers.py
+          python -m pytest -q --noconftest tests/test_ci_workflow_tiers.py
       - name: GitHub Actions trigger-fanout audit
         if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_trigger_fanout.py

@@ -51,7 +51,7 @@ def _open_parent(path: Path) -> tuple[int, Path]:
     parent = _directory(path)
     if parent != path.parent.absolute():
         raise SaveSlotError("save parent must not contain symlinks")
-    if (not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY")
+    if (not hasattr(os, "supports_dir_fd") or not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY")
             or not all(fn in os.supports_dir_fd for fn in
                        (os.open, os.stat, os.rename, os.unlink))):
         raise SaveSlotError("descriptor-relative saves unavailable on this platform")

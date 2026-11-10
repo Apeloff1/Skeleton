@@ -70,7 +70,7 @@ class CampaignSaveModeTests(unittest.TestCase):
             self.assertFalse(slot.exists())
             code, _, error = invoke("inspect", "--save-slot", str(slot))
             self.assertEqual(code, 2)
-            self.assertIn("requires play or run", error)
+            self.assertIn("inspect does not accept", error)
 
     def test_invalid_save_does_not_publish(self):
         from skeleton.game.gameplay.offline_grid_save_slot import SaveSlotError, write_slot
@@ -81,6 +81,17 @@ class CampaignSaveModeTests(unittest.TestCase):
             with self.assertRaises(SaveSlotError):
                 write_slot(path, {"bad": object()})
             self.assertFalse(path.exists())
+
+    def test_descriptor_api_unavailable_never_creates_slot(self):
+        import os
+        from unittest.mock import patch
+        from skeleton.game.gameplay.offline_grid_save_slot import SaveSlotError, write_slot
+        with tempfile.TemporaryDirectory() as tmp:
+            slot = Path(tmp) / "slot.json"
+            with patch.object(os, "supports_dir_fd", frozenset()):
+                with self.assertRaisesRegex(SaveSlotError, "descriptor-relative"):
+                    write_slot(slot, {"tick": 1})
+            self.assertFalse(slot.exists())
 
 
 if __name__ == "__main__":
