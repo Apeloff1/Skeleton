@@ -18,6 +18,7 @@ import binascii
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import hashlib
+import ipaddress
 import json
 import math
 import os
@@ -172,7 +173,7 @@ def _positive_float(value: object, field: str, *, maximum: float) -> float:
 def _header_text(value: object, field: str, *, maximum: int) -> str:
     """Accept finite printable ASCII in delegated authority request headers."""
     text = _text(value, field, maximum=maximum)
-    if not text.isascii() or any(not 32 <= ord(ch) <= 126 for ch in text):
+    if not text.isascii() or any(not 33 <= ord(ch) <= 126 for ch in text):
         raise EngineProtocolError(f"{field} contains invalid HTTP header characters")
     return text
 
@@ -199,6 +200,61 @@ def _json_object(value: object, field: str) -> dict[str, Any]:
     return dict(value)
 
 
+def _engine_origin(raw: str) -> str:
+    """Resolve one strict authority, never a redirecting/path-bearing token sink.
+
+    This is trusted operator configuration, not general-purpose web crawling.
+    Reject userinfo, fragments, query, origin-relative escapes and ambiguous
+    host spellings before any internal service bearer token can be sent.
+    """
+    if not isinstance(raw, str) or raw != raw.strip() or len(raw) > 4096:
+        raise EngineProtocolError("engine base_url must be normalized")
+    if (
+        any(ord(ch) < 33 or ord(ch) > 126 for ch in raw)
+        or "\\" in raw or "?" in raw or "#" in raw
+    ):
+        raise EngineProtocolError("engine base_url contains forbidden URL characters")
+    try:
+        parts = urlsplit(raw)
+        scheme = parts.scheme.lower()
+        host = parts.hostname
+        port = parts.port
+    except ValueError as exc:
+        raise EngineProtocolError("engine base_url is invalid") from exc
+    if (
+        scheme not in {"http", "https"}
+        or not parts.netloc
+        or not host
+        or parts.username is not None or parts.password is not None
+        or parts.query or parts.fragment
+        or parts.path not in {"", "/"}
+        or "%" in parts.netloc
+        or "@" in parts.netloc
+    ):
+        raise EngineProtocolError("engine base_url must be an origin without credentials or paths")
+    if port is not None and not 1 <= port <= 65535:
+        raise EngineProtocolError("engine base_url port is invalid")
+    if ":" in host:
+        try:
+            address = ipaddress.IPv6Address(host)
+        except ValueError as exc:
+            raise EngineProtocolError("engine base_url IPv6 authority is invalid") from exc
+        authority = "[" + address.compressed + "]"
+    else:
+        if (
+            len(host) > 253
+            or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?", host)
+            or ".." in host
+            or any(label.startswith("-") or label.endswith("-") or len(label) > 63
+                   for label in host.split("."))
+        ):
+            raise EngineProtocolError("engine base_url host is invalid")
+        authority = host.lower()
+    if port is not None:
+        authority += ":" + str(port)
+    return scheme + "://" + authority
+
+
 @dataclass(frozen=True, slots=True)
 class EngineClientConfig:
     """Bounded application-side engine transport configuration."""
@@ -214,46 +270,8 @@ class EngineClientConfig:
     max_poll_attempts: int = 2400
 
     def __post_init__(self) -> None:
-        # Do not delegate the service token to a URI with userinfo, query,
-        # fragments, or a path that changes the canonical engine origin.
-        # URL parsers silently discard CR/LF/TAB: reject those first.
-        supplied = _text(self.base_url, "base_url", maximum=4096)
-        if (
-            any(ord(ch) <= 32 or ord(ch) == 127 for ch in supplied)
-            or "\\" in supplied
-        ):
-            raise EngineProtocolError("engine base_url contains forbidden characters")
-        try:
-            url = urlsplit(supplied)
-            port = url.port
-            host = url.hostname
-        except ValueError as exc:
-            raise EngineProtocolError("engine base_url authority is invalid") from exc
-        if (
-            url.scheme not in {"http", "https"}
-            or not url.netloc
-            or not host
-            or url.username is not None
-            or url.password is not None
-            or url.path not in {"", "/"}
-            or "?" in supplied
-            or "#" in supplied
-            or "%" in url.netloc
-            or "@" in url.netloc
-            or port == 0
-        ):
-            raise EngineProtocolError("engine base_url must be an absolute origin without credentials or path")
-        # Permit Docker single-label hosts and bracketed IPv6, but not
-        # authority labels that are ambiguous after IDNA normalization.
-        if (
-            not host.isascii()
-            or any(ch.isspace() for ch in host)
-            or host.startswith(".")
-            or host.endswith(".")
-            or ".." in host
-        ):
-            raise EngineProtocolError("engine base_url host is invalid")
-        object.__setattr__(self, "base_url", supplied.rstrip("/"))
+        base = _engine_origin(self.base_url)
+        object.__setattr__(self, "base_url", base)
         token = self.service_token
         if token is not None:
             if (
@@ -1150,7 +1168,7 @@ class EngineClient:
             # expand before the application can apply its response ceiling.
             "accept-encoding": "identity",
         }
-        if trace_id:
+        if trace_id is not None:
             headers["x-trace-id"] = _header_text(
                 trace_id,
                 "trace_id",

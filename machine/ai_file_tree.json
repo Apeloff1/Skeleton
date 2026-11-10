@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "d43b5584cf38e65ab22e67dc8788b45627f948f9",
+      "source_git_object_sha": "31db10ca81db97afc140ef8dfa7062bf76ce89b7",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -735,7 +735,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "0c4c6b06b32c10df770c978606f1c914359c8135",
+      "source_git_object_sha": "210885ccab579802f44bd6ba1dbb69a2b47af6e8",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "b16f256487e8c13b1f3cc97fa61777e8926a1d97",
+      "source_git_object_sha": "5cd3cb340b5597a6f6e9e97491a353d474fd4c7b",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1544,7 +1544,7 @@
       "source": "skeleton/native",
       "destination": "skeleton/ai/runtime/native",
       "kind": "tree",
-      "source_git_object_sha": "715c1deb0a549d5e60992e6793b6d30b7d2c6e33",
+      "source_git_object_sha": "d5b2f3205175fa2344d66ea191735cf29d9f5ae7",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
         "VOL-032",
@@ -1681,7 +1681,7 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "24344e2d1d147ede201f7b780b50c8525b2c2430",
+      "source_git_object_sha": "6a5b9f465d8ee295492a734232d63fba923f66e9",
       "role": "Incremental build graph, resource-bounded parallel scheduling, deterministic asset invalidation, build observability, release/remote build controls, and network audit support autonomous AI work.",
       "work_package_refs": [
         "WP-W27",
@@ -5027,7 +5027,7 @@
       "source": "backend/gameforge/knowledge",
       "destination": "skeleton/ai/research/legacy/gameforge/knowledge",
       "kind": "tree",
-      "source_git_object_sha": "99ae29925580ed6cc8715bbcafb9a386ce696256",
+      "source_git_object_sha": "e746337edcead75de6741dc9105ad8a28314ceb2",
       "role": "Legacy knowledge/free-API ingestion retained as untrusted research evidence.",
       "work_package_refs": [
         "WP-W08",
