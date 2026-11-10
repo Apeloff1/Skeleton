@@ -97,11 +97,41 @@ def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
             linked = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False)
             fields = ("st_dev", "st_ino", "st_mode", "st_nlink",
                       "st_size", "st_mtime_ns", "st_ctime_ns")
-            identity = lambda s: tuple(getattr(s, name) for name in fields)
+
+            def identity(info: os.stat_result) -> tuple[int, ...]:
+                return tuple(getattr(info, name) for name in fields)
+
             if (size != before.st_size or identity(before) != identity(after)
                     or identity(after) != identity(linked)
                     or not stat.S_ISREG(linked.st_mode) or linked.st_nlink != 1):
                 raise ValueError("artifact changed or path replaced during digest")
+            # The original parent fd can continue referencing a detached
+            # directory after an ancestor path swap. Rewalk the complete
+            # root/relative parent chain with O_NOFOLLOW and prove it still
+            # reaches that same directory, then revalidate the leaf identity.
+            # A digest of an orphaned inode is NOT proof of the current path.
+            current_fd = os.open("/", dflags)
+            try:
+                try:
+                    for component in absolute_root.parts[1:] + parts[:-1]:
+                        nxt = os.open(component, dflags, dir_fd=current_fd)
+                        os.close(current_fd)
+                        current_fd = nxt
+                    current_parent = os.fstat(current_fd)
+                    held_parent = os.fstat(fd)
+                    if (current_parent.st_dev, current_parent.st_ino) != (
+                        held_parent.st_dev, held_parent.st_ino
+                    ):
+                        raise ValueError("artifact ancestor path replaced during digest")
+                    current_leaf = os.stat(
+                        parts[-1], dir_fd=current_fd, follow_symlinks=False,
+                    )
+                except OSError as exc:
+                    raise ValueError("artifact ancestor path changed during digest") from exc
+                if identity(after) != identity(current_leaf):
+                    raise ValueError("artifact path replaced during digest")
+            finally:
+                os.close(current_fd)
             return digest.hexdigest(), size
         finally:
             os.close(file_fd)
@@ -109,32 +139,61 @@ def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
         os.close(fd)
 
 
+MAX_SOURCE_ENTRIES = 2 * MAX_SOURCE_FILES
+
+
 def tree_digest(root: Path) -> str:
-    """Order-independent bounded source digest; refuse linked and special files."""
+    """Bound directory traversal before sorting, then hash canonical paths.
+
+    sorted(root.rglob("*")) used to enumerate the *entire* source tree before
+    checking MAX_SOURCE_FILES, allowing huge untrusted directories to exhaust
+    memory. An iterative scandir walk bounds every admitted entry, prunes
+    ignored directories, rejects links and special files, and sorts only the
+    bounded set of verified source path digests.
+    """
     root = Path(root)
     if root.is_symlink():
         raise ValueError("symlink project source root cannot be certified")
-    h = hashlib.sha256()
-    count = total = 0
-    for p in sorted(root.rglob("*")):
-        rel = p.relative_to(root)
-        if any(part in IGNORED_DIRS for part in rel.parts):
-            continue
-        if p.is_symlink():
-            raise ValueError("symlink or linked project source cannot be certified")
-        if p.is_dir():
-            continue
-        if not p.is_file():
-            raise ValueError("special project source cannot be certified")
-        count += 1
-        if count > MAX_SOURCE_FILES:
-            raise ValueError("source file budget exceeded")
-        digest, size = _digest_beneath(root, rel.as_posix())
-        total += size
-        if total > MAX_SOURCE_BYTES:
-            raise ValueError("source size budget exceeded")
-        h.update(rel.as_posix().encode() + b"\0" + digest.encode() + b"\n")
-    return h.hexdigest()
+    initial = os.stat(root, follow_symlinks=False)
+    if not stat.S_ISDIR(initial.st_mode):
+        raise ValueError("project source root must be a directory")
+    pending = [root]
+    seen = count = total = 0
+    source_digests: list[tuple[str, str]] = []
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                rel = Path(entry.path).relative_to(root)
+                if any(part in IGNORED_DIRS for part in rel.parts):
+                    continue
+                seen += 1
+                if seen > MAX_SOURCE_ENTRIES:
+                    raise ValueError("source tree entry budget exceeded")
+                if entry.is_symlink():
+                    raise ValueError("symlink or linked project source cannot be certified")
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(Path(entry.path))
+                    continue
+                if not entry.is_file(follow_symlinks=False):
+                    raise ValueError("special project source cannot be certified")
+                count += 1
+                if count > MAX_SOURCE_FILES:
+                    raise ValueError("source file budget exceeded")
+                relative = rel.as_posix()
+                digest, size = _digest_beneath(root, relative)
+                total += size
+                if total > MAX_SOURCE_BYTES:
+                    raise ValueError("source size budget exceeded")
+                source_digests.append((relative, digest))
+    end = os.stat(root, follow_symlinks=False)
+    if ((initial.st_dev, initial.st_ino) != (end.st_dev, end.st_ino)
+            or not stat.S_ISDIR(end.st_mode)):
+        raise ValueError("source root changed during tree digest")
+    result = hashlib.sha256()
+    for relative, digest in sorted(source_digests):
+        result.update(relative.encode() + b"\0" + digest.encode() + b"\n")
+    return result.hexdigest()
 
 
 def git_head(root: Path) -> str | None:
