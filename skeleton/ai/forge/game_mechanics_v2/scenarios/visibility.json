@@ -1,0 +1,55 @@
+{
+  "schema": "skeleton.game_mechanic_scenario.v1",
+  "name": "visibility",
+  "domain": "world",
+  "initial": 61,
+  "capacity": 130,
+  "events": [
+    {
+      "id": "visibility:gain:1",
+      "action": "gain",
+      "amount": 11,
+      "tick": 1
+    },
+    {
+      "id": "visibility:spend:2",
+      "action": "spend",
+      "amount": 11,
+      "tick": 2
+    },
+    {
+      "id": "visibility:recover:3",
+      "action": "recover",
+      "amount": 2,
+      "tick": 3
+    },
+    {
+      "id": "visibility:observe:4",
+      "action": "observe",
+      "amount": 0,
+      "tick": 4
+    },
+    {
+      "id": "visibility:decay:5",
+      "action": "decay",
+      "amount": 3,
+      "tick": 5
+    }
+  ],
+  "assertions": {
+    "bounds": [
+      0,
+      130
+    ],
+    "accepted_receipts": 5,
+    "duplicate_receipts_change_state": false,
+    "stable_ordering": true,
+    "no_authorization_side_effects": true
+  },
+  "notes": [
+    "Designed for world simulation with bounded intensity units.",
+    "Event IDs carry replay identity within a world instance.",
+    "Timestamps are logical ticks, not wall-clock time.",
+    "This fixture is synthetic and does not claim gameplay/device qualification."
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.skeleton.local/questflows/exploration_landmark_discovery.json",
+  "title": "landmark discovery quest event",
+  "description": "Four-stage exploration workflow with optimistic version fencing and mandatory per-stage evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "action",
+    "expected_version",
+    "evidence"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "action": {
+      "enum": [
+        "advance",
+        "abandon",
+        "inspect"
+      ],
+      "type": "string"
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    }
+  },
+  "$comment": "Request schema is advisory; Python transition code is the fail-closed authority for event state and version fencing."
+}

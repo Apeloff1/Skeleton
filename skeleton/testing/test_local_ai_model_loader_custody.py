@@ -78,3 +78,30 @@ class ModelLoaderCustodyTests(unittest.TestCase):
         os.link(self.path, link)
         with self.assertRaises(ValueError):
             self.qualify()
+
+    def test_compat_constructor_requires_explicit_license(self):
+        loader = ModelLoader(str(self.path), expected_sha256=self.sha,
+                             license_accepted=True)
+        self.assertEqual(loader.load("c" * 32)["digest"], self.sha)
+        self.assertFalse(loader.verify(self.sha))
+        with self.assertRaises(PermissionError):
+            ModelLoader(str(self.path), expected_sha256=self.sha).load("c" * 32)
+
+    @unittest.skipUnless(os.name == "posix" and hasattr(os, "O_NOFOLLOW"),
+                         "requires descriptor-relative no-follow support")
+    def test_parent_symlink_is_never_followed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            physical = Path(tmp) / "physical"
+            physical.mkdir()
+            (physical / "model.gguf").write_bytes(self.data)
+            linked = Path(tmp) / "alias"
+            linked.symlink_to(physical, target_is_directory=True)
+            with self.assertRaises(OSError):
+                self.qualify(ModelLoader(str(linked / "model.gguf")))
+
+    def test_model_budget_does_not_claim_success(self):
+        with self.assertRaises(ValueError):
+            self.qualify(max_bytes=24)
+        with self.assertRaises(ValueError):
+            ModelLoader(str(self.path), expected_sha256=self.sha,
+                        license_accepted=True, max_bytes=23).load("c" * 32)
