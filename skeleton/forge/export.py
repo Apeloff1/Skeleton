@@ -24,12 +24,12 @@ import os
 import sys
 import math
 import stat
-import hashlib
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from skeleton.forge.playtest import _run, resolve_binary, scan_log
+from skeleton.godot_export.provenance import _digest_beneath
 
 PRESET_OUTPUTS: Dict[str, str] = {
     "Linux": "linux/game.x86_64",
@@ -39,32 +39,76 @@ PRESET_OUTPUTS: Dict[str, str] = {
 DEFAULT_TIMEOUT_S = 300.0
 MAX_OUTPUT_BYTES = 2 * 1024 * 1024 * 1024
 MAX_OUTPUT_FILES = 64
+MAX_REPORT_BYTES = 4 * 1024 * 1024
 
 
-def _safe_directory(path: Path) -> Path:
-    """Walk through directories without following existing symlinks.
-
-    The resulting output tree must be private to the current build worker:
-    this guard is not a substitute for an adversarial concurrent-filesystem
-    sandbox. No output target may already exist.
-    """
-    if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+def _open_directory(path: Path) -> tuple[Path, int]:
+    """Create or open each directory relative to a no-follow parent fd."""
+    if (os.name != "posix"
+            or not hasattr(os, "O_NOFOLLOW")
+            or not hasattr(os, "O_DIRECTORY")
+            or not hasattr(os, "supports_dir_fd")
+            or not all(fn in os.supports_dir_fd for fn in
+                       (os.open, os.mkdir, os.unlink))):
         raise ValueError("native Godot exporter requires POSIX no-follow directory custody")
     target = Path(os.path.abspath(path))
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     fd = os.open("/", flags)
     try:
-        for part in target.parts[1:]:
+        for component in target.parts[1:]:
             try:
-                os.mkdir(part, mode=0o700, dir_fd=fd)
+                os.mkdir(component, mode=0o700, dir_fd=fd)
             except FileExistsError:
                 pass
-            child = os.open(part, flags, dir_fd=fd)
+            child = os.open(component, flags, dir_fd=fd)
             os.close(fd)
             fd = child
-    finally:
+        return target, fd
+    except BaseException:
         os.close(fd)
+        raise
+
+
+def _safe_directory(path: Path) -> Path:
+    """Prepare a no-follow directory; this is not an OS sandbox."""
+    target, dfd = _open_directory(path)
+    os.close(dfd)
     return target
+
+
+def _write_report_new(path: Path, text: str) -> None:
+    """Publish a bounded text receipt without following or clobbering paths."""
+    if type(text) is not str:
+        raise ValueError("report must be textual JSON")
+    data = text.encode("utf-8")
+    if len(data) > MAX_REPORT_BYTES:
+        raise ValueError("report byte budget exceeded")
+    path = Path(path)
+    if path.name in ("", ".", ".."):
+        raise ValueError("invalid report filename")
+    _, dfd = _open_directory(path.parent)
+    created = False
+    try:
+        fd = os.open(
+            path.name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+            | getattr(os, "O_CLOEXEC", 0),
+            0o600,
+            dir_fd=dfd,
+        )
+        created = True
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.fsync(dfd)
+        except BaseException:
+            if created:
+                os.unlink(path.name, dir_fd=dfd)
+            raise
+    finally:
+        os.close(dfd)
 
 
 def _regular_output(path: Path) -> bool:
@@ -77,44 +121,19 @@ def _regular_output(path: Path) -> bool:
 
 
 def _artifact_digest(path: Path) -> str:
+    """Digest output through no-follow ancestors, not a path-only open.
+
+    The shared provenance primitive re-anchors the parent after streaming,
+    verifies the current leaf, and allows the export's explicit 2 GiB cap.
+    """
     if not _regular_output(path):
         raise ValueError("unsafe or oversized native artifact")
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-    try:
-        st = os.fstat(fd)
-        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or not 0 < st.st_size <= MAX_OUTPUT_BYTES:
-            raise ValueError("artifact identity changed during no-follow inspection")
-        size = 0
-        hasher = hashlib.sha256()
-        while True:
-            chunk = os.read(fd, min(1 << 20, MAX_OUTPUT_BYTES - size + 1))
-            if not chunk:
-                break
-            size += len(chunk)
-            if size > MAX_OUTPUT_BYTES:
-                raise ValueError("artifact exceeded byte cap during hashing")
-            hasher.update(chunk)
-        if size != st.st_size:
-            raise ValueError("artifact changed while hashing")
-        # A same-byte-count rewrite can otherwise produce a plausible but
-        # unowned digest. Refuse changes to the opened inode during streaming
-        # and refuse path replacement between open and receipt publication.
-        after = os.fstat(fd)
-        fields = ("st_dev", "st_ino", "st_mode", "st_nlink", "st_size",
-                  "st_mtime_ns", "st_ctime_ns")
-        if any(getattr(after, name) != getattr(st, name) for name in fields):
-            raise ValueError("artifact changed during hashing")
-        try:
-            linked = path.lstat()
-        except OSError as exc:
-            raise ValueError("artifact disappeared during hashing") from exc
-        if (not stat.S_ISREG(linked.st_mode) or linked.st_nlink != 1
-                or any(getattr(linked, name) != getattr(after, name)
-                       for name in fields)):
-            raise ValueError("artifact path replaced during hashing")
-        return hasher.hexdigest()
-    finally:
-        os.close(fd)
+    digest, size = _digest_beneath(
+        Path(path).parent, Path(path).name, max_bytes=MAX_OUTPUT_BYTES,
+    )
+    if not 0 < size <= MAX_OUTPUT_BYTES:
+        raise ValueError("unsafe or empty native artifact")
+    return digest
 
 
 def _boot_exported(executable: Path, frames: int, timeout: float) -> Dict[str, Any]:
@@ -199,8 +218,17 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
             entry["ok"] = code == 0 and _regular_output(target) and not timed_out
             if not entry["ok"]:
                 entry["reason"] = "export-failed"
-        artefacts = sorted(parent.iterdir())
-        if len(artefacts) > MAX_OUTPUT_FILES or any(not _regular_output(item) for item in artefacts):
+        # A huge output directory must not be fully enumerated and sorted.
+        artefacts: list[Path] = []
+        too_many = False
+        with os.scandir(parent) as entries:
+            for item in entries:
+                if len(artefacts) == MAX_OUTPUT_FILES:
+                    too_many = True
+                    break
+                artefacts.append(Path(item.path))
+        artefacts.sort()
+        if too_many or any(not _regular_output(item) for item in artefacts):
             entry["ok"], entry["reason"] = False, "unsafe-or-unbounded-artifacts"
             artefacts = []
         entry["artefacts"] = [str(item.relative_to(out)) for item in artefacts]
@@ -243,8 +271,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     result["era"] = args.era
     text = json.dumps(result, indent=2, default=str)
     if args.report:
-        Path(args.report).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.report).write_text(text, encoding="utf-8")
+        _write_report_new(Path(args.report), text)
     summary = {k: result.get(k) for k in ("era", "status", "binary_source", "verified")}
     summary["presets"] = {k: {"ok": v.get("ok"), "reason": v.get("reason"), "bytes": v.get("bytes")}
                           for k, v in result.get("presets", {}).items()}
