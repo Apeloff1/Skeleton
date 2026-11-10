@@ -311,7 +311,11 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
                 entry["ok"], entry["reason"] = False, "unsafe-or-unbounded-artifacts"
                 artefacts = []
             entry["artefacts"] = [str(item.relative_to(out)) for item in artefacts]
-            entry["bytes"] = sum(item.lstat().st_size for item in artefacts)
+            # Preserve the exact listed inode and metadata for each artifact.
+            # A later hash of a substituted same-name file is NOT evidence
+            # that the exporter produced the original discovered inventory.
+            listed = {item: item.lstat() for item in artefacts}
+            entry["bytes"] = sum(info.st_size for info in listed.values())
             entry["sha256"] = {}
             # A per-artifact bound alone could admit 64 × 2 GiB across multiple
             # presets. Count the whole invocation before hashing expensive output
@@ -331,12 +335,34 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
             cumulative_output_bytes += entry["bytes"]
             if entry["ok"]:
                 try:
-                    entry["sha256"] = {str(item.relative_to(out)): _artifact_digest(item)
-                                       for item in artefacts}
+                    receipts: dict[str, str] = {}
+                    verified_bytes = 0
+                    fields = (
+                        "st_dev", "st_ino", "st_mode", "st_nlink",
+                        "st_size", "st_mtime_ns", "st_ctime_ns",
+                    )
+                    for item in artefacts:
+                        digest = _artifact_digest(item)
+                        _verify_report_parent(parent, output_dfd)
+                        after_hash = item.lstat()
+                        if any(
+                            getattr(listed[item], field) != getattr(after_hash, field)
+                            for field in fields
+                        ):
+                            raise ValueError("artifact identity changed after inventory")
+                        verified_bytes += after_hash.st_size
+                        if verified_bytes > MAX_EXPORT_TOTAL_BYTES - (
+                            cumulative_output_bytes - entry["bytes"]
+                        ):
+                            raise ValueError("artifact byte budget exceeded during hashing")
+                        receipts[str(item.relative_to(out))] = digest
+                    if verified_bytes != entry["bytes"]:
+                        raise ValueError("artifact byte inventory changed during hashing")
                     if preset == "Linux" and not _regular_output(target.with_suffix(".pck")):
                         raise ValueError("missing Linux game resource pack")
                     if preset == "Web" and not _regular_output(target.with_suffix(".wasm")):
                         raise ValueError("missing Web engine WASM payload")
+                    entry["sha256"] = receipts
                 except (OSError, ValueError):
                     entry["ok"], entry["reason"] = False, "artifact-custody-failed"
             _verify_report_parent(parent, output_dfd)
