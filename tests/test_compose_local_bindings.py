@@ -1,67 +1,104 @@
-"""Fail-closed local host publishing contract for the canonical Compose app.
+"""Source-only Docker Compose admission tests for five bound consumer services.
 
-Run with: python -m unittest tests.test_compose_local_bindings
-No Docker daemon, network, or credentials are required.
+These tests inspect the shipped Compose declaration, not a fake container or
+host network. They prevent accidental public bind defaults and preserve setup
+availability while retaining explicit operator port and origin overrides.
 """
+from __future__ import annotations
+
 from pathlib import Path
 import re
 import unittest
 
-COMPOSE = Path(__file__).resolve().parents[1] / "docker-compose.yml"
-PORTS = {
-    "skeleton": ("SKELETON_BIND_HOST", "SKELETON_PORT", "8010", "8001"),
-    "backend": ("BACKEND_BIND_HOST", "BACKEND_PORT", "8001", "8001"),
-    "frontend": ("FRONTEND_BIND_HOST", "FRONTEND_PORT", "3000", "${FRONTEND_CONTAINER_PORT:-3000}"),
+ROOT = Path(__file__).resolve().parents[1]
+COMPOSE = ROOT / "docker-compose.yml"
+EXPECTED = {
+    "skeleton": '127.0.0.1:${SKELETON_PORT:-8010}:8001',
+    "backend": '127.0.0.1:${BACKEND_PORT:-8001}:8001',
+    "frontend": '127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}',
+    "mongo": '127.0.0.1:${MONGO_PORT:-27017}:27017',
+    "chroma": '127.0.0.1:${CHROMA_PORT:-8000}:8000',
 }
+CORS = ('CORS_ORIGINS=${CORS_ORIGINS:-'
+        'http://localhost:${FRONTEND_PORT:-3000},'
+        'http://127.0.0.1:${FRONTEND_PORT:-3000}}')
 
 
-def published_ports(text: str) -> dict[str, str]:
-    """Inspect service-level port bindings, not comments or environment URLs."""
-    result = {}
+def published_ports(source: str) -> dict[str, list[str]]:
+    """Inspect service-level ports, ignoring URLs and comments."""
+    result: dict[str, list[str]] = {}
     current = None
     in_ports = False
-    for line in text.splitlines():
-        service = re.match(r"^  ([a-z][a-z0-9_-]*):\s*$", line)
+    for line in source.splitlines():
+        service = re.fullmatch(r"  ([a-z][a-z0-9_-]*):", line)
         if service:
-            current, in_ports = service.group(1), False
-        elif re.match(r"^    [a-z_]+:", line):
+            current = service.group(1)
+            in_ports = False
+            continue
+        if current and re.match(r"^    [a-z_]+:", line):
             in_ports = line.strip() == "ports:"
-        elif in_ports and current and re.match(r'^      - "', line):
-            result[current] = line.strip()[3:-1]
+            continue
+        if in_ports and current and re.fullmatch(r'      - "([^"]+)"', line):
+            result.setdefault(current, []).append(line.strip()[3:-1])
     return result
 
 
-class ComposeLocalBindingsTests(unittest.TestCase):
-    def test_default_app_services_are_loopback_only(self):
-        ports = published_ports(COMPOSE.read_text(encoding="utf-8"))
-        for service, (bind, host_port, default_port, container_port) in PORTS.items():
-            with self.subTest(service=service):
-                self.assertEqual(
-                    ports[service],
-                    f"${{{bind}:-127.0.0.1}}:${{{host_port}:-{default_port}}}:{container_port}",
-                )
+def violations(source: str) -> list[str]:
+    actual = published_ports(source)
+    return [f"{service}: unsafe or changed host publication"
+            for service, expected in EXPECTED.items()
+            if actual.get(service) != [expected]]
 
-    def test_unbound_or_public_default_regression_is_rejected(self):
-        original = COMPOSE.read_text(encoding="utf-8")
-        for service, (bind, host_port, default_port, container_port) in PORTS.items():
-            with self.subTest(service=service):
-                original_line = f'"${{{bind}:-127.0.0.1}}:${{{host_port}:-{default_port}}}:{container_port}"'
-                for replacement in (
-                    f'"${{{host_port}:-{default_port}}}:{container_port}"',
-                    f'"0.0.0.0:${{{host_port}:-{default_port}}}:{container_port}"',
-                ):
-                    mutated = original.replace(original_line, replacement)
-                    self.assertNotEqual(mutated, original)
-                    self.assertNotEqual(
-                        published_ports(mutated)[service],
-                        published_ports(original)[service],
+
+class LocalComposePortsTests(unittest.TestCase):
+    def test_exact_loopback_for_all_host_published_services(self):
+        source = COMPOSE.read_text(encoding="utf-8")
+        self.assertEqual(violations(source), [])
+        self.assertTrue(set(EXPECTED).issubset(published_ports(source)))
+
+    def test_public_or_unqualified_mutations_are_detected(self):
+        source = COMPOSE.read_text(encoding="utf-8")
+        for service, expected in EXPECTED.items():
+            for mutant in (
+                expected.replace("127.0.0.1:", "", 1),
+                expected.replace("127.0.0.1:", "0.0.0.0:", 1),
+                expected.replace("127.0.0.1:", "${HOST_BIND:-127.0.0.1}:", 1),
+            ):
+                with self.subTest(service=service, mutant=mutant):
+                    modified = source.replace(f'"{expected}"', f'"{mutant}"', 1)
+                    self.assertNotEqual(modified, source)
+                    self.assertIn(
+                        f"{service}: unsafe or changed host publication",
+                        violations(modified),
                     )
 
-    def test_setup_frontend_has_no_backend_or_engine_dependency(self):
-        text = COMPOSE.read_text(encoding="utf-8")
-        frontend = text.split("\n  frontend:\n", 1)[1].split("\n  mongo:\n", 1)[0]
-        self.assertNotIn("    depends_on:", frontend)
-        self.assertIn("    networks:", frontend)
+    def test_frontend_setup_starts_without_healthy_backend_dependency(self):
+        source = COMPOSE.read_text(encoding="utf-8")
+        self.assertIn("\n  frontend:\n", source)
+        frontend = source.split("\n  frontend:\n", 1)[1].split("\n  mongo:\n", 1)[0]
+        self.assertNotIn("\n    depends_on:", frontend)
+        self.assertIn("\n    networks:", frontend)
+
+    def test_public_browser_urls_track_selected_published_ports(self):
+        source = COMPOSE.read_text(encoding="utf-8")
+        self.assertIn(CORS, source)
+        self.assertIn(
+            'EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}',
+            source,
+        )
+        self.assertIn(
+            'EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:${SKELETON_PORT:-8010}}',
+            source,
+        )
+
+    def test_operator_cors_policy_can_override_without_exposing_bind_address(self):
+        source = COMPOSE.read_text(encoding="utf-8")
+        self.assertIn('CORS_ORIGINS=${CORS_ORIGINS:-', source)
+        for published in published_ports(source).values():
+            for port in published:
+                self.assertNotIn("_BIND_HOST", port)
+                self.assertNotIn("_BIND_ADDRESS", port)
+                self.assertTrue(port.startswith("127.0.0.1:"), port)
 
 
 if __name__ == "__main__":

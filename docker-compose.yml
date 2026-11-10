@@ -15,6 +15,8 @@
 
 services:
   # ==========================================================================
+  # Local first-install APIs are loopback-only. Remote access requires an
+  # independently authenticated TLS ingress, never an implicit 0.0.0.0 bind.
   # Skeleton API (hexagonal v16 rewrite)
   # ==========================================================================
   skeleton:
@@ -30,10 +32,8 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
-    # Local-first default: exposing this unauthenticated listener to a LAN
-    # requires an explicit operator-selected bind address and separate review.
     ports:
-      - "${SKELETON_BIND_HOST:-127.0.0.1}:${SKELETON_PORT:-8010}:8001"
+      - "127.0.0.1:${SKELETON_PORT:-8010}:8001"
     environment:
       - SKL_ENVIRONMENT=${ENVIRONMENT:-development}
       - SKL_MONGO_URI=${SKL_MONGO_URI:?SKL_MONGO_URI must be set to an authenticated MongoDB URI}
@@ -117,7 +117,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
     ports:
-      - "${BACKEND_BIND_HOST:-127.0.0.1}:${BACKEND_PORT:-8001}:8001"
+      - "127.0.0.1:${BACKEND_PORT:-8001}:8001"
     environment:
       - MONGO_URL=${MONGO_URL:?MONGO_URL must be set to an authenticated MongoDB URI}
       - DB_NAME=${DB_NAME:-tutolage}
@@ -125,7 +125,9 @@ services:
       # Explicit trusted browser origin; never build share links from Host headers.
       - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost:${FRONTEND_PORT:-3000}}
       - DEBUG=${DEBUG:-false}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      # Keep browser admission aligned with the published frontend port. A
+      # tester may need a non-default port when another local app owns 3000.
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-3000},http://127.0.0.1:${FRONTEND_PORT:-3000}}
       # Runtime model-provider credentials are engine-owned after Stage-5 cutover.
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a high-entropy value}
       - GAMEFORGE_JWT_SECRET=${GAMEFORGE_JWT_SECRET:?GAMEFORGE_JWT_SECRET must be set; run app setup}
@@ -181,7 +183,7 @@ services:
     container_name: tutolage-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_BIND_HOST:-127.0.0.1}:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
     environment:
       # EXPO_PUBLIC_* values are embedded into the browser bundle, so they
       # must be host-resolvable rather than Docker-internal service names.
