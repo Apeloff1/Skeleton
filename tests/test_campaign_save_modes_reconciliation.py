@@ -94,5 +94,20 @@ class CampaignSaveModeTests(unittest.TestCase):
             self.assertFalse(slot.exists())
 
 
+    def test_oversized_snapshot_preserves_last_committed_slot(self):
+        from skeleton.game.gameplay.offline_grid_save_slot import (
+            MAX_SAVE_BYTES, SaveSlotError, write_slot,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            slot = Path(tmp) / "checkpoint.json"
+            write_slot(slot, {"tick": 7})
+            durable = slot.read_bytes()
+            with self.assertRaisesRegex(SaveSlotError, "byte budget"):
+                write_slot(slot, {"payload": "x" * MAX_SAVE_BYTES})
+            self.assertEqual(slot.read_bytes(), durable)
+            self.assertEqual(read_slot(slot), {"tick": 7})
+            self.assertEqual(list(Path(tmp).glob(".campaign-*.tmp")), [])
+
+
 if __name__ == "__main__":
     unittest.main()
