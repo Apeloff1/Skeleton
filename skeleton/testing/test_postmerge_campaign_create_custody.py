@@ -7,6 +7,7 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -20,6 +21,7 @@ from skeleton.game.gameplay.offline_grid_save_slot import (
 
 SUPPORTS = (
     os.name == "posix"
+    and (sys.platform.startswith("linux") or sys.platform == "darwin")
     and hasattr(os, "O_DIRECTORY")
     and hasattr(os, "O_NOFOLLOW")
     and hasattr(os, "supports_dir_fd")
