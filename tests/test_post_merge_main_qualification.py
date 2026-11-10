@@ -22,7 +22,7 @@ def fixture():
         "protection": {
             "required_status_checks": {
                 "enforcement_level": "everyone",
-                "contexts": list(ESSENTIAL_JOBS),
+                "contexts": [job for group in ESSENTIAL_JOBS.values() for job in group],
                 "checks": [],
             }
         },
@@ -100,9 +100,9 @@ class ExactMainEvidenceTests(unittest.TestCase):
     def test_missing_required_context_blocks_independent_of_success(self):
         data = fixture()
         contexts = data["branch_after"]["protection"]["required_status_checks"]["contexts"]
-        contexts.remove("App Foundation E2E")
+        contexts.remove("App Foundation E2E (stack + Playwright)")
         result = verify(data)
-        self.assertIn("main_required_check_not_configured:App Foundation E2E",
+        self.assertIn("main_required_check_not_configured:App Foundation E2E:App Foundation E2E (stack + Playwright)",
                       result["blocking_reasons"])
 
     def test_protection_detail_cannot_be_omitted_or_approximated(self):
@@ -135,6 +135,24 @@ class ExactMainEvidenceTests(unittest.TestCase):
                 data = fixture()
                 data["protection_detail"][key] = value
                 self.assertIn(reason, verify(data)["blocking_reasons"])
+
+    def test_workflow_titles_are_not_valid_required_status_contexts(self):
+        data = fixture()
+        for scope in ("branch_before", "branch_after"):
+            data[scope]["protection"]["required_status_checks"]["contexts"] = list(
+                ESSENTIAL_JOBS,
+            )
+        findings = verify(data)["blocking_reasons"]
+        self.assertIn(
+            "main_required_check_not_configured:"
+            "App Foundation E2E:App Foundation E2E (stack + Playwright)",
+            findings,
+        )
+        self.assertIn(
+            "main_required_check_not_configured:"
+            "Workflow Input Security:Workflow input shell boundary",
+            findings,
+        )
 
     def test_pending_cancelled_skipped_and_failed_are_all_blocks(self):
         for status, conclusion in [
