@@ -83,6 +83,7 @@ def inspect(
     branch_after: Mapping[str, Any],
     runs: Sequence[Mapping[str, Any]],
     jobs_by_run: Mapping[str, Sequence[Mapping[str, Any]]],
+    protection_detail: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Produce an auditable, fail-closed report with deterministic reasons."""
     if not isinstance(head, str) or SHA.fullmatch(head) is None:
@@ -116,6 +117,26 @@ def inspect(
                         checks.add(item["context"])
     if enforcement != "everyone":
         reasons.append("main_required_checks_not_enforced_for_everyone")
+    if not isinstance(protection_detail, Mapping):
+        reasons.append("main_protection_detail_unverified")
+    else:
+        admins = protection_detail.get("enforce_admins")
+        reviews = protection_detail.get("required_pull_request_reviews")
+        strict_status = protection_detail.get("required_status_checks")
+        if not isinstance(admins, Mapping) or admins.get("enabled") is not True:
+            reasons.append("main_admin_bypass_not_fenced")
+        if (not isinstance(reviews, Mapping)
+                or type(reviews.get("required_approving_review_count")) is not int
+                or reviews["required_approving_review_count"] < 1):
+            reasons.append("main_independent_review_not_required")
+        elif reviews.get("dismiss_stale_reviews") is not True:
+            reasons.append("main_stale_review_dismissal_missing")
+        if not isinstance(strict_status, Mapping) or strict_status.get("strict") is not True:
+            reasons.append("main_up_to_date_required_status_checks_missing")
+        conversations = protection_detail.get("required_conversation_resolution")
+        if (not isinstance(conversations, Mapping)
+                or conversations.get("enabled") is not True):
+            reasons.append("main_conversation_resolution_not_required")
     for name in ESSENTIAL_JOBS:
         if name not in checks:
             reasons.append("main_required_check_not_configured:" + name)
@@ -283,10 +304,15 @@ def live_snapshot(repo: str, head: str | None = None) -> dict[str, Any]:
             repo, "/actions/runs/" + str(run_id) + "/jobs",
             "jobs", token,
         )
+    # /branches/main is an abbreviated projection: it cannot establish
+    # enforce_admins, review policy, up-to-date status or conversation fencing.
+    # Missing credentials, 404 and forbidden policy reads must fail closed.
+    protection_detail = _get_json(repo, "/branches/main/protection", token)
     after = _get_json(repo, "/branches/main", token)
     return {
         "head": expected, "branch_before": before, "branch_after": after,
         "runs": runs, "jobs_by_run": jobs_by_run,
+        "protection_detail": protection_detail,
     }
 
 
