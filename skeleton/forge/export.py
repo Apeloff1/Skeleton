@@ -205,6 +205,10 @@ def _artifact_digest(path: Path) -> str:
     return _artifact_evidence(path)[0]
 
 def _boot_exported(executable: Path, frames: int, timeout: float) -> Dict[str, Any]:
+    # The boot command still runs by pathname (Godot process semantics), so
+    # digest the original image and revalidate after execution. A replaced
+    # or rewritten binary must not produce a valid playability receipt.
+    before, size = _artifact_evidence(executable)
     if not _regular_output(executable):
         raise ValueError("unsafe or missing Linux executable")
     os.chmod(executable, 0o755, follow_symlinks=False)
@@ -214,6 +218,12 @@ def _boot_exported(executable: Path, frames: int, timeout: float) -> Dict[str, A
     errors = scan_log(log)
     if timed_out:
         errors.append(f"boot timed out after {timeout:.0f}s")
+    try:
+        after, observed_size = _artifact_evidence(executable)
+        if before != after or observed_size != size:
+            errors.append("exported executable changed during boot")
+    except (OSError, ValueError):
+        errors.append("exported executable custody lost during boot")
     return {
         "returncode": code,
         "timed_out": timed_out,
