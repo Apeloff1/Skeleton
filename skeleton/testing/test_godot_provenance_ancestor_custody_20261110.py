@@ -414,6 +414,7 @@ def test_cli_verify_fails_closed_on_oversized_manifest(tmp_path, capsys):
     with patch.object(provenance, "MAX_MANIFEST_BYTES", 128):
         status = godot_main([
             "verify", str(path), "--base", str(tmp_path),
+            "--project", str(tmp_path),
         ])
     observed = capsys.readouterr().out
     assert status != 0
