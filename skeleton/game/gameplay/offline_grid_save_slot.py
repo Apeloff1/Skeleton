@@ -210,7 +210,14 @@ def read_slot(path: Path) -> object:
     dfd, _ = _open_parent(path)
     try:
         _check_slot(path.name, dfd)
-        fd = os.open(path.name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0), dir_fd=dfd)
+        # O_NONBLOCK prevents a stat/open race from hanging on an attacker-
+        # substituted FIFO; fstat below must still admit only regular files.
+        fd = os.open(
+            path.name,
+            os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=dfd,
+        )
     finally:
         os.close(dfd)
     try:
