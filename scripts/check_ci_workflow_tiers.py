@@ -25,6 +25,24 @@ PAUSED_RECOVERY = frozenset({
     "three-hour-actions-queue-expiry.yml",
 })
 
+# Both formerly independent, PR-path-scoped source qualifications execute
+# inside the required quality_security lane. Manual workflows remain for
+# additional operator evidence, not as a replacement for the required gate.
+MANUAL_SOURCE_QUALIFICATIONS = {
+    "godot-provenance-source-qualification.yml": (
+        "test_godot_provenance_ancestor_custody_20261110.py",
+        "test_forge_native_output_custody_20261110.py",
+        "test_godot_export_provenance.py",
+        "test_godot_export_provenance_negative.py",
+        "test_forge_export_quarantine.py",
+    ),
+    "strict-replay-source-qualification.yml": (
+        "test_postmerge_environment_checkpoint_custody.py",
+        "test_replay_checkpoint_v6.py",
+        "test_environment_replay_admission_bounds.py",
+    ),
+}
+
 
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
@@ -85,6 +103,30 @@ def audit(root: Path = ROOT) -> list[str]:
     for name in SCHEDULED_RECOVERY | PAUSED_RECOVERY:
         if not (root / WORKFLOWS / name).is_file():
             failures.append(f"{name}: required operational workflow missing")
+    # Do not solve the workflow budget by dropping source custody tests:
+    # these exact source qualifications are required within Merge Readiness.
+    try:
+        readiness_source = (root / WORKFLOWS / "merge-readiness.yml").read_text(encoding="utf-8")
+        required_quality = readiness_source.split("\n  quality_security:\n", 1)[1].split("\n  pr_automation:\n", 1)[0]
+    except (OSError, UnicodeError, IndexError) as exc:
+        failures.append(f"protected source qualification lane missing ({exc})")
+        required_quality = ""
+    for name, cases in MANUAL_SOURCE_QUALIFICATIONS.items():
+        try:
+            source = (root / WORKFLOWS / name).read_text(encoding="utf-8")
+            if events(source) != {"workflow_dispatch"}:
+                failures.append(f"{name}: source qualification must be manually dispatched, not automatically subscribed")
+        except (OSError, UnicodeError, ValueError) as exc:
+            failures.append(f"{name}: cannot inspect manual source qualification ({exc})")
+        for case in cases:
+            if case not in required_quality:
+                failures.append(f"{name}: required quality gate lost source test {case}")
+    if ("python -m pytest -q" not in required_quality
+            or "python -m unittest discover" not in required_quality
+            or "python -m compileall -q" not in required_quality
+            or "continue-on-error: true" in required_quality):
+        failures.append("protected source qualification steps must compile, execute and fail closed")
+
     names = specialised + core + reusable + scheduled + paused
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
