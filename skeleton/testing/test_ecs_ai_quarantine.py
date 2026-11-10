@@ -53,6 +53,37 @@ def test_steering_nan_cannot_poison_velocity():
         steering("seek",(0,float("nan")),(0,0),{"max_speed":4},(5,5))
 
 
+@pytest.mark.parametrize(("field", "bad"), [
+    ("max_speed", 10**1000),
+    ("max_speed", True),
+    ("pos", (10**1000, 0)),
+    ("vel", (0, 10**1000)),
+    ("target_pos", (0, 10**1000)),
+    ("target_vel", (10**1000, 0)),
+    ("wander_angle", 10**1000),
+    ("pos", (0,)),
+    ("vel", (0, 0, 0)),
+])
+def test_steering_rejects_oversized_or_malformed_inputs(field, bad):
+    values = {
+        "behavior": "seek", "pos": (0, 0), "vel": (0, 0),
+        "agent": {"max_speed": 4}, "target_pos": (5, 5),
+        "target_vel": (0, 0), "wander_angle": 0,
+    }
+    if field == "max_speed":
+        values["agent"] = {"max_speed": bad}
+    else:
+        values[field] = bad
+    with pytest.raises(ValidationError):
+        steering(**values)
+
+
+@pytest.mark.parametrize("radius", (10**1000, 0, -1, float("nan"), float("inf")))
+def test_arrival_rejects_invalid_radius_before_float_conversion(radius):
+    with pytest.raises(ValidationError):
+        steering("arrive", (0, 0), (0, 0), {"max_speed": 4, "radius": radius}, (5, 5))
+
+
 def test_sense_radius_is_bounded_before_registration():
     world=LiveWorld()
     tick=TickScheduler(fixed_dt=1/30)
