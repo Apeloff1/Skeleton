@@ -187,6 +187,15 @@ class WorkflowTierTests(unittest.TestCase):
                 for issue in audit(root)
             ))
             strict.write_text(strict_original)
+            strict.write_text(strict_original.replace(
+                "group: strict-replay-source-${{ inputs.candidate_sha }}",
+                "group: strict-replay-source-${{ github.sha }}",
+            ))
+            self.assertTrue(any(
+                "manual candidate concurrency must preserve independent immutable evidence" in issue
+                for issue in audit(root)
+            ))
+            strict.write_text(strict_original)
 
             # The required Merge Readiness lane must retain the same exact
             # source suites even though separate automatic runs are removed.
