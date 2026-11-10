@@ -102,6 +102,26 @@ def _digest(value: object) -> str:
     return hashlib.sha256(_canonical(value)).hexdigest()
 
 
+def _index_digest(records: Iterable["ReplayRecord"]) -> str:
+    """Hash the canonical replay index without a monolithic 1 MiB payload.
+
+    Buffer item and byte budgets bound the index length separately from each
+    retained record. The old `_digest(list_of_ids)` failed once enough small
+    records made the index exceed MAX_RECORD_BYTES, even though the buffer
+    remained within its memory contract.
+    """
+    hasher = hashlib.sha256()
+    hasher.update(b"[")
+    for index, record in enumerate(records):
+        if index >= 100000:
+            raise ValueError("replay index item budget exhausted")
+        if index:
+            hasher.update(b",")
+        hasher.update(_canonical((record.example_id, record.payload_digest)))
+    hasher.update(b"]")
+    return hasher.hexdigest()
+
+
 @dataclass(frozen=True, slots=True)
 class EnvironmentIdentity:
     simulation_id: str
@@ -236,7 +256,7 @@ class BoundedRecordBuffer:
                          for r in self._records)
 
     def digest(self) -> str:
-        return _digest([(r.example_id, r.payload_digest) for r in self.records()])
+        return _index_digest(self.records())
 
 
 class HoldoutBuffer(BoundedRecordBuffer):
@@ -272,7 +292,7 @@ class DeterministicReplayBuffer(BoundedRecordBuffer):
         # Bind the population and the RNG seed to the same locked snapshot.
         # A second self.digest() read could observe a different generation.
         items = self.records()
-        generation = _digest([(r.example_id, r.payload_digest) for r in items])
+        generation = _index_digest(items)
         rng = random.Random(f"{seed}:{generation}")
         return tuple(rng.sample(items, min(k, len(items))))
 
