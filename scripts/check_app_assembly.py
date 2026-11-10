@@ -990,6 +990,73 @@ def audit_public_product_readiness_contract() -> None:
     check("health?.product?.available" in product, "product shell does not consume runtime product summary")
 
 
+def has_canonical_ops_router(source: str) -> bool:
+    """Validate governed router, literal ops prefix and immutable admin dependency.
+
+    Parse syntax rather than relying on an exact single-line formatting string.
+    Unrecognized expression/alias forms fail closed rather than being evaluated.
+    """
+    try:
+        module = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return False
+    if not any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "routes.playable_access"
+        and any(alias.name == "project_router" and alias.asname is None for alias in node.names)
+        for node in module.body
+    ):
+        return False
+    if not any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "routes"
+        and any(alias.name == "gameforge_auth" and alias.asname == "auth" for alias in node.names)
+        for node in module.body
+    ):
+        return False
+    assignments = [
+        node for node in module.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "router" for target in node.targets)
+    ]
+    if len(assignments) != 1 or len(assignments[0].targets) != 1:
+        return False
+    call = assignments[0].value
+    if not (isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+            and call.func.id == "project_router" and not call.args):
+        return False
+    if any(kw.arg is None for kw in call.keywords):
+        return False
+    kwargs = {kw.arg: kw.value for kw in call.keywords}
+    if len(kwargs) != len(call.keywords):
+        return False
+    prefix = kwargs.get("prefix")
+    if not (isinstance(prefix, ast.Constant) and type(prefix.value) is str
+            and prefix.value == "/api/admin/ops"):
+        return False
+    dependencies = kwargs.get("dependencies")
+    if not (isinstance(dependencies, (ast.List, ast.Tuple))
+            and len(dependencies.elts) == 1):
+        return False
+    gate = dependencies.elts[0]
+    if not (isinstance(gate, ast.Call) and isinstance(gate.func, ast.Name)
+            and gate.func.id == "Depends" and len(gate.args) == 1
+            and not gate.keywords):
+        return False
+    role = gate.args[0]
+    return (
+        isinstance(role, ast.Call)
+        and isinstance(role.func, ast.Attribute)
+        and role.func.attr == "require_role"
+        and isinstance(role.func.value, ast.Name)
+        and role.func.value.id == "auth"
+        and len(role.args) == 1
+        and isinstance(role.args[0], ast.Constant)
+        and role.args[0].value == "admin"
+        and not role.keywords
+    )
+
+
 def audit_product_control_contract() -> None:
     client = read("frontend/src/product/productControlClient.ts")
     ops = read("backend/routes/ops.py")
@@ -1000,7 +1067,7 @@ def audit_product_control_contract() -> None:
         "product control client root drift",
     )
     check(
-        'router = project_router(prefix="/api/admin/ops"' in ops,
+        has_canonical_ops_router(ops),
         "backend ops prefix must use the canonical project router",
     )
     check('("routes.ops",' in registry, "backend ops router is not registered")

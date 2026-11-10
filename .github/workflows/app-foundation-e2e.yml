@@ -96,9 +96,21 @@ jobs:
       - name: Validate compose configuration
         run: docker compose -f docker-compose.yml config --quiet
 
-      - name: Build stack images
-        timeout-minutes: 30
-        run: docker compose -f docker-compose.yml build skeleton backend frontend
+      # Separate the expensive Expo export from backend image assembly. The
+      # previous combined build repeatedly timed out *after* Expo printed
+      # "Exported: dist", leaving no actionable stage-completion evidence.
+      # Each Docker build must still succeed; neither is advisory/skippable.
+      - name: Build frontend production image
+        timeout-minutes: 20
+        env:
+          BUILDKIT_PROGRESS: plain
+        run: docker compose -f docker-compose.yml build frontend
+
+      - name: Build engine and backend images
+        timeout-minutes: 15
+        env:
+          BUILDKIT_PROGRESS: plain
+        run: docker compose -f docker-compose.yml build skeleton backend
 
       - name: Start stack
         run: docker compose -f docker-compose.yml up -d mongo skeleton backend frontend
