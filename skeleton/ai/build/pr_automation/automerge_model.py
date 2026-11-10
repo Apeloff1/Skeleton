@@ -21,6 +21,36 @@ _REF_RE = re.compile(r"^[A-Za-z0-9._/-]{1,255}$")
 _CONTEXT_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,160}$")
 _LABEL_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,100}$")
 
+# A PR author's explicit merge prohibition is authoritative even if an
+# automated label is absent and implicit owner opt-in is otherwise enabled.
+_EXPLICIT_MERGE_HOLD_RE = re.compile(
+    r"(?<![a-z])(?:"
+    r"do[\s-]+not[\s-]+(?:auto[\s-]*)?merge"
+    r"|never[\s-]+merge"
+    r"|no[\s-]+(?:auto[\s-]*|squash\s*/\s*)?merge"
+    r"|review[\s-]*only"
+    r"|merge[\s-]+(?:held|hold)"
+    r"|not[\s-]+(?:merge[\s-]*approved|approved[\s-]+for[\s-]+merge)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def has_explicit_merge_hold(title: object, body: object) -> bool:
+    """Reject explicit review/merge holds without trusting labels or authorship.
+
+    Missing descriptions are permitted; malformed or oversized GitHub text is
+    conservatively held. Never use body wording to grant merge permission.
+    """
+    for value in (title, body):
+        if value is None:
+            continue
+        if type(value) is not str or len(value) > 131072:
+            return True
+        if _EXPLICIT_MERGE_HOLD_RE.search(value):
+            return True
+    return False
+
 
 def canonical_json(value: Any) -> str:
     """Return deterministic JSON suitable for hashing and durable evidence."""
@@ -283,9 +313,12 @@ class CandidateSnapshot:
     parent_pr: int | None = None
     sensitive_paths: tuple[str, ...] = ()
     risk_tier: RiskTier = RiskTier.MEDIUM
+    explicit_merge_hold: bool = False
     captured_at: str = field(default_factory=lambda: utc_now().isoformat())
 
     def __post_init__(self) -> None:
+        if type(self.explicit_merge_hold) is not bool:
+            raise ValueError("explicit merge hold must be an exact boolean")
         if self.unresolved_threads is not None and self.unresolved_threads < 0:
             raise ValueError("unresolved thread count must be non-negative")
         for label in self.labels:
@@ -538,6 +571,7 @@ __all__ = [
     "WorkflowEvidence",
     "canonical_json",
     "fingerprint",
+    "has_explicit_merge_hold",
     "immutable_identity_equal",
     "labels_normalized",
     "parse_timestamp",
