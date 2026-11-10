@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
@@ -213,6 +214,9 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
         def read(self, _size):
             return b"ok"
 
+        def geturl(self):
+            return "http://localhost:8010/api/v1/health/live"
+
     seen = {}
 
     def fake_urlopen(request, timeout):
@@ -285,7 +289,19 @@ def test_product_control_client_matches_mounted_backend_routes():
     registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
 
     assert "const ROOT = '/api/admin/ops/product-control';" in client
-    assert 'router = project_router(prefix="/api/admin/ops"' in ops
+    ops_tree = ast.parse(ops)
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "project_router"
+        and any(
+            keyword.arg == "prefix"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "/api/admin/ops"
+            for keyword in node.keywords
+        )
+        for node in ast.walk(ops_tree)
+    )
     assert '("routes.ops",' in registry
 
     required_routes = (
@@ -765,6 +781,9 @@ def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
         def read(self, _size):
             return b"redirect"
 
+        def geturl(self):
+            return "http://localhost:8001/api/health"
+
     monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: RedirectResponse())
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert not result.ok
@@ -787,6 +806,9 @@ def test_health_probe_transport_forbids_redirects_and_proxy_environment(monkeypa
 
         def read(self, _size):
             return b"ok"
+
+        def geturl(self):
+            return "http://localhost:8001/api/health"
 
     class Opener:
         def open(self, request, *, timeout):
@@ -974,3 +996,31 @@ def test_python_image_unpinned_stage_is_rejected():
     assert changed != source
     errors = backend_python_image_errors(changed)
     assert any("digest-pinned Alpine stage" in error for error in errors)
+
+
+def test_fresh_install_backend_cors_tracks_selected_frontend_port():
+    """A custom published frontend port cannot be blocked by stale CORS defaults."""
+    root = find_repo_root(Path(__file__))
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    template = (root / ".env.example").read_text(encoding="utf-8")
+
+    assert (
+        "CORS_ORIGINS=${CORS_ORIGINS:-"
+        "http://localhost:${FRONTEND_PORT:-3000},"
+        "http://127.0.0.1:${FRONTEND_PORT:-3000}}"
+    ) in compose
+    assert "\nCORS_ORIGINS=\n" in template
+    assert "\nCORS_ORIGINS=http://localhost:3000" not in template
+
+
+def test_fresh_install_cors_defaults_preserve_operator_override(tmp_path):
+    from skeleton.app.setup_runtime import ensure_runtime_environment
+
+    # Operator policies and upgrades must not be expanded automatically.
+    manual = "https://operator.example.invalid"
+    (tmp_path / ".env").write_text(
+        f"CORS_ORIGINS={manual}\n", encoding="utf-8"
+    )
+    ensure_runtime_environment(tmp_path)
+    values = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert f"CORS_ORIGINS={manual}" in values

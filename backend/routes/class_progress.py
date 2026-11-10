@@ -4,7 +4,7 @@ Version: 1.0.0 | Track class completions, repeat classes, and earn achievements
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -31,13 +31,13 @@ achievements_collection = db.user_achievements
 # =============================================================================
 
 class ClassCompletion(BaseModel):
-    user_id: str = "default_user"
-    class_id: str
-    class_name: str
-    language_id: Optional[str] = None
-    category: str = "general"  # language, academy, camera, etc.
-    score: Optional[float] = None
-    notes: Optional[str] = None
+    user_id: str = Field(default="default_user", min_length=1, max_length=200)
+    class_id: str = Field(..., min_length=1, max_length=200)
+    class_name: str = Field(..., min_length=1, max_length=500)
+    language_id: Optional[str] = Field(default=None, max_length=100)
+    category: str = Field(default="general", min_length=1, max_length=100)
+    score: Optional[float] = Field(default=None, ge=0, le=100)
+    notes: Optional[str] = Field(default=None, max_length=5000)
 
 class ClassProgressResponse(BaseModel):
     class_id: str
@@ -384,6 +384,7 @@ async def get_user_progress_overview(user_id: str):
         "user_id": user_id,
         "total_completions": total_completions,
         "unique_classes": len(unique_classes),
+        "completed_class_ids": unique_classes[:1000],
         "unique_languages": len(unique_languages),
         "languages_studied": unique_languages,
         "total_xp": total_xp,

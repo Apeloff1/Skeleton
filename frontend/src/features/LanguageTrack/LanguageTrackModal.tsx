@@ -21,6 +21,7 @@ interface LanguageTrackModalProps {
   onClose: () => void;
   colors: any;
   languageId?: string;
+  userId?: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -48,7 +49,7 @@ interface LanguageData {
 }
 
 export const LanguageTrackModal: React.FC<LanguageTrackModalProps> = ({
-  visible, onClose, colors, languageId = 'python'
+  visible, onClose, colors, languageId = 'python', userId = 'default_user'
 }) => {
   const [languageData, setLanguageData] = useState<LanguageData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,13 +71,13 @@ export const LanguageTrackModal: React.FC<LanguageTrackModalProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, languageId]);
 
-  const loadLanguageData = async () => {
+  const loadLanguageData = async (level: string = selectedLevel) => {
     setLoading(true);
     try {
-      const res = await apiFetch(`${API_BASE}/api/jeeves-languages/language/${languageId}/teach?level=${selectedLevel}`);
-      if (res.ok) {
-        const data = await res.json();
-        setLanguageData({
+      const res = await apiFetch(`${API_BASE}/api/jeeves-languages/language/${languageId}/teach?level=${encodeURIComponent(level)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || `Curriculum request failed (${res.status})`);
+      const nextLanguageData: LanguageData = {
           language_id: languageId,
           name: data.language || languageId,
           greeting: data.greeting || '',
@@ -88,43 +89,39 @@ export const LanguageTrackModal: React.FC<LanguageTrackModalProps> = ({
           difficulty_tips: {},
           ecosystem: data.ecosystem || [],
           history_note: '',
-        });
-      }
-    } catch {
-      // Fallback data
-      setLanguageData({
-        language_id: languageId,
-        name: languageId.charAt(0).toUpperCase() + languageId.slice(1),
-        greeting: `Welcome to the ${languageId} track!`,
-        teaching_style: 'Interactive',
-        core_concepts: ['Variables & Types', 'Control Flow', 'Functions', 'Data Structures', 'Error Handling', 'Advanced Patterns'],
-        code_snippets: {},
-        best_practices: ['Write clean code', 'Test your code', 'Read the documentation'],
-        common_mistakes: [{mistake: 'Not reading docs', fix: 'Always read the official documentation'}],
-        difficulty_tips: {},
-        ecosystem: [],
-        history_note: '',
-      });
+      };
+      setLanguageData(nextLanguageData);
+      const progress = await Promise.all(nextLanguageData.core_concepts.map(async (_, index) => {
+        const classId = `${languageId}_concept_${index}`;
+        try {
+          const progressRes = await apiFetch(`${API_BASE}/api/class-progress/class/${encodeURIComponent(classId)}?user_id=${encodeURIComponent(userId)}`);
+          const progressData = await progressRes.json();
+          return [classId, progressRes.ok ? Number(progressData.completion_count || 0) : 0] as const;
+        } catch { return [classId, 0] as const; }
+      }));
+      setCompletedClasses(Object.fromEntries(progress));
+    } catch (e: any) {
+      setLanguageData(null);
+      toast.error(e?.message || 'Failed to load this language curriculum.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleCompleteClass = async (conceptIndex: number) => {
     const classId = `${languageId}_concept_${conceptIndex}`;
     const className = languageData?.core_concepts[conceptIndex] || `Class ${conceptIndex}`;
-    const currentCount = completedClasses[classId] || 0;
-
     try {
       const res = await apiFetch(`${API_BASE}/api/class-progress/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: 'default_user',
+          user_id: userId,
           class_id: classId,
           class_name: className,
           language_id: languageId,
           category: 'language',
-          score: Math.floor(Math.random() * 30) + 70,
+          score: null,
         }),
       });
       if (res.ok) {
@@ -141,10 +138,12 @@ export const LanguageTrackModal: React.FC<LanguageTrackModalProps> = ({
         } else {
           Alert.alert('Class Complete!', data.message);
         }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.detail || `Completion failed (${res.status})`);
       }
-    } catch {
-      setCompletedClasses(prev => ({ ...prev, [classId]: currentCount + 1 }));
-      toast.info(`Completed ${currentCount + 1} time(s)`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Class completion was not recorded.');
     }
   };
 
@@ -203,7 +202,7 @@ export const LanguageTrackModal: React.FC<LanguageTrackModalProps> = ({
                     { backgroundColor: selectedLevel === level ? levelColors[level] + '20' : colors.surface,
                       borderColor: selectedLevel === level ? levelColors[level] : colors.border }
                   ]}
-                  onPress={() => { setSelectedLevel(level); loadLanguageData(); }}
+                  onPress={() => { setSelectedLevel(level); loadLanguageData(level); }}
                 >
                   <Text style={[
                     styles.levelText,
@@ -253,7 +252,7 @@ export const LanguageTrackModal: React.FC<LanguageTrackModalProps> = ({
                   >
                     <Ionicons name={count > 0 ? 'refresh' : 'play'} size={16} color="#FFF" />
                     <Text style={styles.startBtnText}>
-                      {count > 0 ? `Repeat (${count}x)` : 'Start Class'}
+                      {count > 0 ? `Complete Again (${count}x)` : 'Mark Complete'}
                     </Text>
                   </TouchableOpacity>
                 </View>

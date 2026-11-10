@@ -22,6 +22,7 @@ from core.product_default_executors import build_default_executor_registry
 from core.product_executor_registry import ExecutorNotRegistered, ProductExecutorRegistry
 from core.product_kernel import PRODUCT_KERNEL, ProductKernel
 from core.product_operations import AdmittedOperation, OperationExecutionError, ProductOperationCoordinator
+from core.runtime_sessions import RuntimeSessionManager
 from core.system_assurance import evaluate_assurance
 from core.system_root_attestation import build_root_attestation
 from core.verified_curiosity import VerifiedCuriosityEngine
@@ -47,7 +48,7 @@ class ProductControlPlane:
         )
         if bind_native_executors:
             self.executors, self.native_executors = build_default_executor_registry(
-                self.receipts, curiosity=self.curiosity,
+                self.receipts, sessions=RuntimeSessionManager(self.root / "runtime-sessions"), curiosity=self.curiosity,
                 operations_provider=self._operations_projection,
                 policy_provider=self._policy_projection, audit_provider=self._audit_projection,
                 safety_provider=self._safety_projection,

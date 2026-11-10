@@ -85,7 +85,36 @@ class PayloadZipPreflightTests(unittest.TestCase):
         info = ZipInfo("link")
         info.create_system = 3
         info.external_attr = (stat.S_IFLNK | 0o777) << 16
-        self.assertTrue(any("symbolic link" in issue for issue in archive_errors([info])))
+        self.assertTrue(any("unsupported Unix special file type" in issue for issue in archive_errors([info])))
+
+    def test_unix_special_inode_types_fail_closed(self) -> None:
+        for inode in (stat.S_IFIFO, stat.S_IFSOCK, stat.S_IFCHR, stat.S_IFBLK, stat.S_IFLNK):
+            with self.subTest(inode=inode):
+                entry = ZipInfo("payload/special")
+                entry.create_system = 3
+                entry.external_attr = (inode | 0o600) << 16
+                self.assertTrue(
+                    any("unsupported Unix special file type" in error for error in archive_errors([entry]))
+                )
+
+    def test_unix_directory_and_file_metadata_mismatch(self) -> None:
+        directory_without_suffix = ZipInfo("payload/dir")
+        directory_without_suffix.create_system = 3
+        directory_without_suffix.external_attr = (stat.S_IFDIR | 0o755) << 16
+        file_with_suffix = ZipInfo("payload/file/")
+        file_with_suffix.create_system = 3
+        file_with_suffix.external_attr = (stat.S_IFREG | 0o644) << 16
+        self.assertTrue(any("directory mode" in e for e in archive_errors([directory_without_suffix])))
+        self.assertTrue(any("regular file mode" in e for e in archive_errors([file_with_suffix])))
+
+    def test_regular_unix_file_and_directory_allowed(self) -> None:
+        directory = ZipInfo("payload/")
+        directory.create_system = 3
+        directory.external_attr = (stat.S_IFDIR | 0o755) << 16
+        regular = ZipInfo("payload/main.py")
+        regular.create_system = 3
+        regular.external_attr = (stat.S_IFREG | 0o644) << 16
+        self.assertEqual(archive_errors([directory, regular]), [])
 
     def test_huge_entry_rejected_without_allocating(self) -> None:
         info = ZipInfo("big.bin")
