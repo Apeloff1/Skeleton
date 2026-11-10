@@ -415,6 +415,16 @@ def main() -> int:
             f"missing frontend script {script}",
             failures,
         )
+    require_all(
+        read("frontend/Dockerfile"),
+        (
+            "node --test scripts/test-guarded-expo-export.cjs",
+            "node scripts/guarded-expo-export.cjs",
+            "test -s /app/dist/setup.html",
+        ),
+        "Frontend Docker build must verify and supervise real Expo output",
+        failures,
+    )
     require(
         re.search(
             r"^ARG NODE_VERSION=24$",
@@ -464,7 +474,14 @@ def main() -> int:
     )
     require_all(
         ci,
-        ("yarn lint:ci", "yarn typecheck", "yarn export:web"),
+        (
+            "yarn lint:ci",
+            "yarn typecheck",
+            "node --test scripts/test-guarded-expo-export.cjs",
+            "node scripts/guarded-expo-export.cjs",
+            "test -s dist/index.html",
+            "test -s dist/setup.html || test -s dist/setup/index.html",
+        ),
         "CI frontend scripts drifted",
         failures,
     )
