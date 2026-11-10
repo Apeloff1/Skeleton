@@ -172,7 +172,9 @@ def check_condition(cond: Mapping[str, Any], facts: Mapping[str, Any]) -> bool:
 def curve(kind: str, x: float) -> float:
     # A malformed utility sample must not silently become a valid action
     # score through clamping (especially adversarial negative inputs).
-    if type(x) not in (int, float) or not math.isfinite(x) or not 0 <= x <= 1:
+    # Bound native integers before converting them to C doubles for
+    # math.isfinite: very large Python ints otherwise raise OverflowError.
+    if type(x) not in (int, float) or not 0 <= x <= 1 or not math.isfinite(x):
         raise ValidationError("utility input must be finite and within [0, 1]")
     x = float(x)
     if kind == "linear":
@@ -198,8 +200,8 @@ def choose_utility(options: list[Mapping[str, Any]], needs: Mapping[str, float])
         if not isinstance(opt, Mapping) or type(opt.get("action")) is not str:
             raise ValidationError("utility option requires an action identity")
         weight = opt.get("weight", 1.0)
-        if type(weight) not in (float, int) or not math.isfinite(weight) or not 0 <= weight <= 100:
-            raise ValidationError("utility weight must be finite and nonnegative")
+        if type(weight) not in (float, int) or not 0 <= weight <= 100 or not math.isfinite(weight):
+            raise ValidationError("utility weight must be finite and between 0 and 100")
         s = float(weight) * curve(str(opt.get("curve", "linear")), needs.get(opt.get("need", ""), 0.0))
         if s > score + 1e-12:  # ties keep declaration order
             best, score = opt.get("action"), s
