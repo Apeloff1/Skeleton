@@ -137,9 +137,15 @@ def inspect(
         if (not isinstance(conversations, Mapping)
                 or conversations.get("enabled") is not True):
             reasons.append("main_conversation_resolution_not_required")
-    for name in ESSENTIAL_JOBS:
-        if name not in checks:
-            reasons.append("main_required_check_not_configured:" + name)
+    # Branch protection binds *check-run job contexts*, not the display
+    # title of the containing workflow. Requiring workflow titles would
+    # incorrectly reject a correctly protected repository.
+    for workflow, job_names in ESSENTIAL_JOBS.items():
+        for job in job_names:
+            if job not in checks:
+                reasons.append(
+                    "main_required_check_not_configured:" + workflow + ":" + job
+                )
 
     evidence: dict[str, dict[str, Any]] = {}
     for name, jobs_required in ESSENTIAL_JOBS.items():
