@@ -25,7 +25,6 @@ import sys
 import math
 import stat
 import hashlib
-import re
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -50,8 +49,10 @@ def _safe_directory(path: Path) -> Path:
     """
     if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
         raise ValueError("native Godot exporter requires POSIX no-follow directory custody")
+    if ".." in Path(path).parts:
+        raise ValueError("native export output traversal refused")
     target = Path(os.path.abspath(path))
-    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
     fd = os.open("/", flags)
     try:
         for part in target.parts[1:]:
@@ -67,6 +68,50 @@ def _safe_directory(path: Path) -> Path:
     return target
 
 
+def _anchored_directory(path: Path) -> int:
+    """Open all ancestor directories without following a single symlink.
+
+    Returns a caller-owned directory FD. This rejects uncanonical traversal
+    rather than relying on Path.resolve()/an absolute path's final O_NOFOLLOW.
+    """
+    if os.name != "posix" or not all(
+        hasattr(os, key) for key in ("O_DIRECTORY", "O_NOFOLLOW")
+    ):
+        raise ValueError("descriptor-relative export verification unavailable")
+    raw = Path(path)
+    if ".." in raw.parts:
+        raise ValueError("export directory traversal refused")
+    absolute = Path(os.path.abspath(raw))
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    dfd = os.open("/", flags)
+    try:
+        for name in absolute.parts[1:]:
+            next_fd = os.open(name, flags, dir_fd=dfd)
+            os.close(dfd)
+            dfd = next_fd
+        return dfd
+    except BaseException:
+        os.close(dfd)
+        raise
+
+
+def _bounded_output_inventory(parent: Path) -> list[Path]:
+    """Inspect at most MAX_OUTPUT_FILES + 1 entries from an opened parent FD."""
+    dfd = _anchored_directory(parent)
+    names: list[str] = []
+    try:
+        with os.scandir(dfd) as iterator:
+            for entry in iterator:
+                if len(names) >= MAX_OUTPUT_FILES:
+                    raise ValueError("export output file budget exhausted")
+                if not entry.is_file(follow_symlinks=False):
+                    raise ValueError("unsafe export output directory entry")
+                names.append(entry.name)
+        return [parent / name for name in sorted(names)]
+    finally:
+        os.close(dfd)
+
+
 def _regular_output(path: Path) -> bool:
     """Never accept a symlink, directory, device or empty native artifact."""
     try:
@@ -76,46 +121,88 @@ def _regular_output(path: Path) -> bool:
     return stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and 0 < st.st_size <= MAX_OUTPUT_BYTES
 
 
-def _artifact_digest(path: Path) -> str:
-    if not _regular_output(path):
-        raise ValueError("unsafe or oversized native artifact")
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-    try:
-        st = os.fstat(fd)
-        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or not 0 < st.st_size <= MAX_OUTPUT_BYTES:
-            raise ValueError("artifact identity changed during no-follow inspection")
-        size = 0
-        hasher = hashlib.sha256()
-        while True:
-            chunk = os.read(fd, min(1 << 20, MAX_OUTPUT_BYTES - size + 1))
-            if not chunk:
-                break
-            size += len(chunk)
-            if size > MAX_OUTPUT_BYTES:
-                raise ValueError("artifact exceeded byte cap during hashing")
-            hasher.update(chunk)
-        if size != st.st_size:
-            raise ValueError("artifact changed while hashing")
-        # A same-byte-count rewrite can otherwise produce a plausible but
-        # unowned digest. Refuse changes to the opened inode during streaming
-        # and refuse path replacement between open and receipt publication.
-        after = os.fstat(fd)
-        fields = ("st_dev", "st_ino", "st_mode", "st_nlink", "st_size",
-                  "st_mtime_ns", "st_ctime_ns")
-        if any(getattr(after, name) != getattr(st, name) for name in fields):
-            raise ValueError("artifact changed during hashing")
-        try:
-            linked = path.lstat()
-        except OSError as exc:
-            raise ValueError("artifact disappeared during hashing") from exc
-        if (not stat.S_ISREG(linked.st_mode) or linked.st_nlink != 1
-                or any(getattr(linked, name) != getattr(after, name)
-                       for name in fields)):
-            raise ValueError("artifact path replaced during hashing")
-        return hasher.hexdigest()
-    finally:
-        os.close(fd)
+def _artifact_evidence(path: Path) -> tuple[str, int]:
+    """Hash one inode from no-follow ancestor FDs and revalidate its path.
 
+    Verification cannot certify an unlinked old inode after a same-name
+    replacement, and must not follow an intermediate symlink to a foreign
+    output tree before reading native code or signed resource packs.
+    """
+    path = Path(path)
+    if path.name in ("", ".", ".."):
+        raise ValueError("invalid native artifact basename")
+    try:
+        dfd = _anchored_directory(path.parent)
+    except OSError as exc:
+        raise ValueError("unsafe native artifact ancestor") from exc
+    try:
+        try:
+            fd = os.open(
+                path.name,
+                os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=dfd,
+            )
+        except OSError as exc:
+            raise ValueError("unsafe native artifact path") from exc
+        try:
+            before = os.fstat(fd)
+            if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                    or not 0 < before.st_size <= MAX_OUTPUT_BYTES):
+                raise ValueError("unsafe or oversized native artifact")
+            hasher = hashlib.sha256()
+            count = 0
+            while True:
+                chunk = os.read(fd, min(1 << 20, MAX_OUTPUT_BYTES + 1 - count))
+                if not chunk:
+                    break
+                count += len(chunk)
+                if count > MAX_OUTPUT_BYTES:
+                    raise ValueError("artifact exceeded byte cap during hashing")
+                hasher.update(chunk)
+            after = os.fstat(fd)
+            fields = (
+                "st_dev", "st_ino", "st_mode", "st_nlink", "st_size",
+                "st_mtime_ns", "st_ctime_ns",
+            )
+            before_id = tuple(getattr(before, attr) for attr in fields)
+            after_id = tuple(getattr(after, attr) for attr in fields)
+            try:
+                linked = os.stat(
+                    path.name, dir_fd=dfd, follow_symlinks=False,
+                )
+            except OSError as exc:
+                raise ValueError("artifact path disappeared during hashing") from exc
+            linked_id = tuple(getattr(linked, attr) for attr in fields)
+            if (count != before.st_size or before_id != after_id
+                    or after_id != linked_id
+                    or not stat.S_ISREG(linked.st_mode) or linked.st_nlink != 1):
+                raise ValueError("artifact changed or path replaced during hashing")
+            # A swap of an intermediate directory after open leaves the
+            # original FD valid but no longer reachable at its source path.
+            try:
+                reachable_fd = _anchored_directory(path.parent)
+            except OSError as exc:
+                raise ValueError("artifact parent changed during hashing") from exc
+            try:
+                current_dir = os.fstat(reachable_fd)
+                held_dir = os.fstat(dfd)
+                if (current_dir.st_dev, current_dir.st_ino) != (
+                    held_dir.st_dev, held_dir.st_ino,
+                ):
+                    raise ValueError("artifact parent changed during hashing")
+            finally:
+                os.close(reachable_fd)
+            return hasher.hexdigest(), count
+        finally:
+            os.close(fd)
+    finally:
+        os.close(dfd)
+
+
+def _artifact_digest(path: Path) -> str:
+    """Preserve the public digest API while requiring full custody evidence."""
+    return _artifact_evidence(path)[0]
 
 def _boot_exported(executable: Path, frames: int, timeout: float) -> Dict[str, Any]:
     if not _regular_output(executable):
@@ -199,17 +286,26 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
             entry["ok"] = code == 0 and _regular_output(target) and not timed_out
             if not entry["ok"]:
                 entry["reason"] = "export-failed"
-        artefacts = sorted(parent.iterdir())
-        if len(artefacts) > MAX_OUTPUT_FILES or any(not _regular_output(item) for item in artefacts):
+        try:
+            artefacts = _bounded_output_inventory(parent)
+        except (OSError, ValueError):
             entry["ok"], entry["reason"] = False, "unsafe-or-unbounded-artifacts"
             artefacts = []
         entry["artefacts"] = [str(item.relative_to(out)) for item in artefacts]
-        entry["bytes"] = sum(item.lstat().st_size for item in artefacts)
+        entry["bytes"] = 0
         entry["sha256"] = {}
         if entry["ok"]:
             try:
-                entry["sha256"] = {str(item.relative_to(out)): _artifact_digest(item)
-                                   for item in artefacts}
+                evidence = {
+                    str(item.relative_to(out)): _artifact_evidence(item)
+                    for item in artefacts
+                }
+                entry["bytes"] = sum(size for _, size in evidence.values())
+                if entry["bytes"] > MAX_OUTPUT_BYTES:
+                    raise ValueError("aggregate export byte budget exhausted")
+                entry["sha256"] = {
+                    name: digest for name, (digest, _) in evidence.items()
+                }
                 if preset == "Linux" and not _regular_output(target.with_suffix(".pck")):
                     raise ValueError("missing Linux game resource pack")
                 if preset == "Web" and not _regular_output(target.with_suffix(".wasm")):
