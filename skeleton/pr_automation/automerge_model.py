@@ -25,12 +25,15 @@ _LABEL_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,100}$")
 # automated label is absent and implicit owner opt-in is otherwise enabled.
 _EXPLICIT_MERGE_HOLD_RE = re.compile(
     r"(?<![a-z])(?:"
-    r"do[\s-]+not[\s-]+(?:auto[\s-]*)?merge"
-    r"|never[\s-]+merge"
-    r"|no[\s-]+(?:auto[\s-]*|squash\s*/\s*)?merge"
-    r"|review[\s-]*only"
-    r"|merge[\s-]+(?:held|hold)"
-    r"|not[\s-]+(?:merge[\s-]*approved|approved[\s-]+for[\s-]+merge)"
+    r"do[\s_–—-]+not[\s_–—-]+(?:auto[\s_–—-]*)?merge"
+    r"|never[\s_–—-]+(?:auto[\s_–—-]*)?merge"
+    r"|no[\s_–—-]+(?:auto[\s_–—-]*|squash\s*/\s*)?merge"
+    r"|review[\s_–—-]*only"
+    r"|merge[\s_–—-]+(?:held|hold|blocked|prohibited|disabled|forbidden|embargoed)"
+    r"|(?:hold|block|prohibit|deny)[\s_–—-]+(?:auto[\s_–—-]*)?merge"
+    r"|not[\s_–—-]+(?:ready[\s_–—-]+for[\s_–—-]+merge|for[\s_–—-]+merge)"
+    r"|(?:do[\s_–—-]+not|never)[\s_–—-]+(?:squash|land)"
+    r"|not[\s_–—-]+(?:merge[\s_–—-]*approved|approved[\s_–—-]+for[\s_–—-]+merge)"
     r")\b",
     re.IGNORECASE,
 )

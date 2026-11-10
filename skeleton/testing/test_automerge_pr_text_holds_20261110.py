@@ -21,6 +21,17 @@ from skeleton.testing.automerge_test_support import NOW, policy, snapshot
     ("Fix a subsystem", "Merge held until native acceptance."),
     ("fix docs", "Never merge before independent source review."),
     ("DO NOT AUTO-MERGE security candidate", ""),
+    ("[REVIEW—ONLY] protected", ""),
+    ("fix work", "DO—NOT—MERGE pending independent approval"),
+    ("fix work", "NO_MERGE while CI is pending"),
+    ("fix work", "MERGE BLOCKED pending security signoff"),
+    ("fix work", "MERGE PROHIBITED"),
+    ("fix work", "Merge disabled for this branch"),
+    ("fix work", "Not ready for merge"),
+    ("fix work", "Not for merge"),
+    ("fix work", "Hold merge until tests pass"),
+    ("fix work", "Do not land the PR"),
+    ("fix work", "Never squash this PR"),
     ("Fix a subsystem", "Do not merge child before the held parent."),
 ])
 def test_explicit_text_holds_are_always_detected(title, body):
