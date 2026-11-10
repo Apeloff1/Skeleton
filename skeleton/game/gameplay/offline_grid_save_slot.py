@@ -11,10 +11,10 @@ import errno
 import json
 import math
 import os
+import secrets
+import stat
 import sys
 from pathlib import Path
-import stat
-import secrets
 
 MAX_SAVE_BYTES = 2_000_000
 
@@ -295,11 +295,13 @@ def read_slot(path: Path) -> object:
         except FileNotFoundError as exc:
             raise SaveSlotError("save path disappeared during read") from exc
         held_dir = os.fstat(dfd)
+
         def fingerprint(info: os.stat_result) -> tuple[int, int, int, int, int]:
             return (
                 info.st_dev, info.st_ino, info.st_size,
                 info.st_mtime_ns, info.st_ctime_ns,
             )
+
         if (fingerprint(before) != fingerprint(after)
                 or (reachable.st_dev, reachable.st_ino) !=
                    (after.st_dev, after.st_ino)
