@@ -158,3 +158,14 @@ def test_anchored_hash_allows_unchanged_private_regular_file(tmp_path):
     digest, size = provenance._digest_beneath(root, "game.bin")
     assert digest == hashlib.sha256(content).hexdigest()
     assert size == len(content)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor-backed custody")
+def test_digest_rejects_symlinked_ancestor_of_source_root(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "game.bin").write_bytes(b"private")
+    alias = tmp_path / "alias"
+    alias.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(OSError):
+        provenance._digest_beneath(alias, "game.bin")
