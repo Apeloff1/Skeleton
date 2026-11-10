@@ -18,6 +18,7 @@ import threading
 from typing import Any
 
 from .contracts import identifier, identity_hash
+from .desktop_environment import native_child_environment
 from .desktop_protocol import (
     SCHEMA_RESPONSE, DesktopProtocolHold, MAX_OUTBOUND,
     command, read_frame, write_frame,
@@ -481,6 +482,7 @@ class DesktopBridge:
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL, close_fds=True,
                 bufsize=0, creationflags=creationflags,
+                env=native_child_environment(),
             )
             process = self._process
             assert process.stdout is not None
