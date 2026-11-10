@@ -258,13 +258,16 @@ jobs:
       - name: Exercise source custody, product surfaces and workflow regression tests
         run: |
           set -euo pipefail
+          # Repository and backend both have a tests package: do not import
+          # same-name modules in one pytest collection namespace.
           python -m pytest -q --maxfail=12 --noconftest \
             tests/test_repo_machine_live_taxonomy.py \
-            backend/tests/test_live_service_test_boundaries.py \
             tests/test_app_foundation_e2e_build_isolation.py \
             tests/test_ops_router_source_contract.py \
             tests/test_product_surface_specification.py \
-            tests/test_product_surface_delegated_backend_20261110.py \
+            tests/test_product_surface_delegated_backend_20261110.py
+          python -m pytest -q --maxfail=12 --noconftest --import-mode=importlib \
+            backend/tests/test_live_service_test_boundaries.py \
             backend/tests/test_queue_drain_workflow.py \
             backend/tests/test_workflow_concurrency_gate.py
       - name: Exercise bounded Expo export supervisor with live child-process fixtures
