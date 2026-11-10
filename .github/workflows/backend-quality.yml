@@ -659,8 +659,11 @@ jobs:
       - name: Verify explicit live-service boundary (not a live service test)
         run: |
           set -euo pipefail
+          python scripts/check_backend_source_convergence.py
           python backend/scripts/check_live_service_test_boundaries.py
-          python -m pytest -q --maxfail=6 --noconftest tests/test_repo_machine_live_taxonomy.py
+          python -m pytest -q --maxfail=6 --noconftest \
+            tests/test_backend_source_convergence_ci.py \
+            tests/test_repo_machine_live_taxonomy.py
       - name: Exercise true backend source, replay and security regressions
         run: |
           set -euo pipefail
