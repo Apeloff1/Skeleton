@@ -177,6 +177,16 @@ class WorkflowTierTests(unittest.TestCase):
                 for issue in audit(root)
             ))
             strict.write_text(strict_original)
+            # Dispatch validation is insufficient if checkout still follows a
+            # moving branch; the immutable source SHA must be checked twice.
+            strict.write_text(strict_original.replace(
+                "ref: ${{ inputs.candidate_sha }}", "ref: main",
+            ))
+            self.assertTrue(any(
+                "immutable SHA admission or checkout attestation missing" in issue
+                for issue in audit(root)
+            ))
+            strict.write_text(strict_original)
 
             # The required Merge Readiness lane must retain the same exact
             # source suites even though separate automatic runs are removed.
