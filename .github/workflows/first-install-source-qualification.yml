@@ -76,6 +76,9 @@ on:
       - 'skeleton/testing/test_app_compose_parity.py'
       - 'skeleton/testing/test_windows_installer.py'
       - 'scripts/check_app_assembly.py'
+      - 'scripts/check_product_surface_specification.py'
+      - 'machine/product_surface_specification.json'
+      - 'tests/test_product_surface_delegated_backend_20261110.py'
       - 'tests/test_app_assembly_vertical_surface_custody.py'
       - 'scripts/check_app_compose_parity.py'
 
@@ -134,6 +137,8 @@ jobs:
             skeleton/testing/test_app_assembly.py \
             skeleton/testing/test_first_run_probe_gate.py \
             tests/test_app_assembly_vertical_surface_custody.py \
+            tests/test_product_surface_specification.py \
+            tests/test_product_surface_delegated_backend_20261110.py \
             skeleton/testing/test_app_installer.py \
             skeleton/testing/test_app_installer_epoch.py \
             skeleton/testing/test_app_compose_parity.py \

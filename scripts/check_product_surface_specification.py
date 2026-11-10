@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -78,6 +79,63 @@ def inspect_source(path: Path) -> dict[str, Any]:
     }
 
 
+def _delegated_backend_paths(
+    root: Path, source: Path, source_text: str,
+    row: dict[str, Any], sid: str, errors: list[str],
+) -> set[str]:
+    """Bind delegated API routes to directly imported, source-digested helpers.
+
+    No runtime import, eval, glob discovery, or implicit source delegation.
+    Undeclared helper paths remain absent from this static proof.
+    """
+    declared = row.get("backend_delegates", [])
+    if not isinstance(declared, list) or len(declared) > 4:
+        errors.append(f"{sid}: malformed bounded backend delegation inventory")
+        return set()
+    observed: set[str] = set()
+    visited: set[str] = set()
+    evidence = row.get("validation_evidence") or []
+    for item in declared:
+        if not isinstance(item, dict) or set(item) != {"source", "source_sha256"}:
+            errors.append(f"{sid}: invalid backend delegation record")
+            continue
+        relative = item["source"]
+        digest = item["source_sha256"]
+        if (
+            not isinstance(relative, str)
+            or not relative.startswith("frontend/src/features/")
+            or not relative.endswith(".ts")
+            or "\\\\" in relative
+            or any(part in {"", ".", ".."} for part in relative.split("/"))
+            or relative in visited
+            or not isinstance(digest, str)
+            or re.fullmatch(r"[a-f0-9]{64}", digest) is None
+        ):
+            errors.append(f"{sid}: invalid backend delegation path or digest")
+            continue
+        visited.add(relative)
+        candidate = root / relative
+        if not candidate.is_file() or candidate.is_symlink():
+            errors.append(f"{sid}: delegated backend source missing or unsafe: {relative}")
+            continue
+        module = os.path.relpath(candidate.with_suffix(""), source.parent).replace(os.sep, "/")
+        if not module.startswith("."):
+            module = "./" + module
+        if not re.search(r"\\bfrom\\s+['\\\"]" + re.escape(module) + r"['\\\"]", source_text):
+            errors.append(f"{sid}: delegated backend source not statically imported: {relative}")
+            continue
+        if not isinstance(evidence, list) or relative not in evidence:
+            errors.append(f"{sid}: delegated backend lacks explicit source evidence: {relative}")
+        payload = candidate.read_bytes()
+        if hashlib.sha256(payload).hexdigest() != digest:
+            errors.append(f"{sid}: delegated backend source_sha256 drift: {relative}")
+        paths = {match.group("path") for match in BACKEND.finditer(payload.decode("utf-8"))}
+        if not paths:
+            errors.append(f"{sid}: declared backend helper exposes no literal API paths: {relative}")
+        observed.update(paths)
+    return observed
+
+
 def _load_registry(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -121,6 +179,10 @@ def validate(root: Path = ROOT) -> list[str]:
             continue
         source = root / actual["source"]
         observed = inspect_source(source)
+        delegated = _delegated_backend_paths(
+            root, source, source.read_text(encoding="utf-8"), row, sid, errors,
+        )
+        observed["backend_surfaces"] = sorted(set(observed["backend_surfaces"]) | delegated)
         for key in ("source_sha256", "interaction_count", "backend_surfaces", "navigation_targets", "accessibility_signal_count"):
             if row.get(key) != observed[key]:
                 errors.append(f"{sid}: {key} drift")
