@@ -98,7 +98,7 @@ def test_digest_denies_path_replacement_after_open(tmp_path, monkeypatch):
 
     with monkeypatch.context() as scope:
         scope.setattr(ex.os, "read", replacing_read)
-        with pytest.raises(ValueError, match="replaced"):
+        with pytest.raises(ValueError, match="artifact changed during hashing"):
             ex._artifact_digest(target)
     assert replaced[0] is True
 
