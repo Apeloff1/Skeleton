@@ -2,12 +2,18 @@
 Academy Routes v3.0 — MongoDB-Backed
 All data served from pre-seeded MongoDB collections.
 """
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional, List
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from typing import Dict, Optional, List
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from pathlib import Path
 import os
+import hashlib
+import json
+from datetime import datetime, timezone
+
+from routes.gameforge_auth import require_authenticated_identity
 
 load_dotenv(Path(__file__).parent.parent / '.env')
 
@@ -18,6 +24,38 @@ router = APIRouter(prefix="/api/academy", tags=["academy"])
 from core.databases import core_db as _db, content_db as _cdb
 
 PROJECTION = {"_id": 0}
+
+
+class AssessmentSubmission(BaseModel):
+    answers: Dict[str, str] = Field(..., min_length=1, max_length=200)
+    idempotency_key: str = Field(..., min_length=12, max_length=160, pattern=r"^[A-Za-z0-9._:-]+$")
+
+
+def _public_assessment(assessment: dict) -> dict:
+    """Remove answer keys while retaining every learner-facing question field."""
+    public = {key: value for key, value in assessment.items() if key != "_id"}
+    public["questions"] = [
+        {key: value for key, value in question.items() if key not in {"correct", "correct_answer", "explanation"}}
+        for question in assessment.get("questions", [])
+        if isinstance(question, dict)
+    ]
+    public["question_count"] = len(public["questions"])
+    return public
+
+
+def _assessment_receipt_valid(attempt: dict) -> bool:
+    material = {
+        "attempt_id": attempt.get("attempt_id"),
+        "assessment_id": attempt.get("assessment_id"),
+        "answer_digest": attempt.get("answer_digest"),
+        "score": attempt.get("score"),
+        "passed": attempt.get("passed"),
+        "completed_at": attempt.get("completed_at"),
+    }
+    expected = hashlib.sha256(
+        json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return bool(attempt.get("receipt_sha256")) and expected == attempt.get("receipt_sha256")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -191,7 +229,8 @@ async def get_assessments(
     if module_id: query["module_id"] = module_id
     skip = (page - 1) * limit
     total_docs = await _db.assessments.count_documents(query)
-    items = await _db.assessments.find(query, PROJECTION).skip(skip).limit(limit).to_list(limit)
+    documents = await _db.assessments.find(query, PROJECTION).skip(skip).limit(limit).to_list(limit)
+    items = [_public_assessment(document) for document in documents]
     return {"assessments": items, "total_count": total_docs, "page": page, "pages": (total_docs + limit - 1) // limit}
 
 
@@ -201,7 +240,117 @@ async def get_assessment(assessment_id: str):
     assess = await _db.assessments.find_one({"id": assessment_id}, PROJECTION)
     if not assess:
         raise HTTPException(404, f"Assessment '{assessment_id}' not found")
-    return {"assessment": assess}
+    return {"assessment": _public_assessment(assess)}
+
+
+@router.post("/assessment/{assessment_id}/submit")
+async def submit_assessment(
+    assessment_id: str,
+    submission: AssessmentSubmission,
+    scope=Depends(require_authenticated_identity),
+):
+    """Grade and durably record one source-bound assessment attempt.
+
+    Idempotency binds the caller-provided key to the exact answer payload. A
+    retry returns the original receipt; reusing a key for different answers is
+    rejected rather than silently overwriting learning evidence.
+    """
+    assessment = await _db.assessments.find_one({"id": assessment_id}, PROJECTION)
+    if not assessment:
+        raise HTTPException(404, f"Assessment '{assessment_id}' not found")
+    questions = [question for question in assessment.get("questions", []) if isinstance(question, dict)]
+    if not questions:
+        raise HTTPException(409, "Assessment has no gradeable questions")
+
+    expected_ids = [str(question.get("id") or "").strip() for question in questions]
+    if any(not question_id for question_id in expected_ids) or set(submission.answers) != set(expected_ids):
+        raise HTTPException(422, "Answers must contain exactly one entry for every assessment question")
+    normalized = {key: submission.answers[key].strip() for key in sorted(submission.answers)}
+    if any(not value or len(value) > 2_000 for value in normalized.values()):
+        raise HTTPException(422, "Assessment answers must be non-empty and at most 2000 characters")
+    payload_digest = hashlib.sha256(
+        json.dumps(normalized, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    identity = {"tenant_id": scope["tenant_id"], "owner_id": scope["owner_id"]}
+    existing = await _db.academy_assessment_attempts.find_one(
+        {**identity, "idempotency_key": submission.idempotency_key}, PROJECTION
+    )
+    if existing:
+        if existing.get("assessment_id") != assessment_id or existing.get("answer_digest") != payload_digest:
+            raise HTTPException(409, "Idempotency key is already bound to another assessment submission")
+        if not _assessment_receipt_valid(existing):
+            raise HTTPException(409, "Stored assessment receipt failed integrity verification")
+        existing["receipt_verified"] = True
+        return {"attempt": existing, "replayed": True}
+
+    earned = 0
+    possible = 0
+    results = []
+    for question, question_id in zip(questions, expected_ids):
+        points = max(0, min(int(question.get("points", 1) or 1), 1_000))
+        correct_answer = str(question.get("correct", question.get("correct_answer", ""))).strip()
+        if not correct_answer:
+            raise HTTPException(409, f"Question '{question_id}' has no answer key")
+        correct = normalized[question_id].casefold() == correct_answer.casefold()
+        possible += points
+        if correct:
+            earned += points
+        results.append({
+            "question_id": question_id,
+            "correct": correct,
+            "points_earned": points if correct else 0,
+            "points_possible": points,
+            "correct_answer": correct_answer,
+            "explanation": question.get("explanation", ""),
+        })
+    if possible <= 0:
+        raise HTTPException(409, "Assessment has no positive point value")
+    score = round(earned * 100 / possible, 2)
+    passing_score = max(0, min(float(assessment.get("passing_score", 70) or 70), 100))
+    completed_at = datetime.now(timezone.utc).isoformat()
+    attempt_id = "academy-attempt-" + hashlib.sha256(
+        f"{scope['tenant_id']}\0{scope['owner_id']}\0{submission.idempotency_key}".encode("utf-8")
+    ).hexdigest()[:24]
+    receipt_material = {
+        "attempt_id": attempt_id,
+        "assessment_id": assessment_id,
+        "answer_digest": payload_digest,
+        "score": score,
+        "passed": score >= passing_score,
+        "completed_at": completed_at,
+    }
+    attempt = {
+        **identity,
+        **receipt_material,
+        "idempotency_key": submission.idempotency_key,
+        "points_earned": earned,
+        "points_possible": possible,
+        "passing_score": passing_score,
+        "results": results,
+        "receipt_sha256": hashlib.sha256(
+            json.dumps(receipt_material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
+    }
+    await _db.academy_assessment_attempts.insert_one(dict(attempt))
+    attempt["receipt_verified"] = True
+    return {"attempt": attempt, "replayed": False}
+
+
+@router.get("/assessment-attempts")
+async def get_assessment_attempts(
+    assessment_id: Optional[str] = Query(None, min_length=1, max_length=200),
+    limit: int = Query(20, ge=1, le=100),
+    scope=Depends(require_authenticated_identity),
+):
+    query = {"tenant_id": scope["tenant_id"], "owner_id": scope["owner_id"]}
+    if assessment_id:
+        query["assessment_id"] = assessment_id
+    attempts = await _db.academy_assessment_attempts.find(query, PROJECTION).sort("completed_at", -1).limit(limit).to_list(limit)
+    for attempt in attempts:
+        attempt["receipt_verified"] = _assessment_receipt_valid(attempt)
+    if any(not attempt["receipt_verified"] for attempt in attempts):
+        raise HTTPException(409, "Stored assessment receipt failed integrity verification")
+    return {"attempts": attempts, "count": len(attempts)}
 
 
 # ═══════════════════════════════════════════════════════════════
