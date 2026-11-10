@@ -412,7 +412,7 @@ def verify(manifest: Manifest, base: Path, root: Path | None = None) -> list[str
             problems.append(f"{a.preset}: unsafe artifact path")
             continue
         if _has_symlink(Path(base), rel):
-            problems.append(f"{a.preset}: symlink artifact path refused")
+            problems.append(f"{a.preset}: unsafe symlink artifact path refused")
             continue
         try:
             digest, size = _digest_beneath(Path(base), a.path)
