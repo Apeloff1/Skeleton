@@ -552,3 +552,68 @@ def test_cli_provenance_output_is_create_only(tmp_path, capsys):
     result = __import__("json").loads(capsys.readouterr().out)
     assert result == {"error": "unsafe or occupied provenance manifest output"}
     assert output.read_bytes() == previous
+
+
+
+def _bound_project_manifest(tmp_path):
+    """Project and output are separate to keep tree re-check deterministic."""
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / "project.godot").write_text("[application]\n", encoding="utf-8")
+    artifact = tmp_path / "native.bin"
+    artifact.write_bytes(b"sample-native-export" * 24)
+    manifest = provenance.build(
+        root, "Godot 4.7", "SHIP", {"Linux": artifact}, base=tmp_path,
+    )
+    assert provenance.verify(manifest, tmp_path, root) == []
+    return root, artifact, manifest
+
+
+def test_provenance_verifier_refuses_identical_tree_with_wrong_project_name(tmp_path):
+    root, _artifact, manifest = _bound_project_manifest(tmp_path)
+    impostor = tmp_path / "another-project"
+    root.rename(impostor)
+    # The file set and SHA remain identical; only the authorial identity is
+    # different. A manifest for one project must not qualify another.
+    assert provenance.tree_digest(impostor) == manifest.tree
+    problems = provenance.verify(manifest, tmp_path, impostor)
+    assert "project identity differs from manifest" in problems
+    assert "project tree changed since manifest" not in problems
+
+
+def test_provenance_verifier_binds_git_pin_to_exact_source_revision(tmp_path):
+    root, _artifact, manifest = _bound_project_manifest(tmp_path)
+    manifest.git = "a" * 40
+    with patch.object(provenance, "git_head", return_value="b" * 40):
+        problems = provenance.verify(manifest, tmp_path, root)
+    assert "git source pin differs from manifest" in problems
+    with patch.object(provenance, "git_head", return_value="a" * 40):
+        assert provenance.verify(manifest, tmp_path, root) == []
+
+
+def test_provenance_verifier_rejects_unavailable_pinned_git_revision(tmp_path):
+    root, _artifact, manifest = _bound_project_manifest(tmp_path)
+    manifest.git = "b" * 40
+    with patch.object(provenance, "git_head", return_value=None):
+        problems = provenance.verify(manifest, tmp_path, root)
+    assert "git source pin differs from manifest" in problems
+
+
+def test_provenance_cli_requires_source_to_claim_ok(tmp_path, capsys):
+    from skeleton.godot_export import cli
+
+    root, _artifact, manifest = _bound_project_manifest(tmp_path)
+    path = tmp_path / "manifest.json"
+    provenance.write_manifest_file_new(path, manifest)
+    assert cli.main([
+        "verify", str(path), "--base", str(tmp_path),
+    ]) == 1
+    result = __import__("json").loads(capsys.readouterr().out)
+    assert result["ok"] is False
+    assert "project source tree was not supplied for verification" in result["problems"]
+    assert cli.main([
+        "verify", str(path), "--base", str(tmp_path),
+        "--project", str(root),
+    ]) == 0
+    qualified = __import__("json").loads(capsys.readouterr().out)
+    assert qualified == {"ok": True, "problems": []}
