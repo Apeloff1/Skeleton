@@ -144,60 +144,139 @@ def _digest_beneath(
 
 
 MAX_SOURCE_ENTRIES = 2 * MAX_SOURCE_FILES
+MAX_SOURCE_DEPTH = 64
+
+
+def _open_tree_directory(root_fd: int, relative: tuple[str, ...]) -> int:
+    """Reopen a directory without following *any* changed path component.
+
+    os.scandir(string_path) follows intermediate symlinks after a preceding
+    is_dir() check. Instead, every iteration re-anchors directory traversal
+    from the held root fd, with O_NOFOLLOW applied to each component.
+    """
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    fd = os.dup(root_fd)
+    try:
+        for part in relative:
+            child = os.open(part, flags, dir_fd=fd)
+            os.close(fd)
+            fd = child
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
 
 
 def tree_digest(root: Path) -> str:
-    """Bound directory traversal before sorting, then hash canonical paths.
+    """Bound source traversal with descriptor-anchored, no-follow directories.
 
-    sorted(root.rglob("*")) used to enumerate the *entire* source tree before
-    checking MAX_SOURCE_FILES, allowing huge untrusted directories to exhaust
-    memory. An iterative scandir walk bounds every admitted entry, prunes
-    ignored directories, rejects links and special files, and sorts only the
-    bounded set of verified source path digests.
+    Enumerating sorted(root.rglob("*")) materialized arbitrary source trees
+    before checking budgets. A path-based scandir still followed replaced
+    intermediate directories. This scan uses bounded relative components
+    and independently checks that even empty subdirectories remained stable
+    before certifying a source snapshot.
     """
     root = Path(root)
-    if root.is_symlink():
-        raise ValueError("symlink project source root cannot be certified")
-    initial = os.stat(root, follow_symlinks=False)
-    if not stat.S_ISDIR(initial.st_mode):
-        raise ValueError("project source root must be a directory")
-    pending = [root]
-    seen = count = total = 0
-    source_digests: list[tuple[str, str]] = []
-    while pending:
-        directory = pending.pop()
-        with os.scandir(directory) as entries:
-            for entry in entries:
-                rel = Path(entry.path).relative_to(root)
-                if any(part in IGNORED_DIRS for part in rel.parts):
-                    continue
-                seen += 1
-                if seen > MAX_SOURCE_ENTRIES:
-                    raise ValueError("source tree entry budget exceeded")
-                if entry.is_symlink():
-                    raise ValueError("symlink or linked project source cannot be certified")
-                if entry.is_dir(follow_symlinks=False):
-                    pending.append(Path(entry.path))
-                    continue
-                if not entry.is_file(follow_symlinks=False):
-                    raise ValueError("special project source cannot be certified")
-                count += 1
-                if count > MAX_SOURCE_FILES:
-                    raise ValueError("source file budget exceeded")
-                relative = rel.as_posix()
-                digest, size = _digest_beneath(root, relative)
-                total += size
-                if total > MAX_SOURCE_BYTES:
-                    raise ValueError("source size budget exceeded")
-                source_digests.append((relative, digest))
-    end = os.stat(root, follow_symlinks=False)
-    if ((initial.st_dev, initial.st_ino) != (end.st_dev, end.st_ino)
-            or not stat.S_ISDIR(end.st_mode)):
-        raise ValueError("source root changed during tree digest")
-    result = hashlib.sha256()
-    for relative, digest in sorted(source_digests):
-        result.update(relative.encode() + b"\0" + digest.encode() + b"\n")
-    return result.hexdigest()
+    if root.is_symlink() or ".." in root.parts:
+        raise ValueError("symlink or unsafe source root cannot be certified")
+    if os.name != "posix" or not all(
+        hasattr(os, name) for name in ("O_NOFOLLOW", "O_DIRECTORY")
+    ):
+        raise ValueError("source tree descriptor custody unavailable")
+    absolute = Path(os.path.abspath(os.fspath(root)))
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    root_fd = os.open("/", flags)
+    try:
+        for component in absolute.parts[1:]:
+            next_fd = os.open(component, flags, dir_fd=root_fd)
+            os.close(root_fd)
+            root_fd = next_fd
+        initial = os.fstat(root_fd)
+        pending: list[tuple[str, ...]] = [()]
+        observed: list[tuple[tuple[str, ...], tuple[int, ...]]] = []
+        source_digests: list[tuple[str, str]] = []
+        seen = count = total = 0
+
+        def directory_identity(info: os.stat_result) -> tuple[int, ...]:
+            return (
+                info.st_dev, info.st_ino,
+                info.st_mtime_ns, info.st_ctime_ns,
+            )
+
+        while pending:
+            relative_dir = pending.pop()
+            try:
+                dfd = _open_tree_directory(root_fd, relative_dir)
+            except OSError as exc:
+                raise ValueError("source directory changed during scan") from exc
+            try:
+                observed.append((relative_dir, directory_identity(os.fstat(dfd))))
+                with os.scandir(dfd) as entries:
+                    for item in entries:
+                        name = item.name
+                        if name in IGNORED_DIRS:
+                            continue
+                        # Ignore no path aliases. Names from a dirfd are single
+                        # names, not attacker-supplied relative path expressions.
+                        if not name or name in (".", "..") or "/" in name:
+                            raise ValueError("noncanonical source tree entry")
+                        seen += 1
+                        if seen > MAX_SOURCE_ENTRIES:
+                            raise ValueError("source tree entry budget exceeded")
+                        rel = relative_dir + (name,)
+                        if item.is_symlink():
+                            raise ValueError("symlink or linked project source cannot be certified")
+                        if item.is_dir(follow_symlinks=False):
+                            if len(rel) > MAX_SOURCE_DEPTH:
+                                raise ValueError("source directory depth exceeded")
+                            pending.append(rel)
+                            continue
+                        if not item.is_file(follow_symlinks=False):
+                            raise ValueError("special project source cannot be certified")
+                        count += 1
+                        if count > MAX_SOURCE_FILES:
+                            raise ValueError("source file budget exceeded")
+                        rel_path = "/".join(rel)
+                        digest, size = _digest_beneath(root, rel_path)
+                        total += size
+                        if total > MAX_SOURCE_BYTES:
+                            raise ValueError("source size budget exceeded")
+                        source_digests.append((rel_path, digest))
+            finally:
+                os.close(dfd)
+
+        # Verify that previously scanned directories (including empty ones)
+        # still have the same identities and listing generations. Otherwise
+        # an attacker can replace a directory after it was marked as empty.
+        for relative_dir, fingerprint in observed:
+            try:
+                dfd = _open_tree_directory(root_fd, relative_dir)
+            except OSError as exc:
+                raise ValueError("source directory changed after scan") from exc
+            try:
+                if directory_identity(os.fstat(dfd)) != fingerprint:
+                    raise ValueError("source directory changed after scan")
+            finally:
+                os.close(dfd)
+
+        # Source root itself must still be reachable from the identical path.
+        check_fd = os.open("/", flags)
+        try:
+            for component in absolute.parts[1:]:
+                next_fd = os.open(component, flags, dir_fd=check_fd)
+                os.close(check_fd)
+                check_fd = next_fd
+            current = os.fstat(check_fd)
+            if directory_identity(current) != directory_identity(initial):
+                raise ValueError("source root changed during tree digest")
+        finally:
+            os.close(check_fd)
+        result = hashlib.sha256()
+        for rel_path, digest in sorted(source_digests):
+            result.update(rel_path.encode() + b"\0" + digest.encode() + b"\n")
+        return result.hexdigest()
+    finally:
+        os.close(root_fd)
 
 
 def git_head(root: Path) -> str | None:
