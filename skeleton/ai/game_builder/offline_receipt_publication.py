@@ -166,7 +166,10 @@ def publish_verified_receipt(
         # Never unlink the published name: another process may already have
         # observed it. Preserve it for owner-controlled quarantine/recovery;
         # a retry must fail the existing-name no-clobber check.
-        if isinstance(exc, (ReceiptPublicationError, PermissionError)):
+        # Authorization was checked before entering the publication transaction.
+        # Filesystem EPERM during the atomic link is a custody/publication error,
+        # not an authorization decision. Keep the public API fail-closed.
+        if isinstance(exc, ReceiptPublicationError):
             raise
         if isinstance(exc, DualRuntimeVerificationError):
             raise ReceiptPublicationError("receipt destination changed during publication") from exc
