@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "31db10ca81db97afc140ef8dfa7062bf76ce89b7",
+      "source_git_object_sha": "75d874f67a6ed1dcfb2745b97a4663d88895ff09",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "966bbe8c5794ad478c801e27b177035ae7ee16ed",
+      "source_git_object_sha": "8d6c437961625b0994c3aa2e9b52acc3b3912dee",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -7339,6 +7339,11 @@
       "reason": "Canonical CPU and runtime profiling instrumentation belongs to the platform observability substrate and remains outside AI-tree implementation ownership until an explicit, independently qualified cutover."
     },
     {
+      "path": "skeleton/perfgate",
+      "owner": "performance assurance / benchmarking",
+      "reason": "Finite performance budgets, soak workloads, baseline statistics and diagnostic gates are independent quality evidence, not an AI model-runtime owner or migration authority."
+    },
+    {
       "path": "skeleton/persist",
       "owner": "persistence compatibility boundary",
       "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
@@ -7377,6 +7382,11 @@
       "path": "skeleton/providers",
       "owner": "integration contract owner",
       "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
+    },
+    {
+      "path": "skeleton/qualification",
+      "owner": "independent qualification and evidence",
+      "reason": "Source-bound performance, FPS, replay, retention, promotion and soak qualification gates validate product behavior without becoming model execution, deployment or release authority."
     },
     {
       "path": "skeleton/quality/scatter10240",
@@ -7782,7 +7792,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 157,
+    "retained_outside_ai_tree_count": 164,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
