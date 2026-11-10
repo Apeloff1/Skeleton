@@ -144,7 +144,7 @@ class CreateOnlyCampaignCustodyTests(unittest.TestCase):
             self.assertEqual(code, 2)
             self.assertFalse((outside / "save.json").exists())
 
-    def test_create_only_requires_descriptor_link_support(self):
+    def test_create_only_requires_descriptor_relative_directory_apis(self):
         with tempfile.TemporaryDirectory() as tmp:
             slot = Path(tmp) / "save.json"
             with patch.object(os, "supports_dir_fd", frozenset()):
