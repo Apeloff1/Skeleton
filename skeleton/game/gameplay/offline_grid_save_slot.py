@@ -29,13 +29,6 @@ def _encode(snapshot: object) -> bytes:
     return payload
 
 
-def _directory(path: Path) -> Path:
-    parent = path.parent.resolve(strict=True)
-    if not parent.is_dir():
-        raise SaveSlotError("save directory is not a directory")
-    return parent
-
-
 def _check_slot(name: str, dfd: int) -> None:
     try:
         info = os.stat(name, dir_fd=dfd, follow_symlinks=False)
@@ -46,21 +39,42 @@ def _check_slot(name: str, dfd: int) -> None:
 
 
 def _open_parent(path: Path) -> tuple[int, Path]:
+    """Open every parent path component from the root without symlink traversal.
+
+    Opening only the final directory with O_NOFOLLOW does not protect earlier
+    ancestors: an attacker can replace an intermediate component after a
+    Path.resolve preflight and before os.open. Descriptor-relative walking
+    makes each hop no-follow and anchors subsequent hops to opened directories.
+    """
     if path.name in ("", ".", "..") or path.name != os.path.basename(path):
         raise SaveSlotError("invalid slot filename")
-    parent = _directory(path)
-    if parent != path.parent.absolute():
-        raise SaveSlotError("save parent must not contain symlinks")
-    if (not hasattr(os, "supports_dir_fd") or not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY")
+    if (not hasattr(os, "supports_dir_fd") or not hasattr(os, "O_NOFOLLOW")
+            or not hasattr(os, "O_DIRECTORY")
             or not all(fn in os.supports_dir_fd for fn in
                        (os.open, os.stat, os.rename, os.unlink))):
         raise SaveSlotError("descriptor-relative saves unavailable on this platform")
+    parent = path.parent.absolute()
+    parts = parent.parts
+    if not parent.is_absolute() or not parts or any(part in (".", "..") for part in parts[1:]):
+        raise SaveSlotError("save parent must be a canonical absolute path")
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-    dfd = os.open(parent, flags)
-    if os.stat(parent).st_ino != os.fstat(dfd).st_ino or os.stat(parent).st_dev != os.fstat(dfd).st_dev:
-        os.close(dfd)
-        raise SaveSlotError("save parent changed during open")
-    return dfd, parent
+    try:
+        dfd = os.open(parts[0], flags)
+        try:
+            for component in parts[1:]:
+                next_fd = os.open(component, flags, dir_fd=dfd)
+                os.close(dfd)
+                dfd = next_fd
+            observed = os.stat(parent, follow_symlinks=False)
+            held = os.fstat(dfd)
+            if (observed.st_dev, observed.st_ino) != (held.st_dev, held.st_ino):
+                raise SaveSlotError("save parent changed during open")
+            return dfd, parent
+        except BaseException:
+            os.close(dfd)
+            raise
+    except OSError as exc:
+        raise SaveSlotError("save parent must not contain symlinks or inaccessible components") from exc
 
 
 def write_slot(path: Path, snapshot: object) -> None:
@@ -72,9 +86,6 @@ def write_slot(path: Path, snapshot: object) -> None:
     """
     path = Path(path)
     payload = _encode(snapshot)
-    parent = _directory(path)
-    if parent != path.parent.absolute():
-        raise SaveSlotError("save parent must not contain symlinks")
     dfd, parent = _open_parent(path)
     temporary = ".campaign-" + secrets.token_hex(16) + ".tmp"
     created = False
@@ -96,9 +107,11 @@ def write_slot(path: Path, snapshot: object) -> None:
         created = False
         os.fsync(dfd)
     finally:
-        if created:
-            os.unlink(temporary, dir_fd=dfd)
-        os.close(dfd)
+        try:
+            if created:
+                os.unlink(temporary, dir_fd=dfd)
+        finally:
+            os.close(dfd)
 
 
 def read_slot(path: Path) -> object:
