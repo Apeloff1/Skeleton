@@ -429,3 +429,126 @@ def test_manifest_special_fifo_fails_without_blocking(tmp_path):
     os.mkfifo(target)
     with pytest.raises(ValueError, match="unsafe"):
         provenance.read_manifest_file(target)
+
+
+def test_manifest_writer_create_only_roundtrip(tmp_path):
+    path = tmp_path / "manifest.json"
+    manifest = _manifest_fixture()
+    provenance.write_manifest_file_new(path, manifest)
+    assert path.read_bytes() == manifest.dumps().encode("utf-8")
+    assert provenance.read_manifest_file(path).to_dict() == manifest.to_dict()
+    assert path.stat().st_nlink == 1
+
+
+def test_manifest_writer_cannot_replace_existing_receipt(tmp_path):
+    path = tmp_path / "manifest.json"
+    path.write_bytes(b"original receipt")
+    with pytest.raises(FileExistsError):
+        provenance.write_manifest_file_new(path, _manifest_fixture())
+    assert path.read_bytes() == b"original receipt"
+
+
+def test_manifest_writer_refuses_final_symlink_and_intermediate_symlink(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    private = outside / "private.txt"
+    private.write_bytes(b"untouched")
+    existing = tmp_path / "linked.json"
+    existing.symlink_to(private)
+    with pytest.raises(FileExistsError):
+        provenance.write_manifest_file_new(existing, _manifest_fixture())
+    assert private.read_bytes() == b"untouched"
+
+    alias = tmp_path / "alias"
+    alias.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(OSError):
+        provenance.write_manifest_file_new(alias / "new.json", _manifest_fixture())
+    assert not (outside / "new.json").exists()
+
+
+def test_manifest_writer_removes_partial_publication_on_fsync_failure(tmp_path):
+    path = tmp_path / "manifest.json"
+    with patch.object(provenance.os, "fsync", side_effect=OSError("disk full")):
+        with pytest.raises(OSError, match="disk full"):
+            provenance.write_manifest_file_new(path, _manifest_fixture())
+    assert not path.exists()
+
+
+def test_manifest_writer_refuses_same_size_in_place_tampering(tmp_path):
+    path = tmp_path / "manifest.json"
+    fixture = _manifest_fixture()
+    original = provenance._read_manifest_bytes
+    mutated = False
+
+    def rewrite_before_readback(current):
+        nonlocal mutated
+        if not mutated:
+            mutated = True
+            data = path.read_bytes()
+            assert b"NO-SHIP" in data
+            path.write_bytes(data.replace(b"NO-SHIP", b"UN-SHIP"))
+        return original(current)
+
+    with patch.object(
+        provenance, "_read_manifest_bytes", side_effect=rewrite_before_readback,
+    ):
+        with pytest.raises(ValueError, match="contents changed"):
+            provenance.write_manifest_file_new(path, fixture)
+    assert mutated
+    assert not path.exists()
+
+
+def test_manifest_writer_refuses_parent_substitution_during_readback(tmp_path):
+    parent = tmp_path / "approved"
+    parent.mkdir()
+    path = parent / "manifest.json"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    old = tmp_path / "old-approved"
+    original = provenance._read_manifest_bytes
+    swapped = False
+
+    def substitute_parent(current):
+        nonlocal swapped
+        if not swapped:
+            parent.rename(old)
+            parent.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        return original(current)
+
+    with patch.object(
+        provenance, "_read_manifest_bytes", side_effect=substitute_parent,
+    ):
+        with pytest.raises(OSError):
+            provenance.write_manifest_file_new(path, _manifest_fixture())
+    assert swapped
+    assert not (outside / "manifest.json").exists()
+    assert not (old / "manifest.json").exists()
+
+
+def test_manifest_writer_refuses_oversized_output_without_creation(tmp_path):
+    path = tmp_path / "manifest.json"
+    with patch.object(provenance, "MAX_MANIFEST_BYTES", 32):
+        with pytest.raises(ValueError, match="byte bound"):
+            provenance.write_manifest_file_new(path, _manifest_fixture())
+    assert not path.exists()
+
+
+def test_cli_provenance_output_is_create_only(tmp_path, capsys):
+    from skeleton.godot_export.cli import main as godot_main
+
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "project.godot").write_text("[application]\n", encoding="utf-8")
+    output = tmp_path / "receipt.json"
+    args = [
+        "provenance", str(project), "--verdict", "NO-SHIP",
+        "--out", str(output),
+    ]
+    assert godot_main(args) == 0
+    previous = output.read_bytes()
+    assert provenance.read_manifest_file(output).verdict == "NO-SHIP"
+    assert godot_main(args) == 2
+    result = __import__("json").loads(capsys.readouterr().out)
+    assert result == {"error": "unsafe or occupied provenance manifest output"}
+    assert output.read_bytes() == previous
