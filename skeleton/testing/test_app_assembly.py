@@ -854,6 +854,9 @@ def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
         def __exit__(self, *_args):
             return False
 
+        def geturl(self):
+            return "http://localhost:8001/api/health"
+
         def read(self, _size):
             return b"redirect"
 
@@ -876,6 +879,9 @@ def test_health_probe_transport_forbids_redirects_and_proxy_environment(monkeypa
 
         def __exit__(self, *_args):
             return False
+
+        def geturl(self):
+            return seen["url"]
 
         def read(self, _size):
             return b"ok"
