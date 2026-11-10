@@ -9,9 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
-import stat
 import sys
 
 from skeleton.game.gameplay.flgb_gameplay_runtime import GameplayContractError
@@ -21,23 +19,16 @@ from skeleton.game.gameplay.grid_terminal_input import parse_terminal_input
 from skeleton.game.gameplay.offline_grid_save_slot import SaveSlotError, create_slot, read_slot, write_slot
 
 DEFAULT_SOURCE = Path(__file__).resolve().parents[2] / "skeleton/game/gameplay/content/lantern_harbor.json"
-MAX_READ = 2_000_000
 
 
 def _read(path: Path) -> object:
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(path, flags)
-    try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_READ:
-            raise ValueError("not a bounded regular file")
-        with os.fdopen(fd, "rb", closefd=False) as handle:
-            data = handle.read(MAX_READ + 1)
-        if len(data) > MAX_READ:
-            raise ValueError("input exceeds byte budget")
-        return json.loads(data)
-    finally:
-        os.close(fd)
+    """Read all campaign source and command JSON under save-slot custody.
+
+    Prior direct os.open() protected only the final pathname. This reusable
+    reader guards every directory component, refuses non-regular files and
+    duplicate/non-finite JSON, and bounds reads before parser admission.
+    """
+    return read_slot(path)
 
 
 def _write_new_save(path: Path, snapshot: dict) -> None:
