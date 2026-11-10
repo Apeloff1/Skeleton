@@ -24,7 +24,7 @@ test('full live refuses an absent operator token before contacting the backend',
   const child = launch({ SKELETON_E2E_BASE_URL: 'http://127.0.0.1:1' },
                        ['SKELETON_E2E_OPERATOR_TOKEN_FILE']);
   assert.equal(child.error, undefined);
-  assert.notEqual(child.status, 0, 'a skipped privileged step must not certify E2E');
+  assert.notEqual(child.status, 0, `a skipped privileged step must not certify E2E: stdout=${child.stdout.slice(0, 1200)} stderr=${child.stderr.slice(0, 1200)}`);
   assert.match(child.stdout + child.stderr,
                /full live E2E requires authorized operator token/);
 });
@@ -37,7 +37,7 @@ test('full live refuses an absent backend even with a fixture operator token', (
     const child = launch({ SKELETON_E2E_OPERATOR_TOKEN_FILE: token },
                          ['SKELETON_E2E_BASE_URL']);
     assert.equal(child.error, undefined);
-    assert.notEqual(child.status, 0, 'a missing live backend cannot qualify');
+    assert.notEqual(child.status, 0, `a missing live backend cannot qualify: stdout=${child.stdout.slice(0, 1200)} stderr=${child.stderr.slice(0, 1200)}`);
     assert.match(child.stdout + child.stderr,
                  /full live E2E requires SKELETON_E2E_BASE_URL/);
   } finally {
