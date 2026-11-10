@@ -84,6 +84,13 @@ class TestNativeReceiptCustody(unittest.TestCase):
         with self.assertRaises(ContractViolation):self.run_gateway(gateway)
         self.assertTrue(breaker.health['open'])
 
+    def test_output_receipt_digest_mismatch_trips_circuit(self):
+        gateway,backend,breaker=self.gateway('digest')
+        with self.assertRaises(ContractViolation):
+            self.run_gateway(gateway)
+        self.assertTrue(breaker.health['open'])
+        self.assertEqual(backend.calls, 1)
+
     def test_context_overrun_trips_circuit(self):
         gateway,backend,breaker=self.gateway('context')
         with self.assertRaises(ContractViolation):self.run_gateway(gateway)

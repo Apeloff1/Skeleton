@@ -18,6 +18,8 @@ import tempfile
 from skeleton.game.gameplay.flgb_gameplay_runtime import GameplayContractError
 from skeleton.game.gameplay.offline_grid_campaign import Campaign, Command, Session
 from skeleton.game.gameplay.grid_viewport import viewport
+from skeleton.game.gameplay.grid_terminal_input import parse_terminal_input
+from skeleton.game.gameplay.offline_grid_save_slot import SaveSlotError, read_slot, write_slot
 
 DEFAULT_SOURCE = Path(__file__).resolve().parents[2] / "skeleton/game/gameplay/content/lantern_harbor.json"
 MAX_READ = 2_000_000
@@ -68,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--commands", type=Path)
     parser.add_argument("--resume", type=Path)
     parser.add_argument("--out-save", type=Path, help="Create a durable no-clobber replay save")
+    parser.add_argument("--save-slot", type=Path, help="Opt-in durable atomic replacement of a single save slot")
     parser.add_argument("--view-width", type=int, default=11)
     parser.add_argument("--view-height", type=int, default=9)
     parser.add_argument("--accessible", action="store_true")
@@ -78,8 +81,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         campaign = Campaign.load(_read(args.source))
         camera = viewport(Session.new(campaign), args.view_width, args.view_height)
+        if args.out_save is not None and args.save_slot is not None:
+            raise ValueError("--out-save and --save-slot are mutually exclusive")
         if args.operation == "solve":
-            if args.commands or args.resume or args.out_save or not args.goal_ending:
+            if args.commands or args.resume or args.out_save or args.save_slot or not args.goal_ending:
                 raise ValueError("solve requires goal and forbids commands/resume")
             from skeleton.game.gameplay.grid_playthrough_route import plan_playthrough
             result = plan_playthrough(
@@ -91,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.goal_ending is not None or args.max_nodes != 1024 or args.max_depth != 64:
             raise ValueError("route options require solve")
         if args.operation == "inspect":
-            if args.commands or args.resume or args.out_save:
+            if args.commands or args.resume or args.out_save or args.save_slot:
                 raise ValueError("inspect does not accept commands or resume")
             session = Session.new(campaign)
             print(json.dumps({"source_digest": campaign.source_digest, "map": session.render(),
@@ -101,8 +106,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.operation == "play":
             if args.commands is not None:
                 raise ValueError("play reads commands from the terminal")
-            session = Session.restore(campaign, _read(args.resume)) if args.resume else Session.new(campaign)
-            print("Offline grid campaign: move north/south/east/west, collect ID, talk ID, finish ID, wait, quit")
+            session = Session.restore(campaign, read_slot(args.resume) if args.save_slot is not None else _read(args.resume)) if args.resume else Session.new(campaign)
+            print("Offline grid campaign: W/A/S/D or arrow words to move; collect ID, talk ID, strike ID, finish ID, wait, quit")
             while session.ending is None and session.tick < 4096:
                 camera = viewport(session, args.view_width, args.view_height)
                 print(camera.description if args.accessible else camera.render())
@@ -112,18 +117,15 @@ def main(argv: list[str] | None = None) -> int:
                     break
                 if line == "quit":
                     break
-                parts = line.split()
-                if not parts or len(parts) > 2:
-                    print("Enter a command and optional target.", file=sys.stderr)
-                    continue
-                kind = parts[0]
-                target = parts[1] if len(parts) == 2 else ""
                 try:
-                    session = session.step(Command(f"terminal-{session.tick + 1}", kind, target))
+                    command = parse_terminal_input(line, f"terminal-{session.tick + 1}")
+                    session = session.step(command)
                 except GameplayContractError as exc:
                     print(f"Rejected: {exc}", file=sys.stderr)
             if args.out_save is not None:
                 _write_new_save(args.out_save, session.snapshot())
+            if args.save_slot is not None:
+                write_slot(args.save_slot, session.snapshot())
             print()
             print(json.dumps({"save": session.snapshot(), "map": session.render(),
                               "viewport": viewport(session, args.view_width, args.view_height).record()},
@@ -134,18 +136,20 @@ def main(argv: list[str] | None = None) -> int:
         raw_commands = _read(args.commands)
         if not isinstance(raw_commands, list) or len(raw_commands) > 4096:
             raise ValueError("invalid command batch")
-        session = Session.restore(campaign, _read(args.resume)) if args.resume else Session.new(campaign)
+        session = Session.restore(campaign, read_slot(args.resume) if args.save_slot is not None else _read(args.resume)) if args.resume else Session.new(campaign)
         for item in raw_commands:
             if not isinstance(item, dict) or set(item) - {"command_id", "kind", "target"}:
                 raise ValueError("invalid command fields")
             session = session.step(Command(**item))
         if args.out_save is not None:
             _write_new_save(args.out_save, session.snapshot())
+        if args.save_slot is not None:
+            write_slot(args.save_slot, session.snapshot())
         print(json.dumps({"save": session.snapshot(), "map": session.render(),
                           "viewport": viewport(session, args.view_width, args.view_height).record()},
                          sort_keys=True))
         return 0
-    except (GameplayContractError, OSError, ValueError, TypeError, KeyError) as exc:
+    except (GameplayContractError, SaveSlotError, OSError, ValueError, TypeError, KeyError) as exc:
         print(f"offline-grid-campaign: {exc}", file=sys.stderr)
         return 2
 

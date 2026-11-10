@@ -35,6 +35,7 @@ export default function AgentReviewScreen() {
   const [report, setReport] = React.useState<Report | null>(null);
   const [history, setHistory] = React.useState<HistoryPoint[]>([]);
   const [running, setRunning] = React.useState(false);
+  const [loadingInitial, setLoadingInitial] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [query, setQuery] = React.useState('');
   const [degradedOnly, setDegradedOnly] = React.useState(params.focus === 'degraded');
@@ -43,17 +44,25 @@ export default function AgentReviewScreen() {
     const r = await api.get<{ ok: boolean; count: number; history: HistoryPoint[] }>(
       '/api/galaxy-studio/agents/once-over/history?limit=30',
     );
-    if (r.ok && r.data?.history) setHistory(r.data.history);
+    if (!r.ok || !Array.isArray(r.data?.history)) throw new Error(r.error || 'Agent review history is unavailable.');
+    setHistory(r.data.history.slice(-30));
   }, []);
 
   const loadLast = React.useCallback(async () => {
     const r = await api.get<{ ok: boolean; ran: boolean; report: Report | null }>(
       '/api/galaxy-studio/agents/once-over/last',
     );
-    if (r.ok && r.data?.report) setReport(r.data.report);
+    if (!r.ok) throw new Error(r.error || 'The latest agent review is unavailable.');
+    if (r.data?.report) setReport(r.data.report);
   }, []);
 
-  React.useEffect(() => { loadLast(); loadHistory(); }, [loadLast, loadHistory]);
+  React.useEffect(() => {
+    let active = true;
+    Promise.all([loadLast(), loadHistory()])
+      .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : 'Agent review evidence is unavailable.'); })
+      .finally(() => { if (active) setLoadingInitial(false); });
+    return () => { active = false; };
+  }, [loadLast, loadHistory]);
 
   // Arriving from the home degradation chip: auto-run a fresh once-over so the
   // user immediately sees which agents are degraded (no manual tap needed).
@@ -70,7 +79,7 @@ export default function AgentReviewScreen() {
     if (r.ok && r.data?.ok) {
       setReport(r.data);
       haptics.notify('success');
-      loadHistory();
+      loadHistory().catch(cause => setError(cause instanceof Error ? cause.message : 'Review completed, but history could not be refreshed.'));
     } else {
       setError(r.error || `HTTP ${r.status}`);
       haptics.notify('error');
@@ -131,7 +140,11 @@ export default function AgentReviewScreen() {
         ) : null}
 
         <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 24 }}>
-          {!report && !running ? (
+          {loadingInitial ? (
+            <View style={styles.center}><ActivityIndicator color="#8B5CF6" /><Text style={styles.hint}>Loading review evidence…</Text></View>
+          ) : null}
+
+          {!loadingInitial && !report && !running && !error ? (
             <View style={styles.center}>
               <Text style={styles.hint}>Run a consecutive once-over across all specialist agents in cadence.</Text>
             </View>
