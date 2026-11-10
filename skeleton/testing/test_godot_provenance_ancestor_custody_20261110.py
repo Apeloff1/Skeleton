@@ -617,3 +617,55 @@ def test_provenance_cli_requires_source_to_claim_ok(tmp_path, capsys):
     ]) == 0
     qualified = __import__("json").loads(capsys.readouterr().out)
     assert qualified == {"ok": True, "problems": []}
+
+
+def test_artifact_identity_requires_nonempty_payload_and_safe_label():
+    digest = "a" * 64
+    with pytest.raises(ValueError, match="invalid artifact size"):
+        provenance.Artifact("Linux", "linux/game.bin", digest, 0)
+    for preset in ("Linux\nSHIP", "Linux\r", "\tWeb", "Linux\x7f", " Web"):
+        with pytest.raises(ValueError, match="invalid artifact preset"):
+            provenance.Artifact(preset, "linux/game.bin", digest, 1)
+    assert provenance.Artifact("Linux", "linux/game.bin", digest, 1).size == 1
+
+
+def test_manifest_identity_rejects_control_chars_and_whitespace():
+    digest = "a" * 64
+    for bad in ("project\nSHIP", "\tproject", "project ", "\x7fproject"):
+        with pytest.raises(ValueError, match="invalid project identity"):
+            provenance.Manifest(bad, digest, "Godot 4.7", "SHIP")
+    for bad in ("Godot\nSHIP", " Godot", "Godot\t", "Godot\x7f"):
+        with pytest.raises(ValueError, match="invalid engine identity"):
+            provenance.Manifest("project", digest, bad, "SHIP")
+
+
+def test_distinct_export_presets_cannot_reuse_one_artifact_path():
+    digest = "a" * 64
+    with pytest.raises(ValueError, match="artifact path reused"):
+        provenance.Manifest(
+            "project", digest, "Godot 4.7", "SHIP",
+            artifacts=[
+                provenance.Artifact("Linux", "same/file.bin", digest, 10),
+                provenance.Artifact("Web", "same/file.bin", digest, 10),
+            ],
+        )
+    distinct = provenance.Manifest(
+        "project", digest, "Godot 4.7", "SHIP",
+        artifacts=[
+            provenance.Artifact("Linux", "linux/game.bin", digest, 10),
+            provenance.Artifact("Web", "web/index.html", digest, 10),
+        ],
+    )
+    assert len(distinct.artifacts) == 2
+
+
+def test_zero_byte_export_cannot_mint_ship_artifact_receipt(tmp_path):
+    source = tmp_path / "project"
+    source.mkdir()
+    (source / "project.godot").write_text("[application]\n", encoding="utf-8")
+    empty = tmp_path / "empty.bin"
+    empty.write_bytes(b"")
+    with pytest.raises(ValueError, match="invalid artifact size"):
+        provenance.build(
+            source, "Godot 4.7", "SHIP", {"Linux": empty}, base=tmp_path,
+        )
