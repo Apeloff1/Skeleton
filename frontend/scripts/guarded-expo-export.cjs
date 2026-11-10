@@ -47,7 +47,12 @@ async function supervise(opts = {}) {
   const cwd = path.resolve(opts.cwd || path.join(__dirname, '..'));
   const out = path.join(cwd, 'dist');
   if (fs.existsSync(out)) throw Error('stale dist is not qualifying evidence');
-  const child = spawn(opts.command || 'yarn', opts.args || ['export:web'], {
+  // Launch Expo's Node CLI directly. A Yarn wrapper converts the process-group
+  // SIGTERM used after verified export into exit code 1, hiding its true cause.
+  const defaultArgs = [path.join(cwd, 'node_modules', 'expo', 'bin', 'cli'),
+    'export', '--platform', 'web'];
+  const child = spawn(opts.command || process.execPath,
+    opts.args || (opts.command ? ['export:web'] : defaultArgs), {
     cwd, stdio: ['ignore', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
     env: { ...process.env, CI: '1', EXPO_NO_TELEMETRY: '1' },

@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "5cd3cb340b5597a6f6e9e97491a353d474fd4c7b",
+      "source_git_object_sha": "c17c39ce784ae05ddae2a0efdc0b468887870fd1",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "8d6c437961625b0994c3aa2e9b52acc3b3912dee",
+      "source_git_object_sha": "488e8aad7192e6dcb55bcec06ab9bba8399746cf",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -7377,6 +7377,11 @@
       "path": "skeleton/provider_contract.py",
       "owner": "provider compatibility boundary",
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
+    },
+    {
+      "path": "skeleton/provider_environment.py",
+      "owner": "deterministic game-environment and replay adapter",
+      "reason": "Canonical bounded deterministic game-environment source stays outside provider-credential AI tree; holdout/replay custody is retained here until a separately reviewed mirror and ownership cutover"
     },
     {
       "path": "skeleton/providers",
