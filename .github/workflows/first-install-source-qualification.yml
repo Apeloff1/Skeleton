@@ -282,7 +282,9 @@ jobs:
         run: >-
           python -m pip install --disable-pip-version-check --no-input
           -e .
-          "pytest>=8,<9" "PyYAML>=6,<7" "numpy>=2,<3" "Pillow>=13.0.0,<14"
+          "pytest>=8,<9" "pytest-asyncio>=1.4.0,<2"
+          "PyJWT==2.15.1" "zstandard==0.25.0"
+          "PyYAML>=6,<7" "numpy>=2,<3" "Pillow>=13.0.0,<14"
       - name: Verify exact canonical tree and backend live-service manifest
         run: |
           set -euo pipefail
@@ -299,7 +301,9 @@ jobs:
             tests/test_ops_router_source_contract.py \
             tests/test_product_surface_specification.py \
             tests/test_product_surface_delegated_backend_20261110.py
-          python -m pytest -q --maxfail=12 --noconftest --import-mode=importlib \
+          # Plugin autoload is deliberately disabled globally. Explicitly load
+          # the reviewed async plugin for backend tests carrying asyncio markers.
+          python -m pytest -q -p pytest_asyncio.plugin --maxfail=12 --noconftest --import-mode=importlib \
             backend/tests/test_live_service_test_boundaries.py \
             backend/tests/test_queue_drain_workflow.py \
             backend/tests/test_workflow_concurrency_gate.py \
