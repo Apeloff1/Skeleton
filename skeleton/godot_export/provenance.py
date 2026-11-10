@@ -22,6 +22,7 @@ from .project import IGNORED_DIRS
 SCHEMA = "skeleton.godot_export.provenance/v1"
 MAX_ARTIFACT_BYTES = 100 * 1024 * 1024
 MAX_SOURCE_FILES = 100_000
+MAX_SOURCE_DIRS = 100_000
 MAX_SOURCE_BYTES = 4 * 1024 * 1024 * 1024
 
 
@@ -50,6 +51,23 @@ def _has_symlink(root: Path, rel: PurePosixPath) -> bool:
     return False
 
 
+def _directory_fd(absolute_root: Path, extra_parts: tuple[str, ...]) -> int:
+    """Re-open every ancestor relative to an already-open no-follow root FD."""
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    fd = os.open("/", flags)
+    try:
+        for name in absolute_root.parts[1:] + extra_parts:
+            if name in ("", ".", ".."):
+                raise ValueError("unsafe artifact directory traversal")
+            next_fd = os.open(name, flags, dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
     """Read a bounded artifact via anchored descriptors, detecting path swaps.
 
@@ -60,7 +78,6 @@ def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
     parts = _relative(relative)
     if not all(hasattr(os, k) for k in ("O_NOFOLLOW", "O_DIRECTORY")) or os.name != "posix":
         raise ValueError("secure artifact verification unavailable on this host")
-    dflags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     # O_NONBLOCK prevents a malicious named pipe from hanging before fstat()
     # rejects it as non-regular. No symlink or hardlink is admitted.
     fflags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
@@ -69,12 +86,8 @@ def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
         raise ValueError("unsafe artifact root traversal")
     absolute_root = Path(os.path.abspath(os.fspath(raw_root)))
     # Anchor every ancestor, not only the last source directory component.
-    fd = os.open("/", dflags)
+    fd = _directory_fd(absolute_root, parts[:-1])
     try:
-        for part in absolute_root.parts[1:] + parts[:-1]:
-            nxt = os.open(part, dflags, dir_fd=fd)
-            os.close(fd)
-            fd = nxt
         file_fd = os.open(parts[-1], fflags, dir_fd=fd)
         try:
             before = os.fstat(file_fd)
@@ -97,11 +110,26 @@ def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
             linked = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False)
             fields = ("st_dev", "st_ino", "st_mode", "st_nlink",
                       "st_size", "st_mtime_ns", "st_ctime_ns")
-            identity = lambda s: tuple(getattr(s, name) for name in fields)
+            def identity(info: os.stat_result) -> tuple[object, ...]:
+                return tuple(getattr(info, name) for name in fields)
+
             if (size != before.st_size or identity(before) != identity(after)
                     or identity(after) != identity(linked)
                     or not stat.S_ISREG(linked.st_mode) or linked.st_nlink != 1):
                 raise ValueError("artifact changed or path replaced during digest")
+            # A directory rename/symlink swap after opening leaves the old
+            # descriptor valid. It must not produce a current-path receipt.
+            try:
+                reachable_fd = _directory_fd(absolute_root, parts[:-1])
+            except OSError as exc:
+                raise ValueError("artifact directory changed during digest") from exc
+            try:
+                held = os.fstat(fd)
+                reachable = os.fstat(reachable_fd)
+                if (held.st_dev, held.st_ino) != (reachable.st_dev, reachable.st_ino):
+                    raise ValueError("artifact directory replaced during digest")
+            finally:
+                os.close(reachable_fd)
             return digest.hexdigest(), size
         finally:
             os.close(file_fd)
@@ -110,32 +138,56 @@ def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
 
 
 def tree_digest(root: Path) -> str:
-    """Order-independent bounded source digest; refuse linked and special files."""
-    root = Path(root)
-    if root.is_symlink():
-        raise ValueError("symlink project source root cannot be certified")
-    h = hashlib.sha256()
-    count = total = 0
-    for p in sorted(root.rglob("*")):
-        rel = p.relative_to(root)
-        if any(part in IGNORED_DIRS for part in rel.parts):
-            continue
-        if p.is_symlink():
-            raise ValueError("symlink or linked project source cannot be certified")
-        if p.is_dir():
-            continue
-        if not p.is_file():
-            raise ValueError("special project source cannot be certified")
-        count += 1
-        if count > MAX_SOURCE_FILES:
-            raise ValueError("source file budget exceeded")
-        digest, size = _digest_beneath(root, rel.as_posix())
-        total += size
-        if total > MAX_SOURCE_BYTES:
-            raise ValueError("source size budget exceeded")
-        h.update(rel.as_posix().encode() + b"\0" + digest.encode() + b"\n")
-    return h.hexdigest()
+    """Hash a bounded source inventory without materializing an unbounded rglob.
 
+    Preserve the original globally sorted relative-name order, while bounding
+    both directory traversal and file count before storing source pathnames.
+    Every file is independently verified through descriptor-anchored hashing.
+    """
+    root = Path(root)
+    if root.is_symlink() or not root.is_dir():
+        raise ValueError("invalid or symlinked source project root")
+    if ".." in root.parts:
+        raise ValueError("source root traversal forbidden")
+    files: list[tuple[str, str]] = []
+    count = total = directory_count = 0
+
+    def fail_on_walk_error(exc: OSError) -> None:
+        raise ValueError("unable to traverse project source inventory") from exc
+
+    for directory, child_dirs, children in os.walk(
+        root, topdown=True, followlinks=False, onerror=fail_on_walk_error,
+    ):
+        current = Path(directory)
+        child_dirs[:] = sorted(
+            name for name in child_dirs if name not in IGNORED_DIRS
+        )
+        for name in child_dirs:
+            node = current / name
+            if node.is_symlink() or not node.is_dir():
+                raise ValueError("unsafe project source directory")
+            directory_count += 1
+            if directory_count > MAX_SOURCE_DIRS:
+                raise ValueError("source directory budget exceeded")
+        for name in sorted(children):
+            node = current / name
+            relative = node.relative_to(root)
+            if any(part in IGNORED_DIRS for part in relative.parts):
+                continue
+            if node.is_symlink() or not node.is_file():
+                raise ValueError("unsafe project source file")
+            count += 1
+            if count > MAX_SOURCE_FILES:
+                raise ValueError("source file budget exceeded")
+            digest, size = _digest_beneath(root, relative.as_posix())
+            total += size
+            if total > MAX_SOURCE_BYTES:
+                raise ValueError("source size budget exceeded")
+            files.append((relative.as_posix(), digest))
+    hasher = hashlib.sha256()
+    for relative, digest in sorted(files):
+        hasher.update(relative.encode() + b"\0" + digest.encode() + b"\n")
+    return hasher.hexdigest()
 
 def git_head(root: Path) -> str | None:
     try:
