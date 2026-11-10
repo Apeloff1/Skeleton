@@ -2199,7 +2199,7 @@
       "source": "skeleton/pr_automation",
       "destination": "skeleton/ai/build/pr_automation",
       "kind": "tree",
-      "source_git_object_sha": "3df606ef721a256881d0656737c77649b47f522b",
+      "source_git_object_sha": "53a0a1d4921bdf7f4a66426d962e3f1218182248",
       "role": "Automerge, runner, queue, policy, evidence, and hygiene logic is autonomous repository-engineering/build-control code.",
       "work_package_refs": [
         "WP-W15",
