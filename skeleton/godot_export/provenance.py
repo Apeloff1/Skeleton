@@ -585,12 +585,23 @@ def verify(manifest: Manifest, base: Path, root: Path | None = None) -> list[str
         if digest != a.sha256:
             problems.append(f"{a.preset}: sha256 mismatch for {a.path}")
     if root is not None:
+        source = Path(root)
+        # A digest alone cannot distinguish two separately identified
+        # projects with identical source files. This field is part of the
+        # signed-off manifest identity, not descriptive UI metadata.
+        if source.name != manifest.project:
+            problems.append("project identity differs from manifest")
         try:
-            same_tree = tree_digest(root) == manifest.tree
+            same_tree = tree_digest(source) == manifest.tree
         except (OSError, ValueError):
             same_tree = False
         if not same_tree:
             problems.append("project tree changed since manifest")
+        # A source-tree SHA does not attest the Git revision recorded in the
+        # receipt. The field is optional for exported trees outside Git; if a
+        # Git head was pinned, require the exact head on re-verification.
+        if manifest.git is not None and git_head(source) != manifest.git:
+            problems.append("git source pin differs from manifest")
     if manifest.verdict != "SHIP":
         problems.append(f"manifest verdict is {manifest.verdict}")
     if not manifest.artifacts and manifest.verdict == "SHIP":
