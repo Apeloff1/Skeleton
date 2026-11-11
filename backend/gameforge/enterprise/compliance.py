@@ -153,7 +153,7 @@ class ComplianceExportService:
         with anchored_directory(self.out_dir) as directory:
             atomic_write(
                 directory, filename,
-                lambda stream: stream.write(sealed), max_bytes=64 * 1024 * 1024,
+                lambda stream: stream.write(sealed), max_bytes=68 * 1024 * 1024,
             )
         path = self.out_dir / filename
         pack["export_path"] = str(path)
