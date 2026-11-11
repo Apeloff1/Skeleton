@@ -1,12 +1,14 @@
 """Fixture-only first boot and replay: never claim a real GGUF qualification."""
-import copy,hashlib,json,os,tempfile,unittest
+import copy,errno,hashlib,json,os,tempfile,unittest
 from pathlib import Path
 from contextlib import ExitStack
+from unittest import mock
 from skeleton.ai.runtime.operational_ai.deployment.qualification import (
     QualificationInput,QualificationError,probe_first_boot,
 )
 from skeleton.ai.runtime.operational_ai.deployment.qualification.verification import verify
 from skeleton.ai.runtime.operational_ai.deployment.qualification.paths import publish_private_report
+from skeleton.ai.runtime.operational_ai.deployment.qualification import paths as report_paths
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine import (
     SpineDatabase, ExecutionSpine, Identity, SpineLimits,
 )
@@ -79,6 +81,7 @@ class QualificationTests(unittest.TestCase):
             publish_private_report(self.out,'report.json',proof)
         self.assertEqual((self.out/'report.json').read_bytes(),before)
         self.assertEqual((self.out/'report.json').stat().st_mode & 0o777,0o600)
+        self.assertEqual([p.name for p in self.out.iterdir()], ['report.json'])
 
     def test_report_parent_permissions_hold(self):
         proof=probe_first_boot(self.plan,activation=self.factory)
@@ -136,6 +139,46 @@ class QualificationTests(unittest.TestCase):
         with self.assertRaises(QualificationError):
             publish_private_report(child, 'receipt.json', {'status': 'fixture-only'})
         self.assertFalse((child / 'receipt.json').exists())
+
+    def test_report_fsync_failure_leaves_no_partial_final_or_stage(self):
+        with mock.patch.object(report_paths.os, 'fsync',
+                               side_effect=OSError(errno.ENOSPC, 'disk full')):
+            with self.assertRaises(OSError):
+                publish_private_report(self.out, 'partial.json', {'ok': True})
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_directory_fsync_failure_rolls_back_final_name(self):
+        real_fsync = os.fsync
+        calls = [0]
+
+        def fail_second(fd):
+            calls[0] += 1
+            if calls[0] == 2:
+                raise OSError(errno.ENOSPC, 'directory sync failed')
+            return real_fsync(fd)
+
+        with mock.patch.object(report_paths.os, 'fsync', side_effect=fail_second):
+            with self.assertRaises(OSError):
+                publish_private_report(self.out, 'not-committed.json', {'ok': True})
+        self.assertEqual(calls[0], 2)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_parent_replacement_after_link_rolls_back_receipt(self):
+        real_open = report_paths._open_private_report_root
+        calls = [0]
+
+        def reject_third(root):
+            calls[0] += 1
+            if calls[0] == 3:
+                raise QualificationError('report parent changed during publication')
+            return real_open(root)
+
+        with mock.patch.object(report_paths, '_open_private_report_root',
+                               side_effect=reject_third):
+            with self.assertRaisesRegex(QualificationError, 'parent changed'):
+                publish_private_report(self.out, 'wrong-parent.json', {'ok': True})
+        self.assertEqual(calls[0], 3)
+        self.assertEqual(list(self.out.iterdir()), [])
 
     def test_report_name_traversal_refused(self):
         proof=probe_first_boot(self.plan,activation=self.factory)
