@@ -34,12 +34,12 @@ def integer(value: object, *, ceiling: int = 10**13) -> int:
 
 
 def _preflight_canonical(value: object, maximum: int) -> None:
-    """Bound traversal and text before the JSON encoder allocates output.
+    """Bound aggregate encoded evidence before the JSON encoder allocates.
 
-    A post-encoding byte limit alone is insufficient: a direct caller can
-    supply a huge string, a deep/cyclic container or a giant integer and force
-    substantial allocation before the final length check. The budget counts
-    a lower bound on encoded string bytes; the final check remains exact.
+    Account for *all* scalar values and container punctuation, not only
+    strings. A large list of builtin integers, floats or empty strings can
+    otherwise allocate far beyond the output ceiling before the post-encode
+    check. Every charge is a lower bound on the eventual ASCII JSON size.
     """
     if type(maximum) is not int or maximum < 1:
         raise LaptopGateHold("invalid finite canonical ceiling")
@@ -55,28 +55,38 @@ def _preflight_canonical(value: object, maximum: int) -> None:
 
         kind = type(item)
         if kind is str:
-            # ensure_ascii=True cannot encode a code point in fewer bytes
-            # than its one-code-point contribution to len(str).
-            remaining -= len(item)
+            # Two JSON quotes plus at least one byte per code point.
+            remaining -= len(item) + 2
         elif kind is dict:
-            if len(item) > maximum:
+            count = len(item)
+            if count > maximum:
                 raise LaptopGateHold("evidence exceeds finite structure ceiling")
+            remaining -= 2 + max(0, count - 1)  # braces and commas
             for key, child in item.items():
-                # Do not invoke arbitrary key conversion or comparison.
                 if type(key) is not str:
                     raise LaptopGateHold("invalid canonical evidence")
-                remaining -= len(key)
+                remaining -= len(key) + 3  # key quotes and colon
                 pending.append((child, depth + 1))
         elif kind is list or kind is tuple:
-            if len(item) > maximum:
+            count = len(item)
+            if count > maximum:
                 raise LaptopGateHold("evidence exceeds finite structure ceiling")
+            remaining -= 2 + max(0, count - 1)  # brackets and commas
             pending.extend((child, depth + 1) for child in item)
         elif kind is int:
-            # Prevent decimal conversion of unbounded Python integers.
-            if item.bit_length() > maximum * 4:
+            bits = item.bit_length()
+            if bits > maximum * 4:
                 raise LaptopGateHold("evidence exceeds finite size ceiling")
-        elif kind is bool or kind is float or item is None:
-            pass  # The JSON encoder still rejects NaN and infinity.
+            # 3/10 < log10(2): conservative decimal digit lower bound.
+            digits = max(1, ((bits - 1) * 3) // 10 + 1)
+            remaining -= digits + (1 if item < 0 else 0)
+        elif kind is bool:
+            remaining -= 4 if item else 5
+        elif kind is float:
+            # Builtin float repr is bounded and requires no JSON allocation.
+            remaining -= len(repr(item))
+        elif item is None:
+            remaining -= 4
         else:
             raise LaptopGateHold("invalid canonical evidence")
 

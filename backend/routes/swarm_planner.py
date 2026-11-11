@@ -7,6 +7,8 @@ dependency ordering (topological waves) and deterministic seeds.
 """
 from __future__ import annotations
 
+from core.public_exception_route import PublicExceptionRoute
+
 from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -14,7 +16,7 @@ from pydantic import BaseModel, Field
 from core import swarm_planner as planner
 from core import swarm_scheduler as scheduler
 
-router = APIRouter(prefix="/api/galaxy-studio/swarm/planner", tags=["swarm-planner"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/galaxy-studio/swarm/planner", tags=["swarm-planner"])
 
 
 class PlanReq(BaseModel):

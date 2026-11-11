@@ -1,0 +1,48 @@
+name: PR Merge Hold Gate
+
+# Trusted-base only: never execute PR-head code in this privileged workflow.
+# Keep this workflow distinct from PR source qualification: a skipped gate job
+# in a mixed-trigger workflow could otherwise appear as a passing required check.
+on:
+  pull_request_target:
+    branches: [main]
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+      - ready_for_review
+      - converted_to_draft
+      - labeled
+      - unlabeled
+      - review_requested
+      - review_request_removed
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-merge-hold-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  explicit_pr_merge_hold:
+    name: PR Merge Hold Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout trusted target branch, never PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up pinned Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Verify current PR title/body against live GitHub API
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check_pr_merge_hold.py

@@ -72,6 +72,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify immutable exact tested source
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
 
       - name: Generate ephemeral stack credentials
         run: |
@@ -93,12 +101,32 @@ jobs:
             echo "SKL_MONGO_URI=mongodb://${userinfo}@mongo:27017/skeleton?authSource=admin"
           } >> "$GITHUB_ENV"
 
+          # Ephemeral, isolated, authorized CI operator: no shared or committed secret.
+          operator_email="qa-e2e-operator-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com"
+          generated_value="$(gen)"
+          echo "::add-mask::${generated_value}"
+          {
+            echo "GAMEFORGE_SEED_ADMIN_EMAIL=${operator_email}"
+            printf "GAMEFORGE_SEED_ADMIN_PASSWORD=%s\n" "$generated_value"
+          } >> "$GITHUB_ENV"
       - name: Validate compose configuration
         run: docker compose -f docker-compose.yml config --quiet
 
-      - name: Build stack images
-        timeout-minutes: 30
-        run: docker compose -f docker-compose.yml build skeleton backend frontend
+      # Separate the expensive Expo export from backend image assembly. The
+      # previous combined build repeatedly timed out *after* Expo printed
+      # "Exported: dist", leaving no actionable stage-completion evidence.
+      # Each Docker build must still succeed; neither is advisory/skippable.
+      - name: Build frontend production image
+        timeout-minutes: 20
+        env:
+          BUILDKIT_PROGRESS: plain
+        run: docker compose -f docker-compose.yml build frontend
+
+      - name: Build engine and backend images
+        timeout-minutes: 15
+        env:
+          BUILDKIT_PROGRESS: plain
+        run: docker compose -f docker-compose.yml build skeleton backend
 
       - name: Start stack
         run: docker compose -f docker-compose.yml up -d mongo skeleton backend frontend
@@ -128,18 +156,32 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Test isolated operator provisioning contracts
+        run: python -m unittest discover -s tests -p test_ci_e2e_operator_provision.py -q
+
+      - name: Provision authenticated ephemeral E2E operator
+        run: python scripts/provision_e2e_operator.py
       - name: Tier 2 live app-foundation flow (#4098)
         timeout-minutes: 15
         working-directory: frontend
         env:
           SKELETON_E2E_MAX_CHECKS: "150"
+          SKELETON_E2E_REQUIRE_FULL_LIVE: "1"
         run: |
           set -euo pipefail
           suite=scripts/test-app-foundation-flows.mjs
-          if [ ! -f "$suite" ]; then
-            echo "::notice::$suite is not on this ref yet (lands with #4098); Tier 2 skipped."
-            exit 0
-          fi
+          test -s "$suite" || {
+            echo "::error::Tier 2 test suite missing or empty"
+            exit 1
+          }
+          test -n "${SKELETON_E2E_OPERATOR_TOKEN_FILE:-}" || {
+            echo "::error::Authorized operator token file not provided"
+            exit 1
+          }
+          test -s "$SKELETON_E2E_OPERATOR_TOKEN_FILE" || {
+            echo "::error::Authorized operator token file missing or empty"
+            exit 1
+          }
           node --test --test-reporter=spec "$suite"
 
       - name: Install Playwright (isolated, no lockfile changes)
@@ -171,6 +213,17 @@ jobs:
           docker compose -f docker-compose.yml ps || true
           docker compose -f docker-compose.yml logs --no-color --tail=400 skeleton backend frontend mongo || true
 
+      - name: Remove ephemeral operator token
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -n "${SKELETON_E2E_OPERATOR_TOKEN_FILE:-}" ]; then
+            case "$SKELETON_E2E_OPERATOR_TOKEN_FILE" in
+              "$RUNNER_TEMP"/skeleton-ci-operator-*.token)
+                rm -f -- "$SKELETON_E2E_OPERATOR_TOKEN_FILE" ;;
+              *) echo "::error::Invalid operator token cleanup path"; exit 1 ;;
+            esac
+          fi
       - name: Tear down stack
         if: always()
         run: docker compose -f docker-compose.yml down -v --remove-orphans || true

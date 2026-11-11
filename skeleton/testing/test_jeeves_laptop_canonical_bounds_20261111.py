@@ -109,6 +109,35 @@ class TestBoundedJeevesCanonicalEvidence(unittest.TestCase):
             with self.assertRaises(contracts.LaptopGateHold):
                 evaluate_bundle(evidence)
 
+    def test_aggregate_scalars_and_container_overhead_denied_preencoder(self):
+        # Each payload previously fit the traversal and string-only budget,
+        # yet could allocate oversized JSON before the final byte check.
+        cases = (
+            ([(1 << 500)] * 20, 1024),
+            ([1e-300] * 200, 512),
+            ([""] * 100, 128),
+        )
+        for value, ceiling in cases:
+            with self.subTest(kind=type(value[0]).__name__, ceiling=ceiling):
+                with mock.patch.object(
+                    contracts.json, "dumps",
+                    side_effect=AssertionError("JSON allocation was reached"),
+                ):
+                    with self.assertRaises(contracts.LaptopGateHold):
+                        contracts.canonical(value, maximum=ceiling)
+
+    def test_exact_small_valid_json_budget_preserved(self):
+        for value in ({"": 0}, {"x": 1.25}, [True, None, ""]):
+            expected = json.dumps(
+                value, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=True, allow_nan=False,
+            ).encode("ascii")
+            with self.subTest(value=value):
+                self.assertEqual(
+                    contracts.canonical(value, maximum=len(expected)),
+                    expected,
+                )
+
     def test_byte_identical_canonical_mirror(self):
         root = Path(__file__).resolve().parents[1]
         canonical = root / "jeeves/native_fabric/laptop_ops/contracts.py"
