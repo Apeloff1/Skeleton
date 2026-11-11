@@ -175,4 +175,5 @@ def install_public_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=500,
             content={"detail": PUBLIC_INTERNAL_ERROR},
+            headers={"Cache-Control": "no-store"},
         )
