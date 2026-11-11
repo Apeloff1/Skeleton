@@ -275,6 +275,88 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual((self.out / 'replaced.json').read_bytes(), forged)
         self.assertEqual([p.name for p in self.out.iterdir()], ['replaced.json'])
 
+    def test_report_stage_content_mutation_is_rejected_before_link(self):
+        real_open = report_paths._open_private_report_root
+        calls = [0]
+
+        def mutate_second(root):
+            calls[0] += 1
+            if calls[0] == 2:
+                stages = list(self.out.glob('.qualification-*.tmp'))
+                self.assertEqual(len(stages), 1)
+                original = stages[0].read_bytes()
+                stages[0].write_bytes(b'X' * len(original))
+            return real_open(root)
+
+        with mock.patch.object(report_paths, '_open_private_report_root',
+                               side_effect=mutate_second):
+            with self.assertRaisesRegex(QualificationError, 'contents changed'):
+                publish_private_report(self.out, 'stage-tampered.json', {'ok': True})
+        self.assertEqual(calls[0], 2)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_in_place_post_link_rewrite_is_not_attested(self):
+        real_open = report_paths._open_private_report_root
+        calls = [0]
+
+        def rewrite_third(root):
+            calls[0] += 1
+            if calls[0] == 3:
+                target = self.out / 'rewritten.json'
+                original = target.read_bytes()
+                # Keep the inode, file length and mode unchanged: dev/ino
+                # checks alone cannot detect this forged canonical receipt.
+                target.write_bytes(b'X' * len(original))
+            return real_open(root)
+
+        with mock.patch.object(report_paths, '_open_private_report_root',
+                               side_effect=rewrite_third):
+            with self.assertRaisesRegex(QualificationError, 'contents changed'):
+                publish_private_report(self.out, 'rewritten.json', {'ok': True})
+        self.assertEqual(calls[0], 3)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_post_link_mode_relaxation_is_rejected(self):
+        real_open = report_paths._open_private_report_root
+        calls = [0]
+
+        def relax_third(root):
+            calls[0] += 1
+            if calls[0] == 3:
+                os.chmod(self.out / 'relaxed.json', 0o644)
+            return real_open(root)
+
+        with mock.patch.object(report_paths, '_open_private_report_root',
+                               side_effect=relax_third):
+            with self.assertRaisesRegex(QualificationError, 'identity changed'):
+                publish_private_report(self.out, 'relaxed.json', {'ok': True})
+        self.assertEqual(calls[0], 3)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_post_link_extra_hardlink_is_not_attested(self):
+        real_open = report_paths._open_private_report_root
+        calls = [0]
+        extra = self.out / 'extra-link.json'
+
+        def link_third(root):
+            calls[0] += 1
+            if calls[0] == 3:
+                os.link(self.out / 'linked.json', extra)
+            return real_open(root)
+
+        try:
+            with mock.patch.object(report_paths, '_open_private_report_root',
+                                   side_effect=link_third):
+                with self.assertRaisesRegex(QualificationError, 'identity changed'):
+                    publish_private_report(self.out, 'linked.json', {'ok': True})
+            self.assertEqual(calls[0], 3)
+            self.assertFalse((self.out / 'linked.json').exists())
+            # Do not remove another writer's link during rollback.
+            self.assertTrue(extra.exists())
+            self.assertEqual(extra.stat().st_nlink, 1)
+        finally:
+            extra.unlink(missing_ok=True)
+
     def test_report_name_traversal_refused(self):
         proof=probe_first_boot(self.plan,activation=self.factory)
         for name in ('../escape.json','/tmp/x.json','.json','bad.txt'):
