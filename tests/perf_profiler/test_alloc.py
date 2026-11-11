@@ -116,3 +116,44 @@ def test_tracker_accepts_bounded_top_and_trace_depth():
     assert tracker.results == [result]
     assert result.peak_bytes >= 1024
     del data
+
+
+
+@pytest.mark.parametrize("name", ["", "x" * 129, "a/b", None, 1, True])
+def test_scope_name_is_bounded_without_mutating_tracker(name):
+    with AllocationTracker() as tracker:
+        with pytest.raises(ValueError, match="scope name"):
+            with tracker.scope(name):
+                pass
+        assert tracker.results == []
+        assert tracker._stack == []
+        with tracker.scope("valid") as result:
+            pass
+        assert tracker.results == [result]
+
+
+def test_allocation_scope_depth_and_node_count_fail_closed(monkeypatch):
+    from contextlib import ExitStack
+    from skeleton.perf_profiler import alloc
+
+    monkeypatch.setattr(alloc, "MAX_SCOPE_DEPTH", 2)
+    with AllocationTracker() as tracker:
+        with ExitStack() as stack:
+            stack.enter_context(tracker.scope("outer"))
+            stack.enter_context(tracker.scope("inner"))
+            with pytest.raises(ValueError, match="bounded depth"):
+                stack.enter_context(tracker.scope("too-deep"))
+        assert [r.name for r in tracker.results] == ["outer"]
+        assert [r.name for r in tracker.results[0].children] == ["inner"]
+
+    monkeypatch.setattr(alloc, "MAX_SCOPE_NODES", 2)
+    with AllocationTracker() as tracker:
+        with tracker.scope("first"):
+            pass
+        with tracker.scope("second"):
+            pass
+        with pytest.raises(ValueError, match="bounded node limit"):
+            with tracker.scope("third"):
+                pass
+        assert [r.name for r in tracker.results] == ["first", "second"]
+        assert tracker._stack == []
