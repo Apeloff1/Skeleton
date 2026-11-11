@@ -8,6 +8,31 @@ from pydantic import ValidationError
 
 from routes import discourse
 
+ALICE = {"tenant_id": "tenant-1", "owner_id": "alice@example.test"}
+
+
+@pytest.fixture(autouse=True)
+def _source_declared_model_fixture(monkeypatch):
+    """Provider tests inject catalog authority, never fake a legacy model pin."""
+    from core.discourse_catalog import DeclaredModel, DeclaredPanel
+
+    async def resolve(*, tenant_id, actor_id, selected=None, judge_key=None, maximum=5):
+        assert tenant_id and actor_id
+        names = selected or ["m1", "m2"]
+        models = tuple(
+            DeclaredModel("fixture:" + name, "fixture", name, index == 0)
+            for index, name in enumerate(names[:maximum])
+        )
+        name = judge_key or "judge"
+        judge = DeclaredModel("fixture:" + name, "fixture", name, False)
+        return DeclaredPanel(
+            models, judge,
+            "multiple_models_one_provider" if len(models) > 1 else "single_model_self_review",
+            False, judge.key not in {model.key for model in models},
+        )
+
+    monkeypatch.setattr(discourse, "tenant_panel", resolve)
+
 
 @pytest.mark.parametrize("value", [
     "[]", "true", "null", "NaN", '{"winner_index":NaN}',
@@ -51,7 +76,7 @@ def test_async_overlong_prompt_rejected_before_any_database_access(monkeypatch):
     body = discourse.DeliberateBody.model_construct(prompt="x" * 20_001, task="creative",
                                                     system="", panel=[], judge_model="",
                                                     discord=True, rounds=1)
-    result = asyncio.run(discourse.deliberate_async(body))
+    result = asyncio.run(discourse.deliberate_async(body, identity=ALICE))
     assert result["error"] == "prompt exceeds 20k char limit"
 
 
@@ -61,12 +86,12 @@ def test_direct_input_rejects_unknown_selected_panel_before_model_invocation(mon
 
     monkeypatch.setattr(discourse, "route_complete", forbidden)
     result = asyncio.run(discourse.deliberate(
-        "creative", "valid prompt", panel=[{"unhashable": "model"}], do_discord=False
+        "creative", "valid prompt", panel=[{"unhashable": "model"}], do_discord=False, identity=ALICE
     ))
     assert "error" in result
 
 
-def test_direct_admission_exception_text_never_reaches_public_result(monkeypatch):
+def test_direct_admission_exception_is_redacted_before_provider_io(monkeypatch):
     secret = "private-provider-credentials-do-not-return"
 
     def reject(*_args, **_kwargs):
@@ -77,12 +102,14 @@ def test_direct_admission_exception_text_never_reaches_public_result(monkeypatch
 
     monkeypatch.setattr(discourse, "_admit", reject)
     monkeypatch.setattr(discourse, "route_complete", forbidden_provider)
-    result = asyncio.run(discourse.deliberate("creative", "valid prompt"))
+    result = asyncio.run(discourse.deliberate(
+        "creative", "valid prompt", identity=ALICE,
+    ))
     assert result == {"error": "invalid_deliberation_request"}
     assert secret not in repr(result)
 
 
-def test_async_admission_exception_text_never_reaches_public_result(monkeypatch):
+def test_async_admission_exception_is_redacted_before_storage_io(monkeypatch):
     secret = "private-persistence-key-do-not-return"
 
     class ForbiddenDatabase:
@@ -95,37 +122,33 @@ def test_async_admission_exception_text_never_reaches_public_result(monkeypatch)
 
     monkeypatch.setattr(discourse, "_admit", reject)
     monkeypatch.setattr(discourse, "_db", ForbiddenDatabase())
-    result = asyncio.run(
-        discourse.deliberate_async(discourse.DeliberateBody(prompt="valid prompt"))
-    )
+    result = asyncio.run(discourse.deliberate_async(
+        discourse.DeliberateBody(prompt="valid prompt"), identity=ALICE,
+    ))
     assert result == {"error": "invalid_deliberation_request"}
     assert secret not in repr(result)
 
 
 def test_malformed_judge_scores_do_not_create_fabricated_winner(monkeypatch):
-    monkeypatch.setattr(discourse, "MODEL_CATALOG", {
-        "m1": {"provider": "a"}, "m2": {"provider": "b"}, "judge": {"provider": "c"}
-    })
 
     async def fake_route(*_args, model=None, **_kwargs):
+        model = _kwargs.get("model_id", model)
         if model == "judge":
             return {"content": '{"winner_index":true,"scores":[{},false,"x",{"index":0,"quality":NaN,"fidelity":95}]}'}
         return {"content": "valid candidate from model"}
 
     monkeypatch.setattr(discourse, "route_complete", fake_route)
     result = asyncio.run(discourse.deliberate(
-        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False
+        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False, identity=ALICE
     ))
     assert result["error"] == "judge_scores_unavailable"
     assert "winner_model" not in result
 
 
 def test_provider_exception_does_not_cancel_surviving_candidate(monkeypatch):
-    monkeypatch.setattr(discourse, "MODEL_CATALOG", {
-        "m1": {"provider": "a"}, "m2": {"provider": "b"}, "judge": {"provider": "c"}
-    })
 
     async def fake_route(*_args, model=None, **_kwargs):
+        model = _kwargs.get("model_id", model)
         if model == "m1":
             raise RuntimeError("provider unavailable")
         if model == "judge":
@@ -143,19 +166,17 @@ def test_provider_exception_does_not_cancel_surviving_candidate(monkeypatch):
     monkeypatch.setattr(discourse, "route_complete", fake_route)
     monkeypatch.setattr(discourse, "_db", Database())
     result = asyncio.run(discourse.deliberate(
-        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False
+        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False, identity=ALICE
     ))
-    assert result["winner_model"] == "m2"
+    assert result["winner_model"] == "fixture:m2"
     assert result["judge_status"] == "reported_scores"
     assert result["winner_score"] > 0
 
 
 def test_boolean_judge_index_must_not_select_second_candidate(monkeypatch):
-    monkeypatch.setattr(discourse, "MODEL_CATALOG", {
-        "m1": {"provider": "a"}, "m2": {"provider": "b"}, "judge": {"provider": "c"}
-    })
 
     async def fake_route(*_args, model=None, **_kwargs):
+        model = _kwargs.get("model_id", model)
         if model == "judge":
             return {"content": '{"winner_index":true,"scores":[{"index":0,"quality":95,"fidelity":95},'
                                '{"index":1,"quality":5,"fidelity":5}]}'}
@@ -172,10 +193,10 @@ def test_boolean_judge_index_must_not_select_second_candidate(monkeypatch):
     monkeypatch.setattr(discourse, "route_complete", fake_route)
     monkeypatch.setattr(discourse, "_db", Database())
     result = asyncio.run(discourse.deliberate(
-        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False
+        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge", do_discord=False, identity=ALICE
     ))
     assert result["winner_index"] == 0
-    assert result["winner_model"] == "m1"
+    assert result["winner_model"] == "fixture:m1"
 
 
 
@@ -185,11 +206,9 @@ def test_large_integer_scores_do_not_overflow_float_conversion():
 
 
 def test_unacknowledged_log_write_is_not_reported_as_durable(monkeypatch):
-    monkeypatch.setattr(discourse, "MODEL_CATALOG", {
-        "m1": {"provider": "a"}, "judge": {"provider": "b"}
-    })
 
     async def fake_route(*_args, model=None, **_kwargs):
+        model = _kwargs.get("model_id", model)
         if model == "judge":
             return {"content": '{"winner_index":0,"scores":[{"index":0,"quality":85,"fidelity":92}]}'}
         return {"content": "candidate"}
@@ -205,7 +224,7 @@ def test_unacknowledged_log_write_is_not_reported_as_durable(monkeypatch):
     monkeypatch.setattr(discourse, "route_complete", fake_route)
     monkeypatch.setattr(discourse, "_db", Database())
     result = asyncio.run(discourse.deliberate(
-        "creative", "valid prompt", panel=["m1"], judge_model="judge", do_discord=False
+        "creative", "valid prompt", panel=["m1"], judge_model="judge", do_discord=False, identity=ALICE
     ))
     assert result["error"] == "deliberation_not_durable"
     assert result["persistence_status"] == "unconfirmed"
@@ -241,7 +260,7 @@ def test_unacknowledged_async_admission_never_schedules_work(monkeypatch):
     monkeypatch.setattr(discourse, "_db", Database())
     body = discourse.DeliberateBody(prompt="Build the game system")
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(discourse.deliberate_async(body))
+        asyncio.run(discourse.deliberate_async(body, identity=ALICE))
     assert exc.value.status_code == 503
     assert not discourse._ACTIVE_DELIBERATIONS
 
@@ -260,7 +279,7 @@ def test_async_capacity_refuses_new_jobs_before_database(monkeypatch):
     ))
     with pytest.raises(HTTPException) as exc:
         asyncio.run(discourse.deliberate_async(
-            discourse.DeliberateBody(prompt="Build the game system")
+            discourse.DeliberateBody(prompt="Build the game system"), identity=ALICE
         ))
     assert exc.value.status_code == 503
 
@@ -277,7 +296,7 @@ def test_acknowledged_async_job_completes_and_frees_capacity(monkeypatch):
 
         async def update_one(self, query, update, **_kw):
             seen.append(("terminal", update["$set"]["status"]))
-            return SimpleNamespace(acknowledged=True)
+            return SimpleNamespace(acknowledged=True, matched_count=1)
 
     class Database:
         discourse_jobs = Jobs()
@@ -290,7 +309,7 @@ def test_acknowledged_async_job_completes_and_frees_capacity(monkeypatch):
 
     async def scenario():
         result = await discourse.deliberate_async(
-            discourse.DeliberateBody(prompt="Build the game system")
+            discourse.DeliberateBody(prompt="Build the game system"), identity=ALICE
         )
         for _ in range(10):
             if not discourse._ACTIVE_DELIBERATIONS:
@@ -325,7 +344,7 @@ def test_async_terminal_write_without_ack_marks_error(monkeypatch):
     did = "a" * 32
     discourse._ACTIVE_DELIBERATIONS.add(did)
     asyncio.run(discourse._run_bg(
-        did, discourse.DeliberateBody(prompt="Build the game system")
+        did, discourse.DeliberateBody(prompt="Build the game system"), ALICE
     ))
     assert [row["status"] for row in updates] == ["done", "error"]
     assert not discourse._ACTIVE_DELIBERATIONS
@@ -358,7 +377,7 @@ def test_history_db_outage_is_not_an_empty_success(monkeypatch):
 
     monkeypatch.setattr(discourse, "_db", Database())
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(discourse.history())
+        asyncio.run(discourse.history(identity=ALICE))
     assert exc.value.status_code == 503
 
 
@@ -372,3 +391,84 @@ def test_invalid_job_identity_does_not_access_database(monkeypatch):
     assert asyncio.run(discourse.get_result("../../../etc/passwd")) == {
         "error": "not found", "status": "unknown",
     }
+
+
+
+def test_every_discourse_http_route_requires_authenticated_identity():
+    """Prevent the private UI from silently reverting to anonymous endpoints."""
+    from fastapi.routing import APIRoute
+
+    routes = [route for route in discourse.router.routes if isinstance(route, APIRoute)]
+    expected = {
+        "/api/discourse/panel",
+        "/api/discourse/deliberate",
+        "/api/discourse/deliberate/async",
+        "/api/discourse/result/{job_id}",
+        "/api/discourse/jobs",
+        "/api/discourse/history",
+    }
+    assert expected.issubset({route.path for route in routes})
+    for route in routes:
+        assert any(
+            dependency.call is discourse.require_authenticated_identity
+            for dependency in route.dependant.dependencies
+        ), route.path
+
+
+def test_private_result_uses_tenant_account_filter_and_redacts_worker_token(monkeypatch):
+    """Even a valid job ID cannot bypass tenant ownership or leak CAS custody."""
+    from types import SimpleNamespace
+
+    job_id = "a" * 32
+
+    class Jobs:
+        async def find_one(self, query, projection):
+            assert query == {"job_id": job_id, **ALICE}
+            assert projection["owner_id"] == projection["tenant_id"] == 0
+            return {
+                "job_id": job_id, "status": "done", "content": "owned receipt",
+                "run_token": "private-worker-cas",
+                "tenant_id": ALICE["tenant_id"], "owner_id": ALICE["owner_id"],
+            }
+
+    monkeypatch.setattr(discourse, "_db", SimpleNamespace(discourse_jobs=Jobs()))
+    result = asyncio.run(discourse.get_result(job_id, identity=ALICE))
+    assert result["content"] == "owned receipt"
+    assert not {"run_token", "tenant_id", "owner_id"}.intersection(result)
+
+
+def test_private_job_discovery_scopes_query_and_omits_prompt(monkeypatch):
+    """Resume UI receives metadata only, never stored private provider inputs."""
+    from types import SimpleNamespace
+
+    job_id = "b" * 32
+
+    class Cursor:
+        def sort(self, *_args):
+            return self
+
+        def limit(self, *_args):
+            return self
+
+        async def to_list(self, *_args):
+            return [{
+                "job_id": job_id, "status": "done",
+                "created_at": "2026-11-11T05:00:00+00:00",
+                "prompt": "secret prompt", "run_token": "secret token",
+            }]
+
+    class Jobs:
+        def find(self, query, projection):
+            assert query == ALICE
+            assert projection["job_id"] == projection["status"] == 1
+            assert "prompt" not in projection and "run_token" not in projection
+            return Cursor()
+
+    monkeypatch.setattr(discourse, "_db", SimpleNamespace(discourse_jobs=Jobs()))
+    result = asyncio.run(discourse.list_jobs(identity=ALICE))
+    assert result["count"] == 1
+    assert result["jobs"] == [{
+        "job_id": job_id, "status": "done",
+        "created_at": "2026-11-11T05:00:00+00:00",
+        "worker_continuity_verified": False,
+    }]
