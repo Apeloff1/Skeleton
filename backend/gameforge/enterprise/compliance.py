@@ -1,23 +1,24 @@
 from __future__ import annotations
+
 import base64
 import binascii
-import json
 import hashlib
+import json
+import os
 import secrets
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import os
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from core.vault_secure_fs import anchored_directory, atomic_write, ensure_directory
-from gameforge.enterprise.audit import AUDIT
-from gameforge.enterprise.quotas import QUOTAS
-from gameforge.enterprise.oidc_config import load_oidc_settings
-from gameforge.enterprise.alerts import METRICS
 from gameforge.enterprise.access_review import AccessReviewService
+from gameforge.enterprise.alerts import METRICS
+from gameforge.enterprise.audit import AUDIT
+from gameforge.enterprise.oidc_config import load_oidc_settings
+from gameforge.enterprise.quotas import QUOTAS
 
 
 def _data_dir() -> Path:
