@@ -113,22 +113,28 @@ async function _drainQueue(): Promise<TelemetryEvent[]> {
 export async function flushTelemetry(): Promise<void> {
   if (_flushInflight) return;
   _flushInflight = true;
-  let batch: TelemetryEvent[] = [];
+  let pending: TelemetryEvent[] = [];
   try {
     const queued = await _drainQueue();
-    batch = _buffer.splice(0, _buffer.length)
+    pending = _buffer.splice(0, _buffer.length)
       .concat(queued)
       .map(sanitizeQueuedEvent)
       .filter((event): event is TelemetryEvent => event !== null);
-    if (!batch.length) return;
-    const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ events: batch }),
-    });
-    if (!r.ok) await _persistQueue(batch);
+    // The backend admits at most 500 entries per batch. Split offline
+    // backlogs into bounded requests and replay only the still-unsent tail.
+    while (pending.length) {
+      const part = pending.slice(0, 200);
+      const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events: part }),
+      });
+      if (!r.ok) break;
+      pending = pending.slice(part.length);
+    }
+    if (pending.length) await _persistQueue(pending);
   } catch {
-    await _persistQueue(batch);
+    if (pending.length) await _persistQueue(pending);
   } finally {
     _flushInflight = false;
   }
