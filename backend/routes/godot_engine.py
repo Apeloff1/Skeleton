@@ -131,6 +131,25 @@ class JobSubmitRequest(BaseModel):
     timeout: int = Field(600, ge=10, le=3600)
 
 
+def _public_job(job) -> dict:
+    """Expose bounded status data, never arbitrary process stdout/stderr.
+
+    Godot's exception stack traces, console output and subprocess diagnostics
+    may embed credentials, private project paths or user-authored source.
+    The detailed diagnostic log stays inside the engine's governed process.
+    """
+    data = job.to_dict()
+    fields = ("id", "kind", "status", "created_at")
+    result = {key: data[key] for key in fields if key in data}
+    metadata = data.get("result")
+    if isinstance(metadata, dict) and type(metadata.get("returncode")) is int:
+        result["result"] = {"returncode": metadata["returncode"]}
+    else:
+        result["result"] = None
+    result["error"] = "godot_job_failed" if data.get("error") else None
+    return result
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────
 
 @router.get("/status")
@@ -143,7 +162,7 @@ async def godot_status() -> dict:
         status["version"] = (await get_binary().probe()).version
     except Exception:
         status["probe_error"] = "godot_probe_failed"
-    status["projects_root"] = str(_PROJECTS_ROOT)
+    status["projects_root"] = "[private]"
     status["pipeline"] = get_pipeline().stats()
     return status
 
@@ -203,12 +222,12 @@ async def submit_job(req: JobSubmitRequest) -> dict:
         )
     except (ValueError, FileNotFoundError):
         raise HTTPException(422, "Invalid Godot job parameters") from None
-    return job.to_dict()
+    return _public_job(job)
 
 
 @router.get("/jobs")
 async def list_jobs(limit: int = 50) -> list[dict]:
-    return [j.to_dict() for j in get_pipeline().list(limit)]
+    return [_public_job(j) for j in get_pipeline().list(max(1, min(limit, 50)))]
 
 
 @router.get("/jobs/{job_id}")
@@ -216,4 +235,4 @@ async def get_job(job_id: str) -> dict:
     job = get_pipeline().get(job_id)
     if job is None:
         raise HTTPException(404, "Godot job not found")
-    return job.to_dict()
+    return _public_job(job)
