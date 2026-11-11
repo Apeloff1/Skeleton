@@ -874,7 +874,7 @@ def _build_real_apk(build: dict, out_path: Path) -> tuple[int, int, str, bool]:
         return (file_count, total_bytes, sig_summary, v.returncode == 0)
 
 
-def build_apk(build: dict) -> dict:
+def _build_apk_private_stage(build: dict, private_path: Path) -> dict:
     if not require_execution_allowed("APK packaging"):
         return {
             "ok": False,
@@ -884,7 +884,7 @@ def build_apk(build: dict) -> dict:
     build_id = _safe_build_id(build.get("build_id", "unknown"))
     token = build.get("artifact_output_token")
     suffix = "-" + _safe_build_id(str(token)) if token else ""
-    out_path = _ensure_artifacts_root() / f"{build_id}{suffix}.apk"
+    out_path = private_path
     is_real = False
     sig_info = ""
     file_count = 0
@@ -959,6 +959,72 @@ def build_apk(build: dict) -> dict:
         "created_at":           datetime.now(timezone.utc).isoformat(),
         "download_url":         f"/api/binary/download/{build_id}/apk",
     }
+
+
+
+def build_apk(build: dict) -> dict:
+    """Publish only verified, complete APK bytes; never write the public path.
+
+    Native toolchains and placeholder generation run in a private temporary
+    workspace. Descriptor-anchored bounded copy atomically replaces the final
+    name only after the exact staged SHA256 and length have been checked.
+    """
+    if not require_execution_allowed("APK packaging"):
+        return {
+            "ok": False,
+            "disabled": True,
+            "error": execution_disabled_message("APK packaging"),
+        }
+    build_id = _safe_build_id(build.get("build_id", "unknown"))
+    token = build.get("artifact_output_token")
+    suffix = "-" + _safe_build_id(str(token)) if token else ""
+    published_path = _ensure_artifacts_root() / f"{build_id}{suffix}.apk"
+
+    with tempfile.TemporaryDirectory(prefix="galaxy-apk-stage-") as stage:
+        stage_path = Path(stage) / "payload.apk"
+        metadata = _build_apk_private_stage(build, stage_path)
+        if not metadata.get("artifact_id"):
+            return metadata
+        expected_size = metadata["size_bytes"]
+        expected_digest = metadata["sha256"]
+        if (
+            not isinstance(expected_size, int)
+            or expected_size > _MAX_ZIP_OUTPUT_BYTES
+            or expected_size < 0
+        ):
+            raise VaultPathError("staged APK exceeds publication byte budget")
+
+        def _copy_verified(destination):
+            digest = hashlib.sha256()
+            total = 0
+            with anchored_directory(Path(stage)) as stage_directory:
+                with read_regular(
+                    stage_directory, "payload.apk",
+                    max_bytes=_MAX_ZIP_OUTPUT_BYTES,
+                ) as source:
+                    while True:
+                        chunk = source.read(min(1024 * 1024, _MAX_ZIP_OUTPUT_BYTES - total + 1))
+                        if not chunk:
+                            break
+                        if total + len(chunk) > _MAX_ZIP_OUTPUT_BYTES:
+                            raise VaultPathError("staged APK grew beyond byte budget")
+                        digest.update(chunk)
+                        destination.write(chunk)
+                        total += len(chunk)
+            if total != expected_size or digest.hexdigest() != expected_digest:
+                raise VaultPathError("staged APK changed during publication")
+
+        with anchored_directory(published_path.parent) as directory:
+            size = atomic_write(
+                directory, published_path.name, _copy_verified,
+                max_bytes=_MAX_ZIP_OUTPUT_BYTES,
+            )
+        return {
+            **metadata,
+            "path": str(published_path),
+            "size_bytes": size,
+        }
+
 
 
 # ─────────────────────────────────────────────────────────────────
