@@ -360,3 +360,17 @@ def test_receipt_mapping_keys_are_validated_before_lookup(surface, target, key_t
 def test_mapping_key_hardening_preserves_canonical_fixture_receipt():
     receipt = _issue()
     assert verify(receipt, require_real=False)["real_model_executed"] is False
+
+@pytest.mark.parametrize("policy", [None, 0, 1, "", "false", [], {}])
+def test_verifier_rejects_ambiguous_real_model_policy(policy):
+    # The fixture inspection exception must require literal False, not
+    # arbitrary falsey values such as 0, None, or an empty collection.
+    with pytest.raises(QualificationError, match="verification policy"):
+        verify(_issue(), require_real=policy)
+
+
+def test_verifier_preserves_explicit_fixture_policy():
+    receipt = _issue()
+    with pytest.raises(QualificationError, match="fixture"):
+        verify(receipt, require_real=True)
+    assert verify(receipt, require_real=False)["real_model_executed"] is False
