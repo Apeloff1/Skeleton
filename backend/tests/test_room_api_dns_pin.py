@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import socket
 from contextlib import asynccontextmanager
-from types import SimpleNamespace
 
 import httpx
 import pytest
