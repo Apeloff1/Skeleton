@@ -103,11 +103,11 @@ jobs:
 
           # Ephemeral, isolated, authorized CI operator: no shared or committed secret.
           operator_email="qa-e2e-operator-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com"
-          operator_password="$(gen)"
-          echo "::add-mask::${operator_password}"
+          generated_value="$(gen)"
+          echo "::add-mask::${generated_value}"
           {
             echo "GAMEFORGE_SEED_ADMIN_EMAIL=${operator_email}"
-            printf "GAMEFORGE_SEED_ADMIN_PASSWORD=%s\n" "$operator_password"
+            printf "GAMEFORGE_SEED_ADMIN_PASSWORD=%s\n" "$generated_value"
           } >> "$GITHUB_ENV"
       - name: Validate compose configuration
         run: docker compose -f docker-compose.yml config --quiet
