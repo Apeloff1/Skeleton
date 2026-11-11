@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from core.public_exception_route import PublicExceptionRoute
@@ -35,6 +36,14 @@ def _app() -> FastAPI:
             status_code=status,
             detail={"database_password": "private-db-password-do-not-leak"},
             headers={"X-Debug-Token": "private-debug-secret-do-not-leak"},
+        )
+
+    @router.get("/returned-server-error/{status}")
+    async def returned_server_error(status: int):
+        return JSONResponse(
+            status_code=status,
+            content={"detail": "private-response-body-must-not-leak"},
+            headers={"X-Private-Debug": "private-response-header-must-not-leak"},
         )
 
     class Payload(BaseModel):
@@ -74,6 +83,25 @@ def test_explicit_server_http_errors_do_not_leak_details_or_headers():
         assert "private-db-password" not in response.text
         assert "x-debug-token" not in response.headers
         assert response.headers["cache-control"] == "no-store"
+
+
+def test_returned_server_responses_are_replaced_before_wire_serialization():
+    for status in (500, 502, 503):
+        with TestClient(_app(), raise_server_exceptions=False) as client:
+            response = client.get(f"/returned-server-error/{status}")
+        assert response.status_code == status
+        assert response.json() == {"detail": "internal server error"}
+        assert "private-response-body-must-not-leak" not in response.text
+        assert "x-private-debug" not in response.headers
+        assert response.headers["cache-control"] == "no-store"
+
+
+def test_returned_client_responses_are_not_rewritten():
+    with TestClient(_app(), raise_server_exceptions=False) as client:
+        response = client.get("/returned-server-error/409")
+    assert response.status_code == 409
+    assert response.json() == {"detail": "private-response-body-must-not-leak"}
+    assert response.headers["x-private-debug"] == "private-response-header-must-not-leak"
 
 
 def test_explicit_public_client_errors_remain_unchanged():
