@@ -1,5 +1,5 @@
 """Fixture-only first boot and replay: never claim a real GGUF qualification."""
-import copy,errno,hashlib,json,os,tempfile,unittest
+import copy,errno,hashlib,json,os,stat,tempfile,unittest
 from pathlib import Path
 from contextlib import ExitStack
 from unittest import mock
@@ -388,6 +388,38 @@ class QualificationTests(unittest.TestCase):
                 publish_private_report(self.out, 'wrong-parent.json', {'ok': True})
         self.assertEqual(calls[0], 3)
         self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_stage_descriptor_remains_pinned_through_final_check(self):
+        """Unlinked published inode cannot be recycled during rollback."""
+        real_os_open = report_paths.os.open
+        real_root_open = report_paths._open_private_report_root
+        stage_fd = [None]
+        root_calls = [0]
+
+        def track_stage(path, flags, *args, **kwargs):
+            handle = real_os_open(path, flags, *args, **kwargs)
+            if (type(path) is str and path.startswith('.qualification-')
+                    and path.endswith('.tmp')):
+                stage_fd[0] = handle
+            return handle
+
+        def inspect_third(root):
+            root_calls[0] += 1
+            if root_calls[0] == 3:
+                self.assertIsNotNone(stage_fd[0])
+                pinned = os.fstat(stage_fd[0])
+                self.assertTrue(stat.S_ISREG(pinned.st_mode))
+                self.assertEqual(pinned.st_nlink, 1)
+            return real_root_open(root)
+
+        with mock.patch.object(report_paths.os, 'open', side_effect=track_stage):
+            with mock.patch.object(report_paths, '_open_private_report_root',
+                                   side_effect=inspect_third):
+                publish_private_report(self.out, 'pinned.json', {'ok': True})
+        self.assertEqual(root_calls[0], 3)
+        self.assertEqual((self.out / 'pinned.json').read_bytes(), b'{"ok":true}\\n')
+        with self.assertRaises(OSError):
+            os.fstat(stage_fd[0])
 
     def test_report_replaced_after_link_is_not_accepted_or_deleted(self):
         real_open = report_paths._open_private_report_root
