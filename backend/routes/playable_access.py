@@ -14,6 +14,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.routing import APIRoute
 
+from core.public_exception_route import PublicExceptionRouteMixin
 from routes import gameforge_auth as auth
 from routes.playable_htmlutils import model_review_projection, playable_html_digest
 
@@ -232,6 +233,11 @@ class _PrivateProjectRoute(APIRoute):
             response.headers["Cache-Control"] = "private, no-store"
             return response
         return handler
+
+
+class _GuardedPrivateProjectRoute(PublicExceptionRouteMixin, _PrivateProjectRoute):
+    """Keep project admission and private no-store semantics while redacting 500s."""
+
 
 
 def project_router(*args, **kwargs):
