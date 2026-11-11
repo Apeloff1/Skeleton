@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import socket
-from types import SimpleNamespace
+from contextlib import asynccontextmanager
 
 import httpx
 import pytest
@@ -34,9 +34,19 @@ async def test_api_connects_only_to_resolved_public_ip_with_original_host_and_sn
         async def __aexit__(self, *_):
             return False
 
-        async def request(self, method, path, **kwargs):
-            calls.append(("request", method, path, kwargs))
-            return SimpleNamespace(text="ok", is_success=True, status_code=200)
+        @asynccontextmanager
+        async def stream(self, method, path, **kwargs):
+            calls.append(("stream", method, path, kwargs))
+
+            class Response:
+                headers = {}
+                is_success = True
+                status_code = 200
+
+                async def aiter_bytes(self):
+                    yield b"ok"
+
+            yield Response()
 
     monkeypatch.setattr(httpx, "AsyncClient", RecordingClient)
     result = await gateway._api_query({
