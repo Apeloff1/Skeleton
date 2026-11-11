@@ -28,15 +28,21 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-router = APIRouter(prefix="/api/gameforge/studio", tags=["gameforge-studio"])
-
 # RBAC authority is mandatory even when optional CNS components fail.
 # Never impersonate an administrator if the authentication module fails to
 # load; an import/bootstrap error must fail closed before routes are mounted.
 from routes.gameforge_auth import require_role
 
+_viewer = require_role("viewer")
 _editor = require_role("editor")
 _admin = require_role("admin")
+# Apply the viewer floor to *all* CNS routes, including oversight/read
+# endpoints. Mutating routes retain their stronger editor/admin dependencies.
+router = APIRouter(
+    prefix="/api/gameforge/studio",
+    tags=["gameforge-studio"],
+    dependencies=[Depends(_viewer)],
+)
 
 # ── Defensive imports of the integrated CNS modules ───────────────────────────
 _IMPORT_ERR: dict[str, str] = {}
