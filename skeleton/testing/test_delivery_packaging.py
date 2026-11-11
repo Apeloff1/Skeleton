@@ -195,3 +195,27 @@ def test_package_combined_prefix_and_file_path_are_bounded():
         name = "pkg.zip" if build in (build_zip, mirrored.build_zip) else "pkg.tar.gz"
         with pytest.raises(DeliveryError):
             build(name, {"a" * 100: b"x"}, prefix="b" * 4050)
+
+
+def test_mapping_subclass_with_false_empty_length_still_validates_entries():
+    """Do not mistake an empty backing dict for an empty custom mapping."""
+    class VirtualFiles(dict):
+        def items(self):
+            yield "virtual.txt", b"source"
+
+    from skeleton.ai.build.core.delivery import packaging as mirrored
+    for builder in (build_zip, mirrored.build_zip):
+        package = builder("virtual.zip", VirtualFiles())
+        assert package.file_count == 1
+        assert list_zip(package.data) == {"virtual.txt": b"source"}
+
+
+def test_truly_empty_custom_mapping_is_still_rejected():
+    class EmptyFiles(dict):
+        def items(self):
+            return iter(())
+
+    from skeleton.ai.build.core.delivery import packaging as mirrored
+    for builder in (build_zip, mirrored.build_zip):
+        with pytest.raises(DeliveryError, match="non-empty"):
+            builder("empty.zip", EmptyFiles())
