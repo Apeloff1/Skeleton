@@ -8,6 +8,7 @@ from __future__ import annotations
 from routes.playable_access import project_router, scoped_database
 
 import os
+import re
 import html
 from urllib.parse import quote, urlencode, urlsplit
 
@@ -31,6 +32,13 @@ def _app_origin() -> str:
             raise ValueError("PUBLIC_APP_URL is required outside development")
         raw = "http://localhost:3000"
     parsed = urlsplit(raw)
+    # An origin enters an HTTP header via Content-Security-Policy. Forbid
+    # whitespace/semicolons/control characters and malformed authority bytes.
+    # DNS names, IPv4 and bracketed IPv6 are the only accepted host shapes.
+    if not parsed.hostname or not parsed.hostname.isascii() or not re.fullmatch(
+        r"[A-Za-z0-9.:-]{1,253}", parsed.hostname
+    ):
+        raise ValueError("invalid PUBLIC_APP_URL host")
     if (not parsed.hostname or parsed.username is not None
             or parsed.password is not None or parsed.fragment or parsed.query
             or parsed.path not in ("", "/") or "\\" in raw):
@@ -93,13 +101,10 @@ text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:800}}p{{co
 <a href="{deep_link_attr}">▶ Open in Galaxy Studio</a></div></body></html>"""
 
 
-# Deliberately scriptless share cards. Only local images and inline CSS.
+# Deliberately scriptless share cards. Only same-origin/approved-app covers.
+# A generic https: source permits arbitrary off-origin image beacons, so scope
+# the CSP to the configured canonical application origin on every response.
 _SHARE_HEADERS = {
-    "Content-Security-Policy": (
-        "default-src 'none'; script-src 'none'; img-src 'self' https: http://localhost:3000; "
-        "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; "
-        "frame-ancestors 'none'; object-src 'none'"
-    ),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
@@ -107,7 +112,16 @@ _SHARE_HEADERS = {
 
 
 def _share_html(content: str, *, status_code: int = 200) -> HTMLResponse:
-    return HTMLResponse(content, status_code=status_code, headers=_SHARE_HEADERS)
+    app_origin = _app_origin()
+    policy = (
+        f"default-src 'none'; script-src 'none'; img-src 'self' {app_origin}; "
+        "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; "
+        "frame-ancestors 'none'; object-src 'none'"
+    )
+    return HTMLResponse(
+        content, status_code=status_code,
+        headers={**_SHARE_HEADERS, "Content-Security-Policy": policy},
+    )
 
 
 @router.get("/playable/{pid}", response_class=HTMLResponse)
