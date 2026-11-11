@@ -34,6 +34,11 @@ def inputs():
 
 def game_journal(source, actions):
     root = create_journal(export_bundle(source, []))
+    # Empty history is already a valid journal root. Production CAS append
+    # intentionally rejects zero-action revisions; do not weaken that guard
+    # merely to construct a foreign-world negative fixture.
+    if not actions:
+        return root
     return append_journal(
         root, actions, expected_journal_digest=root["journal_digest"],
     )
@@ -117,3 +122,11 @@ def test_cli_original_game_to_portable_journal_play(tmp_path):
     )
     assert checked.returncode == 0, checked.stderr.decode()
     assert decode(checked.stdout)["ending"] == "beacon"
+
+
+def test_empty_journal_root_is_valid_but_empty_revision_is_rejected():
+    source, _ = inputs()
+    root = game_journal(source, [])
+    assert journal_head(root)["source_digest"] == root["root"]["source_digest"]
+    with pytest.raises(HarborError, match="action budget"):
+        append_journal(root, [], expected_journal_digest=root["journal_digest"])
