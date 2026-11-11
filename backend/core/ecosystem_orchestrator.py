@@ -151,6 +151,10 @@ class EcosystemOrchestrator:
             session = self.sessions.get(session_id)
             if session is None:
                 return {"ok": False, "reason": "session_not_found"}
+            # A failed or incomplete pipeline can still produce Godot files.
+            # Never publish those unqualified artifacts as a sealed export.
+            if session.status != "sealed":
+                return {"ok": False, "reason": "not_sealed"}
             if not session.godot_files:
                 return {"ok": False, "reason": "no_export"}
             return {"ok": True, "session_id": session_id, "files": [dict(item) for item in session.godot_files]}

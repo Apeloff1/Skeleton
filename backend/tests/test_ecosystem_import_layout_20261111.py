@@ -67,6 +67,27 @@ assert {item["path"] for item in exported["files"]} == {
 }
 exported["files"][0]["content"] = "tampered"
 assert asyncio.run(route.session_export(created["session_id"]))["files"][0]["content"] != "tampered"
+# A pipeline can produce candidate files while failing its seal gate.
+# Those files must not be exported as qualified Godot deliverables.
+from unittest.mock import patch
+incomplete = asyncio.run(route.create_session(
+    route.CreateSessionBody(brief="An intentionally unsealed original world")
+))
+assert incomplete["ok"]
+orch = route.get_orchestrator()
+with patch.object(orch.studio, "run_pipeline", return_value={
+        "ok": False, "sealed": False, "reason": "gates_failed",
+        "godot_files": [{"path": "unsealed.gd", "content": "unqualified"}],
+}):
+    failed = asyncio.run(route.run_session(route.RunBody(session_id=incomplete["session_id"])))
+assert failed["status"] == "incomplete" and not failed["ok"]
+assert orch.status(incomplete["session_id"])["status"] == "incomplete"
+assert orch.export_godot(incomplete["session_id"]) == {"ok": False, "reason": "not_sealed"}
+try:
+    asyncio.run(route.session_export(incomplete["session_id"]))
+    raise AssertionError("incomplete pipeline artifact was exported")
+except HTTPException as exc:
+    assert exc.status_code == 404 and exc.detail == "not_sealed"
 # Evict only completed sessions, then deny capacity when all jobs are pending.
 orch = route.get_orchestrator()
 module.MAX_SESSIONS = 3
