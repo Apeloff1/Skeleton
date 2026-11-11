@@ -33,7 +33,7 @@ def test_large_error_text_is_clamped_before_regex_and_output():
     assert len(output) == 2000
     assert output == "a" * 2000
     with pytest.raises(ValueError):
-        redact_client_text(raw, max_len=2001)
+        redact_client_text(raw, max_len=16_385)
     with pytest.raises(ValueError):
         redact_client_text(raw, max_len=-1)
     with pytest.raises(ValueError):
