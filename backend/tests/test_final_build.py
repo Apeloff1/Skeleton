@@ -5,6 +5,29 @@ from core import final_build as fb
 from core import forge_quality
 
 
+def _trusted_build_download_url(value: object) -> bool:
+    """Require an exact HTTPS CDN authority, not a matching URL substring."""
+    if type(value) is not str or not 1 <= len(value) <= 2048 or "\\\\" in value:
+        return False
+    try:
+        parsed = urlsplit(value)
+        return (
+            parsed.scheme == "https"
+            and parsed.netloc == "cdn.galaxy.studio"
+            and parsed.hostname == "cdn.galaxy.studio"
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.port is None
+            and not parsed.query
+            and not parsed.fragment
+            and parsed.path.startswith("/builds/")
+            and "//" not in parsed.path
+            and "/../" not in parsed.path
+        )
+    except ValueError:
+        return False
+
+
 def _pkg(era="modern", seed=5, platforms=None):
     return fb.build_package("fb_test", genre="rpg", era=era, seed=seed,
                             platforms=platforms or ["windows", "android"],
@@ -51,11 +74,7 @@ def test_platform_builds_and_downloads():
     r = _pkg(platforms=["windows", "macos", "linux", "android", "ios"])
     assert len(r["platforms"]) == 5
     assert len(r["downloads"]) == 5
-    assert all(
-        urlsplit(d["url"]).scheme == "https"
-        and urlsplit(d["url"]).hostname == "cdn.galaxy.studio"
-        for d in r["downloads"]
-    )
+    assert all(_trusted_build_download_url(d["url"]) for d in r["downloads"])
 
 
 def test_gdd_reflects_choices_gates_platforms():
