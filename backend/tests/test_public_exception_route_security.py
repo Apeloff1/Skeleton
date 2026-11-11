@@ -119,13 +119,94 @@ def test_request_validation_remains_http_422():
     assert response.json()["detail"][0]["type"]
 
 
+def _assert_private_build_route_inherits_public_error_custody(
+    playable_source: str, build_source: str
+) -> None:
+    """Keep both project admission and inherited public 5xx redaction."""
+    import ast
+
+    playable_tree = ast.parse(playable_source)
+    public_import = [
+        node for node in playable_tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "core.public_exception_route"
+        and any(alias.name == "PublicExceptionRoute" for alias in node.names)
+    ]
+    assert len(public_import) == 1
+    private_classes = [
+        node for node in playable_tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "_PrivateProjectRoute"
+    ]
+    assert len(private_classes) == 1
+    assert len(private_classes[0].bases) == 1
+    assert isinstance(private_classes[0].bases[0], ast.Name)
+    assert private_classes[0].bases[0].id == "PublicExceptionRoute"
+
+    build_tree = ast.parse(build_source)
+    private_import = [
+        node for node in build_tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "routes.playable_access"
+        and any(alias.name == "_PrivateProjectRoute" for alias in node.names)
+    ]
+    assert len(private_import) == 1
+    routers = [
+        node.value for node in build_tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "router"
+                for target in node.targets)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "APIRouter"
+    ]
+    assert len(routers) == 1
+    route_classes = [keyword.value for keyword in routers[0].keywords
+                     if keyword.arg == "route_class"]
+    assert len(route_classes) == 1
+    assert isinstance(route_classes[0], ast.Name)
+    assert route_classes[0].id == "_PrivateProjectRoute"
+
+
 def test_legacy_routes_use_fail_closed_error_boundary():
     backend = Path(__file__).resolve().parents[1]
     for filename in (
         "nexus.py", "swarm_planner.py", "swarm_cold_legion.py",
         "storage.py", "text_gamefile.py", "sota_2026.py",
-        "gameforge_build.py", "build_pipeline.py",
+        "build_pipeline.py",
     ):
         source = (backend / "routes" / filename).read_text(encoding="utf-8")
         assert "PublicExceptionRoute" in source, filename
         assert "route_class=PublicExceptionRoute" in source, filename
+
+    _assert_private_build_route_inherits_public_error_custody(
+        (backend / "routes/playable_access.py").read_text(encoding="utf-8"),
+        (backend / "routes/gameforge_build.py").read_text(encoding="utf-8"),
+    )
+
+
+def test_private_build_route_contract_rejects_security_regressions():
+    backend = Path(__file__).resolve().parents[1]
+    playable = (backend / "routes/playable_access.py").read_text(encoding="utf-8")
+    build = (backend / "routes/gameforge_build.py").read_text(encoding="utf-8")
+    mutations = (
+        (playable.replace(
+            "class _PrivateProjectRoute(PublicExceptionRoute):",
+            "class _PrivateProjectRoute(APIRoute):", 1), build),
+        (playable.replace(
+            "from core.public_exception_route import PublicExceptionRoute",
+            "from fastapi.routing import PublicExceptionRoute", 1), build),
+        (playable, build.replace(
+            "route_class=_PrivateProjectRoute", "route_class=APIRoute", 1)),
+        (playable, build.replace(
+            "from routes.playable_access import _PrivateProjectRoute",
+            "from routes.other_access import _PrivateProjectRoute", 1)),
+    )
+    for mutated_playable, mutated_build in mutations:
+        assert (mutated_playable, mutated_build) != (playable, build)
+        try:
+            _assert_private_build_route_inherits_public_error_custody(
+                mutated_playable, mutated_build
+            )
+        except AssertionError:
+            continue
+        raise AssertionError("unprotected private build route passed contract")
