@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
+from itertools import islice
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -27,6 +29,16 @@ _SENSITIVE_KEYS = {
     "refresh_token",
     "credential",
     "credentials",
+    "session",
+    "session_token",
+    "session_key",
+    "client_key",
+    "private_key",
+    "x_api_key",
+    "api_secret",
+    "id_token",
+    "jwt",
+    "bearer",
 }
 
 _AUTHORIZATION_RE = re.compile(
@@ -37,45 +49,76 @@ _SECRET_ASSIGNMENT_RE = re.compile(
     r"\b\s*[:=]\s*([^\s,;]+)"
 )
 _BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
+_QUERY_SECRET_RE = re.compile(
+    r"(?i)([?&](?:token|access[-_]?token|refresh[-_]?token|session|"
+    r"api[-_]?key|secret|password|code|client[-_]?secret)=)[^&#\\s]+"
+)
+_JSON_SECRET_RE = re.compile(
+    r'(?i)"(?:token|password|secret|authorization|api[_-]?key|'
+    r'access[_-]?token|refresh[_-]?token)"\\s*:\\s*"[^"\\r\\n]*"'
+)
+_MAX_REDACTED_TEXT = 2_000
 
 
 def redact_client_text(value: str, *, max_len: int = 2000) -> str:
-    """Redact credential-shaped text before it is stored or returned."""
-    text = _AUTHORIZATION_RE.sub(f"authorization={REDACTED}", value)
+    """Bound before pattern matching, including JSON and URL credential forms.
+
+    Inputs may contain hostile network error bodies or exception traces. Never
+    regex-scan unbounded text, and never serialize unknown objects to text.
+    """
+    if not isinstance(value, str):
+        return "[UNSUPPORTED]"
+    if type(max_len) is not int or not 0 <= max_len <= _MAX_REDACTED_TEXT:
+        raise ValueError("redaction character budget must be within [0, 2000]")
+    # Include a bounded lookahead to redact credentials crossing the output
+    # boundary; processing is capped even for gigabyte-sized exceptions.
+    text = value[:max_len + 256]
+    text = _AUTHORIZATION_RE.sub(f"authorization={REDACTED}", text)
     text = _BEARER_RE.sub("Bearer [REDACTED]", text)
     text = _SECRET_ASSIGNMENT_RE.sub(
         lambda match: f"{match.group(1)}={REDACTED}", text
     )
-    if len(text) > max_len:
-        return text[:max_len]
-    return text
+    text = _QUERY_SECRET_RE.sub(
+        lambda match: f"{match.group(1)}{REDACTED}", text
+    )
+    text = _JSON_SECRET_RE.sub(REDACTED, text)
+    # Do not split the redaction marker at the output budget: that can
+    # turn an otherwise redacted value into a misleading partial token.
+    result = text[:max_len]
+    if result.endswith("[REDACT"):
+        result = result[:-7]
+    return result
 
 
 def redact_client_payload(value: Any, *, depth: int = 0, max_depth: int = 4) -> Any:
-    """Bounded redaction for nested crash/telemetry payloads."""
+    """Never run arbitrary object repr/getters or allocate unbounded key lists."""
     if depth >= max_depth:
         return "[TRUNCATED]"
     if isinstance(value, str):
         return redact_client_text(value)
     if isinstance(value, dict):
         redacted: dict[str, Any] = {}
-        for key, child in list(value.items())[:50]:
-            normalized = str(key).strip().lower().replace("-", "_")
+        for key, child in islice(value.items(), 50):
+            if not isinstance(key, str) or key in {"__proto__", "prototype", "constructor"}:
+                continue
+            normalized = key.strip().lower().replace("-", "_")
             if normalized in _SENSITIVE_KEYS:
-                redacted[str(key)] = REDACTED
+                redacted[key] = REDACTED
             else:
-                redacted[str(key)] = redact_client_payload(
+                redacted[key] = redact_client_payload(
                     child, depth=depth + 1, max_depth=max_depth
                 )
         return redacted
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple)):
         return [
             redact_client_payload(child, depth=depth + 1, max_depth=max_depth)
-            for child in value[:50]
+            for child in islice(value, 50)
         ]
-    if isinstance(value, (int, float, bool)) or value is None:
+    if isinstance(value, bool) or value is None:
         return value
-    return redact_client_text(str(value), max_len=200)
+    if isinstance(value, (int, float)):
+        return value if not isinstance(value, float) or math.isfinite(value) else None
+    return "[UNSUPPORTED]"
 
 
 def public_http_error(
