@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/perf-profiler-literal-target-qualification.yml'
       - 'skeleton/perf_profiler/cli.py'
+      - 'skeleton/perf_profiler/frames.py'
       - 'tests/perf_profiler/**'
 
 permissions:
