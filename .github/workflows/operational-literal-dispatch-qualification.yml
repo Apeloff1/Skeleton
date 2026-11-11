@@ -1,0 +1,49 @@
+name: Operational AI Literal Dispatch Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - '.github/workflows/operational-literal-dispatch-qualification.yml'
+      - 'skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/**'
+      - 'skeleton/ai/runtime/operational_ai/reliability_fabric/engine.py'
+      - 'skeleton/ai/runtime/operational_ai/trust_gates/engine.py'
+      - 'skeleton/perf_profiler/_stats.py'
+      - 'tests/test_operational_literal_dispatch_20261111.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: operational-literal-dispatch-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  source_qualification:
+    name: Operational AI literal import and runtime regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify exact immutable checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Compile literal dispatch and regression sources
+        run: |
+          python -m compileall -q skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements
+          python -m compileall -q skeleton/ai/runtime/operational_ai/reliability_fabric/engine.py skeleton/ai/runtime/operational_ai/trust_gates/engine.py skeleton/perf_profiler/_stats.py tests/test_operational_literal_dispatch_20261111.py
+      - name: Verify source index and literal dispatch contracts
+        run: |
+          python scripts/check_ai_file_tree.py
+          python -m unittest discover -s tests -p 'test_operational_literal_dispatch_20261111.py' -v
