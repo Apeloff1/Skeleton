@@ -13,6 +13,7 @@
 ║  Jeeves is the focal orchestrator. No shortcuts. Systematically perfect.       ║
 ╚══════════════════════════════════════════════════════════════════════════════════╝
 """
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
@@ -32,7 +33,7 @@ import tempfile
 import subprocess
 import shutil
 
-router = APIRouter(prefix="/api/jeeves-master", tags=["jeeves-master-build"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/jeeves-master", tags=["jeeves-master-build"])
 
 # ═══════════════════════════════════════════════════════════════════════
 # AGENT MANIFEST — Every agent system in the platform

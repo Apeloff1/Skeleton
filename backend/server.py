@@ -21,6 +21,7 @@ import sys as _sys, os as _os, time as _time
 _sys.stdout.reconfigure(line_buffering=True) if hasattr(_sys.stdout, "reconfigure") else None
 print(f"[BOOT] {_time.strftime('%Y-%m-%d %H:%M:%S')} server.py module import begin pid={_os.getpid()}", flush=True)
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks, Depends, Query, Request, WebSocket
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -3397,7 +3398,7 @@ app.add_middleware(
 from api_middleware import install_middleware as _install_api_middleware, get_stats as _api_stats  # noqa: E402
 _install_api_middleware(app)
 
-api_router = APIRouter(prefix="/api")
+api_router = APIRouter(route_class=PublicExceptionRoute, prefix="/api")
 
 #====================================================================================================
 # API ROUTES
