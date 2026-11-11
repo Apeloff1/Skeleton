@@ -87,8 +87,16 @@ function sanitizeQueuedEvent(value: unknown): TelemetryEvent | null {
 async function _persistQueue(events: TelemetryEvent[]) {
   try {
     const raw = await AsyncStorage.getItem(QUEUE_KEY);
-    const existing = raw && raw.length <= MAX_QUEUE_BYTES ? JSON.parse(raw) : [];
-    const previous = Array.isArray(existing) ? existing : [];
+    let previous: unknown[] = [];
+    if (raw && raw.length <= MAX_QUEUE_BYTES) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) previous = parsed;
+      } catch {
+        // A corrupt legacy queue must not prevent today's safe diagnostics.
+        previous = [];
+      }
+    }
     const merged = [...previous, ...events]
       .slice(-MAX_EVENTS)
       .map(sanitizeQueuedEvent)
@@ -166,6 +174,11 @@ export function recordEvent(
       return;
     }
   } catch { /* swallow — proceed with buffering */ }
+  // Network outages or blocked timers must not grow an unbounded in-memory
+  // buffer; older diagnostics are less useful than current ones.
+  if (_buffer.length >= MAX_EVENTS) {
+    _buffer.splice(0, _buffer.length - MAX_EVENTS + 1);
+  }
   _buffer.push({
     modal_id:   safeTelemetryLabel(modalId),
     session_id: sessionId(),
