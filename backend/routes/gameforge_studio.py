@@ -18,8 +18,11 @@ All imports are defensive so a partial CNS never crashes boot.
 from __future__ import annotations
 
 import base64
+import json
 import time
 from typing import Any, Optional
+
+from core.http_errors import redact_client_payload, redact_client_text
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
@@ -27,15 +30,13 @@ from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/gameforge/studio", tags=["gameforge-studio"])
 
-# RBAC guards (soft in dev; enforced when GAMEFORGE_AUTH_ENFORCE=1)
-try:
-    from routes.gameforge_auth import require_role
-    _editor = require_role("editor")
-    _admin = require_role("admin")
-except Exception:  # noqa: BLE001
-    def _editor():  # type: ignore
-        return {"role": "admin", "dev_mode": True}
-    _admin = _editor
+# RBAC authority is mandatory even when optional CNS components fail.
+# Never impersonate an administrator if the authentication module fails to
+# load; an import/bootstrap error must fail closed before routes are mounted.
+from routes.gameforge_auth import require_role
+
+_editor = require_role("editor")
+_admin = require_role("admin")
 
 # ── Defensive imports of the integrated CNS modules ───────────────────────────
 _IMPORT_ERR: dict[str, str] = {}
@@ -84,8 +85,33 @@ def _room_ids() -> list[str]:
 
 
 def dispatch_to_rooms(event: str, payload: dict, fanout: int = 3) -> list[str]:
-    """Round-robin a step/forge/boardroom event across the CNS rooms so agents
-    everywhere log it and keep working. Persisted to gameforge_room_activity."""
+    """Dispatch bounded and redacted room activity without leaking secrets.
+
+    Only identity-safe metadata is stored or copied into agent-visible notes.
+    A failed or malformed redaction must never fall back to the original
+    payload, including after transient Mongo or step-log failures.
+    """
+    if not isinstance(event, str) or not 1 <= len(event) <= 80:
+        raise ValueError("room event identifier is invalid")
+    if not isinstance(payload, dict):
+        raise ValueError("room event payload must be an object")
+    if type(fanout) is not int or not 0 <= fanout <= 1000:
+        raise ValueError("room fanout is outside allowed bounds")
+
+    # Convert unknown objects to a fixed placeholder, never repr/str().
+    safe_event = redact_client_text(event, max_len=80)
+    safe_payload = redact_client_payload(payload, max_depth=4)
+    if not isinstance(safe_payload, dict):
+        raise ValueError("room activity is not an object")
+    encoder = json.JSONEncoder(
+        ensure_ascii=True, separators=(",", ":"), allow_nan=False
+    )
+    total = 0
+    for piece in encoder.iterencode(safe_payload):
+        total += len(piece)
+        if total > 64 * 1024:
+            raise ValueError("room activity payload exceeds byte budget")
+
     ids = _room_ids()
     if not ids:
         return []
@@ -94,8 +120,8 @@ def dispatch_to_rooms(event: str, payload: dict, fanout: int = 3) -> list[str]:
         picked.append(ids[_rr["i"] % len(ids)])
         _rr["i"] += 1
     doc = {
-        "event": event,
-        "payload": payload,
+        "event": safe_event,
+        "payload": safe_payload,
         "rooms": picked,
         "ts": time.time(),
     }
@@ -103,17 +129,19 @@ def dispatch_to_rooms(event: str, payload: dict, fanout: int = 3) -> list[str]:
         _db()["gameforge_room_activity"].insert_one(dict(doc))
     except Exception:  # noqa: BLE001
         pass
-    # also drop a note into the relevant snowball step so all rooms can read it
+
+    # Agent notes carry only the event type and room IDs, never raw payloads.
     try:
-        step_id = payload.get("step_id")
-        if step_id and get_step_database:
+        step_id = safe_payload.get("step_id")
+        if isinstance(step_id, str) and step_id and get_step_database:
             sdb = get_step_database(step_id)
             if sdb:
-                sdb.add_agent_note(f"[rooms {','.join(picked)}] {event}: {str(payload)[:120]}")
+                sdb.add_agent_note(
+                    f"[rooms {','.join(picked)}] {safe_event}: activity recorded"
+                )
     except Exception:  # noqa: BLE001
         pass
     return picked
-
 
 def _room_activity(limit: int = 50) -> list[dict]:
     try:
