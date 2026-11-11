@@ -78,12 +78,13 @@ export async function flushTelemetry(): Promise<void> {
   // Hold the lock *before* the first await. Two simultaneous flushes must not
   // drain or replay the same offline queue twice.
   _flushInflight = true;
+  let safeBatch: TelemetryEvent[] = [];
   try {
     const queued = await _drainQueue();
     const batch = _buffer.splice(0, _buffer.length).concat(queued);
     if (!batch.length) return;
     // Scrub legacy queue contents too, not just new events.
-    const safeBatch = scrubTelemetry(batch) as TelemetryEvent[];
+    safeBatch = scrubTelemetry(batch) as TelemetryEvent[];
     const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -91,8 +92,9 @@ export async function flushTelemetry(): Promise<void> {
     });
     if (!r.ok) await _persistQueue(safeBatch);
   } catch {
-    // Exception messages/stack traces are never persisted here.
-    await _persistQueue(_buffer.splice(0, _buffer.length));
+    // Preserve the original in-flight batch on network failure, but only
+    // after scrubbing. Events that arrived during the request remain buffered.
+    if (safeBatch.length) await _persistQueue(safeBatch);
   } finally {
     _flushInflight = false;
   }
