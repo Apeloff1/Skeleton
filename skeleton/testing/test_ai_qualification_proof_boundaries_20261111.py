@@ -9,7 +9,7 @@ import pytest
 from skeleton.ai.runtime.operational_ai.deployment.qualification.contracts import (
     QualificationError,
 )
-from skeleton.ai.runtime.operational_ai.deployment.qualification import paths, proof
+from skeleton.ai.runtime.operational_ai.deployment.qualification import paths, proof, verification
 from skeleton.ai.runtime.operational_ai.deployment.qualification.verification import verify
 
 
@@ -219,3 +219,66 @@ def test_replay_digest_subclass_cannot_override_equality():
                 "c" * 64, "d" * 64, "session", "request",
                 first, replayed, history, doctor, exact_native=False,
             )
+
+
+class _UntrustedText(str):
+    """A str subclass must not control authoritative receipt comparisons."""
+
+    def __eq__(self, other):
+        raise AssertionError("hostile equality invoked")
+
+    def __ne__(self, other):
+        raise AssertionError("hostile inequality invoked")
+
+    __hash__ = str.__hash__
+
+
+@pytest.mark.parametrize("field", [
+    "schema", "model_sha256", "tokenizer_sha256", "session_sha256",
+    "request_id_sha256", "request_sha256", "output_sha256",
+    "transcript_sha256", "context_sha256", "proof_sha256",
+    "checkpoint_execution_mode", "status",
+])
+def test_verifier_rejects_subclassed_receipt_text_without_equality(field):
+    receipt = _issue()
+    receipt[field] = _UntrustedText(receipt[field])
+    with pytest.raises(QualificationError):
+        verify(receipt, require_real=False)
+
+
+def test_verifier_rejects_subclassed_report_key_before_set_comparison():
+    receipt = _issue()
+    saved = receipt.pop("status")
+    receipt[_UntrustedText("status")] = saved
+    with pytest.raises(QualificationError, match="schema mismatch"):
+        verify(receipt, require_real=False)
+
+
+def test_fixture_receipt_cannot_spoof_real_model_provenance():
+    receipt = _issue()
+    # Without exact builtin strings, a malicious __eq__ may claim that both
+    # fixture labels are real-model labels while the canonical bytes stay
+    # identical to the valid fixture report and its existing SHA-256.
+    class _AlwaysEqualText(str):
+        def __eq__(self, other):
+            return True
+
+        def __ne__(self, other):
+            return False
+
+    receipt["checkpoint_execution_mode"] = _AlwaysEqualText(
+        receipt["checkpoint_execution_mode"]
+    )
+    receipt["status"] = _AlwaysEqualText(receipt["status"])
+    with pytest.raises(QualificationError, match="provenance"):
+        verify(receipt, require_real=True)
+
+
+def test_verifier_normalizes_canonicalization_failure():
+    from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.contracts import SpineError
+
+    with mock.patch.object(
+        verification, "canonical", side_effect=SpineError("internal encoder detail")
+    ):
+        with pytest.raises(QualificationError, match="invalid qualification report"):
+            verify(_issue(), require_real=False)
