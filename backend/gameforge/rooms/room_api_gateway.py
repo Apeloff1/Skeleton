@@ -22,8 +22,8 @@ import os
 import re
 import socket
 import time
-from urllib.parse import urlsplit
 from typing import Any
+from urllib.parse import urlsplit
 
 _EXTERNAL_ENABLED = os.getenv("GAMEFORGE_ENABLE_EXTERNAL_APIS", "0") == "1"
 _EXTERNAL_API_HOSTS = frozenset(
