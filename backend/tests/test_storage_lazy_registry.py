@@ -105,3 +105,51 @@ def test_registry_has_no_runtime_selected_python_imports():
     from pathlib import Path
     from scripts.check_dynamic_import_safety import violations
     assert violations(Path(lazy_registry.__file__)) == []
+
+
+def test_flagged_wrapper_uses_only_reviewed_seed_loaders(monkeypatch):
+    """A recursive size inventory must not authorize new import targets."""
+    from core import unbulk
+
+    known = next(name for name in lazy_registry._LOADERS if name.startswith("seeds."))
+    monkeypatch.setattr(lazy_registry, "_noncore_proxies", {})
+
+    def inventory(top=25):
+        assert top == 10_000
+        return {"biggest": [
+            {"module": "seeds/deep/unregistered.py", "lazy_eligible": True},
+            {"module": "routes/foreign.py", "lazy_eligible": True},
+            {"module": known.replace(".", "/") + ".py", "lazy_eligible": True},
+            {"module": "seeds/not_flagged.py", "lazy_eligible": False},
+        ]}
+
+    monkeypatch.setattr(unbulk, "module_inventory", inventory)
+    before = set(sys.modules)
+    wrapped = lazy_registry.wrap_flagged()
+    assert set(wrapped) == {known}
+    assert wrapped[known] is lazy_registry._noncore_proxies[known]
+    assert set(sys.modules) == before
+
+
+def test_storage_wrap_survives_unregistered_nested_seed_inventory(storage_client, monkeypatch):
+    """The public endpoint stays usable while nested seeds remain deferred."""
+    from core import unbulk
+
+    original_inventory = unbulk.module_inventory
+
+    def inventory(top=25):
+        result = original_inventory(top=top)
+        result["biggest"].insert(
+            0, {"module": "seeds/deep/unregistered.py", "lazy_eligible": True}
+        )
+        return result
+
+    monkeypatch.setattr(unbulk, "module_inventory", inventory)
+    before = {name for name in sys.modules if name.startswith("seeds.")}
+    response = storage_client.post("/api/storage/lazy/wrap")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["wrapped_core"] > 0
+    assert payload["wrapped_noncore"] > 0
+    assert "seeds.deep.unregistered" not in lazy_registry._noncore_proxies
+    assert {name for name in sys.modules if name.startswith("seeds.")} == before
