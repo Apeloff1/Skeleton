@@ -619,3 +619,153 @@ jobs:
           set -euo pipefail
           node --test frontend/scripts/test-guarded-expo-export.cjs
           node --test frontend/scripts/test-app-foundation-e2e-admission.cjs
+
+  backend_source_convergence:
+    # Draft-safe, host-portable backend regression evidence only; not a full
+    # Backend Quality, release, device or live network qualification.
+    name: Exact-head backend security and source convergence (review only)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ".:backend"
+      PYTHONNOUSERSITE: "1"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Checkout immutable backend source without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Prove exact test source revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up supported Python runtime
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install reviewed isolated backend test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          -e .
+          "pytest>=8,<9" "pytest-asyncio>=1.4.0,<2"
+          "PyJWT==2.15.1" "zstandard==0.25.0"
+          "PyYAML>=6,<7" "numpy>=2,<3" "Pillow>=13.0.0,<14"
+      - name: Verify explicit live-service boundary (not a live service test)
+        run: |
+          set -euo pipefail
+          python scripts/check_backend_source_convergence.py
+          python backend/scripts/check_live_service_test_boundaries.py
+          python -m pytest -q --maxfail=6 --noconftest \
+            tests/test_backend_source_convergence_ci.py \
+            tests/test_repo_machine_live_taxonomy.py
+      - name: Exercise true backend source, replay and security regressions
+        run: |
+          set -euo pipefail
+          python -m pytest -q -p pytest_asyncio.plugin --maxfail=12 --noconftest --import-mode=importlib \
+            backend/tests/test_live_service_test_boundaries.py \
+            backend/tests/test_queue_drain_workflow.py \
+            backend/tests/test_workflow_concurrency_gate.py \
+            backend/tests/test_free_api_dns_pin.py \
+            backend/tests/test_galaxy_file_budget.py \
+            backend/tests/test_storage_lazy_registry.py \
+            backend/tests/test_discourse_judge_admission.py \
+            backend/tests/test_code_intelligence_engine_boundary.py \
+            backend/tests/test_engine_text_route_cutovers.py
+
+  discourse_surface_contracts:
+    # Source proof only: no remote provider, no fabricated independent consensus.
+    name: Exact-head Discourse jobs and product surface contracts (review only)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      PYTHONNOUSERSITE: "1"
+    steps:
+      - name: Checkout exact product candidate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Prove exact product source identity
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Set up Node for bounded source-only TypeScript test
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Install isolated source test dependencies
+        run: python -m pip install --disable-pip-version-check --no-input "pytest>=8,<9"
+      - name: Enforce full Expo route and delegated API contract
+        run: |
+          set -euo pipefail
+          python scripts/check_product_surface_specification.py
+          python -m pytest -q --maxfail=8 --noconftest \
+            tests/test_product_surface_specification.py \
+            tests/test_product_surface_delegated_backend_20261110.py
+      - name: Exercise authenticated Discourse job source with negative fixtures
+        run: node --test frontend/scripts/test-discourse-async-jobs.mjs
+
+  godot_source_custody:
+    # Source-only; no Godot engine launch, Windows installer or signed release.
+    name: Exact-head Godot/Forge export provenance and ancestor custody (review only)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      PYTHONNOUSERSITE: "1"
+    steps:
+      - name: Checkout exact Godot provenance candidate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Prove immutable Godot tested revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install reviewed offline source test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-cache-dir
+          pytest==8.4.2 cryptography==50.0.2
+      - name: Compile verified Godot and Forge custody modules
+        run: >-
+          python -m compileall -q skeleton/godot_export/provenance.py
+          skeleton/godot_export/cli.py skeleton/forge/export.py
+          skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py
+          skeleton/testing/test_forge_native_output_custody_20261110.py
+      - name: Exercise hostile provenance, symlink, ancestor and export fixtures
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py \
+            skeleton/testing/test_forge_native_output_custody_20261110.py \
+            skeleton/testing/test_godot_export_provenance.py \
+            skeleton/testing/test_godot_export_provenance_negative.py \
+            skeleton/testing/test_forge_export_quarantine.py
