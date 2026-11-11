@@ -192,7 +192,7 @@ def test_default_generation_remains_unbounded_by_an_implicit_floor(bounded_build
 
 
 @pytest.mark.parametrize("emergency", [False, True])
-def test_fallback_and_emergency_output_cannot_escape_the_pending_budget(bounded_build, monkeypatch, emergency):
+def test_unavailable_generation_fails_closed_without_stub_or_fallback_files(bounded_build, monkeypatch, emergency):
     build = bounded_build(3)
     monkeypatch.setattr(galaxy, "_submit_floor_chunk", forbidden_padding)
     monkeypatch.setattr(galaxy, "_generate_floor_padding", forbidden_padding)
@@ -200,8 +200,8 @@ def test_fallback_and_emergency_output_cannot_escape_the_pending_budget(bounded_
     def unavailable(*_args, **_kwargs):
         raise ValueError("content fixture unavailable")
 
-    # Real dispatch reaches the fallback cascade; neither a degraded phase nor
-    # its emergency path can queue an uncounted dictionary beyond the cap.
+    # Every real generator fails. Synthetic fallback or emergency material
+    # must never count as generated game source or a completed phase.
     for function in set(galaxy._PHASE_FUNC_MAP.values()):
         monkeypatch.setattr(galaxy, function, unavailable)
     monkeypatch.setattr(galaxy, "_phase_generic", unavailable)
@@ -209,10 +209,13 @@ def test_fallback_and_emergency_output_cannot_escape_the_pending_budget(bounded_
         monkeypatch.setattr(galaxy, "_generate_fallback_files", unavailable)
     asyncio.run(galaxy._run_background_build(build["build_id"], duration_minutes=1))
 
-    assert build["status"] == "failed"
-    assert build["_bg_stop_reason"] == "artifact_file_budget_exhausted"
-    assert vault.get_file_count(build["build_id"]) == 3
-    names = vault.get_file_paths(build["build_id"])
-    assert all(name.startswith("stubs/" if emergency else "fallback/") for name in names)
+    assert build["status"] == build["_bg_status"] == "failed"
+    assert build["_bg_stop_reason"] == "phase_generation_failed"
+    assert vault.get_file_count(build["build_id"]) == build["file_count"] == 0
+    assert vault.get_file_paths(build["build_id"]) == []
+    assert build["files"] == {}
+    assert build["_bg_partial_artifacts"] is False
     assert not any(phase["status"] == "completed" for phase in build["phases"])
     assert not build.get("completed_at") and not build["_bg_drain_pending"]
+    assert build["build_id"] not in galaxy._active_runners
+    assert build["build_id"] not in galaxy._background_tasks

@@ -165,6 +165,50 @@ class WorkflowTierTests(unittest.TestCase):
             (root / ".github/workflows" / name).write_text(original)
             self.assertTrue(any("unexpectedly active" in p for p in audit(root)))
             (root / ".github/workflows" / name).unlink()
+            # Both source suites remain manual-only for independent review;
+            # restoring an automatic subscription is a tier-policy regression.
+            strict = root / ".github/workflows/strict-replay-source-qualification.yml"
+            strict_original = strict.read_text()
+            strict.write_text(strict_original.replace(
+                "  workflow_dispatch:", "  pull_request:\n  workflow_dispatch:", 1,
+            ))
+            self.assertTrue(any(
+                "source qualification must be manually dispatched" in issue
+                for issue in audit(root)
+            ))
+            strict.write_text(strict_original)
+            # Dispatch validation is insufficient if checkout still follows a
+            # moving branch; the immutable source SHA must be checked twice.
+            strict.write_text(strict_original.replace(
+                "ref: ${{ inputs.candidate_sha }}", "ref: main",
+            ))
+            self.assertTrue(any(
+                "immutable SHA admission or checkout attestation missing" in issue
+                for issue in audit(root)
+            ))
+            strict.write_text(strict_original)
+            strict.write_text(strict_original.replace(
+                "group: strict-replay-source-${{ inputs.candidate_sha }}",
+                "group: strict-replay-source-${{ github.sha }}",
+            ))
+            self.assertTrue(any(
+                "manual candidate concurrency must preserve independent immutable evidence" in issue
+                for issue in audit(root)
+            ))
+            strict.write_text(strict_original)
+
+            # The required Merge Readiness lane must retain the same exact
+            # source suites even though separate automatic runs are removed.
+            readiness.write_text(readiness_original.replace(
+                "test_replay_checkpoint_v6.py", "missing_replay_checkpoint_v6.py",
+            ))
+            self.assertTrue(any(
+                "required quality gate lost source test" in issue
+                for issue in audit(root)
+            ))
+            readiness.write_text(readiness_original)
+            self.assertEqual(audit(root), [])
+
             core = root / ".github/workflows" / registry["core_automatic_pr"][0]
             core.write_text("name: disabled\non:\n  workflow_dispatch:\njobs:\n")
             self.assertTrue(any("core PR trigger missing" in p for p in audit(root)))

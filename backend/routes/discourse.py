@@ -139,8 +139,9 @@ async def deliberate(task: str, prompt: str, system: str = "",
     """Run bounded deliberation without reporting ungrounded judge verdicts."""
     try:
         panel, judge_model = _admit(task, prompt, system, panel, judge_model, do_discord, rounds)
-    except ValueError as exc:
-        return {"error": str(exc)}
+    except ValueError:
+        # Admission must not echo exception text from validators or extensions.
+        return {"error": "invalid_deliberation_request"}
 
     drafts = await asyncio.gather(*[
         route_complete(task, prompt, system, model=m, use_cache=False) for m in panel
@@ -354,8 +355,9 @@ async def deliberate_async(body: DeliberateBody):
             body.task, body.prompt, body.system, body.panel or None,
             body.judge_model, body.discord, body.rounds,
         )
-    except ValueError as exc:
-        return {"error": str(exc)}
+    except ValueError:
+        # Admission must not echo exception text from validators or extensions.
+        return {"error": "invalid_deliberation_request"}
 
     with _ACTIVE_LOCK:
         if len(_ACTIVE_DELIBERATIONS) >= MAX_ASYNC_DELIBERATIONS:
