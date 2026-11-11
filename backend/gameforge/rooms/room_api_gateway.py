@@ -251,8 +251,16 @@ async def _api_query(target: dict) -> dict:
         return {"channel": "api", "target": "invalid", "ok": False,
                 "error": "invalid_api_target"}
     url = target.get("url", "")
-    name = target.get("name", url)
-    name = name[:128] if isinstance(name, str) else "external_api"
+    # Never echo caller URLs (which may contain tokens) into room responses.
+    # A name is only a short ASCII label, not a credential-bearing URI.
+    supplied_name = target.get("name", "external_api")
+    name = (
+        supplied_name
+        if isinstance(supplied_name, str)
+        and 1 <= len(supplied_name) <= 128
+        and all(ch.isascii() and (ch.isalnum() or ch in " ._-") for ch in supplied_name)
+        else "external_api"
+    )
     if not _EXTERNAL_ENABLED:
         return {"channel": "api", "target": name, "ok": True, "disabled": True,
                 "note": "external APIs disabled (inward-focused); set GAMEFORGE_ENABLE_EXTERNAL_APIS=1"}
