@@ -145,3 +145,17 @@ def test_repository_manifest_is_explicit_and_versioned() -> None:
         assert name.startswith("test_") and name.endswith(".py")
         assert len(metadata["reason"].strip()) >= 20
         assert metadata["target"].strip()
+
+
+def test_hermetic_collection_boundary_is_not_registered_as_live_service() -> None:
+    """A fixture proving collection isolation is not itself an external service."""
+    payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    name = "test_live_collection_boundary.py"
+    assert name not in payload["tests"]
+    source = ROOT / "backend" / "tests" / name
+    assert source.is_file()
+    # Import-free AST classification: synthetic URLs in test fixtures do not
+    # grant the test the live-service marker or permission for external I/O.
+    module = _module()
+    assert not module._has_live_marker(source.read_text(encoding="utf-8"))
+    assert module.audit() == ()

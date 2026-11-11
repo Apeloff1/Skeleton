@@ -85,7 +85,7 @@ def test_catalog_dns_rejects_mixed_and_private_answers(monkeypatch, answers):
     monkeypatch.setattr(free_apis.socket, "getaddrinfo",
                         lambda *args, **kwargs: answers)
     with pytest.raises(ValueError, match="non-public"):
-        free_apis._pin_catalog_host("api.github.com")
+        free_apis._pin_public_origin("api.github.com")
 
 
 def test_catalog_rejects_nonstandard_https_ports_and_fragments():
@@ -95,7 +95,12 @@ def test_catalog_rejects_nonstandard_https_ports_and_fragments():
             free_apis._catalog_request_parts(api, url)
 
 
-def test_public_ipv6_address_formats_as_pinned_https_authority():
-    assert free_apis._pinned_origin("2606:2800:220:1:248:1893:25c8:1946") == (
+def test_public_ipv6_address_formats_as_pinned_https_authority(monkeypatch):
+    address = "2606:2800:220:1:248:1893:25c8:1946"
+    monkeypatch.setattr(
+        free_apis.socket, "getaddrinfo",
+        lambda *args, **kwargs: [_dns(address)],
+    )
+    assert free_apis._pin_public_origin("api.github.com") == (
         "https://[2606:2800:220:1:248:1893:25c8:1946]"
     )

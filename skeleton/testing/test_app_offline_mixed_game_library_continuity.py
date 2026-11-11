@@ -20,12 +20,10 @@ from skeleton.testing.test_app_offline_signed_game_library_audit import (
     _entry as _signed_entry,
 )
 from skeleton.testing.test_app_offline_policy_chain_delivery import chain_delivery
-# The upstream fixture depends on delivered. Explicitly expose it here so
-# sharded pytest collection does not rely on another test module being loaded.
-from skeleton.testing.test_app_offline_policy_signed_delivery import delivered
-from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
-from skeleton.testing.test_app_offline_signed_progress_migration import migration
-from skeleton.testing.test_app_offline_archive_signature import signed
+from skeleton.testing.test_app_offline_policy_chain_delivery import delivered  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_policy_signed_delivery import policy_migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX private custody")
 
@@ -153,7 +151,8 @@ def test_cross_project_save_alias_rejected(catalog, tmp_path):
     unsigned, signed = catalog
     advanced = _advance(unsigned, tmp_path / "cross-save.json")
     invalid = replace(signed, private_save=unsigned.private_save)
-    with pytest.raises(OfflineMixedGameLibraryContinuityError, match="custody"):
+    with pytest.raises(OfflineMixedGameLibraryContinuityError,
+                       match="cross-project private save alias"):
         _audit([unsigned], [advanced], [signed], [invalid])
 
 

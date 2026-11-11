@@ -20,9 +20,14 @@ from zipfile import ZipFile, ZipInfo, ZIP_STORED, BadZipFile, LargeZipFile
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.dual_runtime_verify import (
     DualRuntimeVerificationError, _MAX_BYTES, _MAX_FILES, _MAX_MANIFEST,
-    _REQUIRED, _MAX_STUDIO_BYTES, _canonical_bytes, _assert_original_root, _json, _parts, _read, _root_fd,
-    verify_exported_package,
+    _REQUIRED, _STUDIO_REQUIRED, _assert_original_root, _canonical_bytes, _json, _parts, _read,
+    _root_fd, verify_exported_package, verify_studio_release_evidence,
 )
+
+_RELEASE_SCHEMAS = frozenset({
+    "skeleton.game_builder.dual_runtime_package.v1",
+    "skeleton.game_builder.studio_package.v1",
+})
 
 SCHEMA = "skeleton.app.offline_game_source_archive.v1"
 INSPECTION_SCHEMA = "skeleton.app.offline_game_source_archive_inspection.v1"
@@ -34,34 +39,6 @@ _DATE = (1980, 1, 1, 0, 0, 0)
 
 class OfflineGameArchiveError(ValueError):
     """Source archive custody, contents, or independent pin failed."""
-
-
-
-_STUDIO_REQUIRED = frozenset({
-    "studio/pipeline.json",
-    "studio/jeeves_dragon_tools.json",
-    "studio/executed_tool_receipts.json",
-    "studio/mirror_room.json",
-    "studio/consumer_gate.json",
-    "studio/companion_mirror_room.json",
-    "studio/companion_almanac.json",
-    "studio/companion_practice.json",
-})
-
-
-def _validate_studio_archive_claim(manifest: Mapping[str, object],
-                                   files: Mapping[str, bytes]) -> None:
-    """Carry forward the canonical Studio superset, never infer device approval."""
-    if manifest.get("schema") != "skeleton.game_builder.studio_package.v1":
-        return
-    if not _STUDIO_REQUIRED.issubset(files):
-        raise OfflineGameArchiveError("archived Studio custody paths are incomplete")
-    pipeline = _json(files["studio/pipeline.json"], _MAX_MANIFEST)
-    if (pipeline.get("schema") != "skeleton.game_builder.studio_pipeline.v1"
-            or pipeline.get("not_automatically_published") is not True
-            or pipeline.get("original_game_claim") != "generated-or-user-authored-geometry"
-            or pipeline.get("project_id") != manifest.get("project_id")):
-        raise OfflineGameArchiveError("archived Studio source custody is untrusted")
 
 
 def _parent(path: str | Path) -> tuple[Path, int]:
@@ -117,9 +94,6 @@ def _source_payloads(source: str | Path, pin: str) -> tuple[dict[str, bytes], di
         if not hmac.compare_digest(sha256(release).hexdigest(), pin):
             raise OfflineGameArchiveError("source release changed after verification")
         manifest = _json(release, _MAX_MANIFEST)
-        source_budget = min(_ARCHIVE_MAX_BYTES,
-                            _MAX_STUDIO_BYTES if manifest.get("schema") ==
-                            "skeleton.game_builder.studio_package.v1" else _MAX_BYTES)
         declared = manifest["files"]
         if type(declared) is not dict or len(declared) > _MAX_FILES:
             raise OfflineGameArchiveError("source file inventory invalid")
@@ -127,9 +101,7 @@ def _source_payloads(source: str | Path, pin: str) -> tuple[dict[str, bytes], di
         total = len(release)
         for path, digest in sorted(declared.items()):
             _parts(path)
-            if total >= source_budget:
-                raise OfflineGameArchiveError("archive source byte budget exceeded")
-            payload = _read(fd, path, source_budget - total)
+            payload = _read(fd, path, _MAX_BYTES - total)
             total += len(payload)
             if sha256(payload).hexdigest() != digest:
                 raise OfflineGameArchiveError("source changed during archive snapshot")
@@ -341,7 +313,7 @@ def inspect_offline_game_archive(
                         or info.extra or info.comment):
                     raise OfflineGameArchiveError("unsafe archive entry")
                 total += info.file_size
-                if total > _ARCHIVE_MAX_BYTES:
+                if total > _MAX_BYTES:
                     raise OfflineGameArchiveError("archive source bytes exceed budget")
                 files[info.filename] = bundle.read(info, pwd=None)
             release = files.get("release.json")
@@ -350,23 +322,22 @@ def inspect_offline_game_archive(
             if sha256(release).hexdigest() != expected_manifest_sha256:
                 raise OfflineGameArchiveError("archive release differs from independent pin")
             manifest = _json(release, _MAX_MANIFEST)
+            # Independent hashes pin exact archive bytes, but must never grant
+            # authority to ambiguous, reserialized noncanonical release JSON.
+            if release != _canonical_bytes(manifest):
+                raise OfflineGameArchiveError("noncanonical archived release manifest")
             digest = manifest.get("manifest_digest")
             body = {key: value for key, value in manifest.items()
                     if key != "manifest_digest"}
-            release_schema = manifest.get("schema")
-            if (release_schema not in {
-                    "skeleton.game_builder.dual_runtime_package.v1",
-                    "skeleton.game_builder.studio_package.v1",
-                } or release != _canonical_bytes(manifest)
+            schema = manifest.get("schema")
+            # Studio releases are the same canonical source package with extra
+            # hashed studio evidence; admit them only with that evidence.
+            studio = schema == "skeleton.game_builder.studio_package.v1"
+            if (schema not in _RELEASE_SCHEMAS
                     or type(digest) is not str or digest != canonical_digest(body)
                     or manifest.get("automatic_publication") is not False
                     or manifest.get("godot_hardware_tested") is not False):
                 raise OfflineGameArchiveError("unsupported archived release authority")
-            source_budget = min(_ARCHIVE_MAX_BYTES,
-                                _MAX_STUDIO_BYTES if release_schema ==
-                                "skeleton.game_builder.studio_package.v1" else _MAX_BYTES)
-            if total > source_budget:
-                raise OfflineGameArchiveError("archive exceeds schema source byte budget")
             declared = manifest.get("files")
             if (type(declared) is not dict or not 1 <= len(declared) <= _MAX_FILES
                     or "release.json" in declared
@@ -374,11 +345,28 @@ def inspect_offline_game_archive(
                     or not _REQUIRED <= set(files)
                     or manifest.get("proof_status") != "python-simulated-winning-actions"):
                 raise OfflineGameArchiveError("archived source inventory mismatch")
+            if studio and not _STUDIO_REQUIRED <= set(files):
+                raise OfflineGameArchiveError("archived studio release lacks evidence")
+            if not studio and any(name.startswith("studio/") for name in declared):
+                raise OfflineGameArchiveError("archived studio evidence requires studio schema")
             for name, expected_digest in declared.items():
                 if (type(expected_digest) is not str or not _HEX.fullmatch(expected_digest)
                         or sha256(files[name]).hexdigest() != expected_digest):
                     raise OfflineGameArchiveError("archived source digest mismatch")
-            _validate_studio_archive_claim(manifest, files)
+            if studio:
+                try:
+                    verify_studio_release_evidence(files)
+                    # A re-signed source ZIP is not a studio export authority.
+                    # Preserve the same original-game/project denial checks
+                    # enforced by verify_exported_package on live source trees.
+                    pipeline = _json(files["studio/pipeline.json"], _MAX_MANIFEST)
+                    if (pipeline.get("schema") != "skeleton.game_builder.studio_pipeline.v1"
+                            or pipeline.get("not_automatically_published") is not True
+                            or pipeline.get("original_game_claim") != "generated-or-user-authored-geometry"
+                            or pipeline.get("project_id") != manifest.get("project_id")):
+                        raise DualRuntimeVerificationError("archived studio source custody invalid")
+                except DualRuntimeVerificationError as exc:
+                    raise OfflineGameArchiveError("archived studio evidence rejected") from exc
         if not hmac.compare_digest(_canonical_zip(files), raw):
             raise OfflineGameArchiveError("noncanonical or ambiguous source archive")
     except (OSError, BadZipFile, LargeZipFile, KeyError, TypeError,

@@ -14,6 +14,7 @@ Shared state (``_active_runners``, ``_background_tasks``, ``_builds``,
 """
 from __future__ import annotations
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 from routes.galaxy_studio_access import record_query, record_visible
 
@@ -27,7 +28,7 @@ from routes.galaxy_studio_state import (
     get_worker_pool,
 )
 
-router = APIRouter(tags=["galaxy-studio"])
+router = APIRouter(route_class=PublicExceptionRoute, tags=["galaxy-studio"])
 
 
 @router.get("/workers")

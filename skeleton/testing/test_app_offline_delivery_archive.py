@@ -338,37 +338,3 @@ def test_archive_dotdot_alias_into_original_source_is_rejected(
         )
     assert not (root / "untrusted.zip").exists()
     assert not list(root.glob("*.zip"))
-
-
-def test_studio_archive_rejects_missing_or_forged_custody_source():
-    """Studio schema alone is not proof: eight source identities must be retained."""
-    from skeleton.app.offline_delivery_archive import (
-        OfflineGameArchiveError, _STUDIO_REQUIRED, _validate_studio_archive_claim,
-    )
-    manifest = {"schema": "skeleton.game_builder.studio_package.v1", "project_id": "original"}
-    pipeline = {
-        "schema": "skeleton.game_builder.studio_pipeline.v1",
-        "project_id": "original",
-        "not_automatically_published": True,
-        "original_game_claim": "generated-or-user-authored-geometry",
-    }
-    files = {name: b"{}" for name in _STUDIO_REQUIRED}
-    files["studio/pipeline.json"] = json.dumps(pipeline).encode("utf-8")
-    _validate_studio_archive_claim(manifest, files)
-    for missing in sorted(_STUDIO_REQUIRED):
-        reduced = dict(files)
-        reduced.pop(missing)
-        with pytest.raises(OfflineGameArchiveError, match="incomplete"):
-            _validate_studio_archive_claim(manifest, reduced)
-    for key, forged in (
-        ("schema", "skeleton.game_builder.unknown"),
-        ("project_id", "foreign"),
-        ("original_game_claim", "borrowed-template"),
-        ("not_automatically_published", False),
-    ):
-        changed = dict(pipeline, **{key: forged})
-        poisoned = dict(files, **{
-            "studio/pipeline.json": json.dumps(changed).encode("utf-8")
-        })
-        with pytest.raises(OfflineGameArchiveError, match="untrusted"):
-            _validate_studio_archive_claim(manifest, poisoned)

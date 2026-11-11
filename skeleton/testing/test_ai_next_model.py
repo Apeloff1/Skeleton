@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from hashlib import sha256
 from types import SimpleNamespace
 from unittest.mock import patch
 import io
 import contextlib
 import unittest
-from hashlib import sha256 as _sha256
 
 from skeleton.ai.runtime.operational_ai.model.gateway import ModelGateway
 from skeleton.ai.runtime.operational_ai.model.circuit import CircuitBreaker, CircuitOpen
@@ -18,7 +18,6 @@ from skeleton.ai.runtime.operational_ai.model.gguf.probe_cli import main as prob
 
 A = 'a'*64
 B = 'b'*64
-TEXT_DIGEST = _sha256(b'hello').hexdigest()
 
 
 class InvalidBackend:
@@ -38,7 +37,7 @@ class InvalidBackend:
         prompt=10000 if self.kind=='context' else 3
         generated=900 if self.kind=='output' else 3
         return Generated('hello',prompt,generated,
-                         B if self.kind=='digest' else TEXT_DIGEST,
+                         B if self.kind=='digest' else sha256(b'hello').hexdigest(),
                          B if self.kind=='identity' else A,A,'stop')
 
 
@@ -57,12 +56,21 @@ class TestNativeReceiptCustody(unittest.TestCase):
         self.assertEqual(receipt.generation.text,'hello')
         self.assertEqual(breaker.health['failures'],0)
 
-    def test_invalid_output_digest_trips_circuit(self):
+    def test_native_output_digest_tamper_trips_circuit(self):
         gateway,backend,breaker=self.gateway('digest')
-        with self.assertRaisesRegex(ContractViolation,'digest'):
+        with self.assertRaisesRegex(ContractViolation,'native output digest'):
             self.run_gateway(gateway)
         self.assertTrue(breaker.health['open'])
+        with self.assertRaises(CircuitOpen):
+            self.run_gateway(gateway)
         self.assertEqual(backend.calls,1)
+
+    def test_valid_receipt_is_bound_to_exact_utf8_output(self):
+        gateway,backend,breaker=self.gateway('valid')
+        receipt=self.run_gateway(gateway)
+        self.assertEqual(receipt.generation.output_digest,sha256(receipt.generation.text.encode('utf-8')).hexdigest())
+        self.assertEqual(backend.calls,1)
+        self.assertEqual(breaker.health['failures'],0)
 
     def test_untyped_native_output_trips_circuit(self):
         gateway,backend,breaker=self.gateway('untyped')
@@ -75,6 +83,13 @@ class TestNativeReceiptCustody(unittest.TestCase):
         gateway,backend,breaker=self.gateway('identity')
         with self.assertRaises(ContractViolation):self.run_gateway(gateway)
         self.assertTrue(breaker.health['open'])
+
+    def test_output_receipt_digest_mismatch_trips_circuit(self):
+        gateway,backend,breaker=self.gateway('digest')
+        with self.assertRaises(ContractViolation):
+            self.run_gateway(gateway)
+        self.assertTrue(breaker.health['open'])
+        self.assertEqual(backend.calls, 1)
 
     def test_context_overrun_trips_circuit(self):
         gateway,backend,breaker=self.gateway('context')

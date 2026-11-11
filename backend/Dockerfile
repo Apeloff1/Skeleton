@@ -5,7 +5,10 @@
 # skeleton/ alongside backend/.
 # ============================================================================
 
-# Stage 1: dependency builder. Alpine keeps the builder/runtime ABI aligned
+# Stage 1: dependency builder. Keep Python below 3.15 until the
+# pinned LiteLLM/FastUUID stack is qualified on newer Python. A previous
+# automated base-image bump to 3.15 made the guard below fail on every build.
+# Alpine keeps the builder/runtime ABI aligned
 # so compiled wheels and native extensions do not cross a glibc/musl boundary.
 FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72 AS builder
 

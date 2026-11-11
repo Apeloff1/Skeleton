@@ -65,7 +65,7 @@ def test_wrong_independent_pin_blocks_entire_library(delivered, field, capsys):
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
 
 
-@pytest.mark.parametrize("kind", ["archive", "save", "installed_source"])
+@pytest.mark.parametrize("kind", ["archive", "private_save", "installed_source"])
 def test_hostile_library_member_rejects_success(delivered, kind, tmp_path):
     payload = asdict(_entry(delivered))
     original = payload[kind]

@@ -69,6 +69,10 @@ class AdventureGameCapability:
         }
 
     def create_room_graph(self, title: str, room_count: int = 12) -> dict[str, Any]:
+        if not isinstance(title, str) or not title.strip() or len(title) > 200:
+            raise ValueError("title must contain 1-200 characters")
+        if type(room_count) is not int or not 1 <= room_count <= 256:
+            raise ValueError("room_count must be an integer between 1 and 256")
         rooms = []
         for i in range(room_count):
             rid = f"room_{i+1:02d}"
@@ -77,7 +81,7 @@ class AdventureGameCapability:
                 name=f"Location {i+1}",
                 description=f"Detailed environmental description for {title} room {i+1}. "
                             f"Lighting, sound cues, and interactive density noted.",
-                exits={"north": f"room_{((i+1)%room_count)+1:02d}"} if i < room_count-1 else {},
+                exits={"north": f"room_{i+2:02d}"} if i < room_count-1 else {},
                 items=[f"item_{i+1}"] if i % 3 == 0 else [],
                 hotspots=[{"id": f"hs_{i}", "verb": "examine", "response": "Carefully observed."}],
             ))
@@ -85,11 +89,24 @@ class AdventureGameCapability:
             "title": title,
             "schema": ADVENTURE_SCHEMA,
             "rooms": [r.__dict__ for r in rooms],
-            "graph_type": "connected with gated branches",
-            "navigation_notes": "Classic adventure connectivity; some exits require flags or items.",
+            "graph_type": "directed linear progression",
+            "start_room": "room_01",
+            "goal_room": f"room_{room_count:02d}",
+            "navigation_notes": "Every room is reachable from the start through north exits; no gates are authored.",
         }
 
     def create_inventory_system(self, items: list[str]) -> dict[str, Any]:
+        """Admit only bounded, unambiguous item identities to the game design."""
+        import re
+
+        if type(items) is not list or len(items) > 256:
+            raise ValueError("invalid_inventory_size")
+        if any(type(iid) is not str or
+               re.fullmatch(r"[a-z][a-z0-9_]{0,47}", iid) is None
+               for iid in items):
+            raise ValueError("invalid_item_id")
+        if len(set(items)) != len(items):
+            raise ValueError("duplicate_item_id")
         item_objs = []
         for iid in items:
             item_objs.append(Item(
@@ -154,6 +171,8 @@ class AdventureGameCapability:
 
     def full_adventure_pipeline(self, title: str, era: str = "16bit", rooms: int = 10) -> dict[str, Any]:
         graph = self.create_room_graph(title, rooms)
+        if not isinstance(era, str) or not era.strip() or len(era) > 80:
+            raise ValueError("era must contain 1-80 characters")
         items = [f"item_{i}" for i in range(1, 6)]
         inv = self.create_inventory_system(items)
         puzzle = self.create_puzzle("main_gate", "ancient mechanism")

@@ -11,6 +11,23 @@ from typing import Any, Dict, Iterator, List, Optional
 from .clock import Clock, MonotonicClock
 
 REPORT_SCHEMA = "perf_profiler.load_report.v1"
+MAX_PHASE_DEPTH = 64
+MAX_PHASE_NODES = 4_096
+
+
+def _clock_reading(clock: Clock) -> float:
+    """Reject malformed or overflowing clock values before mutating the tree."""
+    raw = clock.now_ms()
+    if type(raw) not in (int, float):
+        raise ValueError("load clock timestamp must be finite")
+    try:
+        value = float(raw)
+    except OverflowError as exc:
+        raise ValueError("load clock timestamp must be finite") from exc
+    if not math.isfinite(value):
+        raise ValueError("load clock timestamp must be finite")
+    return value
+
 
 
 @dataclass
@@ -74,11 +91,15 @@ class LoadTimer:
     """
 
     def __init__(self, label: str = "load", clock: Optional[Clock] = None, budget_ms: Optional[float] = None) -> None:
-        if (budget_ms is not None and (
-            isinstance(budget_ms, bool) or not isinstance(budget_ms, (int, float))
-            or not math.isfinite(budget_ms) or budget_ms <= 0
-        )):
-            raise ValueError("budget_ms must be finite and positive")
+        if budget_ms is not None:
+            if type(budget_ms) not in (int, float):
+                raise ValueError("budget_ms must be finite and positive")
+            try:
+                budget_ms = float(budget_ms)
+            except OverflowError as exc:
+                raise ValueError("budget_ms must be finite and positive") from exc
+            if not math.isfinite(budget_ms) or budget_ms <= 0:
+                raise ValueError("budget_ms must be finite and positive")
         if type(label) is not str or not 1 <= len(label) <= 128:
             raise ValueError("load report label must be bounded text")
         self.label = label
@@ -87,29 +108,47 @@ class LoadTimer:
         self._roots: List[_Node] = []
         self._stack: List[_Node] = []
         self._errors: List[Dict[str, str]] = []
+        self._node_count = 0
 
     @contextmanager
     def phase(self, name: str) -> Iterator[None]:
         if type(name) is not str or not 1 <= len(name) <= 128 or "/" in name:
             raise ValueError("phase name must be bounded text without '/'")
+        if len(self._stack) >= MAX_PHASE_DEPTH:
+            raise ValueError("load phase nesting exceeds bounded depth")
+        if self._node_count >= MAX_PHASE_NODES:
+            raise ValueError("load phase count exceeds bounded node limit")
         siblings = self._stack[-1].children if self._stack else self._roots
         if any(n.name == name for n in siblings):
             raise ValueError(f"duplicate phase name at this level: {name!r}")
-        node = _Node(name=name, start_ms=self.clock.now_ms())
+        # Read and validate the clock before publishing a new node.
+        node = _Node(name=name, start_ms=_clock_reading(self.clock))
         siblings.append(node)
         self._stack.append(node)
+        self._node_count += 1
+        body_failed = False
         try:
             yield
         except BaseException as exc:
+            body_failed = True
             path = "/".join(n.name for n in self._stack)
             self._errors.append({"phase": path, "error": type(exc).__name__})
             raise
         finally:
-            end = self.clock.now_ms()
-            if end < node.start_ms:
-                raise RuntimeError("clock went backwards during phase")
-            node.duration_ms = end - node.start_ms
-            self._stack.pop()
+            try:
+                end = _clock_reading(self.clock)
+                duration = end - node.start_ms
+                if not math.isfinite(duration) or duration < 0:
+                    raise ValueError("load clock must advance by a finite non-negative duration")
+                node.duration_ms = duration
+            except BaseException as exc:
+                path = "/".join(n.name for n in self._stack)
+                self._errors.append({"phase": path, "error": type(exc).__name__})
+                # Preserve the original body exception if both body and clock fail.
+                if not body_failed:
+                    raise
+            finally:
+                self._stack.pop()
 
     def report(self) -> LoadReport:
         if self._stack:
@@ -125,6 +164,8 @@ class LoadTimer:
 
         walk(tree, "")
         total = round(sum(n["duration_ms"] for n in tree), 6)
+        if not math.isfinite(total):
+            raise ValueError("load report total exceeds finite bound")
         payload: Dict[str, Any] = {
             "schema": REPORT_SCHEMA,
             "label": self.label,

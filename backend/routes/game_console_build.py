@@ -21,7 +21,7 @@ from core.game_console_build import (
     preview_artifact,
 )
 from core.game_learning import workspace
-from routes.game_learning import Request, User, WriteRequest, PlayRequest, TrainRequest, _call, _scope
+from routes.game_learning import Request, User, WriteRequest, PlayRequest, TrainRequest, _call, _scope, _write_scope
 from routes.game_studio_learning import CampaignCreate
 
 router = APIRouter(prefix="/game-learning", tags=["Console builds"])
@@ -87,7 +87,7 @@ async def console_build_catalog(user: User):
 async def start_console_build(project_id: str, body: ConsoleBuildBody, user: User):
     return {
         "job": await _call(
-            workspace.start_job(_scope(user), project_id, "build", body.model_dump(exclude_none=True))
+            workspace.start_job(_write_scope(user), project_id, "build", body.model_dump(exclude_none=True))
         )
     }
 
@@ -133,7 +133,7 @@ async def get_artifact_playback(project_id: str, artifact_id: str, user: User):
 @router.post("/projects/{project_id}/build-artifacts/{artifact_id}/admit")
 async def admit_compiled_source(project_id: str, artifact_id: str, body: ArtifactAdmission, user: User):
     return await _call(
-        admit_artifact_source(_scope(user), project_id, artifact_id, body.model_dump(exclude_none=True))
+        admit_artifact_source(_write_scope(user), project_id, artifact_id, body.model_dump(exclude_none=True))
     )
 
 
@@ -147,12 +147,12 @@ async def play_compiled_source(project_id: str, artifact_id: str, body: Artifact
 @router.post("/projects/{project_id}/build-artifacts/{artifact_id}/train")
 async def train_compiled_source(project_id: str, artifact_id: str, body: ArtifactTrain, user: User):
     return await _call(
-        start_artifact_training(_scope(user), project_id, artifact_id, body.admitted_request())
+        start_artifact_training(_write_scope(user), project_id, artifact_id, body.admitted_request())
     )
 
 
 @router.post("/projects/{project_id}/build-artifacts/{artifact_id}/campaign")
 async def campaign_compiled_source(project_id: str, artifact_id: str, body: ArtifactCampaign, user: User):
     return await _call(
-        start_artifact_campaign(_scope(user), project_id, artifact_id, body.model_dump(exclude_none=True))
+        start_artifact_campaign(_write_scope(user), project_id, artifact_id, body.model_dump(exclude_none=True))
     )

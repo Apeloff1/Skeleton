@@ -1,13 +1,23 @@
 name: Masterplan 421 Volume Dossier Integrity
 
 on:
+  pull_request:
+    paths:
+      - 'docs/plan/volume_completion/**'
+      - 'machine/ai_master_plan.json'
+      - 'machine/ai_masterplan_parse_index.json'
+      - 'machine/ai_build_accountability.json'
+      - 'machine/ai_100_large_delivery_milestones.json'
+      - 'scripts/check_masterplan_volume_dossiers.py'
+      - 'tests/test_masterplan_volume_dossiers.py'
+      - '.github/workflows/masterplan-421-dossier-integrity.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: masterplan-421-${{ github.ref }}
+  group: masterplan-421-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -15,14 +25,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      EXPECTED_SHA: '${{ github.sha }}'
+      EXPECTED_SHA: '${{ github.event.pull_request.head.sha || github.sha }}'
       PYTHONPATH: '.'
     steps:
       - name: Exact-head checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify immutable checkout
         shell: bash
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
