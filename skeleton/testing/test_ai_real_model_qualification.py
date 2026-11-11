@@ -398,8 +398,13 @@ class QualificationTests(unittest.TestCase):
 
         def track_stage(path, flags, *args, **kwargs):
             handle = real_os_open(path, flags, *args, **kwargs)
+            # Capture the *writer* descriptor, not the temporary reader
+            # opened by _require_our_name. That reader is closed after its
+            # identity check, while the writer must remain pinned through
+            # post-link verification and rollback.
             if (type(path) is str and path.startswith('.qualification-')
-                    and path.endswith('.tmp')):
+                    and path.endswith('.tmp') and flags & os.O_CREAT):
+                self.assertIsNone(stage_fd[0])
                 stage_fd[0] = handle
             return handle
 
