@@ -140,4 +140,66 @@ def test_guarded_modules_parse_and_never_overwrite_public_http_error_contract():
     assert "if exc.status_code >= 500:" in source
     assert 'headers={"Cache-Control": "no-store"}' in source
     assert "raise StarletteHTTPException(" in source
-    assert "status_code=500, detail=PUBLIC_INTERNAL_ERROR" in source
+    _assert_unhandled_exception_is_public_and_noncacheable(source)
+
+
+def _assert_unhandled_exception_is_public_and_noncacheable(source: str) -> None:
+    """AST contract: formatting changes cannot hide an unsafe 500 handler."""
+    tree = ast.parse(source)
+    route = next(
+        node for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "PublicExceptionRoute"
+    )
+    factory = next(
+        node for node in route.body
+        if isinstance(node, ast.FunctionDef) and node.name == "get_route_handler"
+    )
+    protected = next(
+        node for node in factory.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "protected"
+    )
+    guarded = next(node for node in protected.body if isinstance(node, ast.Try))
+    handlers = [
+        handler for handler in guarded.handlers
+        if isinstance(handler.type, ast.Name) and handler.type.id == "Exception"
+    ]
+    assert len(handlers) == 1
+    raises = [node for node in handlers[0].body if isinstance(node, ast.Raise)]
+    assert len(raises) == 1 and raises[0] is handlers[0].body[-1]
+    assert isinstance(raises[0].cause, ast.Constant)
+    assert raises[0].cause.value is None
+    call = raises[0].exc
+    assert isinstance(call, ast.Call)
+    assert isinstance(call.func, ast.Name) and call.func.id == "StarletteHTTPException"
+    assert not call.args
+    kwargs = {keyword.arg: keyword.value for keyword in call.keywords}
+    assert set(kwargs) == {"status_code", "detail", "headers"}
+    assert isinstance(kwargs["status_code"], ast.Constant)
+    assert kwargs["status_code"].value == 500
+    assert isinstance(kwargs["detail"], ast.Name)
+    assert kwargs["detail"].id == "PUBLIC_INTERNAL_ERROR"
+    assert isinstance(kwargs["headers"], ast.Dict)
+    assert ast.literal_eval(kwargs["headers"]) == {"Cache-Control": "no-store"}
+
+
+def test_unhandled_500_ast_contract_rejects_leakage_mutations():
+    source = (ROOT / "backend/core/public_exception_route.py").read_text(
+        encoding="utf-8"
+    )
+    mutations = (
+        source.replace("status_code=500,", "status_code=200,", 1),
+        source.replace(
+            "status_code=500,\n                    detail=PUBLIC_INTERNAL_ERROR",
+            "status_code=500,\n                    detail=str(exc)", 1,
+        ),
+        source.replace(
+            'status_code=500,\n                    detail=PUBLIC_INTERNAL_ERROR,\n'
+            '                    headers={"Cache-Control": "no-store"}',
+            'status_code=500,\n                    detail=PUBLIC_INTERNAL_ERROR,\n'
+            '                    headers={"X-Debug": "private"}', 1,
+        ),
+    )
+    for mutation in mutations:
+        assert mutation != source
+        with pytest.raises(AssertionError):
+            _assert_unhandled_exception_is_public_and_noncacheable(mutation)
