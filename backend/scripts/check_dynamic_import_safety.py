@@ -265,12 +265,12 @@ def _propagate_aliases(
                     before = len(importlib_modules)
                     importlib_modules.update(targets)
                     changed |= len(importlib_modules) != before
-                    continue
+                    # A name can be rebound from module to import callable.
+                    # Preserve both possible roles rather than hiding the call.
                 if value.id in builtins_modules:
                     before = len(builtins_modules)
                     builtins_modules.update(targets)
                     changed |= len(builtins_modules) != before
-                    continue
 
             primitive = _dynamic_import_callable(
                 value,

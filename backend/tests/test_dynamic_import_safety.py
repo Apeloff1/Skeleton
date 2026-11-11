@@ -289,3 +289,46 @@ def test_unrelated_alias_cycle_terminates_without_false_positive(tmp_path: Path)
         'result = importlib.import_module("json")\n'
     )
     assert _scan(tmp_path, source) == []
+
+
+@pytest.mark.parametrize(
+    "module_import,method,primitive",
+    [
+        ("import importlib as module", "import_module", "importlib.import_module"),
+        ("import builtins as module", "__import__", "__import__"),
+    ],
+)
+def test_rebound_module_alias_cannot_hide_callable(
+    tmp_path: Path, module_import: str, method: str, primitive: str,
+) -> None:
+    # The module alias is later rebound to the import callable. A further
+    # alias must retain callable provenance even if the same name was a module.
+    source = (
+        f"{module_import}\n"
+        f"load = module.{method}\n"
+        "module = load\n"
+        "forwarded = module\n"
+        "result = forwarded(chosen)\n"
+    )
+    assert _unsafe(_scan(tmp_path, source), primitive)
+
+
+@pytest.mark.parametrize(
+    "bootstrap,primitive",
+    [
+        (
+            "import importlib as shared\n"
+            "from importlib import import_module as shared\n",
+            "importlib.import_module",
+        ),
+        (
+            "import builtins as shared\n"
+            "from builtins import __import__ as shared\n",
+            "__import__",
+        ),
+    ],
+)
+def test_import_binding_collision_preserves_callable_provenance(
+    tmp_path: Path, bootstrap: str, primitive: str,
+) -> None:
+    assert _unsafe(_scan(tmp_path, bootstrap + "forwarded = shared\nforwarded(chosen)\n"), primitive)
