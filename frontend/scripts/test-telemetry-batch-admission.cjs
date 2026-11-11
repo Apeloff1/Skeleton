@@ -75,7 +75,7 @@ test('event uploads are split into server-accepted batches of at most 100', asyn
   await logger.flushTelemetry();
   await logger.flushTelemetry();
   assert.deepEqual(uploads.map(batch => batch.length), [100, 100, 45]);
-  assert.equal(disk.get('@telemetry/queue'), '[]');
+  assert.equal(disk.has('@telemetry/queue'), false);
 });
 
 test('failed network requests stay sanitized and are retried', async () => {
