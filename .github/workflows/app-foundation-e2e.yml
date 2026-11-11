@@ -101,6 +101,14 @@ jobs:
             echo "SKL_MONGO_URI=mongodb://${userinfo}@mongo:27017/skeleton?authSource=admin"
           } >> "$GITHUB_ENV"
 
+          # Ephemeral, isolated, authorized CI operator: no shared or committed secret.
+          operator_email="qa-e2e-operator-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com"
+          operator_password="$(gen)"
+          echo "::add-mask::${operator_password}"
+          {
+            echo "GAMEFORGE_SEED_ADMIN_EMAIL=${operator_email}"
+            echo "GAMEFORGE_SEED_ADMIN_PASSWORD=${operator_password}"
+          } >> "$GITHUB_ENV"
       - name: Validate compose configuration
         run: docker compose -f docker-compose.yml config --quiet
 
@@ -148,6 +156,11 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Test isolated operator provisioning contracts
+        run: python -m unittest discover -s tests -p test_ci_e2e_operator_provision.py -q
+
+      - name: Provision authenticated ephemeral E2E operator
+        run: python scripts/provision_e2e_operator.py
       - name: Tier 2 live app-foundation flow (#4098)
         timeout-minutes: 15
         working-directory: frontend
@@ -200,6 +213,17 @@ jobs:
           docker compose -f docker-compose.yml ps || true
           docker compose -f docker-compose.yml logs --no-color --tail=400 skeleton backend frontend mongo || true
 
+      - name: Remove ephemeral operator token
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -n "${SKELETON_E2E_OPERATOR_TOKEN_FILE:-}" ]; then
+            case "$SKELETON_E2E_OPERATOR_TOKEN_FILE" in
+              "$RUNNER_TEMP"/skeleton-ci-operator-*.token)
+                rm -f -- "$SKELETON_E2E_OPERATOR_TOKEN_FILE" ;;
+              *) echo "::error::Invalid operator token cleanup path"; exit 1 ;;
+            esac
+          fi
       - name: Tear down stack
         if: always()
         run: docker compose -f docker-compose.yml down -v --remove-orphans || true

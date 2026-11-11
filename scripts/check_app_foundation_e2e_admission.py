@@ -55,6 +55,54 @@ def validate_text(workflow: str, suite: str) -> list[str]:
             or 'test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"' not in identity.get("run", "")):
         issues.append("no fail-closed exact-head checkout proof")
 
+    credentials = step("Generate ephemeral stack credentials")
+    credentials_run = credentials.get("run", "")
+    if any(
+        part not in credentials_run for part in (
+            'operator_email="qa-e2e-operator-',
+            'operator_password="$(gen)"',
+            'GAMEFORGE_SEED_ADMIN_EMAIL=${operator_email}',
+            'GAMEFORGE_SEED_ADMIN_PASSWORD=${operator_password}',
+            '::add-mask::${operator_password}',
+        )
+    ):
+        issues.append("isolated CI operator credentials are not minted and masked")
+
+    proof = step("Test isolated operator provisioning contracts")
+    if (
+        "python -m unittest discover -s tests -p test_ci_e2e_operator_provision.py -q"
+        not in proof.get("run", "")
+        or str(proof.get("continue-on-error", "false")) == "true"
+    ):
+        issues.append("operator provisioning security regressions are not required")
+    admission = step("Provision authenticated ephemeral E2E operator")
+    if (
+        admission.get("run", "").strip() != "python scripts/provision_e2e_operator.py"
+        or str(admission.get("continue-on-error", "false")) == "true"
+    ):
+        issues.append("live operator must be authenticated by strict provisioning")
+    cleanup = step("Remove ephemeral operator token")
+    if (
+        cleanup.get("if") != "always()"
+        or 'rm -f -- "$SKELETON_E2E_OPERATOR_TOKEN_FILE"' not in cleanup.get("run", "")
+    ):
+        issues.append("ephemeral operator token must be removed on every exit")
+
+    names = [item.get("name") for item in steps]
+    sequence = (
+        "Generate ephemeral stack credentials",
+        "Test isolated operator provisioning contracts",
+        "Provision authenticated ephemeral E2E operator",
+        "Tier 2 live app-foundation flow (#4098)",
+        "Remove ephemeral operator token",
+    )
+    if any(name not in names for name in sequence) or any(
+        names.index(left) >= names.index(right)
+        for left, right in zip(sequence, sequence[1:])
+        if left in names and right in names
+    ):
+        issues.append("ephemeral operator bootstrap and cleanup order is invalid")
+
     live = step("Tier 2 live app-foundation flow (#4098)")
     env = live.get("env")
     if type(env) is not dict or env.get("SKELETON_E2E_REQUIRE_FULL_LIVE") != "1":

@@ -77,5 +77,19 @@ class LiveE2ESourceAdmission(unittest.TestCase):
                 "assert.ok(true)")))
 
 
+    def test_operator_bootstrap_cannot_be_silently_skipped(self):
+        for token in (
+            'GAMEFORGE_SEED_ADMIN_PASSWORD=${operator_password}',
+            "python -m unittest discover -s tests -p test_ci_e2e_operator_provision.py -q",
+            "python scripts/provision_e2e_operator.py",
+            'rm -f -- "$SKELETON_E2E_OPERATOR_TOKEN_FILE"',
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, W)
+                self.assertTrue(guard.validate_text(
+                    W.replace(token, "echo operator-bypassed", 1), S,
+                ))
+
+
 if __name__ == "__main__":
     unittest.main()
