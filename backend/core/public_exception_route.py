@@ -48,6 +48,7 @@ class PublicExceptionRoute(APIRoute):
                     raise StarletteHTTPException(
                         status_code=exc.status_code,
                         detail=PUBLIC_INTERNAL_ERROR,
+                        headers={"Cache-Control": "no-store"},
                     ) from None
                 # Existing public 4xx protocol and validation behavior remain.
                 raise
@@ -60,7 +61,9 @@ class PublicExceptionRoute(APIRoute):
                     type(exc).__name__,
                 )
                 raise StarletteHTTPException(
-                    status_code=500, detail=PUBLIC_INTERNAL_ERROR
+                    status_code=500,
+                    detail=PUBLIC_INTERNAL_ERROR,
+                    headers={"Cache-Control": "no-store"},
                 ) from None
 
         return protected
