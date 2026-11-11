@@ -12,6 +12,7 @@ Endpoints:
 """
 import random
 from typing import Optional
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel
 import logging
@@ -20,7 +21,7 @@ from core.databases import core_db as _db
 
 logger = logging.getLogger("api.jeeves_persona")
 
-router = APIRouter(prefix="/api/jeeves", tags=["Jeeves Persona + Personality TTS"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/jeeves", tags=["Jeeves Persona + Personality TTS"])
 
 
 # ─── In-memory cache so we don't hit Mongo on every catchphrase ─────────
@@ -34,7 +35,7 @@ async def _load_persona() -> dict:
         async for doc in _db.jeeves_persona.find({}, {"_id": 0}):
             _PERSONA_CACHE[doc["_key"]] = doc
     except Exception as e:
-        logger.warning(f"persona load failed: {e}")
+        logger.warning("persona load failed: %s", type(e).__name__)
     return _PERSONA_CACHE
 
 

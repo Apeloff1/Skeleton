@@ -18,6 +18,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
@@ -38,7 +39,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
 
-router = APIRouter(prefix="/api/ai-toolkit", tags=["Enhanced AI Toolkit"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/ai-toolkit", tags=["Enhanced AI Toolkit"])
 
 
 @router.get("/reviews/recent")

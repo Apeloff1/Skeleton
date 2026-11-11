@@ -88,9 +88,10 @@ def shape_cadence(text: str, tone: Optional[str] = None) -> str:
     if not text:
         return ""
 
-    # Bound caller-controlled text before any shaping work. TTS accepts at most
-    # TTS_LIMIT characters anyway, so processing more only creates DoS surface.
-    s = text.strip()[:TTS_LIMIT]
+    # Bound caller-controlled input *before* stripping. Calling strip() on a
+    # million-character hostile string allocates and scans the whole value
+    # despite the TTS_LIMIT contract.
+    s = text[:TTS_LIMIT].strip()
     if not s:
         return ""
 
@@ -100,21 +101,33 @@ def shape_cadence(text: str, tone: Optional[str] = None) -> str:
     s = s.replace(" - ", " — ")
 
     if pauses in ("medium", "rich"):
-        # Input is whitespace-normalized, so connective matching can use
-        # bounded case-insensitive substring scans instead of backtracking regex.
-        for word in _BREATH_WORDS:
-            needle = f" {word.casefold()} "
-            cursor = 0
-            while True:
-                folded = s.casefold()
-                index = folded.find(needle, cursor)
-                if index < 0:
-                    break
-                if index > 0 and s[index - 1].isalpha():
-                    s = s[:index] + ", " + s[index + 1:]
-                    cursor = index + len(word) + 2
-                else:
-                    cursor = index + len(needle)
+        # One-pass connective detection: each character is visited once,
+        # with a fixed 16-word vocabulary. Avoid repeated casefold() and
+        # whole-string insertion on every occurrence (quadratic on "a and "
+        # repeated thousands of times).
+        emitted: list[str] = []
+        index = 0
+        length = len(s)
+        folded_words = tuple((word, word.casefold()) for word in _BREATH_WORDS)
+        while index < length:
+            if s[index] == " " and index > 0 and s[index - 1].isalpha():
+                matched = False
+                for word, folded_word in folded_words:
+                    end = index + 1 + len(word)
+                    if (
+                        end < length
+                        and s[end] == " "
+                        and s[index + 1:end].casefold() == folded_word
+                    ):
+                        emitted.append(", ")
+                        index += 1  # consume the original space exactly once
+                        matched = True
+                        break
+                if matched:
+                    continue
+            emitted.append(s[index])
+            index += 1
+        s = "".join(emitted)
 
         folded = s.casefold()
         for word in _PAUSE_AFTER_INTRO:

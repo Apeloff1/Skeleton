@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "source_pr": 5258,
+  "source_head": "d28c87b5deb80a7a81cb0d91ef8ee7dc28c18178",
+  "target_main": "42c9908bee87bacde621b99e6015250cb41d64da",
+  "kind": "source-preserving structural reconciliation",
+  "adopted": [
+    "backend/core/telemetry_privacy.py",
+    "backend/tests/test_room_api_egress_resource_limits.py",
+    "backend/tests/test_telemetry_privacy_boundary.py",
+    "frontend/scripts/test-telemetry-privacy.mjs",
+    "scripts/check_pr_merge_hold.py",
+    "tests/test_pr_merge_hold_gate.py"
+  ],
+  "provisional": true,
+  "pending_conflict_resolution": [
+    {
+      "path": ".github/workflows/merge-readiness.yml",
+      "head_blob": "a99ef7c79fcac8e0df34c4696b62a14ee15385ab",
+      "change": "modified"
+    },
+    {
+      "path": "backend/gameforge/rooms/room_api_gateway.py",
+      "head_blob": "12e3c8b7cceb3fb633c00988bcdc163c47923ce6",
+      "change": "modified"
+    },
+    {
+      "path": "backend/routes/telemetry.py",
+      "head_blob": "140635a6c10e4e6dda434c7e0f5e725e336e1736",
+      "change": "modified"
+    },
+    {
+      "path": "backend/tests/test_room_api_dns_pin.py",
+      "head_blob": "d4391f640109092b64d30d68b83af17e846036ea",
+      "change": "modified"
+    },
+    {
+      "path": "frontend/src/utils/modalLogger.ts",
+      "head_blob": "979925c335e7ff4bd16ec51e2a0d8afc8373a451",
+      "change": "modified"
+    },
+    {
+      "path": "frontend/src/utils/telemetryPrivacy.ts",
+      "head_blob": "c931f2c791e9d36d08b176e3695bf82dad55c6a1",
+      "change": "added"
+    }
+  ],
+  "merge_approval": false,
+  "security_review_required": true,
+  "notes": "Non-overlapping source blobs carried onto current main. All six overlapping current-main source paths retain main's blob; their source versions remain recoverable from the first parent. This only removes Git graph divergence; it does not resolve the deferred semantic conflicts."
+}

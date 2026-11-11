@@ -9,7 +9,7 @@ import pytest
 from skeleton.ai.runtime.operational_ai.deployment.qualification.contracts import (
     QualificationError,
 )
-from skeleton.ai.runtime.operational_ai.deployment.qualification import paths, proof
+from skeleton.ai.runtime.operational_ai.deployment.qualification import paths, proof, verification
 from skeleton.ai.runtime.operational_ai.deployment.qualification.verification import verify
 
 
@@ -219,3 +219,158 @@ def test_replay_digest_subclass_cannot_override_equality():
                 "c" * 64, "d" * 64, "session", "request",
                 first, replayed, history, doctor, exact_native=False,
             )
+
+
+class _UntrustedText(str):
+    """A str subclass must not control authoritative receipt comparisons."""
+
+    def __eq__(self, other):
+        raise AssertionError("hostile equality invoked")
+
+    def __ne__(self, other):
+        raise AssertionError("hostile inequality invoked")
+
+    __hash__ = str.__hash__
+
+
+@pytest.mark.parametrize("field", [
+    "schema", "model_sha256", "tokenizer_sha256", "session_sha256",
+    "request_id_sha256", "request_sha256", "output_sha256",
+    "transcript_sha256", "context_sha256", "proof_sha256",
+    "checkpoint_execution_mode", "status",
+])
+def test_verifier_rejects_subclassed_receipt_text_without_equality(field):
+    receipt = _issue()
+    receipt[field] = _UntrustedText(receipt[field])
+    with pytest.raises(QualificationError):
+        verify(receipt, require_real=False)
+
+
+def test_verifier_rejects_subclassed_report_key_before_set_comparison():
+    receipt = _issue()
+    saved = receipt.pop("status")
+    receipt[_UntrustedText("status")] = saved
+    with pytest.raises(QualificationError, match="schema mismatch"):
+        verify(receipt, require_real=False)
+
+
+def test_fixture_receipt_cannot_spoof_real_model_provenance():
+    receipt = _issue()
+    # Without exact builtin strings, a malicious __eq__ may claim that both
+    # fixture labels are real-model labels while the canonical bytes stay
+    # identical to the valid fixture report and its existing SHA-256.
+    class _AlwaysEqualText(str):
+        def __eq__(self, other):
+            return True
+
+        def __ne__(self, other):
+            return False
+
+    receipt["checkpoint_execution_mode"] = _AlwaysEqualText(
+        receipt["checkpoint_execution_mode"]
+    )
+    receipt["status"] = _AlwaysEqualText(receipt["status"])
+    with pytest.raises(QualificationError, match="provenance"):
+        verify(receipt, require_real=True)
+
+
+def test_verifier_normalizes_canonicalization_failure():
+    from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.contracts import SpineError
+
+    with mock.patch.object(
+        verification, "canonical", side_effect=SpineError("internal encoder detail")
+    ):
+        with pytest.raises(QualificationError, match="invalid qualification report"):
+            verify(_issue(), require_real=False)
+
+
+def test_native_report_ci_watches_and_compiles_receipt_verifier():
+    # A proof-verifier-only repair must always re-run the native custody gate.
+    workflow = (
+        Path(__file__).resolve().parents[2]
+        / ".github/workflows/native-qualification-report-custody.yml"
+    ).read_text(encoding="utf-8")
+    relative = "skeleton/ai/runtime/operational_ai/deployment/qualification/verification.py"
+    watch, run = workflow.split("      - name: Compile and execute actual native report regression suite", 1)
+    assert f"      - '{relative}'" in watch
+    assert relative in run
+    assert "ref: ${{ github.event.pull_request.head.sha }}" in workflow
+
+
+class _HostileReceiptKey:
+    """A foreign key colliding with a trusted lookup must never run equality."""
+
+    def __init__(self, target):
+        self.target = target
+
+    def __hash__(self):
+        return hash(self.target)
+
+    def __eq__(self, other):
+        raise AssertionError("untrusted mapping-key equality invoked")
+
+
+class _HostileStringKey(str):
+    __hash__ = str.__hash__
+
+    def __eq__(self, other):
+        raise AssertionError("untrusted string-subclass equality invoked")
+
+
+@pytest.mark.parametrize("surface,target", [
+    ("first", "replayed"),
+    ("replayed", "request_sha256"),
+    ("user_history", "role"),
+    ("assistant_history", "content"),
+    ("diagnostics", "turns"),
+])
+@pytest.mark.parametrize("key_type", [_HostileReceiptKey, _HostileStringKey])
+def test_receipt_mapping_keys_are_validated_before_lookup(surface, target, key_type):
+    # Exact dict containers can still carry keys whose equality executes
+    # arbitrary caller code during .get(), membership, or indexed lookup.
+    first, replayed, history, diagnostics = _inputs()
+
+    def poison(mapping):
+        altered = dict(mapping)
+        original = altered.pop(target)
+        altered[key_type(target)] = original
+        return altered
+
+    if surface == "first":
+        first = poison(first)
+    elif surface == "replayed":
+        replayed = poison(replayed)
+    elif surface == "user_history":
+        history = (poison(history[0]), history[1])
+    elif surface == "assistant_history":
+        history = (history[0], poison(history[1]))
+    else:
+        diagnostics = poison(diagnostics)
+
+    with mock.patch.object(
+        proof, "canonical", side_effect=AssertionError("forged mapping serialized"),
+    ):
+        with pytest.raises(QualificationError):
+            proof.construct(
+                "c" * 64, "d" * 64, "session", "request",
+                first, replayed, history, diagnostics, exact_native=False,
+            )
+
+
+def test_mapping_key_hardening_preserves_canonical_fixture_receipt():
+    receipt = _issue()
+    assert verify(receipt, require_real=False)["real_model_executed"] is False
+
+@pytest.mark.parametrize("policy", [None, 0, 1, "", "false", [], {}])
+def test_verifier_rejects_ambiguous_real_model_policy(policy):
+    # The fixture inspection exception must require literal False, not
+    # arbitrary falsey values such as 0, None, or an empty collection.
+    with pytest.raises(QualificationError, match="verification policy"):
+        verify(_issue(), require_real=policy)
+
+
+def test_verifier_preserves_explicit_fixture_policy():
+    receipt = _issue()
+    with pytest.raises(QualificationError, match="fixture"):
+        verify(receipt, require_real=True)
+    assert verify(receipt, require_real=False)["real_model_executed"] is False

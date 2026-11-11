@@ -36,16 +36,17 @@ async def test_api_connects_only_to_resolved_public_ip_with_original_host_and_sn
 
         @asynccontextmanager
         async def stream(self, method, path, **kwargs):
-            calls.append(("stream", method, path, kwargs))
-            class FakeResponse:
-                headers = {}
+            calls.append(("request", method, path, kwargs))
+
+            class Response:
+                headers = {"content-length": "2"}
                 is_success = True
                 status_code = 200
 
                 async def aiter_bytes(self):
                     yield b"ok"
 
-            yield FakeResponse()
+            yield Response()
 
     monkeypatch.setattr(httpx, "AsyncClient", RecordingClient)
     result = await gateway._api_query({
@@ -57,8 +58,7 @@ async def test_api_connects_only_to_resolved_public_ip_with_original_host_and_sn
     assert client["base_url"] == "https://93.184.216.34"
     assert client["follow_redirects"] is False
     assert client["trust_env"] is False
-    label, method, path, kwargs = calls[1]
-    assert label == "stream"
+    _, method, path, kwargs = calls[1]
     assert method == "GET"
     assert path == "/v1?q=hello"
     assert kwargs["headers"]["Host"] == "api.example.com"

@@ -95,6 +95,20 @@ function boundedMessage(value: unknown, fallback: string): string {
     : fallback;
 }
 
+// The API is trusted for account authority, not for render-safe JSON types.
+// Backend output is capped at 12k Unicode codepoints; 24k UTF-16 units also
+// accommodates astral characters without rejecting valid model responses.
+function safeOptionalText(value: unknown, maxUnits: number): boolean {
+  return value == null || (typeof value === 'string' && value.length <= maxUnits);
+}
+
+function safeOptionalScore(value: unknown): boolean {
+  return value == null || (
+    typeof value === 'number' && Number.isFinite(value) &&
+    value >= 0 && value <= 100
+  );
+}
+
 function validResult(record: JobWire): DiscourseResult | null {
   const rows = record.candidates;
   if (
@@ -103,15 +117,27 @@ function validResult(record: JobWire): DiscourseResult | null {
     (record.winner_index as number) < 0 ||
     (record.winner_index as number) >= rows.length ||
     typeof record.winner_model !== 'string' || !record.winner_model ||
+    record.winner_model.length > 2048 ||
     typeof record.winner_content !== 'string' || !record.winner_content.trim() ||
+    record.winner_content.length > 24_000 ||
     typeof record.judge_model !== 'string' || !record.judge_model ||
+    record.judge_model.length > 2048 ||
+    !safeOptionalScore(record.winner_score) ||
+    !safeOptionalText(record.judge_why, 2_000) ||
     !Array.isArray(record.panel) || !record.panel.length || record.panel.length > 5 ||
-    !record.panel.every((item: unknown) => typeof item === 'string') ||
-    !rows.every((item: unknown) =>
-      item && typeof item === 'object' &&
-      typeof (item as DiscourseCandidate).model === 'string' &&
-      typeof (item as DiscourseCandidate).content === 'string'
+    !record.panel.every((item: unknown) =>
+      typeof item === 'string' && item.length > 0 && item.length <= 2048
     ) ||
+    !rows.every((item: unknown) => {
+      if (!item || typeof item !== 'object') return false;
+      const candidate = item as DiscourseCandidate;
+      return typeof candidate.model === 'string' && candidate.model.length > 0 &&
+        candidate.model.length <= 2048 &&
+        typeof candidate.content === 'string' && candidate.content.length <= 24_000 &&
+        safeOptionalScore(candidate.quality) && safeOptionalScore(candidate.fidelity) &&
+        safeOptionalScore(candidate.score) &&
+        safeOptionalText(candidate.critique, 4_000);
+    }) ||
     rows[record.winner_index as number].model !== record.winner_model ||
     rows[record.winner_index as number].content !== record.winner_content
   ) return null;

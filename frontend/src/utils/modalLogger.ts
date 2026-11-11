@@ -16,16 +16,13 @@ import { API_BASE as CANONICAL_API_BASE } from './apiBase';
 import { useEffect, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
-import {
-  safeTelemetryErrorType, safeTelemetryEvent, safeTelemetryLabel,
-  sanitizeTelemetryDetail,
-} from './telemetryPrivacy';
+import { sanitizeTelemetryDetail, sanitizeTelemetryEvent, redactTelemetryText } from './telemetryPrivacy';
 
 const BACKEND  = CANONICAL_API_BASE;
 const FLUSH_MS = 5000;
+const MAX_EVENTS_PER_UPLOAD = 100;
+const MAX_MEMORY_EVENTS = 500;
 const QUEUE_KEY = '@telemetry/queue';
-const MAX_QUEUE_BYTES = 1024 * 1024;
-const MAX_EVENTS = 2000;
 
 // One session id per app launch — persists across route changes.
 let _sessionId: string | null = null;
@@ -50,7 +47,7 @@ export interface TelemetryEvent {
   severity:    Severity;
   ts_client?:  number;
   duration_ms?: number;
-  detail?:     Record<string, string | number | boolean>;
+  detail?:     any;
 }
 
 // ─── Buffer + flusher ─────────────────────────────────────────────
@@ -58,58 +55,21 @@ const _buffer: TelemetryEvent[] = [];
 let _flushTimer: ReturnType<typeof setInterval> | null = null;
 let _flushInflight = false;
 
-function sanitizeQueuedEvent(value: unknown): TelemetryEvent | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  // Old app versions wrote full exception objects to AsyncStorage. Strip all
-  // foreign/untrusted fields both on restore and immediately before POST.
-  const row = value as Record<string, unknown>;
-  const severity = row.severity;
-  const safeSeverity: Severity =
-    severity === 'warn' || severity === 'error' || severity === 'fatal'
-      ? severity : 'info';
-  const timestamp = row.ts_client;
-  const duration = row.duration_ms;
-  return {
-    modal_id: safeTelemetryLabel(row.modal_id),
-    session_id: sessionId(),
-    event: safeTelemetryEvent(row.event),
-    severity: safeSeverity,
-    ...(typeof timestamp === 'number' && Number.isFinite(timestamp) &&
-        timestamp >= 0 && timestamp <= 10_000_000_000
-      ? { ts_client: timestamp } : {}),
-    ...(typeof duration === 'number' && Number.isFinite(duration) &&
-        duration >= 0 && duration <= 86_400_000
-      ? { duration_ms: duration } : {}),
-    detail: sanitizeTelemetryDetail(row.detail),
-  };
-}
-
-async function _persistQueue(events: TelemetryEvent[]) {
+async function _persistQueue(events: TelemetryEvent[]): Promise<boolean> {
   try {
-    const raw = await AsyncStorage.getItem(QUEUE_KEY);
-    let previous: unknown[] = [];
-    if (raw && raw.length <= MAX_QUEUE_BYTES) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) previous = parsed;
-      } catch {
-        // A corrupt legacy queue must not prevent today's safe diagnostics.
-        previous = [];
-      }
-    }
-    const merged = [...previous, ...events]
-      .slice(-MAX_EVENTS)
-      .map(sanitizeQueuedEvent)
-      .filter((event): event is TelemetryEvent => event !== null);
-    let serialized = JSON.stringify(merged);
-    // Count limits alone are insufficient: many large but individually valid
-    // diagnostic rows can still exhaust mobile persistent storage.
-    while (serialized.length > MAX_QUEUE_BYTES && merged.length) {
-      merged.splice(0, Math.max(1, Math.ceil(merged.length / 4)));
-      serialized = JSON.stringify(merged);
-    }
-    await AsyncStorage.setItem(QUEUE_KEY, serialized);
-  } catch { /* non-fatal; never log the queue content */ }
+    const old = JSON.parse((await AsyncStorage.getItem(QUEUE_KEY)) || '[]');
+    // Revalidate legacy queued events before rewriting them to disk.
+    const existing = Array.isArray(old) ? old.slice(-2000) : [];
+    const merged = [...existing, ...events]
+      .slice(-2000)
+      .map(sanitizeTelemetryEvent)
+      .filter((event): event is NonNullable<typeof event> => event !== null);
+    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(merged));
+    return true;
+  } catch {
+    // Failed local storage is not a reason to send an unbounded request.
+    return false;
+  }
 }
 
 async function _drainQueue(): Promise<TelemetryEvent[]> {
@@ -117,39 +77,49 @@ async function _drainQueue(): Promise<TelemetryEvent[]> {
     const raw = await AsyncStorage.getItem(QUEUE_KEY);
     if (!raw) return [];
     await AsyncStorage.removeItem(QUEUE_KEY);
-    if (raw.length > MAX_QUEUE_BYTES) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.slice(-MAX_EVENTS).map(sanitizeQueuedEvent)
-      .filter((event): event is TelemetryEvent => event !== null);
+    const decoded: unknown = JSON.parse(raw);
+    if (!Array.isArray(decoded)) return [];
+    return decoded.slice(-2000)
+      .map(sanitizeTelemetryEvent)
+      .filter((event): event is NonNullable<typeof event> => event !== null) as TelemetryEvent[];
   } catch { return []; }
+}
+
+function _recoverInMemory(events: TelemetryEvent[]): void {
+  if (!events.length) return;
+  // A storage failure must not allow unbounded buffer expansion.
+  _buffer.unshift(...events.slice(-MAX_MEMORY_EVENTS));
+  if (_buffer.length > MAX_MEMORY_EVENTS) {
+    _buffer.splice(0, _buffer.length - MAX_MEMORY_EVENTS);
+  }
+}
+
+async function _retryLater(events: TelemetryEvent[]): Promise<void> {
+  if (events.length && !(await _persistQueue(events))) {
+    _recoverInMemory(events);
+  }
 }
 
 export async function flushTelemetry(): Promise<void> {
   if (_flushInflight) return;
   _flushInflight = true;
-  let pending: TelemetryEvent[] = [];
+  let admitted: TelemetryEvent[] = [];
   try {
     const queued = await _drainQueue();
-    pending = _buffer.splice(0, _buffer.length)
-      .concat(queued)
-      .map(sanitizeQueuedEvent)
-      .filter((event): event is TelemetryEvent => event !== null);
-    // The backend admits at most 500 entries per batch. Split offline
-    // backlogs into bounded requests and replay only the still-unsent tail.
-    while (pending.length) {
-      const part = pending.slice(0, 200);
-      const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ events: part }),
-      });
-      if (!r.ok) break;
-      pending = pending.slice(part.length);
-    }
-    if (pending.length) await _persistQueue(pending);
+    const ready = _buffer.splice(0, _buffer.length).concat(queued);
+    if (!ready.length) return;
+    // The server rejects oversized batches, so split before creating the
+    // request. Persist the remainder for the next scheduled flush.
+    admitted = ready.slice(0, MAX_EVENTS_PER_UPLOAD);
+    await _retryLater(ready.slice(MAX_EVENTS_PER_UPLOAD));
+    const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ events: admitted }),
+    });
+    if (!r.ok) await _retryLater(admitted);
   } catch {
-    if (pending.length) await _persistQueue(pending);
+    await _retryLater(admitted);
   } finally {
     _flushInflight = false;
   }
@@ -181,22 +151,19 @@ export function recordEvent(
       return;
     }
   } catch { /* swallow — proceed with buffering */ }
-  // Network outages or blocked timers must not grow an unbounded in-memory
-  // buffer; older diagnostics are less useful than current ones.
-  if (_buffer.length >= MAX_EVENTS) {
-    _buffer.splice(0, _buffer.length - MAX_EVENTS + 1);
-  }
-  _buffer.push({
-    modal_id:   safeTelemetryLabel(modalId),
+  const row = sanitizeTelemetryEvent({
+    modal_id: modalId,
     session_id: sessionId(),
-    event:      safeTelemetryEvent(event),
+    event,
     severity,
-    ts_client:  Date.now() / 1000,
-    duration_ms: typeof duration_ms === 'number' &&
-      Number.isFinite(duration_ms) && duration_ms >= 0 && duration_ms <= 86_400_000
-      ? duration_ms : undefined,
+    ts_client: Date.now() / 1000,
+    duration_ms,
     detail: sanitizeTelemetryDetail(detail),
   });
+  if (!row) return;
+  // Bound the in-memory queue even when offline or when uploads fail.
+  if (_buffer.length >= MAX_MEMORY_EVENTS) _buffer.shift();
+  _buffer.push(row as TelemetryEvent);
   _startFlusher();
   // Force-flush fatals immediately
   if (severity === 'fatal' || severity === 'error') {
@@ -224,12 +191,14 @@ export function useModalLogger(modalId: string) {
     action:  (name: string, detail?: any)               => recordEvent(modalId, `action:${name}`, 'info', detail),
     nav:     (to: string)                               => recordEvent(modalId, 'nav', 'info', { to }),
     metric:  (name: string, value: number, unit?: string)=> recordEvent(modalId, `metric:${name}`, 'info', { value, unit }),
-    warn:    (msg: string, detail?: any)                => recordEvent(modalId, 'warn', 'warn', { msg, ...detail }),
+    warn:    (msg: string, detail?: any)                => recordEvent(modalId, 'warn', 'warn', { msg, context: sanitizeTelemetryDetail(detail) }),
     error:   (err: any, detail?: any)                   => {
-      // Never include raw exception message or stack: they may contain URL
-      // credentials, user text, prompts or private local filesystem paths.
+      // Exception message/stack can embed bearer tokens, source code and private
+      // filesystem paths; do not retain or upload them at all.
+      const errorType = err instanceof Error ? redactTelemetryText(err.name, 64) : 'UnknownError';
       recordEvent(modalId, 'error', 'error', {
-        error_type: safeTelemetryErrorType(err), ...detail,
+        type: errorType,
+        context: sanitizeTelemetryDetail(detail),
       });
     },
     raw:     (event: string, severity: Severity, detail?: any) => recordEvent(modalId, event, severity, detail),

@@ -14,25 +14,59 @@ import asyncio
 import os
 import time
 from collections import deque
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.routing import APIRoute
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
-from core.telemetry_privacy import (
-    crash_metadata,
-    safe_detail,
-    safe_event,
-    safe_label,
-    safe_number,
-    safe_session,
-)
+from core.http_errors import redact_client_payload, redact_client_text
 from middleware.security import AuditMiddleware, RateLimitMiddleware
 from routes.gameforge_auth import require_role
 
-router = APIRouter()
+_MAX_TELEMETRY_BODY_BYTES = 512 * 1024
+_MAX_TELEMETRY_BATCH = 100
+
+
+class _BoundedTelemetryRoute(APIRoute):
+    """Reject oversized request bodies before FastAPI JSON parsing.
+
+    A dependency runs too late: FastAPI has already fully materialized and
+    validated the JSON before resolving dependencies. This route boundary
+    enforces the byte budget at the ASGI receive stream instead.
+    """
+
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def guarded(request: Request):
+            if request.method == "POST":
+                header = request.headers.get("content-length")
+                if header is not None:
+                    try:
+                        length = int(header)
+                    except ValueError:
+                        raise HTTPException(400, "Invalid content length") from None
+                    if length < 0:
+                        raise HTTPException(400, "Invalid content length")
+                    if length > _MAX_TELEMETRY_BODY_BYTES:
+                        raise HTTPException(413, "Telemetry payload exceeds byte limit")
+                collected = bytearray()
+                async for chunk in request.stream():
+                    if len(collected) + len(chunk) > _MAX_TELEMETRY_BODY_BYTES:
+                        raise HTTPException(413, "Telemetry payload exceeds byte limit")
+                    collected.extend(chunk)
+                # Starlette's cached request-body path permits the normal
+                # FastAPI parser to read the already-admitted bytes.
+                request._body = bytes(collected)
+            return await handler(request)
+
+        return guarded
+
+
+router = APIRouter(route_class=_BoundedTelemetryRoute)
 
 _DB_NAME = os.environ.get("DB_NAME", "test_database")
 _client: AsyncIOMotorClient | None = None
@@ -64,34 +98,27 @@ def _get_ring_lock() -> asyncio.Lock:
 # Models
 # ─────────────────────────────────────────────────────────────────
 class TelemetryEvent(BaseModel):
-    modal_id: str = Field(
-        ..., min_length=1, max_length=80,
-        description="canonical modal/screen id",
-    )
-    session_id: str = Field(
-        ..., min_length=1, max_length=80,
-        description="opaque per-app-launch session id from client",
-    )
-    event: str = Field(..., min_length=1, max_length=96, description="event category")
-    severity: str = Field(default="info", max_length=20)
+    modal_id: str = Field(min_length=1, max_length=80)
+    session_id: str = Field(min_length=1, max_length=80)
+    event: str = Field(min_length=1, max_length=64)
+    severity: Literal["info", "warn", "error", "fatal"] = "info"
     detail: Any | None = None
-    ts_client: float | None = None
-    duration_ms: float | None = None
+    ts_client: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    duration_ms: float | None = Field(default=None, ge=0, le=86_400_000, allow_inf_nan=False)
 
 
 class TelemetryBatch(BaseModel):
-    # Bound list admission before preparing persistent storage.
-    events: list[TelemetryEvent] = Field(max_length=500)
+    events: list[TelemetryEvent] = Field(min_length=1, max_length=_MAX_TELEMETRY_BATCH)
 
 
 class CrashReport(BaseModel):
-    source: str = Field(default="ErrorBoundary", max_length=120)
-    component: str | None = Field(default=None, max_length=200)
-    message: str = Field(max_length=4096)
-    stack: str | None = Field(default=None, max_length=16384)
+    source: str = Field(default="ErrorBoundary", max_length=80)
+    component: str | None = Field(default=None, max_length=120)
+    message: str = Field(max_length=2000)
+    stack: str | None = Field(default=None, max_length=16_384)
     info: Any | None = None
     session_id: str | None = Field(default=None, max_length=80)
-    app_version: str | None = Field(default=None, max_length=100)
+    app_version: str | None = Field(default=None, max_length=80)
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -117,15 +144,13 @@ async def _persist_critical(event: dict) -> None:
 def _norm(event: TelemetryEvent) -> dict:
     return {
         "ts": time.time(),
-        "modal_id": safe_label(event.modal_id),
-        "session_id": safe_session(event.session_id),
-        "event": safe_event(event.event),
-        "severity": event.severity if event.severity in {
-            "info", "warn", "error", "fatal"
-        } else "info",
-        "ts_client": safe_number(event.ts_client, maximum=10_000_000_000),
-        "duration_ms": safe_number(event.duration_ms, maximum=86_400_000),
-        "detail": safe_detail(event.detail),
+        "modal_id": event.modal_id[:80],
+        "session_id": event.session_id[:40],
+        "event": event.event[:24],
+        "severity": event.severity[:16],
+        "ts_client": event.ts_client,
+        "duration_ms": event.duration_ms,
+        "detail": redact_client_payload(event.detail),
     }
 
 
@@ -149,7 +174,7 @@ async def post_event(event: TelemetryEvent):
     dependencies=[Depends(require_role("viewer"))],
 )
 async def post_batch(batch: TelemetryBatch):
-    rows = [_norm(event) for event in batch.events[:500]]
+    rows = [_norm(event) for event in batch.events]
     async with _get_ring_lock():
         for row in rows:
             _EVENT_RING.append(row)
@@ -160,21 +185,21 @@ async def post_batch(batch: TelemetryBatch):
 
 
 def crash_row(report: CrashReport) -> dict:
-    """Collect diagnostic presence and bounded safe scalars, never raw text."""
+    """Build a secret-stripped crash record for the ring and durable store."""
     return {
         "ts": time.time(),
         "modal_id": "__app__",
-        "session_id": safe_session(report.session_id),
+        "session_id": (report.session_id or "anon")[:40],
         "event": "crash",
         "severity": "fatal",
-        "detail": crash_metadata(
-            source=report.source,
-            component=report.component,
-            message=report.message,
-            stack=report.stack,
-            info=report.info,
-            app_version=report.app_version,
-        ),
+        "detail": {
+            "source": redact_client_text(report.source, max_len=80),
+            "component": redact_client_text(report.component or "", max_len=120),
+            "message": redact_client_text(report.message, max_len=500),
+            "stack": redact_client_text(report.stack or "", max_len=2000),
+            "info": redact_client_payload(report.info),
+            "app_version": redact_client_text(report.app_version or "", max_len=40),
+        },
     }
 
 
