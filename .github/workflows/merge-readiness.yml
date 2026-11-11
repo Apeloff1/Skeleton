@@ -261,6 +261,7 @@ jobs:
           python -m pytest --noconftest -q \
             tests/test_binary_tenant_boundary_20261111.py \
             tests/test_binary_archive_custody_20261111.py \
+            tests/test_apk_atomic_publication_20261111.py \
             tests/test_vault_loader_path_custody_20261111.py \
             tests/test_room_api_egress_admission_20261111.py
       - name: Verify native-secure frontend sessions, prototype integrity and telemetry privacy
