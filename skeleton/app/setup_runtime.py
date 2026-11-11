@@ -11,6 +11,7 @@ import json
 import os
 import secrets
 import stat
+from hashlib import sha256
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -223,6 +224,52 @@ def _read_existing_env(path: Path, *, label: str = "runtime .env", private: bool
     if len(raw) > _MAX_ENV_BYTES:
         raise ValueError("runtime .env exceeds the 256 KiB input limit")
     return raw.decode("utf-8"), repaired_permissions
+
+
+
+def runtime_source_fingerprint(root: Path) -> str:
+    """Return a redacted identity for the exact bounded runtime source bytes.
+
+    Bind the private bytes to their file and installation-root identities.
+    Content-only hashes would admit replacement by a new same-byte inode.
+    This is an observation fence rather than a lock on an external writer;
+    neither raw secrets nor source names are exposed in the result.
+    """
+    try:
+        root = Path(root)
+        source = root / ".env"
+        root_before = os.lstat(root)
+        file_before = os.lstat(source)
+        if (not stat.S_ISDIR(root_before.st_mode)
+                or not stat.S_ISREG(file_before.st_mode)):
+            raise ValueError("invalid runtime source identity")
+        raw, _ = _read_existing_env(
+            source, label="runtime .env", private=False
+        )
+        root_after = os.lstat(root)
+        file_after = os.lstat(source)
+        if (not stat.S_ISDIR(root_after.st_mode)
+                or not stat.S_ISREG(file_after.st_mode)
+                or (root_before.st_dev, root_before.st_ino) !=
+                   (root_after.st_dev, root_after.st_ino)
+                or (file_before.st_dev, file_before.st_ino) !=
+                   (file_after.st_dev, file_after.st_ino)
+                or (file_before.st_size, file_before.st_mtime_ns,
+                    file_before.st_ctime_ns) !=
+                   (file_after.st_size, file_after.st_mtime_ns,
+                    file_after.st_ctime_ns)):
+            raise ValueError("runtime source identity changed during admission")
+        identity = {
+            "root": (root_after.st_dev, root_after.st_ino),
+            "file": (file_after.st_dev, file_after.st_ino,
+                     file_after.st_size, file_after.st_mtime_ns,
+                     file_after.st_ctime_ns),
+            "content_sha256": sha256(raw.encode("utf-8")).hexdigest(),
+        }
+        return sha256(json.dumps(identity, sort_keys=True,
+                                 separators=(",", ":")).encode("ascii")).hexdigest()
+    except (OSError, ValueError, TypeError, UnicodeError):
+        raise ValueError("runtime configuration source cannot be safely admitted") from None
 
 
 def _atomic_write(path: Path, text: str) -> None:
