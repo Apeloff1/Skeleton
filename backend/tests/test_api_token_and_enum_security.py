@@ -4,8 +4,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import pytest
 from fastapi import HTTPException
+import pytest
 
 
 ROUTES = Path(__file__).resolve().parents[1] / "routes"
