@@ -64,6 +64,10 @@ export function sanitizeTelemetryDetail(
       );
     }
     return safe;
+  } catch {
+    // Proxies and exotic objects may throw from reflection traps. Telemetry
+    // must never crash the UI or execute arbitrary accessors to record a log.
+    return '[UNSUPPORTED]';
   } finally {
     visited.delete(value);
   }
