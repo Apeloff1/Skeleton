@@ -117,3 +117,22 @@ def test_cross_tenant_patch_fails_before_entering_directory(tenants, monkeypatch
         ))
     assert error.value.status_code == 403
     assert called == []
+
+
+def test_nested_scim_operations_cannot_retarget_after_blue_tenant_authorization(tenants):
+    directory, registry = tenants
+    with pytest.raises(ValueError, match="cannot change tenant"):
+        asyncio.run(directory.patch_user(
+            "shared",
+            {
+                "tenant_id": "blue",
+                "Operations": [{
+                    "op": "replace",
+                    "path": "tenant_id",
+                    "value": "red",
+                }],
+            },
+            actor="alice",
+        ))
+    assert registry.get("blue").members["shared"] == MemberRole.VIEWER
+    assert registry.get("red").members["shared"] == MemberRole.OPERATOR
