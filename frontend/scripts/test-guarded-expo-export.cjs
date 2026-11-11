@@ -104,3 +104,36 @@ test('changed output cannot pass repeated digest verification', t => {
   fs.writeFileSync(html, '<html>changed</html>');
   assert.notEqual(first, snapshot(dir).digest);
 });
+
+test('same-size content rewrite with restored timestamp changes evidence digest', t => {
+  const dir = path.join(root(t), 'dist');
+  fs.mkdirSync(dir);
+  const html = path.join(dir, 'setup.html');
+  fs.writeFileSync(html, '<html>a</html>');
+  const first = snapshot(dir).digest;
+  const before = fs.statSync(html);
+  fs.writeFileSync(html, '<html>b</html>');
+  fs.utimesSync(html, before.atime, before.mtime);
+  assert.equal(fs.statSync(html).size, before.size);
+  assert.notEqual(snapshot(dir).digest, first);
+});
+
+test('hard-linked export members cannot be used as ambiguous evidence', t => {
+  const dir = path.join(root(t), 'dist');
+  fs.mkdirSync(dir);
+  const html = path.join(dir, 'setup.html');
+  fs.writeFileSync(html, '<html>setup</html>');
+  fs.linkSync(html, path.join(dir, 'alias.html'));
+  assert.throws(() => snapshot(dir), /unsafe export member/);
+});
+
+test('file contents, not only path metadata, determine export evidence', t => {
+  const dir = path.join(root(t), 'dist');
+  fs.mkdirSync(dir);
+  const html = path.join(dir, 'setup.html');
+  fs.writeFileSync(html, 'ABCD');
+  const first = snapshot(dir);
+  fs.writeFileSync(html, 'WXYZ');
+  assert.equal(snapshot(dir).bytes, first.bytes);
+  assert.notEqual(snapshot(dir).digest, first.digest);
+});

@@ -8,35 +8,82 @@ const { spawn } = require('node:child_process');
 const { setTimeout: sleep } = require('node:timers/promises');
 
 function snapshot(dir) {
+  // This is build-output evidence, not a filesystem sandbox. Never trust a
+  // filename/mtime/size tuple as proof that its bytes remained unchanged.
   const root = path.resolve(dir);
-  if (!fs.lstatSync(root).isDirectory() || fs.lstatSync(root).isSymbolicLink()) {
+  const rootBefore = fs.lstatSync(root, { bigint: true });
+  if (!rootBefore.isDirectory() || rootBefore.isSymbolicLink()) {
     throw Error('non-directory export output');
   }
+  if (typeof fs.constants.O_NOFOLLOW !== 'number') {
+    throw Error('no-follow export inspection unavailable');
+  }
+  const sameFile = (a, b) =>
+    a.dev === b.dev && a.ino === b.ino && a.mode === b.mode &&
+    a.nlink === b.nlink && a.size === b.size &&
+    a.mtimeNs === b.mtimeNs && a.ctimeNs === b.ctimeNs;
   let count = 0, bytes = 0, html = 0, setup = false;
   const entries = [], stack = [{ dir: root, prefix: '', depth: 0 }];
+  const buffer = Buffer.allocUnsafe(64 * 1024);
   while (stack.length) {
     const { dir: parent, prefix, depth } = stack.pop();
     if (depth >= 32) throw Error('export depth limit exceeded');
     for (const name of fs.readdirSync(parent)) {
       const rel = prefix ? prefix + '/' + name : name;
       const abs = path.join(parent, name);
-      const st = fs.lstatSync(abs);
+      const st = fs.lstatSync(abs, { bigint: true });
       if (st.isSymbolicLink()) throw Error('symlink in export');
       if (st.isDirectory()) {
         stack.push({ dir: abs, prefix: rel, depth: depth + 1 });
         continue;
       }
-      if (!st.isFile() || st.size > 512 * 1024 * 1024) throw Error('unsafe export member');
-      if (++count > 250000 || (bytes += st.size) > 6 * 1024 ** 3) {
+      if (!st.isFile() || st.nlink !== 1n ||
+          st.size > 512n * 1024n * 1024n) {
+        throw Error('unsafe export member');
+      }
+      if (++count > 250000 || (bytes += Number(st.size)) > 6 * 1024 ** 3) {
         throw Error('export bound exceeded');
+      }
+      const fd = fs.openSync(abs, fs.constants.O_RDONLY |
+        fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+      let digest;
+      try {
+        const opened = fs.fstatSync(fd, { bigint: true });
+        if (!sameFile(st, opened) || !opened.isFile()) {
+          throw Error('export member replaced before inspection');
+        }
+        const hasher = crypto.createHash('sha256');
+        let readBytes = 0;
+        while (true) {
+          const length = fs.readSync(fd, buffer, 0, buffer.length, null);
+          if (length === 0) break;
+          readBytes += length;
+          if (readBytes > 512 * 1024 * 1024) {
+            throw Error('export member exceeded byte cap');
+          }
+          hasher.update(buffer.subarray(0, length));
+        }
+        if (readBytes !== Number(opened.size) ||
+            !sameFile(opened, fs.fstatSync(fd, { bigint: true })) ||
+            !sameFile(opened, fs.lstatSync(abs, { bigint: true }))) {
+          throw Error('export member changed during inspection');
+        }
+        digest = hasher.digest('hex');
+      } finally {
+        fs.closeSync(fd);
       }
       if (rel.endsWith('.html')) {
         if (!st.size) throw Error('empty export HTML');
         html++;
       }
       if (rel === 'setup.html' || rel === 'setup/index.html') setup = true;
-      entries.push(rel + ':' + st.size + ':' + st.mtimeMs);
+      entries.push(JSON.stringify([rel, Number(st.size), digest]));
     }
+  }
+  const rootAfter = fs.lstatSync(root, { bigint: true });
+  if (!rootAfter.isDirectory() || rootAfter.isSymbolicLink() ||
+      rootBefore.dev !== rootAfter.dev || rootBefore.ino !== rootAfter.ino) {
+    throw Error('export output root replaced during inspection');
   }
   if (!setup || !html || !count) throw Error('required setup HTML absent');
   return { files: count, bytes, digest: crypto.createHash('sha256')
