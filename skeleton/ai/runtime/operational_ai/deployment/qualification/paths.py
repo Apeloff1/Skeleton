@@ -224,6 +224,7 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
         finally:
             os.close(handle)
 
+    fd = None
     try:
         if os.fstat(fdroot).st_mode & 0o077:
             raise QualificationError('qualification report directory must be private')
@@ -233,17 +234,17 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
             | getattr(os, 'O_CLOEXEC', 0),
             0o600, dir_fd=fdroot,
         )
-        try:
-            staged_identity = os.fstat(fd)
-            offset = 0
-            while offset < len(encoded):
-                written = os.write(fd, encoded[offset:])
-                if written <= 0:
-                    raise QualificationError('cannot write qualification report')
-                offset += written
-            os.fsync(fd)
-        finally:
-            os.close(fd)
+        staged_identity = os.fstat(fd)
+        offset = 0
+        while offset < len(encoded):
+            written = os.write(fd, encoded[offset:])
+            if written <= 0:
+                raise QualificationError('cannot write qualification report')
+            offset += written
+        os.fsync(fd)
+        # Retain this descriptor through post-link verification and rollback.
+        # Otherwise unlinking the published inode can free its number, allowing
+        # a replacement receipt to reuse (dev, ino) and be deleted as ours.
         _check_parent()
         _require_our_name(staged_name)
         # A preexisting final receipt remains untouched; the stage is removed.
@@ -270,4 +271,6 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
             _remove_our_name(staged_name)
         except OSError:
             pass
+        if fd is not None:
+            os.close(fd)
         os.close(fdroot)

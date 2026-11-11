@@ -199,10 +199,14 @@ def prove(source: Any) -> Proof:
     visited = {initial}
     scene_seen: set[str] = set()
     witnesses: dict[str, tuple[str, ...]] = {}
+    # Keep all transitions, even edges to previously visited states.
+    predecessors: dict[tuple[str, frozenset[str]], set[tuple[str, frozenset[str]]]] = {}
+    terminal_states: set[tuple[str, frozenset[str]]] = set()
     while queue:
         (scene, flags), path = queue.popleft()
         scene_seen.add(scene)
         if scene in endings:
+            terminal_states.add((scene, flags))
             witnesses.setdefault(scene, path)
             continue
         outgoing = edges.get(scene, [])
@@ -211,6 +215,7 @@ def prove(source: Any) -> Proof:
             raise CanonError("reachable_dead_end", scene)
         for edge in enabled:
             state = (edge["to"], flags | frozenset(edge["grants"]))
+            predecessors.setdefault(state, set()).add((scene, flags))
             if state not in visited:
                 visited.add(state)
                 if len(visited) > MAX_STATES:
@@ -221,6 +226,19 @@ def prove(source: Any) -> Proof:
                          ",".join(sorted({s["id"] for s in world["scenes"]} - scene_seen)))
     if set(witnesses) != endings:
         raise CanonError("unreachable_endings", ",".join(sorted(endings - set(witnesses))))
+    # Every reachable state must be able to reach a genuine terminal state.
+    can_finish = set(terminal_states)
+    frontier = deque(sorted(terminal_states))
+    while frontier:
+        state = frontier.popleft()
+        for previous in sorted(predecessors.get(state, ())):
+            if previous not in can_finish:
+                can_finish.add(previous)
+                frontier.append(previous)
+    stranded = visited - can_finish
+    if stranded:
+        raise CanonError("nonterminating_world_state",
+                         ",".join(sorted({scene for scene, _ in stranded})))
     return Proof(digest(world), tuple(sorted(scene_seen)), witnesses, len(visited))
 
 
