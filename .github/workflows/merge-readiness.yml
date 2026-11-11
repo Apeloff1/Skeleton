@@ -272,8 +272,11 @@ jobs:
             tests/test_codeql_origin_guards_20261111.py \
             tests/test_enterprise_auth_fail_closed_20261111.py \
             tests/test_scim_tenant_custody_20261111.py \
+            tests/test_scim_webhook_principal_20261111.py \
             tests/test_codeql_godot_quorum_errors_20261111.py \
-            ../tests/test_full_security_alert_inventory_20261111.py
+            ../tests/test_full_security_alert_inventory_20261111.py \
+            ../tests/test_codeql_lineage_contract_20261111.py \
+            ../tests/test_codeql_stack_trace_custody_20261111.py
       - name: Verify native-secure sessions, telemetry custody and isolated WASM code execution
         run: >-
           node --test
