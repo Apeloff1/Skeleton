@@ -112,7 +112,8 @@ function validResult(record: JobWire): DiscourseResult | null {
       typeof (item as DiscourseCandidate).model === 'string' &&
       typeof (item as DiscourseCandidate).content === 'string'
     ) ||
-    rows[record.winner_index as number].model !== record.winner_model
+    rows[record.winner_index as number].model !== record.winner_model ||
+    rows[record.winner_index as number].content !== record.winner_content
   ) return null;
   return record as unknown as DiscourseResult;
 }
@@ -183,6 +184,11 @@ export async function pollDiscourseJob(
       const record = response.data;
       if (!record || typeof record !== 'object') return failure('invalid_job_record', jobId);
       if (record.status === 'done') {
+        // Never display a terminal receipt for another job, or a terminal
+        // failure masquerading as a successful durable deliberation.
+        if (record.job_id !== jobId || record.error != null) {
+          return failure('invalid_terminal_result', jobId);
+        }
         const result = validResult(record);
         return result
           ? { ok: true, jobId, result }
