@@ -27,7 +27,7 @@ def test_api_request_headers_reject_credentials_and_overlength_values():
     for header in ("Authorization", "Cookie", "X-API-Key", "Forwarded", "Host"):
         with pytest.raises(ValueError):
             gateway._safe_headers({header: "Bearer sensitive"})
-    for payload in ({"X-Trace": "x" * 2049}, {"Invalid Name": "ok"}, {"x": "ok\\r\\nInjected: 1"}):
+    for payload in ({"X-Trace": "x" * 2049}, {"Invalid Name": "ok"}, {"x": "ok\r\nInjected: 1"}):
         with pytest.raises(ValueError):
             gateway._safe_headers(payload)
     assert gateway._safe_headers({"X-Trace": "safe"}) == {"X-Trace": "safe"}
