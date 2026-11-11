@@ -26,6 +26,11 @@ def _app() -> FastAPI:
 
     @router.get("/declared-server-error/{status}")
     async def declared_server_error(status: int):
+        if status < 500:
+            raise HTTPException(
+                status_code=status, detail={"reason": "ordinary public error"},
+                headers={"Retry-After": "30"},
+            )
         raise HTTPException(
             status_code=status,
             detail={"database_password": "private-db-password-do-not-leak"},
@@ -73,7 +78,8 @@ def test_explicit_public_client_errors_remain_unchanged():
     with TestClient(_app(), raise_server_exceptions=False) as client:
         response = client.get("/declared-server-error/429")
     assert response.status_code == 429
-    assert response.json()["detail"]["database_password"] == "private-db-password-do-not-leak"
+    assert response.json() == {"detail": {"reason": "ordinary public error"}}
+    assert response.headers["retry-after"] == "30"
 
 
 def test_request_validation_remains_http_422():
