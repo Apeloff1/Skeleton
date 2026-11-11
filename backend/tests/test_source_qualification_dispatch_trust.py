@@ -124,6 +124,25 @@ def test_rejects_dispatch_regression(change, expected: str) -> None:
             ),
             "exactly one",
         ),
+
+        (
+            lambda source: source.replace(
+                "      - name: Compile",
+                '      - uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"\n'
+                "        with:\n          persist-credentials: false\n"
+                "          ref: \${{ github.sha }}\n"
+                "      - name: Compile",
+            ),
+            "exactly one",
+        ),
+        (
+            lambda source: source.replace(
+                "      - name: Compile",
+                "      - uses: *untrusted_action\n"
+                "      - name: Compile",
+            ),
+            "dynamic or aliased action",
+        ),
         (
             lambda source: source.replace(
                 "      - name: Compile",
