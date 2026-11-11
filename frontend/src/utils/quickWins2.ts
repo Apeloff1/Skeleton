@@ -13,6 +13,9 @@
  *   • Async    (29-35)   • Misc      (36-42)
  */
 
+// Never allow an attacker-selected object path to resolve or mutate an object prototype.
+const UNSAFE_PATH_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 // ═══ STRINGS ═════════════════════════════════════════════════════════════
 
 /** ① Capitalize first letter, leave the rest untouched. */
@@ -138,7 +141,7 @@ export function unique<T>(arr: readonly T[]): T[] {
 
 /** ⑯ Group by a key function. */
 export function groupBy<T, K extends string | number>(arr: readonly T[], key: (item: T) => K): Record<K, T[]> {
-  const out = {} as Record<K, T[]>;
+  const out = Object.create(null) as Record<K, T[]>;
   for (const item of arr) {
     const k = key(item);
     (out[k] = out[k] || []).push(item);
@@ -191,21 +194,21 @@ export function shuffle<T>(arr: readonly T[]): T[] {
 
 /** ㉒ Map values of an object (key-preserving). */
 export function mapValues<V, R>(obj: Record<string, V>, fn: (v: V, k: string) => R): Record<string, R> {
-  const out: Record<string, R> = {};
+  const out = Object.create(null) as Record<string, R>;
   for (const k of Object.keys(obj)) out[k] = fn(obj[k], k);
   return out;
 }
 
 /** ㉓ Filter object entries by a predicate. */
 export function filterObject<V>(obj: Record<string, V>, pred: (v: V, k: string) => boolean): Record<string, V> {
-  const out: Record<string, V> = {};
+  const out = Object.create(null) as Record<string, V>;
   for (const k of Object.keys(obj)) if (pred(obj[k], k)) out[k] = obj[k];
   return out;
 }
 
 /** ㉔ Invert: {a:1,b:2} → {1:"a",2:"b"}. */
 export function invert(obj: Record<string, string | number>): Record<string, string> {
-  const out: Record<string, string> = {};
+  const out = Object.create(null) as Record<string, string>;
   for (const k of Object.keys(obj)) out[String(obj[k])] = k;
   return out;
 }
@@ -214,6 +217,7 @@ export function invert(obj: Record<string, string | number>): Record<string, str
 export function get(obj: any, path: string, fallback?: any): any {
   if (obj == null) return fallback;
   const parts = path.split('.');
+  if (parts.some(part => UNSAFE_PATH_KEYS.has(part))) return fallback;
   let cur = obj;
   for (const p of parts) {
     if (cur == null || typeof cur !== 'object') return fallback;
@@ -225,6 +229,9 @@ export function get(obj: any, path: string, fallback?: any): any {
 /** ㉖ Set a deeply-nested path immutably. */
 export function set(obj: any, path: string, value: any): any {
   const parts = path.split('.');
+  if (!parts.length || parts.some(part => !part || UNSAFE_PATH_KEYS.has(part))) {
+    throw new Error('unsafe object path');
+  }
   const root: any = Array.isArray(obj) ? obj.slice() : { ...(obj || {}) };
   let cur = root;
   for (let i = 0; i < parts.length - 1; i++) {
@@ -249,6 +256,7 @@ export function deepMerge<T extends Record<string, any>>(...sources: Partial<T>[
   for (const src of sources) {
     if (!isPlainObject(src)) continue;
     for (const k of Object.keys(src)) {
+      if (UNSAFE_PATH_KEYS.has(k)) continue;
       const v = (src as any)[k];
       if (isPlainObject(v) && isPlainObject(out[k])) out[k] = deepMerge(out[k], v);
       else out[k] = v;

@@ -171,12 +171,29 @@ class SessionStore:
         if expected_world_digest is not None and digest(world) != expected_world_digest:
             raise CanonError("session_world_lease_mismatch")
 
-    def read(self, world_id: str, slot: str) -> dict[str, Any]:
+    def read(self, world_id: str, slot: str, *,
+             expected_world_digest: str | None = None,
+             source_guard: SourceGuard | None = None) -> dict[str, Any]:
+        """Read a consistent world/session pair under the canonical writer lease.
+
+        Previously a world revision could publish between the two reads,
+        yielding a spurious replay failure or a mixed-generation snapshot.
+        A busy writer is an explicit retryable error, not an unlocked fallback.
+        """
+        _id(world_id, "world_id")
         _id(slot, "slot")
         fd = self.worlds._directory()
         try:
-            world = self._world(fd, world_id)
-            return self._session(fd, world_id, slot, world)
+            lock_fd = self._lock(fd, world_id)
+            try:
+                os.close(lock_fd)
+                if source_guard is not None:
+                    source_guard(fd, world_id)
+                world = self._world(fd, world_id)
+                self._require_world_lease(world, expected_world_digest)
+                return self._session(fd, world_id, slot, world)
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
         finally:
             os.close(fd)
 
@@ -243,12 +260,13 @@ class SessionStore:
                       source_guard: SourceGuard | None,
                       operation: Callable[[], Any]) -> Any:
         """Pin approved artifacts and player reads to one writer lease."""
-        if source_guard is None:
-            return operation()
+        # Pin the canonical world and session to the same writer lease,
+        # including reads without an optional source-review guard.
         lock_fd = self._lock(fd, world_id)
         try:
             os.close(lock_fd)
-            source_guard(fd, world_id)
+            if source_guard is not None:
+                source_guard(fd, world_id)
             return operation()
         finally:
             os.unlink(world_id + ".lock", dir_fd=fd)

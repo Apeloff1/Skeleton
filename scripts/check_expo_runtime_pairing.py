@@ -24,6 +24,14 @@ SUPPORTED: dict[int, dict[str, tuple[int, int]]] = {
         "react-native-web": (0, 21),
         "@types/react": (19, 1),
     },
+    # Reviewed against expo@55.0.32 bundledNativeModules.json (RN 0.83, React 19.2).
+    55: {
+        "react-native": (0, 83),
+        "react": (19, 2),
+        "react-dom": (19, 2),
+        "react-native-web": (0, 21),
+        "@types/react": (19, 2),
+    },
 }
 EXACT = frozenset({"react-native", "react", "react-dom"})
 
@@ -92,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         for issue in errors:
             print("Expo compatibility check failed: " + issue, file=sys.stderr)
         return 1
-    print("Expo SDK 54 / React 19.1 / React Native 0.81 dependency pairing verified")
+    print(f"Expo SDK {parsed['dependencies']['expo']} dependency pairing verified against reviewed matrix")
     return 0
 
 

@@ -24,6 +24,17 @@ Out of scope here: APK/EAS export, deploy, multiplayer, and the standalone-AI la
 
 **Tier 2, live (opt-in).** With `SKELETON_E2E_BASE_URL` set, one test drives the real backend over HTTP: bootstrap, register, sign in, verify `/me`, reject a wrong password, and verify that public registration grants only the viewer role and cannot create builds. A bounded three-file build, observation with the production `watchBuildJob`, and retained-partial library verification additionally require `SKELETON_E2E_OPERATOR_TOKEN_FILE` pointing to a private file containing a valid editor/admin token. The test requires enforced authentication and never upgrades the public consumer account. Its three-file ceiling intentionally stops the mandatory pipeline: it verifies `artifact_file_budget_exhausted`, exactly three durable files, no fabricated completed phases, and fully drained workers. This is a bounded install and recovery probe, not successful end-to-end game creation. `SKELETON_E2E_MAX_CHECKS` bounds the watch (default 120). The live suite is skipped when the base URL is unset; build mutation steps are skipped when the private operator token file is absent.
 
+**Isolated CI operator bootstrap (live Tier 2).** On the disposable GitHub Actions
+stack, the workflow generates a unique, masked admin seed email/password for the
+run and passes them to the existing backend seed-admin contract. A provisioning
+helper authenticates over local loopback using the real login endpoint, verifies
+an enforced admin identity through `/api/auth/me`, and publishes the issued JWT
+only as a mode-0600 file under the runner's temporary directory. The token is
+removed on every workflow exit. No static admin credential, public-registration
+privilege, JWT forgery, external host, or successful skip is allowed. The CI
+gate must fail if admin bootstrap, token proof, or the real live flow fails.
+Manual Tier 2 runs still supply their own authorized private token file.
+
 **Tier 3, browser (planned).** Playwright against `yarn export:web` output, using the existing `testID`s (`gate-email`, `gate-pass`, `gate-submit`, `gate-error`, `gate-google`). Not added yet because it needs new dependencies and a `yarn.lock` regeneration; tracked as a follow-up. Until then Shirt 1 covers the UI layer manually with the cases below.
 
 ## Cases

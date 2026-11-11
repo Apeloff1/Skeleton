@@ -5,12 +5,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Modal,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Rect, Text as SvgText, G } from 'react-native-svg';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { useRouter } from 'expo-router';
+import { API_BASE } from '../../utils/apiBase';
+import { apiFetch } from '../../utils/apiController';
 
 // ============================================================================
 // TYPES
@@ -60,28 +60,6 @@ export interface LearningStats {
 // ============================================================================
 // DEFAULT DATA
 // ============================================================================
-const SKILL_CATEGORIES = [
-  { name: 'Syntax', skills: ['Variables', 'Functions', 'Classes', 'Loops', 'Conditionals', 'Operators'] },
-  { name: 'Data Structures', skills: ['Arrays', 'Lists', 'Dictionaries', 'Sets', 'Trees', 'Graphs'] },
-  { name: 'Algorithms', skills: ['Sorting', 'Searching', 'Recursion', 'Dynamic Programming', 'Greedy'] },
-  { name: 'Memory', skills: ['Pointers', 'References', 'Allocation', 'Garbage Collection', 'Lifetimes'] },
-  { name: 'Concurrency', skills: ['Threads', 'Async/Await', 'Locks', 'Channels', 'Atomics'] },
-  { name: 'Optimization', skills: ['Complexity', 'Profiling', 'Caching', 'Vectorization', 'Inlining'] },
-];
-
-const DEFAULT_ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_run', name: 'First Compile', description: 'Run your first program', icon: 'rocket', color: '#6366F1', unlockedAt: new Date() },
-  { id: 'syntax_master', name: 'Syntax Master', description: 'Master all basic syntax', icon: 'code-slash', color: '#8B5CF6', progress: 4, maxProgress: 6 },
-  { id: 'algorithm_ace', name: 'Algorithm Ace', description: 'Complete 10 algorithm challenges', icon: 'trophy', color: '#F59E0B', progress: 3, maxProgress: 10 },
-  { id: 'debugger', name: 'Bug Hunter', description: 'Fix 25 bugs using sanitizers', icon: 'bug', color: '#EF4444', progress: 8, maxProgress: 25 },
-  { id: 'optimizer', name: 'Speed Demon', description: 'Improve code performance 10 times', icon: 'flash', color: '#10B981', progress: 2, maxProgress: 10 },
-  { id: 'polyglot', name: 'Polyglot', description: 'Write code in 5 languages', icon: 'globe', color: '#2563EB', progress: 2, maxProgress: 5 },
-  { id: 'streak_7', name: 'Weekly Warrior', description: '7-day coding streak', icon: 'flame', color: '#F43F5E' },
-  { id: 'streak_30', name: 'Monthly Master', description: '30-day coding streak', icon: 'diamond', color: '#EC4899' },
-  { id: 'bible_reader', name: 'Scholar', description: 'Complete 10 Bible chapters', icon: 'book', color: '#FFD700', progress: 0, maxProgress: 10 },
-  { id: 'voice_user', name: 'Voice Commander', description: 'Use 20 voice commands', icon: 'mic', color: '#8B5CF6', progress: 0, maxProgress: 20 },
-];
-
 // ============================================================================
 // STORAGE KEY
 // ============================================================================
@@ -99,45 +77,60 @@ interface LearningDashboardProps {
 // MAIN COMPONENT
 // ============================================================================
 export function LearningDashboard({ visible, onClose, colors }: LearningDashboardProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'heatmap' | 'gaps' | 'achievements'>('overview');
   const [skills, setSkills] = useState<SkillLevel[]>([]);
-  const [achievements] = useState<Achievement[]>(DEFAULT_ACHIEVEMENTS);
-  const [stats] = useState<LearningStats>({
-    totalPracticeMinutes: 127,
-    totalExercisesCompleted: 45,
-    averageAccuracy: 78,
-    languagesPracticed: ['Python', 'JavaScript'],
-    conceptsMastered: 12,
-    streak: { current: 3, longest: 7, lastActiveDate: new Date() },
-  });
+  const [knowledgeGaps, setKnowledgeGaps] = useState<KnowledgeGap[]>([]);
+  const achievements: Achievement[] = [];
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Generate mock skills on load
   useEffect(() => {
-    const mockSkills: SkillLevel[] = [];
-    SKILL_CATEGORIES.forEach(cat => {
-      cat.skills.forEach(skill => {
-        mockSkills.push({
-          skill,
-          category: cat.name,
-          level: Math.floor(Math.random() * 100),
-          practiceCount: Math.floor(Math.random() * 50),
-          trend: ['improving', 'stable', 'declining'][Math.floor(Math.random() * 3)] as any,
-        });
-      });
-    });
-    setSkills(mockSkills);
-  }, []);
+    if (!visible) return;
+    let active = true;
+    setLoading(true);
+    setLoadError(null);
+    Promise.all([
+      apiFetch(`${API_BASE}/api/learning/mastery`),
+      apiFetch(`${API_BASE}/api/learning/predictions`),
+    ]).then(async ([masteryResponse, predictionsResponse]) => {
+      if (!masteryResponse.ok || !predictionsResponse.ok) throw new Error('Learning intelligence service unavailable');
+      const mastery = await masteryResponse.json();
+      const predictions = await predictionsResponse.json();
+      if (!active) return;
+      setSkills((Array.isArray(mastery.heatmap) ? mastery.heatmap : []).map((entry: any) => ({
+        skill: String(entry.concept || 'Basics'),
+        category: String(entry.language || 'General'),
+        level: Math.max(0, Math.min(100, Number(entry.mastery) || 0)),
+        practiceCount: Math.max(0, Number(entry.practice_count) || 0),
+        trend: 'stable' as const,
+      })));
+      setKnowledgeGaps((Array.isArray(predictions.predictions) ? predictions.predictions : []).map((entry: any) => ({
+        skill: String(entry.concept || 'General'),
+        prerequisite: 'Recorded fundamentals',
+        confidence: Math.max(0, Math.min(1, (Number(entry.confidence) || 0) / 100)),
+        recommendation: String(entry.recommendation || 'Continue focused practice'),
+      })));
+    }).catch((error: unknown) => {
+      if (active) setLoadError(error instanceof Error ? error.message : 'Unable to load learning intelligence');
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [visible]);
 
-  // Knowledge gaps prediction
-  const knowledgeGaps = useMemo((): KnowledgeGap[] => {
-    const lowSkills = skills.filter(s => s.level < 40);
-    return lowSkills.slice(0, 5).map(s => ({
-      skill: s.skill,
-      prerequisite: skills.find(sk => sk.level > 60 && sk.category === s.category)?.skill || 'Basics',
-      confidence: 0.85 + Math.random() * 0.1,
-      recommendation: `Practice ${s.skill} exercises in the Coding Bible`,
-    }));
+  const stats = useMemo<LearningStats>(() => {
+    const exercises = skills.reduce((total, skill) => total + skill.practiceCount, 0);
+    const weighted = skills.reduce((total, skill) => total + skill.level * skill.practiceCount, 0);
+    return {
+      totalPracticeMinutes: 0,
+      totalExercisesCompleted: exercises,
+      averageAccuracy: exercises ? Math.round(weighted / exercises) : 0,
+      languagesPracticed: Array.from(new Set(skills.map(skill => skill.category))),
+      conceptsMastered: skills.filter(skill => skill.level >= 80).length,
+      streak: { current: 0, longest: 0, lastActiveDate: new Date(0) },
+    };
   }, [skills]);
+
+  const categories = useMemo(() => Array.from(new Set(skills.map(skill => skill.category))), [skills]);
 
   // Get mastery color
   const getMasteryColor = (level: number) => {
@@ -180,15 +173,15 @@ export function LearningDashboard({ visible, onClose, colors }: LearningDashboar
       {/* Mastery Summary */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Skill Mastery</Text>
-        {SKILL_CATEGORIES.map(cat => {
-          const catSkills = skills.filter(s => s.category === cat.name);
+        {categories.map(category => {
+          const catSkills = skills.filter(s => s.category === category);
           const avgLevel = catSkills.length > 0 
             ? Math.round(catSkills.reduce((sum, s) => sum + s.level, 0) / catSkills.length) 
             : 0;
           
           return (
-            <View key={cat.name} style={styles.masteryRow}>
-              <Text style={[styles.masteryCategory, { color: colors.text }]}>{cat.name}</Text>
+            <View key={category} style={styles.masteryRow}>
+              <Text style={[styles.masteryCategory, { color: colors.text }]}>{category}</Text>
               <View style={[styles.masteryBar, { backgroundColor: colors.surfaceAlt }]}>
                 <View style={[styles.masteryFill, { width: `${avgLevel}%`, backgroundColor: getMasteryColor(avgLevel) }]} />
               </View>
@@ -219,8 +212,6 @@ export function LearningDashboard({ visible, onClose, colors }: LearningDashboar
   // RENDER HEATMAP TAB
   // ============================================================================
   const renderHeatmap = () => {
-    const cellSize = (SCREEN_WIDTH - 100) / 7;
-    
     return (
       <ScrollView style={styles.tabContent}>
         <Text style={[styles.heatmapTitle, { color: colors.text }]}>Skill Heatmap</Text>
@@ -228,72 +219,24 @@ export function LearningDashboard({ visible, onClose, colors }: LearningDashboar
           Darker colors indicate higher mastery
         </Text>
         
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <Svg width={SKILL_CATEGORIES.length * cellSize + 60} height={7 * cellSize + 40}>
-            {/* Category Headers */}
-            {SKILL_CATEGORIES.map((cat, i) => (
-              <SvgText
-                key={cat.name}
-                x={i * cellSize + cellSize / 2 + 60}
-                y={15}
-                fontSize={9}
-                fill={colors.textMuted}
-                textAnchor="middle"
-              >
-                {cat.name.slice(0, 4)}
-              </SvgText>
-            ))}
-            
-            {/* Grid cells */}
-            {SKILL_CATEGORIES.map((cat, catIndex) => (
-              <G key={cat.name}>
-                {cat.skills.slice(0, 6).map((skill, skillIndex) => {
-                  const skillData = skills.find(s => s.skill === skill);
-                  const level = skillData?.level || 0;
-                  const color = getMasteryColor(level);
-                  const opacity = 0.3 + (level / 100) * 0.7;
-                  
-                  return (
-                    <G key={skill}>
-                      <Rect
-                        x={catIndex * cellSize + 60}
-                        y={skillIndex * cellSize + 25}
-                        width={cellSize - 4}
-                        height={cellSize - 4}
-                        rx={6}
-                        fill={color}
-                        opacity={opacity}
-                      />
-                      <SvgText
-                        x={catIndex * cellSize + cellSize / 2 + 60}
-                        y={skillIndex * cellSize + cellSize / 2 + 28}
-                        fontSize={8}
-                        fill="#FFF"
-                        textAnchor="middle"
-                      >
-                        {level}
-                      </SvgText>
-                    </G>
-                  );
-                })}
-              </G>
-            ))}
-            
-            {/* Skill labels */}
-            {SKILL_CATEGORIES[0].skills.slice(0, 6).map((skill, i) => (
-              <SvgText
-                key={skill}
-                x={55}
-                y={i * cellSize + cellSize / 2 + 28}
-                fontSize={9}
-                fill={colors.textMuted}
-                textAnchor="end"
-              >
-                {skill.slice(0, 8)}
-              </SvgText>
-            ))}
-          </Svg>
-        </ScrollView>
+        {skills.length === 0 ? (
+          <View style={[styles.emptyGaps, { backgroundColor: colors.surface }]}>
+            <Ionicons name="analytics-outline" size={42} color={colors.textMuted} />
+            <Text style={[styles.emptyGapsTitle, { color: colors.text }]}>No recorded practice yet</Text>
+            <Text style={[styles.emptyGapsSubtitle, { color: colors.textMuted }]}>Complete tracked exercises to build a mastery heatmap.</Text>
+          </View>
+        ) : skills.map(skill => (
+          <View key={`${skill.category}:${skill.skill}`} style={[styles.masteryRow, { backgroundColor: colors.surface, padding: 12, borderRadius: 10 }]}>
+            <View style={{ width: 110 }}>
+              <Text style={[styles.masteryCategory, { color: colors.text }]}>{skill.skill}</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 11 }}>{skill.category} · {skill.practiceCount} attempts</Text>
+            </View>
+            <View style={[styles.masteryBar, { backgroundColor: colors.surfaceAlt }]}>
+              <View style={[styles.masteryFill, { width: `${skill.level}%`, backgroundColor: getMasteryColor(skill.level) }]} />
+            </View>
+            <Text style={[styles.masteryPercent, { color: getMasteryColor(skill.level) }]}>{skill.level}%</Text>
+          </View>
+        ))}
         
         {/* Legend */}
         <View style={styles.legend}>
@@ -326,10 +269,10 @@ export function LearningDashboard({ visible, onClose, colors }: LearningDashboar
       
       {knowledgeGaps.length === 0 ? (
         <View style={[styles.emptyGaps, { backgroundColor: colors.surface }]}>
-          <Ionicons name="checkmark-circle" size={48} color="#10B981" />
-          <Text style={[styles.emptyGapsTitle, { color: colors.text }]}>No Gaps Detected!</Text>
+          <Ionicons name="analytics-outline" size={48} color={colors.textMuted} />
+          <Text style={[styles.emptyGapsTitle, { color: colors.text }]}>No supported gap evidence</Text>
           <Text style={[styles.emptyGapsSubtitle, { color: colors.textMuted }]}>
-            Your knowledge is well-rounded. Keep practicing!
+            Gap recommendations appear after recorded unsuccessful practice attempts.
           </Text>
         </View>
       ) : (
@@ -354,7 +297,7 @@ export function LearningDashboard({ visible, onClose, colors }: LearningDashboar
             <Text style={[styles.gapRecommendation, { color: colors.textSecondary }]}>
               💡 {gap.recommendation}
             </Text>
-            <TouchableOpacity style={[styles.practiceButton, { backgroundColor: '#6366F1' }]}>
+            <TouchableOpacity style={[styles.practiceButton, { backgroundColor: '#6366F1' }]} onPress={() => { onClose(); router.push('/bible'); }}>
               <Ionicons name="play" size={16} color="#FFF" />
               <Text style={styles.practiceButtonText}>Practice Now</Text>
             </TouchableOpacity>
@@ -369,6 +312,13 @@ export function LearningDashboard({ visible, onClose, colors }: LearningDashboar
   // ============================================================================
   const renderAchievements = () => (
     <ScrollView style={styles.tabContent}>
+      {achievements.length === 0 && (
+        <View style={[styles.emptyGaps, { backgroundColor: colors.surface }]}>
+          <Ionicons name="trophy-outline" size={48} color={colors.textMuted} />
+          <Text style={[styles.emptyGapsTitle, { color: colors.text }]}>No verified achievements</Text>
+          <Text style={[styles.emptyGapsSubtitle, { color: colors.textMuted }]}>Achievements appear when the activity ledger records their completion.</Text>
+        </View>
+      )}
       {/* Unlocked */}
       <Text style={[styles.achievementSection, { color: colors.text }]}>Unlocked</Text>
       <View style={styles.achievementsGrid}>
@@ -472,6 +422,8 @@ export function LearningDashboard({ visible, onClose, colors }: LearningDashboar
           </View>
           
           {/* Content */}
+          {loading && <ActivityIndicator style={{ marginTop: 24 }} color="#6366F1" />}
+          {loadError && <Text style={{ color: '#EF4444', paddingHorizontal: 16, paddingTop: 12 }}>{loadError}</Text>}
           {activeTab === 'overview' && renderOverview()}
           {activeTab === 'heatmap' && renderHeatmap()}
           {activeTab === 'gaps' && renderGaps()}

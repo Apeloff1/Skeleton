@@ -98,12 +98,11 @@ class TransformHierarchy:
         if len(by_id)!=len(nodes):raise SimulationContractError("duplicate transform entity")
         for node in nodes:
             if node.parent_id is not None and node.parent_id not in by_id:raise SimulationContractError("unknown transform parent")
-        # Iterative ancestry walk: authored worlds may exceed Python's recursion limit.
-        # Each node is marked complete only after its entire parent chain is known.
+        # Iterative ancestry walk: valid imported scenes may exceed Python's
+        # recursion limit. Each node is finalized once (linear total work).
         state={}
         for eid in by_id:
-            if state.get(eid)==2:
-                continue
+            if state.get(eid)==2:continue
             chain=[]
             current=eid
             while current is not None and state.get(current)!=2:
@@ -112,8 +111,8 @@ class TransformHierarchy:
                 state[current]=1
                 chain.append(current)
                 current=by_id[current].parent_id
-            for ancestor in chain:
-                state[ancestor]=2
+            for visited in chain:
+                state[visited]=2
         self._nodes=MappingProxyType(by_id)
 
     def world_position(self,entity_id:str)->tuple[int,int,int]:

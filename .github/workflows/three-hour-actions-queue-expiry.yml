@@ -1,9 +1,8 @@
 name: Expire Actions queues older than three hours
 
 on:
-  schedule:
-    # Frequent bounded sweeps; offset from the top of the hour.
-    - cron: '13,28,43,58 * * * *'
+  # Owner-directed backlog phase: explicit dispatch only; queue-drain retains
+  # its independent hourly safety recovery admission.
   workflow_dispatch:
     inputs:
       dry_run:
@@ -11,12 +10,6 @@ on:
         required: false
         type: boolean
         default: false
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/three-hour-actions-queue-expiry.yml'
-      - 'scripts/cancel_stale_actions_queue.py'
-      - 'tests/test_cancel_stale_actions_queue.py'
 
 # The sweep never changes CI policies, PR states, or GitHub retention.
 permissions: {}
