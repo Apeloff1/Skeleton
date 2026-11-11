@@ -1,4 +1,5 @@
 from __future__ import annotations
+import hmac
 import os
 from typing import Annotated, Optional, Any, Dict
 
@@ -7,7 +8,7 @@ from fastapi import APIRouter, Header, HTTPException, Depends, Path, Query
 from gameforge.enterprise.scim_webhook import ScimWebhookProcessor
 from gameforge.enterprise.scim_users import ScimUserDirectory
 from gameforge.enterprise.tenancy import TENANT_REGISTRY
-from gameforge.enterprise.auth import Principal, get_principal
+from gameforge.enterprise.auth import AUTH, Principal, get_principal
 
 router = APIRouter(prefix="/scim", tags=["scim"])
 processor = ScimWebhookProcessor()
@@ -16,9 +17,18 @@ directory = ScimUserDirectory(TENANT_REGISTRY)
 
 def _secret_ok(x_scim_secret: Optional[str]) -> bool:
     expected = os.getenv("GAMEFORGE_SCIM_WEBHOOK_SECRET")
-    if not expected:
+    if expected is None or not expected:
+        if x_scim_secret is not None:
+            raise HTTPException(status_code=401, detail="Invalid SCIM webhook secret")
         return False
-    if x_scim_secret != expected:
+    if x_scim_secret is None:
+        return False
+    if (
+        type(x_scim_secret) is not str
+        or len(x_scim_secret) > 512
+        or len(expected) > 512
+        or not hmac.compare_digest(x_scim_secret, expected)
+    ):
         raise HTTPException(status_code=401, detail="Invalid SCIM webhook secret")
     return True
 
@@ -34,7 +44,11 @@ def _authorize_scim_write(x_scim_secret, principal, tenant_id) -> str:
         TENANT_REGISTRY.require_access(tenant_id, principal.user_id, "admin")
     else:
         if not any(t.can(principal.user_id, "admin") for t in TENANT_REGISTRY.tenants.values()):
-            # allow in dev when local tenant
+            # Never create a new tenant owner as an authentication fallback.
+            # This compatibility bootstrap is permitted only in explicit
+            # local development where auth is intentionally open.
+            if not AUTH.dev_open:
+                raise HTTPException(status_code=403, detail="SCIM tenant admin required")
             from gameforge.enterprise.tenancy import bootstrap_local_tenant
 
             bootstrap_local_tenant(principal.user_id)
@@ -55,8 +69,8 @@ async def scim_webhook(
             raise
     try:
         events = processor.normalize_payload(payload)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid SCIM request") from None
     results = []
     for event in events:
         if not secret_mode and event.tenant_id:
