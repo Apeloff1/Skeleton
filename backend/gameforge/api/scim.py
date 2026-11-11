@@ -8,7 +8,7 @@ from fastapi import APIRouter, Header, HTTPException, Depends, Path, Query
 from gameforge.enterprise.scim_webhook import ScimWebhookProcessor
 from gameforge.enterprise.scim_users import ScimUserDirectory
 from gameforge.enterprise.tenancy import TENANT_REGISTRY
-from gameforge.enterprise.auth import AUTH, Principal, get_principal
+from gameforge.enterprise.auth import Principal, get_principal
 
 router = APIRouter(prefix="/scim", tags=["scim"])
 processor = ScimWebhookProcessor()
