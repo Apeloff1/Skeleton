@@ -10,9 +10,10 @@ import importlib.util
 
 def test_enterprise_request():
     gw = get_gateway()
-    out = gw.request("enterprise test", "valid_cas_string_32chars_long_enough")
-    assert out["status"] == "ok"
-    assert out["health"]["healthy"] is True
+    # The legacy bridge has no verified model or tokenizer. Do not fabricate
+    # a successful inference response or a healthy runtime in this test.
+    with pytest.raises(RuntimeError, match="LOCAL_INFERENCE_NOT_BOUND"):
+        gw.request("enterprise test", "valid_cas_string_32chars_long_enough")
 
 def test_enterprise_seam_inventory():
     """Do not report healthy by inventing or silently lowering seam requirements."""
