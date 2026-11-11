@@ -133,6 +133,47 @@ class QualificationTests(unittest.TestCase):
                 publish_private_report(self.out, 'scalar.json', payload)
         self.assertEqual(list(self.out.iterdir()), [])
 
+    def test_report_large_string_preflight_never_invokes_json_encoder(self):
+        payload = {'text': 'x' * (report_paths._MAX_REPORT_BYTES * 128)}
+        with mock.patch.object(
+            report_paths.json.JSONEncoder, 'iterencode',
+            side_effect=AssertionError('unbounded JSON chunk allocated'),
+        ):
+            with self.assertRaisesRegex(QualificationError, 'oversized'):
+                publish_private_report(self.out, 'large-string.json', payload)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_large_container_preflight_never_invokes_json_encoder(self):
+        payload = {'entries': [None] * (report_paths._MAX_REPORT_BYTES + 1)}
+        with mock.patch.object(
+            report_paths.json.JSONEncoder, 'iterencode',
+            side_effect=AssertionError('unbounded JSON container encoded'),
+        ):
+            with self.assertRaisesRegex(QualificationError, 'oversized'):
+                publish_private_report(self.out, 'large-list.json', payload)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_huge_integer_preflight_never_invokes_json_encoder(self):
+        payload = {'counter': 1 << (report_paths._MAX_REPORT_BYTES * 5)}
+        with mock.patch.object(
+            report_paths.json.JSONEncoder, 'iterencode',
+            side_effect=AssertionError('unbounded integer encoded'),
+        ):
+            with self.assertRaisesRegex(QualificationError, 'oversized'):
+                publish_private_report(self.out, 'huge-int.json', payload)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_cyclic_preflight_rejects_without_json_recursion(self):
+        payload = {}
+        payload['cycle'] = payload
+        with mock.patch.object(
+            report_paths.json.JSONEncoder, 'iterencode',
+            side_effect=AssertionError('recursive JSON encoder entered'),
+        ):
+            with self.assertRaisesRegex(QualificationError, 'invalid qualification report payload'):
+                publish_private_report(self.out, 'cycle.json', payload)
+        self.assertEqual(list(self.out.iterdir()), [])
+
     def test_report_byte_budget_rejected_before_publication(self):
         with self.assertRaisesRegex(QualificationError, 'oversized'):
             publish_private_report(self.out, 'oversized.json',

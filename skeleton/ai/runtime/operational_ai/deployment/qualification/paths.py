@@ -43,12 +43,55 @@ def _open_private_report_root(root: Path) -> int:
         raise
 
 
+
+def _preflight_report_payload(payload: dict) -> None:
+    """Bound JSON input *before* the encoder creates an oversized string chunk.
+
+    JSONEncoder.iterencode may materialize an entire large string or integer
+    before yielding its first chunk. A byte check on yielded chunks alone
+    cannot bound that intermediate allocation. Count conservative lower bounds
+    on canonical JSON size while walking only builtin container types, with a
+    fixed depth limit and a node budget tied to the receipt byte cap.
+    """
+    remaining = _MAX_REPORT_BYTES
+    pending: list[tuple[object, int]] = [(payload, 0)]
+    while pending:
+        item, depth = pending.pop()
+        if depth > 64:
+            raise QualificationError('invalid qualification report payload')
+        kind = type(item)
+        if kind is str:
+            remaining -= len(item)
+        elif kind is int:
+            # Hexadecimal digits are a lower bound on decimal digit count.
+            # bit_length avoids decimal conversion of enormous integers.
+            remaining -= max(1, (item.bit_length() + 3) // 4)
+        elif kind in (dict, list, tuple):
+            remaining -= 1
+            if len(item) > remaining:
+                raise QualificationError('qualification receipt oversized')
+            if kind is dict:
+                for key, value in item.items():
+                    pending.append((key, depth + 1))
+                    pending.append((value, depth + 1))
+            else:
+                for child in item:
+                    pending.append((child, depth + 1))
+        elif kind in (bool, float) or item is None:
+            remaining -= 1
+        else:
+            raise QualificationError('invalid qualification report payload')
+        if remaining < 0:
+            raise QualificationError('qualification receipt oversized')
+
+
 def publish_private_report(root: Path, filename: str, payload: dict) -> None:
     """Write a canonical report exclusively; no overwrite, links or partial names."""
     if type(filename) is not str or _REPORT_NAME.fullmatch(filename) is None:
         raise QualificationError('invalid qualification report name')
     if type(payload) is not dict:
         raise QualificationError('invalid qualification report payload')
+    _preflight_report_payload(payload)
     # Stream the same canonical JSON envelope as the legacy encoder, but stop
     # before allocating an unbounded serialized report. ensure_ascii guarantees
     # each chunk's character count is its UTF-8 byte count.
