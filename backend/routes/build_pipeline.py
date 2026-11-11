@@ -247,9 +247,12 @@ def _admit_http_tool(tool: str) -> None:
     Depends(auth.require_authenticated_identity),
     Depends(auth.require_role("editor")),
 ])
-async def tools_invoke(req: ToolInvokeReq):
+async def tools_invoke(req: ToolInvokeReq, user=Depends(auth.get_current_user)):
+    identity = _private_build_identity(user, mutate=True)
     _admit_http_tool(req.tool)
-    return await tool_registry.invoke(req.tool, req.params)
+    return await tool_registry.invoke(
+        req.tool, req.params, tenant_id=identity["tenant_id"]
+    )
 
 
 class ToolMultiReq(BaseModel):
@@ -260,21 +263,26 @@ class ToolMultiReq(BaseModel):
     Depends(auth.require_authenticated_identity),
     Depends(auth.require_role("editor")),
 ])
-async def tools_invoke_many(req: ToolMultiReq):
+async def tools_invoke_many(req: ToolMultiReq, user=Depends(auth.get_current_user)):
+    identity = _private_build_identity(user, mutate=True)
     for call in req.calls:
         _admit_http_tool(call.tool)
-    payload = [{"tool": c.tool, "params": c.params} for c in req.calls]
+    payload = [
+        {"tool": call.tool, "params": call.params, "tenant_id": identity["tenant_id"]}
+        for call in req.calls
+    ]
     return {"results": await tool_registry.invoke_many(payload)}
 
 
 @router.get("/tools/describe", dependencies=[Depends(auth.require_authenticated_identity)])
 async def tools_describe():
     described = tool_registry.describe()
-    # Do not advertise internal-only adapters to public HTTP clients.
-    if isinstance(described, dict):
-        return {key: value for key, value in described.items()
-                if key not in _DENIED_PUBLIC_TOOLS}
-    return described
+    # Filter the tool catalog, not the top-level descriptive metadata.
+    available = [
+        item for item in described.get("tools", [])
+        if item.get("name") not in _DENIED_PUBLIC_TOOLS
+    ]
+    return {**described, "tools": available, "count": len(available)}
 
 
 # ───────────────────────────── INTERPRETER ─────────────────────────────
