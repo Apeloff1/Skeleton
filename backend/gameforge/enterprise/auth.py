@@ -26,7 +26,7 @@ class AuthService:
         }
         self.dev_open = (
             not self.production
-            and os.getenv("GAMEFORGE_DEV_OPEN", "1") == "1"
+            and os.getenv("GAMEFORGE_DEV_OPEN", "0") == "1"
         )
         configured_token = os.getenv("GAMEFORGE_API_TOKEN", "")
         # The historical "dev" fallback is not an authentication secret.
