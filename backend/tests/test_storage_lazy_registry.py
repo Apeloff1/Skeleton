@@ -112,6 +112,11 @@ def test_flagged_wrapper_uses_only_reviewed_seed_loaders(monkeypatch):
     from core import unbulk
 
     known = next(name for name in lazy_registry._LOADERS if name.startswith("seeds."))
+
+    class HostilePath(str):
+        def replace(self, *_args, **_kwargs):
+            raise AssertionError("untrusted inventory path method executed")
+
     monkeypatch.setattr(lazy_registry, "_noncore_proxies", {})
 
     def inventory(top=25):
@@ -119,6 +124,8 @@ def test_flagged_wrapper_uses_only_reviewed_seed_loaders(monkeypatch):
         return {"biggest": [
             {"module": "seeds/deep/unregistered.py", "lazy_eligible": True},
             {"module": "routes/foreign.py", "lazy_eligible": True},
+            {"module": HostilePath("seeds/hostile.py"), "lazy_eligible": True},
+            {"module": object(), "lazy_eligible": True},
             {"module": known.replace(".", "/") + ".py", "lazy_eligible": True},
             {"module": "seeds/not_flagged.py", "lazy_eligible": False},
         ]}
@@ -153,3 +160,19 @@ def test_storage_wrap_survives_unregistered_nested_seed_inventory(storage_client
     assert payload["wrapped_noncore"] > 0
     assert "seeds.deep.unregistered" not in lazy_registry._noncore_proxies
     assert {name for name in sys.modules if name.startswith("seeds.")} == before
+
+
+def test_lazy_import_rejects_str_subclass_without_hashing():
+    """Reject hostile names before invoking dictionary hash/equality hooks."""
+
+    class HostileModuleName(str):
+        def __hash__(self):
+            raise AssertionError("untrusted name hashed")
+
+        def __eq__(self, other):
+            raise AssertionError("untrusted name compared")
+
+    before = set(sys.modules)
+    with pytest.raises(ValueError, match="not registered"):
+        lazy_registry.lazy_import(HostileModuleName("core.public_exception_route"))
+    assert set(sys.modules) == before

@@ -420,7 +420,8 @@ class _LazyModule:
 
 def lazy_import(module_name: str):
     """Defer one repository-owned literal loader without changing sys.modules."""
-    if not isinstance(module_name, str) or module_name not in _LOADERS:
+    # A str subclass can execute hostile __hash__/__eq__ during dict lookup.
+    if type(module_name) is not str or module_name not in _LOADERS:
         raise ValueError("module is not registered for deferred loading")
     return _LazyModule(module_name, _LOADERS[module_name])
 
@@ -508,7 +509,10 @@ def wrap_flagged() -> dict:
     for m in inv["biggest"]:
         if not m.get("lazy_eligible"):
             continue
-        mod = m["module"].replace("/", ".").removesuffix(".py")  # seeds/x.py → seeds.x
+        source_path = m["module"]
+        if type(source_path) is not str:
+            continue
+        mod = source_path.replace("/", ".").removesuffix(".py")  # seeds/x.py → seeds.x
         # The inventory recurses into nested seed packages, while _LOADERS is
         # a reviewed, literal list of importable modules. Never attempt a
         # dynamic import or fail the whole storage endpoint for an unlisted

@@ -20,6 +20,8 @@ on:
       - "pyproject.toml"
       - "requirements.txt"
       - "tests/e2e/**"
+      - "scripts/ci_playwright_install.sh"
+      - "tests/test_ci_playwright_install.py"
       - ".github/workflows/app-foundation-e2e.yml"
   push:
     branches: [main]
@@ -33,6 +35,8 @@ on:
       - "pyproject.toml"
       - "requirements.txt"
       - "tests/e2e/**"
+      - "scripts/ci_playwright_install.sh"
+      - "tests/test_ci_playwright_install.py"
       - ".github/workflows/app-foundation-e2e.yml"
   workflow_dispatch:
 
@@ -188,8 +192,9 @@ jobs:
         working-directory: tests/e2e
         run: |
           set -euo pipefail
-          npm install --no-save --no-package-lock --no-audit --no-fund --ignore-scripts "@playwright/test@${PLAYWRIGHT_VERSION}"
-          npx --no-install playwright install --with-deps chromium
+          # Keep the pinned browser and system dependency gate mandatory;
+          # bounded retries cover intermittent Ubuntu APT mirror DNS outages.
+          bash ../../scripts/ci_playwright_install.sh
 
       - name: Playwright browser cases
         timeout-minutes: 15
@@ -227,6 +232,23 @@ jobs:
       - name: Tear down stack
         if: always()
         run: docker compose -f docker-compose.yml down -v --remove-orphans || true
+
+  playwright-install-contract:
+    name: Playwright install retry contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout immutable source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Test bounded install and fail-closed retry contract
+        run: python -m unittest discover -s tests -p test_ci_playwright_install.py -q
 
   apple-metal-multisync:
     name: Apple M1 Metal Multi-Sync Qualification
