@@ -63,8 +63,17 @@ def test_legacy_routes_use_fail_closed_error_boundary():
     for filename in (
         "nexus.py", "swarm_planner.py", "swarm_cold_legion.py",
         "storage.py", "text_gamefile.py", "sota_2026.py",
-        "gameforge_build.py", "build_pipeline.py",
+        "build_pipeline.py",
     ):
         source = (backend / "routes" / filename).read_text(encoding="utf-8")
         assert "PublicExceptionRoute" in source, filename
         assert "route_class=PublicExceptionRoute" in source, filename
+
+
+def test_private_project_routes_retain_project_admission_and_error_custody():
+    backend = Path(__file__).resolve().parents[1]
+    source = (backend / "routes" / "playable_access.py").read_text(encoding="utf-8")
+    assert "class _GuardedPrivateProjectRoute(PublicExceptionRouteMixin, _PrivateProjectRoute)" in source
+    for filename in ("gameforge_build.py", "ops.py", "snowball.py"):
+        source = (backend / "routes" / filename).read_text(encoding="utf-8")
+        assert "route_class=_GuardedPrivateProjectRoute" in source, filename
