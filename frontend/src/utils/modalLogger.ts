@@ -82,9 +82,10 @@ async function _drainQueue(): Promise<TelemetryEvent[]> {
 export async function flushTelemetry(): Promise<void> {
   if (_flushInflight) return;
   _flushInflight = true;
+  let batch: TelemetryEvent[] = [];
   try {
     const queued = await _drainQueue();
-    const batch = _buffer.splice(0, _buffer.length).concat(queued);
+    batch = _buffer.splice(0, _buffer.length).concat(queued);
     if (!batch.length) return;
     const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
       method: 'POST',
