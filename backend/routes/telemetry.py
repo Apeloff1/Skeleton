@@ -14,9 +14,10 @@ import asyncio
 import os
 import time
 from collections import deque
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.routing import APIRoute
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 
@@ -25,7 +26,47 @@ from core.http_errors import redact_client_payload, redact_client_text
 from middleware.security import AuditMiddleware, RateLimitMiddleware
 from routes.gameforge_auth import require_role
 
-router = APIRouter()
+_MAX_TELEMETRY_BODY_BYTES = 512 * 1024
+_MAX_TELEMETRY_BATCH = 100
+
+
+class _BoundedTelemetryRoute(APIRoute):
+    """Reject oversized request bodies before FastAPI JSON parsing.
+
+    A dependency runs too late: FastAPI has already fully materialized and
+    validated the JSON before resolving dependencies. This route boundary
+    enforces the byte budget at the ASGI receive stream instead.
+    """
+
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def guarded(request: Request):
+            if request.method == "POST":
+                header = request.headers.get("content-length")
+                if header is not None:
+                    try:
+                        length = int(header)
+                    except ValueError:
+                        raise HTTPException(400, "Invalid content length") from None
+                    if length < 0:
+                        raise HTTPException(400, "Invalid content length")
+                    if length > _MAX_TELEMETRY_BODY_BYTES:
+                        raise HTTPException(413, "Telemetry payload exceeds byte limit")
+                collected = bytearray()
+                async for chunk in request.stream():
+                    if len(collected) + len(chunk) > _MAX_TELEMETRY_BODY_BYTES:
+                        raise HTTPException(413, "Telemetry payload exceeds byte limit")
+                    collected.extend(chunk)
+                # Starlette's cached request-body path permits the normal
+                # FastAPI parser to read the already-admitted bytes.
+                request._body = bytes(collected)
+            return await handler(request)
+
+        return guarded
+
+
+router = APIRouter(route_class=_BoundedTelemetryRoute)
 
 _DB_NAME = os.environ.get("DB_NAME", "test_database")
 _client: AsyncIOMotorClient | None = None
@@ -57,33 +98,27 @@ def _get_ring_lock() -> asyncio.Lock:
 # Models
 # ─────────────────────────────────────────────────────────────────
 class TelemetryEvent(BaseModel):
-    modal_id: str = Field(
-        ...,
-        description="canonical modal/screen id, e.g. 'GalaxyStudioFactoryModal'",
-    )
-    session_id: str = Field(
-        ...,
-        description="opaque per-app-launch session id from client",
-    )
-    event: str = Field(..., description="open|close|action|error|nav|metric")
-    severity: str = "info"
+    modal_id: str = Field(min_length=1, max_length=80)
+    session_id: str = Field(min_length=1, max_length=80)
+    event: str = Field(min_length=1, max_length=64)
+    severity: Literal["info", "warn", "error", "fatal"] = "info"
     detail: Any | None = None
-    ts_client: float | None = None
-    duration_ms: float | None = None
+    ts_client: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    duration_ms: float | None = Field(default=None, ge=0, le=86_400_000, allow_inf_nan=False)
 
 
 class TelemetryBatch(BaseModel):
-    events: list[TelemetryEvent]
+    events: list[TelemetryEvent] = Field(min_length=1, max_length=_MAX_TELEMETRY_BATCH)
 
 
 class CrashReport(BaseModel):
-    source: str = "ErrorBoundary"
-    component: str | None = None
-    message: str
-    stack: str | None = None
+    source: str = Field(default="ErrorBoundary", max_length=80)
+    component: str | None = Field(default=None, max_length=120)
+    message: str = Field(max_length=2000)
+    stack: str | None = Field(default=None, max_length=16_384)
     info: Any | None = None
-    session_id: str | None = None
-    app_version: str | None = None
+    session_id: str | None = Field(default=None, max_length=80)
+    app_version: str | None = Field(default=None, max_length=80)
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -139,7 +174,7 @@ async def post_event(event: TelemetryEvent):
     dependencies=[Depends(require_role("viewer"))],
 )
 async def post_batch(batch: TelemetryBatch):
-    rows = [_norm(event) for event in batch.events[:500]]
+    rows = [_norm(event) for event in batch.events]
     async with _get_ring_lock():
         for row in rows:
             _EVENT_RING.append(row)

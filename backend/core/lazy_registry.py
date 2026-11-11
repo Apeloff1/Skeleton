@@ -204,6 +204,7 @@ _LOADERS = {
     'core.policy_repository': lambda: importlib.import_module('core.policy_repository'),
     'core.portable_claim_proof': lambda: importlib.import_module('core.portable_claim_proof'),
     'core.principal_seal': lambda: importlib.import_module('core.principal_seal'),
+    'core.public_exception_route': lambda: importlib.import_module('core.public_exception_route'),
     'core.product_control_plane': lambda: importlib.import_module('core.product_control_plane'),
     'core.product_control_runtime': lambda: importlib.import_module('core.product_control_runtime'),
     'core.product_default_executors': lambda: importlib.import_module('core.product_default_executors'),

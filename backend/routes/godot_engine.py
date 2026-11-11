@@ -56,7 +56,7 @@ def _safe_segment(value: str, *, what: str = "path") -> str:
         or "\\" in s
         or s.startswith(("~", "/", "\\"))
     ):
-        raise ValueError(f"invalid {what}: {value!r}")
+        raise ValueError("invalid Godot path segment")
     return s
 
 
@@ -65,7 +65,7 @@ def _resolve_under(root: Path, *parts: str) -> Path:
     root_r = root.resolve()
     candidate = root_r.joinpath(*parts).resolve()
     if candidate != root_r and root_r not in candidate.parents:
-        raise ValueError(f"path escapes sandbox: {parts!r}")
+        raise ValueError("path escapes Godot sandbox")
     return candidate
 
 
@@ -76,14 +76,14 @@ def _project_dir_for(slug: str) -> Path:
     inside the projects root. No traversal through to the pipeline.
     """
     if not _SLUG_RE.match(slug):
-        raise HTTPException(422, f"invalid project slug: {slug!r}")
+        raise HTTPException(422, "Invalid project slug")
     try:
         safe = _safe_segment(slug, what="project slug")
         project_dir = _resolve_under(_PROJECTS_ROOT, safe)
-    except ValueError as e:
-        raise HTTPException(422, str(e)) from e
+    except ValueError:
+        raise HTTPException(422, "Invalid Godot project or path") from None
     if not project_dir.is_dir():
-        raise HTTPException(404, f"no project named {slug!r}")
+        raise HTTPException(404, "Project not found")
     return project_dir
 
 
@@ -104,9 +104,7 @@ def _resolve_within(base: Path, relative: str, what: str) -> Path:
         safe_parts = [_safe_segment(part, what=what) for part in parts]
         return _resolve_under(base, *safe_parts)
     except ValueError as e:
-        raise HTTPException(
-            422, f"{what} escapes the project sandbox: {relative!r}"
-        ) from e
+        raise HTTPException(422, "Path escapes the Godot sandbox") from None
 
 
 # ── Models ────────────────────────────────────────────────────────────────
@@ -133,6 +131,25 @@ class JobSubmitRequest(BaseModel):
     timeout: int = Field(600, ge=10, le=3600)
 
 
+def _public_job(job) -> dict:
+    """Expose bounded status data, never arbitrary process stdout/stderr.
+
+    Godot's exception stack traces, console output and subprocess diagnostics
+    may embed credentials, private project paths or user-authored source.
+    The detailed diagnostic log stays inside the engine's governed process.
+    """
+    data = job.to_dict()
+    fields = ("id", "kind", "status", "created_at")
+    result = {key: data[key] for key in fields if key in data}
+    metadata = data.get("result")
+    if isinstance(metadata, dict) and type(metadata.get("returncode")) is int:
+        result["result"] = {"returncode": metadata["returncode"]}
+    else:
+        result["result"] = None
+    result["error"] = "godot_job_failed" if data.get("error") else None
+    return result
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────
 
 @router.get("/status")
@@ -145,7 +162,7 @@ async def godot_status() -> dict:
         status["version"] = (await get_binary().probe()).version
     except Exception:
         status["probe_error"] = "godot_probe_failed"
-    status["projects_root"] = str(_PROJECTS_ROOT)
+    status["projects_root"] = "[private]"
     status["pipeline"] = get_pipeline().stats()
     return status
 
@@ -175,10 +192,10 @@ async def create_project(req: ProjectCreateRequest) -> dict:
     except ProjectExistsError as e:
         raise HTTPException(
             409,
-            f"project {e.slug!r} already exists — set overwrite=true to replace it",
-        ) from e
-    except ValueError as e:
-        raise HTTPException(422, str(e)) from e
+            "Project already exists — set overwrite=true to replace it",
+        ) from None
+    except ValueError:
+        raise HTTPException(422, "Invalid Godot project parameters") from None
     return result.to_dict()
 
 
@@ -203,19 +220,19 @@ async def submit_job(req: JobSubmitRequest) -> dict:
         job = await get_pipeline().submit(
             req.kind, project_dir, timeout=req.timeout, **kwargs
         )
-    except (ValueError, FileNotFoundError) as e:
-        raise HTTPException(422, str(e)) from e
-    return job.to_dict()
+    except (ValueError, FileNotFoundError):
+        raise HTTPException(422, "Invalid Godot job parameters") from None
+    return _public_job(job)
 
 
 @router.get("/jobs")
 async def list_jobs(limit: int = 50) -> list[dict]:
-    return [j.to_dict() for j in get_pipeline().list(limit)]
+    return [_public_job(j) for j in get_pipeline().list(max(1, min(limit, 50)))]
 
 
 @router.get("/jobs/{job_id}")
 async def get_job(job_id: str) -> dict:
     job = get_pipeline().get(job_id)
     if job is None:
-        raise HTTPException(404, f"no job {job_id!r}")
-    return job.to_dict()
+        raise HTTPException(404, "Godot job not found")
+    return _public_job(job)
