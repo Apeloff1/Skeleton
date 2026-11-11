@@ -12,6 +12,7 @@ on:
       - "skeleton/testing/test_app_offline_archive_schema_parity.py"
       - "skeleton/testing/test_delivery_packaging.py"
       - "skeleton/testing/test_harbor_crafting_journal_transfer.py"
+      - "skeleton/testing/test_ecs_ai.py"
       - ".github/workflows/harbor-studio-source-qualification.yml"
 
 permissions:
@@ -47,7 +48,8 @@ jobs:
             skeleton/testing/test_harbor_crafting_patrol_guidance.py \
             skeleton/testing/test_app_offline_archive_schema_parity.py \
             skeleton/testing/test_delivery_packaging.py \
-            skeleton/testing/test_harbor_crafting_journal_transfer.py
+            skeleton/testing/test_harbor_crafting_journal_transfer.py \
+            skeleton/testing/test_ecs_ai.py
       - name: Replay report-only CLI and Studio archive custody regressions
         env:
           PYTHONPATH: "."
@@ -60,5 +62,6 @@ jobs:
           skeleton/testing/test_app_offline_archive_schema_parity.py
           skeleton/testing/test_delivery_packaging.py
           skeleton/testing/test_harbor_crafting_journal_transfer.py
+          skeleton/testing/test_ecs_ai.py
       - name: Verify canonical AI-tree parity
         run: python scripts/check_ai_file_tree.py
