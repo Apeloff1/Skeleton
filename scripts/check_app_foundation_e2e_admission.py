@@ -55,6 +55,66 @@ def validate_text(workflow: str, suite: str) -> list[str]:
             or 'test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"' not in identity.get("run", "")):
         issues.append("no fail-closed exact-head checkout proof")
 
+    # The live suite is authorized only after a unique, masked, ephemeral
+    # operator has been minted and successfully provisioned.
+    credentials = step("Generate ephemeral stack credentials")
+    credentials_run = credentials.get("run", "")
+    required_credentials = (
+        "set -euo pipefail",
+        "gen() { openssl rand -hex 32; }",
+        'operator_email="qa-e2e-operator-',
+        'generated_value="$(gen)"',
+        'echo "::add-mask::${generated_value}"',
+        'GAMEFORGE_SEED_ADMIN_EMAIL=${operator_email}',
+        r'printf "GAMEFORGE_SEED_ADMIN_PASSWORD=%s\n" "$generated_value"',
+        '>> "$GITHUB_ENV"',
+    )
+    if (type(credentials_run) is not str
+            or any(token not in credentials_run for token in required_credentials)
+            or str(credentials.get("continue-on-error", "false")).lower() == "true"):
+        issues.append("ephemeral CI operator must be unique, generated and masked")
+
+    proof = step("Test isolated operator provisioning contracts")
+    proof_run = proof.get("run")
+    if (type(proof_run) is not str or proof_run.strip()
+            != "python -m unittest discover -s tests -p test_ci_e2e_operator_provision.py -q"
+            or str(proof.get("continue-on-error", "false")).lower() == "true"):
+        issues.append("operator provisioning security regressions must pass")
+
+    admission = step("Provision authenticated ephemeral E2E operator")
+    admission_run = admission.get("run")
+    if (type(admission_run) is not str or admission_run.strip()
+            != "python scripts/provision_e2e_operator.py"
+            or str(admission.get("continue-on-error", "false")).lower() == "true"):
+        issues.append("live operator must be authenticated by strict provisioning")
+
+    cleanup = step("Remove ephemeral operator token")
+    cleanup_run = cleanup.get("run", "")
+    if (cleanup.get("if") != "always()" or type(cleanup_run) is not str
+            or any(part not in cleanup_run for part in (
+                "set -euo pipefail",
+                'case "$SKELETON_E2E_OPERATOR_TOKEN_FILE" in',
+                '"$RUNNER_TEMP"/skeleton-ci-operator-*.token)',
+                'rm -f -- "$SKELETON_E2E_OPERATOR_TOKEN_FILE"',
+                "Invalid operator token cleanup path",
+            ))
+            or "|| true" in cleanup_run
+            or str(cleanup.get("continue-on-error", "false")).lower() == "true"):
+        issues.append("ephemeral operator token must be removed on every exit")
+
+    names = [item.get("name") for item in steps]
+    required_order = (
+        "Generate ephemeral stack credentials",
+        "Test isolated operator provisioning contracts",
+        "Provision authenticated ephemeral E2E operator",
+        "Tier 2 live app-foundation flow (#4098)",
+        "Remove ephemeral operator token",
+    )
+    positions = [names.index(name) if names.count(name) == 1 else -1
+                 for name in required_order]
+    if -1 in positions or positions != sorted(positions):
+        issues.append("ephemeral operator bootstrap and cleanup order is invalid")
+
     live = step("Tier 2 live app-foundation flow (#4098)")
     env = live.get("env")
     if type(env) is not dict or env.get("SKELETON_E2E_REQUIRE_FULL_LIVE") != "1":
