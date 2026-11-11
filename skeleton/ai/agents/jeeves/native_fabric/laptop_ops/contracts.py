@@ -33,7 +33,59 @@ def integer(value: object, *, ceiling: int = 10**13) -> int:
     return value
 
 
+def _preflight_canonical(value: object, maximum: int) -> None:
+    """Bound traversal and text before the JSON encoder allocates output.
+
+    A post-encoding byte limit alone is insufficient: a direct caller can
+    supply a huge string, a deep/cyclic container or a giant integer and force
+    substantial allocation before the final length check. The budget counts
+    a lower bound on encoded string bytes; the final check remains exact.
+    """
+    if type(maximum) is not int or maximum < 1:
+        raise LaptopGateHold("invalid finite canonical ceiling")
+
+    pending: list[tuple[object, int]] = [(value, 0)]
+    remaining = maximum
+    visited = 0
+    while pending:
+        item, depth = pending.pop()
+        visited += 1
+        if visited > maximum or depth > 64:
+            raise LaptopGateHold("evidence exceeds finite structure ceiling")
+
+        kind = type(item)
+        if kind is str:
+            # ensure_ascii=True cannot encode a code point in fewer bytes
+            # than its one-code-point contribution to len(str).
+            remaining -= len(item)
+        elif kind is dict:
+            if len(item) > maximum:
+                raise LaptopGateHold("evidence exceeds finite structure ceiling")
+            for key, child in item.items():
+                # Do not invoke arbitrary key conversion or comparison.
+                if type(key) is not str:
+                    raise LaptopGateHold("invalid canonical evidence")
+                remaining -= len(key)
+                pending.append((child, depth + 1))
+        elif kind is list or kind is tuple:
+            if len(item) > maximum:
+                raise LaptopGateHold("evidence exceeds finite structure ceiling")
+            pending.extend((child, depth + 1) for child in item)
+        elif kind is int:
+            # Prevent decimal conversion of unbounded Python integers.
+            if item.bit_length() > maximum * 4:
+                raise LaptopGateHold("evidence exceeds finite size ceiling")
+        elif kind is bool or kind is float or item is None:
+            pass  # The JSON encoder still rejects NaN and infinity.
+        else:
+            raise LaptopGateHold("invalid canonical evidence")
+
+        if remaining < 0:
+            raise LaptopGateHold("evidence exceeds finite size ceiling")
+
+
 def canonical(value: object, *, maximum: int = 65536) -> bytes:
+    _preflight_canonical(value, maximum)
     try:
         data = json.dumps(value, sort_keys=True, separators=(",", ":"),
                           ensure_ascii=True, allow_nan=False).encode("ascii")
