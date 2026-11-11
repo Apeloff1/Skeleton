@@ -82,15 +82,42 @@ def construct(
         value = first.get(key)
         if type(value) is not int or not 0 <= value <= ceiling:
             raise QualificationError("invalid numeric qualification evidence")
+    # Replayed events are reconstructed from the committed receipt. Require
+    # their durable digests and generation accounting to match the first
+    # invocation, not just the request/output pair. Validate exact builtin
+    # types before equality to avoid attacker-controlled comparison hooks.
     try:
         for key in ("request_sha256", "output_sha256", "context_sha256"):
-            hexdigest(first.get(key), key)
+            if type(first.get(key)) is not str or type(replayed.get(key)) is not str:
+                raise QualificationError("invalid qualification digest")
+            hexdigest(first[key], key)
+            hexdigest(replayed[key], key)
     except SpineError:
         raise QualificationError("invalid qualification digest") from None
-    if first.get("output_sha256") != replayed.get("output_sha256"):
+    if first["output_sha256"] != replayed["output_sha256"]:
         raise QualificationError("inference output changed across restart")
-    if first.get("request_sha256") != replayed.get("request_sha256"):
+    if first["request_sha256"] != replayed["request_sha256"]:
         raise QualificationError("request identity changed across restart")
+    if first["context_sha256"] != replayed["context_sha256"]:
+        raise QualificationError("context projection changed across restart")
+    for key in ("generated_tokens", "prompt_tokens"):
+        value = replayed.get(key)
+        if type(value) is not int or value != first[key]:
+            raise QualificationError("generation accounting changed across restart")
+    # The production spine persists these optional provenance fields in the
+    # durable event. Fixture-only minimal receipts may omit them, but if either
+    # side supplies one, both sides must agree with the known model identity.
+    for key, expected in (("model_sha256", model), ("tokenizer_sha256", tokenizer)):
+        if key in first or key in replayed:
+            if (type(first.get(key)) is not str
+                    or type(replayed.get(key)) is not str
+                    or first[key] != expected or replayed[key] != expected):
+                raise QualificationError("model provenance changed across restart")
+    if "finish_reason" in first or "finish_reason" in replayed:
+        if (type(first.get("finish_reason")) is not str
+                or type(replayed.get("finish_reason")) is not str
+                or first["finish_reason"] != replayed["finish_reason"]):
+            raise QualificationError("finish reason changed across restart")
 
     assistant_bytes = _validated_transcript(history)
     if hashlib.sha256(assistant_bytes).hexdigest() != first["output_sha256"]:

@@ -152,3 +152,70 @@ def test_subclassed_receipts_cannot_override_lookup_before_preflight():
                 forged_first, forged_replay, history, diagnostics,
                 exact_native=False,
             )
+
+
+@pytest.mark.parametrize("field,invalid", [
+    ("context_sha256", "f" * 64),
+    ("generated_tokens", 3),
+    ("prompt_tokens", 5),
+    ("generated_tokens", True),
+    ("prompt_tokens", 4.0),
+    ("request_sha256", object()),
+    ("output_sha256", 17),
+    ("context_sha256", None),
+])
+def test_replay_durable_evidence_mismatch_rejected_before_canonical(field, invalid):
+    first, replayed, history, doctor = _inputs()
+    replayed[field] = invalid
+    with mock.patch.object(
+        proof, "canonical", side_effect=AssertionError("forged replay serialized"),
+    ):
+        with pytest.raises(QualificationError):
+            proof.construct(
+                "c" * 64, "d" * 64, "session", "request",
+                first, replayed, history, doctor, exact_native=False,
+            )
+
+
+def test_replay_receipt_rejects_provenance_and_finish_reason_forgery():
+    first, replayed, history, doctor = _inputs()
+    first.update(model_sha256="c" * 64, tokenizer_sha256="d" * 64,
+                 finish_reason="stop")
+    replayed.update(model_sha256="c" * 64, tokenizer_sha256="d" * 64,
+                    finish_reason="stop")
+    valid = proof.construct(
+        "c" * 64, "d" * 64, "session", "request",
+        first, replayed, history, doctor, exact_native=False,
+    )
+    assert verify(valid, require_real=False)["real_model_executed"] is False
+    for key, invalid in (
+        ("model_sha256", "e" * 64),
+        ("tokenizer_sha256", "f" * 64),
+        ("finish_reason", "length"),
+    ):
+        forged = dict(replayed, **{key: invalid})
+        with mock.patch.object(
+            proof, "canonical", side_effect=AssertionError("forged provenance serialized"),
+        ):
+            with pytest.raises(QualificationError, match="changed across restart"):
+                proof.construct(
+                    "c" * 64, "d" * 64, "session", "request",
+                    first, forged, history, doctor, exact_native=False,
+                )
+
+
+def test_replay_digest_subclass_cannot_override_equality():
+    class EqualitySpoof(str):
+        def __eq__(self, other):
+            raise AssertionError("untrusted equality invoked")
+
+    first, replayed, history, doctor = _inputs()
+    replayed["request_sha256"] = EqualitySpoof(first["request_sha256"])
+    with mock.patch.object(
+        proof, "canonical", side_effect=AssertionError("forged digest serialized"),
+    ):
+        with pytest.raises(QualificationError, match="invalid qualification digest"):
+            proof.construct(
+                "c" * 64, "d" * 64, "session", "request",
+                first, replayed, history, doctor, exact_native=False,
+            )
