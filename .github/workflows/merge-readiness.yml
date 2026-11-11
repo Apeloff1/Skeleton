@@ -266,8 +266,8 @@ jobs:
         run: node --test frontend/scripts/test-telemetry-privacy.mjs
       - name: Verify bounded SSRF gateway DNS and resource custody
         working-directory: backend
-        env:
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        # These suites include async tests; allow the installed pytest-asyncio
+        # plugin to load rather than disabling all third-party plugins.
         run: >-
           python -m pytest -q --noconftest
           tests/test_room_api_gateway_security.py
