@@ -51,7 +51,7 @@ def test_vault_reads_have_strict_limit_contract(vault, bad_limit):
 
 
 def test_vault_reads_only_verified_regular_shard(vault):
-    payload = b'{"hello":"world"}\\n{"count":2}\\n'
+    payload = b'{"hello":"world"}\n{"count":2}\n'
     (vault / "safe.jsonl.zst").write_bytes(payload)
     assert vault_loader.query_collection("safe") == [
         {"hello": "world"}, {"count": 2},
@@ -67,26 +67,26 @@ def test_vault_reads_only_verified_regular_shard(vault):
 
 
 def test_second_legacy_collection_filename_preserves_fallback(vault):
-    (vault / "coll__history.jsonl.zst").write_bytes(b'{"ok":true}\\n')
+    (vault / "coll__history.jsonl.zst").write_bytes(b'{"ok":true}\n')
     assert vault_loader.query_collection("history") == [{"ok": True}]
 
 
 @pytest.mark.skipif(os.name != "posix", reason="requires POSIX openat custody")
 def test_symlinked_shard_and_hardlink_denied(vault, tmp_path):
     outside = tmp_path / "secret"
-    outside.write_bytes(b'{"token":"secret"}\\n')
+    outside.write_bytes(b'{"token":"secret"}\n')
     (vault / "evil.jsonl.zst").symlink_to(outside)
     os.link(outside, vault / "linked.jsonl.zst")
     assert vault_loader.list_collections() == []
     for identifier in ("evil", "linked"):
         with pytest.raises((VaultPathError, OSError)):
             vault_loader.query_collection(identifier)
-    assert outside.read_bytes() == b'{"token":"secret"}\\n'
+    assert outside.read_bytes() == b'{"token":"secret"}\n'
 
 
 @pytest.mark.skipif(os.name != "posix", reason="requires POSIX openat custody")
 def test_replaced_directory_symlink_denied(vault, tmp_path):
-    (vault / "safe.jsonl.zst").write_bytes(b'{"ok":true}\\n')
+    (vault / "safe.jsonl.zst").write_bytes(b'{"ok":true}\n')
     real = tmp_path / "real"
     vault.rename(real)
     vault.symlink_to(real, target_is_directory=True)
@@ -98,7 +98,7 @@ def test_replaced_directory_symlink_denied(vault, tmp_path):
 
 def test_compressed_size_budget_blocks_oversized_file(vault, monkeypatch):
     monkeypatch.setattr(vault_loader, "_MAX_COMPRESSED_BYTES", 12)
-    (vault / "too_big.jsonl.zst").write_bytes(b'{"text":"large"}\\n')
+    (vault / "too_big.jsonl.zst").write_bytes(b'{"text":"large"}\n')
     assert vault_loader.list_collections() == []
     with pytest.raises(VaultPathError):
         vault_loader.query_collection("too_big")
@@ -107,7 +107,7 @@ def test_compressed_size_budget_blocks_oversized_file(vault, monkeypatch):
 def test_decompression_budget_limits_stream_without_size_header(vault, monkeypatch):
     monkeypatch.setattr(vault_loader, "_MAX_EXPANDED_SCAN_BYTES", 16)
     (vault / "bomb.jsonl.zst").write_bytes(
-        b'{"data":"' + b"x" * 64 + b'"}\\n'
+        b'{"data":"' + b"x" * 64 + b'"}\n'
     )
     with pytest.raises(ValueError, match="decompression"):
         vault_loader.query_collection("bomb")
@@ -115,15 +115,15 @@ def test_decompression_budget_limits_stream_without_size_header(vault, monkeypat
 
 def test_line_budget_blocks_oversized_row(vault, monkeypatch):
     monkeypatch.setattr(vault_loader, "_MAX_LINE_BYTES", 10)
-    (vault / "long.jsonl.zst").write_bytes(b'{"count":123456}\\n')
+    (vault / "long.jsonl.zst").write_bytes(b'{"count":123456}\n')
     with pytest.raises(ValueError, match="row"):
         vault_loader.query_collection("long")
 
 
 @pytest.mark.parametrize("payload", [
-    b'["not","a","dict"]\\n',
-    b'{"duplicate":1,"duplicate":2}\\n',
-    b'{"nan":NaN}\\n',
+    b'["not","a","dict"]\n',
+    b'{"duplicate":1,"duplicate":2}\n',
+    b'{"nan":NaN}\n',
     b'{"not valid":',
 ])
 def test_invalid_jsonl_fails_closed(vault, payload):
@@ -134,7 +134,7 @@ def test_invalid_jsonl_fails_closed(vault, payload):
 
 def test_filtered_query_and_topic_remain_available(vault):
     (vault / "audio-voice.jsonl.zst").write_bytes(
-        b'{"topic":"sample"}\\n{"topic":"another"}\\n'
+        b'{"topic":"sample"}\n{"topic":"another"}\n'
     )
     assert vault_loader.query_collection("audio-voice", contains="another") == [
         {"topic": "another"},
