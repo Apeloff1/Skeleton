@@ -62,7 +62,7 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
             encoded_buffer.extend(chunk.encode('ascii'))
     except QualificationError:
         raise
-    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+    except (TypeError, ValueError, OverflowError, RecursionError):
         raise QualificationError('invalid qualification report payload') from None
     encoded_buffer.append(10)
     encoded = bytes(encoded_buffer)
