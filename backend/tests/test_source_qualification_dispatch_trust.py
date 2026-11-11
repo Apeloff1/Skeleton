@@ -169,6 +169,13 @@ def test_rejects_dispatch_regression(change, expected: str) -> None:
         ),
         (
             lambda source: source.replace(
+                "    runs-on: ubuntu-latest",
+                "    permissions:\n      contents: write\n    runs-on: ubuntu-latest",
+            ),
+            "job-level token permission overrides",
+        ),
+        (
+            lambda source: source.replace(
                 "permissions:\n", "permissions:\n  id-token: write\n"
             ),
             "no token permissions beyond",
