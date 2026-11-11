@@ -22,7 +22,10 @@ PROTECTED_WORKFLOWS = (
 )
 # A checkout can be written as either "- uses:" or "uses:" beneath "- id:".
 # Split on every step, not just named steps, so extra checkouts cannot hide.
-CHECKOUT_RE = re.compile(r"(?m)^ {6}- uses:\s*actions/checkout@|^ {8}uses:\s*actions/checkout@")
+CHECKOUT_RE = re.compile(
+    r"""(?m)^ {6}- uses:\s*['"]?actions/checkout@|^ {8}uses:\s*['"]?actions/checkout@"""
+)
+USES_RE = re.compile(r"(?m)^ {6}- uses:\s*(.*?)\s*$|^ {8}uses:\s*(.*?)\s*$")
 STEP_SPLIT_RE = re.compile(r"(?m)(?=^ {6}- )")
 PLATFORM_SHA = "${{ github.sha }}"
 MAIN_GUARD = "github.repository == 'Apeloff1/Skeleton' && github.ref == 'refs/heads/main'"
@@ -82,6 +85,11 @@ def violations_from_text(name: str, source: str) -> list[str]:
     if 'test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"' not in source:
         findings.append(f"{name}: missing exact checkout identity verification")
 
+    # YAML aliases/expressions can conceal a checkout from a literal scanner.
+    for inline, named in USES_RE.findall(source):
+        value = (inline or named).strip()
+        if value.startswith(("*", "&", "${{")):
+            findings.append(f"{name}: dynamic or aliased action references are forbidden")
     steps = STEP_SPLIT_RE.split(source)
     checkouts = [step for step in steps if CHECKOUT_RE.search(step)]
     checkout_count = sum(len(CHECKOUT_RE.findall(step)) for step in steps)
