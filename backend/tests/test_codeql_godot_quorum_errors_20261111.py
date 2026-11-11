@@ -83,24 +83,58 @@ def test_godot_public_job_never_returns_stacks_source_or_stdout():
     assert "stderr_tail" not in result
 
 
-def test_prood_invalid_quorum_returns_stable_public_status():
-    # Extract the handler without importing the PROOD runtime's DB/device
-    # dependencies. Exercise its real exception path with a failing actor.
-    source = (_ROOT / "routes" / "prood.py").read_text(encoding="utf-8")
+def _quorum_validation_contract(source: str) -> dict:
+    """Verify the real route catches only constructor validation failures.
+
+    Inspect repository source without compiling or executing a function extracted
+    from a privileged route module. This is intentionally strict: a broader
+    catch, changed constructor arguments or a nonliteral response fails closed.
+    """
     tree = ast.parse(source)
     function = next(
         stmt for stmt in tree.body
         if isinstance(stmt, ast.AsyncFunctionDef) and stmt.name == "run_quorum"
     )
-    function.decorator_list = []
-    function.args.args[0].annotation = None
+    guarded = next(stmt for stmt in function.body if isinstance(stmt, ast.Try))
+    assert len(guarded.body) == 1
+    assignment = guarded.body[0]
+    assert isinstance(assignment, ast.Assign)
+    assert len(assignment.targets) == 1
+    assert isinstance(assignment.targets[0], ast.Name)
+    assert assignment.targets[0].id == "qc"
+    constructor = assignment.value
+    assert isinstance(constructor, ast.Call)
+    assert isinstance(constructor.func, ast.Name)
+    assert constructor.func.id == "QuorumConsensus"
+    assert [(item.arg, ast.unparse(item.value)) for item in constructor.keywords] == [
+        ("n", "req.n"), ("f", "req.f")
+    ]
+    assert not constructor.args
+    assert len(guarded.handlers) == 1
+    handler = guarded.handlers[0]
+    assert isinstance(handler.type, ast.Name) and handler.type.id == "ValueError"
+    assert handler.name is None
+    assert len(handler.body) == 1 and isinstance(handler.body[0], ast.Return)
+    assert not guarded.orelse and not guarded.finalbody
+    return ast.literal_eval(handler.body[0].value)
 
-    class InvalidQuorum:
-        def __init__(self, **_kwargs):
-            raise ValueError("secret internal quorum configuration")
 
-    env = {"QuorumConsensus": InvalidQuorum}
-    exec(compile(ast.Module(body=[function], type_ignores=[]), "prood.py", "exec"), env)
-    req = type("Request", (), {"n": -2, "f": 99})()
-    result = asyncio.run(env["run_quorum"](req))
-    assert result == {"ok": False, "error": "invalid_quorum_configuration"}
+def test_prood_invalid_quorum_returns_stable_public_status():
+    source = (_ROOT / "routes" / "prood.py").read_text(encoding="utf-8")
+    assert _quorum_validation_contract(source) == {
+        "ok": False, "error": "invalid_quorum_configuration"
+    }
+
+
+@pytest.mark.parametrize("mutation", [
+    ("except ValueError:", "except Exception:"),
+    ("QuorumConsensus(n=req.n, f=req.f)", "QuorumConsensus(n=7, f=2)"),
+    ('"invalid_quorum_configuration"', '"private exception detail"'),
+])
+def test_prood_quorum_contract_rejects_broadened_or_leaking_edits(mutation):
+    source = (_ROOT / "routes" / "prood.py").read_text(encoding="utf-8")
+    old, new = mutation
+    assert old in source
+    with pytest.raises(AssertionError):
+        response = _quorum_validation_contract(source.replace(old, new, 1))
+        assert response == {"ok": False, "error": "invalid_quorum_configuration"}
