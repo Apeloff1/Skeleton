@@ -23,7 +23,10 @@ def _trusted_rust_official_url(value: object) -> bool:
     try:
         parsed = urlsplit(value)
         return (
-            parsed.scheme == "https"
+            value.startswith("https://")
+            and parsed.geturl() == value
+            and not any(ord(ch) < 32 or ord(ch) == 127 for ch in value)
+            and parsed.scheme == "https"
             and parsed.netloc in allowed
             and parsed.hostname in allowed
             and parsed.username is None
