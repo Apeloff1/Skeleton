@@ -13,6 +13,7 @@ on:
       - 'skeleton/testing/test_app_offline_archive_schema_parity.py'
       - 'skeleton/testing/test_ecs_ai.py'
       - 'skeleton/testing/test_ai_native_endurance.py'
+      - 'skeleton/ai/runtime/operational_ai/model/qualification/**'
       - 'skeleton/testing/test_jeeves_native_batch.py'
       - 'backend/core/build_vault.py'
       - 'backend/tests/test_galaxy_file_budget.py'
@@ -96,6 +97,13 @@ jobs:
           skeleton/testing/test_delivery_packaging.py::test_package_builders_bound_malicious_mapping_iteration
           skeleton/testing/test_harbor_crafting_journal_transfer.py::test_unrelated_world_is_rejected_before_play
           skeleton/testing/test_app_offline_archive_schema_parity.py::test_resealed_source_archive_cannot_bypass_studio_custody
+      - name: Compile and replay full native endurance custody regressions
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+          PYTHONPATH: '.:backend'
+        run: |
+          python -m compileall -q skeleton/ai/runtime/operational_ai/model/qualification skeleton/testing/test_ai_native_endurance.py
+          python -m pytest -q --noconftest skeleton/testing/test_ai_native_endurance.py
       - name: Compile Galaxy vault and file-budget boundaries
         run: python -m compileall -q backend/core/build_vault.py backend/tests/test_galaxy_file_budget.py
       - name: Replay full Galaxy budget and historical backend failures
