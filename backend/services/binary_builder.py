@@ -118,6 +118,8 @@ def _sanitize_path(p: str) -> str:
                 or any(ord(ch) < 32 or ord(ch) == 127 for ch in part)
                 or part.upper().split(".")[0] in _WINDOWS_SPECIAL):
             raise ValueError("artifact path contains unsafe component")
+    if normalized == "manifest.json":
+        raise ValueError("artifact manifest name is reserved")
     return "/".join(parts)
 
 
@@ -272,7 +274,6 @@ import android.app.Application;
 import android.util.Log;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 
 /**
@@ -290,7 +291,7 @@ public class App extends Application {{
         try {{
             super.onCreate();
         }} catch (Throwable t) {{
-            Log.e(TAG, "Application.onCreate failed", t);
+            Log.e(TAG, "Application.onCreate failed");
             persistCrash(t, "Application.onCreate");
         }}
         installCrashHandler();
@@ -302,7 +303,7 @@ public class App extends Application {{
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {{
             @Override
             public void uncaughtException(Thread t, Throwable ex) {{
-                Log.e(TAG, "UNCAUGHT process-wide on " + t.getName(), ex);
+                Log.e(TAG, "UNCAUGHT process-wide error");
                 persistCrash(ex, "uncaught:" + t.getName());
                 if (prev != null) prev.uncaughtException(t, ex);
             }}
@@ -317,7 +318,7 @@ public class App extends Application {{
             sw.write("Build: API " + android.os.Build.VERSION.SDK_INT
                 + " " + android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL + "\\n");
             sw.write("VM: " + System.getProperty("java.vm.version") + "\\n\\n");
-            if (t != null) t.printStackTrace(new PrintWriter(sw));
+            if (t != null) sw.write("Exception type: " + t.getClass().getName() + "\\n");
             File dir = getFilesDir();
             if (dir != null) {{
                 File f = new File(dir, "last_crash.txt");
@@ -793,7 +794,11 @@ def _build_real_apk(build: dict, out_path: Path) -> tuple[int, int, str, bool]:
         # Drop a manifest.json describing embedded files
         manifest_index = {"title": title, "build_id": build.get("build_id"), "files": []}
         for relpath, content in _build_files_iter(build):
-            data = content.encode("utf-8", errors="replace") if isinstance(content, str) else bytes(content)
+            if file_count >= _MAX_ASSET_FILES:
+                raise ValueError("APK source file count exceeds budget")
+            data = _bounded_asset_bytes(content)
+            if total_bytes + len(data) > _MAX_SOURCE_BYTES:
+                raise ValueError("APK source total exceeds byte budget")
             target = galaxy_dir / relpath
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
@@ -903,7 +908,11 @@ def _build_apk_staged(build: dict, out_path: Path) -> dict:
             for relpath, content in _build_files_iter(build):
                 if relpath in seen: continue
                 seen.add(relpath)
-                data = bytes(content) if isinstance(content, (bytes, bytearray)) else str(content).encode("utf-8", errors="replace")
+                if file_count >= _MAX_ASSET_FILES:
+                    raise ValueError("APK source file count exceeds budget")
+                data = _bounded_asset_bytes(content)
+                if total_bytes + len(data) > _MAX_SOURCE_BYTES:
+                    raise ValueError("APK source total exceeds byte budget")
                 zf.writestr(f"assets/galaxy/{relpath}", data)
                 file_count += 1
                 total_bytes += len(data)
