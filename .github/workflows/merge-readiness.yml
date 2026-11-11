@@ -257,9 +257,10 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
-          python -m compileall -q routes/build_pipeline.py services/vault_loader.py gameforge/rooms/room_api_gateway.py
+          python -m compileall -q routes/build_pipeline.py services/binary_builder.py services/vault_loader.py gameforge/rooms/room_api_gateway.py
           python -m pytest --noconftest -q \
             tests/test_binary_tenant_boundary_20261111.py \
+            tests/test_binary_archive_custody_20261111.py \
             tests/test_vault_loader_path_custody_20261111.py \
             tests/test_room_api_egress_admission_20261111.py
       - name: Verify native-secure frontend sessions, prototype integrity and telemetry privacy
