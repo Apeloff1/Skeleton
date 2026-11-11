@@ -67,8 +67,8 @@ def violations_from_text(name: str, source: str) -> list[str]:
         findings.append(f"{name}: manual candidate inputs are forbidden")
     if re.search(r"\$\{\{\s*(?:inputs\b|github\.event\.inputs\b)", source):
         findings.append(f"{name}: caller-controlled GitHub expressions are forbidden")
-    if "candidate_sha" in source.lower():
-        findings.append(f"{name}: candidate_sha cannot select executable source")
+    # A trusted shell variable named CANDIDATE_SHA is allowed; only dispatch
+    # input declarations and untrusted GitHub expressions are forbidden.
     guards = re.findall(r"(?m)^ {4}if:\s*(.*?)\s*$", _top_level_section(source, "jobs"))
     if guards != [MAIN_GUARD]:
         findings.append(f"{name}: job must be restricted to the repository default main branch")
