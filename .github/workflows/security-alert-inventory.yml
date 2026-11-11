@@ -182,7 +182,7 @@ jobs:
               else empty end
             ' "$RUNNER_TEMP/security/batch.json"
             echo
-            echo '> Selection is severity-first, excludes immutable historical snapshots, and lists up to 200 actionable findings. A partial coverage state must never be treated as closure. Canonical code and dependency findings require root-cause remediation and fresh analysis.'
+            echo '> Batch selection is severity-first, excludes immutable historical snapshots, and lists up to 200 actionable findings. Canonical code and dependency findings must be fixed at the root cause.'
           } > "$body_file"
 
           body_bytes=$(wc -c < "$body_file" | tr -d ' ')
