@@ -15,6 +15,8 @@ on:
       - 'skeleton/testing/test_ai_native_endurance.py'
       - 'skeleton/testing/test_jeeves_native_batch.py'
       - 'backend/tests/test_galaxy_file_budget.py'
+      - 'backend/core/lazy_registry.py'
+      - 'backend/core/public_exception_route.py'
       - 'backend/tests/test_storage_lazy_registry.py'
 
 permissions:

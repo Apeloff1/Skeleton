@@ -119,3 +119,11 @@ def test_cli_original_game_to_portable_journal_play(tmp_path):
     )
     assert checked.returncode == 0, checked.stderr.decode()
     assert decode(checked.stdout)["ending"] == "beacon"
+
+
+def test_empty_journal_root_is_valid_but_empty_revision_is_rejected():
+    source, _ = inputs()
+    root = game_journal(source, [])
+    assert journal_head(root)["source_digest"] == root["root"]["source_digest"]
+    with pytest.raises(HarborError, match="action budget"):
+        append_journal(root, [], expected_journal_digest=root["journal_digest"])
