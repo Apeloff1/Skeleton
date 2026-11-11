@@ -143,12 +143,55 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
             pass
 
     def _require_our_name(name: str) -> None:
-        current = os.stat(name, dir_fd=fdroot, follow_symlinks=False)
-        if (not stat.S_ISREG(current.st_mode)
-                or (current.st_dev, current.st_ino) != (
-                    staged_identity.st_dev, staged_identity.st_ino
-                )):
-            raise QualificationError('qualification report identity changed during publication')
+        """Re-read the complete private inode before accepting its name.
+
+        Matching dev/inode alone is insufficient: the owner of the private
+        directory can truncate, rewrite, chmod or hardlink the same inode
+        between the completed staged write and final publication. Never
+        attest a changed receipt as the original canonical payload.
+        """
+        flags = (os.O_RDONLY | os.O_NOFOLLOW
+                 | getattr(os, 'O_NONBLOCK', 0)
+                 | getattr(os, 'O_CLOEXEC', 0))
+        handle = os.open(name, flags, dir_fd=fdroot)
+        try:
+            before = os.fstat(handle)
+
+            def identity(st):
+                return (st.st_dev, st.st_ino, st.st_uid, st.st_mode,
+                        st.st_nlink, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+
+            if (not stat.S_ISREG(before.st_mode)
+                    or (before.st_dev, before.st_ino) != (
+                        staged_identity.st_dev, staged_identity.st_ino
+                    )
+                    or before.st_uid != os.geteuid()
+                    or before.st_mode & 0o077
+                    or before.st_nlink != 1
+                    or before.st_size != len(encoded)):
+                raise QualificationError(
+                    'qualification report identity changed during publication'
+                )
+            observed = bytearray()
+            while len(observed) < len(encoded):
+                chunk = os.read(handle, min(4096, len(encoded) - len(observed)))
+                if not chunk:
+                    raise QualificationError(
+                        'qualification report contents changed during publication'
+                    )
+                observed.extend(chunk)
+            if observed != encoded or os.read(handle, 1):
+                raise QualificationError(
+                    'qualification report contents changed during publication'
+                )
+            after = os.fstat(handle)
+            current = os.stat(name, dir_fd=fdroot, follow_symlinks=False)
+            if identity(before) != identity(after) or identity(after) != identity(current):
+                raise QualificationError(
+                    'qualification report identity changed during publication'
+                )
+        finally:
+            os.close(handle)
 
     try:
         if os.fstat(fdroot).st_mode & 0o077:
