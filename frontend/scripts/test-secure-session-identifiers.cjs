@@ -8,6 +8,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
+// Security checks operate on executable lines, not explanatory comments.
+// Keep the negative check fail-closed for all non-comment source lines.
+function executableHelperLines(helper) {
+  return helper.split('\n').filter((line) => !/^\s*\/\//.test(line)).join('\n');
+}
+
+test('secure identity scan ignores full-line comments without ignoring executable fallbacks', () => {
+  const commentary = '  // Do not use Math.random(), Date.now(), or getRandomValues()';
+  assert.doesNotMatch(executableHelperLines(commentary), /Math\.random|Date\.now|getRandomValues/);
+  const executable = '  return Math.random();';
+  assert.match(executableHelperLines(executable), /Math\.random/);
+  const mixed = '// harmless mention of sequence\n  return Date.now();';
+  assert.match(executableHelperLines(mixed), /Date\.now/);
+});
+
 const fixtures = [
   ['app/tools-arena.tsx', 'createArenaSessionId'],
   ['src/utils/modalLogger.ts', 'createSessionId'],
@@ -24,6 +39,6 @@ for (const [relative, functionName] of fixtures) {
     assert.ok(end > begin, 'expected complete helper block');
     const helper = source.slice(begin, end);
     assert.match(helper, /Crypto\.randomUUID\(\)/);
-    assert.doesNotMatch(helper, /Math\.random|Date\.now|Sequence|sequence|cryptoObject|getRandomValues/);
+    assert.doesNotMatch(executableHelperLines(helper), /Math\.random|Date\.now|Sequence|sequence|cryptoObject|getRandomValues/);
   });
 }
