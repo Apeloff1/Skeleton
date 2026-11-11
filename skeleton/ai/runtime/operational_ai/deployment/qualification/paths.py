@@ -97,6 +97,14 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
         except FileNotFoundError:
             pass
 
+    def _require_our_name(name: str) -> None:
+        current = os.stat(name, dir_fd=fdroot, follow_symlinks=False)
+        if (not stat.S_ISREG(current.st_mode)
+                or (current.st_dev, current.st_ino) != (
+                    staged_identity.st_dev, staged_identity.st_ino
+                )):
+            raise QualificationError('qualification report identity changed during publication')
+
     try:
         if os.fstat(fdroot).st_mode & 0o077:
             raise QualificationError('qualification report directory must be private')
@@ -118,6 +126,7 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
         finally:
             os.close(fd)
         _check_parent()
+        _require_our_name(staged_name)
         # A preexisting final receipt remains untouched; the stage is removed.
         os.link(
             staged_name, filename,
@@ -127,6 +136,7 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
         _remove_our_name(staged_name)
         os.fsync(fdroot)
         _check_parent()
+        _require_our_name(filename)
     except BaseException:
         # On write, link, fsync or ancestor-verification failure, never leave
         # a partial final receipt. Only unlink the inode created by this call.
