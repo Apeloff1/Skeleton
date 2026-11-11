@@ -509,6 +509,12 @@ def wrap_flagged() -> dict:
         if not m.get("lazy_eligible"):
             continue
         mod = m["module"].replace("/", ".").removesuffix(".py")  # seeds/x.py → seeds.x
+        # The inventory recurses into nested seed packages, while _LOADERS is
+        # a reviewed, literal list of importable modules. Never attempt a
+        # dynamic import or fail the whole storage endpoint for an unlisted
+        # nested source file that the size heuristic marks as eligible.
+        if not mod.startswith("seeds.") or mod not in _LOADERS:
+            continue
         if mod not in _noncore_proxies:
             _noncore_proxies[mod] = lazy_import(mod)
         out[mod] = _noncore_proxies[mod]
