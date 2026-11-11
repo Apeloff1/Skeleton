@@ -16,6 +16,7 @@ import { API_BASE as CANONICAL_API_BASE } from './apiBase';
 import { useEffect, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
+import { sanitizeTelemetryDetail, sanitizeTelemetryEvent, redactTelemetryText } from './telemetryPrivacy';
 
 const BACKEND  = CANONICAL_API_BASE;
 const FLUSH_MS = 5000;
@@ -54,8 +55,13 @@ let _flushInflight = false;
 
 async function _persistQueue(events: TelemetryEvent[]) {
   try {
-    const existing = JSON.parse((await AsyncStorage.getItem(QUEUE_KEY)) || '[]');
-    const merged = [...existing, ...events].slice(-2000);
+    const old = JSON.parse((await AsyncStorage.getItem(QUEUE_KEY)) || '[]');
+    // Revalidate legacy queued events before rewriting them to disk.
+    const existing = Array.isArray(old) ? old.slice(-2000) : [];
+    const merged = [...existing, ...events]
+      .slice(-2000)
+      .map(sanitizeTelemetryEvent)
+      .filter((event): event is NonNullable<typeof event> => event !== null);
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(merged));
   } catch { /* non-fatal */ }
 }
@@ -65,17 +71,21 @@ async function _drainQueue(): Promise<TelemetryEvent[]> {
     const raw = await AsyncStorage.getItem(QUEUE_KEY);
     if (!raw) return [];
     await AsyncStorage.removeItem(QUEUE_KEY);
-    return JSON.parse(raw) as TelemetryEvent[];
+    const decoded: unknown = JSON.parse(raw);
+    if (!Array.isArray(decoded)) return [];
+    return decoded.slice(-2000)
+      .map(sanitizeTelemetryEvent)
+      .filter((event): event is NonNullable<typeof event> => event !== null) as TelemetryEvent[];
   } catch { return []; }
 }
 
 export async function flushTelemetry(): Promise<void> {
   if (_flushInflight) return;
-  const queued = await _drainQueue();
-  const batch = _buffer.splice(0, _buffer.length).concat(queued);
-  if (!batch.length) return;
   _flushInflight = true;
   try {
+    const queued = await _drainQueue();
+    const batch = _buffer.splice(0, _buffer.length).concat(queued);
+    if (!batch.length) return;
     const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -110,20 +120,24 @@ export function recordEvent(
     if (getFeatureFlag('modal_telemetry_batch') === false) {
       if (severity === 'fatal' || severity === 'error') {
         // eslint-disable-next-line no-console
-        console.warn(`[telemetry:off] ${modalId} ${event}`, detail);
+        console.warn('[telemetry:off] error event suppressed');
       }
       return;
     }
   } catch { /* swallow — proceed with buffering */ }
-  _buffer.push({
-    modal_id:   modalId,
+  const row = sanitizeTelemetryEvent({
+    modal_id: modalId,
     session_id: sessionId(),
     event,
     severity,
-    ts_client:  Date.now() / 1000,
+    ts_client: Date.now() / 1000,
     duration_ms,
-    detail,
+    detail: sanitizeTelemetryDetail(detail),
   });
+  if (!row) return;
+  // Bound the in-memory queue even when offline or when uploads fail.
+  if (_buffer.length >= 500) _buffer.shift();
+  _buffer.push(row as TelemetryEvent);
   _startFlusher();
   // Force-flush fatals immediately
   if (severity === 'fatal' || severity === 'error') {
@@ -153,8 +167,13 @@ export function useModalLogger(modalId: string) {
     metric:  (name: string, value: number, unit?: string)=> recordEvent(modalId, `metric:${name}`, 'info', { value, unit }),
     warn:    (msg: string, detail?: any)                => recordEvent(modalId, 'warn', 'warn', { msg, ...detail }),
     error:   (err: any, detail?: any)                   => {
-      const e = err instanceof Error ? { name: err.name, message: err.message, stack: err.stack?.slice(0, 4000) } : { message: String(err) };
-      recordEvent(modalId, 'error', 'error', { ...e, ...detail });
+      // Exception message/stack can embed bearer tokens, source code and private
+      // filesystem paths; do not retain or upload them at all.
+      const errorType = err instanceof Error ? redactTelemetryText(err.name, 64) : 'UnknownError';
+      recordEvent(modalId, 'error', 'error', {
+        type: errorType,
+        context: sanitizeTelemetryDetail(detail),
+      });
     },
     raw:     (event: string, severity: Severity, detail?: any) => recordEvent(modalId, event, severity, detail),
   };
