@@ -34,6 +34,7 @@ DO NOT split in a single PR — instead extract ONE sub-module at a time,
 running ``pytest`` + ``curl /api/galaxy-studio/*`` between each step.
 """
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator, AliasChoices
@@ -50,7 +51,7 @@ from routes.galaxy_studio_access import galaxy_request_access, record_identity, 
 
 load_dotenv()
 
-router = APIRouter(
+router = APIRouter(route_class=PublicExceptionRoute, 
     prefix="/api/galaxy-studio", tags=["galaxy-studio"],
     dependencies=[Depends(galaxy_request_access)],
 )
