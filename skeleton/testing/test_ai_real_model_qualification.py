@@ -7,6 +7,7 @@ from skeleton.ai.runtime.operational_ai.deployment.qualification import (
     QualificationInput,QualificationError,probe_first_boot,
 )
 from skeleton.ai.runtime.operational_ai.deployment.qualification.verification import verify
+from skeleton.ai.runtime.operational_ai.deployment.qualification import verification as receipt_verification
 from skeleton.ai.runtime.operational_ai.deployment.qualification.paths import publish_private_report
 from skeleton.ai.runtime.operational_ai.deployment.qualification import paths as report_paths
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine import (
@@ -72,6 +73,45 @@ class QualificationTests(unittest.TestCase):
         changed=copy.deepcopy(proof);changed['generated_tokens']=1234
         with self.assertRaisesRegex(QualificationError,'digest mismatch'):
             verify(changed,require_real=False)
+
+    def test_verify_rejects_unbounded_or_non_first_boot_numeric_evidence(self):
+        proof = probe_first_boot(self.plan, activation=self.factory)
+        bad_counters = (
+            ('revision', 2),
+            ('revision', 1 << 100_000),
+            ('database_turns', 2),
+            ('database_turns', True),
+            ('generated_tokens', 8193),
+            ('generated_tokens', 1 << 100_000),
+            ('prompt_tokens', 131073),
+            ('prompt_tokens', -1),
+        )
+        for key, invalid in bad_counters:
+            with self.subTest(key=key, invalid_bits=invalid.bit_length()
+                              if type(invalid) is int else None):
+                altered = dict(proof)
+                altered[key] = invalid
+                with mock.patch.object(
+                    receipt_verification, 'canonical',
+                    side_effect=AssertionError('invalid receipt serialized'),
+                ):
+                    with self.assertRaisesRegex(
+                        QualificationError, 'invalid numeric qualification evidence',
+                    ):
+                        verify(altered, require_real=False)
+        # The original bounded fixture receipt remains verifiable.
+        self.assertFalse(verify(proof, require_real=False)['real_model_executed'])
+
+    def test_verify_rejects_malformed_digests_as_qualification_errors(self):
+        proof = probe_first_boot(self.plan, activation=self.factory)
+        for invalid in ('G' * 64, 'a' * 63, '', None):
+            with self.subTest(invalid=repr(invalid)):
+                altered = dict(proof)
+                altered['model_sha256'] = invalid
+                with self.assertRaisesRegex(
+                    QualificationError, 'invalid qualification digest',
+                ):
+                    verify(altered, require_real=False)
 
     def test_same_report_filename_never_overwrites(self):
         proof=probe_first_boot(self.plan,activation=self.factory)
