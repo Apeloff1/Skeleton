@@ -166,7 +166,7 @@ def _safe_timeout(value: Any) -> float:
 def _safe_headers(value: Any) -> dict[str, str] | None:
     if value is None:
         return None
-    if not isinstance(value, dict) or len(value) > 24:
+    if type(value) is not dict or len(value) > 24:
         raise ValueError("external API headers must be a bounded mapping")
     headers: dict[str, str] = {}
     for raw_name, raw_value in value.items():
@@ -289,7 +289,7 @@ async def _mcp_query(query: str, sources: list[str] | None) -> dict:
 
 async def _api_query(target: dict) -> dict:
     """Call only approved public endpoints with bounded DNS, body and response."""
-    if not isinstance(target, dict):
+    if type(target) is not dict:
         return {"channel": "api", "target": "external-api",
                 "ok": False, "error": "invalid_api_target"}
     name = target.get("name")
@@ -361,7 +361,7 @@ async def query_concurrent(room_id: str, mcp_queries: list[str] | None = None,
         or any(type(q) is not str or not 1 <= len(q) <= 2048 for q in mcp_queries)
         or type(api_targets) is not list
         or len(api_targets) > _MAX_EXTERNAL_TARGETS_PER_CALL
-        or any(not isinstance(item, dict) for item in api_targets)
+        or any(type(item) is not dict for item in api_targets)
         or len(mcp_queries) + len(api_targets) > _MAX_TOTAL_CONCURRENT_JOBS
         or (
             sources is not None
