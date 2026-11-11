@@ -145,6 +145,41 @@ class TestBoundedJeevesCanonicalEvidence(unittest.TestCase):
         self.assertEqual(canonical.read_bytes(), mirror.read_bytes())
 
 
+    def test_domain_verdict_rejects_foreign_stage_before_field_access(self):
+        class HostileStage:
+            @property
+            def stage(self):
+                raise AssertionError("foreign stage property was evaluated")
+
+        stages = tuple(
+            contracts.StageVerdict(f"stage{i}", True, "ok", "a" * 64)
+            for i in range(7)
+        )
+        with self.assertRaises(contracts.LaptopGateHold):
+            contracts.DomainVerdict("domain", (HostileStage(),) + stages, "b" * 64)
+
+    def test_domain_verdict_rejects_tuple_subclass_before_iteration(self):
+        class HostileTuple(tuple):
+            def __iter__(self):
+                raise AssertionError("foreign tuple iterator was executed")
+
+        stages = tuple(
+            contracts.StageVerdict(f"stage{i}", True, "ok", "a" * 64)
+            for i in range(8)
+        )
+        with self.assertRaises(contracts.LaptopGateHold):
+            contracts.DomainVerdict("domain", HostileTuple(stages), "b" * 64)
+
+    def test_domain_verdict_valid_stages_and_duplicate_denial(self):
+        stages = tuple(
+            contracts.StageVerdict(f"stage{i}", True, "ok", "a" * 64)
+            for i in range(8)
+        )
+        verdict = contracts.DomainVerdict("domain", stages, "b" * 64)
+        self.assertTrue(verdict.accepted)
+        with self.assertRaisesRegex(contracts.LaptopGateHold, "duplicate safeguard"):
+            contracts.DomainVerdict("domain", stages[:-1] + stages[:1], "b" * 64)
+
     def test_qualification_workflow_executes_exact_immutable_head(self):
         workflow = (
             Path(__file__).resolve().parents[2]
