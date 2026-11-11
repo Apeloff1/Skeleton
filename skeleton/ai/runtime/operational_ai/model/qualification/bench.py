@@ -4,11 +4,13 @@ On any failure or timeout, stop. Never retry a potentially completed native call
 This is a burn-in observation, not an accuracy, safety, or device certificate.
 """
 from __future__ import annotations
-from hashlib import sha256
 import time
-from .contracts import BurnInPolicy,QualificationHeld
+from .contracts import BurnInPolicy,QualificationHeld,SHA
+from skeleton.ai.runtime.operational_ai.authority.canonical import ContractViolation
 from .latency import summarize
 from .records import trial_record
+
+_MAX_MONOTONIC_NS = (1 << 63) - 1
 
 _SYSTEM='You are an offline native runtime under a local stability probe. No tools.'
 _PROMPTS=(
@@ -20,12 +22,19 @@ _PROMPTS=(
 
 
 def measure(backend, policy:BurnInPolicy,*,clock=time.monotonic_ns) -> dict:
-    if not isinstance(policy,BurnInPolicy):raise QualificationHeld('validated trial policy required')
+    if type(policy) is not BurnInPolicy:
+        raise QualificationHeld('validated trial policy required')
+    # Frozen dataclasses can still be altered through object.__setattr__.
+    # Recheck the policy before reserving any native model resources.
+    BurnInPolicy.__post_init__(policy)
     model=getattr(backend,'model_digest',None)
     tokenizer=getattr(backend,'tokenizer_digest',None)
-    if (not isinstance(model,str) or len(model)!=64 or
-        not isinstance(tokenizer,str) or len(tokenizer)!=64):
+    if (type(model) is not str or len(model) != 64 or SHA.fullmatch(model) is None or
+        type(tokenizer) is not str or len(tokenizer) != 64 or SHA.fullmatch(tokenizer) is None or
+        model == '0' * 64 or tokenizer == '0' * 64):
         raise QualificationHeld('pinned real model and tokenizer identities required')
+    if not callable(clock):
+        raise QualificationHeld('monotonic clock required')
     results=[]
     latencies=[]
     tokens=[]
@@ -37,15 +46,27 @@ def measure(backend, policy:BurnInPolicy,*,clock=time.monotonic_ns) -> dict:
         prompt=_PROMPTS[(index-1)%len(_PROMPTS)]
         inputs=[{'role':'system','content':_SYSTEM},{'role':'user','content':prompt}]
         begin=clock()
+        if type(begin) is not int or not 0 <= begin <= _MAX_MONOTONIC_NS:
+            raise QualificationHeld('invalid monotonic trial clock')
         try:
             receipt=backend.generate(inputs,max_output_tokens=policy.max_output_tokens,
                                      seed=42+index,temperature=0.5)
+        except ContractViolation:
+            # A malformed model receipt is a qualification hold, never a pass.
+            # Do not stringify provider-controlled exception content, retry
+            # an already-started native call, or manufacture an output.
+            raise QualificationHeld('native generated receipt rejected') from None
         except BaseException:
             # No retry. The isolated model child must be shutdown by its
             # enclosing context manager; the request is not considered good.
             raise
-        elapsed=clock()-begin
-        if elapsed<=0 or elapsed>policy.inference_ms*1_000_000:
+        end=clock()
+        # Reject foreign numeric subclasses and backwards clocks without
+        # invoking untrusted subtraction/comparison after a native call.
+        if type(end) is not int or end > _MAX_MONOTONIC_NS or end <= begin:
+            raise QualificationHeld('native generation missed monotonic deadline')
+        elapsed=end-begin
+        if elapsed>policy.inference_ms*1_000_000:
             raise QualificationHeld('native generation missed monotonic deadline')
         recorded=trial_record(index,elapsed,receipt,model,tokenizer,policy.max_output_tokens)
         if recorded['generated_tokens']<policy.minimum_generated_tokens:

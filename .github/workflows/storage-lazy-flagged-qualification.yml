@@ -1,0 +1,58 @@
+name: Storage Lazy-Loader Exact-Head Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - '.github/workflows/storage-lazy-flagged-qualification.yml'
+      - 'backend/core/lazy_registry.py'
+      - 'backend/tests/test_storage_lazy_registry.py'
+      - 'backend/core/unbulk.py'
+      - 'backend/routes/storage.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storage-lazy-flagged-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  storage_lazy:
+    name: Exact-head nested seed and storage endpoint regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout immutable PR head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify checked-out source SHA
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11.16'
+      - name: Install backend test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          -r backend/requirements.txt
+          'pytest==8.4.2' 'httpx>=0.28.1,<1'
+          'fastapi>=0.142.2,<1' 'pydantic>=2.14.1,<3'
+          'pydantic-settings>=2.15.0,<3'
+      - name: Compile and execute complete storage lazy-registry tests
+        env:
+          PYTHONPATH: '.:backend'
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m compileall -q backend/core/lazy_registry.py backend/tests/test_storage_lazy_registry.py
+          python -m pytest -q --noconftest --import-mode=importlib backend/tests/test_storage_lazy_registry.py
+      - name: Verify static import policy and canonical AI source parity
+        run: |
+          python scripts/check_repository_dynamic_import_safety.py
+          python scripts/check_ai_file_tree.py

@@ -20,7 +20,7 @@ from zipfile import ZipFile, ZipInfo, ZIP_STORED, BadZipFile, LargeZipFile
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.dual_runtime_verify import (
     DualRuntimeVerificationError, _MAX_BYTES, _MAX_FILES, _MAX_MANIFEST,
-    _REQUIRED, _STUDIO_REQUIRED, _assert_original_root, _json, _parts, _read,
+    _REQUIRED, _STUDIO_REQUIRED, _assert_original_root, _canonical_bytes, _json, _parts, _read,
     _root_fd, verify_exported_package, verify_studio_release_evidence,
 )
 
@@ -322,6 +322,10 @@ def inspect_offline_game_archive(
             if sha256(release).hexdigest() != expected_manifest_sha256:
                 raise OfflineGameArchiveError("archive release differs from independent pin")
             manifest = _json(release, _MAX_MANIFEST)
+            # Independent hashes pin exact archive bytes, but must never grant
+            # authority to ambiguous, reserialized noncanonical release JSON.
+            if release != _canonical_bytes(manifest):
+                raise OfflineGameArchiveError("noncanonical archived release manifest")
             digest = manifest.get("manifest_digest")
             body = {key: value for key, value in manifest.items()
                     if key != "manifest_digest"}
@@ -352,6 +356,15 @@ def inspect_offline_game_archive(
             if studio:
                 try:
                     verify_studio_release_evidence(files)
+                    # A re-signed source ZIP is not a studio export authority.
+                    # Preserve the same original-game/project denial checks
+                    # enforced by verify_exported_package on live source trees.
+                    pipeline = _json(files["studio/pipeline.json"], _MAX_MANIFEST)
+                    if (pipeline.get("schema") != "skeleton.game_builder.studio_pipeline.v1"
+                            or pipeline.get("not_automatically_published") is not True
+                            or pipeline.get("original_game_claim") != "generated-or-user-authored-geometry"
+                            or pipeline.get("project_id") != manifest.get("project_id")):
+                        raise DualRuntimeVerificationError("archived studio source custody invalid")
                 except DualRuntimeVerificationError as exc:
                     raise OfflineGameArchiveError("archived studio evidence rejected") from exc
         if not hmac.compare_digest(_canonical_zip(files), raw):

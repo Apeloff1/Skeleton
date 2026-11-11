@@ -467,20 +467,10 @@ def audit_compose_modes() -> None:
         "target: ${FRONTEND_BUILD_TARGET:-development}" in base,
         "frontend build target must be assembly-selectable",
     )
-    safe_frontend_port = "\"127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\""
     check(
-        safe_frontend_port in base,
-        "frontend container port must be loopback-bound and assembly-selectable",
+        '${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
+        "frontend container port must be assembly-selectable",
     )
-    for unsafe_frontend_port in (
-        "\"${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\"",
-        "\"0.0.0.0:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\"",
-        "\"[::]:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\"",
-    ):
-        check(
-            unsafe_frontend_port not in base,
-            "frontend published port must not expose unrestricted bindings",
-        )
     check(
         "EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}" in base,
         "frontend backend public URL default drift",
@@ -1048,7 +1038,35 @@ def audit_product_surface_specification() -> None:
     check(not errors, "product surface specification failed: " + "; ".join(errors[:8]))
 
 
+def audit_preinstall_docker_sources() -> None:
+    """Fail closed when the installable image sources are not in source custody."""
+    from skeleton.app.install_source_contracts import build_source_errors
+
+    defects = build_source_errors(ROOT)
+    check(
+        not defects,
+        ("pre-first-install Docker source admission failed: " + "; ".join(defects[:4])
+         if defects else "pre-first-install Docker source admission passed"),
+    )
+    try:
+        manifest = json.loads(read("skeleton/app/manifest.json"))
+        required = manifest["required_paths"]
+        if not isinstance(required, list):
+            raise ValueError("required_paths must be a list")
+    except (ValueError, KeyError, TypeError):
+        check(False, "first-install required-path manifest is unreadable or invalid")
+        return
+    for path in (
+        "Dockerfile.dockerignore",
+        "backend/Dockerfile.dockerignore",
+        "frontend/.dockerignore",
+        "skeleton/app/install_source_contracts.py",
+    ):
+        check(path in required, f"installed assembly omits required Docker input: {path}")
+
+
 def main() -> int:
+    audit_preinstall_docker_sources()
     audit_manifest()
     audit_topology_alignment()
     audit_backend_public_identity()

@@ -85,6 +85,8 @@ def fake_host():
 
     def exchange(command, payload, blocks=None):
         commands.append(command)
+        if command == "disc_status":
+            return {"supported": False}, {}
         if command == "state_info":
             return {"state_size": 4}, {}
         if command == "snapshot":

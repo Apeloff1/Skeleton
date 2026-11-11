@@ -10,10 +10,11 @@ def test_share_page_escapes_markup_and_script_boundaries() -> None:
         f"https://app.example.invalid/{payload}",
     )
 
-    assert page.count("<script>") == 1
+    assert "<script" not in page.lower()
+    assert "setTimeout" not in page
+    assert '<meta http-equiv="refresh" content="1;url=https://app.example.invalid/&quot;&gt;' in page
     assert '<img src=x onerror=alert(1)>' not in page
     assert '&lt;img src=x onerror=alert(1)&gt;' in page
-    assert '\\u003cimg src=x onerror=alert(1)\\u003e' in page
     assert 'href="https://app.example.invalid/&quot;&gt;&lt;img' in page
 
 import asyncio
@@ -94,3 +95,58 @@ def test_tournament_cover_link_encodes_champion_identifier(
     page = response.body.decode("utf-8")
     assert "/api/playable/player%26admin%3Dtrue/cover.png" in page
     assert "attacker.example" not in page
+
+
+def test_share_html_response_enforces_scriptless_csp() -> None:
+    response = share._share_html(
+        share._page(
+            "safe", "game", "https://app.example.test/cover.png",
+            "https://app.example.test/playable",
+        )
+    )
+    assert response.status_code == 200
+    assert "script-src 'none'" in response.headers["content-security-policy"]
+    assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["cache-control"] == "no-store"
+    assert "<script" not in response.body.decode("utf-8").lower()
+
+
+def test_page_refuses_to_make_untrusted_markup_executable() -> None:
+    payload = '</head><script>globalThis.pwned=true</script><img src=x onerror=alert(1)>'
+    body = share._page(payload, payload,
+                       "https://app.example.test/icon.png",
+                       "https://app.example.test/?q=" + payload)
+    assert "<script" not in body.lower()
+    assert "onerror=alert(1)>" not in body
+    assert "&lt;script&gt;" in body
+    assert 'http-equiv="refresh"' in body
+
+
+
+def test_share_csp_pins_configured_origin_without_wildcard_https(monkeypatch):
+    monkeypatch.setenv("PUBLIC_APP_URL", "https://app.example.test")
+    response = share._share_html(
+        share._page(
+            "safe", "description", "https://app.example.test/cover.png",
+            "https://app.example.test/playable",
+        )
+    )
+    policy = response.headers["content-security-policy"]
+    assert "img-src 'self' https://app.example.test;" in policy
+    assert "img-src 'self' https:;" not in policy
+    assert "http://localhost:3000" not in policy
+    assert "script-src 'none'" in policy
+
+
+@pytest.mark.parametrize("malformed", [
+    "https://app.example.test;script-src'unsafe-inline'",
+    "https://app.example.test whitespace",
+    "https://app.example.test\r\nX-CSP-Bypass: true",
+    "https://app.example.test%3bscript-src",
+])
+def test_csp_origin_host_rejects_http_header_injection(monkeypatch, malformed):
+    monkeypatch.setenv("PUBLIC_APP_URL", malformed)
+    with pytest.raises(ValueError):
+        share._app_origin()

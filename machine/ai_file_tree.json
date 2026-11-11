@@ -278,7 +278,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "502ea2af6d42ff58dc2a4f1b5e01b2c3e98a336f",
+      "source_git_object_sha": "c2ad7951bc3b6d2be1631f080f77b585e3cb9abf",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "31db10ca81db97afc140ef8dfa7062bf76ce89b7",
+      "source_git_object_sha": "8838d5416d0aab19a840b9146abe4f2ec4651d9d",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "5cd3cb340b5597a6f6e9e97491a353d474fd4c7b",
+      "source_git_object_sha": "c17c39ce784ae05ddae2a0efdc0b468887870fd1",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "966bbe8c5794ad478c801e27b177035ae7ee16ed",
+      "source_git_object_sha": "604551f6ce80fe74cfbf93dc073e306d9aa14fa6",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -2199,7 +2199,7 @@
       "source": "skeleton/pr_automation",
       "destination": "skeleton/ai/build/pr_automation",
       "kind": "tree",
-      "source_git_object_sha": "3df606ef721a256881d0656737c77649b47f522b",
+      "source_git_object_sha": "5ebd1c49e3adf6b9260debec0fd62f17f1150b90",
       "role": "Automerge, runner, queue, policy, evidence, and hygiene logic is autonomous repository-engineering/build-control code.",
       "work_package_refs": [
         "WP-W15",
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "1256eba56b57dafa77e7c2ce49045353971d6750"
+      "source_git_object_sha": "ce7c1908fa42a17bc146b6e1b1f7356fb9af855a"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
@@ -7339,6 +7339,11 @@
       "reason": "Canonical CPU and runtime profiling instrumentation belongs to the platform observability substrate and remains outside AI-tree implementation ownership until an explicit, independently qualified cutover."
     },
     {
+      "path": "skeleton/perfgate",
+      "owner": "performance assurance / benchmarking",
+      "reason": "Finite performance budgets, soak workloads, baseline statistics and diagnostic gates are independent quality evidence, not an AI model-runtime owner or migration authority."
+    },
+    {
       "path": "skeleton/persist",
       "owner": "persistence compatibility boundary",
       "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
@@ -7374,9 +7379,19 @@
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
     },
     {
+      "path": "skeleton/provider_environment.py",
+      "owner": "game-environment simulation and deterministic replay",
+      "reason": "The deterministic game-world adapter and holdout/replay buffers remain outside credential-provider AI tree authority; this module has no model credential custody or provider runtime ownership."
+    },
+    {
       "path": "skeleton/providers",
       "owner": "integration contract owner",
       "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
+    },
+    {
+      "path": "skeleton/qualification",
+      "owner": "independent qualification and evidence",
+      "reason": "Source-bound performance, FPS, replay, retention, promotion and soak qualification gates validate product behavior without becoming model execution, deployment or release authority."
     },
     {
       "path": "skeleton/quality/scatter10240",
@@ -7782,7 +7797,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 157,
+    "retained_outside_ai_tree_count": 164,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,

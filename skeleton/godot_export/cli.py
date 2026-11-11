@@ -44,21 +44,52 @@ def _provenance(a: argparse.Namespace) -> int:
     for spec in a.artifact:
         preset, sep, path = spec.partition("=")
         if not sep or not preset or not path:
-            print(json.dumps({"error": f"bad --artifact {spec!r}, want PRESET=PATH"}))
+            print(json.dumps({"error": "invalid --artifact; expected PRESET=PATH"}))
+            return 2
+        # A duplicate key previously overwrote the earlier artifact before
+        # admission, concealing an ambiguous release receipt.
+        if preset in arts:
+            print(json.dumps({"error": "duplicate --artifact preset"}))
             return 2
         arts[preset] = Path(path)
-    m = provenance.build(a.project, a.engine, a.verdict, arts, a.base)
-    text = m.dumps()
+    if a.verdict == "SHIP" and not arts:
+        print(json.dumps({"error": "SHIP provenance requires real artifacts"}))
+        return 2
+    try:
+        m = provenance.build(a.project, a.engine, a.verdict, arts, a.base)
+        text = m.dumps()
+    except (ValueError, OSError, UnicodeError, RecursionError):
+        # Invalid source paths, credentials or malformed contents must not
+        # be reflected into publicly visible workflow logs.
+        print(json.dumps({"error": "unsafe or invalid provenance inputs"}))
+        return 2
     if a.out:
-        a.out.write_text(text, encoding="utf-8")
+        try:
+            provenance.write_manifest_file_new(a.out, m)
+        except (ValueError, OSError, UnicodeError, RecursionError):
+            print(json.dumps({"error": "unsafe or occupied provenance manifest output"}))
+            return 2
     else:
         sys.stdout.write(text)
     return 0
 
 
 def _verify(a: argparse.Namespace) -> int:
-    m = provenance.Manifest.loads(a.manifest.read_text(encoding="utf-8"))
-    problems = provenance.verify(m, a.base, a.project)
+    # A matching artifact hash alone does not prove which project produced it.
+    # The CLI's "ok" result must bind artifact bytes AND the source tree.
+    # Preserve a JSON error response (rather than argparse SystemExit) for
+    # callers that previously omitted the optional --project argument.
+    if a.project is None:
+        problems = ["project source tree was not supplied for verification"]
+        print(json.dumps({"ok": False, "problems": problems}))
+        return 1
+    try:
+        manifest = provenance.read_manifest_file(a.manifest)
+        problems = provenance.verify(manifest, a.base, a.project)
+    except (ValueError, OSError, UnicodeError, RecursionError):
+        # Do not leak attacker-controlled paths or malformed JSON contents
+        # into public CI logs. A malformed receipt is never a successful one.
+        problems = ["unsafe or malformed provenance manifest"]
     print(json.dumps({"ok": not problems, "problems": problems}))
     return 0 if not problems else 1
 

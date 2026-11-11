@@ -1,14 +1,13 @@
 """Strictly synthetic 20-domain source cases, never real GGUF witnesses."""
 from __future__ import annotations
 
-import importlib
 from skeleton.jeeves.native_fabric.laptop_ops.casebook import (
     successful_evidence, mutation_cases,
 )
 from skeleton.jeeves.native_fabric.laptop_ops.contracts import (
     LaptopGateHold, canonical,
 )
-from skeleton.jeeves.native_fabric.laptop_ops.runner import list_domains
+from skeleton.jeeves.native_fabric.laptop_ops.runner import list_domains, registry_module
 from .schema import BUNDLE_INPUT_SCHEMA
 
 
@@ -16,10 +15,7 @@ def successful_bundle() -> dict[str, dict[str, object]]:
     """Construct one complete synthetic observation from declared predicates."""
     result: dict[str, dict[str, object]] = {}
     for domain in list_domains():
-        module = importlib.import_module(
-            "skeleton.jeeves.native_fabric.laptop_ops.domains."
-            + domain + ".registry"
-        )
+        module = registry_module(domain)
         result[domain] = successful_evidence(module.STAGE_TYPES)
     return result
 
@@ -29,10 +25,7 @@ def negative_bundle(domain: str, stage: str) -> dict[str, dict[str, object]]:
     if domain not in list_domains():
         raise LaptopGateHold("unregistered diagnostic domain")
     source = successful_bundle()
-    module = importlib.import_module(
-        "skeleton.jeeves.native_fabric.laptop_ops.domains."
-        + domain + ".registry"
-    )
+    module = registry_module(domain)
     changed = dict(mutation_cases(module.STAGE_TYPES))
     if stage not in changed:
         raise LaptopGateHold("undeclared diagnostic stage")

@@ -204,6 +204,7 @@ _LOADERS = {
     'core.policy_repository': lambda: importlib.import_module('core.policy_repository'),
     'core.portable_claim_proof': lambda: importlib.import_module('core.portable_claim_proof'),
     'core.principal_seal': lambda: importlib.import_module('core.principal_seal'),
+    'core.public_exception_route': lambda: importlib.import_module('core.public_exception_route'),
     'core.product_control_plane': lambda: importlib.import_module('core.product_control_plane'),
     'core.product_control_runtime': lambda: importlib.import_module('core.product_control_runtime'),
     'core.product_default_executors': lambda: importlib.import_module('core.product_default_executors'),
@@ -276,6 +277,7 @@ _LOADERS = {
     'core.universal_forge': lambda: importlib.import_module('core.universal_forge'),
     'core.user_control_receipts': lambda: importlib.import_module('core.user_control_receipts'),
     'core.vault_gdd': lambda: importlib.import_module('core.vault_gdd'),
+    'core.vault_secure_fs': lambda: importlib.import_module('core.vault_secure_fs'),
     'core.verified_curiosity': lambda: importlib.import_module('core.verified_curiosity'),
     'core.vfx_combat_catalog': lambda: importlib.import_module('core.vfx_combat_catalog'),
     'core.vfx_cues': lambda: importlib.import_module('core.vfx_cues'),
@@ -418,7 +420,8 @@ class _LazyModule:
 
 def lazy_import(module_name: str):
     """Defer one repository-owned literal loader without changing sys.modules."""
-    if not isinstance(module_name, str) or module_name not in _LOADERS:
+    # A str subclass can execute hostile __hash__/__eq__ during dict lookup.
+    if type(module_name) is not str or module_name not in _LOADERS:
         raise ValueError("module is not registered for deferred loading")
     return _LazyModule(module_name, _LOADERS[module_name])
 
@@ -506,7 +509,16 @@ def wrap_flagged() -> dict:
     for m in inv["biggest"]:
         if not m.get("lazy_eligible"):
             continue
-        mod = m["module"].replace("/", ".").removesuffix(".py")  # seeds/x.py → seeds.x
+        source_path = m["module"]
+        if type(source_path) is not str:
+            continue
+        mod = source_path.replace("/", ".").removesuffix(".py")  # seeds/x.py → seeds.x
+        # The inventory recurses into nested seed packages, while _LOADERS is
+        # a reviewed, literal list of importable modules. Never attempt a
+        # dynamic import or fail the whole storage endpoint for an unlisted
+        # nested source file that the size heuristic marks as eligible.
+        if not mod.startswith("seeds.") or mod not in _LOADERS:
+            continue
         if mod not in _noncore_proxies:
             _noncore_proxies[mod] = lazy_import(mod)
         out[mod] = _noncore_proxies[mod]

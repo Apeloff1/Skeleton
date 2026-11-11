@@ -7,6 +7,8 @@ share /api/nexus.
 """
 from __future__ import annotations
 
+from core.public_exception_route import PublicExceptionRoute
+
 from dataclasses import asdict
 import sys
 from pathlib import Path
@@ -22,7 +24,7 @@ from core.curiosity_service import curiosity_service
 from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.truth_watch import TruthEventKind
 
-router = APIRouter(prefix="/api/nexus", tags=["knowledge-nexus"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/nexus", tags=["knowledge-nexus"])
 _NX = str(Path(__file__).resolve().parent.parent / "knowledge_nexus")
 
 

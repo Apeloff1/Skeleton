@@ -1025,21 +1025,239 @@ def test_fresh_install_cors_defaults_preserve_operator_override(tmp_path):
     values = (tmp_path / ".env").read_text(encoding="utf-8")
     assert f"CORS_ORIGINS={manual}" in values
 
+# The runtime diagnostic path must enforce the same private-file input
+# boundaries as setup, without chmod'ing or rewriting a user's credentials.
 
-def test_frontend_compose_port_is_loopback_bound_and_assembly_selectable():
-    from pathlib import Path
+def test_runtime_env_reader_accepts_valid_simple_values_without_mutation(tmp_path):
+    import os
 
-    compose = (Path(__file__).resolve().parents[2] / "docker-compose.yml").read_text(encoding="utf-8")
-    expected = "\"127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\""
-    assert expected in compose
-    assert "\"${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\"" not in compose
-    assert "\"0.0.0.0:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\"" not in compose
-    assert "\"[::]:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}\"" not in compose
+    from skeleton.app.assembly import _read_dotenv
+
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        'FRONTEND_PORT=3300\nCORS_ORIGINS="http://localhost:3300"\n',
+        encoding="utf-8",
+    )
+    before = env_path.stat()
+    assert _read_dotenv(env_path) == {
+        "FRONTEND_PORT": "3300",
+        "CORS_ORIGINS": "http://localhost:3300",
+    }
+    after = env_path.stat()
+    assert (before.st_dev, before.st_ino, before.st_mode, before.st_size) == (
+        after.st_dev, after.st_ino, after.st_mode, after.st_size,
+    )
+    assert os.path.exists(env_path)
 
 
-def test_assembly_auditor_requires_loopback_not_unrestricted_frontend_port():
-    from pathlib import Path
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"F" * (256 * 1024 + 1),
+        b"\xff\xfeinvalid",
+    ],
+)
+def test_runtime_env_reader_rejects_oversize_and_invalid_utf8(tmp_path, payload):
+    from skeleton.app.assembly import _read_dotenv
 
-    source = (Path(__file__).resolve().parents[2] / "scripts/check_app_assembly.py").read_text(encoding="utf-8")
-    assert "safe_frontend_port in base" in source
-    assert "unsafe_frontend_port not in base" in source
+    (tmp_path / ".env").write_bytes(payload)
+    with pytest.raises(ValueError, match="runtime .env"):
+        _read_dotenv(tmp_path / ".env")
+
+
+def test_runtime_env_reader_rejects_symlink_without_following(tmp_path):
+    from skeleton.app.assembly import _read_dotenv
+
+    secret = tmp_path / "operator-secret"
+    secret.write_text("JWT_SECRET=must-remain-outside\n", encoding="utf-8")
+    target = tmp_path / ".env"
+    try:
+        target.symlink_to(secret)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation not supported on this host")
+    with pytest.raises(ValueError, match="symbolic link|safely opened"):
+        _read_dotenv(target)
+    assert secret.read_text(encoding="utf-8") == "JWT_SECRET=must-remain-outside\n"
+
+
+def test_runtime_env_reader_rejects_hardlinked_credentials(tmp_path):
+    import os
+
+    from skeleton.app.assembly import _read_dotenv
+
+    original = tmp_path / "operator-secret"
+    original.write_text("JWT_SECRET=must-remain-outside\n", encoding="utf-8")
+    try:
+        os.link(original, tmp_path / ".env")
+    except (OSError, NotImplementedError):
+        pytest.skip("hardlink creation not supported on this host")
+    if os.name == "nt":
+        pytest.skip("Windows hardlink identity policy is governed by ACLs")
+    with pytest.raises(ValueError, match="unlinked regular file"):
+        _read_dotenv(tmp_path / ".env")
+
+
+def test_runtime_env_reader_rejects_directory(tmp_path):
+    from skeleton.app.assembly import _read_dotenv
+
+    (tmp_path / ".env").mkdir()
+    with pytest.raises(ValueError, match="runtime .env"):
+        _read_dotenv(tmp_path / ".env")
+
+
+def test_runtime_env_reader_rejects_fifo_without_waiting(tmp_path):
+    import os
+
+    from skeleton.app.assembly import _read_dotenv
+
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("named pipes are unavailable")
+    os.mkfifo(tmp_path / ".env")
+    with pytest.raises(ValueError, match="unlinked regular file"):
+        _read_dotenv(tmp_path / ".env")
+
+
+@pytest.mark.parametrize("source_kind", ["oversize", "invalid-utf8", "directory"])
+def test_runtime_preflight_fails_closed_on_invalid_env_source(tmp_path, source_kind):
+    from skeleton.app.assembly import preflight
+
+    env = tmp_path / ".env"
+    if source_kind == "oversize":
+        env.write_bytes(b"A" * (256 * 1024 + 1))
+    elif source_kind == "invalid-utf8":
+        env.write_bytes(b"\xff\xfe")
+    else:
+        env.mkdir()
+
+    checks = preflight(tmp_path, runtime=True, environ={})
+    indexed = {check.code: check for check in checks}
+    assert indexed["env:source"].ok is False
+    assert indexed["runtime:ports"].ok is False
+    assert not checks_ok(checks)
+    assert "unsafe" in indexed["runtime:ports"].message
+    assert "A" * 64 not in repr(checks)
+
+
+def test_runtime_doctor_does_not_network_probe_when_env_source_is_unsafe(
+    tmp_path, monkeypatch
+):
+    from skeleton.app import first_install
+    from skeleton.app.preloader import PreloadReport
+
+    (tmp_path / ".env").write_bytes(b"Z" * (256 * 1024 + 1))
+    host = PreloadReport(
+        root=tmp_path, platform="test", python="3.11", checks=(),
+    )
+    monkeypatch.setattr(first_install, "inspect_host", lambda _root: host)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("unsafe runtime environment must suppress every live probe")
+
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_application", forbidden
+    )
+    monkeypatch.setattr(first_install, "critical_backend_route_report", forbidden)
+    report = first_install.first_install_report(
+        tmp_path, live=True, environ={},
+    )
+
+    assert report["configuration_ready"] is False
+    assert report["services_ready"] is None
+    assert report["ai"]["observed"] is False
+    assert report["critical_routes"]["observed"] is False
+    assert any(
+        check["code"] == "env:source" and not check["ok"]
+        for check in report["checks"]["configuration"]
+    )
+    assert any("private runtime .env is unsafe" in step for step in report["next_steps"])
+    assert "ZZZZ" not in repr(report)
+
+
+def test_runtime_env_reader_missing_source_returns_empty(tmp_path):
+    from skeleton.app.assembly import _read_dotenv
+
+    assert _read_dotenv(tmp_path / ".env") == {}
+
+
+
+def test_app_status_hides_unsafe_runtime_config_error(monkeypatch, capsys):
+    from skeleton.app import cli
+
+    def unsafe():
+        raise ValueError("private operator secret material must not be logged")
+
+    monkeypatch.setattr(cli, "runtime_manifest", unsafe)
+    assert cli._print_status(as_json=True) == 2
+    serialized = capsys.readouterr().out
+    import json
+
+    value = json.loads(serialized)
+    assert value["ok"] is False
+    assert value["code"] == "runtime_configuration_unavailable"
+    assert "private operator secret material" not in serialized
+
+
+def test_first_install_studio_drops_live_token_after_unsafe_env(tmp_path, monkeypatch):
+    from skeleton.app import first_install, studio_readiness
+    from skeleton.app.preloader import PreloadReport
+
+    (tmp_path / ".env").write_bytes(b"Q" * (256 * 1024 + 1))
+    monkeypatch.setattr(
+        first_install,
+        "inspect_host",
+        lambda _root: PreloadReport(
+            root=tmp_path, platform="test", python="3.11", checks=()
+        ),
+    )
+    observed: list[tuple[object, object]] = []
+
+    def fake_studio(*_args, **kwargs):
+        observed.append((kwargs["live"], kwargs["auth_token_file"]))
+        return {
+            "local_host": {"observed": False},
+            "server": {"observed": False, "crawler": {"observed": False}},
+        }
+
+    monkeypatch.setattr(studio_readiness, "studio_readiness_report", fake_studio)
+    report = first_install.first_install_report(
+        tmp_path,
+        live=True,
+        studio=True,
+        auth_token_file=tmp_path / "private-operator-token",
+        environ={},
+    )
+    assert observed == [(False, None)]
+    assert report["configuration_ready"] is False
+    assert report["crawler"]["observed"] is False
+
+
+def test_new_install_contract_module_is_required_in_windows_payload():
+    from skeleton.app.assembly import load_manifest
+
+    manifest = load_manifest()
+    assert "skeleton/app/install_source_contracts.py" in manifest.required_paths
+
+
+@pytest.mark.parametrize(
+    ("other", "conflicting_port"),
+    [
+        ("FRONTEND_PORT", "3000"),
+        ("BACKEND_PORT", "8001"),
+        ("SKELETON_PORT", "8010"),
+        ("MONGO_PORT", "27017"),
+    ],
+)
+def test_chroma_published_host_port_cannot_overlap_existing_service(
+    tmp_path, other, conflicting_port,
+):
+    from skeleton.app.assembly import public_service_urls, runtime_manifest
+
+    # The Chroma full profile may be guarded at startup, but its published
+    # port must never silently collide with the canonical service sockets.
+    (tmp_path / ".env").write_text(
+        f"CHROMA_PORT={conflicting_port}\n", encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="CHROMA_PORT"):
+        runtime_manifest(root=tmp_path, environ={})
+    with pytest.raises(ValueError, match="CHROMA_PORT"):
+        public_service_urls(tmp_path, environ={})

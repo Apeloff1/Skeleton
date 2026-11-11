@@ -23,6 +23,7 @@ from .automerge_model import (
     PullRequestIdentity,
     ReviewEvidence,
     WorkflowEvidence,
+    has_explicit_merge_hold,
     valid_sha,
 )
 
@@ -476,6 +477,9 @@ class GitHubAutoMergeClient:
             identity=identity,
             diff=diff,
             labels=self.labels(payload),
+            explicit_merge_hold=has_explicit_merge_hold(
+                payload.get("title"), payload.get("body"),
+            ),
             reviews=reviews,
             unresolved_threads=unresolved,
             workflow_runs=runs,
