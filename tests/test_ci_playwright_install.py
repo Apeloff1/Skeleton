@@ -87,6 +87,17 @@ printf 'sleep:%s\\n' "$*" >> "$MOCK_LOG"
         self.assertEqual(len(lines), 1)
         self.assertTrue(lines[0].startswith("npm:"))
 
+    def test_workflow_wires_pinned_installer_and_unskipped_contract(self):
+        workflow = (SCRIPT.parents[1] / ".github" / "workflows" /
+                    "app-foundation-e2e.yml").read_text(encoding="utf-8")
+        self.assertIn('PLAYWRIGHT_VERSION: "1.56.1"', workflow)
+        self.assertIn("bash ../../scripts/ci_playwright_install.sh", workflow)
+        self.assertIn("playwright-install-contract:", workflow)
+        self.assertIn("python -m unittest discover -s tests -p test_ci_playwright_install.py -q",
+                      workflow)
+        self.assertIn("npx --no-install playwright install --with-deps chromium",
+                      SCRIPT.read_text(encoding="utf-8"))
+
     def test_invalid_versions_are_rejected_before_any_install(self):
         for version in (None, "", "latest", "1.56.1;echo unsafe", "1.56.1\n"):
             with self.subTest(version=version):
