@@ -10,6 +10,17 @@ from ._stats import percentile_summary
 from .clock import Clock, MonotonicClock
 
 
+def _finite_number(value: object) -> float | None:
+    """Accept only finite real builtins; reject bools and overflowing integers."""
+    if type(value) not in (int, float):
+        return None
+    try:
+        number = float(value)
+    except OverflowError:
+        return None
+    return number if math.isfinite(number) else None
+
+
 @dataclass(frozen=True)
 class Hitch:
     frame_index: int
@@ -32,8 +43,10 @@ class FrameStats:
     percentiles: Dict[str, Any]
 
     def within_budget(self, max_hitch_ratio: float = 0.0) -> bool:
-        """Fail closed: no frames means not within budget."""
-        return self.window > 0 and self.hitch_ratio <= max_hitch_ratio
+        """Fail closed for empty windows and malformed/unsafe ratio limits."""
+        limit = _finite_number(max_hitch_ratio)
+        return (self.window > 0 and limit is not None
+                and 0.0 <= limit <= 1.0 and self.hitch_ratio <= limit)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -64,14 +77,18 @@ class FrameSampler:
         clock: Optional[Clock] = None,
         max_hitches: int = 256,
     ) -> None:
-        if not (isinstance(budget_ms, (int, float)) and math.isfinite(budget_ms) and budget_ms > 0):
+        budget = _finite_number(budget_ms)
+        factor = _finite_number(hitch_factor)
+        if budget is None or budget <= 0:
             raise ValueError("budget_ms must be a positive finite number")
         if capacity < 1 or max_hitches < 1:
             raise ValueError("capacity and max_hitches must be >= 1")
-        if not (math.isfinite(hitch_factor) and hitch_factor >= 1.0):
-            raise ValueError("hitch_factor must be >= 1.0")
-        self.budget_ms = float(budget_ms)
-        self.hitch_factor = float(hitch_factor)
+        if factor is None or factor < 1.0:
+            raise ValueError("hitch_factor must be finite and >= 1.0")
+        if not math.isfinite(budget * factor):
+            raise ValueError("hitch threshold must be finite")
+        self.budget_ms = budget
+        self.hitch_factor = factor
         self.clock: Clock = clock or MonotonicClock()
         self._ring: Deque[float] = deque(maxlen=capacity)
         self._hitches: Deque[Hitch] = deque(maxlen=max_hitches)
