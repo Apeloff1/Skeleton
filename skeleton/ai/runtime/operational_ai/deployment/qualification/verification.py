@@ -22,6 +22,10 @@ DIGEST_FIELDS = (
 
 
 def verify(record: dict, *, require_real: bool = True) -> dict:
+    # Only an explicit False may opt into fixture-only structural inspection.
+    # Falsey foreign policy values must not silently bypass real-model custody.
+    if type(require_real) is not bool:
+        raise QualificationError("invalid qualification verification policy")
     # A dict with string-subclass keys or values can override equality checks.
     # Only exact built-in types may authorize real-model provenance. Check key
     # types before comparing them to the allowlisted schema names.

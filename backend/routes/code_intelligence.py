@@ -5,12 +5,13 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-router = APIRouter(prefix="/intelligence", tags=["Code Intelligence"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/intelligence", tags=["Code Intelligence"])
 
 from core.engine_chat import EngineChat, UserMessage
 from core.engine_text import EngineTextError

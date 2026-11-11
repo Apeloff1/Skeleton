@@ -295,3 +295,82 @@ def test_native_report_ci_watches_and_compiles_receipt_verifier():
     assert f"      - '{relative}'" in watch
     assert relative in run
     assert "ref: ${{ github.event.pull_request.head.sha }}" in workflow
+
+
+class _HostileReceiptKey:
+    """A foreign key colliding with a trusted lookup must never run equality."""
+
+    def __init__(self, target):
+        self.target = target
+
+    def __hash__(self):
+        return hash(self.target)
+
+    def __eq__(self, other):
+        raise AssertionError("untrusted mapping-key equality invoked")
+
+
+class _HostileStringKey(str):
+    __hash__ = str.__hash__
+
+    def __eq__(self, other):
+        raise AssertionError("untrusted string-subclass equality invoked")
+
+
+@pytest.mark.parametrize("surface,target", [
+    ("first", "replayed"),
+    ("replayed", "request_sha256"),
+    ("user_history", "role"),
+    ("assistant_history", "content"),
+    ("diagnostics", "turns"),
+])
+@pytest.mark.parametrize("key_type", [_HostileReceiptKey, _HostileStringKey])
+def test_receipt_mapping_keys_are_validated_before_lookup(surface, target, key_type):
+    # Exact dict containers can still carry keys whose equality executes
+    # arbitrary caller code during .get(), membership, or indexed lookup.
+    first, replayed, history, diagnostics = _inputs()
+
+    def poison(mapping):
+        altered = dict(mapping)
+        original = altered.pop(target)
+        altered[key_type(target)] = original
+        return altered
+
+    if surface == "first":
+        first = poison(first)
+    elif surface == "replayed":
+        replayed = poison(replayed)
+    elif surface == "user_history":
+        history = (poison(history[0]), history[1])
+    elif surface == "assistant_history":
+        history = (history[0], poison(history[1]))
+    else:
+        diagnostics = poison(diagnostics)
+
+    with mock.patch.object(
+        proof, "canonical", side_effect=AssertionError("forged mapping serialized"),
+    ):
+        with pytest.raises(QualificationError):
+            proof.construct(
+                "c" * 64, "d" * 64, "session", "request",
+                first, replayed, history, diagnostics, exact_native=False,
+            )
+
+
+def test_mapping_key_hardening_preserves_canonical_fixture_receipt():
+    receipt = _issue()
+    assert verify(receipt, require_real=False)["real_model_executed"] is False
+
+@pytest.mark.parametrize("policy", [None, 0, 1, "", "false", [], {}])
+def test_verifier_rejects_ambiguous_real_model_policy(policy):
+    # The fixture inspection exception must require literal False, not
+    # arbitrary falsey values such as 0, None, or an empty collection.
+    with pytest.raises(QualificationError, match="verification policy"):
+        verify(_issue(), require_real=policy)
+
+
+def test_verifier_preserves_explicit_fixture_policy():
+    receipt = _issue()
+    with pytest.raises(QualificationError, match="fixture"):
+        verify(receipt, require_real=True)
+    assert verify(receipt, require_real=False)["real_model_executed"] is False

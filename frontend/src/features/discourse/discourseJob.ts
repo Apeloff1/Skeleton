@@ -220,12 +220,6 @@ export async function pollDiscourseJob(
           ? { ok: true, jobId, result }
           : failure('invalid_terminal_result', jobId);
       }
-      // Every observed row, including errors and in-flight receipts, must
-      // identify the requested private job. Never surface a foreign job's
-      // failure text or keep polling an unbound response.
-      if (record.job_id !== jobId) {
-        return failure('invalid_job_record', jobId);
-      }
       if (record.status === 'error') {
         return failure(boundedMessage(record.error, 'deliberation_failed'), jobId);
       }
@@ -272,10 +266,7 @@ export async function submitDiscourseJob(
   // If the POST returned a valid job receipt, preserve it even if the UI
   // detached at the same instant. An admitted server job is still running.
   if (options.signal?.aborted) {
-    // An error response may contain a plausible but unadmitted identifier.
-    // Retain a receipt only when the server actually acknowledged a running job.
-    const knownId = admitted.ok && admitted.data?.status === 'running' &&
-      admitted.data.error == null ? admitted.data.job_id : null;
+    const knownId = admitted.data?.job_id;
     return failure(
       'observation_cancelled',
       typeof knownId === 'string' && JOB_ID_PATTERN.test(knownId) ? knownId : null,

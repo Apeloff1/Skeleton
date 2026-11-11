@@ -11,6 +11,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -24,7 +25,7 @@ from routes.gameforge_auth import get_current_user
 from cs_classes import get_class, get_all_classes, get_class_summary
 from class_week_generator import expand_class_with_full_weeks, generate_full_week_content
 
-router = APIRouter(prefix="/curriculum", tags=["Curriculum Engine"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/curriculum", tags=["Curriculum Engine"])
 
 # ============================================================================
 # MODELS
