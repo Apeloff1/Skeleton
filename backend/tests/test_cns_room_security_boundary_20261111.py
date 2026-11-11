@@ -21,6 +21,12 @@ def test_studio_has_mandatory_auth_dependency_without_unauthorized_fallback():
     assert studio._editor is not studio._admin
     assert callable(studio._editor)
     assert callable(studio._admin)
+    assert callable(studio._viewer)
+    route_floor = studio.router.dependencies
+    assert any(getattr(dep, "dependency", None) is studio._viewer for dep in route_floor)
+    # Every route must inherit the protected router when mounted; no public
+    # CNS/boardroom read endpoint can omit its baseline viewer admission.
+    assert len(studio.router.routes) > 5
     for node in ast.walk(tree):
         if not isinstance(node, ast.FunctionDef):
             continue
