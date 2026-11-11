@@ -6,13 +6,14 @@
 """
 
 from skeleton.context.instruction_policy import InstructionPolicy
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from datetime import datetime
 import uuid
 
-router = APIRouter(prefix="/collab", tags=["Collaboration"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/collab", tags=["Collaboration"])
 
 try:
     from core.engine_chat import EngineChat, UserMessage
