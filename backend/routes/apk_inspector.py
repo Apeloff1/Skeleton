@@ -18,6 +18,7 @@ import subprocess
 import shutil
 import tempfile
 from pathlib import Path
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
@@ -26,7 +27,7 @@ from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 from services import binary_builder
 
-router = APIRouter()
+router = APIRouter(route_class=PublicExceptionRoute, )
 
 _MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 _DB_NAME = os.environ.get("DB_NAME", "test_database")

@@ -237,7 +237,16 @@ async def fetch(api_key: str, params: dict) -> dict:
 
 # ── heuristic API picker for on-demand knowledge acquisition ──────────────────
 def pick_api(query: str) -> tuple[str, dict]:
+    """Select from the fixed public API catalog using bounded request text.
+
+    The query may originate in an untrusted room message. Bound it before
+    allocating normalized text or matching any heuristic regex.
+    """
+    if type(query) is not str or not 1 <= len(query) <= 512:
+        raise ValueError("knowledge query must be bounded text")
     q = query.lower().strip()
+    if not q:
+        raise ValueError("knowledge query must not be blank")
     m = re.search(r"(?:define|meaning of|definition of)\s+(.+)", q)
     if m:
         return "dictionary", {"q": m.group(1).split()[0]}

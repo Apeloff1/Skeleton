@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "f86cdf940be31f6a4b6187f89c5e440b40f226a2",
+      "source_git_object_sha": "8838d5416d0aab19a840b9146abe4f2ec4651d9d",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "9d7b998b37facbb417996c73b6fa49712857116c",
+      "source_git_object_sha": "c17c39ce784ae05ddae2a0efdc0b468887870fd1",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "9941875f5a5f10922ff63dfe39bffe0f09bea01d",
+      "source_git_object_sha": "604551f6ce80fe74cfbf93dc073e306d9aa14fa6",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1644,7 +1644,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "e56cbf7803b26a4122711def2aed6731e02ad313",
+      "source_git_object_sha": "1d502dad477e068307996d73bc88b7fd8e913b24",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -2199,7 +2199,7 @@
       "source": "skeleton/pr_automation",
       "destination": "skeleton/ai/build/pr_automation",
       "kind": "tree",
-      "source_git_object_sha": "3df606ef721a256881d0656737c77649b47f522b",
+      "source_git_object_sha": "5ebd1c49e3adf6b9260debec0fd62f17f1150b90",
       "role": "Automerge, runner, queue, policy, evidence, and hygiene logic is autonomous repository-engineering/build-control code.",
       "work_package_refs": [
         "WP-W15",
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "1256eba56b57dafa77e7c2ce49045353971d6750"
+      "source_git_object_sha": "ce7c1908fa42a17bc146b6e1b1f7356fb9af855a"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
@@ -7380,8 +7380,8 @@
     },
     {
       "path": "skeleton/provider_environment.py",
-      "owner": "provider environment and deterministic replay custody boundary",
-      "reason": "Canonical bounded provider-environment records and replay checkpoint evidence remain owned by skeleton/provider_environment.py. This is not model execution or provider admission authority; no AI-tree ownership cutover or promotion is implied."
+      "owner": "game-environment simulation and deterministic replay",
+      "reason": "The deterministic game-world adapter and holdout/replay buffers remain outside credential-provider AI tree authority; this module has no model credential custody or provider runtime ownership."
     },
     {
       "path": "skeleton/providers",

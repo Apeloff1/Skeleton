@@ -252,20 +252,25 @@ def _propagate_aliases(
     function_aliases: dict[str, str],
 ) -> None:
     """Conservatively follow simple module/callable aliases to import primitives."""
-    for _ in range(6):
+    # A reverse-ordered alias chain can require one pass per assignment.
+    # A fixed small iteration cap silently misses imports after that depth.
+    # Materialize the finite assignment graph once and bound closure by its
+    # size; an unstable/conflicting alias graph must fail closed.
+    assignments = list(_assignment_pairs(tree))
+    for _ in range(len(assignments) + 1):
         changed = False
-        for targets, value in _assignment_pairs(tree):
+        for targets, value in assignments:
             if isinstance(value, ast.Name):
                 if value.id in importlib_modules:
                     before = len(importlib_modules)
                     importlib_modules.update(targets)
                     changed |= len(importlib_modules) != before
-                    continue
+                    # A name can be rebound from module to import callable.
+                    # Preserve both possible roles rather than hiding the call.
                 if value.id in builtins_modules:
                     before = len(builtins_modules)
                     builtins_modules.update(targets)
                     changed |= len(builtins_modules) != before
-                    continue
 
             primitive = _dynamic_import_callable(
                 value,
@@ -282,6 +287,7 @@ def _propagate_aliases(
                 changed = True
         if not changed:
             return
+    raise DynamicImportScanError("alias propagation did not converge")
 
 
 def _called_dynamic_import(
@@ -351,7 +357,10 @@ def violations(path: Path) -> list[str]:
         return [f"{label}: parse failure: {type(exc).__name__}"]
 
     importlib_modules, builtins_modules, function_aliases = _import_aliases(tree)
-    _propagate_aliases(tree, importlib_modules, builtins_modules, function_aliases)
+    try:
+        _propagate_aliases(tree, importlib_modules, builtins_modules, function_aliases)
+    except DynamicImportScanError:
+        return [f"{label}: alias propagation did not converge"]
     parents = _parent_map(tree)
     used_exception_indexes: set[int] = set()
     findings: list[str] = []

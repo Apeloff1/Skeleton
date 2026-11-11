@@ -214,6 +214,7 @@ def test_idempotency_decorator_cannot_hide_missing_completion_or_replay(monkeypa
         "skeleton.api.routes:forge_materialise",
         "skeleton.api.routes:forge_archetype",
         "skeleton.api.routes:gameforge_run",
+        "skeleton.api.routes:game_build",
         "skeleton.api.routes:gameforge_intake",
     }
     for missing in ("complete", "replay"):
@@ -251,61 +252,6 @@ def test_idempotency_decorator_cannot_hide_missing_completion_or_replay(monkeypa
             snapshot = idempotency_audit_snapshot()
         failures = snapshot["missing_remember" if missing == "complete" else "missing_replay"]
         assert expected <= set(failures)
-
-
-def test_queued_game_build_missing_replay_or_digest_remains_audit_visible(monkeypatch) -> None:
-    """The separately queued build must fail the audit when its guard is lost."""
-    import ast
-    import copy
-
-    from skeleton.app.runtime import audit_parse
-
-    parse = audit_parse.parse_module_tree
-    original = parse("skeleton.api.routes")
-    assert isinstance(original, ast.Module)
-    handler = next(
-        node for node in original.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "game_build"
-    )
-    assert audit_parse._queued_build_idempotency_verified(handler)
-    for missing in ("key_extraction", "request_digest"):
-        modified = copy.deepcopy(original)
-        build = next(
-            node for node in modified.body
-            if isinstance(node, ast.AsyncFunctionDef) and node.name == "game_build"
-        )
-        if missing == "key_extraction":
-            calls = [
-                node for node in ast.walk(build)
-                if isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id == "_idempotency"
-                and node.func.attr == "_extract_key"
-            ]
-            assert len(calls) == 1
-            calls[0].func.attr = "unsafe_noop"
-        else:
-            calls = [
-                node for node in ast.walk(build)
-                if isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == "enqueue_game_build"
-            ]
-            assert len(calls) == 1
-            keywords = [kw for kw in calls[0].keywords if kw.arg == "request_digest"]
-            assert len(keywords) == 1
-            keywords[0].arg = "unsafe_digest"
-        assert not audit_parse._queued_build_idempotency_verified(build)
-
-        def substituted(module: str):
-            return modified if module == "skeleton.api.routes" else parse(module)
-
-        with monkeypatch.context() as patch:
-            patch.setattr(audit_parse, "parse_module_tree", substituted)
-            snapshot = idempotency_audit_snapshot()
-        assert "skeleton.api.routes:game_build" in snapshot["missing_replay"]
-        assert "skeleton.api.routes:game_build" in snapshot["missing_remember"]
 
 
 def test_idempotency_audit_rejects_completion_hidden_in_dead_branch(monkeypatch) -> None:

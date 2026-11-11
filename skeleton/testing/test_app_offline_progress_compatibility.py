@@ -57,8 +57,12 @@ def test_foreign_progress_rejected_before_install_reservation(tmp_path, capsys):
     foreign_source, foreign_manifest = _journey(
         tmp_path, capsys, "foreign-world", 987,
     )
+    # A second original save must not overwrite the prepared source's
+    # create-only progress receipt; keep both worlds independent.
+    foreign_save_dir = tmp_path / "foreign-progress"
+    foreign_save_dir.mkdir(mode=0o700)
     foreign_save, foreign_pin, _ = _save(
-        tmp_path, capsys, foreign_source, foreign_manifest,
+        foreign_save_dir, capsys, foreign_source, foreign_manifest,
     )
     destination = tmp_path / "never-reserved"
     migrated = tmp_path / "never-published.json"

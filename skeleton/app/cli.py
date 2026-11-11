@@ -322,7 +322,20 @@ def _print_status(
     full: bool = False,
     timeout: float = 3.0,
 ) -> int:
-    manifest = runtime_manifest()
+    try:
+        manifest = runtime_manifest()
+    except (OSError, ValueError, UnicodeError):
+        # Diagnostic output must not leak operator secrets or throw a traceback
+        # when the .env source is oversized, linked, malformed or replaced.
+        if as_json:
+            print(json.dumps({
+                "ok": False,
+                "code": "runtime_configuration_unavailable",
+                "message": "Cannot safely read runtime configuration or host port settings",
+            }, sort_keys=True))
+        else:
+            print("Runtime configuration unavailable; inspect app check --runtime")
+        return 2
     payload = manifest_payload(manifest)
     live_results = ()
     live_ok: bool | None = None
@@ -411,6 +424,12 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     """Run the application assembly CLI and return a process-style exit code."""
 
     arguments = list(argv or ())
+    # The original-game authoring CLI owns its own strict argument validation,
+    # source-bound replay and exclusive save-custody rules. Do not duplicate
+    # those operations in the assembly shell's argument parser.
+    if arguments and arguments[0] == "game-project":
+        from scripts.game.game_project import main as game_project_main
+        return game_project_main(arguments[1:])
     # The same pinned Jeeves candidate optimizer owns multidomain specialization.
     if arguments and arguments[0] == "training-modules":
         from skeleton.ai.training.jeeves_parallel_mirrors import main as training_main
@@ -1123,7 +1142,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 if check.required and not check.ok:
                     print(f"[FAIL] {check.detail}; {check.remediation}")
             return 1
-        manifest = runtime_manifest(manifest, root=root)
+        try:
+            manifest = runtime_manifest(manifest, root=root)
+        except (OSError, ValueError, UnicodeError):
+            print("application start aborted: runtime configuration changed or is unsafe")
+            return 2
         mode = "production" if bool(args.production) else "development"
         try:
             startup_command = compose_command(
@@ -1172,7 +1195,20 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if command == "smoke":
         from skeleton.app.health import probes_ok, wait_for_application
 
-        manifest = runtime_manifest(manifest, root=root)
+        try:
+            manifest = runtime_manifest(manifest, root=root)
+        except (OSError, ValueError, UnicodeError):
+            message = "runtime configuration unsafe or unreadable; health probes were not sent"
+            if bool(args.as_json):
+                print(json.dumps({
+                    "ok": False,
+                    "code": "runtime_configuration_unavailable",
+                    "message": message,
+                    "results": [],
+                }, sort_keys=True))
+            else:
+                print("application smoke blocked: " + message)
+            return 2
         timeout = float(args.timeout)
         attempts = int(args.attempts)
         delay = float(args.delay)

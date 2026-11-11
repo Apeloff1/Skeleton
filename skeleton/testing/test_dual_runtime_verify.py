@@ -496,6 +496,8 @@ def _studio_verification_fixture(tmp_path):
         if path == "studio/consumer_gate.json":
             obj = consumer
         elif path == "studio/pipeline.json":
+            # This is an admitted source-only studio package. Mirror the
+            # current verifier's project-bound, no-publication source contract.
             obj = {
                 "schema": "skeleton.game_builder.studio_pipeline.v1",
                 "project_id": original.manifest["project_id"],
