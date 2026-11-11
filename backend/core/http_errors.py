@@ -57,7 +57,7 @@ _JSON_SECRET_RE = re.compile(
     r'(?i)"(?:token|password|secret|authorization|api[_-]?key|'
     r'access[_-]?token|refresh[_-]?token)"\s*:\s*"[^"\r\n]*"'
 )
-_MAX_REDACTED_TEXT = 2_000
+_MAX_REDACTED_TEXT = 16_384
 
 
 def redact_client_text(value: str, *, max_len: int = 2000) -> str:
@@ -69,7 +69,7 @@ def redact_client_text(value: str, *, max_len: int = 2000) -> str:
     if not isinstance(value, str):
         return "[UNSUPPORTED]"
     if type(max_len) is not int or not 0 <= max_len <= _MAX_REDACTED_TEXT:
-        raise ValueError("redaction character budget must be within [0, 2000]")
+        raise ValueError("redaction character budget exceeds maximum")
     # Include a bounded lookahead to redact credentials crossing the output
     # boundary; processing is capped even for gigabyte-sized exceptions.
     text = value[:max_len + 256]
