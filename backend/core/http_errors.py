@@ -4,11 +4,14 @@ from __future__ import annotations
 import logging
 import math
 import re
+from inspect import isawaitable
 from itertools import islice
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 log = logging.getLogger("codedock.http_errors")
 
@@ -140,7 +143,31 @@ def internal_http_error(public_detail: str, exc: BaseException | None = None) ->
 
 
 def install_public_error_handlers(app: FastAPI) -> None:
-    """Register a fail-closed handler for unhandled exceptions."""
+    """Register fail-closed handlers for explicit 5xx and unhandled failures.
+
+    Starlette considers HTTPException a handled exception, not an unexpected
+    failure. Protecting only Exception leaves explicit 500/502/503 route
+    details and their headers untouched. Preserve the registered 4xx handler.
+    """
+    previous_http_handler = app.exception_handlers.get(
+        StarletteHTTPException, http_exception_handler
+    )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def public_http_exception_handler(
+        request: Any, exc: StarletteHTTPException
+    ) -> Any:
+        if exc.status_code < 500:
+            result = previous_http_handler(request, exc)
+            return await result if isawaitable(result) else result
+        # Do not include the public path, arbitrary detail, or upstream
+        # headers; all of these may contain network/provider credentials.
+        log.warning("server HTTP failure (%s)", exc.status_code)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": PUBLIC_INTERNAL_ERROR},
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.exception_handler(Exception)
     async def unhandled_error_handler(_request: Any, exc: Exception) -> JSONResponse:
