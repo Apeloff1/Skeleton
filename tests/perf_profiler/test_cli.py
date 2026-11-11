@@ -70,9 +70,59 @@ def test_alloc_rejects_unpinned_target_before_import(monkeypatch):
     def forbidden_import(_module):
         raise AssertionError("untrusted module was imported")
 
-    monkeypatch.setattr(cli.importlib, "import_module", forbidden_import)
+    import importlib
+    monkeypatch.setattr(importlib, "import_module", forbidden_import)
     assert main(["alloc", "untrusted.module:run", "--allow-local-callable"]) == 2
 
+
+
+def test_alloc_allowlisted_but_unloaded_module_is_not_imported(monkeypatch, capsys):
+    import importlib
+    from skeleton.perf_profiler import cli
+
+    target = "never_loaded_perf_target.worker:run"
+    monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
+    monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", target)
+
+    def forbidden_import(*_args, **_kwargs):
+        raise AssertionError("allowlisted CLI input must not trigger an import")
+
+    monkeypatch.setattr(importlib, "import_module", forbidden_import)
+    assert cli.main(["alloc", target, "--allow-local-callable"]) == 2
+    assert "preloaded" in capsys.readouterr().err
+
+
+def test_alloc_does_not_evaluate_module_getattr(monkeypatch, capsys):
+    import sys
+    from types import ModuleType
+    from skeleton.perf_profiler import cli
+
+    name = "perf_profiler_preloaded_module_without_callable"
+    module = ModuleType(name)
+
+    def forbidden_getattr(_attr):
+        raise AssertionError("module __getattr__ must not execute")
+
+    module.__getattr__ = forbidden_getattr
+    monkeypatch.setitem(sys.modules, name, module)
+    target = f"{name}:run"
+    monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
+    monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", target)
+    assert cli.main(["alloc", target, "--allow-local-callable"]) == 2
+    assert "preloaded callable" in capsys.readouterr().err
+
+
+def test_alloc_rejects_fake_preloaded_module(monkeypatch, capsys):
+    import sys
+    from skeleton.perf_profiler import cli
+
+    name = "perf_profiler_fake_module"
+    monkeypatch.setitem(sys.modules, name, object())
+    target = f"{name}:run"
+    monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
+    monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", target)
+    assert cli.main(["alloc", target, "--allow-local-callable"]) == 2
+    assert "preloaded" in capsys.readouterr().err
 
 def test_verify(tmp_path):
     t = LoadTimer(clock=DeterministicClock(script=[5]))
