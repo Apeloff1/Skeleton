@@ -33,10 +33,13 @@ test('unsafe object paths cannot access inherited prototype graph', () => {
 });
 
 test('deepMerge never assigns attacker-controlled prototype keys', () => {
-  const payload = JSON.parse(
-    '{"__proto__":{"isAdmin":true},"constructor":{"prototype":{"isAdmin":true}},"safe":{"ok":true}}',
-  );
-  const merged = utils.deepMerge(payload, { safe: { valid: true } });
+  // Keep fixtures in the same JS realm as transpiled utilities: the
+  // isPlainObject contract intentionally excludes non-native prototypes.
+  sandbox.untrustedInput = '{"__proto__":{"isAdmin":true},"constructor":{"prototype":{"isAdmin":true}},"safe":{"ok":true}}';
+  const payload = vm.runInNewContext('JSON.parse(untrustedInput)', sandbox);
+  sandbox.untrustedInput = '{"safe":{"valid":true}}';
+  const legitimate = vm.runInNewContext('JSON.parse(untrustedInput)', sandbox);
+  const merged = utils.deepMerge(payload, legitimate);
   assert.equal(merged.safe.ok, true);
   assert.equal(merged.safe.valid, true);
   assert.equal(Object.prototype.isAdmin, undefined);
