@@ -47,3 +47,11 @@ jobs:
           python -m pytest -q --noconftest \
             tests/test_product_surface_specification.py \
             tests/test_product_surface_delegated_backend_20261110.py
+      - name: Enforce workflow security with immutable trusted-target exception
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python scripts/check_workflow_security.py
+          python -m pytest -q --noconftest tests/test_workflow_trusted_merge_hold_policy.py
