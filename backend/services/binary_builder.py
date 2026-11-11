@@ -960,20 +960,10 @@ def open_artifact_for_download(build_id: str, kind: str):
         return None
 
 def find_artifact_path(build_id: str, kind: str) -> Optional[Path]:
-    if kind not in {"zip", "apk"}:
-        return None
-    if (
-        not isinstance(build_id, str)
-        or not build_id
-        or len(build_id) > 128
-        or any(not (ch.isascii() and (ch.isalnum() or ch in {"-", "_"})) for ch in build_id)
-    ):
-        return None
+    """Deprecated unsafe path-only API: fail closed.
 
-    root = ARTIFACTS_ROOT.resolve()
-    candidate = (root / f"{build_id}.{kind}").resolve()
-    try:
-        candidate.relative_to(root)
-    except ValueError:
-        return None
-    return candidate if candidate.is_file() else None
+    Returning a checked pathname allows a symlink or parent-directory swap
+    between validation and FileResponse. Use open_artifact_for_download()
+    to obtain and serve a verified descriptor instead.
+    """
+    return None
