@@ -84,6 +84,23 @@ def test_literal_loader_inventory_matches_declared_repository_modules():
     assert set(lazy_registry._LOADERS) == expected
 
 
+def test_public_exception_route_literal_loader_uses_reviewed_import(monkeypatch):
+    """A newly added redaction route stays in the explicit lazy allowlist."""
+    name = "core.public_exception_route"
+    assert "public_exception_route" in lazy_registry.module_names()
+    assert name in lazy_registry._LOADERS
+    sentinel = object()
+    calls = []
+
+    def recorded_import(module_name):
+        calls.append(module_name)
+        return sentinel
+
+    monkeypatch.setattr(lazy_registry.importlib, "import_module", recorded_import)
+    assert lazy_registry._LOADERS[name]() is sentinel
+    assert calls == [name]
+
+
 def test_registry_has_no_runtime_selected_python_imports():
     from pathlib import Path
     from scripts.check_dynamic_import_safety import violations
