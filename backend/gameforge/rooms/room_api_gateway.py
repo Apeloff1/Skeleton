@@ -37,16 +37,20 @@ _mcp = None
 _ALLOWED_HTTP_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"})
 _MAX_EXTERNAL_URL_CHARS = 4096
 _MAX_EXTERNAL_TIMEOUT_SECONDS = 30.0
-_MAX_RESPONSE_BYTES = 256 * 1024
-_MAX_REQUEST_BYTES = 64 * 1024
+_MAX_RESPONSE_BYTES = 64 * 1024
+_MAX_REQUEST_BYTES = 16 * 1024
 _MAX_MCP_QUERIES = 32
 _MAX_API_TARGETS = 32
 _MAX_SOURCES = 16
 _MAX_CONCURRENT_QUERIES = 8
+_MAX_TOTAL_CONCURRENT_JOBS = 48
 _MAX_JSON_DEPTH = 8
 _MAX_JSON_NODES = 1024
 _FORBIDDEN_FORWARD_HEADERS = frozenset({
     "host",
+    "authorization", "cookie", "set-cookie", "proxy-authenticate",
+    "forwarded", "x-forwarded-for", "x-forwarded-host", "x-real-ip",
+    "x-api-key", "x-auth-token",
     "proxy-authorization",
     "proxy-connection",
     "connection",
@@ -79,6 +83,8 @@ def _resolve_public_host(hostname: str) -> str:
         raise ValueError("external API host could not be resolved") from exc
     if not addresses:
         raise ValueError("external API host resolved to no addresses")
+    if len(addresses) > 32:
+        raise ValueError("external API host has too many DNS addresses")
     approved: set[str] = set()
     for address in addresses:
         try:
@@ -109,7 +115,7 @@ def _prepare_external_request(url: str) -> tuple[str, str]:
     HTTP client removes the full-URL SSRF sink while retaining the explicit
     operator allowlist and public-address checks.
     """
-    if not isinstance(url, str) or not url or len(url) > _MAX_EXTERNAL_URL_CHARS:
+    if type(url) is not str or not url or len(url) > _MAX_EXTERNAL_URL_CHARS:
         raise ValueError("external API URL is missing or exceeds the size limit")
     if any(ord(ch) < 32 or ord(ch) == 127 for ch in url):
         raise ValueError("external API URL contains control characters")
@@ -145,13 +151,22 @@ def _validate_external_url(url: str) -> None:
 
 
 def _safe_method(value: Any) -> str:
-    method = str(value or "GET").upper()
+    # Never execute arbitrary __str__ hooks during untrusted request admission.
+    if value is None:
+        value = "GET"
+    if type(value) is not str or len(value) > 16:
+        raise ValueError("external API method is invalid")
+    method = value.upper()
     if method not in _ALLOWED_HTTP_METHODS:
         raise ValueError("external API method is not allowed")
     return method
 
 
 def _safe_timeout(value: Any) -> float:
+    if type(value) not in (str, int, float) or (
+        type(value) is str and len(value) > 16
+    ):
+        raise ValueError("external API timeout is invalid")
     try:
         timeout = float(value)
     except (TypeError, ValueError, OverflowError) as exc:
@@ -164,24 +179,19 @@ def _safe_timeout(value: Any) -> float:
 def _safe_headers(value: Any) -> dict[str, str] | None:
     if value is None:
         return None
-    if type(value) is not dict or len(value) > 32:
+    if type(value) is not dict or len(value) > 24:
         raise ValueError("external API headers exceed the allowlisted shape")
     headers: dict[str, str] = {}
-    total = 0
     for raw_name, raw_value in value.items():
         if type(raw_name) is not str or type(raw_value) is not str:
             raise ValueError("external API header keys and values must be strings")
-        name, header_value = raw_name, raw_value
-        if (not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]{1,64}", name)
-                or name.lower() in _FORBIDDEN_FORWARD_HEADERS):
+        if not re.fullmatch(r"[A-Za-z0-9-]{1,64}", raw_name):
+            raise ValueError("external API header name is invalid")
+        if raw_name.lower() in _FORBIDDEN_FORWARD_HEADERS:
             raise ValueError("external API contains a forbidden forwarding header")
-        if (len(header_value) > 8192
-                or any(ord(ch) < 32 or ord(ch) == 127 for ch in header_value)):
-            raise ValueError("external API header contains control characters")
-        total += len(name) + len(header_value)
-        if total > 16 * 1024:
-            raise ValueError("external API header budget exceeded")
-        headers[name] = header_value
+        if len(raw_value) > 1024 or any(ord(ch) < 32 or ord(ch) > 126 for ch in raw_value):
+            raise ValueError("external API header contains unsafe characters")
+        headers[raw_name] = raw_value
     return headers
 
 
@@ -290,7 +300,10 @@ async def _api_query(target: dict) -> dict:
                 "error": "api_query_failed"}
     # Never echo an entire caller-controlled URL containing bearer tokens.
     raw_name = target.get("name", "external_api")
-    name = raw_name if type(raw_name) is str and 1 <= len(raw_name) <= 80 else "external_api"
+    name = (
+        raw_name if type(raw_name) is str and 1 <= len(raw_name) <= 64
+        and re.fullmatch(r"[A-Za-z0-9_-]+", raw_name) else "external_api"
+    )
     if not _EXTERNAL_ENABLED:
         return {"channel": "api", "target": name, "ok": True, "disabled": True,
                 "note": "external APIs disabled (inward-focused); set GAMEFORGE_ENABLE_EXTERNAL_APIS=1"}
@@ -346,6 +359,7 @@ async def query_concurrent(room_id: str, mcp_queries: list[str] | None = None,
     if (type(room_id) is not str or not 1 <= len(room_id) <= 128
             or type(mcp_queries) is not list or len(mcp_queries) > _MAX_MCP_QUERIES
             or type(api_targets) is not list or len(api_targets) > _MAX_API_TARGETS
+            or len(mcp_queries) + len(api_targets) > _MAX_TOTAL_CONCURRENT_JOBS
             or any(type(q) is not str or not 1 <= len(q) <= 4096 for q in mcp_queries)
             or any(type(target) is not dict for target in api_targets)
             or (sources is not None and (

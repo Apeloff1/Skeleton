@@ -167,7 +167,7 @@ async def test_external_api_stream_is_bounded_and_pinned(monkeypatch):
         "params": {"q": "safe"},
     })
     assert result == {
-        "channel": "api", "target": "Test service", "ok": False,
+        "channel": "api", "target": "external_api", "ok": False,
         "error": "api_query_failed",
     }
     assert calls[0][1]["base_url"] == "https://93.184.216.34"
