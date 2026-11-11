@@ -103,3 +103,28 @@ def test_docs_allows_only_canonical_https_rust_origins(rust_predicate, url):
 ])
 def test_docs_denies_credentialed_or_redirected_origins(rust_predicate, url):
     assert rust_predicate(url) is False
+
+
+@pytest.mark.parametrize("relative,name", [
+    ("../../etc/passwd", "_trusted_build_download_url"),
+    ("backend/tests/test_final_build.py", "_trusted_rust_official_url"),
+    ("tests/legacy_root/backend_test_review_2026_05.py", "main"),
+])
+def test_origin_loader_denies_unreviewed_module_or_function(relative, name):
+    with pytest.raises(KeyError):
+        _load_helper(relative, name)
+
+
+def test_legacy_origin_predicate_import_never_runs_live_smoke_main(monkeypatch):
+    import requests
+
+    def deny_network(*_args, **_kwargs):
+        raise AssertionError("legacy smoke import attempted a network request")
+
+    monkeypatch.setattr(requests, "get", deny_network)
+    monkeypatch.setattr(requests, "post", deny_network)
+    predicate = _load_helper(
+        "tests/legacy_root/backend_test_review_2026_05.py",
+        "_trusted_rust_official_url",
+    )
+    assert predicate("https://doc.rust-lang.org/book/") is True
