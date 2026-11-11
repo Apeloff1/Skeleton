@@ -90,7 +90,11 @@ def test_condition_depth_bound() -> None:
 def test_utility_curves_and_choice() -> None:
     assert curve("inverse", 0.25) == 0.75
     assert curve("logistic", 0.5) == pytest.approx(0.5)
-    assert curve("linear", 7) == 1.0
+    assert curve("linear", 1.0) == 1.0
+    # Utility samples outside [0, 1] are invalid rather than silently
+    # clamped into plausible AI decisions.
+    with pytest.raises(ValidationError):
+        curve("linear", 7)
     with pytest.raises(ValidationError):
         curve("cubic", 0.5)
     opts = [{"action": "wander", "need": "boredom", "weight": 1}, {"action": "flee", "need": "fear", "weight": 1.5, "curve": "quadratic"}]
@@ -177,3 +181,10 @@ def test_wander_is_seeded_and_replayable() -> None:
 
     assert run(4) == run(4)
     assert run(4) != run(5)
+
+
+@pytest.mark.parametrize("sample", (-0.1, 1.01, float("nan"), float("inf"),
+                                    -float("inf"), True, 1 << 10000))
+def test_utility_curve_rejects_out_of_domain_samples(sample) -> None:
+    with pytest.raises(ValidationError):
+        curve("linear", sample)
