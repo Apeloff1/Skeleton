@@ -23,6 +23,7 @@ def _validated_transcript(history: tuple[dict, ...]) -> bytes:
     for expected_role, entry in zip(("user", "assistant"), history):
         if (type(entry) is not dict or len(entry) != 2
                 or "role" not in entry or "content" not in entry
+                or type(entry["role"]) is not str
                 or entry["role"] != expected_role):
             raise QualificationError("committed transcript did not replay exactly")
         content = entry["content"]

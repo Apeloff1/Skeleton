@@ -120,3 +120,35 @@ def test_oversized_del_escapes_rejected_before_json_encoder_or_filesystem():
                 Path("/does-not-need-to-exist"), "report.json",
                 {"payload": "\x7f" * 3_000},
             )
+
+
+def test_role_equality_spoof_rejected_before_canonicalization():
+    class SpoofRole:
+        def __eq__(self, other):
+            return True
+
+    _, _, history, _ = _inputs()
+    forged = ({"role": SpoofRole(), "content": "hi"}, history[1])
+    with mock.patch.object(
+        proof, "canonical", side_effect=AssertionError("canonical called"),
+    ):
+        with pytest.raises(QualificationError, match="committed transcript"):
+            _issue(history=forged)
+
+
+def test_subclassed_receipts_cannot_override_lookup_before_preflight():
+    class HostileReceipt(dict):
+        def get(self, *args, **kwargs):
+            raise AssertionError("hostile mapping getter invoked")
+
+    first, replayed, history, diagnostics = _inputs()
+    for forged_first, forged_replay in (
+        (HostileReceipt(first), replayed),
+        (first, HostileReceipt(replayed)),
+    ):
+        with pytest.raises(QualificationError, match="missing inference receipts"):
+            proof.construct(
+                "c" * 64, "d" * 64, "session", "request",
+                forged_first, forged_replay, history, diagnostics,
+                exact_native=False,
+            )
