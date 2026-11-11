@@ -46,7 +46,7 @@ _AUTHORIZATION_RE = re.compile(
 )
 _SECRET_ASSIGNMENT_RE = re.compile(
     r"(?i)\b(api[-_]?key|access[-_]?token|refresh[-_]?token|token|secret|password)"
-    r"\b\s*[:=]\s*([^\s,;]+)"
+    r"\b\s*[:=]\s*([^\s,;&#}]+)"
 )
 _BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
 _QUERY_SECRET_RE = re.compile(
