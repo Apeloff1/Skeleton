@@ -32,6 +32,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       ISSUE_NUMBER: '1016'
+      # Inventory all 151 open CodeQL and 4 dependency alerts; never truncate at 50.
       BATCH_SIZE: '200'
       BODY_MAX_BYTES: '60000'
     steps:
@@ -126,6 +127,13 @@ jobs:
           total=$((code_count + dep_count))
           actionable_total=$((canonical_code_count + dep_count))
           expected_batch=$(( actionable_total < BATCH_SIZE ? actionable_total : BATCH_SIZE ))
+          # Every current alert should be shown, not merely the first 50.
+          # If the volume later exceeds 200, say so without pretending a
+          # partial prioritized list is a complete alert inventory.
+          coverage="complete"
+          if (( actionable_total > BATCH_SIZE )); then
+            coverage="partial: alert count exceeds batch admission limit"
+          fi
           if (( batch_count > BATCH_SIZE )); then
             echo "Prioritized security batch exceeded configured bound." >&2
             exit 1
@@ -149,6 +157,7 @@ jobs:
             echo "- Total tracked findings: **${total}**"
             echo "- Actionable canonical/dependency findings: **${actionable_total}**"
             echo "- Prioritized remediation batch: **${batch_count} / ${BATCH_SIZE}**"
+            echo "- Detailed finding coverage: **${coverage}**"
             echo "- Nominal batch target before identity de-duplication: **${expected_batch}**"
             echo
             echo '### Root-cause groups in this batch'
@@ -200,6 +209,7 @@ jobs:
             echo "- Digest issue: #${issue_number}"
             echo "- Code scanning alerts: ${code_count}"
             echo "- Dependabot alerts: ${dep_count}"
+            echo "- Detailed finding coverage: ${coverage}"
             echo "- Prioritized batch: ${batch_count}/${BATCH_SIZE}"
             echo "- Nominal target before de-duplication: ${expected_batch}"
             echo '- Read-only alert inventory: no alerts dismissed or modified.'
