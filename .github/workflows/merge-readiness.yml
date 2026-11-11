@@ -260,12 +260,14 @@ jobs:
           tests/test_room_api_admission_security.py
           tests/test_binary_atomic_security_20261111.py
           tests/test_api_token_and_enum_security.py
+          tests/test_telemetry_privacy_boundary.py
       - name: Qualify secure session, telemetry, prototype and guest VM custody
         run: >-
           node --test
           frontend/scripts/test-secure-session-identifiers.cjs
           frontend/scripts/test-quickwins-prototype-guard.cjs
           frontend/scripts/test-telemetry-redaction.cjs
+          frontend/scripts/test-telemetry-privacy.mjs
           frontend/scripts/test-wasm-guest-sandbox.cjs
       # Full repository Ruff lint runs in the canonical quality gate below; avoid a second backend-only pass.
       - name: Canonical lint, type, and high-confidence security gates
@@ -296,6 +298,8 @@ jobs:
         run: >-
           python -m pip install --disable-pip-version-check
           "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "httpx>=0.28.1,<1" "motor==3.7.1" "pymongo==4.19.0" "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3" "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2"
+      - name: Verify live-label merge holds and stale PR authority
+        run: python -m unittest discover -s tests -p test_pr_merge_hold_gate.py -v
       - name: Compile automation package
         run: >-
           python -m compileall -q
