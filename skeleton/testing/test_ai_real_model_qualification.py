@@ -88,12 +88,8 @@ class QualificationTests(unittest.TestCase):
 
     def test_report_rejects_control_unicode_and_oversized_names(self):
         bad_names = (
-            'line\\nbreak.json'.replace('\\n', '\n'),
-            'line\\rbreak.json'.replace('\\r', '\r'),
-            'tab\\t.json'.replace('\\t', '\t'),
-            'nul\\x00.json'.replace('\\x00', '\x00'),
-            'unicode-\\u2603.json'.replace('\\u2603', '\u2603'),
-            'rtl-\\u202e.json'.replace('\\u202e', '\u202e'),
+            'line\nbreak.json', 'line\rbreak.json', 'tab\t.json',
+            'nul\x00.json', 'unicode-\u2603.json', 'rtl-\u202e.json',
             'bad name.json', 'a' * 96 + '.json',
         )
         for name in bad_names:
@@ -102,8 +98,7 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(list(self.out.iterdir()), [])
 
     def test_report_streaming_keeps_canonical_bytes(self):
-        payload = {'z': 'caf\\u00e9'.replace('\\u00e9', '\u00e9'),
-                   'a': {'nested': [1, True, None]}}
+        payload = {'z': 'café', 'a': {'nested': [1, True, None]}}
         name = 'a' * 95 + '.json'
         publish_private_report(self.out, name, payload)
         expected = (json.dumps(payload, sort_keys=True, separators=(',', ':'),
