@@ -37,8 +37,16 @@ with ThreadPoolExecutor(max_workers=12) as pool:
     singleton_ids = list(pool.map(lambda _: id(route.get_orchestrator()), range(48)))
 assert len(set(singleton_ids)) == 1
 paths = {item.path for item in route.router.routes}
-assert {"/health", "/session", "/run", "/session/{session_id}",
-        "/session/{session_id}/export", "/sessions", "/studio/status"} <= paths
+# FastAPI stores APIRouter prefix on every registered route, not bare paths.
+expected = {route.router.prefix + suffix for suffix in (
+    "/health", "/session", "/run", "/session/{session_id}",
+    "/session/{session_id}/export", "/sessions", "/studio/status"
+)}
+assert expected <= paths, (expected - paths, paths)
+methods = {(item.path, method) for item in route.router.routes for method in item.methods}
+assert (route.router.prefix + "/session", "POST") in methods
+assert (route.router.prefix + "/run", "POST") in methods
+assert (route.router.prefix + "/health", "GET") in methods
 health = asyncio.run(route.ecosystem_health())
 assert health["ok"] is True
 created = asyncio.run(route.create_session(
