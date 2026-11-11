@@ -7,7 +7,7 @@ from core import forge_quality
 
 def _trusted_build_download_url(value: object) -> bool:
     """Require an exact HTTPS CDN authority, not a matching URL substring."""
-    if type(value) is not str or not 1 <= len(value) <= 2048 or "\\\\" in value:
+    if type(value) is not str or not 1 <= len(value) <= 2048 or "\\" in value:
         return False
     try:
         parsed = urlsplit(value)
