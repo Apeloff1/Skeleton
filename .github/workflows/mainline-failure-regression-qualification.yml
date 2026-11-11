@@ -14,8 +14,8 @@ on:
       - 'skeleton/testing/test_ecs_ai.py'
       - 'skeleton/testing/test_ai_native_endurance.py'
       - 'skeleton/testing/test_jeeves_native_batch.py'
-      - 'tests/test_galaxy_file_budget.py'
-      - 'tests/test_storage_lazy_registry.py'
+      - 'backend/tests/test_galaxy_file_budget.py'
+      - 'backend/tests/test_storage_lazy_registry.py'
 
 permissions:
   contents: read
@@ -98,7 +98,7 @@ jobs:
           PYTHONPATH: '.:backend'
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin --maxfail=3
-          tests/test_galaxy_file_budget.py::test_unavailable_generation_fails_closed_without_stub_or_fallback_files
-          tests/test_storage_lazy_registry.py::test_literal_loader_inventory_matches_declared_repository_modules
+          backend/tests/test_galaxy_file_budget.py::test_unavailable_generation_fails_closed_without_stub_or_fallback_files
+          backend/tests/test_storage_lazy_registry.py::test_literal_loader_inventory_matches_declared_repository_modules
       - name: Verify canonical AI source tree
         run: python scripts/check_ai_file_tree.py
