@@ -111,7 +111,10 @@ class PRMergeHoldGateTests(unittest.TestCase):
             validate_current_pr(event(candidate), live, REPOSITORY)
 
     def test_absent_or_malformed_live_labels_fail_closed(self):
-        for labels in (None, "do-not-merge", [None], [{"name": None}], [{"name": "\\n"}]):
+        for labels in (
+            None, "do-not-merge", [None], [{"name": None}],
+            [{"name": chr(10)}],
+        ):
             candidate = pr()
             if labels is None:
                 del candidate["labels"]
