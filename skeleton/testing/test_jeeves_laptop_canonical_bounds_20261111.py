@@ -145,5 +145,20 @@ class TestBoundedJeevesCanonicalEvidence(unittest.TestCase):
         self.assertEqual(canonical.read_bytes(), mirror.read_bytes())
 
 
+    def test_qualification_workflow_executes_exact_immutable_head(self):
+        workflow = (
+            Path(__file__).resolve().parents[2]
+            / ".github/workflows/jeeves-bounded-canonical-evidence.yml"
+        ).read_text(encoding="utf-8")
+        expected_ref = 'ref: ${{ github.event.pull_request.head.sha }}'
+        expected_guard = 'run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"'
+        self.assertEqual(workflow.count(expected_ref), 1)
+        self.assertEqual(workflow.count(expected_guard), 1)
+        self.assertIn('EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}', workflow)
+        self.assertLess(workflow.index(expected_ref), workflow.index(expected_guard))
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("fetch-depth: 1", workflow)
+
+
 if __name__ == "__main__":
     unittest.main()
