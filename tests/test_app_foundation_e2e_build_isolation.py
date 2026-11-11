@@ -46,5 +46,31 @@ class AppFoundationBuildIsolationTests(unittest.TestCase):
         self.assertNotIn("EXPO_NO_METRO_LAZY", builder)
 
 
+    def test_export_supervisor_preserves_fail_closed_source_contract(self):
+        # Historical #5186 contained independent guard assertions omitted by
+        # the newer stage-isolation suite. Keep the stronger current Docker
+        # artifact requirements while retaining those security regressions.
+        builder = DOCKERFILE.read_text(encoding="utf-8").split(
+            "FROM deps AS builder", 1
+        )[1].split("FROM nginx:", 1)[0]
+        guard = (ROOT / "frontend/scripts/guarded-expo-export.cjs").read_text(
+            encoding="utf-8"
+        )
+        guard_tests = (ROOT / "frontend/scripts/test-guarded-expo-export.cjs").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("yarn export:web", builder)
+        self.assertIn("node --test scripts/test-guarded-expo-export.cjs", builder)
+        self.assertIn("node scripts/guarded-expo-export.cjs", builder)
+        self.assertIn("stale dist is not qualifying evidence", guard)
+        self.assertIn("CI: '1'", guard)
+        self.assertIn("EXPO_NO_TELEMETRY: '1'", guard)
+        self.assertIn("if (code !== 0 || signal)", guard)
+        self.assertIn("export hard deadline exceeded", guard)
+        self.assertIn("export output is not stable", guard)
+        self.assertIn("stalled exporter requires stable output", guard_tests)
+        self.assertIn("a nonzero exporter exit cannot be masked", guard_tests)
+
+
 if __name__ == "__main__":
     unittest.main()
