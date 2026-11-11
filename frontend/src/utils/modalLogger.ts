@@ -61,8 +61,13 @@ async function _persistQueue(events: TelemetryEvent[]) {
     const existing = raw.length <= 2 * 1024 * 1024 ? JSON.parse(raw) : [];
     const previous = Array.isArray(existing) ? existing : [];
     const merged = [...previous.slice(-500), ...events].slice(-500);
-    const sanitized = JSON.stringify(scrubTelemetry(merged));
-    await AsyncStorage.setItem(QUEUE_KEY, sanitized.slice(0, 2 * 1024 * 1024));
+    let sanitized = JSON.stringify(scrubTelemetry(merged));
+    while (sanitized.length > 2 * 1024 * 1024 && merged.length) {
+      // Evict complete oldest events, never persist a truncated JSON record.
+      merged.shift();
+      sanitized = JSON.stringify(scrubTelemetry(merged));
+    }
+    await AsyncStorage.setItem(QUEUE_KEY, sanitized);
   } catch { /* non-fatal */ }
 }
 
