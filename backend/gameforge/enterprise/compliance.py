@@ -1,12 +1,18 @@
 from __future__ import annotations
+import base64
+import binascii
 import json
 import hashlib
+import secrets
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import os
 
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+from core.vault_secure_fs import anchored_directory, atomic_write, ensure_directory
 from gameforge.enterprise.audit import AUDIT
 from gameforge.enterprise.quotas import QUOTAS
 from gameforge.enterprise.oidc_config import load_oidc_settings
@@ -16,8 +22,37 @@ from gameforge.enterprise.access_review import AccessReviewService
 
 def _data_dir() -> Path:
     p = Path(os.getenv("GAMEFORGE_DATA_DIR", "/tmp/gameforge_data"))
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    return ensure_directory(p)
+
+
+def _seal_compliance_export(plaintext: bytes, tenant_token: str) -> bytes:
+    """Authenticated encryption of tenant exports; never persist plaintext.
+
+    The key is injected by the operator from a secret manager. A missing key
+    stops export instead of writing a sensitive unencrypted compliance pack.
+    The nonce is unique per export; tenant binding prevents cross-tenant swaps.
+    """
+    raw = os.getenv("GAMEFORGE_COMPLIANCE_EXPORT_KEY_B64", "")
+    try:
+        key = base64.b64decode(raw, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise ValueError("invalid compliance export encryption configuration") from exc
+    if len(key) != 32:
+        raise ValueError("compliance export requires a 256-bit AES-GCM key")
+    if not isinstance(tenant_token, str) or len(tenant_token) != 24:
+        raise ValueError("invalid compliance export tenant binding")
+    if len(plaintext) > 48 * 1024 * 1024:
+        raise ValueError("compliance export exceeds plaintext byte budget")
+    nonce = secrets.token_bytes(12)
+    aad = ("gameforge-compliance-v1:" + tenant_token).encode("ascii")
+    ciphertext = AESGCM(key).encrypt(nonce, plaintext, aad)
+    envelope = {
+        "format": "gameforge-compliance-aes256gcm-v1",
+        "tenant_sha256_prefix": tenant_token,
+        "nonce_b64": base64.b64encode(nonce).decode("ascii"),
+        "ciphertext_b64": base64.b64encode(ciphertext).decode("ascii"),
+    }
+    return json.dumps(envelope, separators=(",", ":"), sort_keys=True).encode("ascii")
 
 
 @dataclass
@@ -30,8 +65,7 @@ class CompliancePackMeta:
 
 class ComplianceExportService:
     def __init__(self, out_dir: str | None = None):
-        self.out_dir = Path(out_dir or _data_dir() / "compliance_exports")
-        self.out_dir.mkdir(parents=True, exist_ok=True)
+        self.out_dir = ensure_directory(Path(out_dir) if out_dir else _data_dir() / "compliance_exports")
         self.access_reviews = AccessReviewService()
 
     async def build_tenant_pack(
@@ -108,13 +142,19 @@ class ComplianceExportService:
         pack["meta"]["sha256"] = hashlib.sha256(body).hexdigest()
         tenant_token = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:24]
         timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-        root = self.out_dir.resolve()
-        path = (root / f"compliance_{tenant_token}_{timestamp}.json").resolve()
-        try:
-            path.relative_to(root)
-        except ValueError as exc:
-            raise ValueError("invalid compliance export path") from exc
-        path.write_text(json.dumps(pack, indent=2, default=str), encoding="utf-8")
+        # Compliance bundles may contain private tenant audit events, member details,
+        # and enterprise posture. Never publish their plaintext to the filesystem.
+        # Require an operator-provisioned 256-bit AES-GCM key; do not silently
+        # downgrade to unencrypted JSON when the key is absent or malformed.
+        plaintext = json.dumps(pack, indent=2, default=str, allow_nan=False).encode("utf-8")
+        sealed = _seal_compliance_export(plaintext, tenant_token)
+        filename = f"compliance_{tenant_token}_{timestamp}_{secrets.token_hex(8)}.json.aesgcm"
+        with anchored_directory(self.out_dir) as directory:
+            atomic_write(
+                directory, filename,
+                lambda stream: stream.write(sealed), max_bytes=64 * 1024 * 1024,
+            )
+        path = self.out_dir / filename
         pack["export_path"] = str(path)
         return pack
 
