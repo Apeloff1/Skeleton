@@ -222,10 +222,10 @@ def _load_trusted_lazy_module(module_name: str):
         return import_module(".execution_telemetry", __name__)
     if module_name == ".flgb_model_runtime":
         return import_module(".flgb_model_runtime", __name__)
-    if module_name == ".long_context_progress":
-        return import_module(".long_context_progress", __name__)
     if module_name == ".long_context_spool":
         return import_module(".long_context_spool", __name__)
+    if module_name == ".long_context_progress":
+        return import_module(".long_context_progress", __name__)
     if module_name == ".iteration_scheduler":
         return import_module(".iteration_scheduler", __name__)
     if module_name == ".native_llm_runtime":

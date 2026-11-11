@@ -20,22 +20,17 @@ from zipfile import ZipFile, ZipInfo, ZIP_STORED, BadZipFile, LargeZipFile
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.dual_runtime_verify import (
     DualRuntimeVerificationError, _MAX_BYTES, _MAX_FILES, _MAX_MANIFEST,
-    _REQUIRED, _assert_original_root, _canonical_bytes, _json, _parts, _read, _root_fd,
-    verify_exported_package,
+    _REQUIRED, _STUDIO_REQUIRED, _assert_original_root, _canonical_bytes, _json, _parts, _read,
+    _root_fd, verify_exported_package, verify_studio_release_evidence,
 )
+
+_RELEASE_SCHEMAS = frozenset({
+    "skeleton.game_builder.dual_runtime_package.v1",
+    "skeleton.game_builder.studio_package.v1",
+})
 
 SCHEMA = "skeleton.app.offline_game_source_archive.v1"
 INSPECTION_SCHEMA = "skeleton.app.offline_game_source_archive_inspection.v1"
-_DUAL_SCHEMA = "skeleton.game_builder.dual_runtime_package.v1"
-_STUDIO_SCHEMA = "skeleton.game_builder.studio_package.v1"
-# Keep the versioned Studio intake contract aligned with dual_runtime_verify.
-# Studio source files are never treated as native or device-qualified artifacts.
-_STUDIO_REQUIRED = frozenset({
-    "studio/pipeline.json", "studio/jeeves_dragon_tools.json",
-    "studio/executed_tool_receipts.json", "studio/mirror_room.json",
-    "studio/consumer_gate.json", "studio/companion_mirror_room.json",
-    "studio/companion_almanac.json", "studio/companion_practice.json",
-})
 _ARCHIVE_MAX_BYTES = 2_500_000
 _NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,126}\.zip\Z")
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
@@ -327,16 +322,18 @@ def inspect_offline_game_archive(
             if sha256(release).hexdigest() != expected_manifest_sha256:
                 raise OfflineGameArchiveError("archive release differs from independent pin")
             manifest = _json(release, _MAX_MANIFEST)
+            # Independent hashes pin exact archive bytes, but must never grant
+            # authority to ambiguous, reserialized noncanonical release JSON.
             if release != _canonical_bytes(manifest):
                 raise OfflineGameArchiveError("noncanonical archived release manifest")
-            schema = manifest.get("schema")
             digest = manifest.get("manifest_digest")
             body = {key: value for key, value in manifest.items()
                     if key != "manifest_digest"}
-            # The producer's independent verifier accepts both versioned source
-            # formats. The archive inspector must enforce the same authority
-            # contract instead of rejecting valid Studio archives by schema.
-            if (schema not in (_DUAL_SCHEMA, _STUDIO_SCHEMA)
+            schema = manifest.get("schema")
+            # Studio releases are the same canonical source package with extra
+            # hashed studio evidence; admit them only with that evidence.
+            studio = schema == "skeleton.game_builder.studio_package.v1"
+            if (schema not in _RELEASE_SCHEMAS
                     or type(digest) is not str or digest != canonical_digest(body)
                     or manifest.get("automatic_publication") is not False
                     or manifest.get("godot_hardware_tested") is not False):
@@ -348,19 +345,28 @@ def inspect_offline_game_archive(
                     or not _REQUIRED <= set(files)
                     or manifest.get("proof_status") != "python-simulated-winning-actions"):
                 raise OfflineGameArchiveError("archived source inventory mismatch")
+            if studio and not _STUDIO_REQUIRED <= set(files):
+                raise OfflineGameArchiveError("archived studio release lacks evidence")
+            if not studio and any(name.startswith("studio/") for name in declared):
+                raise OfflineGameArchiveError("archived studio evidence requires studio schema")
             for name, expected_digest in declared.items():
                 if (type(expected_digest) is not str or not _HEX.fullmatch(expected_digest)
                         or sha256(files[name]).hexdigest() != expected_digest):
                     raise OfflineGameArchiveError("archived source digest mismatch")
-            if schema == _STUDIO_SCHEMA:
-                if not _STUDIO_REQUIRED <= set(declared):
-                    raise OfflineGameArchiveError("missing mandatory Studio provenance")
-                studio = _json(files["studio/pipeline.json"], _MAX_MANIFEST)
-                if (studio.get("schema") != "skeleton.game_builder.studio_pipeline.v1"
-                        or studio.get("not_automatically_published") is not True
-                        or studio.get("original_game_claim") != "generated-or-user-authored-geometry"
-                        or studio.get("project_id") != manifest.get("project_id")):
-                    raise OfflineGameArchiveError("invalid archived Studio provenance")
+            if studio:
+                try:
+                    verify_studio_release_evidence(files)
+                    # A re-signed source ZIP is not a studio export authority.
+                    # Preserve the same original-game/project denial checks
+                    # enforced by verify_exported_package on live source trees.
+                    pipeline = _json(files["studio/pipeline.json"], _MAX_MANIFEST)
+                    if (pipeline.get("schema") != "skeleton.game_builder.studio_pipeline.v1"
+                            or pipeline.get("not_automatically_published") is not True
+                            or pipeline.get("original_game_claim") != "generated-or-user-authored-geometry"
+                            or pipeline.get("project_id") != manifest.get("project_id")):
+                        raise DualRuntimeVerificationError("archived studio source custody invalid")
+                except DualRuntimeVerificationError as exc:
+                    raise OfflineGameArchiveError("archived studio evidence rejected") from exc
         if not hmac.compare_digest(_canonical_zip(files), raw):
             raise OfflineGameArchiveError("noncanonical or ambiguous source archive")
     except (OSError, BadZipFile, LargeZipFile, KeyError, TypeError,

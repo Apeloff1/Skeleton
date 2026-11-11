@@ -88,3 +88,74 @@ def test_record_rejects_bad_values(bad):
 def test_constructor_validation(kwargs):
     with pytest.raises(ValueError):
         FrameSampler(**kwargs)
+
+
+@pytest.mark.parametrize("limit", [float("nan"), float("inf"), float("-inf"), -0.1, 1.1, True, "0.5", 10**1000])
+def test_direct_frame_gate_rejects_invalid_ratio_limits(limit):
+    sampler = FrameSampler(budget_ms=10)
+    sampler.record(20)
+    assert not sampler.stats().within_budget(limit)
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"budget_ms": 1e308, "hitch_factor": 2.0},
+    {"budget_ms": 2.0, "hitch_factor": 1e308},
+    {"budget_ms": 10**1000},
+    {"hitch_factor": 10**1000},
+    {"budget_ms": True},
+    {"hitch_factor": True},
+])
+def test_constructor_rejects_unbounded_or_overflowing_threshold(kwargs):
+    with pytest.raises(ValueError):
+        FrameSampler(**kwargs)
+
+
+@pytest.mark.parametrize("bad", [10**1000, False, "16", object()])
+def test_record_fail_closed_without_mutating_ring_on_invalid_duration(bad):
+    sampler = FrameSampler(budget_ms=16)
+    sampler.record(10)
+    before = sampler.window
+    with pytest.raises(ValueError, match="finite non-negative"):
+        sampler.record(bad)
+    assert sampler.window == before
+    assert sampler.stats().frames == 1
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"capacity": True}, {"capacity": 1.5}, {"capacity": "5"},
+    {"capacity": 10**1000}, {"capacity": 1_000_001},
+    {"max_hitches": False}, {"max_hitches": 2.5},
+    {"max_hitches": 10**1000}, {"max_hitches": 1_000_001},
+])
+def test_frame_history_limits_are_strict_and_bounded(kwargs):
+    with pytest.raises(ValueError, match="bounded positive integers"):
+        FrameSampler(**kwargs)
+
+
+def test_mark_rejects_invalid_and_backward_clock_without_advancing_state():
+    readings = iter([0.0, float("nan"), 16.0, 10.0, 32.0])
+
+    class Clock:
+        def now_ms(self):
+            return next(readings)
+
+    sampler = FrameSampler(budget_ms=20, clock=Clock())
+    assert sampler.mark() is None
+    with pytest.raises(ValueError, match="timestamp must be finite"):
+        sampler.mark()
+    assert sampler.window == ()
+    assert sampler.mark() is None
+    assert sampler.window == (16.0,)
+    with pytest.raises(ValueError, match="clock must advance"):
+        sampler.mark()
+    assert sampler.window == (16.0,)
+    assert sampler.mark() is None
+    assert sampler.window == (16.0, 16.0)
+
+
+def test_direct_forged_frame_stats_do_not_pass_nonfinite_ratio():
+    from skeleton.perf_profiler.frames import FrameStats
+
+    for ratio in (float("nan"), float("inf"), -0.1, 1.1):
+        forged = FrameStats(1, 1, 10.0, 0, ratio, 1.0, {})
+        assert not forged.within_budget(1.0)

@@ -5,9 +5,8 @@ machine_root = ".machine"
 default_owner = "automation-supervisor"
 # Full working-tree machine/code-search coverage must include current tracked growth.
 # Retain a finite scan budget; scanner and CI still fail closed on truncation.
-# The prior 100,000-file ceiling truncated the 2026-11-08 102,945-file inventory.
-# Retain a finite, fail-closed budget: future growth beyond this bound must be reviewed.
-max_files = 150000
+# The previous 80,000-file ceiling truncated the 2026-10-29 exact-head inventory.
+max_files = 250000
 max_file_bytes = 2000000
 max_context_bytes = 30000
 
@@ -359,7 +358,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "build-delivery"
-prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/godot_export/", "skeleton/mass_build/", "skeleton/deploy/", "skeleton/release/", "skeleton/ops/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
+prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/ops/", "skeleton/developer/", "skeleton/ubuntu/", "skeleton/godot_export/", "skeleton/mass_build/", "packaging/", "java-accelerators/", "deploy.py"]
 owner = "delivery-plane"
 criticality = "high"
 purpose = "Build graph, packaging, installers, release, deployment and developer delivery tooling."
@@ -494,7 +493,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "quality"
-prefixes = ["skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/"]
+prefixes = ["skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/", "skeleton/perfgate/", "skeleton/qualification/"]
 owner = "quality-plane"
 criticality = "high"
 purpose = "Evaluation, quality analysis, artifact assurance and reusable gate-plane implementation."
@@ -665,7 +664,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "game-simulation-extensions"
-prefixes = ["skeleton/cs300/", "skeleton/emulation/", "skeleton/frontier_nav/", "skeleton/gameforge/", "skeleton/godot/"]
+prefixes = ["skeleton/cs300/", "skeleton/emulation/", "skeleton/frontier_nav/", "skeleton/gameforge/", "skeleton/godot/", "skeleton/godot_export/"]
 owner = "simulation-runtime"
 criticality = "high"
 purpose = "Game-engine, frontier navigation, emulator and gameforge simulation surfaces."
@@ -692,7 +691,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "automation-extensions"
-prefixes = ["skeleton/completion/", "skeleton/fix/", "skeleton/jobs/", "skeleton/maximise/", "skeleton/merge/", "skeleton/p3/", "skeleton/p4/", "skeleton/p5/"]
+prefixes = ["skeleton/completion/", "skeleton/fix/", "skeleton/jobs/", "skeleton/mass_build/", "skeleton/maximise/", "skeleton/merge/", "skeleton/p3/", "skeleton/p4/", "skeleton/p5/"]
 owner = "automation-control-plane"
 criticality = "medium"
 purpose = "Governed automation jobs, repository repair, merge orchestration and staged work."

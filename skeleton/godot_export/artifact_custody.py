@@ -1,8 +1,8 @@
-"""Fail-closed, independently inspectable Godot export artifact custody.
+"""Fail-closed custody of a Godot desktop export.
 
-A zero process exit is not evidence that a standalone game was produced.
-This module validates the actual artifact after the canonical GodotRunner
-has invoked the installed engine. It does not certify real playability.
+A successful Godot process exit is not evidence of a usable artifact. This
+module verifies that an export produced a new, bounded, regular executable
+with a recognizable platform header and records its content digest.
 """
 from __future__ import annotations
 
@@ -14,90 +14,96 @@ from pathlib import Path
 
 from .runner import GodotRunner, RunResult
 
+MAX_EXPORT_BYTES = 2 * 1024 * 1024 * 1024
+CHUNK = 1024 * 1024
+
+
+class ExportCustodyError(ValueError):
+    """Export cannot be admitted as an independently inspectable artifact."""
+
 
 @dataclass(frozen=True)
 class ExportEvidence:
-    result: RunResult
-    artifact: str | None
-    sha256: str | None
+    path: str
+    platform: str
     size: int
-    failure: str | None
-
-    @property
-    def verified(self) -> bool:
-        return self.failure is None and self.sha256 is not None
+    sha256: str
+    godot_exit_code: int
 
 
-def export_with_evidence(
-    runner: GodotRunner,
-    project: Path,
-    preset: str,
-    artifact: Path,
-    *,
-    mode: str = "release",
-    timeout: int = 600,
-    max_bytes: int = 2_000_000_000,
-) -> ExportEvidence:
-    """Run Godot then hash a regular newly created output without following symlinks.
+def _regular_file(path: Path) -> os.stat_result:
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise ExportCustodyError("artifact-missing") from exc
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise ExportCustodyError("artifact-not-single-regular-file")
+    if not 0 < info.st_size <= MAX_EXPORT_BYTES:
+        raise ExportCustodyError("artifact-size-invalid")
+    return info
 
-    The destination must be inside the project, absent before the export,
-    and must remain the same inode throughout hashing. A failed export never
-    returns success just because a stale artifact was already on disk.
+
+def inspect_export(path: Path, platform: str, *, root: Path, result: RunResult) -> ExportEvidence:
+    """Validate an actual binary; never mistake a successful process for proof.
+
+    The output must be under an existing trusted export directory. A caller
+    must control that directory; untrusted writers must not share it.
     """
-    absent = RunResult(127, "export not invoked")
-    if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 1:
-        return ExportEvidence(absent, None, None, 0, "invalid_size_budget")
-    if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout < 1:
-        return ExportEvidence(absent, None, None, 0, "invalid_timeout")
-    if not preset or not isinstance(preset, str) or "\x00" in preset:
-        return ExportEvidence(absent, None, None, 0, "invalid_preset")
-    try:
-        root = project.resolve(strict=True)
-        if not root.is_dir() or root.is_symlink():
-            raise ValueError("invalid project")
-        target = artifact.absolute()
-        relative = target.relative_to(root)
-        if not relative.parts or any(part in (".", "..") for part in relative.parts):
-            raise ValueError("unsafe artifact path")
-        parent = target.parent.resolve(strict=True)
-        parent.relative_to(root)
-        if target.exists() or target.is_symlink():
-            return ExportEvidence(absent, None, None, 0, "artifact_already_exists")
-    except (OSError, ValueError):
-        return ExportEvidence(absent, None, None, 0, "unsafe_artifact_path")
-    try:
-        result = runner.export(root, preset, str(target), mode=mode, timeout=timeout)
-    except (OSError, ValueError) as exc:
-        return ExportEvidence(absent, None, None, 0, "engine_invocation_failed:" + type(exc).__name__)
+    if platform not in {"windows", "linux"}:
+        raise ExportCustodyError("unsupported-platform")
     if not result.ok:
-        return ExportEvidence(result, None, None, 0, "engine_export_failed")
-    fd = None
+        raise ExportCustodyError("godot-export-failed")
+    if path.is_symlink() or root.is_symlink():
+        raise ExportCustodyError("export-symlink")
     try:
-        fd = os.open(target, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
-        before = os.fstat(fd)
-        if not stat.S_ISREG(before.st_mode) or before.st_size < 1 or before.st_size > max_bytes:
-            return ExportEvidence(result, None, None, 0, "invalid_artifact")
-        digest = hashlib.sha256()
-        total = 0
-        while True:
-            chunk = os.read(fd, min(1024 * 1024, max_bytes + 1 - total))
-            if not chunk:
-                break
-            total += len(chunk)
-            if total > max_bytes:
-                return ExportEvidence(result, None, None, 0, "artifact_exceeds_budget")
-            digest.update(chunk)
-        after = os.fstat(fd)
-        path_stat = os.lstat(target)
-        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
-            after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns
-        ) or (after.st_dev, after.st_ino) != (path_stat.st_dev, path_stat.st_ino) or total != after.st_size:
-            return ExportEvidence(result, None, None, 0, "artifact_changed_during_read")
-        if not stat.S_ISREG(path_stat.st_mode):
-            return ExportEvidence(result, None, None, 0, "artifact_not_regular")
-        return ExportEvidence(result, str(target), digest.hexdigest(), total, None)
-    except OSError:
-        return ExportEvidence(result, None, None, 0, "artifact_unreadable")
-    finally:
-        if fd is not None:
-            os.close(fd)
+        canonical_root = root.resolve(strict=True)
+        canonical_path = path.resolve(strict=True)
+        canonical_path.relative_to(canonical_root)
+    except (OSError, ValueError) as exc:
+        raise ExportCustodyError("artifact-outside-export-root") from exc
+    before = _regular_file(canonical_path)
+    digest = hashlib.sha256()
+    try:
+        with canonical_path.open("rb") as stream:
+            signature = stream.read(4)
+            if platform == "windows" and signature[:2] != b"MZ":
+                raise ExportCustodyError("invalid-pe-signature")
+            if platform == "linux" and signature != b"\x7fELF":
+                raise ExportCustodyError("invalid-elf-signature")
+            digest.update(signature)
+            total = len(signature)
+            while True:
+                block = stream.read(CHUNK)
+                if not block:
+                    break
+                total += len(block)
+                if total > MAX_EXPORT_BYTES:
+                    raise ExportCustodyError("artifact-too-large")
+                digest.update(block)
+    except OSError as exc:
+        raise ExportCustodyError("artifact-read-failed") from exc
+    after = _regular_file(canonical_path)
+    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
+        after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns
+    ) or total != after.st_size:
+        raise ExportCustodyError("artifact-changed-during-verification")
+    return ExportEvidence(str(canonical_path), platform, total, digest.hexdigest(), result.code)
+
+
+def export_and_inspect(
+    runner: GodotRunner, project: Path, preset: str, output: Path, platform: str,
+    *, timeout: int = 600,
+) -> ExportEvidence:
+    """Run the real configured Godot exporter and inspect its emitted binary.
+
+    Requires a dedicated export directory. Never overwrites an existing
+    artifact, including symlinks and broken links.
+    """
+    if not preset or not isinstance(preset, str):
+        raise ExportCustodyError("preset-required")
+    if output.exists() or output.is_symlink():
+        raise ExportCustodyError("output-already-exists")
+    if not output.parent.is_dir() or output.parent.is_symlink():
+        raise ExportCustodyError("unsafe-output-directory")
+    result = runner.export(project, preset, str(output), timeout=timeout)
+    return inspect_export(output, platform, root=output.parent, result=result)

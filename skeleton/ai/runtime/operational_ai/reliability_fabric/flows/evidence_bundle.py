@@ -47,6 +47,8 @@ class EvidenceBundle:
     def seal(self,*,required):
         if type(required) not in (set,frozenset,tuple,list):
             fail("explicit bounded domain list required")
+        if not 1<=len(required)<=40 or any(type(item) is not str for item in required):
+            fail("required domain names must be bounded strings")
         required=set(required)
         if not required or not required.issubset(set(domains())):
             fail("unknown or empty required assurance domain set")

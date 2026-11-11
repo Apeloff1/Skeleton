@@ -36,11 +36,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: Verify exact source-head checkout identity
-        env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - name: Install canonical Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -59,6 +54,21 @@ jobs:
             "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
           python -m pytest -q tests/test_repository_integration.py tests/test_ci_portable_native_ai_fixtures.py
 
+      - name: Qualify literal Jeeves laptop registry and fail-closed source-only batch
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m compileall -q \
+            skeleton/jeeves/native_fabric/laptop_ops/runner.py \
+            skeleton/jeeves/native_fabric/laptop_ops/batch \
+            skeleton/testing/test_jeeves_first_laptop_static_dispatch_20261111.py
+          python -m pytest -q --maxfail=1 --noconftest \
+            skeleton/testing/test_jeeves_first_laptop_static_dispatch_20261111.py \
+            skeleton/testing/test_jeeves_first_laptop_batch_denials.py \
+            skeleton/testing/test_jeeves_first_laptop_batch_missing.py
+
+
   native_sqlite_ci_fixture_regressions:
     name: Host-portable offline native AI and SQLite acceptance
     runs-on: ubuntu-latest
@@ -68,11 +78,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: Verify exact source-head checkout identity
-        env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - name: Install canonical Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:

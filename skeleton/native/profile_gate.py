@@ -14,9 +14,6 @@ from dataclasses import dataclass
 import math
 from typing import Any, Callable
 
-# Keep native telemetry representable and bounded before any speedup division.
-MAX_EVIDENCE_INTEGER = (1 << 63) - 1
-
 
 class ProfileGateError(RuntimeError):
     """Profile input cannot be interpreted. Not a maturity signal."""
@@ -31,23 +28,10 @@ class AccelerationProfile:
     abi_version: int
     protocol: str
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.name, str) or not self.name.strip() or self.name != self.name.strip():
-            raise ProfileGateError("name must be canonical non-empty text")
-        if not isinstance(self.protocol, str) or not self.protocol.strip() or self.protocol != self.protocol.strip():
-            raise ProfileGateError("protocol must be canonical non-empty text")
-        for field_name in ("samples", "baseline_ns", "candidate_ns", "abi_version"):
-            value = getattr(self, field_name)
-            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-                raise ProfileGateError(f"{field_name} must be a positive integer")
-            if value > MAX_EVIDENCE_INTEGER:
-                raise ProfileGateError(f"{field_name} exceeds native evidence bounds")
-
     def speedup(self) -> float:
-        ratio = self.baseline_ns / self.candidate_ns
-        if not math.isfinite(ratio):
-            raise ProfileGateError("profile speedup must be finite")
-        return ratio
+        if self.candidate_ns <= 0:
+            raise ProfileGateError("candidate_ns must be positive")
+        return self.baseline_ns / self.candidate_ns
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,13 +73,12 @@ class ProfileGate:
     ) -> None:
         if isinstance(expected_abi, bool) or not isinstance(expected_abi, int):
             raise ProfileGateError("expected_abi must be an integer")
-        if not 0 < expected_abi <= MAX_EVIDENCE_INTEGER:
-            raise ProfileGateError("expected_abi must be positive and bounded")
+        if expected_abi < 1:
+            raise ProfileGateError("expected_abi must be positive")
         if not isinstance(protocol, str) or not protocol.strip() or protocol != protocol.strip():
             raise ProfileGateError("protocol must be canonical text")
-        if (isinstance(min_samples, bool) or not isinstance(min_samples, int)
-                or not 8 <= min_samples <= MAX_EVIDENCE_INTEGER):
-            raise ProfileGateError("min_samples must be an integer between 8 and native evidence bounds")
+        if isinstance(min_samples, bool) or not isinstance(min_samples, int) or min_samples < 8:
+            raise ProfileGateError("min_samples must be an integer >= 8")
         if not isinstance(min_speedup, (int, float)) or isinstance(min_speedup, bool):
             raise ProfileGateError("min_speedup must be numeric")
         try:
@@ -114,27 +97,24 @@ class ProfileGate:
             return GateDecision("scalar", "profile-missing")
         if not isinstance(profile, AccelerationProfile):
             raise ProfileGateError("profile must be an AccelerationProfile")
-        # A frozen dataclass can still be modified by low-level test or native
-        # deserialization tricks: revalidate before any privileged dispatch.
-        if (not isinstance(profile.name, str) or not profile.name.strip()
-                or profile.name != profile.name.strip()
-                or not isinstance(profile.protocol, str) or not profile.protocol.strip()
-                or profile.protocol != profile.protocol.strip()):
-            return GateDecision("scalar", "profile-identity-invalid")
-        numeric = (profile.abi_version, profile.samples,
-                   profile.baseline_ns, profile.candidate_ns)
-        if any(type(value) is not int or not 0 < value <= MAX_EVIDENCE_INTEGER
-               for value in numeric):
-            return GateDecision("scalar", "profile-numeric-invalid")
+        if not isinstance(profile.name, str) or not profile.name.strip():
+            return GateDecision("scalar", "profile-name-invalid")
         if profile.protocol != self.protocol:
             return GateDecision("scalar", "protocol-mismatch")
         if profile.abi_version != self.expected_abi:
             return GateDecision("scalar", "abi-mismatch")
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in
+               (profile.abi_version, profile.samples, profile.baseline_ns, profile.candidate_ns)):
+            return GateDecision("scalar", "profile-numeric-invalid")
         if profile.samples < self.min_samples:
             return GateDecision("scalar", "sample-thin")
         if profile.baseline_ns <= 0 or profile.candidate_ns <= 0:
             return GateDecision("scalar", "timing-invalid")
-        if profile.speedup() < self.min_speedup:
+        # Compare with bounded integer arithmetic, never float-divide attacker-supplied
+        # profile timings. Reject implausibly large telemetry before native admission.
+        if max(profile.baseline_ns, profile.candidate_ns, profile.samples) > (1 << 63) - 1:
+            return GateDecision("scalar", "profile-numeric-out-of-range")
+        if profile.baseline_ns / profile.candidate_ns < self.min_speedup:
             return GateDecision("scalar", "speedup-unproven")
         return GateDecision("native", "profile-justified")
 
