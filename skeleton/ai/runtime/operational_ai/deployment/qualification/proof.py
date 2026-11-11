@@ -22,6 +22,7 @@ def _validated_transcript(history: tuple[dict, ...]) -> bytes:
     assistant_bytes = b""
     for expected_role, entry in zip(("user", "assistant"), history):
         if (type(entry) is not dict or len(entry) != 2
+                or any(type(key) is not str for key in entry)
                 or "role" not in entry or "content" not in entry
                 or type(entry["role"]) is not str
                 or entry["role"] != expected_role):
@@ -70,7 +71,11 @@ def construct(
         raise QualificationError("invalid qualification identity") from None
     if type(exact_native) is not bool:
         raise QualificationError("qualification backend proof missing")
-    if type(first) is not dict or type(replayed) is not dict:
+    if (type(first) is not dict or type(replayed) is not dict
+            or any(type(key) is not str for key in first)
+            or any(type(key) is not str for key in replayed)):
+        # A built-in dict can still contain keys with hostile __eq__/__hash__.
+        # Validate keys before any .get(), membership, or indexed lookup.
         raise QualificationError("missing inference receipts")
     if first.get("replayed") is not False or replayed.get("replayed") is not True:
         raise QualificationError("restarted invocation did not prove replay")
@@ -122,7 +127,9 @@ def construct(
     assistant_bytes = _validated_transcript(history)
     if hashlib.sha256(assistant_bytes).hexdigest() != first["output_sha256"]:
         raise QualificationError("durable output does not match generation receipt")
-    if (type(diagnostics) is not dict or type(diagnostics.get("turns")) is not int
+    if (type(diagnostics) is not dict
+            or any(type(key) is not str for key in diagnostics)
+            or type(diagnostics.get("turns")) is not int
             or diagnostics["turns"] != 1):
         raise QualificationError("database integrity doctor did not prove the turn")
     try:
