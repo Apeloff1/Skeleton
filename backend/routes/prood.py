@@ -246,8 +246,8 @@ async def run_quorum(req: QuorumRequest):
     safely when the fault budget is exceeded). Returns the full vote log."""
     try:
         qc = QuorumConsensus(n=req.n, f=req.f)
-    except ValueError as e:
-        return {"ok": False, "error": str(e)}
+    except ValueError:
+        return {"ok": False, "error": "invalid_quorum_configuration"}
     faulty = set(req.faulty or [])
     result = qc.agree(req.value, proof=f"api:{time.time()}", faulty=faulty)
     await event_bus.publish(

@@ -18,24 +18,31 @@ All imports are defensive so a partial CNS never crashes boot.
 from __future__ import annotations
 
 import base64
+import json
 import time
 from typing import Any, Optional
+
+from core.http_errors import redact_client_payload, redact_client_text
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-router = APIRouter(prefix="/api/gameforge/studio", tags=["gameforge-studio"])
+# RBAC authority is mandatory even when optional CNS components fail.
+# Never impersonate an administrator if the authentication module fails to
+# load; an import/bootstrap error must fail closed before routes are mounted.
+from routes.gameforge_auth import require_role
 
-# RBAC guards (soft in dev; enforced when GAMEFORGE_AUTH_ENFORCE=1)
-try:
-    from routes.gameforge_auth import require_role
-    _editor = require_role("editor")
-    _admin = require_role("admin")
-except Exception:  # noqa: BLE001
-    def _editor():  # type: ignore
-        return {"role": "admin", "dev_mode": True}
-    _admin = _editor
+_viewer = require_role("viewer")
+_editor = require_role("editor")
+_admin = require_role("admin")
+# Apply the viewer floor to *all* CNS routes, including oversight/read
+# endpoints. Mutating routes retain their stronger editor/admin dependencies.
+router = APIRouter(
+    prefix="/api/gameforge/studio",
+    tags=["gameforge-studio"],
+    dependencies=[Depends(_viewer)],
+)
 
 # ── Defensive imports of the integrated CNS modules ───────────────────────────
 _IMPORT_ERR: dict[str, str] = {}
@@ -84,8 +91,33 @@ def _room_ids() -> list[str]:
 
 
 def dispatch_to_rooms(event: str, payload: dict, fanout: int = 3) -> list[str]:
-    """Round-robin a step/forge/boardroom event across the CNS rooms so agents
-    everywhere log it and keep working. Persisted to gameforge_room_activity."""
+    """Dispatch bounded and redacted room activity without leaking secrets.
+
+    Only identity-safe metadata is stored or copied into agent-visible notes.
+    A failed or malformed redaction must never fall back to the original
+    payload, including after transient Mongo or step-log failures.
+    """
+    if not isinstance(event, str) or not 1 <= len(event) <= 80:
+        raise ValueError("room event identifier is invalid")
+    if not isinstance(payload, dict):
+        raise ValueError("room event payload must be an object")
+    if type(fanout) is not int or not 0 <= fanout <= 1000:
+        raise ValueError("room fanout is outside allowed bounds")
+
+    # Convert unknown objects to a fixed placeholder, never repr/str().
+    safe_event = redact_client_text(event, max_len=80)
+    safe_payload = redact_client_payload(payload, max_depth=4)
+    if not isinstance(safe_payload, dict):
+        raise ValueError("room activity is not an object")
+    encoder = json.JSONEncoder(
+        ensure_ascii=True, separators=(",", ":"), allow_nan=False
+    )
+    total = 0
+    for piece in encoder.iterencode(safe_payload):
+        total += len(piece)
+        if total > 64 * 1024:
+            raise ValueError("room activity payload exceeds byte budget")
+
     ids = _room_ids()
     if not ids:
         return []
@@ -94,8 +126,8 @@ def dispatch_to_rooms(event: str, payload: dict, fanout: int = 3) -> list[str]:
         picked.append(ids[_rr["i"] % len(ids)])
         _rr["i"] += 1
     doc = {
-        "event": event,
-        "payload": payload,
+        "event": safe_event,
+        "payload": safe_payload,
         "rooms": picked,
         "ts": time.time(),
     }
@@ -103,17 +135,19 @@ def dispatch_to_rooms(event: str, payload: dict, fanout: int = 3) -> list[str]:
         _db()["gameforge_room_activity"].insert_one(dict(doc))
     except Exception:  # noqa: BLE001
         pass
-    # also drop a note into the relevant snowball step so all rooms can read it
+
+    # Agent notes carry only the event type and room IDs, never raw payloads.
     try:
-        step_id = payload.get("step_id")
-        if step_id and get_step_database:
+        step_id = safe_payload.get("step_id")
+        if isinstance(step_id, str) and step_id and get_step_database:
             sdb = get_step_database(step_id)
             if sdb:
-                sdb.add_agent_note(f"[rooms {','.join(picked)}] {event}: {str(payload)[:120]}")
+                sdb.add_agent_note(
+                    f"[rooms {','.join(picked)}] {safe_event}: activity recorded"
+                )
     except Exception:  # noqa: BLE001
         pass
     return picked
-
 
 def _room_activity(limit: int = 50) -> list[dict]:
     try:
@@ -158,7 +192,7 @@ async def _auto_research(topic: str) -> dict:
                     {"topic": f"acquired:{topic[:60]}"},
                     {"$set": {"topic": f"acquired:{topic[:60]}", "text": summary, "domain": "acquired",
                               "source_api": api_key, "auto": True, "acquired_at": time.time()}}, upsert=True)
-        dispatch_to_rooms("auto_research", {"topic": topic, "api": api_key})
+        dispatch_to_rooms("auto_research", {"api": api_key})
         return {"topic": topic, "known": False, "acquired": bool(summary), "api": api_key,
                 "summary": summary, "jury": adjudication}
     except Exception:  # noqa: BLE001
@@ -196,7 +230,7 @@ async def questionnaire_log(b: QBody):
     if not questionnaire_logger:
         return {"ok": False, "error": "questionnaire module unavailable"}
     questionnaire_logger.log_response(b.question_id, b.question, b.answer, b.confidence)
-    rooms = dispatch_to_rooms("questionnaire_answer", {"question_id": b.question_id, "answer": b.answer})
+    rooms = dispatch_to_rooms("questionnaire_answer", {"question_id": b.question_id, "recorded": True})
     return {"ok": True, "logged": b.question_id, "dispatched_rooms": rooms}
 
 
@@ -243,7 +277,7 @@ async def step_choice(step_id: str, b: ChoiceBody):
     if not sdb:
         return {"ok": False, "error": f"unknown step '{step_id}'", "valid": list(SNOWBALL_STEPS.keys())}
     sdb.record_user_choice(b.key, b.value)
-    rooms = dispatch_to_rooms("step_choice", {"step_id": step_id, "key": b.key, "value": b.value})
+    rooms = dispatch_to_rooms("step_choice", {"step_id": step_id, "recorded": True})
     return {"ok": True, "step": step_id, "dispatched_rooms": rooms, "log": sdb.get_log()}
 
 
@@ -379,7 +413,7 @@ async def vault_put(b: VaultPut, user=Depends(_editor)):
         return {"ok": False, "error": "vault unavailable"}
     content = base64.b64decode(b.content) if b.is_base64 else b.content.encode("utf-8")
     entry = boardroom_vault.put_file(b.filename, content, b.metadata)
-    dispatch_to_rooms("vault_put", {"filename": b.filename, "file_id": entry.file_id})
+    dispatch_to_rooms("vault_put", {"file_id": entry.file_id})
     _audit("vault_put", b.filename, user)
     return {"ok": True, "file_id": entry.file_id, "version": entry.version}
 
@@ -568,7 +602,7 @@ async def auto_recover(b: RecoverBody, user=Depends(_editor)):
         _alarms().update_many({"resolved": False}, {"$set": {"resolved": True, "resolved_at": time.time()}})
         _raise_alarm("auto_recover", f"rolled back {result['filename']} to v{result['restored_from']}", "info")
         _audit("auto_recover", result.get("filename", "?"), user)
-        dispatch_to_rooms("auto_recover", result)
+        dispatch_to_rooms("auto_recover", {"ok": result.get("ok"), "file_id": result.get("file_id")})
     return {"ok": True, "reason": b.reason, **result}
 
 
@@ -803,13 +837,13 @@ async def jeeves_command(c: JeevesCmd):
             concept = {"game_name": c.game_name, "genre": "fantasy", "art_style": "pixel",
                        "core_mechanic": "core_loop", "core_loop": "explore"}
             data["forge"] = forge_orchestrator.run_full_pipeline(concept)
-            dispatch_to_rooms("jeeves_forge", {"game": c.game_name})
+            dispatch_to_rooms("jeeves_forge", {"recorded": True})
             actions.append("ran_forges")
 
     if "deploy" in msg or "ship" in msg or "build" in msg:
         if enhanced_deployment:
             data["deploy"] = enhanced_deployment.full_deploy(c.game_name)
-            dispatch_to_rooms("jeeves_deploy", {"game": c.game_name})
+            dispatch_to_rooms("jeeves_deploy", {"recorded": True})
             actions.append("deployed")
 
     if "vault" in msg:
@@ -855,7 +889,7 @@ async def deploy(b: DeployBody, user=Depends(_editor)):
     if not enhanced_deployment:
         return {"ok": False, "error": "deployment unavailable"}
     rec = enhanced_deployment.full_deploy(b.game_name, b.platforms, b.sign)
-    dispatch_to_rooms("deploy", {"game": b.game_name})
+    dispatch_to_rooms("deploy", {"recorded": True})
     _audit("deploy", b.game_name, user)
     return {"ok": True, "deployment": rec}
 
@@ -1117,8 +1151,7 @@ async def ship(b: ShipBody, user=Depends(_editor)):
         except Exception:  # noqa: BLE001
             out["build_brief"] = None
 
-    dispatch_to_rooms("ship", {"game": b.game_name, "pushed": out.get("pushed"),
-                               "saga": result.status})
+    dispatch_to_rooms("ship", {"pushed": out.get("pushed"), "saga": result.status})
     _audit("ship", b.game_name, user)
     return out
 

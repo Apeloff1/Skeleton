@@ -146,7 +146,7 @@ async def bootstrap_all_dbs():
                 from seeds.game_code_library_seed import seed_game_code_library
                 await seed_game_code_library(_cdb)
             except Exception as e:
-                print(f"[bootstrap] code_library seed failed: {e}")
+                print(f"[bootstrap] code_library seed failed: {type(e).__name__}")
         result = await bootstrap_all(_db)
         return result
     except Exception:

@@ -63,7 +63,7 @@ try:
     router.include_router(_catalogs_router)
 except Exception as _cat_err:  # pragma: no cover — defensive
     import sys as _s
-    print(f"[GALAXY] catalogs subrouter import SKIPPED: {type(_cat_err).__name__}: {_cat_err}", flush=True, file=_s.stderr)
+    print(f"[GALAXY] catalogs subrouter import SKIPPED: {type(_cat_err).__name__}", flush=True, file=_s.stderr)
 
 # Manifest + Genres read-only endpoints (extracted Jun 2026 →
 # routes/galaxy_studio_manifest.py). Mounted early so their static paths win.
@@ -72,7 +72,7 @@ try:
     router.include_router(_manifest_router)
 except Exception as _man_err:  # pragma: no cover — defensive
     import sys as _s
-    print(f"[GALAXY] manifest subrouter import SKIPPED: {type(_man_err).__name__}: {_man_err}", flush=True, file=_s.stderr)
+    print(f"[GALAXY] manifest subrouter import SKIPPED: {type(_man_err).__name__}", flush=True, file=_s.stderr)
 
 # ═══════════════════════════════════════════════════════════════════════
 # STATIC DATA CONSTANTS — extracted Jun 2026 → routes/galaxy_studio_constants.py
@@ -447,7 +447,7 @@ async def _load_build(build_id: str):
         except Exception:
             pass
     except Exception as e:
-        print(f"[GALAXY _load_build] WARN: {e}")
+        print(f"[GALAXY _load_build] WARN: {type(e).__name__}")
     return None
 
 
@@ -885,7 +885,7 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
             build["_code_refs"] = refs
             print(f"[GALAXY] Batch {batch_num}: pulled {len(refs)} code-library refs for era={era_id} genre={genre}")
     except Exception as e:
-        print(f"[GALAXY] code-library ref pull skipped (non-fatal): {str(e)[:120]}")
+        print(f"[GALAXY] code-library ref pull skipped (non-fatal): {type(e).__name__}")
 
     t = build["title"]
     g = build["genre"]
@@ -926,9 +926,8 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
             except GalaxyBuildStopped:
                 raise
             except Exception as e:
-                import traceback, time as _time
+                import time as _time
                 last_error = "phase_failed"
-                traceback.print_exc()
                 print(f"[GALAXY] Batch {batch_num} phase '{phase_id}' attempt {attempt}/{MAX_RETRIES} failed: {type(e).__name__}")
                 if attempt < MAX_RETRIES:
                     backoff = 0.5 * (2 ** (attempt - 1))
@@ -3143,7 +3142,7 @@ async def _ensure_code_library_seeded():
         result = await seed_game_code_library(_cdb)
         print(f"[GALAXY CodeLibrary] Seed result: {result}")
     except Exception as e:
-        print(f"[GALAXY CodeLibrary] Seed error (non-fatal): {e}")
+        print(f"[GALAXY CodeLibrary] Seed error (non-fatal): {type(e).__name__}")
     # Intentionally keep lock engaged until process restart — avoids repeat attempts
 
 
