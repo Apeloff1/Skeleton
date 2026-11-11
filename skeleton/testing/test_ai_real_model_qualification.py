@@ -8,6 +8,7 @@ from skeleton.ai.runtime.operational_ai.deployment.qualification import (
 )
 from skeleton.ai.runtime.operational_ai.deployment.qualification.verification import verify
 from skeleton.ai.runtime.operational_ai.deployment.qualification import verification as receipt_verification
+from skeleton.ai.runtime.operational_ai.deployment.qualification.proof import construct
 from skeleton.ai.runtime.operational_ai.deployment.qualification.paths import publish_private_report
 from skeleton.ai.runtime.operational_ai.deployment.qualification import paths as report_paths
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine import (
@@ -112,6 +113,46 @@ class QualificationTests(unittest.TestCase):
                     QualificationError, 'invalid qualification digest',
                 ):
                     verify(altered, require_real=False)
+
+    def test_construct_rejects_forged_first_boot_evidence_before_hashing(self):
+        answer = 'fixture reply'
+        digest = hashlib.sha256(answer.encode('utf8')).hexdigest()
+        first = {
+            'replayed': False, 'revision': 1,
+            'output_sha256': digest, 'request_sha256': 'a' * 64,
+            'context_sha256': 'b' * 64,
+            'generated_tokens': 2, 'prompt_tokens': 4,
+        }
+        replayed = dict(first, replayed=True)
+        history = ({'role': 'user', 'content': 'hi'},
+                   {'role': 'assistant', 'content': answer})
+        diagnostics = {'turns': 1}
+
+        def issue(first_receipt=first, replay_receipt=replayed,
+                  doctor=diagnostics, model='c' * 64):
+            return construct(model, 'd' * 64, 'session', 'request',
+                             first_receipt, replay_receipt, history, doctor,
+                             exact_native=False)
+
+        self.assertFalse(verify(issue(), require_real=False)['real_model_executed'])
+        malformed = (
+            (dict(first, revision=True), replayed, diagnostics, 'c' * 64),
+            (first, dict(replayed, revision=True), diagnostics, 'c' * 64),
+            (first, replayed, {'turns': True}, 'c' * 64),
+            (dict(first, generated_tokens=1 << 100_000), replayed,
+             diagnostics, 'c' * 64),
+            (dict(first, prompt_tokens=131073), replayed, diagnostics,
+             'c' * 64),
+            (dict(first, request_sha256='bad'),
+             dict(replayed, request_sha256='bad'), diagnostics, 'c' * 64),
+            (dict(first, context_sha256='bad'), replayed, diagnostics,
+             'c' * 64),
+            (first, replayed, diagnostics, 'not-a-sha'),
+        )
+        for index, (receipt, replay, doctor, model) in enumerate(malformed):
+            with self.subTest(index=index):
+                with self.assertRaises(QualificationError):
+                    issue(receipt, replay, doctor, model)
 
     def test_same_report_filename_never_overwrites(self):
         proof=probe_first_boot(self.plan,activation=self.factory)
