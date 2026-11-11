@@ -20,6 +20,7 @@ Public paths (UNCHANGED from before extraction):
 
 from __future__ import annotations
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException, Query
 
 from routes.galaxy_studio_state import (
@@ -31,7 +32,7 @@ from routes.galaxy_studio_state import (
     advance_build,
 )
 
-router = APIRouter(tags=["galaxy-studio"])
+router = APIRouter(route_class=PublicExceptionRoute, tags=["galaxy-studio"])
 
 
 @router.post("/resurrect/{build_id}")
