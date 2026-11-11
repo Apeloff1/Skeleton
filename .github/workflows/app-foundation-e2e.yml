@@ -107,7 +107,7 @@ jobs:
           echo "::add-mask::${operator_password}"
           {
             echo "GAMEFORGE_SEED_ADMIN_EMAIL=${operator_email}"
-            echo "GAMEFORGE_SEED_ADMIN_PASSWORD=${operator_password}"
+            printf "GAMEFORGE_SEED_ADMIN_PASSWORD=%s\n" "$operator_password"
           } >> "$GITHUB_ENV"
       - name: Validate compose configuration
         run: docker compose -f docker-compose.yml config --quiet
