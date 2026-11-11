@@ -178,7 +178,10 @@ class PRMergeHoldGateTests(unittest.TestCase):
         self.assertIn("contents: read", workflow)
         self.assertNotIn("pull-requests: write", workflow)
         self.assertNotIn("contents: write", workflow)
-        self.assertNotIn("github.event.pull_request.head.sha", workflow)
+        trusted_job = workflow.split("  qualification:", 1)[0]
+        self.assertNotIn("github.event.pull_request.head.sha", trusted_job)
+        self.assertIn("github.event.pull_request.head.sha", workflow)
+        self.assertIn("PR Merge Hold Qualification", workflow)
         self.assertIn("edited", workflow)
         self.assertIn("synchronize", workflow)
         self.assertIn("PR Merge Hold Gate", workflow)
