@@ -139,12 +139,14 @@ class DomainVerdict:
     def __post_init__(self) -> None:
         name(self.domain)
         sha(self.evidence_sha256)
-        if not isinstance(self.stages, tuple) or len(self.stages) != 8:
+        if type(self.stages) is not tuple or len(self.stages) != 8:
             raise LaptopGateHold("domain must evaluate all eight safeguards")
-        if len({x.stage for x in self.stages}) != len(self.stages):
-            raise LaptopGateHold("duplicate safeguard result")
-        if any(not isinstance(x, StageVerdict) for x in self.stages):
+        # Reject foreign objects and tuple subclasses *before* invoking
+        # caller-defined __iter__, __getattribute__, __hash__, or equality.
+        if any(type(item) is not StageVerdict for item in self.stages):
             raise LaptopGateHold("untyped safeguard result")
+        if len({item.stage for item in self.stages}) != len(self.stages):
+            raise LaptopGateHold("duplicate safeguard result")
 
     @property
     def accepted(self) -> bool:
