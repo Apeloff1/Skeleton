@@ -86,6 +86,62 @@ class QualificationTests(unittest.TestCase):
         with self.assertRaises(QualificationError):
             publish_private_report(self.out,'report.json',proof)
 
+    def test_report_rejects_control_unicode_and_oversized_names(self):
+        bad_names = (
+            'line\\nbreak.json'.replace('\\n', '\n'),
+            'line\\rbreak.json'.replace('\\r', '\r'),
+            'tab\\t.json'.replace('\\t', '\t'),
+            'nul\\x00.json'.replace('\\x00', '\x00'),
+            'unicode-\\u2603.json'.replace('\\u2603', '\u2603'),
+            'rtl-\\u202e.json'.replace('\\u202e', '\u202e'),
+            'bad name.json', 'a' * 96 + '.json',
+        )
+        for name in bad_names:
+            with self.subTest(name=repr(name)), self.assertRaises(QualificationError):
+                publish_private_report(self.out, name, {'schema': 'fixture-only'})
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_streaming_keeps_canonical_bytes(self):
+        payload = {'z': 'caf\\u00e9'.replace('\\u00e9', '\u00e9'),
+                   'a': {'nested': [1, True, None]}}
+        name = 'a' * 95 + '.json'
+        publish_private_report(self.out, name, payload)
+        expected = (json.dumps(payload, sort_keys=True, separators=(',', ':'),
+                               allow_nan=False, ensure_ascii=True) + '\n').encode('utf8')
+        self.assertEqual((self.out / name).read_bytes(), expected)
+        self.assertEqual((self.out / name).stat().st_mode & 0o777, 0o600)
+
+    def test_report_payload_rejections_leave_no_output(self):
+        cyclic = {}
+        cyclic['self'] = cyclic
+        for index, payload in enumerate((
+            {'value': object()},
+            {'value': float('nan')},
+            {'value': float('inf')},
+            cyclic,
+        )):
+            with self.subTest(index=index), self.assertRaisesRegex(
+                QualificationError, 'invalid qualification report payload',
+            ):
+                publish_private_report(self.out, 'bad.json', payload)
+            self.assertFalse((self.out / 'bad.json').exists())
+
+    def test_report_byte_budget_rejected_before_publication(self):
+        with self.assertRaisesRegex(QualificationError, 'oversized'):
+            publish_private_report(self.out, 'oversized.json',
+                                   {'data': 'x' * 1_000_000})
+        self.assertFalse((self.out / 'oversized.json').exists())
+
+    def test_writable_nonsticky_report_ancestor_rejected(self):
+        root = Path(self.tmp.name) / 'shared'
+        root.mkdir(mode=0o700)
+        os.chmod(root, 0o777)
+        child = root / 'private'
+        child.mkdir(mode=0o700)
+        with self.assertRaises(QualificationError):
+            publish_private_report(child, 'receipt.json', {'status': 'fixture-only'})
+        self.assertFalse((child / 'receipt.json').exists())
+
     def test_report_name_traversal_refused(self):
         proof=probe_first_boot(self.plan,activation=self.factory)
         for name in ('../escape.json','/tmp/x.json','.json','bad.txt'):
