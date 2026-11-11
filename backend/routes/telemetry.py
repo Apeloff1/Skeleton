@@ -21,7 +21,14 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
-from core.http_errors import redact_client_payload, redact_client_text
+from core.telemetry_privacy import (
+    crash_metadata,
+    safe_detail,
+    safe_event,
+    safe_label,
+    safe_number,
+    safe_session,
+)
 from middleware.security import AuditMiddleware, RateLimitMiddleware
 from routes.gameforge_auth import require_role
 
@@ -58,32 +65,33 @@ def _get_ring_lock() -> asyncio.Lock:
 # ─────────────────────────────────────────────────────────────────
 class TelemetryEvent(BaseModel):
     modal_id: str = Field(
-        ...,
-        description="canonical modal/screen id, e.g. 'GalaxyStudioFactoryModal'",
+        ..., min_length=1, max_length=80,
+        description="canonical modal/screen id",
     )
     session_id: str = Field(
-        ...,
+        ..., min_length=1, max_length=80,
         description="opaque per-app-launch session id from client",
     )
-    event: str = Field(..., description="open|close|action|error|nav|metric")
-    severity: str = "info"
+    event: str = Field(..., min_length=1, max_length=96, description="event category")
+    severity: str = Field(default="info", max_length=20)
     detail: Any | None = None
     ts_client: float | None = None
     duration_ms: float | None = None
 
 
 class TelemetryBatch(BaseModel):
-    events: list[TelemetryEvent]
+    # Bound list admission before preparing persistent storage.
+    events: list[TelemetryEvent] = Field(max_length=500)
 
 
 class CrashReport(BaseModel):
-    source: str = "ErrorBoundary"
-    component: str | None = None
-    message: str
-    stack: str | None = None
+    source: str = Field(default="ErrorBoundary", max_length=120)
+    component: str | None = Field(default=None, max_length=200)
+    message: str = Field(max_length=4096)
+    stack: str | None = Field(default=None, max_length=16384)
     info: Any | None = None
-    session_id: str | None = None
-    app_version: str | None = None
+    session_id: str | None = Field(default=None, max_length=80)
+    app_version: str | None = Field(default=None, max_length=100)
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -109,13 +117,15 @@ async def _persist_critical(event: dict) -> None:
 def _norm(event: TelemetryEvent) -> dict:
     return {
         "ts": time.time(),
-        "modal_id": event.modal_id[:80],
-        "session_id": event.session_id[:40],
-        "event": event.event[:24],
-        "severity": event.severity[:16],
-        "ts_client": event.ts_client,
-        "duration_ms": event.duration_ms,
-        "detail": redact_client_payload(event.detail),
+        "modal_id": safe_label(event.modal_id),
+        "session_id": safe_session(event.session_id),
+        "event": safe_event(event.event),
+        "severity": event.severity if event.severity in {
+            "info", "warn", "error", "fatal"
+        } else "info",
+        "ts_client": safe_number(event.ts_client, maximum=10_000_000_000),
+        "duration_ms": safe_number(event.duration_ms, maximum=86_400_000),
+        "detail": safe_detail(event.detail),
     }
 
 
@@ -150,21 +160,21 @@ async def post_batch(batch: TelemetryBatch):
 
 
 def crash_row(report: CrashReport) -> dict:
-    """Build a secret-stripped crash record for the ring and durable store."""
+    """Collect diagnostic presence and bounded safe scalars, never raw text."""
     return {
         "ts": time.time(),
         "modal_id": "__app__",
-        "session_id": (report.session_id or "anon")[:40],
+        "session_id": safe_session(report.session_id),
         "event": "crash",
         "severity": "fatal",
-        "detail": {
-            "source": redact_client_text(report.source, max_len=80),
-            "component": redact_client_text(report.component or "", max_len=120),
-            "message": redact_client_text(report.message, max_len=500),
-            "stack": redact_client_text(report.stack or "", max_len=2000),
-            "info": redact_client_payload(report.info),
-            "app_version": redact_client_text(report.app_version or "", max_len=40),
-        },
+        "detail": crash_metadata(
+            source=report.source,
+            component=report.component,
+            message=report.message,
+            stack=report.stack,
+            info=report.info,
+            app_version=report.app_version,
+        ),
     }
 
 
