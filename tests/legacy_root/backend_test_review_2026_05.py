@@ -10,6 +10,33 @@ BASE = "http://localhost:8001"
 results = []
 
 
+def _trusted_rust_official_url(value: object) -> bool:
+    """Validate a canonical HTTPS origin instead of an arbitrary host fragment.
+
+    This legacy smoke script receives URLs from a remote API; matching an
+    approved hostname alone permits credentialed/non-HTTPS forms and unsafe
+    authority variants to pass the test.
+    """
+    if type(value) is not str or not 1 <= len(value) <= 2048 or "\\" in value:
+        return False
+    allowed = {"doc.rust-lang.org", "www.rust-lang.org", "rust-lang.org"}
+    try:
+        parsed = urlsplit(value)
+        return (
+            parsed.scheme == "https"
+            and parsed.netloc in allowed
+            and parsed.hostname in allowed
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.port is None
+            and not parsed.fragment
+            and parsed.path.startswith("/")
+        )
+    except ValueError:
+        return False
+
+
+
 def record(name: str, ok: bool, detail: str):
     status = "PASS" if ok else "FAIL"
     results.append((status, name, detail))
@@ -80,12 +107,12 @@ def main() -> int:
         data = r.json() if ok else {}
         license_str = str(data.get("license") or "")
         url_str = str(data.get("official_url") or "")
-        official_host = (urlsplit(url_str).hostname or "").lower()
+        official_ok = _trusted_rust_official_url(url_str)
         cond = (
             ok
             and data.get("is_open_license") is True
             and "MIT" in license_str
-            and official_host in {"doc.rust-lang.org", "www.rust-lang.org", "rust-lang.org"}
+            and official_ok
         )
         record(
             "T2 GET reading-library/book/open_the_rust_programming_language/chapter/3/content",
