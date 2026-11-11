@@ -183,3 +183,10 @@ def test_wander_is_seeded_and_replayable() -> None:
 
     assert run(4) == run(4)
     assert run(4) != run(5)
+
+
+@pytest.mark.parametrize("sample", (-0.1, 1.01, float("nan"), float("inf"),
+                                    -float("inf"), True, 1 << 10000))
+def test_utility_curve_rejects_out_of_domain_samples(sample) -> None:
+    with pytest.raises(ValidationError):
+        curve("linear", sample)

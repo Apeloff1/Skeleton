@@ -36,10 +36,10 @@ async def test_api_connects_only_to_resolved_public_ip_with_original_host_and_sn
 
         @asynccontextmanager
         async def stream(self, method, path, **kwargs):
-            calls.append(("stream", method, path, kwargs))
+            calls.append(("request", method, path, kwargs))
 
             class Response:
-                headers = {}
+                headers = {"content-length": "2"}
                 is_success = True
                 status_code = 200
 

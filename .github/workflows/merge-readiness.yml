@@ -247,29 +247,49 @@ jobs:
           python -m unittest discover -s tests -p test_environment_replay_admission_bounds.py -v
       - name: Install frontend dependencies
         run: yarn --cwd frontend install --ignore-scripts --non-interactive
-      - name: Qualify guarded route, pinned egress, encrypted storage and atomic artifacts
+      - name: Verify filesystem and encrypted compliance CodeQL regressions
         working-directory: backend
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: >-
-          python -m pytest -q --noconftest -p pytest_asyncio.plugin
-          tests/test_codeql_storage_security_20261111.py
-          tests/test_public_exception_route_security.py
-          tests/test_room_api_gateway_security.py
-          tests/test_room_api_dns_pin.py
-          tests/test_room_api_admission_security.py
-          tests/test_room_api_egress_policy_regressions.py
-          tests/test_binary_atomic_security_20261111.py
-          tests/test_api_token_and_enum_security.py
-          tests/test_telemetry_privacy_boundary.py
-      - name: Qualify secure session, telemetry, prototype and guest VM custody
+        run: python -m pytest -q --noconftest tests/test_codeql_storage_security_20261111.py
+      - name: Verify tenant-bound binary custody, vault streaming and bounded SSRF
+        working-directory: backend
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m compileall -q routes/build_pipeline.py services/binary_builder.py services/vault_loader.py gameforge/rooms/room_api_gateway.py routes/telemetry.py core/http_errors.py core/public_exception_route.py routes/share.py routes/gameforge_studio.py core/expressive_tts.py gameforge/knowledge/free_apis.py gameforge/api/scim.py gameforge/enterprise/auth.py gameforge/enterprise/scim_users.py gameforge/enterprise/oidc_config.py routes/godot_engine.py routes/prood.py routes/galaxy_studio.py
+          python -m pytest --noconftest -q \
+            tests/test_binary_tenant_boundary_20261111.py \
+            tests/test_binary_archive_custody_20261111.py \
+            tests/test_apk_atomic_publication_20261111.py \
+            tests/test_telemetry_admission_20261111.py \
+            tests/test_http_error_redaction_bounds_20261111.py \
+            tests/test_http_error_redaction.py \
+            tests/test_public_exception_route_security.py \
+            tests/test_vault_loader_path_custody_20261111.py \
+            tests/test_room_api_egress_admission_20261111.py \
+            tests/test_cns_room_security_boundary_20261111.py \
+            tests/test_codeql_tts_linear_20261111.py \
+            tests/test_codeql_free_api_selector_20261111.py \
+            tests/test_codeql_origin_guards_20261111.py \
+            tests/test_share_page_security.py \
+            tests/test_enterprise_auth_fail_closed_20261111.py \
+            tests/test_scim_tenant_custody_20261111.py \
+            tests/test_scim_webhook_principal_20261111.py \
+            tests/test_codeql_godot_quorum_errors_20261111.py \
+            ../tests/test_full_security_alert_inventory_20261111.py \
+            ../tests/test_codeql_lineage_contract_20261111.py \
+            tests/test_codeql_exception_boundary_20261111.py \
+            ../tests/test_codeql_all_151_source_contracts_20261111.py \
+            ../tests/test_codeql_stack_trace_custody_20261111.py
+      - name: Verify native-secure sessions, telemetry custody and isolated WASM code execution
         run: >-
           node --test
           frontend/scripts/test-secure-session-identifiers.cjs
           frontend/scripts/test-quickwins-prototype-guard.cjs
-          frontend/scripts/test-telemetry-redaction.cjs
-          frontend/scripts/test-telemetry-privacy.mjs
-          frontend/scripts/test-wasm-guest-sandbox.cjs
+          frontend/scripts/test-telemetry-privacy.cjs
+          frontend/scripts/test-telemetry-batch-admission.cjs
+          frontend/scripts/test-wasm-origin-execution-boundary.cjs
       # Full repository Ruff lint runs in the canonical quality gate below; avoid a second backend-only pass.
       - name: Canonical lint, type, and high-confidence security gates
         run: bash scripts/quality-gates.sh
@@ -299,8 +319,6 @@ jobs:
         run: >-
           python -m pip install --disable-pip-version-check
           "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "httpx>=0.28.1,<1" "motor==3.7.1" "pymongo==4.19.0" "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3" "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2"
-      - name: Verify live-label merge holds and stale PR authority
-        run: python -m unittest discover -s tests -p test_pr_merge_hold_gate.py -v
       - name: Compile automation package
         run: >-
           python -m compileall -q

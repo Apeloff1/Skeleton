@@ -187,6 +187,50 @@ test('malformed terminal receipts cannot masquerade as a winner', async () => {
   }
 });
 
+test('terminal receipts reject non-renderable and unbounded optional fields', async () => {
+  const oversized = 'x'.repeat(24_001);
+  const validCandidate = { model: 'local:gguf', content: 'A coherent original light puzzle mechanic.' };
+  const invalid = [
+    terminal({ winner_score: { private: 'object cannot render as text' } }),
+    terminal({ winner_score: Infinity }),
+    terminal({ winner_score: -1 }),
+    terminal({ judge_why: { private: 'object cannot render as text' } }),
+    terminal({ judge_why: 'x'.repeat(2_001) }),
+    terminal({ panel: ['x'.repeat(2_049)] }),
+    terminal({ candidates: [{ ...validCandidate, score: { forged: true } }] }),
+    terminal({ candidates: [{ ...validCandidate, quality: 'forged' }] }),
+    terminal({ candidates: [{ ...validCandidate, fidelity: NaN }] }),
+    terminal({ candidates: [{ ...validCandidate, critique: { private: true } }] }),
+    terminal({ candidates: [{ ...validCandidate, critique: 'x'.repeat(4_001) }] }),
+    terminal({ winner_content: oversized, candidates: [{ ...validCandidate, content: oversized }] }),
+  ];
+  for (const record of invalid) {
+    let gets = 0;
+    const transport = mockTransport({
+      post: async () => { throw Error('invalid result must never resubmit'); },
+      get: async () => { gets++; return ok(record); },
+    });
+    const outcome = await pollDiscourseJob(transport, JOB_ID);
+    assert.deepEqual(outcome, {
+      ok: false, jobId: JOB_ID,
+      error: 'invalid_terminal_result', recoverable: false,
+    });
+    assert.equal(gets, 1);
+    assert.equal(JSON.stringify(outcome).includes('private'), false);
+  }
+  const control = terminal({
+    winner_score: 99.5, judge_why: 'Grounded judge reasoning',
+    candidates: [{ ...validCandidate, quality: 99, fidelity: 100, score: 99.5,
+      critique: 'A bounded and valid critique.' }],
+  });
+  const accepted = await pollDiscourseJob(mockTransport({
+    post: async () => { throw Error('unexpected POST'); },
+    get: async () => ok(control),
+  }), JOB_ID);
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.result?.winner_score, 99.5);
+});
+
 test('failed terminal job is never represented as completed', async () => {
   const transport = mockTransport({
     post: async () => { throw Error('unexpected POST'); },
