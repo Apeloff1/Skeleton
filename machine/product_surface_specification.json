@@ -3297,7 +3297,7 @@
       "backend_delegates": [
         {
           "source": "frontend/src/features/discourse/discourseJob.ts",
-          "source_sha256": "3464b10ada43668c96514a3bda38b23c35b2c289958a627ef98c3c27efedb98a"
+          "source_sha256": "30e8a8ae73e13a6d6ebdde9ef04f8b8dda16c6cadc7be6f7e1cec1e990e8df8f"
         }
       ]
     },
