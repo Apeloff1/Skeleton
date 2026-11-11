@@ -133,6 +133,11 @@ def test_guarded_modules_parse_and_never_overwrite_public_http_error_contract():
     for relative in paths:
         ast.parse((ROOT / relative).read_text(encoding="utf-8"), filename=relative)
     source = (ROOT / "backend/core/public_exception_route.py").read_text(encoding="utf-8")
-    assert "except (StarletteHTTPException, RequestValidationError)" in source
+    # The handlers are deliberately separate: 422 and public 4xx preserve
+    # their semantics, while 5xx errors are stripped of private details.
+    assert "except RequestValidationError:" in source
+    assert "except StarletteHTTPException as exc:" in source
+    assert "if exc.status_code >= 500:" in source
+    assert 'headers={"Cache-Control": "no-store"}' in source
     assert "raise StarletteHTTPException(" in source
     assert "status_code=500, detail=PUBLIC_INTERNAL_ERROR" in source
