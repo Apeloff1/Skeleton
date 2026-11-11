@@ -4,14 +4,14 @@ from __future__ import annotations
 import logging
 import math
 import re
+from inspect import isawaitable
 from itertools import islice
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from inspect import isawaitable
 
 log = logging.getLogger("codedock.http_errors")
 
