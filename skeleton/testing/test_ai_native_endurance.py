@@ -12,7 +12,6 @@ from skeleton.ai.runtime.operational_ai.model.qualification.records import trial
 from skeleton.ai.runtime.operational_ai.model.qualification.latency import summarize
 from skeleton.ai.runtime.operational_ai.model.qualification.storage import publish_private
 from skeleton.ai.runtime.operational_ai.model.native import Generated
-from skeleton.ai.runtime.operational_ai.authority.canonical import ContractViolation
 
 MODEL='a'*64
 TOKEN='b'*64
@@ -84,7 +83,7 @@ class EnduranceTests(unittest.TestCase):
 
     def test_empty_output_refused(self):
         backend = FixtureOnlyBackend('empty')
-        with self.assertRaisesRegex(ContractViolation, 'empty or oversized'):
+        with self.assertRaisesRegex(QualificationHeld, 'native generated receipt rejected'):
             measure(backend, self.new_policy(), clock=self.clock())
         self.assertEqual(backend.admits, 1)
         self.assertEqual(backend.calls, 1)  # invalid native receipt is never retried

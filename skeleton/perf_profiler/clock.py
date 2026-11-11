@@ -3,7 +3,11 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Iterable, Protocol
+from collections import deque
+from typing import Deque, Iterable, Protocol
+
+# Scripted clocks are untrusted test/replay inputs. Bound ingestion and storage.
+MAX_SCRIPT_STEPS = 100_000
 
 
 class Clock(Protocol):
@@ -28,20 +32,29 @@ class DeterministicClock:
     def __init__(self, start_ms: float = 0.0, script: Iterable[float] = ()) -> None:
         _check_finite(start_ms, "start_ms")
         self._now = float(start_ms)
-        raw = list(script)
-        for d in raw:
-            _check_delta(d)
-        self._script = [float(d) for d in raw]
+        self._script: Deque[float] = deque()
+        for index, delta in enumerate(script):
+            if index >= MAX_SCRIPT_STEPS:
+                raise ValueError("clock script exceeds bounded step count")
+            _check_delta(delta)
+            self._script.append(float(delta))
         self._primed = False
 
     def advance(self, delta_ms: float) -> float:
         _check_delta(delta_ms)
-        self._now += float(delta_ms)
+        updated = self._now + float(delta_ms)
+        if not math.isfinite(updated):
+            raise ValueError("clock time exceeds finite bound")
+        self._now = updated
         return self._now
 
     def now_ms(self) -> float:
         if self._primed and self._script:
-            self._now += self._script.pop(0)
+            updated = self._now + self._script[0]
+            if not math.isfinite(updated):
+                raise ValueError("scripted clock time exceeds finite bound")
+            self._now = updated
+            self._script.popleft()
         self._primed = True
         return self._now
 
@@ -51,8 +64,14 @@ class DeterministicClock:
 
 
 def _check_finite(value: float, name: str) -> None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-        raise ValueError(f"{name} must be a finite number, got {value!r}")
+    if type(value) not in (int, float):
+        raise ValueError(f"{name} must be a finite number")
+    try:
+        finite = math.isfinite(float(value))
+    except OverflowError:
+        finite = False
+    if not finite:
+        raise ValueError(f"{name} must be a finite number")
 
 
 def _check_delta(delta: float) -> None:

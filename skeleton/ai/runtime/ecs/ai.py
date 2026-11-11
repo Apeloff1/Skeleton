@@ -218,15 +218,30 @@ def _clamp(vx: float, vy: float, limit: float) -> tuple[float, float]:
     return vx, vy
 
 
+def _finite_bounded(value: object, limit: float) -> bool:
+    """Reject hostile numeric values before float coercion or arithmetic."""
+    return (type(value) in (int, float) and -limit <= value <= limit
+            and math.isfinite(value))
+
+
 def steering(behavior: str, pos: tuple[float, float], vel: tuple[float, float], agent: Mapping[str, Any],
              target_pos: tuple[float, float] | None, target_vel: tuple[float, float] = (0.0, 0.0), wander_angle: float = 0.0) -> tuple[float, float]:
     """Desired steering force for one agent (pure function)."""
-    ms = float(agent["max_speed"])
-    if behavior not in BEHAVIORS or not math.isfinite(ms) or ms <= 0:
+    if not isinstance(agent, Mapping) or behavior not in BEHAVIORS:
         raise ValidationError("invalid steering behavior or speed")
-    if any(not math.isfinite(v) for v in (*pos, *vel, *target_vel, wander_angle)):
+    raw_speed = agent.get("max_speed")
+    if not _finite_bounded(raw_speed, 100000) or raw_speed <= 0:
+        raise ValidationError("invalid steering behavior or speed")
+    ms = float(raw_speed)
+    vectors = (pos, vel, target_vel)
+    if (any(type(vector) not in (tuple, list) or len(vector) != 2 for vector in vectors)
+            or any(not _finite_bounded(v, 1_000_000_000)
+                   for vector in vectors for v in vector)
+            or not _finite_bounded(wander_angle, 1_000_000_000)):
         raise ValidationError("nonfinite steering inputs")
-    if target_pos is not None and any(not math.isfinite(v) for v in target_pos):
+    if (target_pos is not None and
+            (type(target_pos) not in (tuple, list) or len(target_pos) != 2
+             or any(not _finite_bounded(v, 1_000_000_000) for v in target_pos))):
         raise ValidationError("nonfinite target coordinates")
     if behavior == "idle":
         return (-vel[0], -vel[1])
@@ -252,7 +267,10 @@ def steering(behavior: str, pos: tuple[float, float], vel: tuple[float, float], 
         return (-vel[0], -vel[1])
     speed = ms
     if behavior == "arrive":
-        slow = float(agent.get("radius", 1.0)) * 4.0
+        radius = agent.get("radius", 1.0)
+        if not _finite_bounded(radius, 100000) or radius <= 0:
+            raise ValidationError("invalid finite steering radius")
+        slow = float(radius) * 4.0
         speed = ms * min(1.0, dist / slow)
     desired = (dx / dist * speed, dy / dist * speed)
     return (desired[0] - vel[0], desired[1] - vel[1])

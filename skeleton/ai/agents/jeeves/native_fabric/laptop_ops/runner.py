@@ -12,6 +12,37 @@ DOMAINS = frozenset((
 ))
 
 
+# Literal-only lazy registry table: never derive an import path from caller input.
+_REGISTRY_LOADERS = {
+    "bootstrap": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.bootstrap.registry"),
+    "model_manifest": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.model_manifest.registry"),
+    "tokenizer_identity": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.tokenizer_identity.registry"),
+    "memory_capacity": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.memory_capacity.registry"),
+    "cpu_admission": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.cpu_admission.registry"),
+    "gpu_admission": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.gpu_admission.registry"),
+    "context_window": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.context_window.registry"),
+    "native_session": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.native_session.registry"),
+    "generation_budget": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.generation_budget.registry"),
+    "output_receipt": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.output_receipt.registry"),
+    "sqlite_replay": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.sqlite_replay.registry"),
+    "signed_sources": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.signed_sources.registry"),
+    "source_retrieval": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.source_retrieval.registry"),
+    "tool_grants": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.tool_grants.registry"),
+    "memory_consent": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.memory_consent.registry"),
+    "pressure_recovery": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.pressure_recovery.registry"),
+    "cancellation": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.cancellation.registry"),
+    "cold_restart": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.cold_restart.registry"),
+    "first_turn": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.first_turn.registry"),
+    "release_gates": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.release_gates.registry"),
+}
+
+
+def registry_module(domain: str):
+    if type(domain) is not str or domain not in DOMAINS:
+        raise LaptopGateHold("unregistered first-laptop domain")
+    return _REGISTRY_LOADERS[domain]()
+
+
 def list_domains() -> tuple[str, ...]:
     return tuple(sorted(DOMAINS))
 
@@ -29,10 +60,7 @@ def domain_coverage() -> tuple[dict[str, object], ...]:
     for domain in list_domains():
         implemented = False
         try:
-            module = importlib.import_module(
-                "skeleton.jeeves.native_fabric.laptop_ops.domains."
-                + domain + ".registry"
-            )
+            module = registry_module(domain)
             stages = getattr(module, "STAGES")
             stage_types = getattr(module, "STAGE_TYPES")
             handlers = getattr(module, "HANDLERS")
@@ -70,10 +98,7 @@ def evaluate_domain(domain: str, evidence: object) -> DomainVerdict:
         raise LaptopGateHold("domain evidence mapping required")
     # Missing incremental modules are explicitly held, not silently skipped.
     try:
-        module = importlib.import_module(
-            "skeleton.jeeves.native_fabric.laptop_ops.domains."
-            + domain + ".registry"
-        )
+        module = registry_module(domain)
     except (ImportError, ModuleNotFoundError) as exc:
         raise LaptopGateHold("required domain module unavailable") from exc
     stages = module.evaluate(evidence)

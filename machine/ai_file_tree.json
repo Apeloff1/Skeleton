@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "920188b9e275b40716e77afea5a4b5c35dd75760",
+      "source_git_object_sha": "ab0598c31ce31857e3bfdabef1a9311bbef4e606",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -2199,7 +2199,7 @@
       "source": "skeleton/pr_automation",
       "destination": "skeleton/ai/build/pr_automation",
       "kind": "tree",
-      "source_git_object_sha": "3df606ef721a256881d0656737c77649b47f522b",
+      "source_git_object_sha": "5ebd1c49e3adf6b9260debec0fd62f17f1150b90",
       "role": "Automerge, runner, queue, policy, evidence, and hygiene logic is autonomous repository-engineering/build-control code.",
       "work_package_refs": [
         "WP-W15",
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "c89e6b1a7ce867884256703ce44c1830c89aa429"
+      "source_git_object_sha": "ce7c1908fa42a17bc146b6e1b1f7356fb9af855a"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
