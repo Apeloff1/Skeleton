@@ -7,8 +7,8 @@ the checked authority and resource caps without contacting any external host.
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
 import socket
+from contextlib import asynccontextmanager
 
 import httpx
 import pytest
