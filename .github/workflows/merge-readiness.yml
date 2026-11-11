@@ -257,7 +257,7 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
-          python -m compileall -q routes/build_pipeline.py services/binary_builder.py services/vault_loader.py gameforge/rooms/room_api_gateway.py routes/telemetry.py core/http_errors.py routes/gameforge_studio.py core/expressive_tts.py gameforge/knowledge/free_apis.py
+          python -m compileall -q routes/build_pipeline.py services/binary_builder.py services/vault_loader.py gameforge/rooms/room_api_gateway.py routes/telemetry.py core/http_errors.py routes/gameforge_studio.py core/expressive_tts.py gameforge/knowledge/free_apis.py gameforge/api/scim.py gameforge/enterprise/auth.py gameforge/enterprise/scim_users.py gameforge/enterprise/oidc_config.py routes/godot_engine.py routes/prood.py routes/galaxy_studio.py
           python -m pytest --noconftest -q \
             tests/test_binary_tenant_boundary_20261111.py \
             tests/test_binary_archive_custody_20261111.py \
@@ -270,6 +270,9 @@ jobs:
             tests/test_codeql_tts_linear_20261111.py \
             tests/test_codeql_free_api_selector_20261111.py \
             tests/test_codeql_origin_guards_20261111.py \
+            tests/test_enterprise_auth_fail_closed_20261111.py \
+            tests/test_scim_tenant_custody_20261111.py \
+            tests/test_codeql_godot_quorum_errors_20261111.py \
             ../tests/test_full_security_alert_inventory_20261111.py
       - name: Verify native-secure sessions, telemetry custody and isolated WASM code execution
         run: >-
