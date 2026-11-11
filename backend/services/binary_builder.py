@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from core.exec_guard import execution_disabled_message, require_execution_allowed
+from core.vault_secure_fs import VaultPathError, anchored_directory, ensure_directory, read_regular
 
 ARTIFACTS_ROOT = Path("/app/backend/data/build_artifacts")
 
@@ -31,8 +32,7 @@ ARTIFACTS_ROOT = Path("/app/backend/data/build_artifacts")
 def _ensure_artifacts_root() -> Path:
     """Create the artifact root only when an artifact write is authorized."""
 
-    ARTIFACTS_ROOT.mkdir(parents=True, exist_ok=True)
-    return ARTIFACTS_ROOT
+    return ensure_directory(ARTIFACTS_ROOT)
 
 # ─── Android toolchain detection ───
 ANDROID_SDK = Path(os.environ.get("ANDROID_SDK_ROOT", "/opt/android-sdk"))
@@ -97,16 +97,14 @@ def _sanitize_path(p: str) -> str:
 
 
 def _safe_build_id(value: object) -> str:
-    build_id = str(value or "").strip()
+    """Use only bounded ASCII identifiers across packaging and download paths."""
     if (
-        not build_id
-        or build_id in {".", ".."}
-        or ".." in build_id
-        or "/" in build_id
-        or "\\" in build_id
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 128
+        or any(not (ch.isascii() and (ch.isalnum() or ch in {"-", "_"})) for ch in value)
     ):
-        raise ValueError("build_id must be a relative identifier")
-    return build_id
+        raise ValueError("build_id must be a bounded ASCII identifier")
+    return value
 
 
 def _safe_pkg_segment(seg: str) -> str:
@@ -936,6 +934,30 @@ async def package_build(build: dict, kinds: list[str] | None = None) -> dict:
             errors.append("packager returned an invalid result")
     return {"artifacts": artifacts, "errors": errors}
 
+
+
+
+def open_artifact_for_download(build_id: str, kind: str):
+    """Return an already-open verified regular file, never a path-only check.
+
+    All directory ancestors and the artifact leaf are opened O_NOFOLLOW.
+    Duplicating the verified descriptor ensures a replacement of the pathname
+    after validation cannot switch which file the response serves.
+    Callers own and must close the returned binary stream.
+    """
+    if kind not in {"zip", "apk"}:
+        return None
+    try:
+        safe_id = _safe_build_id(build_id)
+        with anchored_directory(ARTIFACTS_ROOT) as directory:
+            with read_regular(
+                directory,
+                f"{safe_id}.{kind}",
+                max_bytes=2 * 1024 * 1024 * 1024,
+            ) as source:
+                return os.fdopen(os.dup(source.fileno()), "rb")
+    except (ValueError, VaultPathError, FileNotFoundError, NotADirectoryError, OSError):
+        return None
 
 def find_artifact_path(build_id: str, kind: str) -> Optional[Path]:
     if kind not in {"zip", "apk"}:
