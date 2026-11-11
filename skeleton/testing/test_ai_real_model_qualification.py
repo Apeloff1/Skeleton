@@ -155,7 +155,7 @@ class QualificationTests(unittest.TestCase):
         with mock.patch.object(report_paths.os, 'write', side_effect=short_first):
             publish_private_report(self.out, 'short.json', payload)
         expected = (json.dumps(payload, sort_keys=True, separators=(',', ':'),
-                               allow_nan=False, ensure_ascii=True) + '\\n').encode('ascii')
+                               allow_nan=False, ensure_ascii=True) + '\n').encode('ascii')
         self.assertEqual((self.out / 'short.json').read_bytes(), expected)
         self.assertGreaterEqual(calls[0], 2)
         self.assertEqual([p.name for p in self.out.iterdir()], ['short.json'])
