@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "ab0598c31ce31857e3bfdabef1a9311bbef4e606",
+      "source_git_object_sha": "f7134ec055ce4d6a2fe527cadf2d6a59bd4218b1",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
