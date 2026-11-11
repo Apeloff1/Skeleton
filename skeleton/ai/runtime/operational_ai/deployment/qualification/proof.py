@@ -1,7 +1,7 @@
 """Privacy-preserving qualification evidence digest; not a model quality claim."""
 from __future__ import annotations
 import hashlib, json
-from ...orchestration.execution_spine.contracts import canonical,hexdigest
+from ...orchestration.execution_spine.contracts import canonical,hexdigest,SpineError
 from .contracts import QualificationError
 
 
@@ -9,15 +9,30 @@ def construct(model: str, tokenizer: str, session: str,
               request: str, first: dict, replayed: dict,
               history: tuple[dict, ...], diagnostics: dict,
               *, exact_native: bool) -> dict:
-    hexdigest(model, 'model digest');hexdigest(tokenizer, 'tokenizer digest')
+    try:
+        hexdigest(model, 'model digest')
+        hexdigest(tokenizer, 'tokenizer digest')
+    except SpineError:
+        raise QualificationError('invalid qualification digest') from None
     if type(exact_native) is not bool:
         raise QualificationError('qualification backend proof missing')
     if not isinstance(first,dict) or not isinstance(replayed,dict):
         raise QualificationError('missing inference receipts')
     if first.get('replayed') is not False or replayed.get('replayed') is not True:
         raise QualificationError('restarted invocation did not prove replay')
-    if first.get('revision') != 1 or replayed.get('revision') != first['revision']:
+    if (type(first.get('revision')) is not int or first['revision'] != 1
+            or type(replayed.get('revision')) is not int
+            or replayed['revision'] != 1):
         raise QualificationError('replay changed conversation revision')
+    for key, ceiling in (('generated_tokens', 8192), ('prompt_tokens', 131072)):
+        value = first.get(key)
+        if type(value) is not int or not 0 <= value <= ceiling:
+            raise QualificationError('invalid numeric qualification evidence')
+    try:
+        for key in ('request_sha256', 'output_sha256', 'context_sha256'):
+            hexdigest(first.get(key), key)
+    except SpineError:
+        raise QualificationError('invalid qualification digest') from None
     if first.get('output_sha256') != replayed.get('output_sha256'):
         raise QualificationError('inference output changed across restart')
     if first.get('request_sha256') != replayed.get('request_sha256'):
@@ -26,7 +41,8 @@ def construct(model: str, tokenizer: str, session: str,
         raise QualificationError('committed transcript did not replay exactly')
     if hashlib.sha256(history[1]['content'].encode('utf8')).hexdigest()!=first['output_sha256']:
         raise QualificationError('durable output does not match generation receipt')
-    if not isinstance(diagnostics,dict) or diagnostics.get('turns') != 1:
+    if (type(diagnostics) is not dict or type(diagnostics.get('turns')) is not int
+            or diagnostics['turns'] != 1):
         raise QualificationError('database integrity doctor did not prove the turn')
     proof = {
         'schema':'skeleton.ai.first-boot-qualification.v1',
