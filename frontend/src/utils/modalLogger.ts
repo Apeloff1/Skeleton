@@ -101,7 +101,14 @@ async function _persistQueue(events: TelemetryEvent[]) {
       .slice(-MAX_EVENTS)
       .map(sanitizeQueuedEvent)
       .filter((event): event is TelemetryEvent => event !== null);
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(merged));
+    let serialized = JSON.stringify(merged);
+    // Count limits alone are insufficient: many large but individually valid
+    // diagnostic rows can still exhaust mobile persistent storage.
+    while (serialized.length > MAX_QUEUE_BYTES && merged.length) {
+      merged.splice(0, Math.max(1, Math.ceil(merged.length / 4)));
+      serialized = JSON.stringify(merged);
+    }
+    await AsyncStorage.setItem(QUEUE_KEY, serialized);
   } catch { /* non-fatal; never log the queue content */ }
 }
 
