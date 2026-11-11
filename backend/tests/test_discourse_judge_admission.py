@@ -503,3 +503,51 @@ def test_private_job_discovery_scopes_query_and_omits_prompt(monkeypatch):
         "created_at": "2026-11-11T05:00:00+00:00",
         "worker_continuity_verified": False,
     }]
+
+
+def _authorized_catalog_for_direct_boundary_tests():
+    return {"models": [
+        {"id": "provider:model", "provider_id": "provider", "model_id": "model",
+         "available": True, "selectable": True, "active": True},
+    ]}
+
+
+@pytest.mark.parametrize("selected,judge_key,maximum", [
+    ([[]], None, 5),
+    ([{"model": "provider:model"}], None, 5),
+    ([None], None, 5),
+    ({"model": "provider:model"}, None, 5),
+    ("provider:model", None, 5),
+    (None, [], 5),
+    (None, {}, 5),
+    (None, True, 5),
+    (None, None, True),
+    (None, None, 0),
+    (None, None, 6),
+    (["provider:model"] * 6, None, 5),
+    (["x" * 386], None, 5),
+])
+def test_catalog_direct_caller_rejects_malformed_panel_before_dispatch(
+    selected, judge_key, maximum,
+):
+    from core.discourse_catalog import PanelUnavailable, _catalog_panel
+
+    with pytest.raises(PanelUnavailable):
+        _catalog_panel(
+            _authorized_catalog_for_direct_boundary_tests(),
+            selected=selected, judge_key=judge_key, maximum=maximum,
+        )
+
+
+def test_catalog_direct_caller_preserves_valid_tuple_and_default_judge():
+    from core.discourse_catalog import _catalog_panel
+
+    catalog = _authorized_catalog_for_direct_boundary_tests()
+    explicit = _catalog_panel(
+        catalog, selected=("provider:model",), judge_key="provider:model",
+    )
+    assert tuple(model.key for model in explicit.models) == ("provider:model",)
+    assert explicit.judge.key == "provider:model"
+    automatic = _catalog_panel(catalog, selected=[], judge_key="")
+    assert automatic.models == explicit.models
+    assert automatic.judge == explicit.judge
