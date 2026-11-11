@@ -48,7 +48,7 @@ test('submits once and observes a confirmed terminal result without a duplicate 
       calls.get++;
       assert.equal(path, '/api/discourse/result/' + JOB_ID);
       assert.equal(opts.retries, 0);
-      return ok(calls.get === 1 ? { status: 'running' } : terminal());
+      return ok(calls.get === 1 ? { status: 'running', job_id: JOB_ID } : terminal());
     },
   });
   const outcome = await submitDiscourseJob(transport, payload, {
@@ -149,7 +149,7 @@ test('stop observing aborts polling without asserting the admitted job was cance
   const abort = new AbortController();
   const transport = mockTransport({
     post: async () => { throw Error('unexpected POST'); },
-    get: async () => ok({ status: 'running' }),
+    get: async () => ok({ status: 'running', job_id: JOB_ID }),
   });
   const work = pollDiscourseJob(transport, JOB_ID, {
     signal: abort.signal, pollIntervalMs: 1000, maxWaitMs: 2000,
@@ -190,11 +190,38 @@ test('malformed terminal receipts cannot masquerade as a winner', async () => {
 test('failed terminal job is never represented as completed', async () => {
   const transport = mockTransport({
     post: async () => { throw Error('unexpected POST'); },
-    get: async () => ok({ status: 'error', error: 'deliberation_not_durable' }),
+    get: async () => ok({ status: 'error', job_id: JOB_ID, error: 'deliberation_not_durable' }),
   });
   const outcome = await pollDiscourseJob(transport, JOB_ID);
   assert.equal(outcome.ok, false);
   assert.equal(outcome.error, 'deliberation_not_durable');
+});
+
+test('in-flight, failed and unconfirmed observations reject foreign job identities', async () => {
+  for (const status of ['running', 'queued', 'error', 'unconfirmed']) {
+    for (const foreignId of ['cd'.repeat(16), undefined]) {
+      let observations = 0;
+      const transport = mockTransport({
+        post: async () => { throw Error('observation must not resubmit'); },
+        get: async () => {
+          observations++;
+          return ok({
+            status, job_id: foreignId,
+            error: 'foreign-private-error-must-not-leak',
+          });
+        },
+      });
+      const outcome = await pollDiscourseJob(transport, JOB_ID, {
+        pollIntervalMs: 10, maxWaitMs: 100,
+      });
+      assert.deepEqual(outcome, {
+        ok: false, jobId: JOB_ID,
+        error: 'invalid_job_record', recoverable: false,
+      });
+      assert.equal(observations, 1);
+      assert.equal(JSON.stringify(outcome).includes('foreign-private-error'), false);
+    }
+  }
 });
 
 test('backend must return a bounded acknowledged job admission receipt', async () => {
@@ -209,7 +236,7 @@ test('backend must return a bounded acknowledged job admission receipt', async (
 test('observation is finite even when the server stays running', async () => {
   const transport = mockTransport({
     post: async () => { throw Error('unexpected POST'); },
-    get: async () => ok({ status: 'running' }),
+    get: async () => ok({ status: 'running', job_id: JOB_ID }),
   });
   const outcome = await pollDiscourseJob(transport, JOB_ID, {
     maxWaitMs: 100, pollIntervalMs: 10,

@@ -194,6 +194,12 @@ export async function pollDiscourseJob(
           ? { ok: true, jobId, result }
           : failure('invalid_terminal_result', jobId);
       }
+      // Every observed row, including errors and in-flight receipts, must
+      // identify the requested private job. Never surface a foreign job's
+      // failure text or keep polling an unbound response.
+      if (record.job_id !== jobId) {
+        return failure('invalid_job_record', jobId);
+      }
       if (record.status === 'error') {
         return failure(boundedMessage(record.error, 'deliberation_failed'), jobId);
       }
