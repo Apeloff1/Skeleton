@@ -200,6 +200,37 @@ def test_boolean_judge_index_must_not_select_second_candidate(monkeypatch):
 
 
 
+def test_judge_cannot_publish_a_winner_below_its_own_validated_scores(monkeypatch):
+    """The winner label must agree with the weighted score evidence."""
+
+    async def fake_route(*_args, model=None, **_kwargs):
+        model = _kwargs.get("model_id", model)
+        if model == "judge":
+            return {"content": '{"winner_index":1,"scores":['
+                               '{"index":0,"quality":95,"fidelity":95},'
+                               '{"index":1,"quality":5,"fidelity":5}]}'}
+        return {"content": "valid candidate from model"}
+
+    class Collection:
+        async def insert_one(self, *_args):
+            from types import SimpleNamespace
+            return SimpleNamespace(acknowledged=True)
+
+    class Database:
+        discourse_log = Collection()
+
+    monkeypatch.setattr(discourse, "route_complete", fake_route)
+    monkeypatch.setattr(discourse, "_db", Database())
+    result = asyncio.run(discourse.deliberate(
+        "creative", "valid prompt", panel=["m1", "m2"], judge_model="judge",
+        do_discord=False, identity=ALICE,
+    ))
+    assert result["persistence_status"] == "durable"
+    assert result["winner_index"] == 0
+    assert result["winner_model"] == "fixture:m1"
+    assert result["winner_score"] == 95
+
+
 def test_large_integer_scores_do_not_overflow_float_conversion():
     assert discourse._score_int(10 ** 1000) is None
     assert discourse._score_int(100) == 100
