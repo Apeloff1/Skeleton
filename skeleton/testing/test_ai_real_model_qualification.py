@@ -189,11 +189,11 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(list(self.out.iterdir()), [])
 
     def test_report_bounded_unicode_and_escapes_preserve_canonical_bytes(self):
-        payload = {'emoji': '\U0001f600' * 12, 'controls': '\\x00\\n\\t',
-                   'quoted': '"\\\\', 'nested': {'caf\\u00e9': True}}
+        payload = {'emoji': '\U0001f600' * 12, 'controls': '\x00\n\t',
+                   'quoted': '"\\', 'nested': {'café': True}}
         publish_private_report(self.out, 'unicode.json', payload)
         expected = (json.dumps(payload, sort_keys=True, separators=(',', ':'),
-                               allow_nan=False, ensure_ascii=True) + '\\n').encode('ascii')
+                               allow_nan=False, ensure_ascii=True) + '\n').encode('ascii')
         self.assertEqual((self.out / 'unicode.json').read_bytes(), expected)
 
     def test_report_large_container_preflight_never_invokes_json_encoder(self):
