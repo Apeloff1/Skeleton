@@ -86,3 +86,20 @@ def test_cli_hint_never_falls_through_to_default_world(tmp_path, capsys, monkeyp
     assert cli.main(["hint", "--report", str(path)]) == 0
     assert opened == [str(path)]
     assert json.loads(capsys.readouterr().out)["report_digest"] == report["report_digest"]
+
+def test_harbor_studio_workflow_qualifies_immutable_pr_head():
+    """A synthetic merge checkout must not masquerade as exact-head evidence."""
+    from pathlib import Path
+
+    workflow = (
+        Path(__file__).resolve().parents[2]
+        / ".github/workflows/harbor-studio-source-qualification.yml"
+    ).read_text(encoding="utf-8")
+    expected_ref = 'ref: ${{ github.event.pull_request.head.sha }}'
+    expected_guard = 'run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"'
+    assert workflow.count(expected_ref) == 1
+    assert workflow.count(expected_guard) == 1
+    assert 'EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}' in workflow
+    assert workflow.index(expected_ref) < workflow.index(expected_guard)
+    assert "persist-credentials: false" in workflow
+    assert "fetch-depth: 1" in workflow
