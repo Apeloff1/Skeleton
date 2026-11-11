@@ -276,6 +276,7 @@ _LOADERS = {
     'core.universal_forge': lambda: importlib.import_module('core.universal_forge'),
     'core.user_control_receipts': lambda: importlib.import_module('core.user_control_receipts'),
     'core.vault_gdd': lambda: importlib.import_module('core.vault_gdd'),
+    'core.vault_secure_fs': lambda: importlib.import_module('core.vault_secure_fs'),
     'core.verified_curiosity': lambda: importlib.import_module('core.verified_curiosity'),
     'core.vfx_combat_catalog': lambda: importlib.import_module('core.vfx_combat_catalog'),
     'core.vfx_cues': lambda: importlib.import_module('core.vfx_cues'),

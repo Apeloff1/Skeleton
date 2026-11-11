@@ -76,6 +76,9 @@ on:
       - 'skeleton/testing/test_app_compose_parity.py'
       - 'skeleton/testing/test_windows_installer.py'
       - 'scripts/check_app_assembly.py'
+      - 'scripts/check_product_surface_specification.py'
+      - 'machine/product_surface_specification.json'
+      - 'tests/test_product_surface_delegated_backend_20261110.py'
       - 'tests/test_app_assembly_vertical_surface_custody.py'
       - 'scripts/check_app_compose_parity.py'
 
@@ -134,6 +137,8 @@ jobs:
             skeleton/testing/test_app_assembly.py \
             skeleton/testing/test_first_run_probe_gate.py \
             tests/test_app_assembly_vertical_surface_custody.py \
+            tests/test_product_surface_specification.py \
+            tests/test_product_surface_delegated_backend_20261110.py \
             skeleton/testing/test_app_installer.py \
             skeleton/testing/test_app_installer_epoch.py \
             skeleton/testing/test_app_compose_parity.py \
@@ -211,3 +216,59 @@ jobs:
             tests/test_jeeves_deep_authoring_graph.py \
             skeleton/testing/test_godot_export_artifact_custody.py \
             skeleton/testing/test_godot_export_cli_custody.py
+
+  ci_convergence_source:
+    name: Exact-head backend taxonomy, source custody and Expo export regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: ".:backend"
+      PYTHONNOUSERSITE: "1"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Checkout immutable candidate source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Require exact head before source qualification
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up canonical Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Set up Node for source-only Expo supervisor tests
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Install bounded source test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          -e .
+          "pytest>=8,<9" "PyYAML>=6,<7" "numpy>=2,<3" "Pillow>=13.0.0,<14"
+      - name: Verify exact canonical tree and backend live-service manifest
+        run: |
+          set -euo pipefail
+          python scripts/check_ai_file_tree.py
+          python backend/scripts/check_live_service_test_boundaries.py
+      - name: Exercise source custody, product surfaces and workflow regression tests
+        run: |
+          set -euo pipefail
+          # Repository and backend both have a tests package: do not import
+          # same-name modules in one pytest collection namespace.
+          python -m pytest -q --maxfail=12 --noconftest \
+            tests/test_repo_machine_live_taxonomy.py \
+            tests/test_app_foundation_e2e_build_isolation.py \
+            tests/test_ops_router_source_contract.py \
+            tests/test_product_surface_specification.py \
+            tests/test_product_surface_delegated_backend_20261110.py
+          python -m pytest -q --maxfail=12 --noconftest --import-mode=importlib \
+            backend/tests/test_live_service_test_boundaries.py \
+            backend/tests/test_queue_drain_workflow.py \
+            backend/tests/test_workflow_concurrency_gate.py
+      - name: Exercise bounded Expo export supervisor with live child-process fixtures
+        run: node --test frontend/scripts/test-guarded-expo-export.cjs

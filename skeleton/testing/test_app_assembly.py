@@ -204,11 +204,17 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
     class _Response:
         status = 200
 
+        def __init__(self, effective_url):
+            self.effective_url = effective_url
+
         def __enter__(self):
             return self
 
         def __exit__(self, exc_type, exc, tb):
             return False
+
+        def geturl(self):
+            return self.effective_url
 
         def read(self, _size):
             return b"ok"
@@ -218,7 +224,7 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
     def fake_urlopen(request, timeout):
         seen["url"] = request.full_url
         seen["timeout"] = timeout
-        return _Response()
+        return _Response(request.full_url)
 
     monkeypatch.setattr("skeleton.app.health._open_direct_health", fake_urlopen)
     service = load_manifest().service("skeleton")
@@ -231,6 +237,63 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
         "url": "http://localhost:8010/api/v1/health/live",
         "timeout": 1.25,
     }
+
+
+@pytest.mark.parametrize(
+    ("http_status", "effective_path"),
+    [
+        (True, "/api/v1/health/live"),
+        (0, "/api/v1/health/live"),
+        (200, "/api/v1/health/redirected"),
+        (302, "/api/v1/health/live"),
+    ],
+)
+def test_health_probe_refuses_invalid_transport_or_redirect(monkeypatch, http_status, effective_path):
+    from skeleton.app.health import probe_url
+
+    class _Response:
+        status = http_status
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def geturl(self):
+            return "http://localhost:8010" + effective_path
+
+        def read(self, _size):
+            return b"ok"
+
+    monkeypatch.setattr(
+        "skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: _Response()
+    )
+    result = probe_url(load_manifest().service("skeleton"), timeout=1.25)
+    assert result.ok is False
+
+
+def test_health_probe_fails_closed_without_effective_url(monkeypatch):
+    from skeleton.app.health import probe_url
+
+    class _Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _size):
+            return b"ok"
+
+    monkeypatch.setattr(
+        "skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: _Response()
+    )
+    result = probe_url(load_manifest().service("skeleton"), timeout=1.25)
+    assert result.ok is False
+    assert result.detail == "health transport returned invalid response metadata"
 
 
 def test_default_smoke_profile_has_frontend_backend_and_engine():
@@ -285,7 +348,8 @@ def test_product_control_client_matches_mounted_backend_routes():
     registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
 
     assert "const ROOT = '/api/admin/ops/product-control';" in client
-    assert 'router = project_router(prefix="/api/admin/ops"' in ops
+    from scripts.check_app_assembly import has_canonical_ops_router
+    assert has_canonical_ops_router(ops)
     assert '("routes.ops",' in registry
 
     required_routes = (
@@ -790,6 +854,9 @@ def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
         def __exit__(self, *_args):
             return False
 
+        def geturl(self):
+            return "http://localhost:8001/api/health"
+
         def read(self, _size):
             return b"redirect"
 
@@ -812,6 +879,9 @@ def test_health_probe_transport_forbids_redirects_and_proxy_environment(monkeypa
 
         def __exit__(self, *_args):
             return False
+
+        def geturl(self):
+            return seen["url"]
 
         def read(self, _size):
             return b"ok"
