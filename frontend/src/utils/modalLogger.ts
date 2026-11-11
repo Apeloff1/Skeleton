@@ -20,6 +20,8 @@ import { sanitizeTelemetryDetail, sanitizeTelemetryEvent, redactTelemetryText } 
 
 const BACKEND  = CANONICAL_API_BASE;
 const FLUSH_MS = 5000;
+const MAX_EVENTS_PER_UPLOAD = 100;
+const MAX_MEMORY_EVENTS = 500;
 const QUEUE_KEY = '@telemetry/queue';
 
 // One session id per app launch — persists across route changes.
@@ -53,7 +55,7 @@ const _buffer: TelemetryEvent[] = [];
 let _flushTimer: ReturnType<typeof setInterval> | null = null;
 let _flushInflight = false;
 
-async function _persistQueue(events: TelemetryEvent[]) {
+async function _persistQueue(events: TelemetryEvent[]): Promise<boolean> {
   try {
     const old = JSON.parse((await AsyncStorage.getItem(QUEUE_KEY)) || '[]');
     // Revalidate legacy queued events before rewriting them to disk.
@@ -63,7 +65,11 @@ async function _persistQueue(events: TelemetryEvent[]) {
       .map(sanitizeTelemetryEvent)
       .filter((event): event is NonNullable<typeof event> => event !== null);
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(merged));
-  } catch { /* non-fatal */ }
+    return true;
+  } catch {
+    // Failed local storage is not a reason to send an unbounded request.
+    return false;
+  }
 }
 
 async function _drainQueue(): Promise<TelemetryEvent[]> {
@@ -79,22 +85,41 @@ async function _drainQueue(): Promise<TelemetryEvent[]> {
   } catch { return []; }
 }
 
+function _recoverInMemory(events: TelemetryEvent[]): void {
+  if (!events.length) return;
+  // A storage failure must not allow unbounded buffer expansion.
+  _buffer.unshift(...events.slice(-MAX_MEMORY_EVENTS));
+  if (_buffer.length > MAX_MEMORY_EVENTS) {
+    _buffer.splice(0, _buffer.length - MAX_MEMORY_EVENTS);
+  }
+}
+
+async function _retryLater(events: TelemetryEvent[]): Promise<void> {
+  if (events.length && !(await _persistQueue(events))) {
+    _recoverInMemory(events);
+  }
+}
+
 export async function flushTelemetry(): Promise<void> {
   if (_flushInflight) return;
   _flushInflight = true;
-  let batch: TelemetryEvent[] = [];
+  let admitted: TelemetryEvent[] = [];
   try {
     const queued = await _drainQueue();
-    batch = _buffer.splice(0, _buffer.length).concat(queued);
-    if (!batch.length) return;
+    const ready = _buffer.splice(0, _buffer.length).concat(queued);
+    if (!ready.length) return;
+    // The server rejects oversized batches, so split before creating the
+    // request. Persist the remainder for the next scheduled flush.
+    admitted = ready.slice(0, MAX_EVENTS_PER_UPLOAD);
+    await _retryLater(ready.slice(MAX_EVENTS_PER_UPLOAD));
     const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ events: batch }),
+      body: JSON.stringify({ events: admitted }),
     });
-    if (!r.ok) await _persistQueue(batch);
+    if (!r.ok) await _retryLater(admitted);
   } catch {
-    await _persistQueue(batch);
+    await _retryLater(admitted);
   } finally {
     _flushInflight = false;
   }
@@ -137,7 +162,7 @@ export function recordEvent(
   });
   if (!row) return;
   // Bound the in-memory queue even when offline or when uploads fail.
-  if (_buffer.length >= 500) _buffer.shift();
+  if (_buffer.length >= MAX_MEMORY_EVENTS) _buffer.shift();
   _buffer.push(row as TelemetryEvent);
   _startFlusher();
   // Force-flush fatals immediately
