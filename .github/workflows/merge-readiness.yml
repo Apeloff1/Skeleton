@@ -252,8 +252,11 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: python -m pytest -q --noconftest tests/test_codeql_storage_security_20261111.py
-      - name: Verify native-secure frontend session identities
-        run: node --test frontend/scripts/test-secure-session-identifiers.cjs
+      - name: Verify native-secure frontend session identities and prototype integrity
+        run: >-
+          node --test
+          frontend/scripts/test-secure-session-identifiers.cjs
+          frontend/scripts/test-quickwins-prototype-guard.cjs
       # Full repository Ruff lint runs in the canonical quality gate below; avoid a second backend-only pass.
       - name: Canonical lint, type, and high-confidence security gates
         run: bash scripts/quality-gates.sh
