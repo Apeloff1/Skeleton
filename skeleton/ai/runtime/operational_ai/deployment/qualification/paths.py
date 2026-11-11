@@ -1,6 +1,6 @@
 """Fail-closed evidence publication outside the repo and model directories."""
 from __future__ import annotations
-import json, os, re, stat
+import json, os, re, secrets, stat
 from pathlib import Path
 from .contracts import QualificationError
 
@@ -67,24 +67,15 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
     encoded_buffer.append(10)
     encoded = bytes(encoded_buffer)
     fdroot = _open_private_report_root(root)
-    try:
-        if os.fstat(fdroot).st_mode & 0o077:
-            raise QualificationError('qualification report directory must be private')
-        fd = os.open(filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                     0o600, dir_fd=fdroot)
-        try:
-            offset = 0
-            while offset < len(encoded):
-                written = os.write(fd,encoded[offset:])
-                if written <= 0:
-                    raise QualificationError('cannot write qualification report')
-                offset += written
-            os.fsync(fd)
-        finally:
-            os.close(fd)
-        os.fsync(fdroot)
-        # A renamed ancestor must never become a successful publication
-        # receipt merely because the original directory fd remains open.
+    # Never expose a partially written final receipt. Stage under an
+    # unpredictable, exclusive name in the same private directory, fsync the
+    # completed bytes, then create the final name by a no-overwrite hardlink.
+    # Both names are anchored to the original no-follow directory descriptor.
+    staged_name = f".qualification-{secrets.token_hex(16)}.tmp"
+    staged_identity = None
+    published = False
+
+    def _check_parent() -> None:
         reopened = _open_private_report_root(root)
         try:
             before, after = os.fstat(fdroot), os.fstat(reopened)
@@ -92,5 +83,62 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
                 raise QualificationError("report parent changed during publication")
         finally:
             os.close(reopened)
+
+    def _remove_our_name(name: str) -> None:
+        # Never remove a path that has been replaced by a different inode.
+        if staged_identity is None:
+            return
+        try:
+            current = os.stat(name, dir_fd=fdroot, follow_symlinks=False)
+            if (current.st_dev, current.st_ino) == (
+                staged_identity.st_dev, staged_identity.st_ino
+            ):
+                os.unlink(name, dir_fd=fdroot)
+        except FileNotFoundError:
+            pass
+
+    try:
+        if os.fstat(fdroot).st_mode & 0o077:
+            raise QualificationError('qualification report directory must be private')
+        fd = os.open(
+            staged_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+            | getattr(os, 'O_CLOEXEC', 0),
+            0o600, dir_fd=fdroot,
+        )
+        try:
+            staged_identity = os.fstat(fd)
+            offset = 0
+            while offset < len(encoded):
+                written = os.write(fd, encoded[offset:])
+                if written <= 0:
+                    raise QualificationError('cannot write qualification report')
+                offset += written
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        _check_parent()
+        # A preexisting final receipt remains untouched; the stage is removed.
+        os.link(
+            staged_name, filename,
+            src_dir_fd=fdroot, dst_dir_fd=fdroot, follow_symlinks=False,
+        )
+        published = True
+        _remove_our_name(staged_name)
+        os.fsync(fdroot)
+        _check_parent()
+    except BaseException:
+        # On write, link, fsync or ancestor-verification failure, never leave
+        # a partial final receipt. Only unlink the inode created by this call.
+        if published:
+            try:
+                _remove_our_name(filename)
+            except OSError:
+                pass
+        raise
     finally:
+        try:
+            _remove_our_name(staged_name)
+        except OSError:
+            pass
         os.close(fdroot)
