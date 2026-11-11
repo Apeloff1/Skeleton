@@ -96,7 +96,7 @@ text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:800}}p{{co
 # Deliberately scriptless share cards. Only local images and inline CSS.
 _SHARE_HEADERS = {
     "Content-Security-Policy": (
-        "default-src 'none'; script-src 'none'; img-src 'self'; "
+        "default-src 'none'; script-src 'none'; img-src 'self' https: http://localhost:3000; "
         "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; "
         "frame-ancestors 'none'; object-src 'none'"
     ),
