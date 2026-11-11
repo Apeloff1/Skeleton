@@ -1,0 +1,64 @@
+name: Reconciliation exact-head policy and evidence custody
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reconciliation-exact-policy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fail_closed_review_contracts:
+    name: Historical backlog holds and three-head evidence policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact checked-out revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up pinned supported Python runtime
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Compile policy and adversarial acceptance suites
+        run: |
+          python -m py_compile scripts/check_reconciliation_exact_head.py
+          python -m py_compile tests/test_reconciliation_exact_head.py
+          python -m py_compile tests/test_reconciliation_workflow_admission_20261108.py
+          python -m py_compile scripts/check_backlog19_actions.py
+          python -m py_compile scripts/check_draft19_reconciliation.py
+          python -m py_compile tests/test_backlog19_actions.py
+          python -m py_compile tests/test_draft19_reconciliation.py
+      - name: Verify frozen 19-draft admission denial
+        run: python scripts/check_backlog19_actions.py
+      - name: Verify historical source classification admission denial
+        run: python scripts/check_draft19_reconciliation.py
+      - name: Exercise strict negative and structural evidence regression
+        run: |
+          python -m unittest discover -s tests -p test_reconciliation_exact_head.py -v
+          python -m unittest discover -s tests -p test_reconciliation_workflow_admission_20261108.py -v
+          python -m unittest discover -s tests -p test_backlog19_actions.py -v
+          python -m unittest discover -s tests -p test_draft19_reconciliation.py -v
+      - name: Hold publication and merge claims despite policy-only green
+        shell: bash
+        run: |
+          {
+            echo "## Review-only evidence policy"
+            echo "This job checks source/ledger consistency and negative fixtures."
+            echo "It does not authenticate external GitHub evidence or grant"
+            echo "independent security/owner/device approvals, merge or release."
+            echo "All three PRs still require final-head independent workflows."
+          } >> "$GITHUB_STEP_SUMMARY"

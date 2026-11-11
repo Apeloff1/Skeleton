@@ -53,7 +53,10 @@
     "secret-scanning.yml",
     "security-alert-inventory.yml",
     "three-hour-actions-queue-expiry.yml",
-    "workflow-input-security.yml"
+    "workflow-input-security.yml",
+    "draft19-gguf-source-qualification.yml",
+    "jeeves-atomic-review-regression.yml",
+    "reconciliation-game-source-qualification.yml"
   ],
   "automatic_event_triggers": {
     "actions-housekeeping-cli.yml": [
@@ -151,6 +154,17 @@
     "workflow-input-security.yml": [
       "pull_request",
       "push"
+    ],
+    "draft19-gguf-source-qualification.yml": [
+      "pull_request"
+    ],
+    "jeeves-atomic-review-regression.yml": [
+      "pull_request",
+      "workflow_dispatch"
+    ],
+    "reconciliation-game-source-qualification.yml": [
+      "pull_request",
+      "workflow_dispatch"
     ]
   }
 }

@@ -86,6 +86,9 @@ def _keys(value: Any, required: set[str], optional: set[str] = frozenset()) -> d
 def _text(value: Any, field: str, limit: int = 400) -> str:
     if type(value) is not str or not value or len(value) > limit:
         raise CanonError("invalid_text", field)
+    # Reject ill-formed Unicode before any UTF-8 persistence or publication.
+    if any(0xD800 <= ord(ch) <= 0xDFFF for ch in value):
+        raise CanonError("invalid_unicode_scalar", field)
     if unicodedata.normalize("NFC", value) != value:
         raise CanonError("noncanonical_unicode", field)
     if any(ord(ch) < 32 and ch not in "\n\t" for ch in value):
@@ -195,10 +198,16 @@ def prove(source: Any) -> Proof:
     visited = {initial}
     scene_seen: set[str] = set()
     witnesses: dict[str, tuple[str, ...]] = {}
+    # Preserve every reachable state transition, including edges to states
+    # already visited. Otherwise a terminal-free cycle can be silently
+    # accepted merely because a different branch reaches an ending.
+    predecessors: dict[tuple[str, frozenset[str]], set[tuple[str, frozenset[str]]]] = {}
+    terminal_states: set[tuple[str, frozenset[str]]] = set()
     while queue:
         (scene, flags), path = queue.popleft()
         scene_seen.add(scene)
         if scene in endings:
+            terminal_states.add((scene, flags))
             witnesses.setdefault(scene, path)
             continue
         outgoing = edges.get(scene, [])
@@ -207,6 +216,7 @@ def prove(source: Any) -> Proof:
             raise CanonError("reachable_dead_end", scene)
         for edge in enabled:
             state = (edge["to"], flags | frozenset(edge["grants"]))
+            predecessors.setdefault(state, set()).add((scene, flags))
             if state not in visited:
                 visited.add(state)
                 if len(visited) > MAX_STATES:
@@ -217,6 +227,21 @@ def prove(source: Any) -> Proof:
                          ",".join(sorted({s["id"] for s in world["scenes"]} - scene_seen)))
     if set(witnesses) != endings:
         raise CanonError("unreachable_endings", ",".join(sorted(endings - set(witnesses))))
+    # Backward fixed point: every reachable state must have a path to a
+    # terminal state. This catches closed nonterminating subgraphs while
+    # permitting authored optional loops that have a genuine exit.
+    can_finish = set(terminal_states)
+    frontier = deque(sorted(terminal_states))
+    while frontier:
+        state = frontier.popleft()
+        for previous in sorted(predecessors.get(state, ())):
+            if previous not in can_finish:
+                can_finish.add(previous)
+                frontier.append(previous)
+    stranded = visited - can_finish
+    if stranded:
+        raise CanonError("nonterminating_world_state",
+                         ",".join(sorted({scene for scene, _ in stranded})))
     return Proof(digest(world), tuple(sorted(scene_seen)), witnesses, len(visited))
 
 
@@ -313,64 +338,63 @@ _PLAYER_JS = r"""
 "use strict";
 const model = JSON.parse(document.getElementById("world-data").textContent);
 const world = model.world;
+const sourceDigest = model.proof.source_digest;
 const byId = new Map(world.scenes.map(s => [s.id, s]));
 const ending = new Map(world.endings.map(e => [e.scene, e.label]));
+const byChoice = new Map(world.choices.map(c => [c.id, c]));
 let current = world.start;
 let flags = new Set();
 let trace = [];
-// Save belongs to the standalone browser player, not to the studio's
-// authoritative SessionStore. Never silently import an untrusted save.
-const saveKey = "skeleton-world-save-v1:" + model.proof.source_digest;
+let receiptDraft = "";
+let receiptStatus = "";
 const root = document.getElementById("play");
-let notice = "";
-function replaySave(raw) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw) ||
-      raw.schema !== "jeeves.world.browser_save.v1" ||
-      raw.source_digest !== model.proof.source_digest ||
-      !Array.isArray(raw.choices) || raw.choices.length > 512) {
-    throw new Error("save_schema_or_source_mismatch");
-  }
-  let scene = world.start;
-  const earned = new Set();
-  for (const id of raw.choices) {
-    if (typeof id !== "string" || ending.has(scene)) {
-      throw new Error("save_invalid_choice");
-    }
-    const edge = world.choices.find(c => c.id === id && c.from === scene &&
-      c.requires.every(flag => earned.has(flag)));
-    if (!edge) throw new Error("save_invalid_transition");
-    for (const flag of edge.grants) earned.add(flag);
-    scene = edge.to;
-  }
-  return {scene, earned, choices: raw.choices.slice()};
-}
-function saveGame() {
-  try {
-    localStorage.setItem(saveKey, JSON.stringify({
-      schema: "jeeves.world.browser_save.v1",
-      source_digest: model.proof.source_digest, choices: trace.slice()
-    }));
-    notice = "Progress saved on this browser.";
-  } catch (_) { notice = "Save unavailable; progress remains in memory."; }
-  render();
-}
-function loadGame() {
-  try {
-    const saved = localStorage.getItem(saveKey);
-    if (saved === null) throw new Error("save_missing");
-    if (saved.length > 32768) throw new Error("save_too_large");
-    const replayed = replaySave(JSON.parse(saved));
-    current = replayed.scene;
-    flags = replayed.earned;
-    trace = replayed.choices;
-    notice = "Verified saved progress restored.";
-  } catch (_) { notice = "Saved progress unavailable or invalid; current game unchanged."; }
-  render();
-}
 function element(tag, text) {
   const node = document.createElement(tag);
   node.textContent = text;
   return node;
+}
+function replayTrace(ids) {
+  if (!Array.isArray(ids) || ids.length > 512) throw Error("invalid_session_trace");
+  let scene = world.start;
+  const acquired = new Set();
+  for (const id of ids) {
+    if (typeof id !== "string" || !/^[a-z][a-z0-9_-]{0,47}$/.test(id))
+      throw Error("invalid_session_choice");
+    const choice = byChoice.get(id);
+    if (!choice || ending.has(scene) || choice.from !== scene ||
+        !choice.requires.every(f => acquired.has(f)))
+      throw Error("invalid_session_transition");
+    choice.grants.forEach(f => acquired.add(f));
+    scene = choice.to;
+  }
+  return {schema: "jeeves.world.session.v1", source_digest: sourceDigest,
+    scene, flags: Array.from(acquired).sort(), trace: ids.slice(),
+    ended: ending.has(scene)};
+}
+function exportReceipt() {
+  return JSON.stringify(replayTrace(trace));
+}
+function importReceipt(text) {
+  if (typeof text !== "string" || new TextEncoder().encode(text).length > 65536)
+    throw Error("session_too_large");
+  const receipt = JSON.parse(text);
+  if (!receipt || Array.isArray(receipt) || typeof receipt !== "object" ||
+      Object.keys(receipt).sort().join(",") !==
+      "ended,flags,scene,schema,source_digest,trace")
+    throw Error("invalid_session_fields");
+  if (receipt.schema !== "jeeves.world.session.v1" ||
+      receipt.source_digest !== sourceDigest) throw Error("session_stale_source");
+  const expected = replayTrace(receipt.trace);
+  if (JSON.stringify(receipt.trace) !== JSON.stringify(expected.trace) ||
+      JSON.stringify(receipt.flags) !== JSON.stringify(expected.flags) ||
+      receipt.scene !== expected.scene || receipt.ended !== expected.ended)
+    throw Error("session_state_mismatch");
+  current = expected.scene;
+  flags = new Set(expected.flags);
+  trace = expected.trace;
+  receiptDraft = text;
+  receiptStatus = "Session restored";
+  render();
 }
 function render() {
   root.replaceChildren();
@@ -378,14 +402,6 @@ function render() {
   root.append(element("h1", scene.title));
   root.append(element("p", scene.narrative));
   root.append(element("p", "Choices taken: " + trace.join(", ")));
-  const controls = element("div", "");
-  const save = element("button", "Save progress");
-  save.addEventListener("click", saveGame);
-  const load = element("button", "Load saved progress");
-  load.addEventListener("click", loadGame);
-  controls.append(save, load);
-  root.append(controls);
-  if (notice) root.append(element("p", notice));
   if (ending.has(current)) {
     root.append(element("h2", "Ending: " + ending.get(current)));
     const restart = element("button", "Restart");
@@ -393,35 +409,49 @@ function render() {
       current = world.start; flags = new Set(); trace = []; render();
     });
     root.append(restart);
-    return;
+  } else {
+    const choices = world.choices.filter(c => c.from === current &&
+      c.requires.every(f => flags.has(f)));
+    for (const choice of choices) {
+      const button = element("button", choice.label);
+      button.addEventListener("click", () => {
+        for (const flag of choice.grants) flags.add(flag);
+        trace.push(choice.id);
+        current = choice.to;
+        render();
+      });
+      root.append(button);
+    }
   }
-  const choices = world.choices.filter(c => c.from === current &&
-    c.requires.every(f => flags.has(f)));
-  choices.forEach((choice, index) => {
-    const button = element("button", (index < 9 ? (index + 1) + ". " : "") + choice.label);
-    button.dataset.choiceIndex = String(index);
-    button.addEventListener("click", () => {
-      for (const flag of choice.grants) flags.add(flag);
-      trace.push(choice.id);
-      current = choice.to;
-      render();
-    });
-    root.append(button);
+  const label = element("label", "Portable session receipt");
+  const field = document.createElement("textarea");
+  field.id = "session-receipt";
+  field.rows = 5;
+  field.cols = 48;
+  field.value = receiptDraft;
+  field.addEventListener("input", () => { receiptDraft = field.value; });
+  label.append(field);
+  root.append(label);
+  const save = element("button", "Export session");
+  save.addEventListener("click", () => {
+    receiptDraft = exportReceipt();
+    receiptStatus = "Session exported";
+    render();
   });
+  root.append(save);
+  const load = element("button", "Restore session");
+  const status = element("p", "");
+  status.setAttribute("role", "status");
+  status.textContent = receiptStatus;
+  load.addEventListener("click", () => {
+    try { importReceipt(receiptDraft); }
+    catch (error) {
+      receiptStatus = "Restore rejected: " + error.message;
+      render();
+    }
+  });
+  root.append(load, status);
 }
-// Digit shortcuts target only currently rendered numbered choice controls.
-// Save, Load and Restart are not choices and cannot be activated by digits.
-document.addEventListener("keydown", event => {
-  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey ||
-      event.repeat || event.target?.isContentEditable ||
-      ["INPUT", "TEXTAREA", "SELECT"].includes(event.target?.tagName)) return;
-  if (!/^[1-9]$/.test(event.key)) return;
-  const button = root.querySelector('button[data-choice-index="' + (Number(event.key) - 1) + '"]');
-  if (button && !button.disabled) {
-    event.preventDefault();
-    button.click();
-  }
-});
 render();
 """.strip()
 
@@ -479,26 +509,12 @@ class WorldStore:
             raise CanonError("not_found", name) from None
         try:
             info = os.fstat(handle)
-            if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
-                    info.st_size > MAX_SOURCE_BYTES):
+            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_SOURCE_BYTES:
                 raise CanonError("unsafe_source_file", name)
             with os.fdopen(os.dup(handle), "rb") as stream:
                 data = stream.read(MAX_SOURCE_BYTES + 1)
             if len(data) > MAX_SOURCE_BYTES:
                 raise CanonError("source_too_large")
-            # The opened descriptor must still be the directory's current
-            # source. Reject rename/replacement races instead of accepting
-            # bytes from an unlinked or superseded source inode.
-            try:
-                current = os.stat(name, dir_fd=fd, follow_symlinks=False)
-            except OSError as exc:
-                raise CanonError("source_replaced_during_read", name) from exc
-            after = os.fstat(handle)
-            if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1 or
-                    (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino) or
-                    (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) !=
-                    (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)):
-                raise CanonError("source_replaced_during_read", name)
             return data
         finally:
             os.close(handle)

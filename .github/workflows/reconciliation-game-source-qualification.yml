@@ -1,0 +1,125 @@
+name: Reconciliation original-game and first-install source qualification
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "skeleton/ecs/**"
+      - "skeleton/forge/**"
+      - "skeleton/context/**"
+      - "skeleton/simulation/**"
+      - "skeleton/jeeves/**"
+      - "skeleton/local_ai/**"
+      - "skeleton/godot_export/**"
+      - "skeleton/ai/**"
+      - "skeleton/testing/test_simulation_physics_vehicle*.py"
+      - "skeleton/testing/test_ecs_ai*.py"
+      - "skeleton/testing/test_archetype_playable*.py"
+      - "skeleton/testing/test_forge_export*.py"
+      - "backend/Dockerfile"
+      - "frontend/**"
+      - "machine/ai_file_tree.json"
+      - "tests/test_reconciliation_source_convergence.py"
+      - "tests/test_legacy_local_ai_fail_closed.py"
+      - "tests/test_jeeves_world_unicode_ingress.py"
+      - "tests/test_backend_docker_python_pin.py"
+      - ".github/workflows/reconciliation-game-source-qualification.yml"
+  workflow_dispatch:
+      - "skeleton/ai/research/**"
+      - "docs/ai/VOL_249_250_RESEARCH_REASONING.md"
+      - ".github/workflows/vol249-250-research-reasoning.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reconciliation-game-source-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline_source:
+    name: Deterministic gameplay, source parity and refusal tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout immutable candidate head, no retained credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact candidate head
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Pin supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Install source-only Python test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "PyYAML>=6,<7" "pytest>=8,<9" "pytest-asyncio>=0.24,<2"
+          "httpx>=0.28.1,<1" "motor==3.7.1" "pymongo==4.19.0"
+          "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3"
+          "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2"
+          "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
+      - name: Compile recovered and mirror source
+        run: >-
+          python -m compileall -q skeleton/ecs skeleton/forge skeleton/context
+          skeleton/simulation/physics skeleton/jeeves/worlds skeleton/local_ai
+          skeleton/godot_export skeleton/ai/runtime/ecs skeleton/ai/simulation/physics
+          skeleton/testing/test_simulation_physics_vehicle.py
+          skeleton/testing/test_ecs_ai.py
+      - name: Verify entire source-to-AI tree identity
+        run: python scripts/check_ai_file_tree.py
+      - name: Verify exact committed Git source objects and security holds
+        run: python -m unittest discover -s tests -p test_reconciliation_source_convergence.py -v
+      - name: Run fail-closed original-game and local-AI source regressions
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONNOUSERSITE: "1"
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_simulation_physics_vehicle.py
+          skeleton/testing/test_simulation_physics_vehicle_quarantine.py
+          skeleton/testing/test_ecs_ai.py
+          skeleton/testing/test_ecs_ai_quarantine.py
+          skeleton/testing/test_archetype_playable_e2e.py
+          skeleton/testing/test_archetype_playable_quarantine.py
+          skeleton/testing/test_forge_export.py
+          skeleton/testing/test_forge_export_quarantine.py
+          tests/test_godot_export_verified.py
+          tests/test_jeeves_world_unicode_ingress.py
+          tests/test_legacy_local_ai_fail_closed.py
+          tests/test_backend_docker_python_pin.py
+
+  consumer_readiness:
+    name: Frontend setup readiness TypeScript and app-foundation contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout immutable candidate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact candidate head
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Use repository supported Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "24"
+      - name: Install pinned frontend package inventory without lifecycle scripts
+        run: yarn --cwd frontend install --frozen-lockfile --ignore-scripts --non-interactive
+      - name: Typecheck complete frontend including setup readiness
+        run: yarn --cwd frontend typecheck
+      - name: Execute app readiness and first-install source contracts
+        run: yarn --cwd frontend test:app-foundation
+
+  research_reasoning_qualification:
+    name: Source-qualified hypothesis and causal research regression
+    uses: ./.github/workflows/vol249-250-research-reasoning.yml
+    permissions:
+      contents: read

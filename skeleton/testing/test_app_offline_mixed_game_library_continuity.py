@@ -20,6 +20,12 @@ from skeleton.testing.test_app_offline_signed_game_library_audit import (
     _entry as _signed_entry,
 )
 from skeleton.testing.test_app_offline_policy_chain_delivery import chain_delivery
+# The upstream fixture depends on delivered. Explicitly expose it here so
+# sharded pytest collection does not rely on another test module being loaded.
+from skeleton.testing.test_app_offline_policy_signed_delivery import delivered
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
+from skeleton.testing.test_app_offline_signed_progress_migration import migration
+from skeleton.testing.test_app_offline_archive_signature import signed
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX private custody")
 

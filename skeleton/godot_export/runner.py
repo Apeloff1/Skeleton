@@ -83,6 +83,47 @@ class GodotRunner:
             raise ValueError(f"bad export mode {mode}")
         return self.run(["--path", str(project), f"--export-{mode}", preset, out], project, timeout)
 
+    def export_verified(
+        self,
+        project: Path,
+        preset: str,
+        out: str,
+        mode: str = "release",
+        timeout: int = 600,
+    ) -> RunResult:
+        """Export and require a newly created, nonempty regular artifact.
+
+        This is source-level output custody, not evidence that the binary boots.
+        Existing destinations are rejected rather than silently overwritten.
+        The caller must keep the destination directory private to avoid races
+        with another local process or untrusted filesystem actor.
+        """
+        import stat
+
+        destination = Path(out)
+        if not destination.is_absolute():
+            destination = project / destination
+        if not preset or not preset.strip() or "\\x00" in preset:
+            raise ValueError("export preset must be nonempty")
+        if not out or "\\x00" in out:
+            raise ValueError("export output must be nonempty")
+        try:
+            destination.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            return RunResult(73, "Export destination already exists", ())
+        result = self.export(project, preset, out, mode=mode, timeout=timeout)
+        if not result.ok:
+            return result
+        try:
+            info = destination.lstat()
+        except OSError:
+            return RunResult(74, "Godot reported success but export artifact is missing", result.argv)
+        if not stat.S_ISREG(info.st_mode) or info.st_size == 0:
+            return RunResult(74, "Godot export artifact is not a nonempty regular file", result.argv)
+        return result
+
     def play_scene(
         self,
         project: Path,

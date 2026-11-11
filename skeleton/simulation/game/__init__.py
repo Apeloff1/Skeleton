@@ -31,15 +31,6 @@ from .mechanics import (
     ProgressionSystemSpec,
 )
 
-from .fixed_clock import (
-    CLOCK_SCHEMA,
-    MAX_TICKS_PER_ADVANCE,
-    ClockAdvance,
-    ClockBoundaryError,
-    ClockState,
-    advance_clock,
-)
-
 from .replay import (
     REPLAY_SCHEMA,
     REPLAY_SCHEMA_VERSION,
@@ -52,12 +43,6 @@ from .replay import (
 )
 
 __all__ = [
-    "CLOCK_SCHEMA",
-    "MAX_TICKS_PER_ADVANCE",
-    "ClockAdvance",
-    "ClockBoundaryError",
-    "ClockState",
-    "advance_clock",
     "ReplayTrace",
     "ReplayStep",
     "ReplayMismatch",
@@ -93,3 +78,6 @@ __all__ = [
     "compose_gameplay",
     "initial_composition_state",
 ]
+
+from .golden_grid import GridState, GameplayError, checkpoint as checkpoint_grid, restore as restore_grid, step as step_grid, play as play_grid
+__all__ += ["GridState", "GameplayError", "checkpoint_grid", "restore_grid", "step_grid", "play_grid"]

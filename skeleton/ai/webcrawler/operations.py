@@ -584,10 +584,10 @@ class CrawlRun:
                 "mime_inferred", "declared_content_type", "mime_inference_reason",
             )
             if any(field in provenance for field in mime_fields):
+                inferred = provenance.get("mime_inferred")
+                declared = provenance.get("declared_content_type")
                 if not valid_media_receipt(
-                    source["content_type"],
-                    provenance.get("declared_content_type"),
-                    provenance.get("mime_inferred"),
+                    source["content_type"], declared, inferred,
                     provenance.get("mime_inference_reason"),
                 ):
                     raise CrawlOperationError("source MIME inference receipt mismatch")

@@ -1,0 +1,51 @@
+name: Jeeves atomic reviewed-source regression
+
+on:
+  pull_request:
+    paths:
+      - skeleton/jeeves/worlds/laptop_flow.py
+      - skeleton/testing/test_jeeves_laptop_atomic_review.py
+      - .github/workflows/jeeves-atomic-review-regression.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-atomic-review-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reviewed-source:
+    name: Reviewed-source atomicity and stale-approval revocation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact immutable source head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Reject ancestor, merged-ref or branch-head substitution
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Prepare Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11"
+      - name: Install the repository's existing host-portable Python CI dependencies
+        run: |
+          python -m pip install --disable-pip-version-check "PyYAML>=6,<7" "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "httpx>=0.28.1,<1" "motor==3.7.1" "pymongo==4.19.0" "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3" "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2" "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
+      - name: Compile reviewed-world implementation and regression
+        run: |
+          python -m compileall -q skeleton/jeeves/worlds skeleton/testing/test_jeeves_laptop_atomic_review.py
+      - name: Run real filesystem review, interruption and stale-output regression
+        env:
+          PYTHONPATH: .
+          PYTHONNOUSERSITE: "1"
+        run: |
+          python -m unittest skeleton.testing.test_jeeves_laptop_atomic_review -v

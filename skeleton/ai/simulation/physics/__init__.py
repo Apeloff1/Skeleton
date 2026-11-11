@@ -170,6 +170,19 @@ from .replay import (
     replay_physics_commands,
 )
 
+
+from .vehicle import (
+    MAX_VEHICLE_WHEELS,
+    RaycastVehicle,
+    VehicleControl,
+    VehicleSettings,
+    VehicleState,
+    VehicleUpdateResult,
+    WheelContact,
+    WheelSettings,
+    step_vehicles,
+)
+
 __all__ = [
     "AABB",
     "BodyNotFoundError",
@@ -324,4 +337,13 @@ __all__ = [
     "get_default_broadphase_accelerator",
     "close_default_broadphase_accelerator",
     "world_inertia",
+    "MAX_VEHICLE_WHEELS",
+    "RaycastVehicle",
+    "VehicleControl",
+    "VehicleSettings",
+    "VehicleState",
+    "VehicleUpdateResult",
+    "WheelContact",
+    "WheelSettings",
+    "step_vehicles",
 ]

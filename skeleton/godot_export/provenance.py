@@ -10,54 +10,96 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .binary import sha256_file
 from .project import IGNORED_DIRS
 
 SCHEMA = "skeleton.godot_export.provenance/v1"
+MAX_ARTIFACT_BYTES = 100 * 1024 * 1024
+MAX_SOURCE_FILES = 100_000
+MAX_SOURCE_BYTES = 4 * 1024 * 1024 * 1024
 
 
-def _safe_relative(path: object) -> PurePosixPath:
-    if type(path) is not str or not path or len(path) > 4096:
-        raise ValueError("unsafe artifact path")
-    if any(char in path for char in (chr(92), chr(0), ":")):
-        raise ValueError("unsafe artifact path")
-    parts = path.split("/")
-    if len(parts) > 32 or any(part in ("", ".", "..") for part in parts):
-        raise ValueError("unsafe artifact path")
-    rel = PurePosixPath(path)
-    if rel.is_absolute():
-        raise ValueError("unsafe artifact path")
-    return rel
+def _relative(path: str) -> tuple[str, ...]:
+    """Reject non-canonical and platform-ambiguous manifest paths."""
+    if (not isinstance(path, str) or not path or len(path) > 2048
+            or "\\" in path or "\x00" in path):
+        raise ValueError("invalid artifact path")
+    parts = PurePosixPath(path)
+    if (parts.is_absolute() or parts.as_posix() != path
+            or any(part in ("", ".", "..") or ":" in part for part in parts.parts)):
+        raise ValueError("artifact path escapes or is non-canonical")
+    return parts.parts
 
 
-def _has_symlink(root: Path, rel: PurePosixPath) -> bool:
-    current = root
-    for part in rel.parts:
-        current = current / part
-        if current.is_symlink():
-            return True
-    return False
+def _digest_beneath(root: Path, relative: str) -> tuple[str, int]:
+    """Descriptor-relative, no-follow read; never dereference a manifest symlink."""
+    parts = _relative(relative)
+    if not all(hasattr(os, k) for k in ("O_NOFOLLOW", "O_DIRECTORY")) or os.name != "posix":
+        raise ValueError("secure artifact verification unavailable on this host")
+    dflags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    fflags = os.O_RDONLY | os.O_NOFOLLOW
+    fd = os.open(root, dflags)
+    try:
+        for part in parts[:-1]:
+            nxt = os.open(part, dflags, dir_fd=fd)
+            os.close(fd)
+            fd = nxt
+        file_fd = os.open(parts[-1], fflags, dir_fd=fd)
+    finally:
+        os.close(fd)
+    try:
+        before = os.fstat(file_fd)
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                or before.st_size > MAX_ARTIFACT_BYTES):
+            raise ValueError("artifact is not an allowed bounded regular file")
+        digest = hashlib.sha256()
+        size = 0
+        while True:
+            data = os.read(file_fd, min(1024 * 1024, MAX_ARTIFACT_BYTES + 1 - size))
+            if not data:
+                break
+            size += len(data)
+            if size > MAX_ARTIFACT_BYTES:
+                raise ValueError("artifact exceeds bound")
+            digest.update(data)
+        after = os.fstat(file_fd)
+        identity = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+        if identity(before) != identity(after) or size != before.st_size:
+            raise ValueError("artifact changed during digest")
+        return digest.hexdigest(), size
+    finally:
+        os.close(file_fd)
 
 
 def tree_digest(root: Path) -> str:
-    """Order-independent digest of project sources (path + content hash)."""
+    """Order-independent bounded source digest; refuse linked and special files."""
+    root = Path(root)
     h = hashlib.sha256()
-    if root.is_symlink():
-        raise ValueError("project source root is a symlink")
+    count = total = 0
     for p in sorted(root.rglob("*")):
         rel = p.relative_to(root)
         if any(part in IGNORED_DIRS for part in rel.parts):
             continue
         if p.is_symlink():
-            raise ValueError("project source contains a symlink")
-        if not p.is_file():
+            raise ValueError("linked project source cannot be certified")
+        if p.is_dir():
             continue
-        h.update(rel.as_posix().encode() + b"\0" + sha256_file(p).encode() + b"\n")
+        if not p.is_file():
+            raise ValueError("special project source cannot be certified")
+        count += 1
+        if count > MAX_SOURCE_FILES:
+            raise ValueError("source file budget exceeded")
+        digest, size = _digest_beneath(root, rel.as_posix())
+        total += size
+        if total > MAX_SOURCE_BYTES:
+            raise ValueError("source size budget exceeded")
+        h.update(rel.as_posix().encode() + b"\0" + digest.encode() + b"\n")
     return h.hexdigest()
 
 
@@ -70,12 +112,22 @@ def git_head(root: Path) -> str | None:
     return out if r.returncode == 0 and len(out) == 40 else None
 
 
-@dataclass
+@dataclass(frozen=True)
 class Artifact:
     preset: str
     path: str
     sha256: str
     size: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.preset, str) or not 1 <= len(self.preset) <= 256:
+            raise ValueError("invalid artifact preset")
+        _relative(self.path)
+        if (not isinstance(self.sha256, str) or len(self.sha256) != 64
+                or any(ch not in "0123456789abcdef" for ch in self.sha256)):
+            raise ValueError("invalid artifact sha256")
+        if type(self.size) is not int or not 0 <= self.size <= MAX_ARTIFACT_BYTES:
+            raise ValueError("invalid artifact size")
 
 
 @dataclass
@@ -87,7 +139,29 @@ class Manifest:
     git: str | None = None
     artifacts: list[Artifact] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.project, str) or not 1 <= len(self.project) <= 256:
+            raise ValueError("invalid project identity")
+        if not isinstance(self.engine, str) or not 1 <= len(self.engine) <= 256:
+            raise ValueError("invalid engine identity")
+        if not isinstance(self.tree, str) or len(self.tree) != 64 or any(
+                c not in "0123456789abcdef" for c in self.tree):
+            raise ValueError("invalid project source tree digest")
+        if self.verdict not in ("SHIP", "NO-SHIP"):
+            raise ValueError("invalid certification verdict")
+        if self.git is not None and (not isinstance(self.git, str) or len(self.git) != 40
+                or any(c not in "0123456789abcdef" for c in self.git)):
+            raise ValueError("invalid git source pin")
+        if not isinstance(self.artifacts, list) or len(self.artifacts) > 1024:
+            raise ValueError("invalid artifact inventory")
+        if any(not isinstance(a, Artifact) for a in self.artifacts):
+            raise ValueError("untyped artifact")
+        ids = [(a.preset, a.path) for a in self.artifacts]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate artifact inventory entry")
+
     def to_dict(self) -> dict[str, Any]:
+        self.__post_init__()
         return {"schema": SCHEMA, "project": self.project, "tree": self.tree, "engine": self.engine,
                 "verdict": self.verdict, "git": self.git,
                 "artifacts": [a.__dict__ for a in sorted(self.artifacts, key=lambda a: (a.preset, a.path))]}
@@ -97,86 +171,72 @@ class Manifest:
 
     @classmethod
     def loads(cls, text: str) -> "Manifest":
-        if type(text) is not str or len(text.encode("utf-8")) > 8 * 1024 * 1024:
-            raise ValueError("provenance manifest exceeds byte bound")
-        try:
-            d = json.loads(text)
-        except (ValueError, RecursionError) as exc:
-            raise ValueError("invalid provenance JSON") from exc
-        if type(d) is not dict or d.get("schema") != SCHEMA:
+        def no_duplicates(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("duplicate provenance JSON key")
+                result[key] = value
+            return result
+
+        d = json.loads(text, object_pairs_hook=no_duplicates,
+                       parse_constant=lambda value: (_ for _ in ()).throw(
+                           ValueError("nonfinite provenance JSON")))
+        if not isinstance(d, dict) or d.get("schema") != SCHEMA:
             raise ValueError("unknown provenance schema")
-        items = d.get("artifacts")
-        if type(items) is not list or len(items) > 256:
-            raise ValueError("provenance artifacts exceed bound")
-        artifacts: list[Artifact] = []
-        seen: set[str] = set()
-        for item in items:
-            if type(item) is not dict or set(item) != {"preset", "path", "sha256", "size"}:
-                raise ValueError("provenance artifact shape invalid")
-            rel = _safe_relative(item["path"]).as_posix()
-            sha, size, preset = item["sha256"], item["size"], item["preset"]
-            if (rel in seen or type(preset) is not str or not 1 <= len(preset) <= 128
-                    or type(sha) is not str or len(sha) != 64
-                    or any(ch not in "0123456789abcdef" for ch in sha)
-                    or type(size) is not int or not 0 <= size <= 16 * 1024**3):
-                raise ValueError("provenance artifact identity invalid or duplicated")
-            seen.add(rel)
-            artifacts.append(Artifact(preset, rel, sha, size))
-        for name in ("project", "tree", "engine", "verdict"):
-            if type(d.get(name)) is not str or not d[name]:
-                raise ValueError("provenance metadata invalid")
-        return cls(d["project"], d["tree"], d["engine"], d["verdict"], d.get("git"), artifacts)
+        allowed = {"schema", "project", "tree", "engine", "verdict", "git", "artifacts"}
+        if set(d) - allowed or not {"project", "tree", "engine", "verdict"}.issubset(d):
+            raise ValueError("invalid provenance fields")
+        artifacts = d.get("artifacts", [])
+        if not isinstance(artifacts, list) or len(artifacts) > 1024:
+            raise ValueError("invalid artifact inventory")
+        expected = {"preset", "path", "sha256", "size"}
+        if any(not isinstance(a, dict) or set(a) != expected for a in artifacts):
+            raise ValueError("invalid artifact fields")
+        return cls(d["project"], d["tree"], d["engine"], d["verdict"], d.get("git"),
+                   [Artifact(**a) for a in artifacts])
 
 
 def build(root: Path, engine: str, verdict: str, artifacts: dict[str, Path], base: Path | None = None) -> Manifest:
-    base = base or root
+    root = Path(root)
+    base = Path(base) if base is not None else root
     m = Manifest(root.name, tree_digest(root), engine, verdict, git_head(root))
     for preset, path in artifacts.items():
-        if base.is_symlink() or path.is_symlink():
-            raise ValueError("artifact path contains a symlink")
         try:
-            rel = _safe_relative(path.absolute().relative_to(base.absolute()).as_posix())
+            rel = Path(os.path.abspath(path)).relative_to(Path(os.path.abspath(base))).as_posix()
         except ValueError as exc:
-            raise ValueError("artifact path escapes base") from exc
-        if _has_symlink(base.absolute(), rel):
-            raise ValueError("artifact path contains a symlink")
-        if path.resolve().relative_to(base.resolve()).as_posix() != rel.as_posix():
-            raise ValueError("artifact path resolves to a different source")
-        m.artifacts.append(Artifact(preset, rel.as_posix(), sha256_file(path), path.stat().st_size))
+            raise ValueError("artifact is outside approved base") from exc
+        digest, size = _digest_beneath(base, rel)
+        m.artifacts.append(Artifact(preset, rel, digest, size))
+    m.__post_init__()
     return m
 
 
 def verify(manifest: Manifest, base: Path, root: Path | None = None) -> list[str]:
-    """Reject untrusted paths before reading artifact bytes."""
+    manifest.__post_init__()
     problems: list[str] = []
-    if base.is_symlink() or not base.is_dir():
-        return ["artifact base root is unsafe or missing"]
-    trusted_base = base.resolve()
     for a in manifest.artifacts:
         try:
-            rel = _safe_relative(a.path)
-        except ValueError:
-            problems.append(f"{a.preset}: unsafe artifact path")
-            continue
-        if _has_symlink(trusted_base, rel):
-            problems.append(f"{a.preset}: symlink artifact path refused")
-            continue
-        p = trusted_base.joinpath(*rel.parts)
-        if not p.is_file():
+            digest, size = _digest_beneath(Path(base), a.path)
+        except FileNotFoundError:
             problems.append(f"{a.preset}: missing {a.path}")
             continue
-        if type(a.size) is not int or a.size < 0 or p.stat().st_size != a.size:
+        except (OSError, ValueError):
+            problems.append(f"{a.preset}: unsafe or unreadable {a.path}")
+            continue
+        if size != a.size:
             problems.append(f"{a.preset}: size mismatch for {a.path}")
-        if (type(a.sha256) is not str or len(a.sha256) != 64
-                or any(ch not in "0123456789abcdef" for ch in a.sha256)
-                or sha256_file(p) != a.sha256):
+        if digest != a.sha256:
             problems.append(f"{a.preset}: sha256 mismatch for {a.path}")
     if root is not None:
         try:
-            if tree_digest(root) != manifest.tree:
-                problems.append("project tree changed since manifest")
+            same_tree = tree_digest(root) == manifest.tree
         except (OSError, ValueError):
-            problems.append("project tree cannot be safely verified")
+            same_tree = False
+        if not same_tree:
+            problems.append("project tree changed since manifest")
     if manifest.verdict != "SHIP":
         problems.append(f"manifest verdict is {manifest.verdict}")
+    if not manifest.artifacts and manifest.verdict == "SHIP":
+        problems.append("no certified artifacts in manifest")
     return problems

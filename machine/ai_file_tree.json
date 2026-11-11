@@ -278,7 +278,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "502ea2af6d42ff58dc2a4f1b5e01b2c3e98a336f",
+      "source_git_object_sha": "c2ad7951bc3b6d2be1631f080f77b585e3cb9abf",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "4809ca0006abeedb2cd1f7141fd2bf9dc73162f8",
+      "source_git_object_sha": "840c8a37c09750a58104ba91fe2fbc51044d6758",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -583,7 +583,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "70d5bbfd7213cf2a9b19ee7f5ee6875f61edee1b",
+      "source_git_object_sha": "e1b86479fd75cc09f91ef2a089444de3cb49bd68",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "71fa3ec7bed9f343b545255a4dfc2fe619125e24",
+      "source_git_object_sha": "63be51cf2446449cedbfde7e9380f617e1450695",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "4256c9b1e2b57a6435d668933c2f19f3c8d4e180",
+      "source_git_object_sha": "dda5cfe35cad824f602759fdf85d35ecdb3303e6",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -2777,7 +2777,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "88339e1cdedacc799473d504b85782a23e74191c",
+      "source_git_object_sha": "e14303a16e6f19b374f6ff0980dd952d487ed6a6",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "3eee887a11b2acee992c6bdf7c29c259a7c4e63a"
+      "source_git_object_sha": "ad01e5e181b781cc6e6592e38485a9ebbad4a664"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
@@ -5654,7 +5654,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_execution_sandbox_tree_exactly_mirrored",
-      "source_git_object_sha": "a19734e6dc90b85d3c26c3a322105fbc88d44f04"
+      "source_git_object_sha": "479c7161d13fb676e98d666f46dd13a617879819"
     },
     {
       "id": "AIFT-STORAGE",
@@ -7241,7 +7241,7 @@
     {
       "path": "skeleton/mass_build",
       "owner": "Mass-build orchestration and artifact assembly",
-      "reason": "Canonical bulk construction stays in the independently governed build pipeline until explicit AI ownership and safety cutover"
+      "reason": "Canonical bulk construction stays in the independently governed build pipeline; no AI-runtime cutover before independently verified explicit ownership, security and safety approval"
     },
     {
       "path": "skeleton/masterplan",
@@ -7339,6 +7339,11 @@
       "reason": "Hardware and runtime profiling remain independent observability surfaces pending measured authority and safety cutover"
     },
     {
+      "path": "skeleton/perfgate",
+      "owner": "source-bound performance gate compatibility owner",
+      "reason": "Source/AI mirrored bounded performance and soak gate remains an advisory review-only qualification surface, not hardware-attested, AI-owner-cutover approved or release certified."
+    },
+    {
       "path": "skeleton/persist",
       "owner": "persistence compatibility boundary",
       "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
@@ -7374,9 +7379,19 @@
       "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
     },
     {
+      "path": "skeleton/provider_environment.py",
+      "owner": "offline provider environment replay compatibility owner",
+      "reason": "Environment and holdout replay is source-only, with no provider credential, model execution or runtime activation authority; independent review and explicit import/owner cutover remain required."
+    },
+    {
       "path": "skeleton/providers",
       "owner": "integration contract owner",
       "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
+    },
+    {
+      "path": "skeleton/qualification",
+      "owner": "GF-M isolated performance qualification owner",
+      "reason": "GF-M source-only advisory evidence/measurement harness is not installed as authoritative AI runtime or approved for device hardware/release certification."
     },
     {
       "path": "skeleton/quality/scatter10240",
@@ -7782,7 +7797,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 157,
+    "retained_outside_ai_tree_count": 165,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
