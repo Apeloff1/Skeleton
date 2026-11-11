@@ -51,11 +51,11 @@ _SECRET_ASSIGNMENT_RE = re.compile(
 _BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
 _QUERY_SECRET_RE = re.compile(
     r"(?i)([?&](?:token|access[-_]?token|refresh[-_]?token|session|"
-    r"api[-_]?key|secret|password|code|client[-_]?secret)=)[^&#\\s]+"
+    r"api[-_]?key|secret|password|code|client[-_]?secret)=)[^&#\s]+"
 )
 _JSON_SECRET_RE = re.compile(
     r'(?i)"(?:token|password|secret|authorization|api[_-]?key|'
-    r'access[_-]?token|refresh[_-]?token)"\\s*:\\s*"[^"\\r\\n]*"'
+    r'access[_-]?token|refresh[_-]?token)"\s*:\s*"[^"\r\n]*"'
 )
 _MAX_REDACTED_TEXT = 2_000
 
