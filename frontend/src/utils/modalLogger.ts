@@ -55,10 +55,14 @@ let _flushInflight = false;
 
 async function _persistQueue(events: TelemetryEvent[]) {
   try {
-    const existing = JSON.parse((await AsyncStorage.getItem(QUEUE_KEY)) || '[]');
+    const raw = (await AsyncStorage.getItem(QUEUE_KEY)) || '[]';
+    // Treat legacy offline telemetry as untrusted input: never parse a
+    // multi-megabyte or malformed queue before restoring the byte budget.
+    const existing = raw.length <= 2 * 1024 * 1024 ? JSON.parse(raw) : [];
     const previous = Array.isArray(existing) ? existing : [];
     const merged = [...previous.slice(-500), ...events].slice(-500);
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(scrubTelemetry(merged)));
+    const sanitized = JSON.stringify(scrubTelemetry(merged));
+    await AsyncStorage.setItem(QUEUE_KEY, sanitized.slice(0, 2 * 1024 * 1024));
   } catch { /* non-fatal */ }
 }
 
