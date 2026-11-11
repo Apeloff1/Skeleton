@@ -551,3 +551,60 @@ def test_catalog_direct_caller_preserves_valid_tuple_and_default_judge():
     automatic = _catalog_panel(catalog, selected=[], judge_key="")
     assert automatic.models == explicit.models
     assert automatic.judge == explicit.judge
+
+@pytest.mark.parametrize("selected,judge_key,maximum", [
+    ([{"id": "provider:model"}], None, 5),
+    ([[]], None, 5),
+    ({"id": "provider:model"}, None, 5),
+    ("provider:model", None, 5),
+    (("provider:model", None), None, 5),
+    (["provider:model"] * 6, None, 5),
+    (["x" * 386], None, 5),
+    (None, {}, 5),
+    (None, True, 5),
+    (None, "x" * 386, 5),
+    (None, None, True),
+    (None, None, 0),
+    (None, None, 6),
+])
+def test_tenant_panel_invalid_direct_request_has_no_engine_or_catalog_io(
+    monkeypatch, selected, judge_key, maximum,
+):
+    from core import discourse_catalog
+
+    def forbidden_engine():
+        raise AssertionError("invalid direct request instantiated the engine")
+
+    async def forbidden_catalog(*_args, **_kwargs):
+        raise AssertionError("invalid direct request queried provider inventory")
+
+    monkeypatch.setattr(discourse_catalog.EngineClient, "from_env", forbidden_engine)
+    monkeypatch.setattr(discourse_catalog, "model_catalog", forbidden_catalog)
+    with pytest.raises(discourse_catalog.PanelUnavailable):
+        asyncio.run(discourse_catalog.tenant_panel(
+            tenant_id="tenant", actor_id="owner", selected=selected,
+            judge_key=judge_key, maximum=maximum,
+        ))
+
+
+def test_tenant_panel_valid_direct_request_preserves_authorized_catalog(monkeypatch):
+    from core import discourse_catalog
+
+    client = object()
+
+    def fake_engine():
+        return client
+
+    async def fake_catalog(actual_client, *, tenant_id, actor_id):
+        assert actual_client is client
+        assert (tenant_id, actor_id) == ("tenant", "owner")
+        return _authorized_catalog_for_direct_boundary_tests()
+
+    monkeypatch.setattr(discourse_catalog.EngineClient, "from_env", fake_engine)
+    monkeypatch.setattr(discourse_catalog, "model_catalog", fake_catalog)
+    result = asyncio.run(discourse_catalog.tenant_panel(
+        tenant_id="tenant", actor_id="owner", selected=["provider:model"],
+        judge_key="provider:model", maximum=5,
+    ))
+    assert [model.key for model in result.models] == ["provider:model"]
+    assert result.judge.key == "provider:model"

@@ -55,19 +55,14 @@ def _model_row(item: object) -> DeclaredModel | None:
     return DeclaredModel(key, provider, model, item.get("active") is True)
 
 
-def _catalog_panel(
-    catalog: Mapping[str, Any],
-    *,
-    selected: list[str] | None,
+def _validate_panel_request(
+    selected: list[str] | tuple[str, ...] | None,
     judge_key: str | None,
-    maximum: int = 5,
-) -> DeclaredPanel:
-    rows = catalog.get("models")
-    if not isinstance(rows, list) or type(maximum) is not int or not 1 <= maximum <= 5:
-        raise PanelUnavailable("engine_model_inventory_unavailable")
-    # Public routes validate these values, but the catalog is also a reusable
-    # backend boundary. Reject malformed direct callers before set()/dict
-    # membership can raise TypeError or accidentally select a default panel.
+    maximum: int,
+) -> None:
+    """Reject malformed direct callers before engine or catalog I/O."""
+    if type(maximum) is not int or not 1 <= maximum <= 5:
+        raise PanelUnavailable("invalid_panel_limit")
     if selected is not None and (
         type(selected) not in (list, tuple)
         or len(selected) > maximum
@@ -78,6 +73,19 @@ def _catalog_panel(
         type(judge_key) is not str or len(judge_key) > 385
     ):
         raise PanelUnavailable("invalid_judge_selection")
+
+
+def _catalog_panel(
+    catalog: Mapping[str, Any],
+    *,
+    selected: list[str] | None,
+    judge_key: str | None,
+    maximum: int = 5,
+) -> DeclaredPanel:
+    _validate_panel_request(selected, judge_key, maximum)
+    rows = catalog.get("models")
+    if not isinstance(rows, list):
+        raise PanelUnavailable("engine_model_inventory_unavailable")
     ready: dict[str, DeclaredModel] = {}
     for item in rows[:64]:
         model = _model_row(item)
@@ -140,6 +148,9 @@ async def tenant_panel(
     maximum: int = 5,
 ) -> DeclaredPanel:
     """Resolve one model snapshot from explicit engine-side authorization."""
+    # Direct Python callers do not pass through the HTTP admission layer.
+    # Invalid identities must not instantiate the engine or query inventory.
+    _validate_panel_request(selected, judge_key, maximum)
     try:
         client = EngineClient.from_env()
         catalog = await model_catalog(client, tenant_id=tenant_id, actor_id=actor_id)
