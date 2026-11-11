@@ -6,6 +6,10 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from typing import Dict, Iterator, List, Tuple
 
+MAX_SCOPE_DEPTH = 64
+MAX_SCOPE_NODES = 4_096
+MAX_SCOPE_NAME_LENGTH = 128
+
 
 @dataclass(frozen=True)
 class AllocDiff:
@@ -61,6 +65,7 @@ class AllocationTracker:
         self._stack: List[AllocScopeResult] = []
         self._child_peaks: List[int] = []  # parallel to _stack
         self.results: List[AllocScopeResult] = []
+        self._scope_count = 0
 
     def close(self) -> None:
         if self._stack:
@@ -77,6 +82,15 @@ class AllocationTracker:
 
     @contextmanager
     def scope(self, name: str) -> Iterator[AllocScopeResult]:
+        # Reject untrusted names and unbounded nested/serial reports before
+        # snapshotting or touching process-wide tracing state.
+        if (type(name) is not str or not 1 <= len(name) <= MAX_SCOPE_NAME_LENGTH
+                or "/" in name):
+            raise ValueError("allocation scope name must be bounded text without '/'")
+        if len(self._stack) >= MAX_SCOPE_DEPTH:
+            raise ValueError("allocation scope nesting exceeds bounded depth")
+        if self._scope_count >= MAX_SCOPE_NODES:
+            raise ValueError("allocation scope count exceeds bounded node limit")
         if not tracemalloc.is_tracing():
             raise RuntimeError("tracemalloc is not tracing (tracker closed?)")
         result = AllocScopeResult(name=name)
@@ -86,6 +100,7 @@ class AllocationTracker:
         start, _ = tracemalloc.get_traced_memory()
         self._stack.append(result)
         self._child_peaks.append(0)
+        self._scope_count += 1
         try:
             yield result
         finally:

@@ -125,6 +125,14 @@ class QualificationTests(unittest.TestCase):
                 publish_private_report(self.out, 'bad.json', payload)
             self.assertFalse((self.out / 'bad.json').exists())
 
+    def test_report_requires_object_payload_before_filesystem_io(self):
+        for payload in (None, True, 'signed', 42, [], [1, 2]):
+            with self.subTest(payload=repr(payload)), self.assertRaisesRegex(
+                QualificationError, 'invalid qualification report payload',
+            ):
+                publish_private_report(self.out, 'scalar.json', payload)
+        self.assertEqual(list(self.out.iterdir()), [])
+
     def test_report_byte_budget_rejected_before_publication(self):
         with self.assertRaisesRegex(QualificationError, 'oversized'):
             publish_private_report(self.out, 'oversized.json',

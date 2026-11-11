@@ -47,6 +47,8 @@ def publish_private_report(root: Path, filename: str, payload: dict) -> None:
     """Write a canonical report exclusively; no overwrite, links or partial names."""
     if type(filename) is not str or _REPORT_NAME.fullmatch(filename) is None:
         raise QualificationError('invalid qualification report name')
+    if type(payload) is not dict:
+        raise QualificationError('invalid qualification report payload')
     # Stream the same canonical JSON envelope as the legacy encoder, but stop
     # before allocating an unbounded serialized report. ensure_ascii guarantees
     # each chunk's character count is its UTF-8 byte count.
