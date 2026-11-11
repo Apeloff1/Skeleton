@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_amber_highlands",
+  "title": "Amber Highlands: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010317489,
+  "width": 27,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 9,
+  "theme": "forest",
+  "starting_health": 3
+}

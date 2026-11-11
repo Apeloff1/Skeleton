@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_time_loop_detective_misty_breakwater",
+  "title": "Misty Breakwater: Time Loop Detective",
+  "subtitle": "An original time loop detective brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610303277,
+  "width": 19,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "ocean",
+  "starting_health": 3
+}
