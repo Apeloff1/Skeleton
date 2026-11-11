@@ -422,7 +422,7 @@ class QualificationTests(unittest.TestCase):
                                    side_effect=inspect_third):
                 publish_private_report(self.out, 'pinned.json', {'ok': True})
         self.assertEqual(root_calls[0], 3)
-        self.assertEqual((self.out / 'pinned.json').read_bytes(), b'{"ok":true}\\n')
+        self.assertEqual((self.out / 'pinned.json').read_bytes(), b'{"ok":true}\n')
         with self.assertRaises(OSError):
             os.fstat(stage_fd[0])
 
