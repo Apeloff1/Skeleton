@@ -66,6 +66,42 @@ def test_direct_input_rejects_unknown_selected_panel_before_model_invocation(mon
     assert "error" in result
 
 
+def test_direct_admission_exception_text_never_reaches_public_result(monkeypatch):
+    secret = "private-provider-credentials-do-not-return"
+
+    def reject(*_args, **_kwargs):
+        raise ValueError(secret)
+
+    async def forbidden_provider(*_args, **_kwargs):
+        raise AssertionError("provider contacted after rejected admission")
+
+    monkeypatch.setattr(discourse, "_admit", reject)
+    monkeypatch.setattr(discourse, "route_complete", forbidden_provider)
+    result = asyncio.run(discourse.deliberate("creative", "valid prompt"))
+    assert result == {"error": "invalid_deliberation_request"}
+    assert secret not in repr(result)
+
+
+def test_async_admission_exception_text_never_reaches_public_result(monkeypatch):
+    secret = "private-persistence-key-do-not-return"
+
+    class ForbiddenDatabase:
+        @property
+        def discourse_jobs(self):
+            raise AssertionError("database used after rejected admission")
+
+    def reject(*_args, **_kwargs):
+        raise ValueError(secret)
+
+    monkeypatch.setattr(discourse, "_admit", reject)
+    monkeypatch.setattr(discourse, "_db", ForbiddenDatabase())
+    result = asyncio.run(
+        discourse.deliberate_async(discourse.DeliberateBody(prompt="valid prompt"))
+    )
+    assert result == {"error": "invalid_deliberation_request"}
+    assert secret not in repr(result)
+
+
 def test_malformed_judge_scores_do_not_create_fabricated_winner(monkeypatch):
     monkeypatch.setattr(discourse, "MODEL_CATALOG", {
         "m1": {"provider": "a"}, "m2": {"provider": "b"}, "judge": {"provider": "c"}
