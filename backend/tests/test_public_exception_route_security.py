@@ -55,6 +55,7 @@ def test_unexpected_error_never_leaks_internal_message():
     assert response.json() == {"detail": "internal server error"}
     assert "SECRET_ACCESS_TOKEN" not in response.text
     assert "/var/private" not in response.text
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_explicit_public_http_errors_are_preserved():
@@ -72,6 +73,7 @@ def test_explicit_server_http_errors_do_not_leak_details_or_headers():
         assert response.json() == {"detail": "internal server error"}
         assert "private-db-password" not in response.text
         assert "x-debug-token" not in response.headers
+        assert response.headers["cache-control"] == "no-store"
 
 
 def test_explicit_public_client_errors_remain_unchanged():
