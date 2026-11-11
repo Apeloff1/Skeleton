@@ -62,6 +62,8 @@ def violations_from_text(name: str, source: str) -> list[str]:
     )
     if job_names != ["offline-source"]:
         findings.append(f"{name}: exactly one guarded offline-source job is required")
+    if re.search(r"(?m)^ {4}permissions\s*:", _top_level_section(source, "jobs")):
+        findings.append(f"{name}: job-level token permission overrides are forbidden")
     if not re.search(r"(?m)^on:\s*$", source):
         findings.append(f"{name}: missing explicit on: declaration")
     if not re.search(r"(?m)^ {2}workflow_dispatch:\s*(?:#.*)?$", source):
