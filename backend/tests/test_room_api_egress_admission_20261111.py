@@ -108,8 +108,7 @@ def test_invalid_mcp_queries_and_sources_rejected():
             asyncio.run(gateway.query_concurrent("room", **kwargs))
 
 
-@pytest.mark.asyncio
-async def test_pinned_egress_uses_streaming_body_without_extra_dns_leak(monkeypatch):
+def test_pinned_egress_uses_streaming_body_without_extra_dns_leak(monkeypatch):
     monkeypatch.setattr(gateway, "_EXTERNAL_ENABLED", True)
     monkeypatch.setattr(gateway, "_EXTERNAL_API_HOSTS", frozenset({"api.example.test"}))
     resolves = []
@@ -137,10 +136,10 @@ async def test_pinned_egress_uses_streaming_body_without_extra_dns_leak(monkeypa
             yield FakeResponse([b"trusted"], {"content-length": "7"})
 
     monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
-    response = await gateway._api_query({
+    response = asyncio.run(gateway._api_query({
         "url": "https://api.example.test/knowledge?q=ok",
         "headers": {"X-Trace": "request"},
-    })
+    }))
     assert response["ok"] is True
     assert response["body"] == "trusted"
     assert resolves == ["api.example.test", "api.example.test"]
@@ -152,8 +151,7 @@ async def test_pinned_egress_uses_streaming_body_without_extra_dns_leak(monkeypa
     assert calls[1][3]["extensions"] == {"sni_hostname": "api.example.test"}
 
 
-@pytest.mark.asyncio
-async def test_oversize_upstream_response_never_reaches_caller(monkeypatch):
+def test_oversize_upstream_response_never_reaches_caller(monkeypatch):
     monkeypatch.setattr(gateway, "_EXTERNAL_ENABLED", True)
     monkeypatch.setattr(gateway, "_EXTERNAL_API_HOSTS", frozenset({"api.example.test"}))
     monkeypatch.setattr(gateway, "_MAX_EXTERNAL_RESPONSE_BYTES", 8)
@@ -174,7 +172,7 @@ async def test_oversize_upstream_response_never_reaches_caller(monkeypatch):
             yield FakeResponse([b"long confidential response"])
 
     monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
-    result = await gateway._api_query({"url": "https://api.example.test/"})
+    result = asyncio.run(gateway._api_query({"url": "https://api.example.test/"}))
     assert result["ok"] is False
     assert result["error"] == "api_query_failed"
     assert "body" not in result
