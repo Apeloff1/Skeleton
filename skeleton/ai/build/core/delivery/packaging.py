@@ -45,7 +45,12 @@ class PackageResult:
 
 
 def _normalize_files(files: Mapping[str, bytes], prefix: str | None) -> list[tuple[str, bytes]]:
-    if not isinstance(files, Mapping) or not files:
+    if not isinstance(files, Mapping):
+        raise DeliveryError("files mapping must be non-empty")
+    # A Mapping subclass may expose entries through items() even when its
+    # underlying dict reports zero length. Never let that early truth test
+    # hide an unbounded or hostile iterator from the counted admission loop.
+    if type(files) is dict and not files:
         raise DeliveryError("files mapping must be non-empty")
     if len(files) > MAX_PACKAGE_FILES:
         raise DeliveryError("too many files to package")
@@ -67,6 +72,8 @@ def _normalize_files(files: Mapping[str, bytes], prefix: str | None) -> list[tup
             raise DeliveryError(f"duplicate path after normalization: {path}")
         out[path] = bytes(data)
         total += size
+    if not out:
+        raise DeliveryError("files mapping must be non-empty")
     return sorted(out.items())
 
 
