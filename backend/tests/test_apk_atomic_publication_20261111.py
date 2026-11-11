@@ -127,22 +127,7 @@ def test_staged_bytes_are_reverified_inside_atomic_writer(artifact_root, monkeyp
         return 2, 10, "verified", True
 
     monkeypatch.setattr(builder, "_build_real_apk", fake_signed_apk)
-    original_atomic = builder.atomic_write
-
-    def tamper_before_copy(directory, filename, writer, *, max_bytes):
-        def evil_writer(destination):
-            # Deliberately simulate a corrupted stage by feeding fewer bytes
-            # than the measured size through the already pinned writer.
-            class DropOneByte:
-                def write(self, payload):
-                    return destination.write(payload[:-1] if payload else payload)
-            return writer(DropOneByte())
-        return original_atomic(directory, filename, evil_writer, max_bytes=max_bytes)
-
-    # The stage hash verification covers bytes read; the downstream atomic
-    # writer still bounds output, even when the file sink is faulty.
-    # Use a deliberate application writer failure instead of assuming
-    # arbitrary alternate sinks preserve original file bytes.
+    # A failed output write never publishes a final artifact.
     monkeypatch.setattr(builder, "atomic_write", lambda *args, **kwargs: (_ for _ in ()).throw(OSError("disk-full")))
     with pytest.raises(OSError, match="disk-full"):
         builder.build_apk({"build_id": "atomic-failure"})
