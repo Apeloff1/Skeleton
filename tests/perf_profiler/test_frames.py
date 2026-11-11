@@ -88,3 +88,23 @@ def test_record_rejects_bad_values(bad):
 def test_constructor_validation(kwargs):
     with pytest.raises(ValueError):
         FrameSampler(**kwargs)
+
+
+@pytest.mark.parametrize("limit", [float("nan"), float("inf"), float("-inf"), -0.1, 1.1, True, "0.5", 10**1000])
+def test_direct_frame_gate_rejects_invalid_ratio_limits(limit):
+    sampler = FrameSampler(budget_ms=10)
+    sampler.record(20)
+    assert not sampler.stats().within_budget(limit)
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"budget_ms": 1e308, "hitch_factor": 2.0},
+    {"budget_ms": 2.0, "hitch_factor": 1e308},
+    {"budget_ms": 10**1000},
+    {"hitch_factor": 10**1000},
+    {"budget_ms": True},
+    {"hitch_factor": True},
+])
+def test_constructor_rejects_unbounded_or_overflowing_threshold(kwargs):
+    with pytest.raises(ValueError):
+        FrameSampler(**kwargs)
