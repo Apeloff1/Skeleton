@@ -139,13 +139,21 @@ def _validate_external_url(url: str) -> None:
 
 
 def _safe_method(value: Any) -> str:
-    method = str(value or "GET").upper()
+    if value is None:
+        value = "GET"
+    if type(value) is not str or len(value) > 16:
+        raise ValueError("external API method is invalid")
+    method = value.upper()
     if method not in _ALLOWED_HTTP_METHODS:
         raise ValueError("external API method is not allowed")
     return method
 
 
 def _safe_timeout(value: Any) -> float:
+    if type(value) not in (str, int, float) or (
+        type(value) is str and len(value) > 16
+    ):
+        raise ValueError("external API timeout is invalid")
     try:
         timeout = float(value)
     except (TypeError, ValueError, OverflowError) as exc:
@@ -180,11 +188,11 @@ def _safe_headers(value: Any) -> dict[str, str] | None:
 
 
 def _bounded_request_data(value: Any, *, kind: str) -> Any:
-    """Reject oversized outbound JSON/query material before HTTP allocation."""
+    """Bound depth, elements and bytes *before* JSON serialization."""
     if value is None:
         return None
     if kind == "params" and (
-        not isinstance(value, dict)
+        type(value) is not dict
         or len(value) > 24
         or any(
             type(key) is not str or not 1 <= len(key) <= 64
@@ -195,12 +203,52 @@ def _bounded_request_data(value: Any, *, kind: str) -> Any:
         )
     ):
         raise ValueError("external API query parameters are invalid")
-    try:
-        encoded = json.dumps(value, ensure_ascii=False, allow_nan=False)
-    except (TypeError, ValueError, OverflowError) as exc:
-        raise ValueError("external API request body is not JSON-safe") from exc
+
+    remaining = _MAX_EXTERNAL_REQUEST_BYTES
+    visited = 0
+
+    def admit(node: Any, depth: int) -> None:
+        nonlocal remaining, visited
+        visited += 1
+        if visited > 512 or depth > 6:
+            raise ValueError("external API request exceeds node/depth budget")
+        if node is None or type(node) is bool:
+            remaining -= 5
+        elif type(node) is str:
+            if len(node) > _MAX_EXTERNAL_REQUEST_BYTES:
+                raise ValueError("external API string exceeds the byte budget")
+            remaining -= len(node.encode("utf-8"))
+        elif type(node) in (int, float):
+            if type(node) is float and not math.isfinite(node):
+                raise ValueError("external API request contains nonfinite number")
+            # Large integers cannot bypass the output budget via formatting.
+            if len(str(node)) > 64:
+                raise ValueError("external API number exceeds the byte budget")
+            remaining -= 64
+        elif type(node) is list:
+            if len(node) > 64:
+                raise ValueError("external API list exceeds element budget")
+            remaining -= len(node) * 2
+            for child in node:
+                admit(child, depth + 1)
+        elif type(node) is dict:
+            if len(node) > 64:
+                raise ValueError("external API object exceeds key budget")
+            remaining -= len(node) * 4
+            for key, child in node.items():
+                if type(key) is not str or len(key) > 128:
+                    raise ValueError("external API object contains invalid key")
+                admit(key, depth + 1)
+                admit(child, depth + 1)
+        else:
+            raise ValueError("external API request contains invalid type")
+        if remaining < 0:
+            raise ValueError("external API request exceeds byte budget")
+
+    admit(value, 0)
+    encoded = json.dumps(value, ensure_ascii=False, allow_nan=False)
     if len(encoded.encode("utf-8")) > _MAX_EXTERNAL_REQUEST_BYTES:
-        raise ValueError("external API request exceeds the byte budget")
+        raise ValueError("external API request exceeds byte budget")
     return value
 
 
