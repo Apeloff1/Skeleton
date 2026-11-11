@@ -1,4 +1,5 @@
 from __future__ import annotations
+import hmac
 import os
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -17,8 +18,25 @@ class Principal:
 
 class AuthService:
     def __init__(self):
-        self.api_token = os.getenv("GAMEFORGE_API_TOKEN", "dev")
-        self.dev_open = os.getenv("GAMEFORGE_DEV_OPEN", "1") == "1"
+        # Never let an accidentally inherited development default enable
+        # anonymous administrator access outside explicit local development.
+        environment = os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development"))
+        self.production = environment.strip().lower() in {
+            "production", "prod", "staging", "stage", "preview",
+        }
+        self.dev_open = (
+            not self.production
+            and os.getenv("GAMEFORGE_DEV_OPEN", "1") == "1"
+        )
+        configured_token = os.getenv("GAMEFORGE_API_TOKEN", "")
+        # The historical "dev" fallback is not an authentication secret.
+        self.api_token = (
+            configured_token
+            if configured_token and (
+                not self.production or configured_token != "dev"
+            )
+            else None
+        )
         self.oidc = None  # set by oidc module if configured
 
     async def resolve(
@@ -28,9 +46,16 @@ class AuthService:
     ) -> Principal:
         if authorization and authorization.lower().startswith("bearer "):
             token = authorization.split(" ", 1)[1].strip()
-            if token == self.api_token:
+            if (
+                self.api_token is not None
+                and len(token) <= 2048
+                and hmac.compare_digest(token, self.api_token)
+            ):
                 return Principal(
-                    user_id=x_user_id or "api-token-user",
+                    # The x-user-id header is controlled by the requester.
+                    # Production service tokens are their own identities,
+                    # never arbitrary principals supplied in HTTP headers.
+                    user_id="api-token-user" if self.production else (x_user_id or "api-token-user"),
                     roles=["admin", "operator"],
                     auth_method="api_token",
                 )
@@ -76,6 +101,8 @@ class AuthService:
         )
         if isinstance(roles, str):
             roles = [roles]
+        if not isinstance(user_id, str) or not user_id.strip():
+            raise HTTPException(status_code=401, detail="Invalid identity token")
         return Principal(
             user_id=user_id,
             email=claims.get("email"),
