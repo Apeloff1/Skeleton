@@ -63,8 +63,21 @@ def _catalog_panel(
     maximum: int = 5,
 ) -> DeclaredPanel:
     rows = catalog.get("models")
-    if not isinstance(rows, list) or not 1 <= maximum <= 5:
+    if not isinstance(rows, list) or type(maximum) is not int or not 1 <= maximum <= 5:
         raise PanelUnavailable("engine_model_inventory_unavailable")
+    # Public routes validate these values, but the catalog is also a reusable
+    # backend boundary. Reject malformed direct callers before set()/dict
+    # membership can raise TypeError or accidentally select a default panel.
+    if selected is not None and (
+        type(selected) not in (list, tuple)
+        or len(selected) > maximum
+        or any(type(key) is not str or not 1 <= len(key) <= 385 for key in selected)
+    ):
+        raise PanelUnavailable("invalid_panel_selection")
+    if judge_key is not None and (
+        type(judge_key) is not str or len(judge_key) > 385
+    ):
+        raise PanelUnavailable("invalid_judge_selection")
     ready: dict[str, DeclaredModel] = {}
     for item in rows[:64]:
         model = _model_row(item)
