@@ -362,6 +362,7 @@ def test_unhandled_exception_handler_redacts_detail() -> None:
     payload = response.body.decode("utf-8")
     assert PUBLIC_INTERNAL_ERROR in payload
     assert _PRIVATE not in payload
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_redact_client_text_strips_credentials() -> None:
