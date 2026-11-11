@@ -85,7 +85,7 @@ jobs:
             backend/tests/test_apk_atomic_publication_20261111.py \
             tests/test_codeql_lineage_contract_20261111.py \
             tests/test_full_security_alert_inventory_20261111.py \
-            tests/test_codeql_stack_trace_custody_20261111.py
+            tests/test_codeql_all_151_source_contracts_20261111.py
 
   frontend-source:
     if: github.repository == 'Apeloff1/Skeleton'
