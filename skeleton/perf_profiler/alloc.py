@@ -47,8 +47,12 @@ class AllocationTracker:
     """
 
     def __init__(self, top_n: int = 0, frames: int = 1) -> None:
-        if top_n < 0:
-            raise ValueError("top_n must be >= 0")
+        # Validate before starting global tracemalloc; malformed direct callers
+        # must not alter the process-wide tracing state or allocate huge traces.
+        if type(top_n) is not int or not 0 <= top_n <= 100:
+            raise ValueError("top_n must be a bounded non-negative integer")
+        if type(frames) is not int or not 1 <= frames <= 25:
+            raise ValueError("frames must be a bounded positive integer")
         self.top_n = top_n
         self._owns = False
         if not tracemalloc.is_tracing():
