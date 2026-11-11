@@ -14,6 +14,8 @@ from skeleton.app.offline_policy_chain_recovery import (
 )
 from skeleton.app.offline_source_trust_policy import SCHEMA as POLICY_SCHEMA
 from skeleton.testing.test_app_offline_policy_signed_install_recovery import policy_recovery
+from skeleton.testing.test_app_offline_policy_signed_install_recovery import recovery  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_signed_install_recovery import signed  # noqa: F401  (transitive fixture)
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
 

@@ -16,6 +16,7 @@ from skeleton.ai.game_builder.dual_runtime_verify import (
 )
 from skeleton.ai.game_builder.dual_runtime_verify_cli import main
 from skeleton.ai.game_builder.playable_compiler import compile_original_game
+from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.playable_world import GameBuildIntent
 
 
@@ -41,6 +42,88 @@ def test_offline_export_replays_canonical_winning_game(package):
     assert receipt["verified_files"] >= 10
     assert receipt["godot_executed"] is False
     assert receipt["release_certified"] is False
+
+
+def _source_bound_studio_fixture(package):
+    """Convert an already verified fixture into the exact supported studio envelope."""
+    root, _ = package
+    release = root / "release.json"
+    manifest = json.loads(release.read_text("utf-8"))
+    manifest["schema"] = "skeleton.game_builder.studio_package.v1"
+    studio = root / "studio"
+    studio.mkdir()
+    documents = {
+        "pipeline.json": {
+            "schema": "skeleton.game_builder.studio_pipeline.v1",
+            "project_id": manifest["project_id"],
+            "not_automatically_published": True,
+            "original_game_claim": "generated-or-user-authored-geometry",
+        },
+        "jeeves_dragon_tools.json": {"schema": "test-only-tool-plan"},
+        "executed_tool_receipts.json": {"schema": "test-only-source-receipts"},
+        "mirror_room.json": {"schema": "test-only-mirror"},
+        "consumer_gate.json": {
+            "schema": "skeleton.game_builder.consumer_review.v1",
+            "status": "release-blocked",
+            "not_a_legal_opinion": True,
+            "evidence": {
+                "approved_for_publication": False,
+                "rights_reviewed": False,
+                "human_playtested": False,
+                "platform_hardware_tested": False,
+            },
+        },
+        "companion_mirror_room.json": {"schema": "test-only-companion-mirror"},
+        "companion_almanac.json": {"schema": "test-only-almanac"},
+        "companion_practice.json": {"schema": "test-only-companion-practice"},
+    }
+    for name, document in documents.items():
+        raw = (json.dumps(document, sort_keys=True, ensure_ascii=True,
+                          separators=(",", ":"), allow_nan=False) + "\n").encode()
+        (studio / name).write_bytes(raw)
+        manifest["files"]["studio/" + name] = sha256(raw).hexdigest()
+    manifest.pop("manifest_digest")
+    manifest["manifest_digest"] = canonical_digest(manifest)
+    release.write_bytes((json.dumps(manifest, sort_keys=True, ensure_ascii=True,
+                                     separators=(",", ":"), allow_nan=False) + "\n").encode())
+    return root, sha256(release.read_bytes()).hexdigest()
+
+
+def test_studio_package_source_is_versioned_and_replayed_without_release_claim(package):
+    root, pin = _source_bound_studio_fixture(package)
+    observed = verify_exported_package(root, expected_manifest_sha256=pin, authorized=True)
+    assert observed["offline_gameplay_reexecuted"] is True
+    assert observed["verified_files"] >= 8
+    assert observed["release_certified"] is False
+    assert observed["godot_executed"] is False
+
+
+@pytest.mark.parametrize("defect", ["missing_evidence", "foreign_claim", "foreign_project"])
+def test_studio_package_fails_closed_on_missing_or_forged_source_custody(package, defect):
+    root, _ = _source_bound_studio_fixture(package)
+    release = root / "release.json"
+    manifest = json.loads(release.read_text("utf-8"))
+    if defect == "missing_evidence":
+        (root / "studio" / "mirror_room.json").unlink()
+        manifest["files"].pop("studio/mirror_room.json")
+    else:
+        name = root / "studio" / "pipeline.json"
+        doc = json.loads(name.read_text("utf-8"))
+        if defect == "foreign_claim":
+            doc["not_automatically_published"] = False
+        else:
+            doc["project_id"] = "foreign-tenant-game"
+        raw = (json.dumps(doc, sort_keys=True, ensure_ascii=True,
+                          separators=(",", ":"), allow_nan=False) + "\n").encode()
+        name.write_bytes(raw)
+        manifest["files"]["studio/pipeline.json"] = sha256(raw).hexdigest()
+    manifest.pop("manifest_digest")
+    manifest["manifest_digest"] = canonical_digest(manifest)
+    release.write_bytes((json.dumps(manifest, sort_keys=True, ensure_ascii=True,
+                                     separators=(",", ":"), allow_nan=False) + "\n").encode())
+    pin = sha256(release.read_bytes()).hexdigest()
+    with pytest.raises(DualRuntimeVerificationError):
+        verify_exported_package(root, expected_manifest_sha256=pin, authorized=True)
 
 
 def test_existing_studio_cli_routes_to_readonly_verifier(package, capsys):
@@ -367,3 +450,132 @@ def test_inspect_receipt_rejects_hardlink_and_noncanonical_json(tmp_path):
             alias, expected_sha256=sha256(alias.read_bytes()).hexdigest(),
             authorized=True,
         )
+
+
+def _studio_verification_fixture(tmp_path):
+    """Create correctly pinned studio-source metadata over a real playable."""
+    from skeleton.ai.game_builder.contracts import canonical_digest
+    from skeleton.ai.game_builder.dual_runtime_export import (
+        DualRuntimePackage, render_dual_runtime_package, export_dual_runtime_package,
+    )
+    from skeleton.ai.game_builder.playable_compiler import compile_original_game
+    from skeleton.ai.game_builder.playable_world import GameBuildIntent
+
+    intent = GameBuildIntent(
+        project_id="studio-verified-001", title="Studio Lantern",
+        subtitle="Source-bound first playable", seed=1735,
+        levels=1, width=9, height=9, collectibles_per_level=1,
+        hazards_per_level=0, starting_health=3,
+    )
+    project = compile_original_game(intent, authorized=True)
+    original = render_dual_runtime_package(project, authorized=True)
+    file_data = {path: payload for path, payload in original.files.items()
+                 if path != "release.json"}
+    studio_paths = (
+        "studio/pipeline.json",
+        "studio/jeeves_dragon_tools.json",
+        "studio/executed_tool_receipts.json",
+        "studio/mirror_room.json",
+        "studio/consumer_gate.json",
+        "studio/companion_mirror_room.json",
+        "studio/companion_almanac.json",
+        "studio/companion_practice.json",
+    )
+    consumer = {
+        "schema": "skeleton.game_builder.consumer_review.v1",
+        "status": "release-blocked",
+        "evidence": {
+            "approved_for_publication": False,
+            "rights_reviewed": False,
+            "human_playtested": False,
+            "platform_hardware_tested": False,
+        },
+        "not_a_legal_opinion": True,
+    }
+    for path in studio_paths:
+        if path == "studio/consumer_gate.json":
+            obj = consumer
+        elif path == "studio/pipeline.json":
+            # This is an admitted source-only studio package. Mirror the
+            # current verifier's project-bound, no-publication source contract.
+            obj = {
+                "schema": "skeleton.game_builder.studio_pipeline.v1",
+                "project_id": original.manifest["project_id"],
+                "not_automatically_published": True,
+                "original_game_claim": "generated-or-user-authored-geometry",
+            }
+        else:
+            obj = {
+                "schema": "skeleton.game_builder.original_studio_test_metadata.v1",
+            }
+        file_data[path] = (
+            json.dumps(obj, sort_keys=True, separators=(",", ":"), allow_nan=False)
+            + "\n"
+        ).encode("utf-8")
+    manifest_body = {
+        key: value for key, value in original.manifest.items()
+        if key not in {"files", "manifest_digest"}
+    }
+    manifest_body["schema"] = "skeleton.game_builder.studio_package.v1"
+    manifest_body["files"] = {
+        path: sha256(data).hexdigest() for path, data in sorted(file_data.items())
+    }
+    manifest = {
+        **manifest_body, "manifest_digest": canonical_digest(manifest_body),
+    }
+    file_data["release.json"] = (
+        json.dumps(manifest, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        + "\n"
+    ).encode("utf-8")
+    root = export_dual_runtime_package(
+        DualRuntimePackage(file_data, manifest),
+        tmp_path / "studio-export",
+        authorized=True,
+    )
+    return root, sha256((root / "release.json").read_bytes()).hexdigest()
+
+
+def test_verified_studio_package_preserves_original_playable_and_release_holds(tmp_path):
+    root, pin = _studio_verification_fixture(tmp_path)
+    verified = verify_exported_package(
+        root, expected_manifest_sha256=pin, authorized=True,
+    )
+    assert verified["offline_gameplay_reexecuted"] is True
+    assert verified["godot_executed"] is False
+    assert verified["rights_certified"] is False
+    assert verified["release_certified"] is False
+
+
+@pytest.mark.parametrize("change", ["missing-mirror", "missing-consumer", "claim-published"])
+def test_studio_schema_rejects_missing_or_false_release_evidence(tmp_path, change):
+    from skeleton.ai.game_builder.contracts import canonical_digest
+
+    root, _pin = _studio_verification_fixture(tmp_path)
+    release = json.loads((root / "release.json").read_bytes())
+    if change == "missing-mirror":
+        release["files"].pop("studio/mirror_room.json")
+        (root / "studio/mirror_room.json").unlink()
+    elif change == "missing-consumer":
+        release["files"].pop("studio/consumer_gate.json")
+        (root / "studio/consumer_gate.json").unlink()
+    else:
+        consumer_path = root / "studio/consumer_gate.json"
+        consumer = json.loads(consumer_path.read_bytes())
+        consumer["status"] = "ready-for-authorized-publication"
+        consumer["evidence"]["approved_for_publication"] = True
+        bytes_ = (
+            json.dumps(consumer, sort_keys=True, separators=(",", ":"), allow_nan=False)
+            + "\n"
+        ).encode("utf-8")
+        consumer_path.write_bytes(bytes_)
+        release["files"]["studio/consumer_gate.json"] = sha256(bytes_).hexdigest()
+    release["manifest_digest"] = canonical_digest({
+        key: value for key, value in release.items() if key != "manifest_digest"
+    })
+    (root / "release.json").write_bytes((
+        json.dumps(release, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        + "\n"
+    ).encode("utf-8"))
+    pin = sha256((root / "release.json").read_bytes()).hexdigest()
+    with pytest.raises(DualRuntimeVerificationError):
+        verify_exported_package(root, expected_manifest_sha256=pin, authorized=True)

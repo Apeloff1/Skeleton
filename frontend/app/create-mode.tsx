@@ -31,50 +31,81 @@ export default function CreateMode() {
   const [busy, setBusy] = React.useState(false);
   const [status, setStatus] = React.useState('');
   const [depth, setDepth] = React.useState<'fast' | 'studio'>('studio');
+  const [loadError, setLoadError] = React.useState('');
+  const [previewBusy, setPreviewBusy] = React.useState(false);
+  const [activeJob, setActiveJob] = React.useState('');
 
-  React.useEffect(() => {
-    (async () => {
+  const load = React.useCallback(async () => {
+      setLoadError('');
       const r = await api.get<any>('/api/modes/options', { timeoutMs: 12000 });
-      if (r.ok && r.data?.modes) setModes(r.data.modes);
-      if (parentId) {
-        const g = await api.get<any>(`/api/playable/${parentId}`, { timeoutMs: 12000 });
-        if (g.ok && g.data?.title) setParentTitle(g.data.title);
+      if (!r.ok || !Array.isArray(r.data?.modes) || r.data.modes.length === 0 || r.data.modes.length > 32) {
+        setModes([]); setLoadError(r.error || 'Creation modes could not be loaded.'); return;
       }
-    })();
+      setModes(r.data.modes);
+      if (parentId) {
+        const g = await api.get<any>(`/api/playable/${encodeURIComponent(parentId)}`, { timeoutMs: 12000 });
+        if (!g.ok || typeof g.data?.title !== 'string') setLoadError('The source game could not be verified.');
+        else setParentTitle(g.data.title);
+      }
   }, [parentId]);
+  React.useEffect(() => { void load(); }, [load]);
 
   // forge the inheritance brief whenever the picked mode (or note) changes
   const pick = React.useCallback(async (id: string) => {
-    setPicked(id); setPreview(null); setStatus('');
-    if (!parentId) return;
-    const r = await api.post<any>('/api/modes/forge-brief',
-      { parent_id: parentId, mode: id, extra: note.trim() }, { timeoutMs: 12000 });
-    if (r.ok && r.data?.brief) setPreview(r.data);
-  }, [parentId, note]);
+    if (!modes.some(mode => mode.id === id)) return;
+    setPicked(id); setPreview(null); setStatus(''); setPreviewBusy(true);
+    if (!parentId) { setPreviewBusy(false); return; }
+    try {
+      const r = await api.post<any>('/api/modes/forge-brief',
+        { parent_id: parentId, mode: id, extra: note.trim() }, { timeoutMs: 12000 });
+      if (!r.ok || typeof r.data?.brief !== 'string' || !r.data.brief.trim() || typeof r.data?.title !== 'string') {
+        setStatus(`❌ ${r.error || r.data?.error || 'The inheritance brief was not confirmed.'}`); return;
+      }
+      setPreview(r.data);
+    } finally { setPreviewBusy(false); }
+  }, [parentId, note, modes]);
 
-  const create = React.useCallback(async () => {
-    if (!preview?.brief || busy) return;
-    setBusy(true); setStatus('🚀 Forging your new game…');
-    const r = await api.post<any>('/api/playable/generate/async',
-      { brief: preview.brief, title: preview.title, depth, forged_from: parentId, derive_mode: picked },
-      { timeoutMs: 15000 });
-    if (!r.ok || !r.data?.job_id) { setStatus(`❌ ${r.data?.error || 'could not start'}`); setBusy(false); return; }
-    const jid = r.data.job_id; const t0 = Date.now();
+  const pollJob = React.useCallback(async (jid: string) => {
+    const t0 = Date.now();
     for (let i = 0; i < 90; i++) {
       await new Promise(res => setTimeout(res, 4000));
-      const jr = await api.get<any>(`/api/playable/job/${jid}`, { timeoutMs: 12000 });
-      const d = jr.data || {};
-      if (d.job_status === 'error') { setStatus(`❌ ${d.error || 'generation failed'}`); break; }
+      const jr = await api.get<any>(`/api/playable/job/${encodeURIComponent(jid)}`, { timeoutMs: 12000 });
+      if (!jr.ok || !jr.data || typeof jr.data.job_status !== 'string') {
+        setStatus('⚠ Build status is temporarily unavailable. Resume status checking without starting a duplicate build.');
+        return;
+      }
+      const d = jr.data;
+      if (d.job_status === 'error') { setStatus(`❌ ${d.error || 'generation failed'}`); setActiveJob(''); return; }
       if (d.job_status === 'done') {
         const newId = d.playable_id || d.id;
-        setStatus('✅ Created!');
-        if (newId) router.replace(`/playable?id=${newId}` as any);
-        break;
+        if (typeof newId !== 'string' || !newId.trim()) { setStatus('❌ Build completed without a playable identity.'); return; }
+        setStatus('✅ Created!'); setActiveJob('');
+        router.replace(`/playable?id=${encodeURIComponent(newId)}` as any);
+        return;
+      }
+      if (!['queued', 'running', 'building', 'pending'].includes(d.job_status)) {
+        setStatus(`❌ Unsupported build state: ${d.job_status}`); return;
       }
       setStatus(`🚀 Building (${Math.round((Date.now() - t0) / 1000)}s)… inheriting canon & applying the mode`);
     }
+    setStatus('⚠ Build is still running. Resume status checking without starting a duplicate build.');
+  }, [router]);
+
+  const create = React.useCallback(async () => {
+    if (busy) return;
+    setBusy(true); setStatus('🚀 Forging your new game…');
+    if (activeJob) {
+      await pollJob(activeJob); setBusy(false); return;
+    }
+    if (!preview?.brief) { setBusy(false); return; }
+    const r = await api.post<any>('/api/playable/generate/async',
+      { brief: preview.brief, title: preview.title, depth, forged_from: parentId, derive_mode: picked },
+      { timeoutMs: 15000 });
+    if (!r.ok || typeof r.data?.job_id !== 'string' || !r.data.job_id.trim()) { setStatus(`❌ ${r.data?.error || r.error || 'could not start'}`); setBusy(false); return; }
+    const jid = r.data.job_id; setActiveJob(jid);
+    await pollJob(jid);
     setBusy(false);
-  }, [preview, busy, parentId, router, picked, depth]);
+  }, [preview, busy, parentId, picked, depth, activeJob, pollJob]);
 
   if (!parentId) {
     return (
@@ -96,6 +127,8 @@ export default function CreateMode() {
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
         <Text style={s.sub}>Spin off a new game from{parentTitle ? ` “${parentTitle}”` : ' this game'} — pick how it relates to the original. Stage 1 of the pipeline sets the inheritance contract.</Text>
+
+        {!!loadError && <View style={s.errorCard}><Text accessibilityRole="alert" style={s.errorText}>{loadError}</Text><TouchableOpacity onPress={() => { void load(); }} style={s.retry}><Text style={s.retryText}>Retry source and modes</Text></TouchableOpacity></View>}
 
         <View style={s.grid}>
           {modes.map(m => {
@@ -119,6 +152,7 @@ export default function CreateMode() {
               onBlur={() => picked && pick(picked)}
               placeholder="e.g. set it on a frozen moon; add a rival crew"
               placeholderTextColor="#475569" style={s.noteInput} multiline />
+            {previewBusy && <View style={s.previewBusy}><ActivityIndicator size="small" color="#a5b4fc" /><Text style={s.status}>Verifying inheritance brief…</Text></View>}
 
             {preview?.inherited && (
               <View style={s.inheritBox}>
@@ -144,10 +178,10 @@ export default function CreateMode() {
               </View>
             </View>
 
-            <TouchableOpacity testID="mode-create" onPress={create} disabled={busy || !preview}
-              style={[s.createBtn, (busy || !preview) && s.btnDisabled]} activeOpacity={0.9}>
+            <TouchableOpacity testID="mode-create" onPress={create} disabled={busy || (!preview && !activeJob)}
+              style={[s.createBtn, (busy || (!preview && !activeJob)) && s.btnDisabled]} activeOpacity={0.9}>
               {busy ? <ActivityIndicator size="small" color="#fff" /> : (
-                <Text style={s.createTxt}>✨ Create “{preview?.title || '…'}”</Text>
+                <Text style={s.createTxt}>{activeJob ? '↻ Resume build status' : `✨ Create “${preview?.title || '…'}”`}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -164,6 +198,11 @@ const s = StyleSheet.create({
   backTxt: { color: '#60a5fa', fontSize: 15, fontWeight: '700' },
   title: { color: '#F8FAFC', fontSize: 18, fontWeight: '800' },
   sub: { color: '#94A3B8', fontSize: 13, lineHeight: 19, marginBottom: 16 },
+  errorCard: { backgroundColor: '#30161d', borderColor: '#7f3342', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 14 },
+  errorText: { color: '#fca5a5', fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  retry: { alignSelf: 'flex-start', marginTop: 8, borderColor: '#7f3342', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  retryText: { color: '#E2E8F0', fontSize: 12, fontWeight: '800' },
+  previewBusy: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   empty: { color: '#94A3B8', fontSize: 14, padding: 24, textAlign: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: { width: '31%', minWidth: 100, backgroundColor: '#0b1220', borderRadius: 12, borderWidth: 1, borderColor: '#1e293b', padding: 12, minHeight: 92, justifyContent: 'center' },

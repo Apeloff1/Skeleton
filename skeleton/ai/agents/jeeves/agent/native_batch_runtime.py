@@ -167,8 +167,8 @@ def batch_identity(batch_id: str, tasks: Sequence[NativeBatchTask], *,
     _id(subject, "subject")
     if type(tasks) not in (list, tuple):
         raise NativeBatchHold("typed batch tasks required")
-    if len(tasks) > 1000:
-        raise NativeBatchHold("unbounded batch digest input")
+    if not 1 <= len(tasks) <= 1000 or any(type(task) is not NativeBatchTask for task in tasks):
+        raise NativeBatchHold("bounded exact-type batch digest input required")
     payload = {
         "schema": "jeeves.native_batch_identity.v1",
         "batch": batch_id,
@@ -187,13 +187,13 @@ def preflight_batch_tasks(
 ) -> dict[str, int | str]:
     """Pure operator admission BEFORE loading model packages or prompts."""
     _id(batch_id, "batch ID")
-    if not isinstance(policy, NativeBatchPolicy):
-        raise NativeBatchHold("typed operator batch policy required")
+    if type(policy) is not NativeBatchPolicy:
+        raise NativeBatchHold("exact operator batch policy required")
     if type(configured_output_tokens) is not int or not 1 <= configured_output_tokens <= 8192:
         raise NativeBatchHold("bounded configured output ceiling required")
     if type(tasks) not in (tuple, list) or not 1 <= len(tasks) <= policy.maximum_jobs:
         raise NativeBatchHold("finite operator batch casebook required")
-    if any(not isinstance(task, NativeBatchTask) for task in tasks):
+    if any(type(task) is not NativeBatchTask for task in tasks):
         raise NativeBatchHold("untyped operator job")
     if len({task.task_id for task in tasks}) != len(tasks):
         raise NativeBatchHold("ambiguous duplicate operator task ID")
@@ -224,9 +224,9 @@ class NativeBatchConveyor:
             raise NativeBatchHold("operator native batch approval required")
         self.identity = ActiveModel.from_supervisor(worker)
         self.worker = worker
-        self.policy = policy or NativeBatchPolicy()
-        if not isinstance(self.policy, NativeBatchPolicy):
-            raise NativeBatchHold("typed batch policy required")
+        self.policy = NativeBatchPolicy() if policy is None else policy
+        if type(self.policy) is not NativeBatchPolicy:
+            raise NativeBatchHold("exact batch policy required")
         if not callable(monotonic):
             raise NativeBatchHold("monotonic clock required")
         self.monotonic = monotonic
@@ -235,8 +235,8 @@ class NativeBatchConveyor:
         _id(batch_id, "batch ID")
         if type(tasks) not in (tuple, list) or not 1 <= len(tasks) <= self.policy.maximum_jobs:
             raise NativeBatchHold("bounded operator batch required")
-        if any(not isinstance(t, NativeBatchTask) for t in tasks):
-            raise NativeBatchHold("typed task inventory required")
+        if any(type(t) is not NativeBatchTask for t in tasks):
+            raise NativeBatchHold("exact typed task inventory required")
         if len({t.task_id for t in tasks}) != len(tasks):
             raise NativeBatchHold("duplicate batch task identity")
         if sum(len(t.prompt.encode("utf-8", "strict")) for t in tasks) > self.policy.maximum_prompt_bytes:
@@ -296,17 +296,33 @@ class NativeBatchConveyor:
     ) -> NativeBatchResult:
         tasks, batch_sha = self._check(batch_id, tasks)
         started = self.monotonic()
+        if type(started) not in (int, float) or not math.isfinite(started):
+            raise NativeBatchHold("nonmonotonic native batch measurement")
         results = []
         for task in tasks:
-            if self.monotonic() - started >= self.policy.maximum_wall_seconds:
+            before = self.monotonic()
+            if (type(before) not in (int, float) or not math.isfinite(before)
+                    or before < started):
+                raise NativeBatchHold("nonmonotonic native batch measurement")
+            if before - started >= self.policy.maximum_wall_seconds:
                 raise NativeBatchHold("batch wall-clock budget exhausted")
             session, request = self._session_key(batch_id, task.task_id)
             chat = self._conversation(session)
             began = self.monotonic()
-            turn = chat.turn(task.prompt, request_id=request)
-            elapsed = self.monotonic() - began
-            if not math.isfinite(elapsed) or elapsed < 0:
+            if (type(began) not in (int, float) or not math.isfinite(began)
+                    or began < before):
                 raise NativeBatchHold("nonmonotonic native batch measurement")
+            turn = chat.turn(task.prompt, request_id=request)
+            finished = self.monotonic()
+            if (type(finished) not in (int, float) or not math.isfinite(finished)
+                    or finished < began):
+                raise NativeBatchHold("nonmonotonic native batch measurement")
+            elapsed = finished - began
+            # A native turn can commit before returning. Never acknowledge it
+            # as a successful batch after the operator's wall budget expires.
+            # Its authoritative SQLite receipt remains available for replay.
+            if finished - started >= self.policy.maximum_wall_seconds:
+                raise NativeBatchHold("batch wall-clock budget exhausted")
             millis = int(math.ceil(elapsed * 1000))
             if millis > self.policy.maximum_single_job_ms:
                 raise NativeBatchHold("single native task exceeded operator bound")

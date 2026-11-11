@@ -92,6 +92,8 @@ def first_install_report(
 ) -> dict[str, object]:
     """Return bounded, redacted host/configuration and optional live findings."""
 
+    if type(live) is not bool:
+        raise TypeError("live inspection must be an explicit boolean")
     if type(studio) is not bool:
         raise TypeError("studio inspection must be an explicit boolean")
     if (
@@ -106,13 +108,24 @@ def first_install_report(
     root = (root or find_repo_root()).resolve()
     host = inspect_host(root)
     checks = preflight(root, runtime=True, environ=environ)
-    values = _runtime_env(root, environ)
-    manifest = load_manifest()
     try:
-        manifest = runtime_manifest(manifest, root=root, environ=values)
-    except ValueError:
-        # The original port failure is already an explicit preflight finding.
+        values = _runtime_env(root, environ)
+    except (OSError, ValueError, UnicodeError):
+        # An unsafe credential source is not readable configuration evidence.
+        # Preserve the original in place for manual recovery, and do not make
+        # network requests that might otherwise be attributed to stale values.
+        values = {}
+        source_ok = False
         live = False
+    else:
+        source_ok = True
+    manifest = load_manifest()
+    if source_ok:
+        try:
+            manifest = runtime_manifest(manifest, root=root, environ=values)
+        except ValueError:
+            # The port failure is already reported by runtime preflight.
+            live = False
     provider = values.get("AI_PROVIDER", "local").strip().lower() or "local"
     provider = provider if provider in {"local", "openai"} else "unsupported"
     local_paths = [values.get(key, "").strip() for key in (
@@ -167,8 +180,19 @@ def first_install_report(
             status is not None
             and status.get("engine") == "skeleton-engine"
             and isinstance(status.get("providers"), list)
+            and len(status["providers"]) <= 32
+            and all(type(name) is str and 0 < len(name) <= 64
+                    for name in status["providers"])
+            # The active provider must actually exist in the canonical
+            # advertised inventory; an inconsistent response cannot attest
+            # configured local or hosted model availability.
+            and provider in status["providers"]
             and type(status.get("llm_available")) is bool
             and status.get("availability_observed") is True
+            # A healthy *different* provider must never certify the selected
+            # provider. The active provider is an exact canonical identity.
+            and status.get("active") == provider
+            and configured
         ):
             ai.update(
                 available=status["llm_available"],
@@ -192,7 +216,13 @@ def first_install_report(
             for check in host.checks
             if check.required and not check.ok and check.remediation
         )
-    if not checks_ok(checks):
+    if not source_ok:
+        next_steps.append(
+            "The private runtime .env is unsafe or unreadable. Preserve the original; "
+            "repair its file type, size, ownership or links before retrying setup. "
+            "Do not replace stored database credentials automatically."
+        )
+    elif not checks_ok(checks):
         next_steps.append(
             "Run python -m skeleton app setup, then python -m skeleton app check --runtime; preserve the private .env file."
         )
@@ -259,7 +289,10 @@ def first_install_report(
             backend_url=manifest.service("backend").public_url,
             live=live,
             timeout=timeout,
-            auth_token_file=auth_token_file,
+            # Unsafe .env or invalid port configuration disables live
+            # inspection; never pass an authenticated token to a downgraded
+            # diagnostics call that cannot bind its target.
+            auth_token_file=auth_token_file if live else None,
         )
         crawler = report["studio"]["server"]["crawler"]
         observed = crawler.get("report", {})

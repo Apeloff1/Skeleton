@@ -1,7 +1,7 @@
 """Canonical provider delta timestamps must represent real aware instants."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone; UTC = timezone.utc, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
