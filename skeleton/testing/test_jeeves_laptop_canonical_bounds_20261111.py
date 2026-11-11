@@ -92,6 +92,23 @@ class TestBoundedJeevesCanonicalEvidence(unittest.TestCase):
                 with self.assertRaises(contracts.LaptopGateHold):
                     contracts.canonical({"float": value})
 
+    def test_complete_twenty_domain_bundle_denies_large_direct_evidence(self):
+        # Exercise the real source-bundle admission boundary, not only the
+        # canonical helper; no native model or device is activated.
+        from skeleton.jeeves.native_fabric.laptop_ops.batch.fixtures import successful_bundle
+        from skeleton.jeeves.native_fabric.laptop_ops.batch.runner import evaluate_bundle
+
+        evidence = successful_bundle()
+        domain = next(iter(evidence))
+        stage = next(iter(evidence[domain]))
+        evidence[domain][stage]["untrusted_extra"] = "x" * 65_537
+        with mock.patch.object(
+            contracts.json, "dumps",
+            side_effect=AssertionError("JSON allocation was reached"),
+        ):
+            with self.assertRaises(contracts.LaptopGateHold):
+                evaluate_bundle(evidence)
+
     def test_byte_identical_canonical_mirror(self):
         root = Path(__file__).resolve().parents[1]
         canonical = root / "jeeves/native_fabric/laptop_ops/contracts.py"
