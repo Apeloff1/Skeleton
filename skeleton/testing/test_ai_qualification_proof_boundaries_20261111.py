@@ -282,3 +282,16 @@ def test_verifier_normalizes_canonicalization_failure():
     ):
         with pytest.raises(QualificationError, match="invalid qualification report"):
             verify(_issue(), require_real=False)
+
+
+def test_native_report_ci_watches_and_compiles_receipt_verifier():
+    # A proof-verifier-only repair must always re-run the native custody gate.
+    workflow = (
+        Path(__file__).resolve().parents[2]
+        / ".github/workflows/native-qualification-report-custody.yml"
+    ).read_text(encoding="utf-8")
+    relative = "skeleton/ai/runtime/operational_ai/deployment/qualification/verification.py"
+    watch, run = workflow.split("      - name: Compile and execute actual native report regression suite", 1)
+    assert f"      - '{relative}'" in watch
+    assert relative in run
+    assert "ref: ${{ github.event.pull_request.head.sha }}" in workflow
