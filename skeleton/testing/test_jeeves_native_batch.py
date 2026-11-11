@@ -287,7 +287,10 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                        return_value=SimpleNamespace(source_bridge_ready=True)),
             # Only the test fixture replaces the installed-source fence;
             # the production fence is separately tested to reject synthetic workers.
-            mock.patch("skeleton.jeeves.agent.native_batch_cli.NativeSourceFence"),
+            mock.patch(
+                "skeleton.jeeves.agent.native_batch_cli.NativeSourceFence",
+                return_value=SimpleNamespace(assert_live=lambda _worker: None),
+            ),
         ):
             arguments = [
                 "--model-root", "/approved/private/model",
