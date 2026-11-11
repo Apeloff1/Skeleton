@@ -6,8 +6,11 @@ on:
     paths:
       - "skeleton/game/gameplay/harbor_crafting_patrol_cli.py"
       - "skeleton/app/offline_delivery_archive.py"
+      - "skeleton/build/delivery/packaging.py"
+      - "skeleton/ai/build/core/delivery/packaging.py"
       - "skeleton/testing/test_harbor_crafting_patrol_guidance.py"
       - "skeleton/testing/test_app_offline_archive_schema_parity.py"
+      - "skeleton/testing/test_delivery_packaging.py"
       - ".github/workflows/harbor-studio-source-qualification.yml"
 
 permissions:
@@ -38,8 +41,11 @@ jobs:
           python -m compileall -q \
             skeleton/game/gameplay/harbor_crafting_patrol_cli.py \
             skeleton/app/offline_delivery_archive.py \
+            skeleton/build/delivery/packaging.py \
+            skeleton/ai/build/core/delivery/packaging.py \
             skeleton/testing/test_harbor_crafting_patrol_guidance.py \
-            skeleton/testing/test_app_offline_archive_schema_parity.py
+            skeleton/testing/test_app_offline_archive_schema_parity.py \
+            skeleton/testing/test_delivery_packaging.py
       - name: Replay report-only CLI and Studio archive custody regressions
         env:
           PYTHONPATH: "."
@@ -50,5 +56,6 @@ jobs:
           skeleton/testing/test_harbor_crafting_patrol_debrief.py
           skeleton/testing/test_harbor_crafting_patrol_quests.py
           skeleton/testing/test_app_offline_archive_schema_parity.py
+          skeleton/testing/test_delivery_packaging.py
       - name: Verify canonical AI-tree parity
         run: python scripts/check_ai_file_tree.py
