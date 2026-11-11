@@ -113,9 +113,10 @@ async function _drainQueue(): Promise<TelemetryEvent[]> {
 export async function flushTelemetry(): Promise<void> {
   if (_flushInflight) return;
   _flushInflight = true;
+  let batch: TelemetryEvent[] = [];
   try {
     const queued = await _drainQueue();
-    const batch = _buffer.splice(0, _buffer.length)
+    batch = _buffer.splice(0, _buffer.length)
       .concat(queued)
       .map(sanitizeQueuedEvent)
       .filter((event): event is TelemetryEvent => event !== null);
