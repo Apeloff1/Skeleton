@@ -143,6 +143,59 @@ class QualificationTests(unittest.TestCase):
                 publish_private_report(self.out, 'large-string.json', payload)
         self.assertEqual(list(self.out.iterdir()), [])
 
+    def test_report_escaped_unicode_preflight_never_allocates_json_chunk(self):
+        # 1,500 non-BMP characters occupy 18,000 bytes after ensure_ascii.
+        # The raw Python string is smaller than the 16,384-byte cap.
+        payload = {'emoji': '\\U0001f600' * 1500}
+        self.assertLess(len(payload['emoji']), report_paths._MAX_REPORT_BYTES)
+        with mock.patch.object(
+            report_paths.json.JSONEncoder, 'iterencode',
+            side_effect=AssertionError('oversized escaped chunk allocated'),
+        ):
+            with self.assertRaisesRegex(QualificationError, 'oversized'):
+                publish_private_report(self.out, 'emoji.json', payload)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_escaped_ascii_preflight_never_allocates_json_chunk(self):
+        for index, content in enumerate((
+            '"' * 9000,
+            '\\x00' * 3000,
+            '\\u2028' * 3000,
+        )):
+            with self.subTest(index=index), mock.patch.object(
+                report_paths.json.JSONEncoder, 'iterencode',
+                side_effect=AssertionError('oversized escaped chunk allocated'),
+            ):
+                with self.assertRaisesRegex(QualificationError, 'oversized'):
+                    publish_private_report(self.out, 'escaped.json', {'value': content})
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_nonstring_keys_rejected_before_json_encoder(self):
+        # JSON silently coerces 1 and True to '1' and 'true'; this can
+        # duplicate a string key and make receipt interpretation ambiguous.
+        for index, payload in enumerate((
+            {1: 'numeric'},
+            {None: 'null'},
+            {'nested': {'true': 'trusted', True: 'untrusted'}},
+        )):
+            with self.subTest(index=index), mock.patch.object(
+                report_paths.json.JSONEncoder, 'iterencode',
+                side_effect=AssertionError('ambiguous JSON keys encoded'),
+            ):
+                with self.assertRaisesRegex(
+                    QualificationError, 'invalid qualification report payload',
+                ):
+                    publish_private_report(self.out, 'keys.json', payload)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_bounded_unicode_and_escapes_preserve_canonical_bytes(self):
+        payload = {'emoji': '\\U0001f600' * 12, 'controls': '\\x00\\n\\t',
+                   'quoted': '"\\\\', 'nested': {'caf\\u00e9': True}}
+        publish_private_report(self.out, 'unicode.json', payload)
+        expected = (json.dumps(payload, sort_keys=True, separators=(',', ':'),
+                               allow_nan=False, ensure_ascii=True) + '\\n').encode('ascii')
+        self.assertEqual((self.out / 'unicode.json').read_bytes(), expected)
+
     def test_report_large_container_preflight_never_invokes_json_encoder(self):
         payload = {'entries': [None] * (report_paths._MAX_REPORT_BYTES + 1)}
         with mock.patch.object(
