@@ -19,6 +19,7 @@ import re
 from pathlib import Path
 from typing import Literal
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -32,7 +33,7 @@ from gameforge.godot_engine.project import (
     scaffold_project,
 )
 
-router = APIRouter(prefix="/api/godot-engine", tags=["godot-engine"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/godot-engine", tags=["godot-engine"])
 
 # Projects are scaffolded under the backend data dir (gitignored, volume-backed).
 _PROJECTS_ROOT = Path(

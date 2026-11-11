@@ -13,6 +13,7 @@
 """
 
 from skeleton.context.instruction_policy import InstructionPolicy
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Literal
@@ -35,7 +36,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.http_errors import internal_http_error
 
-router = APIRouter(prefix="/jeeves", tags=["Jeeves AI Tutor"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/jeeves", tags=["Jeeves AI Tutor"])
 
 
 # MongoDB for knowledge vault

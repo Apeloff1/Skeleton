@@ -24,6 +24,7 @@ from typing import Any, Optional
 
 from core.http_errors import redact_client_payload, redact_client_text
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -38,7 +39,7 @@ _editor = require_role("editor")
 _admin = require_role("admin")
 # Apply the viewer floor to *all* CNS routes, including oversight/read
 # endpoints. Mutating routes retain their stronger editor/admin dependencies.
-router = APIRouter(
+router = APIRouter(route_class=PublicExceptionRoute,
     prefix="/api/gameforge/studio",
     tags=["gameforge-studio"],
     dependencies=[Depends(_viewer)],

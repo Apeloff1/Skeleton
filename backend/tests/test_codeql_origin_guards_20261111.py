@@ -1,27 +1,35 @@
 """Exact-origin regression for CodeQL URL-substring alerts #147 and #286."""
 from __future__ import annotations
 
-import ast
+import importlib.util
 from pathlib import Path
-from urllib.parse import urlsplit
 
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
+# Exact repository-owned test modules only. Never execute a caller-selected path.
+_TRUSTED_HELPERS = {
+    ("backend/tests/test_final_build.py", "_trusted_build_download_url"):
+        "_codeql_origin_build_predicate",
+    ("tests/legacy_root/backend_test_review_2026_05.py", "_trusted_rust_official_url"):
+        "_codeql_origin_rust_predicate",
+}
 
 
 def _load_helper(relative: str, name: str):
-    # Load only the pure URL predicate. In particular do not execute the
-    # legacy smoke script: it performs live HTTP requests in its main guard.
+    module_name = _TRUSTED_HELPERS[(relative, name)]
     path = REPO / relative
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    function = next(
-        stmt for stmt in tree.body
-        if isinstance(stmt, ast.FunctionDef) and stmt.name == name
-    )
-    env = {"urlsplit": urlsplit}
-    exec(compile(ast.Module(body=[function], type_ignores=[]), str(path), "exec"), env)
-    return env[name]
+    assert path.is_file() and not path.is_symlink()
+    # Import the original, reviewed module so tests exercise its real function.
+    # The legacy smoke script runs HTTP requests only under its __main__ guard;
+    # importing it here never calls main() or performs those live requests.
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    predicate = getattr(module, name)
+    assert callable(predicate)
+    return predicate
 
 
 @pytest.fixture(scope="module")
@@ -95,3 +103,28 @@ def test_docs_allows_only_canonical_https_rust_origins(rust_predicate, url):
 ])
 def test_docs_denies_credentialed_or_redirected_origins(rust_predicate, url):
     assert rust_predicate(url) is False
+
+
+@pytest.mark.parametrize("relative,name", [
+    ("../../etc/passwd", "_trusted_build_download_url"),
+    ("backend/tests/test_final_build.py", "_trusted_rust_official_url"),
+    ("tests/legacy_root/backend_test_review_2026_05.py", "main"),
+])
+def test_origin_loader_denies_unreviewed_module_or_function(relative, name):
+    with pytest.raises(KeyError):
+        _load_helper(relative, name)
+
+
+def test_legacy_origin_predicate_import_never_runs_live_smoke_main(monkeypatch):
+    import requests
+
+    def deny_network(*_args, **_kwargs):
+        raise AssertionError("legacy smoke import attempted a network request")
+
+    monkeypatch.setattr(requests, "get", deny_network)
+    monkeypatch.setattr(requests, "post", deny_network)
+    predicate = _load_helper(
+        "tests/legacy_root/backend_test_review_2026_05.py",
+        "_trusted_rust_official_url",
+    )
+    assert predicate("https://doc.rust-lang.org/book/") is True
