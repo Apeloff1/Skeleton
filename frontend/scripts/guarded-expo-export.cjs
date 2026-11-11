@@ -120,6 +120,8 @@ async function supervise(opts = {}) {
   // A completion marker is evidence from one complete exporter log line,
   // never a synthetic concatenation of stdout/stderr or an unfinished line.
   const pendingOutput = { stdout: '', stderr: '' };
+  const isMarker = line =>
+    line.replace(/\x1b\[[0-9;]*m/g, '').trim() === 'Exported: dist';
   const done = new Promise(resolve => child.on('close', (c, s) => {
     exited = true; code = c; signal = s; resolve();
   }));
@@ -129,8 +131,7 @@ async function supervise(opts = {}) {
     const lines = (pendingOutput[channel] + chunk.toString('utf8'))
       .split(/\r\n|\r|\n/);
     pendingOutput[channel] = lines.pop().slice(-8192);
-    if (markerTime === null && lines.some(line =>
-      line.replace(/\x1b\[[0-9;]*m/g, '').trim() === 'Exported: dist')) {
+    if (markerTime === null && lines.some(isMarker)) {
       markerTime = Date.now();
     }
   }
@@ -156,6 +157,10 @@ async function supervise(opts = {}) {
       if (spawnError) throw Error('export failed to start');
       if (exited) {
         if (code !== 0 || signal) throw Error('export exited unsuccessfully');
+        // EOF terminates the last line even when the exporter omits a newline.
+        if (markerTime === null && Object.values(pendingOutput).some(isMarker)) {
+          markerTime = Date.now();
+        }
         if (markerTime === null) throw Error('completion marker missing');
         return { ...snapshot(out), mode: 'normal-exit' };
       }
