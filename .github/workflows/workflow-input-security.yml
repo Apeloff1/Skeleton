@@ -15,6 +15,7 @@ on:
       - 'tests/test_repo_machine_catalog.py'
       - 'tests/test_repo_machine_sota.py'
       - 'backend/scripts/check_workflow_input_security.py'
+      - 'backend/scripts/check_source_qualification_dispatch_trust.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
       - 'backend/scripts/check_secret_hygiene.py'
@@ -24,6 +25,7 @@ on:
       - 'backend/scripts/check_branch_flow_contract.py'
       - 'backend/scripts/check_workflow_run_branch_completions.py'
       - 'backend/tests/test_workflow_input_security_gate.py'
+      - 'backend/tests/test_source_qualification_dispatch_trust.py'
       - 'backend/tests/test_workflow_event_shell_security.py'
       - 'backend/tests/test_workflow_action_allowlist.py'
       - 'backend/tests/test_workflow_permissions_gate.py'
@@ -73,6 +75,7 @@ on:
       - 'tests/test_repo_machine_catalog.py'
       - 'tests/test_repo_machine_sota.py'
       - 'backend/scripts/check_workflow_input_security.py'
+      - 'backend/scripts/check_source_qualification_dispatch_trust.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
       - 'backend/scripts/check_secret_hygiene.py'
@@ -82,6 +85,7 @@ on:
       - 'backend/scripts/check_branch_flow_contract.py'
       - 'backend/scripts/check_workflow_run_branch_completions.py'
       - 'backend/tests/test_workflow_input_security_gate.py'
+      - 'backend/tests/test_source_qualification_dispatch_trust.py'
       - 'backend/tests/test_workflow_event_shell_security.py'
       - 'backend/tests/test_workflow_action_allowlist.py'
       - 'backend/tests/test_workflow_permissions_gate.py'
@@ -148,6 +152,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           tests/test_workflow_input_security_gate.py
+          tests/test_source_qualification_dispatch_trust.py
           tests/test_workflow_event_shell_security.py
           tests/test_workflow_action_allowlist.py
           tests/test_workflow_permissions_gate.py
@@ -155,6 +160,8 @@ jobs:
           tests/test_traffic_manager_workflow_contract.py
       - name: Reject direct untrusted event interpolation in run shells
         run: python backend/scripts/check_workflow_input_security.py
+      - name: Reject attacker-selected source in manually dispatched qualification
+        run: python backend/scripts/check_source_qualification_dispatch_trust.py
       - name: Enforce reviewed action repository allowlist
         run: python backend/scripts/check_workflow_action_allowlist.py
       - name: Enforce least-privilege workflow token permissions
