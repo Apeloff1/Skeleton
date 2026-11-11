@@ -17,6 +17,8 @@ Endpoints:
   POST   /api/jeeves/consult                     — direct in-process Jeeves query
 """
 from __future__ import annotations
+
+from core.public_exception_route import PublicExceptionRoute
 import os
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
@@ -29,7 +31,7 @@ from core.databases import client as _SHARED_MONGO_CLIENT
 from services import binary_builder, vault_loader, tool_registry, jeeves_consultant
 from core.exec_guard import code_execution_enabled, execution_disabled_response
 
-router = APIRouter()
+router = APIRouter(route_class=PublicExceptionRoute, )
 
 _MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 _DB_NAME = os.environ.get("DB_NAME", "test_database")
