@@ -80,6 +80,36 @@ test('connection loss during POST does not silently resubmit paid model work', a
   assert.equal(JSON.stringify(outcome).includes('sensitive-transport'), false);
 });
 
+test('cancelled submission preserves only a confirmed running admission receipt', async () => {
+  const scenarios = [
+    [ok({ status: 'running', job_id: JOB_ID }), JOB_ID],
+    [{ ok: false, status: 401, data: { status: 'running', job_id: JOB_ID }, error: 'denied' }, null],
+    [ok({ status: 'queued', job_id: JOB_ID }), null],
+    [ok({ status: 'running', job_id: JOB_ID, error: 'rejected' }), null],
+    [ok({ status: 'running', job_id: 'untrusted-receipt' }), null],
+  ];
+  for (const [admission, expectedId] of scenarios) {
+    const controller = new AbortController();
+    let submissions = 0;
+    const transport = mockTransport({
+      post: async () => {
+        submissions++;
+        controller.abort();
+        return admission;
+      },
+      get: async () => { throw Error('cancelled observation must not poll'); },
+    });
+    const outcome = await submitDiscourseJob(transport, payload, {
+      signal: controller.signal,
+    });
+    assert.deepEqual(outcome, {
+      ok: false, jobId: expectedId,
+      error: 'observation_cancelled', recoverable: true,
+    });
+    assert.equal(submissions, 1);
+  }
+});
+
 test('untrusted job IDs are rejected before any network activity', async () => {
   const transport = mockTransport({
     post: async () => { throw Error('unexpected POST'); },

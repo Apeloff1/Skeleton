@@ -246,7 +246,10 @@ export async function submitDiscourseJob(
   // If the POST returned a valid job receipt, preserve it even if the UI
   // detached at the same instant. An admitted server job is still running.
   if (options.signal?.aborted) {
-    const knownId = admitted.data?.job_id;
+    // An error response may contain a plausible but unadmitted identifier.
+    // Retain a receipt only when the server actually acknowledged a running job.
+    const knownId = admitted.ok && admitted.data?.status === 'running' &&
+      admitted.data.error == null ? admitted.data.job_id : null;
     return failure(
       'observation_cancelled',
       typeof knownId === 'string' && JOB_ID_PATTERN.test(knownId) ? knownId : null,
