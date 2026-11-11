@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from hashlib import sha256
-from io import BytesIO, StringIO, TextIOWrapper
+from io import BytesIO, TextIOWrapper
 import json
 import os
 from pathlib import Path
@@ -272,7 +272,10 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                       for t in tasks(2)],
         }).encode())
         stdin = TextIOWrapper(BytesIO(raw), encoding="utf-8")
-        stdout, stderr = StringIO(), StringIO()
+        # Use actual buffered text streams: production emits to an owned
+        # binary buffer, which a StringIO-only fixture does not provide.
+        stdout = TextIOWrapper(BytesIO(), encoding="utf-8", write_through=True)
+        stderr = TextIOWrapper(BytesIO(), encoding="utf-8", write_through=True)
         with (
             mock.patch("sys.stdin", stdin),
             mock.patch("sys.stdout", stdout),
@@ -281,6 +284,12 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                        return_value=(nullcontext(), self.worker, object())) as active,
             mock.patch("skeleton.jeeves.agent.native_batch_cli.inspect_native_jeeves",
                        return_value=SimpleNamespace(source_bridge_ready=True)),
+            # Only the test fixture replaces the installed-source fence;
+            # the production fence is separately tested to reject synthetic workers.
+            mock.patch(
+                "skeleton.jeeves.agent.native_batch_cli.NativeSourceFence",
+                return_value=SimpleNamespace(assert_live=lambda _worker: None),
+            ),
         ):
             arguments = [
                 "--model-root", "/approved/private/model",
@@ -291,7 +300,14 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
             if approve:
                 arguments.append("--approve-native")
             status = batch_cli(arguments)
-        return status, stdout.getvalue(), stderr.getvalue(), active.call_count
+        stdout.flush()
+        stderr.flush()
+        return (
+            status,
+            stdout.buffer.getvalue().decode("utf-8", "strict"),
+            stderr.buffer.getvalue().decode("utf-8", "strict"),
+            active.call_count,
+        )
 
     def test_cli_real_path_commits_synthetic_source_only_batch(self):
         status, stdout, stderr, calls = self._cli()

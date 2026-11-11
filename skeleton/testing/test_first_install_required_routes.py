@@ -80,7 +80,7 @@ def test_doctor_reports_observed_local_guard_problem_not_missing_weights(monkeyp
     report = _doctor(monkeypatch, tmp_path, {"critical_routes": {
         "ok": True, "report_available": True, "missing": [],
     }}, providers={
-        "engine": "skeleton-engine", "active": "local", "providers": [],
+        "engine": "skeleton-engine", "active": "local", "providers": ["local"],
         "llm_available": False, "availability_observed": True, "active_readiness_code": code,
     })
     assert report["ai"]["readiness_code"] == code
@@ -95,7 +95,7 @@ def test_doctor_reports_observed_local_guard_problem_not_missing_weights(monkeyp
 ])
 def test_doctor_ignores_untrusted_or_contradictory_guard_codes(monkeypatch, tmp_path, overrides):
     payload = {
-        "engine": "skeleton-engine", "active": "local", "providers": [],
+        "engine": "skeleton-engine", "active": "local", "providers": ["local"],
         "llm_available": False, "availability_observed": True, "active_readiness_code": "local_guard_unavailable",
     }
     payload.update(overrides)

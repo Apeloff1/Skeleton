@@ -222,8 +222,41 @@ jobs:
           "ruff==0.17.2" "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "fastapi==0.161.1"
           "httpx>=0.28.1,<1" "pydantic-settings>=2.15.0,<3" "pymongo>=4,<5" "motor>=3,<4"
           "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2" "cryptography>=50.0.2"
+      # Required source qualifications are in the protected aggregate rather
+      # than subscribing as two extra automatic workflows. Any source test
+      # failure blocks Lint Type Security and therefore Merge Readiness.
+      - name: Qualify exact-head Godot provenance and native export custody
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m compileall -q skeleton/godot_export/provenance.py skeleton/godot_export/cli.py skeleton/forge/export.py
+          python -m pytest -q \
+            skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py \
+            skeleton/testing/test_forge_native_output_custody_20261110.py \
+            skeleton/testing/test_godot_export_provenance.py \
+            skeleton/testing/test_godot_export_provenance_negative.py \
+            skeleton/testing/test_forge_export_quarantine.py
+      - name: Qualify exact-head strict replay and environment custody
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m compileall -q skeleton/provider_environment.py skeleton/simulation/replay_checkpoint.py tests/test_postmerge_environment_checkpoint_custody.py
+          python -m unittest discover -s tests -p test_postmerge_environment_checkpoint_custody.py -v
+          python -m unittest discover -s tests -p test_replay_checkpoint_v6.py -v
+          python -m unittest discover -s tests -p test_environment_replay_admission_bounds.py -v
       - name: Install frontend dependencies
         run: yarn --cwd frontend install --ignore-scripts --non-interactive
+      - name: Verify filesystem and encrypted compliance CodeQL regressions
+        working-directory: backend
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest tests/test_codeql_storage_security_20261111.py
+      - name: Verify native-secure frontend session identities and prototype integrity
+        run: >-
+          node --test
+          frontend/scripts/test-secure-session-identifiers.cjs
+          frontend/scripts/test-quickwins-prototype-guard.cjs
       # Full repository Ruff lint runs in the canonical quality gate below; avoid a second backend-only pass.
       - name: Canonical lint, type, and high-confidence security gates
         run: bash scripts/quality-gates.sh

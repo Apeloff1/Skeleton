@@ -9,58 +9,31 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
-import stat
 import sys
-import tempfile
 
 from skeleton.game.gameplay.flgb_gameplay_runtime import GameplayContractError
 from skeleton.game.gameplay.offline_grid_campaign import Campaign, Command, Session
 from skeleton.game.gameplay.grid_viewport import viewport
 from skeleton.game.gameplay.grid_terminal_input import parse_terminal_input
-from skeleton.game.gameplay.offline_grid_save_slot import SaveSlotError, read_slot, write_slot
+from skeleton.game.gameplay.offline_grid_save_slot import SaveSlotError, create_slot, read_slot, write_slot
 
 DEFAULT_SOURCE = Path(__file__).resolve().parents[2] / "skeleton/game/gameplay/content/lantern_harbor.json"
-MAX_READ = 2_000_000
 
 
 def _read(path: Path) -> object:
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(path, flags)
-    try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_READ:
-            raise ValueError("not a bounded regular file")
-        with os.fdopen(fd, "rb", closefd=False) as handle:
-            data = handle.read(MAX_READ + 1)
-        if len(data) > MAX_READ:
-            raise ValueError("input exceeds byte budget")
-        return json.loads(data)
-    finally:
-        os.close(fd)
+    """Read all campaign source and command JSON under save-slot custody.
+
+    Prior direct os.open() protected only the final pathname. This reusable
+    reader guards every directory component, refuses non-regular files and
+    duplicate/non-finite JSON, and bounds reads before parser admission.
+    """
+    return read_slot(path)
 
 
 def _write_new_save(path: Path, snapshot: dict) -> None:
-    """Publish a verified replay snapshot without replacing an existing save slot."""
-    data = (json.dumps(snapshot, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
-    if len(data) > MAX_READ:
-        raise ValueError("save exceeds byte budget")
-    fd, temporary = tempfile.mkstemp(prefix=".campaign-save-", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.link(temporary, path)
-        if hasattr(os, "O_DIRECTORY"):
-            directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
-    finally:
-        os.unlink(temporary)
+    """Create-only publication uses the same guarded filesystem contract."""
+    create_slot(path, snapshot)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -106,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.operation == "play":
             if args.commands is not None:
                 raise ValueError("play reads commands from the terminal")
-            session = Session.restore(campaign, read_slot(args.resume) if args.save_slot is not None else _read(args.resume)) if args.resume else Session.new(campaign)
+            session = Session.restore(campaign, read_slot(args.resume)) if args.resume else Session.new(campaign)
             print("Offline grid campaign: W/A/S/D or arrow words to move; collect ID, talk ID, strike ID, finish ID, wait, quit")
             while session.ending is None and session.tick < 4096:
                 camera = viewport(session, args.view_width, args.view_height)
@@ -136,7 +109,7 @@ def main(argv: list[str] | None = None) -> int:
         raw_commands = _read(args.commands)
         if not isinstance(raw_commands, list) or len(raw_commands) > 4096:
             raise ValueError("invalid command batch")
-        session = Session.restore(campaign, read_slot(args.resume) if args.save_slot is not None else _read(args.resume)) if args.resume else Session.new(campaign)
+        session = Session.restore(campaign, read_slot(args.resume)) if args.resume else Session.new(campaign)
         for item in raw_commands:
             if not isinstance(item, dict) or set(item) - {"command_id", "kind", "target"}:
                 raise ValueError("invalid command fields")

@@ -30,6 +30,9 @@ CMD ["npx", "expo", "start", "--web", "--port", "3000"]
 
 # Stage 3: Web Build
 FROM deps AS builder
+# Ensure deterministic, noninteractive guarded Expo export in CI and image builds.
+ENV CI=1 \
+    EXPO_NO_TELEMETRY=1
 # Expo inlines public endpoints into the exported browser bundle. These are
 # public URLs only; model credentials remain confined to the engine.
 # Leave production web endpoints unset by default: the browser must use the
@@ -42,8 +45,12 @@ ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL \
 COPY . .
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    yarn export:web \
-    && (test -f /app/dist/setup.html || test -f /app/dist/setup/index.html)
+    node --test scripts/test-guarded-expo-export.cjs \
+    && node scripts/guarded-expo-export.cjs \
+    && echo "frontend-export-supervision-complete" \
+    && test -s /app/dist/index.html \
+    && (test -s /app/dist/setup.html || test -s /app/dist/setup/index.html) \
+    && echo "frontend-index-and-setup-artifacts-verified"
 
 # Stage 4: Production (Nginx)
 # Use the minimal official nginx runtime to reduce the production package/CVE

@@ -6,7 +6,7 @@ default_owner = "automation-supervisor"
 # Full working-tree machine/code-search coverage must include current tracked growth.
 # Retain a finite scan budget; scanner and CI still fail closed on truncation.
 # The previous 80,000-file ceiling truncated the 2026-10-29 exact-head inventory.
-max_files = 100000
+max_files = 250000
 max_file_bytes = 2000000
 max_context_bytes = 30000
 
@@ -493,7 +493,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "quality"
-prefixes = ["skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/"]
+prefixes = ["skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/", "skeleton/perfgate/", "skeleton/qualification/"]
 owner = "quality-plane"
 criticality = "high"
 purpose = "Evaluation, quality analysis, artifact assurance and reusable gate-plane implementation."

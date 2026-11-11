@@ -90,7 +90,13 @@ def test_condition_depth_bound() -> None:
 def test_utility_curves_and_choice() -> None:
     assert curve("inverse", 0.25) == 0.75
     assert curve("logistic", 0.5) == pytest.approx(0.5)
-    assert curve("linear", 7) == 1.0
+    assert curve("linear", 0.0) == 0.0
+    assert curve("linear", 0.75) == pytest.approx(0.75)
+    assert curve("linear", 1.0) == 1.0
+    # Out-of-domain utility samples must not be silently clamped into a
+    # seemingly valid decision score; the bounded model fails closed.
+    with pytest.raises(ValidationError, match=r"within \[0, 1\]"):
+        curve("linear", 7)
     with pytest.raises(ValidationError):
         curve("cubic", 0.5)
     opts = [{"action": "wander", "need": "boredom", "weight": 1}, {"action": "flee", "need": "fear", "weight": 1.5, "curve": "quadratic"}]
