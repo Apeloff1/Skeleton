@@ -2950,7 +2950,7 @@ async def lifespan(app: FastAPI):
                         await content_db.reading_library.insert_many(out)
                         logger.info(f"[academy-extras] reading_library: {len(out)} books inserted (content_db)")
                 except Exception as _re:
-                    logger.warning(f"[academy-extras] reading_library seed failed: {_re}")
+                    logger.warning(f"[academy-extras] reading_library seed failed: {type(_re).__name__}")
             # ── Bug/Fix library ── content_db
             if await content_db.bugfix_library.count_documents({}, limit=1) == 0:
                 try:
@@ -2970,7 +2970,7 @@ async def lifespan(app: FastAPI):
                         await content_db.bugfix_library.insert_many(out)
                         logger.info(f"[academy-extras] bugfix_library: {len(out)} entries inserted (content_db)")
                 except Exception as _be:
-                    logger.warning(f"[academy-extras] bugfix_library seed failed: {_be}")
+                    logger.warning(f"[academy-extras] bugfix_library seed failed: {type(_be).__name__}")
             # ── Study paths ── core db (small, user-facing)
             if await db.study_paths.count_documents({}, limit=1) == 0:
                 try:
@@ -2983,7 +2983,7 @@ async def lifespan(app: FastAPI):
                         await db.study_paths.insert_many(sps)
                         logger.info(f"[academy-extras] study_paths: {len(sps)} paths inserted (core db)")
                 except Exception as _se:
-                    logger.warning(f"[academy-extras] study_paths seed failed: {_se}")
+                    logger.warning(f"[academy-extras] study_paths seed failed: {type(_se).__name__}")
         except Exception as ex:
             logger.warning(f"[academy-extras] top-level failure: {ex}")
     if not _skip_heavy:
@@ -3101,7 +3101,7 @@ async def lifespan(app: FastAPI):
                     rep_gk = await seed_game_knowledge_vault(content_db, target_per_topic_per_genre=6)
                     logger.info(f"[game_knowledge] seed: {rep_gk} (content_db)")
                 except Exception as _ve:
-                    logger.warning(f"[narrative_vault/game_knowledge] seed failed: {_ve}")
+                    logger.warning(f"[narrative_vault/game_knowledge] seed failed: {type(_ve).__name__}")
             _kick(55, "vault-seed", _kick_vault_seed)
             logger.info("[narrative_vault+game_knowledge] seeders kicked off in background (content_db)")
         except Exception as e:
@@ -3122,11 +3122,11 @@ async def lifespan(app: FastAPI):
                         await content_db.rosetta_stone.create_index("category")
                         await content_db.rosetta_stone.create_index("language_family")
                     except Exception as _ie:
-                        logger.warning(f"[rosetta_stone] index create deferred: {_ie}")
+                        logger.warning(f"[rosetta_stone] index create deferred: {type(_ie).__name__}")
                     rep = await seed_rosetta_stone(content_db)
                     logger.info(f"[rosetta_stone] result: {rep}")
                 except Exception as _re:
-                    logger.warning(f"[rosetta_stone] seed failed: {_re}")
+                    logger.warning(f"[rosetta_stone] seed failed: {type(_re).__name__}")
             _kick(65, "rosetta-stone", _kick_rosetta_stone)
             logger.info("[rosetta_stone] seeder kicked off in background (content_db)")
         except Exception as e:
@@ -3171,7 +3171,7 @@ async def lifespan(app: FastAPI):
                     total = await coll.count_documents({})
                     logger.info(f"[hyperscale_references] seeded: total={total}")
                 except Exception as _he:
-                    logger.warning(f"[hyperscale_references] seed failed: {_he}")
+                    logger.warning(f"[hyperscale_references] seed failed: {type(_he).__name__}")
             _kick(70, "hyperscale-refs", _kick_hyperscale_refs)
             logger.info("[hyperscale_references] seeder kicked off in background (content_db)")
         except Exception as e:
@@ -3249,7 +3249,7 @@ async def lifespan(app: FastAPI):
                         thawed += 1
                         total_rows += res.get("rows", 0)
                 except Exception as _te:
-                    logger.warning(f"[academy-thaw] {nm} failed: {_te}")
+                    logger.warning(f"[academy-thaw] {nm} failed: {type(_te).__name__}")
             if thawed:
                 logger.info(f"[academy-thaw] restored {thawed} frozen user-facing collections ({total_rows} total rows)")
         except Exception as _ex:
@@ -5239,7 +5239,7 @@ try:
     from core.cold_storage import start_evictor as _start_evictor
     _start_evictor()
 except Exception as _e:
-    logger.warning(f"[cold_storage] evictor not started: {_e}")
+    logger.warning(f"[cold_storage] evictor not started: {type(_e).__name__}")
 
 
 def _kick_build_watchdog_start():
@@ -5254,7 +5254,7 @@ def _kick_build_watchdog_start():
         start_watchdog()
         logger.info("[watchdog] Galaxy Studio build watchdog started")
     except Exception as _e:
-        logger.warning(f"[watchdog] failed to start: {_e}")
+        logger.warning(f"[watchdog] failed to start: {type(_e).__name__}")
 
 
 # ─── Declarative router mounts ───────────────────────────────────────────

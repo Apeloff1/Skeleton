@@ -59,6 +59,8 @@ def test_studio_source_archive_inspection_retains_all_release_denials(tmp_path, 
     "missing_studio_provenance",
     "false_not_automatically_published",
     "foreign_studio_project",
+    "foreign_studio_claim",
+    "foreign_studio_schema",
     "unsupported_schema",
     "noncanonical_manifest",
 ])
@@ -69,12 +71,17 @@ def test_resealed_source_archive_cannot_bypass_studio_custody(
     if attack == "missing_studio_provenance":
         del files["studio/pipeline.json"]
         del release["files"]["studio/pipeline.json"]
-    elif attack in ("false_not_automatically_published", "foreign_studio_project"):
+    elif attack in ("false_not_automatically_published", "foreign_studio_project",
+                    "foreign_studio_claim", "foreign_studio_schema"):
         studio = json.loads(files["studio/pipeline.json"])
         if attack == "false_not_automatically_published":
             studio["not_automatically_published"] = False
-        else:
+        elif attack == "foreign_studio_project":
             studio["project_id"] = "unrelated-studio-project"
+        elif attack == "foreign_studio_claim":
+            studio["original_game_claim"] = "third-party-unreviewed-geometry"
+        else:
+            studio["schema"] = "skeleton.game_builder.studio_pipeline.v999"
         files["studio/pipeline.json"] = _canonical_bytes(studio)
         release["files"]["studio/pipeline.json"] = sha256(
             files["studio/pipeline.json"],

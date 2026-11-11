@@ -55,8 +55,10 @@ class ScimUserDirectory:
             "Resources": page,
         }
 
-    def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
-        data = self.list_users(start_index=1, count=5000)
+    def get_user(self, user_id: str, *, tenant_id: str | None = None) -> Optional[Dict[str, Any]]:
+        # User lookups inherit the caller's previously authorized tenant;
+        # never aggregate roles and memberships from unrelated tenants.
+        data = self.list_users(tenant_id=tenant_id, start_index=1, count=5000)
         for u in data["Resources"]:
             if u["id"] == user_id:
                 return u
@@ -68,6 +70,8 @@ class ScimUserDirectory:
             raise ValueError("id or userName required")
         active = bool(payload.get("active", True))
         tenant_id = payload.get("tenant_id")
+        if not isinstance(tenant_id, str) or not tenant_id:
+            raise ValueError("explicit SCIM tenant_id required")
         role_raw = payload.get("role")
         if tenant_id:
             tenant = self.registry.get(tenant_id)
@@ -96,7 +100,7 @@ class ScimUserDirectory:
                     details={"active": active, "role": role_raw},
                 )
             )
-        return self.get_user(user_id) or {
+        return self.get_user(user_id, tenant_id=tenant_id) or {
             "id": user_id,
             "userName": user_id,
             "active": active,
@@ -121,10 +125,15 @@ class ScimUserDirectory:
                 if name in {"replace", "add"} and "role" in path:
                     role_raw = value
                 if name in {"replace", "add"} and "tenant" in path:
-                    tenant_id = value
-        existing = self.get_user(user_id)
-        if not tenant_id and existing and len(existing.get("tenants") or []) == 1:
-            tenant_id = existing["tenants"][0]
+                    # A route may have authorized "blue" before entering the
+                    # directory. Never let a nested SCIM operation switch the
+                    # tenant to "red" after that authorization decision.
+                    if value != tenant_id:
+                        raise ValueError("SCIM operation cannot change tenant scope")
+        # Implicit global user lookup may pick a tenant the operator does not
+        # control. SCIM mutations require an explicit tenant in their payload.
+        if not isinstance(tenant_id, str) or not tenant_id:
+            raise ValueError("explicit SCIM tenant_id required")
         body = {
             "id": user_id,
             "userName": user_id,

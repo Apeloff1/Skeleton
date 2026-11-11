@@ -136,7 +136,7 @@ async def update_ml_config(build_id: str, patch: dict):
             continue
         coerced, err = _SCHEMA[k](v)
         if err:
-            rejected[k] = f"{err}_(received={v!r})"
+            rejected[k] = err
         else:
             clean[k] = coerced
 
