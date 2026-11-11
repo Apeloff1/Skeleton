@@ -44,6 +44,33 @@ def _open_private_report_root(root: Path) -> int:
 
 
 
+def _bounded_ascii_json_string_size(value: str, budget: int) -> int:
+    """Count the exact ensure_ascii JSON string size without encoding it.
+
+    JSONEncoder may allocate a single escaped string chunk before yielding it.
+    A character-count lower bound cannot stop a 12-byte surrogate escape for
+    every non-BMP code point, so count escapes within the receipt budget first.
+    """
+    size = 2  # JSON opening and closing quotes
+    if len(value) + size > budget:
+        raise QualificationError('qualification receipt oversized')
+    for character in value:
+        codepoint = ord(character)
+        if character in ('"', '\\'):
+            size += 2
+        elif codepoint < 0x20:
+            size += 2 if codepoint in (8, 9, 10, 12, 13) else 6
+        elif codepoint < 0x80:
+            size += 1
+        elif codepoint <= 0xFFFF:
+            size += 6
+        else:
+            size += 12
+        if size > budget:
+            raise QualificationError('qualification receipt oversized')
+    return size
+
+
 def _preflight_report_payload(payload: dict) -> None:
     """Bound JSON input *before* the encoder creates an oversized string chunk.
 
@@ -61,7 +88,7 @@ def _preflight_report_payload(payload: dict) -> None:
             raise QualificationError('invalid qualification report payload')
         kind = type(item)
         if kind is str:
-            remaining -= len(item)
+            remaining -= _bounded_ascii_json_string_size(item, remaining)
         elif kind is int:
             # Hexadecimal digits are a lower bound on decimal digit count.
             # bit_length avoids decimal conversion of enormous integers.
@@ -72,6 +99,10 @@ def _preflight_report_payload(payload: dict) -> None:
                 raise QualificationError('qualification receipt oversized')
             if kind is dict:
                 for key, value in item.items():
+                    # JSON coerces numeric/bool/null keys to strings, which
+                    # can collide with real string keys and forge ambiguity.
+                    if type(key) is not str:
+                        raise QualificationError('invalid qualification report payload')
                     pending.append((key, depth + 1))
                     pending.append((value, depth + 1))
             else:
