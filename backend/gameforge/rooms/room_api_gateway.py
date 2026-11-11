@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import json
 import math
 import os
+import re
 import socket
 import time
 from urllib.parse import urlsplit
@@ -35,12 +37,25 @@ _mcp = None
 _ALLOWED_HTTP_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"})
 _MAX_EXTERNAL_URL_CHARS = 4096
 _MAX_EXTERNAL_TIMEOUT_SECONDS = 30.0
+_MAX_RESPONSE_BYTES = 256 * 1024
+_MAX_REQUEST_BYTES = 64 * 1024
+_MAX_MCP_QUERIES = 32
+_MAX_API_TARGETS = 32
+_MAX_SOURCES = 16
+_MAX_CONCURRENT_QUERIES = 8
+_MAX_JSON_DEPTH = 8
+_MAX_JSON_NODES = 1024
 _FORBIDDEN_FORWARD_HEADERS = frozenset({
     "host",
     "proxy-authorization",
     "proxy-connection",
     "connection",
     "transfer-encoding",
+    "content-length",
+    "te",
+    "trailer",
+    "upgrade",
+    "keep-alive",
 })
 
 
@@ -149,19 +164,106 @@ def _safe_timeout(value: Any) -> float:
 def _safe_headers(value: Any) -> dict[str, str] | None:
     if value is None:
         return None
-    if not isinstance(value, dict):
-        raise ValueError("external API headers must be a mapping")
+    if type(value) is not dict or len(value) > 32:
+        raise ValueError("external API headers exceed the allowlisted shape")
     headers: dict[str, str] = {}
+    total = 0
     for raw_name, raw_value in value.items():
-        name = str(raw_name).strip()
-        header_value = str(raw_value)
-        if not name or name.lower() in _FORBIDDEN_FORWARD_HEADERS:
+        if type(raw_name) is not str or type(raw_value) is not str:
+            raise ValueError("external API header keys and values must be strings")
+        name, header_value = raw_name, raw_value
+        if (not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]{1,64}", name)
+                or name.lower() in _FORBIDDEN_FORWARD_HEADERS):
             raise ValueError("external API contains a forbidden forwarding header")
-        if any(ord(ch) < 32 and ch != "\t" for ch in name + header_value) or "\r" in header_value or "\n" in header_value:
+        if (len(header_value) > 8192
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in header_value)):
             raise ValueError("external API header contains control characters")
+        total += len(name) + len(header_value)
+        if total > 16 * 1024:
+            raise ValueError("external API header budget exceeded")
         headers[name] = header_value
     return headers
 
+
+def _bounded_json(value: Any) -> Any:
+    """Validate request JSON before it can allocate large HTTPX buffers."""
+    if value is None:
+        return None
+    remaining = _MAX_JSON_NODES
+
+    def check(node: Any, depth: int) -> None:
+        nonlocal remaining
+        remaining -= 1
+        if remaining < 0 or depth > _MAX_JSON_DEPTH:
+            raise ValueError("external API JSON structure exceeds budget")
+        if type(node) in (str, int, bool) or node is None:
+            if type(node) is str and len(node) > _MAX_REQUEST_BYTES:
+                raise ValueError("external API JSON text exceeds budget")
+            return
+        if type(node) is float:
+            if not math.isfinite(node):
+                raise ValueError("external API JSON has nonfinite number")
+            return
+        if type(node) is list:
+            if len(node) > _MAX_JSON_NODES:
+                raise ValueError("external API JSON array exceeds budget")
+            for item in node:
+                check(item, depth + 1)
+            return
+        if type(node) is dict:
+            if len(node) > _MAX_JSON_NODES:
+                raise ValueError("external API JSON mapping exceeds budget")
+            for key, item in node.items():
+                if type(key) is not str or len(key) > 256:
+                    raise ValueError("external API JSON keys must be bounded strings")
+                check(item, depth + 1)
+            return
+        raise ValueError("external API JSON contains unsupported types")
+
+    check(value, 0)
+    if len(json.dumps(value, allow_nan=False, ensure_ascii=False).encode("utf-8")) > _MAX_REQUEST_BYTES:
+        raise ValueError("external API request exceeds byte budget")
+    return value
+
+
+def _safe_params(value: Any) -> dict[str, str] | None:
+    if value is None:
+        return None
+    if type(value) is not dict or len(value) > 16:
+        raise ValueError("external API query parameters exceed budget")
+    result = {}
+    for key, item in value.items():
+        if type(key) is not str or not 1 <= len(key) <= 64:
+            raise ValueError("external API query parameter name invalid")
+        if type(item) not in (str, int, float, bool):
+            raise ValueError("external API query parameter type invalid")
+        if type(item) is float and not math.isfinite(item):
+            raise ValueError("external API query parameter is nonfinite")
+        text = str(item)
+        if len(text) > 512:
+            raise ValueError("external API query parameter exceeds budget")
+        result[key] = text
+    return result
+
+
+async def _bounded_http_body(response: Any) -> str:
+    """Bound streamed *decompressed* response bytes, never buffer an entire body."""
+    declared = response.headers.get("content-length")
+    if declared is not None:
+        try:
+            size = int(declared)
+        except (ValueError, TypeError) as exc:
+            raise ValueError("invalid external API content length") from exc
+        if size < 0 or size > _MAX_RESPONSE_BYTES:
+            raise ValueError("external API response exceeds byte budget")
+    chunks: list[bytes] = []
+    size = 0
+    async for data in response.aiter_bytes():
+        size += len(data)
+        if size > _MAX_RESPONSE_BYTES:
+            raise ValueError("external API response exceeds byte budget")
+        chunks.append(data)
+    return b"".join(chunks).decode("utf-8", errors="replace")[:2000]
 
 def _get_mcp():
     global _mcp
