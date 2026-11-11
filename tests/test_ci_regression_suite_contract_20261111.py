@@ -7,7 +7,6 @@ dependency. This is static workflow-contract coverage, not runtime certification
 from __future__ import annotations
 
 from pathlib import Path
-import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
