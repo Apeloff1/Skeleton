@@ -168,23 +168,32 @@ class PRMergeHoldGateTests(unittest.TestCase):
         with self.assertRaisesRegex(MergeHoldGateError, "missing read-only"):
             fetch_current_pr(REPOSITORY, 123, "")
 
-    def test_workflow_uses_trusted_base_without_write_permissions(self):
-        workflow = (Path(__file__).resolve().parents[1] /
-                    ".github/workflows/pr-merge-hold.yml").read_text(encoding="utf-8")
-        self.assertIn("pull_request_target:", workflow)
-        self.assertIn("ref: ${{ github.event.pull_request.base.sha }}", workflow)
-        self.assertIn("persist-credentials: false", workflow)
-        self.assertIn("pull-requests: read", workflow)
-        self.assertIn("contents: read", workflow)
-        self.assertNotIn("pull-requests: write", workflow)
-        self.assertNotIn("contents: write", workflow)
-        trusted_job = workflow.split("  qualification:", 1)[0]
-        self.assertNotIn("github.event.pull_request.head.sha", trusted_job)
-        self.assertIn("github.event.pull_request.head.sha", workflow)
-        self.assertIn("PR Merge Hold Qualification", workflow)
-        self.assertIn("edited", workflow)
-        self.assertIn("synchronize", workflow)
-        self.assertIn("PR Merge Hold Gate", workflow)
+    def test_workflows_separate_privileged_gate_from_source_tests(self):
+        root = Path(__file__).resolve().parents[1] / ".github/workflows"
+        gate = (root / "pr-merge-hold.yml").read_text(encoding="utf-8")
+        qualification = (root / "pr-merge-hold-qualification.yml").read_text(encoding="utf-8")
+        self.assertIn("pull_request_target:", gate)
+        self.assertNotIn("  pull_request:", gate)
+        self.assertNotIn("if: github.event_name", gate)
+        self.assertIn("ref: ${{ github.event.pull_request.base.sha }}", gate)
+        self.assertIn("persist-credentials: false", gate)
+        self.assertIn("pull-requests: read", gate)
+        self.assertIn("contents: read", gate)
+        self.assertNotIn("pull-requests: write", gate)
+        self.assertNotIn("contents: write", gate)
+        self.assertNotIn("github.event.pull_request.head.sha", gate)
+        self.assertIn("edited", gate)
+        self.assertIn("synchronize", gate)
+        self.assertIn("name: PR Merge Hold Gate", gate)
+
+        self.assertIn("  pull_request:", qualification)
+        self.assertNotIn("pull_request_target:", qualification)
+        self.assertIn("github.event.pull_request.head.sha", qualification)
+        self.assertIn("persist-credentials: false", qualification)
+        self.assertIn("contents: read", qualification)
+        self.assertNotIn("contents: write", qualification)
+        self.assertNotIn("pull-requests: write", qualification)
+        self.assertIn("name: PR Merge Hold Qualification", qualification)
 
 
 if __name__ == "__main__":
