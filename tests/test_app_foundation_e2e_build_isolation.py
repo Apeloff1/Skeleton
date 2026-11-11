@@ -5,6 +5,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/app-foundation-e2e.yml"
 DOCKERFILE = ROOT / "frontend/Dockerfile"
+GUARD = ROOT / "frontend/scripts/guarded-expo-export.cjs"
+GUARD_TEST = ROOT / "frontend/scripts/test-guarded-expo-export.cjs"
 
 
 class AppFoundationBuildIsolationTests(unittest.TestCase):
@@ -45,31 +47,33 @@ class AppFoundationBuildIsolationTests(unittest.TestCase):
         self.assertNotIn("|| true", builder)
         self.assertNotIn("EXPO_NO_METRO_LAZY", builder)
 
-
-    def test_export_supervisor_preserves_fail_closed_source_contract(self):
-        # Historical #5186 contained independent guard assertions omitted by
-        # the newer stage-isolation suite. Keep the stronger current Docker
-        # artifact requirements while retaining those security regressions.
-        builder = DOCKERFILE.read_text(encoding="utf-8").split(
-            "FROM deps AS builder", 1
-        )[1].split("FROM nginx:", 1)[0]
-        guard = (ROOT / "frontend/scripts/guarded-expo-export.cjs").read_text(
-            encoding="utf-8"
-        )
-        guard_tests = (ROOT / "frontend/scripts/test-guarded-expo-export.cjs").read_text(
-            encoding="utf-8"
-        )
-        self.assertNotIn("yarn export:web", builder)
+    def test_guarded_export_supervisor_is_bounded_and_source_bound(self):
+        source = DOCKERFILE.read_text(encoding="utf-8")
+        builder = source.split("FROM deps AS builder", 1)[1].split("FROM nginx:", 1)[0]
         self.assertIn("node --test scripts/test-guarded-expo-export.cjs", builder)
         self.assertIn("node scripts/guarded-expo-export.cjs", builder)
-        self.assertIn("stale dist is not qualifying evidence", guard)
-        self.assertIn("CI: '1'", guard)
-        self.assertIn("EXPO_NO_TELEMETRY: '1'", guard)
-        self.assertIn("if (code !== 0 || signal)", guard)
-        self.assertIn("export hard deadline exceeded", guard)
-        self.assertIn("export output is not stable", guard)
-        self.assertIn("stalled exporter requires stable output", guard_tests)
-        self.assertIn("a nonzero exporter exit cannot be masked", guard_tests)
+        self.assertIn("test -s /app/dist/index.html", builder)
+        self.assertIn("test -s /app/dist/setup.html", builder)
+        self.assertNotIn("yarn export:web", builder)
+        self.assertNotIn("|| true", builder)
+        guard = GUARD.read_text(encoding="utf-8")
+        tests = GUARD_TEST.read_text(encoding="utf-8")
+        for contract in (
+            "CI: '1'",
+            "EXPO_NO_TELEMETRY: '1'",
+            "stale dist is not qualifying evidence",
+            "if (code !== 0 || signal)",
+            "export hard deadline exceeded",
+            "export output is not stable",
+            "pinnedExpoInvocation",
+        ):
+            self.assertIn(contract, guard)
+        for assertion in (
+            "stalled exporter requires stable output",
+            "a nonzero exporter exit cannot be masked",
+            "default production invocation uses the pinned Expo CLI",
+        ):
+            self.assertIn(assertion, tests)
 
 
 if __name__ == "__main__":
