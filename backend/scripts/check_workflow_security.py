@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
 import re
 import sys
 
@@ -61,6 +62,23 @@ PULL_REQUEST_TARGET_SEQUENCE_RE = re.compile(
 )
 CHECKOUT_ACTION = "actions/checkout@"
 FORBIDDEN_TRIGGER = "pull_request_target"
+# One audited trusted-base gate is allowed. Any byte-level change to its workflow
+# requires a deliberate security review and updated SHA-256; all other target
+# triggers remain forbidden, including copied or renamed workflows.
+TRUSTED_TARGET_GATE_NAME = "pr-merge-hold.yml"
+TRUSTED_TARGET_GATE_SHA256 = (
+    "c543f51e5e87e8d1309f108f84a922f4c33a4a76a6b9036393f01a4266db1e86"
+)
+
+
+def _audited_trusted_target_gate(path: Path, source: str) -> bool:
+    return (
+        path.name == TRUSTED_TARGET_GATE_NAME
+        and path.parent == WORKFLOW_DIR
+        and hashlib.sha256(source.encode("utf-8")).hexdigest()
+        == TRUSTED_TARGET_GATE_SHA256
+    )
+
 
 UNTRUSTED_RUN_CONTEXTS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("pull request title/body", re.compile(r"\bgithub\.event\.pull_request\.(?:title|body)\b")),
@@ -436,7 +454,10 @@ def violations(path: Path) -> list[str]:
         lines, path.name
     )
     findings.extend(permission_findings)
-    findings.extend(_forbidden_trigger_violations(lines, path.name))
+    # Never grant a broad exception to pull_request_target: only the immutable,
+    # separately reviewed trusted-base hold workflow has that authority.
+    if not _audited_trusted_target_gate(path, text):
+        findings.extend(_forbidden_trigger_violations(lines, path.name))
 
     flow_style_lines: set[int] = set()
     for number, fragment in _flow_style_steps(lines):
