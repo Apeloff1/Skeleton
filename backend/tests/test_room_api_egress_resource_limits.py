@@ -167,6 +167,19 @@ async def test_invalid_target_is_cleanly_denied_without_gather_crash():
     assert result["error"] == "invalid_api_target"
 
 
+@pytest.mark.asyncio
+async def test_malicious_dict_subclass_is_rejected_before_getters_run():
+    class EvilDict(dict):
+        def get(self, *args, **kwargs):
+            raise AssertionError("attacker-controlled method executed")
+
+    assert (await gateway._api_query(EvilDict(url="https://internal.invalid")))[
+        "error"
+    ] == "invalid_api_target"
+    with pytest.raises(ValueError, match="admission bounds"):
+        await gateway.query_concurrent("room", api_targets=[EvilDict()])
+
+
 def test_excessive_per_request_fanout_fails_before_allocation():
     for args in [
         {"mcp_queries": ["q"] * 33},
