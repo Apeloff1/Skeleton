@@ -119,7 +119,7 @@ async def _save_build(build):
         await _db.jeeves_builds.update_one({"build_id": build["build_id"]}, {"$set": build_copy}, upsert=True)
         if vee: build_copy["vee"] = vee
     except Exception as e:
-        print(f"[JEEVES _save_build] WARN: {e}")
+        print(f"[JEEVES _save_build] WARN: {type(e).__name__}")
 
 async def _load_build(build_id: str):
     if build_id in _builds:
@@ -131,7 +131,7 @@ async def _load_build(build_id: str):
             _builds[build_id] = doc
             return doc
     except Exception as e:
-        print(f"[JEEVES _load_build] WARN: {e}")
+        print(f"[JEEVES _load_build] WARN: {type(e).__name__}")
     return None
 
 

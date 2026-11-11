@@ -34,7 +34,7 @@ async def _load_persona() -> dict:
         async for doc in _db.jeeves_persona.find({}, {"_id": 0}):
             _PERSONA_CACHE[doc["_key"]] = doc
     except Exception as e:
-        logger.warning(f"persona load failed: {e}")
+        logger.warning("persona load failed: %s", type(e).__name__)
     return _PERSONA_CACHE
 
 
