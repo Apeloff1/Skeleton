@@ -57,7 +57,7 @@ class ProcessFlights(unittest.TestCase):
     def tearDown(self):
         self.gate.close();self.db.close();self.temp.cleanup()
     def run_child(self,script,worker='w1'):
-        env=dict(os.environ,PYTHONPATH=str(Path(__file__).resolve().parents[2])+os.pathsep+os.environ.get('PYTHONPATH',''))
+        env=dict(os.environ,PYTHONFAULTHANDLER='1',PYTHONPATH=str(Path(__file__).resolve().parents[2])+os.pathsep+os.environ.get('PYTHONPATH',''))
         return subprocess.run([sys.executable,'-c',script,str(self.root),worker],
                               capture_output=True,text=True,timeout=15,env=env)
 
@@ -69,7 +69,11 @@ class ProcessFlights(unittest.TestCase):
         a=threading.Thread(target=run,args=('w1',));b=threading.Thread(target=run,args=('w2',))
         a.start();b.start();a.join(15);b.join(15)
         self.assertEqual(len(results),2)
-        self.assertTrue(all(r.returncode==0 for r in results),[r.stderr for r in results])
+        self.assertTrue(
+            all(r.returncode == 0 for r in results),
+            [{"code": r.returncode, "out": r.stdout[-256:],
+              "err": r.stderr[-512:]} for r in results],
+        )
         names=[json.loads(r.stdout)['job'] for r in results]
         self.assertEqual(sum(x is not None for x in names),1)
         self.assertEqual(self.ledger.state_count()['claimed'],1)
