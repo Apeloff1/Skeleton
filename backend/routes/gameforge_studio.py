@@ -192,7 +192,7 @@ async def _auto_research(topic: str) -> dict:
                     {"topic": f"acquired:{topic[:60]}"},
                     {"$set": {"topic": f"acquired:{topic[:60]}", "text": summary, "domain": "acquired",
                               "source_api": api_key, "auto": True, "acquired_at": time.time()}}, upsert=True)
-        dispatch_to_rooms("auto_research", {"topic": topic, "api": api_key})
+        dispatch_to_rooms("auto_research", {"api": api_key})
         return {"topic": topic, "known": False, "acquired": bool(summary), "api": api_key,
                 "summary": summary, "jury": adjudication}
     except Exception:  # noqa: BLE001
@@ -230,7 +230,7 @@ async def questionnaire_log(b: QBody):
     if not questionnaire_logger:
         return {"ok": False, "error": "questionnaire module unavailable"}
     questionnaire_logger.log_response(b.question_id, b.question, b.answer, b.confidence)
-    rooms = dispatch_to_rooms("questionnaire_answer", {"question_id": b.question_id, "answer": b.answer})
+    rooms = dispatch_to_rooms("questionnaire_answer", {"question_id": b.question_id, "recorded": True})
     return {"ok": True, "logged": b.question_id, "dispatched_rooms": rooms}
 
 
@@ -277,7 +277,7 @@ async def step_choice(step_id: str, b: ChoiceBody):
     if not sdb:
         return {"ok": False, "error": f"unknown step '{step_id}'", "valid": list(SNOWBALL_STEPS.keys())}
     sdb.record_user_choice(b.key, b.value)
-    rooms = dispatch_to_rooms("step_choice", {"step_id": step_id, "key": b.key, "value": b.value})
+    rooms = dispatch_to_rooms("step_choice", {"step_id": step_id, "recorded": True})
     return {"ok": True, "step": step_id, "dispatched_rooms": rooms, "log": sdb.get_log()}
 
 
@@ -413,7 +413,7 @@ async def vault_put(b: VaultPut, user=Depends(_editor)):
         return {"ok": False, "error": "vault unavailable"}
     content = base64.b64decode(b.content) if b.is_base64 else b.content.encode("utf-8")
     entry = boardroom_vault.put_file(b.filename, content, b.metadata)
-    dispatch_to_rooms("vault_put", {"filename": b.filename, "file_id": entry.file_id})
+    dispatch_to_rooms("vault_put", {"file_id": entry.file_id})
     _audit("vault_put", b.filename, user)
     return {"ok": True, "file_id": entry.file_id, "version": entry.version}
 
@@ -602,7 +602,7 @@ async def auto_recover(b: RecoverBody, user=Depends(_editor)):
         _alarms().update_many({"resolved": False}, {"$set": {"resolved": True, "resolved_at": time.time()}})
         _raise_alarm("auto_recover", f"rolled back {result['filename']} to v{result['restored_from']}", "info")
         _audit("auto_recover", result.get("filename", "?"), user)
-        dispatch_to_rooms("auto_recover", result)
+        dispatch_to_rooms("auto_recover", {"ok": result.get("ok"), "file_id": result.get("file_id")})
     return {"ok": True, "reason": b.reason, **result}
 
 
@@ -837,13 +837,13 @@ async def jeeves_command(c: JeevesCmd):
             concept = {"game_name": c.game_name, "genre": "fantasy", "art_style": "pixel",
                        "core_mechanic": "core_loop", "core_loop": "explore"}
             data["forge"] = forge_orchestrator.run_full_pipeline(concept)
-            dispatch_to_rooms("jeeves_forge", {"game": c.game_name})
+            dispatch_to_rooms("jeeves_forge", {"recorded": True})
             actions.append("ran_forges")
 
     if "deploy" in msg or "ship" in msg or "build" in msg:
         if enhanced_deployment:
             data["deploy"] = enhanced_deployment.full_deploy(c.game_name)
-            dispatch_to_rooms("jeeves_deploy", {"game": c.game_name})
+            dispatch_to_rooms("jeeves_deploy", {"recorded": True})
             actions.append("deployed")
 
     if "vault" in msg:
@@ -889,7 +889,7 @@ async def deploy(b: DeployBody, user=Depends(_editor)):
     if not enhanced_deployment:
         return {"ok": False, "error": "deployment unavailable"}
     rec = enhanced_deployment.full_deploy(b.game_name, b.platforms, b.sign)
-    dispatch_to_rooms("deploy", {"game": b.game_name})
+    dispatch_to_rooms("deploy", {"recorded": True})
     _audit("deploy", b.game_name, user)
     return {"ok": True, "deployment": rec}
 
@@ -1151,8 +1151,7 @@ async def ship(b: ShipBody, user=Depends(_editor)):
         except Exception:  # noqa: BLE001
             out["build_brief"] = None
 
-    dispatch_to_rooms("ship", {"game": b.game_name, "pushed": out.get("pushed"),
-                               "saga": result.status})
+    dispatch_to_rooms("ship", {"pushed": out.get("pushed"), "saga": result.status})
     _audit("ship", b.game_name, user)
     return out
 
