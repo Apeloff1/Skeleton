@@ -96,9 +96,25 @@ def test_request_json_and_query_boundaries_enforce_resource_limits():
         ({f"k{i}": i for i in range(25)}, "params"),
         ({"payload": "x" * (16 * 1024 + 1)}, "json"),
         ({"bad": object()}, "json"),
+        ({"list": [1] * 65}, "json"),
+        ({"nested": [[[[[[["too deep"]]]]]]]}, "json"),
+        ({f"k{i}": 1 for i in range(65)}, "json"),
     ]:
         with pytest.raises(ValueError):
             gateway._bounded_request_data(value, kind=kind)
+
+
+def test_method_and_timeout_types_cannot_execute_string_conversion_hooks():
+    class UntrustedObject:
+        def __str__(self):
+            raise AssertionError("untrusted formatting must not run")
+
+    with pytest.raises(ValueError):
+        gateway._safe_method(UntrustedObject())
+    with pytest.raises(ValueError):
+        gateway._safe_timeout(UntrustedObject())
+    with pytest.raises(ValueError):
+        gateway._safe_timeout("2" * 200)
 
 
 def test_dns_answer_fanout_is_bounded(monkeypatch):
