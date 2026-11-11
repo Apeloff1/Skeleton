@@ -141,6 +141,31 @@ class QualificationTests(unittest.TestCase):
             publish_private_report(child, 'receipt.json', {'status': 'fixture-only'})
         self.assertFalse((child / 'receipt.json').exists())
 
+    def test_report_short_write_retries_before_atomic_publication(self):
+        real_write = os.write
+        calls = [0]
+
+        def short_first(fd, data):
+            calls[0] += 1
+            if calls[0] == 1:
+                return real_write(fd, data[:1])
+            return real_write(fd, data)
+
+        payload = {'a': 'bounded'}
+        with mock.patch.object(report_paths.os, 'write', side_effect=short_first):
+            publish_private_report(self.out, 'short.json', payload)
+        expected = (json.dumps(payload, sort_keys=True, separators=(',', ':'),
+                               allow_nan=False, ensure_ascii=True) + '\\n').encode('ascii')
+        self.assertEqual((self.out / 'short.json').read_bytes(), expected)
+        self.assertGreaterEqual(calls[0], 2)
+        self.assertEqual([p.name for p in self.out.iterdir()], ['short.json'])
+
+    def test_report_zero_byte_write_does_not_publish_receipt(self):
+        with mock.patch.object(report_paths.os, 'write', return_value=0):
+            with self.assertRaisesRegex(QualificationError, 'cannot write'):
+                publish_private_report(self.out, 'zero.json', {'ok': True})
+        self.assertEqual(list(self.out.iterdir()), [])
+
     def test_report_fsync_failure_leaves_no_partial_final_or_stage(self):
         with mock.patch.object(report_paths.os, 'fsync',
                                side_effect=OSError(errno.ENOSPC, 'disk full')):
