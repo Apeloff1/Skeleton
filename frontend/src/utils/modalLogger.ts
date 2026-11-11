@@ -1,4 +1,5 @@
 import { API_BASE as CANONICAL_API_BASE } from './apiBase';
+import { scrubTelemetry } from './securityTelemetry';
 /**
  * modalLogger — per-modal telemetry tracker.
  *
@@ -54,9 +55,19 @@ let _flushInflight = false;
 
 async function _persistQueue(events: TelemetryEvent[]) {
   try {
-    const existing = JSON.parse((await AsyncStorage.getItem(QUEUE_KEY)) || '[]');
-    const merged = [...existing, ...events].slice(-2000);
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(merged));
+    const raw = (await AsyncStorage.getItem(QUEUE_KEY)) || '[]';
+    // Treat legacy offline telemetry as untrusted input: never parse a
+    // multi-megabyte or malformed queue before restoring the byte budget.
+    const existing = raw.length <= 2 * 1024 * 1024 ? JSON.parse(raw) : [];
+    const previous = Array.isArray(existing) ? existing : [];
+    const merged = [...previous.slice(-500), ...events].slice(-500);
+    let sanitized = JSON.stringify(scrubTelemetry(merged));
+    while (sanitized.length > 2 * 1024 * 1024 && merged.length) {
+      // Evict complete oldest events, never persist a truncated JSON record.
+      merged.shift();
+      sanitized = JSON.stringify(scrubTelemetry(merged));
+    }
+    await AsyncStorage.setItem(QUEUE_KEY, sanitized);
   } catch { /* non-fatal */ }
 }
 
@@ -65,25 +76,34 @@ async function _drainQueue(): Promise<TelemetryEvent[]> {
     const raw = await AsyncStorage.getItem(QUEUE_KEY);
     if (!raw) return [];
     await AsyncStorage.removeItem(QUEUE_KEY);
-    return JSON.parse(raw) as TelemetryEvent[];
+    if (raw.length > 2 * 1024 * 1024) return [];
+    const data = JSON.parse(raw);
+    return (Array.isArray(data) ? (scrubTelemetry(data.slice(-500)) as TelemetryEvent[]) : []);
   } catch { return []; }
 }
 
 export async function flushTelemetry(): Promise<void> {
   if (_flushInflight) return;
-  const queued = await _drainQueue();
-  const batch = _buffer.splice(0, _buffer.length).concat(queued);
-  if (!batch.length) return;
+  // Hold the lock *before* the first await. Two simultaneous flushes must not
+  // drain or replay the same offline queue twice.
   _flushInflight = true;
+  let safeBatch: TelemetryEvent[] = [];
   try {
+    const queued = await _drainQueue();
+    const batch = _buffer.splice(0, _buffer.length).concat(queued);
+    if (!batch.length) return;
+    // Scrub legacy queue contents too, not just new events.
+    safeBatch = scrubTelemetry(batch) as TelemetryEvent[];
     const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ events: batch }),
+      body: JSON.stringify({ events: safeBatch }),
     });
-    if (!r.ok) await _persistQueue(batch);
+    if (!r.ok) await _persistQueue(safeBatch);
   } catch {
-    await _persistQueue(batch);
+    // Preserve the original in-flight batch on network failure, but only
+    // after scrubbing. Events that arrived during the request remain buffered.
+    if (safeBatch.length) await _persistQueue(safeBatch);
   } finally {
     _flushInflight = false;
   }
@@ -110,7 +130,7 @@ export function recordEvent(
     if (getFeatureFlag('modal_telemetry_batch') === false) {
       if (severity === 'fatal' || severity === 'error') {
         // eslint-disable-next-line no-console
-        console.warn(`[telemetry:off] ${modalId} ${event}`, detail);
+        console.warn('[telemetry:off] error event suppressed');
       }
       return;
     }
@@ -122,8 +142,9 @@ export function recordEvent(
     severity,
     ts_client:  Date.now() / 1000,
     duration_ms,
-    detail,
+    detail: scrubTelemetry(detail),
   });
+  if (_buffer.length > 500) _buffer.splice(0, _buffer.length - 500);
   _startFlusher();
   // Force-flush fatals immediately
   if (severity === 'fatal' || severity === 'error') {
@@ -153,8 +174,11 @@ export function useModalLogger(modalId: string) {
     metric:  (name: string, value: number, unit?: string)=> recordEvent(modalId, `metric:${name}`, 'info', { value, unit }),
     warn:    (msg: string, detail?: any)                => recordEvent(modalId, 'warn', 'warn', { msg, ...detail }),
     error:   (err: any, detail?: any)                   => {
-      const e = err instanceof Error ? { name: err.name, message: err.message, stack: err.stack?.slice(0, 4000) } : { message: String(err) };
-      recordEvent(modalId, 'error', 'error', { ...e, ...detail });
+      // Raw exception messages and stacks routinely contain auth headers,
+      // filesystem paths and private request data. Emit only the class name.
+      const e = { name: err instanceof Error ? err.name : 'UnknownError',
+                  message: 'client_operation_failed' };
+      recordEvent(modalId, 'error', 'error', { ...e, details: detail });
     },
     raw:     (event: string, severity: Severity, detail?: any) => recordEvent(modalId, event, severity, detail),
   };

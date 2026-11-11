@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from core.exec_guard import execution_disabled_message, require_execution_allowed
-from core.vault_secure_fs import VaultPathError, anchored_directory, ensure_directory, read_regular
+from core.vault_secure_fs import VaultPathError, anchored_directory, atomic_write, ensure_directory, read_regular
 
 ARTIFACTS_ROOT = Path("/app/backend/data/build_artifacts")
 
@@ -90,11 +90,54 @@ def _have_full_apk_toolchain() -> bool:
 # ─────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────
-def _sanitize_path(p: str) -> str:
-    p = p.replace("\\", "/").lstrip("/")
-    parts = [x for x in p.split("/") if x not in ("", "..")]
-    return "/".join(parts) or "file.txt"
+_MAX_ASSET_BYTES = 32 * 1024 * 1024
+_MAX_SOURCE_BYTES = 256 * 1024 * 1024
+_MAX_ASSET_FILES = 4096
+_MAX_ARCHIVE_BYTES = 512 * 1024 * 1024
+_WINDOWS_SPECIAL = frozenset(
+    {"CON", "PRN", "AUX", "NUL"} |
+    {f"COM{i}" for i in range(1, 10)} |
+    {f"LPT{i}" for i in range(1, 10)}
+)
 
+
+def _sanitize_path(p: str) -> str:
+    """Reject rather than normalize traversal, ambiguous and OS-reserved paths."""
+    if type(p) is not str or not 1 <= len(p) <= 1024:
+        raise ValueError("artifact path must be a bounded string")
+    normalized = p.replace("\\", "/")
+    if normalized.startswith("/") or (len(normalized) >= 2 and normalized[1] == ":"):
+        raise ValueError("absolute artifact paths are forbidden")
+    parts = normalized.split("/")
+    if len(parts) > 16:
+        raise ValueError("artifact path exceeds nesting budget")
+    for part in parts:
+        if (not part or part in {".", ".."} or len(part) > 128
+                or part.endswith((".", " "))
+                or ":" in part
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in part)
+                or part.upper().split(".")[0] in _WINDOWS_SPECIAL):
+            raise ValueError("artifact path contains unsafe component")
+    if normalized == "manifest.json":
+        raise ValueError("artifact manifest name is reserved")
+    return "/".join(parts)
+
+
+def _bounded_asset_bytes(content: object) -> bytes:
+    """Admit one source file before allocating archive or APK resources."""
+    if type(content) is str:
+        if len(content) > _MAX_ASSET_BYTES:
+            raise ValueError("artifact source file exceeds byte budget")
+        encoded = content.encode("utf-8", errors="replace")
+    elif type(content) in (bytes, bytearray):
+        if len(content) > _MAX_ASSET_BYTES:
+            raise ValueError("artifact source file exceeds byte budget")
+        encoded = bytes(content)
+    else:
+        raise ValueError("artifact source must be text or bytes")
+    if len(encoded) > _MAX_ASSET_BYTES:
+        raise ValueError("artifact source file exceeds UTF-8 byte budget")
+    return encoded
 
 def _safe_build_id(value: object) -> str:
     """Use only bounded ASCII identifiers across packaging and download paths."""
@@ -166,44 +209,60 @@ def build_zip(build: dict) -> dict:
             "error": execution_disabled_message("Binary artifact packaging"),
         }
     build_id = _safe_build_id(build.get("build_id", "unknown"))
-    out_path = _ensure_artifacts_root() / f"{build_id}.zip"
+    root = _ensure_artifacts_root()
+    artifact_name = f"{build_id}.zip"
+    out_path = root / artifact_name
     file_count = 0
     total_bytes = 0
     sha256 = hashlib.sha256()
 
-    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
-        manifest = {
-            "build_id":   build_id,
-            "title":      build.get("title", ""),
-            "genre":      build.get("genre", ""),
-            "subgenre":   build.get("subgenre", ""),
-            "file_count": build.get("file_count", 0),
-            "created_at": build.get("created_at"),
-            "version":    "1.0.0",
-        }
-        manifest_bytes = json.dumps(manifest, indent=2).encode()
-        zf.writestr("manifest.json", manifest_bytes)
-        sha256.update(manifest_bytes)
-        for relpath, content in _build_files_iter(build):
-            data = bytes(content) if isinstance(content, (bytes, bytearray)) else str(content).encode("utf-8", errors="replace")
-            zf.writestr(relpath, data)
-            sha256.update(data)
-            file_count += 1
-            total_bytes += len(data)
+    def archive_writer(output) -> None:
+        nonlocal file_count, total_bytes
+        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+            manifest = {
+                "build_id": build_id,
+                "title": str(build.get("title", ""))[:500],
+                "genre": str(build.get("genre", ""))[:100],
+                "subgenre": str(build.get("subgenre", ""))[:100],
+                "file_count": build.get("file_count", 0),
+                "created_at": build.get("created_at"),
+                "version": "1.0.0",
+            }
+            manifest_bytes = json.dumps(manifest, indent=2, default=str).encode()
+            if len(manifest_bytes) > 64 * 1024:
+                raise ValueError("artifact manifest exceeds byte budget")
+            zf.writestr("manifest.json", manifest_bytes)
+            sha256.update(manifest_bytes)
+            for relpath, content in _build_files_iter(build):
+                if file_count >= _MAX_ASSET_FILES:
+                    raise ValueError("artifact file count exceeds budget")
+                data = _bounded_asset_bytes(content)
+                if total_bytes + len(data) > _MAX_SOURCE_BYTES:
+                    raise ValueError("artifact source total exceeds byte budget")
+                zf.writestr(relpath, data)
+                sha256.update(data)
+                file_count += 1
+                total_bytes += len(data)
+
+    # Build into a private unlinked staging name. Publish only after the ZIP
+    # footer, checksum, byte budget and disk fsync have completed.
+    with anchored_directory(root) as directory:
+        archive_bytes = atomic_write(
+            directory, artifact_name, archive_writer, max_bytes=_MAX_ARCHIVE_BYTES,
+        )
 
     return {
-        "artifact_id":  f"zip_{build_id}",
-        "kind":         "zip",
-        "build_id":     build_id,
-        "path":         str(out_path),
-        "size_bytes":   out_path.stat().st_size,
-        "file_count":   file_count,
-        "raw_bytes":    total_bytes,
-        "sha256":       sha256.hexdigest(),
-        "created_at":   datetime.now(timezone.utc).isoformat(),
+        "artifact_id": f"zip_{build_id}",
+        "kind": "zip",
+        "build_id": build_id,
+        "path": str(out_path),
+        "size_bytes": archive_bytes,
+        "file_count": file_count,
+        "raw_bytes": total_bytes,
+        "sha256": sha256.hexdigest(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "download_url": f"/api/binary/download/{build_id}/zip",
     }
-
 
 # ─────────────────────────────────────────────────────────────────
 # APK builder — produces a *runnable* WebView wrapper
@@ -215,7 +274,6 @@ import android.app.Application;
 import android.util.Log;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 
 /**
@@ -233,7 +291,7 @@ public class App extends Application {{
         try {{
             super.onCreate();
         }} catch (Throwable t) {{
-            Log.e(TAG, "Application.onCreate failed", t);
+            Log.e(TAG, "Application.onCreate failed");
             persistCrash(t, "Application.onCreate");
         }}
         installCrashHandler();
@@ -245,7 +303,7 @@ public class App extends Application {{
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {{
             @Override
             public void uncaughtException(Thread t, Throwable ex) {{
-                Log.e(TAG, "UNCAUGHT process-wide on " + t.getName(), ex);
+                Log.e(TAG, "UNCAUGHT process-wide error");
                 persistCrash(ex, "uncaught:" + t.getName());
                 if (prev != null) prev.uncaughtException(t, ex);
             }}
@@ -260,7 +318,7 @@ public class App extends Application {{
             sw.write("Build: API " + android.os.Build.VERSION.SDK_INT
                 + " " + android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL + "\\n");
             sw.write("VM: " + System.getProperty("java.vm.version") + "\\n\\n");
-            if (t != null) t.printStackTrace(new PrintWriter(sw));
+            if (t != null) sw.write("Exception type: " + t.getClass().getName() + "\\n");
             File dir = getFilesDir();
             if (dir != null) {{
                 File f = new File(dir, "last_crash.txt");
@@ -736,7 +794,11 @@ def _build_real_apk(build: dict, out_path: Path) -> tuple[int, int, str, bool]:
         # Drop a manifest.json describing embedded files
         manifest_index = {"title": title, "build_id": build.get("build_id"), "files": []}
         for relpath, content in _build_files_iter(build):
-            data = content.encode("utf-8", errors="replace") if isinstance(content, str) else bytes(content)
+            if file_count >= _MAX_ASSET_FILES:
+                raise ValueError("APK source file count exceeds budget")
+            data = _bounded_asset_bytes(content)
+            if total_bytes + len(data) > _MAX_SOURCE_BYTES:
+                raise ValueError("APK source total exceeds byte budget")
             target = galaxy_dir / relpath
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
@@ -816,17 +878,9 @@ def _build_real_apk(build: dict, out_path: Path) -> tuple[int, int, str, bool]:
         return (file_count, total_bytes, sig_summary, v.returncode == 0)
 
 
-def build_apk(build: dict) -> dict:
-    if not require_execution_allowed("APK packaging"):
-        return {
-            "ok": False,
-            "disabled": True,
-            "error": execution_disabled_message("APK packaging"),
-        }
+def _build_apk_staged(build: dict, out_path: Path) -> dict:
+    """Produce and inspect an APK only inside a private staging directory."""
     build_id = _safe_build_id(build.get("build_id", "unknown"))
-    token = build.get("artifact_output_token")
-    suffix = "-" + _safe_build_id(str(token)) if token else ""
-    out_path = _ensure_artifacts_root() / f"{build_id}{suffix}.apk"
     is_real = False
     sig_info = ""
     file_count = 0
@@ -854,7 +908,11 @@ def build_apk(build: dict) -> dict:
             for relpath, content in _build_files_iter(build):
                 if relpath in seen: continue
                 seen.add(relpath)
-                data = bytes(content) if isinstance(content, (bytes, bytearray)) else str(content).encode("utf-8", errors="replace")
+                if file_count >= _MAX_ASSET_FILES:
+                    raise ValueError("APK source file count exceeds budget")
+                data = _bounded_asset_bytes(content)
+                if total_bytes + len(data) > _MAX_SOURCE_BYTES:
+                    raise ValueError("APK source total exceeds byte budget")
                 zf.writestr(f"assets/galaxy/{relpath}", data)
                 file_count += 1
                 total_bytes += len(data)
@@ -902,6 +960,42 @@ def build_apk(build: dict) -> dict:
         "download_url":         f"/api/binary/download/{build_id}/apk",
     }
 
+
+
+def build_apk(build: dict) -> dict:
+    if not require_execution_allowed("APK packaging"):
+        return {
+            "ok": False,
+            "disabled": True,
+            "error": execution_disabled_message("APK packaging"),
+        }
+    build_id = _safe_build_id(build.get("build_id", "unknown"))
+    token = build.get("artifact_output_token")
+    suffix = "-" + _safe_build_id(str(token)) if token else ""
+    artifact_name = f"{build_id}{suffix}.apk"
+    root = _ensure_artifacts_root()
+
+    # Never let a running SDK or a placeholder ZIP overwrite the currently
+    # published inode. Keep all toolchain I/O in a private temporary tree.
+    with tempfile.TemporaryDirectory(prefix="codedock-apk-stage-") as scratch:
+        staged = Path(scratch) / artifact_name
+        result = _build_apk_staged(build, staged)
+        if staged.stat().st_size > _MAX_ARCHIVE_BYTES:
+            raise ValueError("APK exceeds artifact byte budget")
+
+        # Copy from the private, complete stage to an unlinked, bounded
+        # descriptor and atomically replace the canonical published leaf.
+        with staged.open("rb") as source:
+            with anchored_directory(root) as directory:
+                published_size = atomic_write(
+                    directory,
+                    artifact_name,
+                    lambda target: shutil.copyfileobj(source, target, length=1024 * 1024),
+                    max_bytes=_MAX_ARCHIVE_BYTES,
+                )
+        result["path"] = str(root / artifact_name)
+        result["size_bytes"] = published_size
+        return result
 
 # ─────────────────────────────────────────────────────────────────
 # Combined entry point

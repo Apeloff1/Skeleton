@@ -20,8 +20,8 @@ from core.http_errors import PUBLIC_INTERNAL_ERROR
 _logger = logging.getLogger("codedock.public_route")
 
 
-class PublicExceptionRoute(APIRoute):
-    """Apply one exception custody policy to *all* paths through a router."""
+class PublicExceptionRouteMixin:
+    """Composes with APIRoute subclasses, preserving existing auth/custody guards."""
 
     def get_route_handler(self) -> Callable[[Request], Awaitable[Response]]:
         original = super().get_route_handler()
@@ -46,3 +46,7 @@ class PublicExceptionRoute(APIRoute):
                 ) from None
 
         return protected
+
+
+class PublicExceptionRoute(PublicExceptionRouteMixin, APIRoute):
+    """Safe default route class for routers without an existing custom class."""
