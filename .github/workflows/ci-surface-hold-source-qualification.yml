@@ -1,0 +1,49 @@
+name: CI Surface and Merge-Hold Source Qualification
+
+# Read-only PR-head qualification. The privileged PR Merge Hold Gate remains
+# pull_request_target on the trusted base; this workflow never grants merges.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-surface-hold-source-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source_contracts:
+    name: Exact-head product surface and trusted gate entrypoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up pinned Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Verify exact checked-out SHA
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Regress trusted-base gate import and event custody
+        run: python -m unittest -q tests.test_pr_merge_hold_entrypoint_20261111
+      - name: Check full Expo surface evidence and delegated APIs
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m pip install --disable-pip-version-check --no-input "pytest>=8,<9"
+          python scripts/check_product_surface_specification.py
+          python -m pytest -q --noconftest \
+            tests/test_product_surface_specification.py \
+            tests/test_product_surface_delegated_backend_20261110.py
