@@ -608,3 +608,56 @@ def test_tenant_panel_valid_direct_request_preserves_authorized_catalog(monkeypa
     ))
     assert [model.key for model in result.models] == ["provider:model"]
     assert result.judge.key == "provider:model"
+
+@pytest.mark.parametrize("tenant_id,actor_id", [
+    ("", "owner"),
+    ("tenant", ""),
+    (None, "owner"),
+    ("tenant", False),
+    (" tenant", "owner"),
+    ("tenant", "owner "),
+    ("tenant\nother", "owner"),
+    ("tenant", "owner\x00other"),
+    ("x" * 513, "owner"),
+    ("tenant", "x" * 513),
+])
+def test_tenant_panel_invalid_identity_rejected_before_engine_io(
+    monkeypatch, tenant_id, actor_id,
+):
+    from core import discourse_catalog
+
+    def forbidden_engine():
+        raise AssertionError("invalid tenant identity instantiated the engine")
+
+    async def forbidden_catalog(*_args, **_kwargs):
+        raise AssertionError("invalid tenant identity queried provider inventory")
+
+    monkeypatch.setattr(discourse_catalog.EngineClient, "from_env", forbidden_engine)
+    monkeypatch.setattr(discourse_catalog, "model_catalog", forbidden_catalog)
+    with pytest.raises(discourse_catalog.PanelUnavailable, match="invalid_panel_identity"):
+        asyncio.run(discourse_catalog.tenant_panel(
+            tenant_id=tenant_id, actor_id=actor_id,
+        ))
+
+
+@pytest.mark.parametrize("catalog", [
+    None,
+    [],
+    {"models": [{}] * 65},
+])
+def test_catalog_direct_call_rejects_invalid_or_truncated_inventory(catalog):
+    from core.discourse_catalog import PanelUnavailable, _catalog_panel
+
+    with pytest.raises(PanelUnavailable, match="engine_model_inventory_unavailable"):
+        _catalog_panel(catalog, selected=None, judge_key=None)
+
+
+def test_catalog_direct_call_admits_bounded_inventory():
+    from core.discourse_catalog import _catalog_panel
+
+    panel = _catalog_panel(
+        _authorized_catalog_for_direct_boundary_tests(),
+        selected=("provider:model",), judge_key="provider:model",
+    )
+    assert panel.models[0].key == "provider:model"
+    assert panel.judge.key == "provider:model"
