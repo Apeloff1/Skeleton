@@ -20,7 +20,7 @@ from zipfile import ZipFile, ZipInfo, ZIP_STORED, BadZipFile, LargeZipFile
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.dual_runtime_verify import (
     DualRuntimeVerificationError, _MAX_BYTES, _MAX_FILES, _MAX_MANIFEST,
-    _REQUIRED, _STUDIO_REQUIRED, _assert_original_root, _json, _parts, _read,
+    _REQUIRED, _STUDIO_REQUIRED, _assert_original_root, _canonical_bytes, _json, _parts, _read,
     _root_fd, verify_exported_package, verify_studio_release_evidence,
 )
 
@@ -322,6 +322,10 @@ def inspect_offline_game_archive(
             if sha256(release).hexdigest() != expected_manifest_sha256:
                 raise OfflineGameArchiveError("archive release differs from independent pin")
             manifest = _json(release, _MAX_MANIFEST)
+            # Independent hashes pin exact archive bytes, but must never grant
+            # authority to ambiguous, reserialized noncanonical release JSON.
+            if release != _canonical_bytes(manifest):
+                raise OfflineGameArchiveError("noncanonical archived release manifest")
             digest = manifest.get("manifest_digest")
             body = {key: value for key, value in manifest.items()
                     if key != "manifest_digest"}

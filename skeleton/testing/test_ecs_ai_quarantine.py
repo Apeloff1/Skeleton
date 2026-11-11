@@ -26,7 +26,9 @@ def test_cycles_and_oversized_bool_tree_rejected():
 
 
 def test_utility_nonfinite_and_invalid_weights_rejected():
-    for bad in (float("nan"),float("inf"),-1):
+    # Oversized Python integers must fail as ValidationError, not escape as
+    # a conversion OverflowError from math.isfinite.
+    for bad in (float("nan"),float("inf"),-1,10**1000):
         with pytest.raises(ValidationError):
             curve("linear",bad)
         with pytest.raises(ValidationError):
@@ -36,6 +38,10 @@ def test_utility_nonfinite_and_invalid_weights_rejected():
 def test_agent_goals_and_brains_have_admission_budgets():
     with pytest.raises(ValidationError):
         agent_component(max_speed=float("nan"))
+    with pytest.raises(ValidationError):
+        agent_component(max_speed=10**1000)
+    with pytest.raises(ValidationError):
+        agent_component(goal=(10**1000, 0))
     with pytest.raises(ValidationError):
         agent_component(goal=(i for i in range(10000000)))
     with pytest.raises(ValidationError):
@@ -52,6 +58,24 @@ def test_sense_radius_is_bounded_before_registration():
     tick=TickScheduler(fixed_dt=1/30)
     with pytest.raises(ValidationError):
         install_ai(tick,world,view_radius=float("inf"))
+    with pytest.raises(ValidationError):
+        install_ai(tick,world,view_radius=10**1000)
+
+
+def test_oversized_perception_rejects_before_spatial_bucket_or_write():
+    from unittest.mock import Mock
+    from skeleton.ecs.ai import sense
+    class OversizedContext:
+        def __init__(self):
+            self.set = Mock()
+        def query(self, *components):
+            if components == ("transform",):
+                return iter([(1, {"x": 10**1000, "y": 0.0})])
+            raise AssertionError("perception should reject coordinates before querying agents")
+    ctx = OversizedContext()
+    with pytest.raises(ValidationError, match="finite perception"):
+        sense(ctx, 8.0)
+    ctx.set.assert_not_called()
 
 
 def test_dense_perception_budget_refuses_before_any_brain_write():
