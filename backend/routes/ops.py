@@ -8,7 +8,6 @@ from routes.playable_access import _GuardedPrivateProjectRoute, project_router, 
 from routes import gameforge_auth as auth
 
 from dataclasses import asdict
-import hmac
 import os
 from datetime import datetime, timezone
 
@@ -59,10 +58,13 @@ def _ops_credential(
     x_ops_token: str = Header(default="", alias="X-Ops-Token", max_length=512),
     legacy_token: str = Query(default="", alias="token", max_length=512, deprecated=True),
 ) -> str:
-    """Prefer a header so operator credentials do not enter URLs or access logs."""
-    if x_ops_token and legacy_token and not hmac.compare_digest(x_ops_token, legacy_token):
-        raise HTTPException(status_code=400, detail="conflicting ops credentials")
-    return x_ops_token or legacy_token
+    """Reject URL credentials: request lines, proxies and analytics retain them."""
+    if legacy_token:
+        raise HTTPException(
+            status_code=400,
+            detail="operator credentials must use the X-Ops-Token header",
+        )
+    return x_ops_token
 
 
 class RuleInput(BaseModel):
