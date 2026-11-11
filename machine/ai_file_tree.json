@@ -7380,8 +7380,8 @@
     },
     {
       "path": "skeleton/provider_environment.py",
-      "owner": "deterministic game-environment and replay adapter",
-      "reason": "Canonical bounded deterministic game-environment source stays outside provider-credential AI tree; holdout/replay custody is retained here until a separately reviewed mirror and ownership cutover"
+      "owner": "game-environment simulation and deterministic replay",
+      "reason": "The deterministic game-world adapter and holdout/replay buffers remain outside credential-provider AI tree authority; this module has no model credential custody or provider runtime ownership."
     },
     {
       "path": "skeleton/providers",
