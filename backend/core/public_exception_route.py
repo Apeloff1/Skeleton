@@ -13,7 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 from core.http_errors import PUBLIC_INTERNAL_ERROR
 
@@ -39,10 +39,9 @@ class PublicExceptionRoute(APIRoute):
                         self.path,
                         response.status_code,
                     )
-                    return Response(
-                        content='{"detail":"internal server error"}',
+                    return JSONResponse(
+                        content={"detail": PUBLIC_INTERNAL_ERROR},
                         status_code=response.status_code,
-                        media_type="application/json",
                         headers={"Cache-Control": "no-store"},
                     )
                 return response
