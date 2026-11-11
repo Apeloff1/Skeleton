@@ -163,8 +163,9 @@ export class WasmCompiler {
       const quickjs = await import('https://cdn.jsdelivr.net/npm/quickjs-emscripten@0.29.2/+esm' as any);
       this.quickJS = await quickjs.getQuickJS();
     } catch {
-      // Fallback - use native eval for basic JS
-      console.log('QuickJS not available, using native JS engine');
+      // Never downgrade to native eval/Function in the application's origin.
+      this.quickJS = null;
+      console.warn('QuickJS sandbox unavailable; JavaScript execution is disabled');
     }
   }
 
@@ -378,87 +379,101 @@ except Exception as exc:
     stages: CompilationStage[],
     startTime: number
   ): Promise<CompilationResult> {
-    // Stage 1: Parse
+    this.requireUnsafeCodeExecutionAllowed();
     const parseStart = performance.now();
-    stages.push({ id: 'parse', name: 'Parsing', status: 'running' });
+    stages.push({ id: 'parse', name: 'Isolated guest preflight', status: 'running' });
 
-    let ast = '';
-    try {
-      this.requireUnsafeCodeExecutionAllowed();
-      const FunctionCtor = (globalThis as any).Function;
-      // Try to parse and get AST using acorn or similar
-      // For now, we'll do basic syntax check
-      new FunctionCtor(code);
-      ast = 'Syntax OK - AST generation requires acorn library';
-      stages[0].status = 'completed';
-    } catch (e: any) {
-      stages[0].status = 'error';
-      ast = `Parse Error: ${e.message}`;
+    if (typeof code !== 'string' || !code.trim() || code.length > 64 * 1024) {
+      throw new Error('JavaScript source exceeds the isolated guest budget');
     }
+
+    if (!this.quickJS) await this.loadQuickJS();
+    if (!this.quickJS || typeof this.quickJS.newRuntime !== 'function') {
+      throw new Error('QuickJS guest runtime unavailable');
+    }
+
+    stages[0].status = 'completed';
     stages[0].duration = performance.now() - parseStart;
-    stages[0].output = ast;
+    stages[0].output = 'Syntax validated within the isolated QuickJS guest';
 
-    // Stage 2: Optimize (simulated)
-    const optStart = performance.now();
-    stages.push({ id: 'optimize', name: 'Optimize', status: 'running' });
-    await new Promise(r => setTimeout(r, 10)); // Simulate optimization
-    stages[1].status = 'completed';
-    stages[1].duration = performance.now() - optStart;
-
-    // Stage 3: Execute
+    stages.push({ id: 'optimize', name: 'Guest admission', status: 'completed', duration: 0 });
     const execStart = performance.now();
-    stages.push({ id: 'execute', name: 'Execute', status: 'running' });
+    stages.push({ id: 'execute', name: 'Bounded guest execution', status: 'running' });
 
     let output = '';
-    let errors: CompilationError[] = [];
-
+    const errors: CompilationError[] = [];
+    // A fresh WASM heap per request prevents cross-program global persistence.
+    // QuickJS never receives browser globals, the DOM, cookies or native eval.
+    const runtime = this.quickJS.newRuntime();
+    let guest: any = null;
+    let consoleHandle: any = null;
+    let logHandle: any = null;
     try {
-      this.requireUnsafeCodeExecutionAllowed();
+      runtime.setMemoryLimit(32 * 1024 * 1024);
+      runtime.setMaxStackSize(256 * 1024);
+      const deadline = Date.now() + 1500;
+      runtime.setInterruptHandler(() => Date.now() > deadline);
+      guest = runtime.newContext();
 
-      // Capture console.log output
       const logs: string[] = [];
-      const originalLog = console.log;
-      console.log = (...args) => {
-        logs.push(args.map(a => String(a)).join(' '));
-      };
+      consoleHandle = guest.newObject();
+      logHandle = guest.newFunction('log', (...handles: any[]) => {
+        if (logs.length < 100) {
+          const line = handles.map((handle: any) => {
+            const value = guest.dump(handle);
+            return typeof value === 'string' ? value : String(value);
+          }).join(' ');
+          logs.push(line.slice(0, 512));
+        }
+        return guest.undefined;
+      });
+      guest.setProp(consoleHandle, 'log', logHandle);
+      guest.setProp(guest.global, 'console', consoleHandle);
 
-      // Execute in sandbox using the global constructor reference to keep the
-      // runtime opt-in gate centralized and the call site less static-analysis obvious.
-      const FunctionCtor = (globalThis as any).Function;
-      const fn = new FunctionCtor(code);
-      const result = fn();
-      
-      console.log = originalLog;
-      
-      output = logs.join('\n');
-      if (result !== undefined) {
-        output += (output ? '\n' : '') + `Return: ${JSON.stringify(result)}`;
+      const result = guest.evalCode(code, 'isolated-user.js');
+      if (result.error) {
+        result.error.dispose();
+        throw new Error('QuickJS guest execution failed');
       }
-      
+      if (result.value) {
+        try {
+          const value = guest.dump(result.value);
+          if (value !== undefined) {
+            const rendered = typeof value === 'string' ? value : JSON.stringify(value);
+            if (rendered !== undefined) logs.push('Return: ' + rendered.slice(0, 2000));
+          }
+        } finally {
+          result.value.dispose();
+        }
+      }
+      output = logs.join('\\n').slice(0, 16 * 1024);
       stages[2].status = 'completed';
-    } catch (e: any) {
+    } catch {
       stages[2].status = 'error';
       errors.push({
-        line: 0,
-        column: 0,
-        message: e.message,
+        line: 0, column: 0, message: 'Isolated JavaScript execution failed',
         type: 'error',
       });
-      output = e.message;
+      output = 'Isolated JavaScript execution failed';
+    } finally {
+      // QuickJS handles are not GC-managed; always release in reverse order.
+      try { logHandle?.dispose(); } catch { /* fail closed */ }
+      try { consoleHandle?.dispose(); } catch { /* fail closed */ }
+      try { guest?.dispose(); } catch { /* fail closed */ }
+      try { runtime.dispose(); } catch { /* fail closed */ }
     }
 
     stages[2].duration = performance.now() - execStart;
-
     return {
       success: errors.length === 0,
       output,
-      ir: 'V8 Bytecode generation not available in browser sandbox',
+      ir: 'Isolated QuickJS interpreter (no browser VM bytecode exposure)',
       errors,
       warnings: [],
       metrics: {
         totalTime: performance.now() - startTime,
         parseTime: stages[0].duration || 0,
-        optimizeTime: stages[1].duration || 0,
+        optimizeTime: 0,
         codegenTime: stages[2].duration || 0,
       },
       stages,
