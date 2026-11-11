@@ -146,7 +146,7 @@ class QualificationTests(unittest.TestCase):
     def test_report_escaped_unicode_preflight_never_allocates_json_chunk(self):
         # 1,500 non-BMP characters occupy 18,000 bytes after ensure_ascii.
         # The raw Python string is smaller than the 16,384-byte cap.
-        payload = {'emoji': '\\U0001f600' * 1500}
+        payload = {'emoji': '\U0001f600' * 1500}
         self.assertLess(len(payload['emoji']), report_paths._MAX_REPORT_BYTES)
         with mock.patch.object(
             report_paths.json.JSONEncoder, 'iterencode',
@@ -159,8 +159,8 @@ class QualificationTests(unittest.TestCase):
     def test_report_escaped_ascii_preflight_never_allocates_json_chunk(self):
         for index, content in enumerate((
             '"' * 9000,
-            '\\x00' * 3000,
-            '\\u2028' * 3000,
+            '\x00' * 3000,
+            '\u2028' * 3000,
         )):
             with self.subTest(index=index), mock.patch.object(
                 report_paths.json.JSONEncoder, 'iterencode',
@@ -189,7 +189,7 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(list(self.out.iterdir()), [])
 
     def test_report_bounded_unicode_and_escapes_preserve_canonical_bytes(self):
-        payload = {'emoji': '\\U0001f600' * 12, 'controls': '\\x00\\n\\t',
+        payload = {'emoji': '\U0001f600' * 12, 'controls': '\\x00\\n\\t',
                    'quoted': '"\\\\', 'nested': {'caf\\u00e9': True}}
         publish_private_report(self.out, 'unicode.json', payload)
         expected = (json.dumps(payload, sort_keys=True, separators=(',', ':'),
