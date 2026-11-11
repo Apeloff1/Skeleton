@@ -10,6 +10,10 @@ from pydantic import BaseModel
 from core.public_exception_route import PublicExceptionRoute
 
 
+class Payload(BaseModel):
+    count: int
+
+
 def _app() -> FastAPI:
     app = FastAPI()
     router = APIRouter(route_class=PublicExceptionRoute)
@@ -23,9 +27,6 @@ def _app() -> FastAPI:
         if code == 404:
             raise HTTPException(404, "known public error")
         return {"ok": True}
-
-    class Payload(BaseModel):
-        count: int
 
     @router.post("/validated")
     async def validated(payload: Payload):
