@@ -7,8 +7,16 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.core.ecosystem_orchestrator import get_orchestrator
-from backend.core.security_augmentation import bound_text
+# The production Dockerfile flattens backend/ into /app. Match the actual
+# module identity rather than relying on the source checkout's backend/ parent.
+if __package__ == "routes":
+    from core.ecosystem_orchestrator import get_orchestrator
+    from core.security_augmentation import bound_text
+elif __package__ == "backend.routes":
+    from backend.core.ecosystem_orchestrator import get_orchestrator
+    from backend.core.security_augmentation import bound_text
+else:
+    raise ImportError("unsupported ecosystem route package layout")
 
 router = APIRouter(prefix="/api/ecosystem", tags=["ecosystem"])
 

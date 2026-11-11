@@ -10,8 +10,16 @@ from typing import Any
 import uuid
 from threading import Lock
 
-from backend.core.security_augmentation import bound_text, is_safe_identifier, redact_error
-from backend.core.massive_upgrades import RateWindow, AuditTrail, health_probe
+# Production imports core.* directly; checkout tools import backend.core.*.
+# Fail closed on unexpected package layouts and missing dependencies.
+if __package__ == "core":
+    from core.security_augmentation import bound_text, is_safe_identifier, redact_error
+    from core.massive_upgrades import RateWindow, AuditTrail, health_probe
+elif __package__ == "backend.core":
+    from backend.core.security_augmentation import bound_text, is_safe_identifier, redact_error
+    from backend.core.massive_upgrades import RateWindow, AuditTrail, health_probe
+else:
+    raise ImportError("unsupported ecosystem orchestrator package layout")
 
 try:
     from skeleton.jeeves.studio.integrated_studio import IntegratedStudio
