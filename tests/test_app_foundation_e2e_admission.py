@@ -59,6 +59,56 @@ class LiveE2ESourceAdmission(unittest.TestCase):
             W.replace('node --test --test-reporter=spec "$suite"',
                       'exit 0', 1), S))
 
+    def test_operator_credential_masking_is_mandatory(self):
+        mutant = W.replace('echo "::add-mask::${generated_value}"', "echo mask-disabled", 1)
+        self.assertNotEqual(mutant, W)
+        self.assertTrue(guard.validate_text(mutant, S))
+
+    def test_operator_password_cannot_be_dropped(self):
+        mutant = W.replace("GAMEFORGE_SEED_ADMIN_PASSWORD=%s", "IGNORED_PASSWORD=%s", 1)
+        self.assertNotEqual(mutant, W)
+        self.assertTrue(guard.validate_text(mutant, S))
+
+    def test_operator_contract_test_cannot_be_skipped(self):
+        mutant = W.replace(
+            "python -m unittest discover -s tests -p test_ci_e2e_operator_provision.py -q",
+            "echo skipped security contracts", 1)
+        self.assertNotEqual(mutant, W)
+        self.assertTrue(guard.validate_text(mutant, S))
+
+    def test_operator_provisioning_cannot_be_bypassed(self):
+        mutant = W.replace(
+            "run: python scripts/provision_e2e_operator.py",
+            "run: echo synthetic operator admitted", 1)
+        self.assertNotEqual(mutant, W)
+        self.assertTrue(guard.validate_text(mutant, S))
+
+    def test_null_operator_security_step_fails_closed(self):
+        mutant = W.replace(
+            "run: python scripts/provision_e2e_operator.py",
+            "run: null", 1)
+        self.assertNotEqual(mutant, W)
+        self.assertTrue(guard.validate_text(mutant, S))
+
+    def test_operator_token_cleanup_is_always_required(self):
+        original = "      - name: Remove ephemeral operator token\n        if: always()"
+        mutant = W.replace(original, "      - name: Remove ephemeral operator token\n        if: success()", 1)
+        self.assertNotEqual(mutant, W)
+        self.assertTrue(guard.validate_text(mutant, S))
+
+    def test_operator_token_cleanup_cannot_remove_path_guard(self):
+        mutant = W.replace("Invalid operator token cleanup path", "unsafe path accepted", 1)
+        self.assertNotEqual(mutant, W)
+        self.assertTrue(guard.validate_text(mutant, S))
+
+    def test_operator_security_steps_must_precede_live_flow(self):
+        first = "name: Provision authenticated ephemeral E2E operator"
+        second = "name: Tier 2 live app-foundation flow (#4098)"
+        mutant = W.replace(first, "__SWAP_OPERATOR_NAME__", 1)
+        mutant = mutant.replace(second, first, 1).replace("__SWAP_OPERATOR_NAME__", second, 1)
+        self.assertNotEqual(mutant, W)
+        self.assertTrue(guard.validate_text(mutant, S))
+
     def test_node_live_flag_cannot_be_disabled(self):
         self.assertTrue(guard.validate_text(
             W.replace('SKELETON_E2E_REQUIRE_FULL_LIVE: "1"',
