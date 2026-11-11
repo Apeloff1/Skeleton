@@ -813,3 +813,12 @@ jobs:
           skeleton/testing/test_harbor_crafting_patrol_guidance.py::test_cli_hints_are_user_reachable
           skeleton/testing/test_jeeves_native_batch.py::TestNativeBatchWithRealSqlite::test_cli_real_path_commits_synthetic_source_only_batch
           skeleton/testing/test_delivery_packaging.py::test_package_builders_bound_malicious_mapping_iteration
+      - name: Replay mainline backend inventory and Galaxy regressions
+        env:
+          PYTHONPATH: ".:backend"
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          backend/tests/test_galaxy_file_budget.py::test_unavailable_generation_fails_closed_without_stub_or_fallback_files
+          backend/tests/test_storage_lazy_registry.py::test_literal_loader_inventory_matches_declared_repository_modules
+          backend/tests/test_storage_lazy_registry.py::test_wrapping_storage_modules_does_not_execute_them
