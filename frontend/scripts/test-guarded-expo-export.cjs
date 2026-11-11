@@ -176,3 +176,35 @@ test('one stdout marker fragmented across writes still qualifies', async t => {
   assert.equal(result.mode, 'supervised-post-export-exit');
   assert.equal(result.files, 1);
 });
+
+
+function markerExitProbe(t, logStatements) {
+  const dir = root(t);
+  const source = [
+    'const fs = require("node:fs");',
+    'fs.mkdirSync("dist");',
+    'fs.writeFileSync("dist/setup.html", "<html>setup</html>");',
+    logStatements,
+  ].join('\n');
+  return supervise({
+    cwd: dir, command: process.execPath, args: ['-e', source],
+    echo: false, maxMs: 1500, pollMs: 20, terminateMs: 500,
+  });
+}
+
+test('clean EOF accepts an exact final marker without a trailing newline', async t => {
+  const result = await markerExitProbe(
+    t, String.raw`process.stdout.write('Exported: dist');`,
+  );
+  assert.equal(result.mode, 'normal-exit');
+  assert.equal(result.files, 1);
+});
+
+test('clean EOF cannot join unfinished marker fragments across streams', async t => {
+  await assert.rejects(
+    markerExitProbe(
+      t, String.raw`process.stdout.write('Exported: '); process.stderr.write('dist');`,
+    ),
+    /completion marker missing/,
+  );
+});
