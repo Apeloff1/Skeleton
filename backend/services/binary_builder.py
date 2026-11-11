@@ -873,17 +873,9 @@ def _build_real_apk(build: dict, out_path: Path) -> tuple[int, int, str, bool]:
         return (file_count, total_bytes, sig_summary, v.returncode == 0)
 
 
-def build_apk(build: dict) -> dict:
-    if not require_execution_allowed("APK packaging"):
-        return {
-            "ok": False,
-            "disabled": True,
-            "error": execution_disabled_message("APK packaging"),
-        }
+def _build_apk_staged(build: dict, out_path: Path) -> dict:
+    """Produce and inspect an APK only inside a private staging directory."""
     build_id = _safe_build_id(build.get("build_id", "unknown"))
-    token = build.get("artifact_output_token")
-    suffix = "-" + _safe_build_id(str(token)) if token else ""
-    out_path = _ensure_artifacts_root() / f"{build_id}{suffix}.apk"
     is_real = False
     sig_info = ""
     file_count = 0
@@ -959,6 +951,42 @@ def build_apk(build: dict) -> dict:
         "download_url":         f"/api/binary/download/{build_id}/apk",
     }
 
+
+
+def build_apk(build: dict) -> dict:
+    if not require_execution_allowed("APK packaging"):
+        return {
+            "ok": False,
+            "disabled": True,
+            "error": execution_disabled_message("APK packaging"),
+        }
+    build_id = _safe_build_id(build.get("build_id", "unknown"))
+    token = build.get("artifact_output_token")
+    suffix = "-" + _safe_build_id(str(token)) if token else ""
+    artifact_name = f"{build_id}{suffix}.apk"
+    root = _ensure_artifacts_root()
+
+    # Never let a running SDK or a placeholder ZIP overwrite the currently
+    # published inode. Keep all toolchain I/O in a private temporary tree.
+    with tempfile.TemporaryDirectory(prefix="codedock-apk-stage-") as scratch:
+        staged = Path(scratch) / artifact_name
+        result = _build_apk_staged(build, staged)
+        if staged.stat().st_size > _MAX_ARCHIVE_BYTES:
+            raise ValueError("APK exceeds artifact byte budget")
+
+        # Copy from the private, complete stage to an unlinked, bounded
+        # descriptor and atomically replace the canonical published leaf.
+        with staged.open("rb") as source:
+            with anchored_directory(root) as directory:
+                published_size = atomic_write(
+                    directory,
+                    artifact_name,
+                    lambda target: shutil.copyfileobj(source, target, length=1024 * 1024),
+                    max_bytes=_MAX_ARCHIVE_BYTES,
+                )
+        result["path"] = str(root / artifact_name)
+        result["size_bytes"] = published_size
+        return result
 
 # ─────────────────────────────────────────────────────────────────
 # Combined entry point
