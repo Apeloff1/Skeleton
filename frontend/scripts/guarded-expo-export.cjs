@@ -43,16 +43,27 @@ function snapshot(dir) {
     .update(entries.sort().join('\n')).digest('hex') };
 }
 
+function pinnedExpoInvocation(cwd) {
+  // Launch the installed, lockfile-resolved CLI directly. Yarn wraps Expo in
+  // another process, and its signal handling can misreport an expected,
+  // supervisor-issued shutdown as a failed export.
+  const cli = path.join(cwd, 'node_modules', 'expo', 'bin', 'cli');
+  let stat;
+  try { stat = fs.lstatSync(cli); } catch {
+    throw Error('pinned Expo CLI missing');
+  }
+  if (!stat.isFile() || stat.isSymbolicLink()) throw Error('unsafe Expo CLI entrypoint');
+  return { command: process.execPath, args: [cli, 'export', '--platform', 'web'] };
+}
+
 async function supervise(opts = {}) {
   const cwd = path.resolve(opts.cwd || path.join(__dirname, '..'));
   const out = path.join(cwd, 'dist');
   if (fs.existsSync(out)) throw Error('stale dist is not qualifying evidence');
-  // Launch Expo's Node CLI directly. A Yarn wrapper converts the process-group
-  // SIGTERM used after verified export into exit code 1, hiding its true cause.
-  const defaultArgs = [path.join(cwd, 'node_modules', 'expo', 'bin', 'cli'),
-    'export', '--platform', 'web'];
-  const child = spawn(opts.command || process.execPath,
-    opts.args || (opts.command ? ['export:web'] : defaultArgs), {
+  const invocation = opts.command
+    ? { command: opts.command, args: opts.args || [] }
+    : pinnedExpoInvocation(cwd);
+  const child = spawn(invocation.command, invocation.args, {
     cwd, stdio: ['ignore', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
     env: { ...process.env, CI: '1', EXPO_NO_TELEMETRY: '1' },
@@ -75,9 +86,9 @@ async function supervise(opts = {}) {
   child.stderr.on('data', c => read(c, process.stderr));
   function kill(sig) {
     if (child.pid && process.platform !== 'win32') {
-      try { process.kill(-child.pid, sig); return; } catch {}
+      try { process.kill(-child.pid, sig); return true; } catch {}
     }
-    try { child.kill(sig); } catch {}
+    try { return child.kill(sig); } catch { return false; }
   }
   async function reap() {
     await Promise.race([done, sleep(opts.terminateMs ?? 5000)]);
@@ -102,11 +113,21 @@ async function supervise(opts = {}) {
         if (exited && code !== 0) throw Error('export failed after completion marker');
         const second = snapshot(out);
         if (first.digest !== second.digest) throw Error('export output is not stable');
-        kill('SIGTERM');
+        // Reject any spontaneous nonzero exit before taking ownership of
+        // process shutdown. A Yarn shell converts SIGTERM into exit code 143;
+        // this is qualifying ONLY after we sent SIGTERM to a live process.
+        if (exited) {
+          if (code !== 0 || signal) throw Error('export failed after completion marker');
+          return { ...second, mode: 'normal-exit' };
+        }
+        if (!kill('SIGTERM')) throw Error('export termination was not delivered');
         await reap();
         const third = snapshot(out);
         if (second.digest !== third.digest) throw Error('export changed during cleanup');
-        if (code !== 0 && signal !== 'SIGTERM') throw Error('unexpected exporter exit');
+        const supervisedExit = (code === 0 && signal === null)
+          || (code === null && signal === 'SIGTERM')
+          || (code === 143 && signal === null);
+        if (!supervisedExit) throw Error('unexpected exporter exit code=' + String(code) + ' signal=' + String(signal));
         return { ...third, mode: 'supervised-post-export-exit' };
       }
       await sleep(opts.pollMs ?? 100);
@@ -117,7 +138,7 @@ async function supervise(opts = {}) {
   }
 }
 
-module.exports = { snapshot, supervise };
+module.exports = { snapshot, supervise, pinnedExpoInvocation };
 
 if (require.main === module) {
   supervise().then(r => {
