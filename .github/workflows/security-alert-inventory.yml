@@ -32,7 +32,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       ISSUE_NUMBER: '1016'
-      BATCH_SIZE: '50'
+      BATCH_SIZE: '200'
       BODY_MAX_BYTES: '60000'
     steps:
       - name: Collect open security findings
@@ -173,7 +173,7 @@ jobs:
               else empty end
             ' "$RUNNER_TEMP/security/batch.json"
             echo
-            echo '> Batch selection is severity-first, excludes immutable historical snapshots, and is capped at 50 actionable findings. Canonical code and dependency findings must be fixed at the root cause.'
+            echo '> Batch selection is severity-first, excludes immutable historical snapshots, and lists up to 200 actionable findings. Canonical code and dependency findings must be fixed at the root cause.'
           } > "$body_file"
 
           body_bytes=$(wc -c < "$body_file" | tr -d ' ')
