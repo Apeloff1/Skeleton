@@ -16,10 +16,16 @@ import { API_BASE as CANONICAL_API_BASE } from './apiBase';
 import { useEffect, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
+import {
+  safeTelemetryErrorType, safeTelemetryEvent, safeTelemetryLabel,
+  sanitizeTelemetryDetail,
+} from './telemetryPrivacy';
 
 const BACKEND  = CANONICAL_API_BASE;
 const FLUSH_MS = 5000;
 const QUEUE_KEY = '@telemetry/queue';
+const MAX_QUEUE_BYTES = 1024 * 1024;
+const MAX_EVENTS = 2000;
 
 // One session id per app launch — persists across route changes.
 let _sessionId: string | null = null;
@@ -44,7 +50,7 @@ export interface TelemetryEvent {
   severity:    Severity;
   ts_client?:  number;
   duration_ms?: number;
-  detail?:     any;
+  detail?:     Record<string, string | number | boolean>;
 }
 
 // ─── Buffer + flusher ─────────────────────────────────────────────
@@ -52,12 +58,43 @@ const _buffer: TelemetryEvent[] = [];
 let _flushTimer: ReturnType<typeof setInterval> | null = null;
 let _flushInflight = false;
 
+function sanitizeQueuedEvent(value: unknown): TelemetryEvent | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  // Old app versions wrote full exception objects to AsyncStorage. Strip all
+  // foreign/untrusted fields both on restore and immediately before POST.
+  const row = value as Record<string, unknown>;
+  const severity = row.severity;
+  const safeSeverity: Severity =
+    severity === 'warn' || severity === 'error' || severity === 'fatal'
+      ? severity : 'info';
+  const timestamp = row.ts_client;
+  const duration = row.duration_ms;
+  return {
+    modal_id: safeTelemetryLabel(row.modal_id),
+    session_id: sessionId(),
+    event: safeTelemetryEvent(row.event),
+    severity: safeSeverity,
+    ...(typeof timestamp === 'number' && Number.isFinite(timestamp) &&
+        timestamp >= 0 && timestamp <= 10_000_000_000
+      ? { ts_client: timestamp } : {}),
+    ...(typeof duration === 'number' && Number.isFinite(duration) &&
+        duration >= 0 && duration <= 86_400_000
+      ? { duration_ms: duration } : {}),
+    detail: sanitizeTelemetryDetail(row.detail),
+  };
+}
+
 async function _persistQueue(events: TelemetryEvent[]) {
   try {
-    const existing = JSON.parse((await AsyncStorage.getItem(QUEUE_KEY)) || '[]');
-    const merged = [...existing, ...events].slice(-2000);
+    const raw = await AsyncStorage.getItem(QUEUE_KEY);
+    const existing = raw && raw.length <= MAX_QUEUE_BYTES ? JSON.parse(raw) : [];
+    const previous = Array.isArray(existing) ? existing : [];
+    const merged = [...previous, ...events]
+      .slice(-MAX_EVENTS)
+      .map(sanitizeQueuedEvent)
+      .filter((event): event is TelemetryEvent => event !== null);
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(merged));
-  } catch { /* non-fatal */ }
+  } catch { /* non-fatal; never log the queue content */ }
 }
 
 async function _drainQueue(): Promise<TelemetryEvent[]> {
@@ -65,17 +102,24 @@ async function _drainQueue(): Promise<TelemetryEvent[]> {
     const raw = await AsyncStorage.getItem(QUEUE_KEY);
     if (!raw) return [];
     await AsyncStorage.removeItem(QUEUE_KEY);
-    return JSON.parse(raw) as TelemetryEvent[];
+    if (raw.length > MAX_QUEUE_BYTES) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(-MAX_EVENTS).map(sanitizeQueuedEvent)
+      .filter((event): event is TelemetryEvent => event !== null);
   } catch { return []; }
 }
 
 export async function flushTelemetry(): Promise<void> {
   if (_flushInflight) return;
-  const queued = await _drainQueue();
-  const batch = _buffer.splice(0, _buffer.length).concat(queued);
-  if (!batch.length) return;
   _flushInflight = true;
   try {
+    const queued = await _drainQueue();
+    const batch = _buffer.splice(0, _buffer.length)
+      .concat(queued)
+      .map(sanitizeQueuedEvent)
+      .filter((event): event is TelemetryEvent => event !== null);
+    if (!batch.length) return;
     const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -110,19 +154,21 @@ export function recordEvent(
     if (getFeatureFlag('modal_telemetry_batch') === false) {
       if (severity === 'fatal' || severity === 'error') {
         // eslint-disable-next-line no-console
-        console.warn(`[telemetry:off] ${modalId} ${event}`, detail);
+        console.warn('[telemetry:off] error event suppressed');
       }
       return;
     }
   } catch { /* swallow — proceed with buffering */ }
   _buffer.push({
-    modal_id:   modalId,
+    modal_id:   safeTelemetryLabel(modalId),
     session_id: sessionId(),
-    event,
+    event:      safeTelemetryEvent(event),
     severity,
     ts_client:  Date.now() / 1000,
-    duration_ms,
-    detail,
+    duration_ms: typeof duration_ms === 'number' &&
+      Number.isFinite(duration_ms) && duration_ms >= 0 && duration_ms <= 86_400_000
+      ? duration_ms : undefined,
+    detail: sanitizeTelemetryDetail(detail),
   });
   _startFlusher();
   // Force-flush fatals immediately
@@ -153,8 +199,11 @@ export function useModalLogger(modalId: string) {
     metric:  (name: string, value: number, unit?: string)=> recordEvent(modalId, `metric:${name}`, 'info', { value, unit }),
     warn:    (msg: string, detail?: any)                => recordEvent(modalId, 'warn', 'warn', { msg, ...detail }),
     error:   (err: any, detail?: any)                   => {
-      const e = err instanceof Error ? { name: err.name, message: err.message, stack: err.stack?.slice(0, 4000) } : { message: String(err) };
-      recordEvent(modalId, 'error', 'error', { ...e, ...detail });
+      // Never include raw exception message or stack: they may contain URL
+      // credentials, user text, prompts or private local filesystem paths.
+      recordEvent(modalId, 'error', 'error', {
+        error_type: safeTelemetryErrorType(err), ...detail,
+      });
     },
     raw:     (event: string, severity: Severity, detail?: any) => recordEvent(modalId, event, severity, detail),
   };
