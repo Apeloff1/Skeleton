@@ -82,6 +82,7 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual((self.out/'report.json').read_bytes(),before)
         self.assertEqual((self.out/'report.json').stat().st_mode & 0o777,0o600)
         self.assertEqual([p.name for p in self.out.iterdir()], ['report.json'])
+        self.assertEqual((self.out/'report.json').stat().st_nlink, 1)
 
     def test_report_parent_permissions_hold(self):
         proof=probe_first_boot(self.plan,activation=self.factory)
@@ -179,6 +180,26 @@ class QualificationTests(unittest.TestCase):
                 publish_private_report(self.out, 'wrong-parent.json', {'ok': True})
         self.assertEqual(calls[0], 3)
         self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_report_replaced_after_link_is_not_accepted_or_deleted(self):
+        real_open = report_paths._open_private_report_root
+        calls = [0]
+        forged = b'foreign receipt must survive failed publication'
+
+        def replace_on_third(root):
+            calls[0] += 1
+            if calls[0] == 3:
+                target = self.out / 'replaced.json'
+                target.unlink()
+                target.write_bytes(forged)
+            return real_open(root)
+
+        with mock.patch.object(report_paths, '_open_private_report_root',
+                               side_effect=replace_on_third):
+            with self.assertRaisesRegex(QualificationError, 'identity changed'):
+                publish_private_report(self.out, 'replaced.json', {'ok': True})
+        self.assertEqual((self.out / 'replaced.json').read_bytes(), forged)
+        self.assertEqual([p.name for p in self.out.iterdir()], ['replaced.json'])
 
     def test_report_name_traversal_refused(self):
         proof=probe_first_boot(self.plan,activation=self.factory)
