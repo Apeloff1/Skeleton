@@ -265,13 +265,14 @@ jobs:
             tests/test_telemetry_admission_20261111.py \
             tests/test_vault_loader_path_custody_20261111.py \
             tests/test_room_api_egress_admission_20261111.py
-      - name: Verify native-secure frontend sessions, prototype integrity and telemetry privacy
+      - name: Verify native-secure sessions, telemetry custody and isolated WASM code execution
         run: >-
           node --test
           frontend/scripts/test-secure-session-identifiers.cjs
           frontend/scripts/test-quickwins-prototype-guard.cjs
           frontend/scripts/test-telemetry-privacy.cjs
           frontend/scripts/test-telemetry-batch-admission.cjs
+          frontend/scripts/test-wasm-origin-execution-boundary.cjs
       # Full repository Ruff lint runs in the canonical quality gate below; avoid a second backend-only pass.
       - name: Canonical lint, type, and high-confidence security gates
         run: bash scripts/quality-gates.sh
