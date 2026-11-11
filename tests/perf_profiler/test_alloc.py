@@ -91,3 +91,28 @@ def test_closing_with_open_scope_fails_and_closed_tracker_refuses_scopes():
 def test_negative_top_n_rejected():
     with pytest.raises(ValueError):
         AllocationTracker(top_n=-1)
+
+
+@pytest.mark.parametrize("top_n", [True, 1.5, "3", -1, 101, 10**1000])
+def test_tracker_rejects_unbounded_or_noninteger_top_n_before_tracing(top_n):
+    assert not tracemalloc.is_tracing()
+    with pytest.raises(ValueError, match="top_n"):
+        AllocationTracker(top_n=top_n)
+    assert not tracemalloc.is_tracing()
+
+
+@pytest.mark.parametrize("frames", [0, True, 1.5, "1", 26, 10**1000])
+def test_tracker_rejects_unbounded_or_noninteger_trace_depth_before_tracing(frames):
+    assert not tracemalloc.is_tracing()
+    with pytest.raises(ValueError, match="frames"):
+        AllocationTracker(frames=frames)
+    assert not tracemalloc.is_tracing()
+
+
+def test_tracker_accepts_bounded_top_and_trace_depth():
+    with AllocationTracker(top_n=1, frames=2) as tracker:
+        with tracker.scope("bounded") as result:
+            data = [bytearray(1024)]
+    assert tracker.results == [result]
+    assert result.peak_bytes >= 1024
+    del data
