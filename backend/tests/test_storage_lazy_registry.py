@@ -84,10 +84,10 @@ def test_literal_loader_inventory_matches_declared_repository_modules():
     assert set(lazy_registry._LOADERS) == expected
 
 
-def test_public_exception_route_literal_loader_uses_reviewed_import(monkeypatch):
-    """A newly added redaction route stays in the explicit lazy allowlist."""
-    name = "core.public_exception_route"
-    assert "public_exception_route" in lazy_registry.module_names()
+@pytest.mark.parametrize("name", ["core.public_exception_route", "core.telemetry_privacy"])
+def test_security_literal_loaders_use_reviewed_import(monkeypatch, name):
+    """Both new security modules stay in the explicit lazy allowlist."""
+    assert name.partition(".")[2] in lazy_registry.module_names()
     assert name in lazy_registry._LOADERS
     sentinel = object()
     calls = []

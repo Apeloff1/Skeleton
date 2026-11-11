@@ -260,6 +260,7 @@ _LOADERS = {
     'core.systems_forge': lambda: importlib.import_module('core.systems_forge'),
     'core.systems_forge_ext': lambda: importlib.import_module('core.systems_forge_ext'),
     'core.systems_knowledge': lambda: importlib.import_module('core.systems_knowledge'),
+    'core.telemetry_privacy': lambda: importlib.import_module('core.telemetry_privacy'),
     'core.tenant_storage_boundary': lambda: importlib.import_module('core.tenant_storage_boundary'),
     'core.terrain_field': lambda: importlib.import_module('core.terrain_field'),
     'core.text_gamefile': lambda: importlib.import_module('core.text_gamefile'),
