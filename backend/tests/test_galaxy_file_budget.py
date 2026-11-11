@@ -212,7 +212,7 @@ def test_unavailable_generation_fails_closed_without_stub_or_fallback_files(boun
     assert build["status"] == build["_bg_status"] == "failed"
     assert build["_bg_stop_reason"] == "phase_generation_failed"
     assert vault.get_file_count(build["build_id"]) == build["file_count"] == 0
-    assert vault.get_file_paths(build["build_id"]) == []
+    assert vault.get_file_paths(build["build_id"]) == ()
     assert build["files"] == {}
     assert build["_bg_partial_artifacts"] is False
     assert not any(phase["status"] == "completed" for phase in build["phases"])
