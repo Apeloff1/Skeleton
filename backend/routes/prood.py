@@ -18,6 +18,7 @@ import time
 from typing import Dict, List, Optional
 
 import httpx
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -27,7 +28,7 @@ from gameforge.prood.saga_orchestrator import SagaStep
 from gameforge.workflow.internal_build_system import create_internal_build_system
 from gameforge.workflow.jeeves_vault import jeeves_vault
 
-router = APIRouter(prefix="/api/prood", tags=["prood"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/prood", tags=["prood"])
 
 _BASE = "http://127.0.0.1:8001"
 
