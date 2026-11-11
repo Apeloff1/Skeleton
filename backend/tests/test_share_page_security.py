@@ -122,3 +122,31 @@ def test_page_refuses_to_make_untrusted_markup_executable() -> None:
     assert "onerror=alert(1)>" not in body
     assert "&lt;script&gt;" in body
     assert 'http-equiv="refresh"' in body
+
+
+
+def test_share_csp_pins_configured_origin_without_wildcard_https(monkeypatch):
+    monkeypatch.setenv("PUBLIC_APP_URL", "https://app.example.test")
+    response = share._share_html(
+        share._page(
+            "safe", "description", "https://app.example.test/cover.png",
+            "https://app.example.test/playable",
+        )
+    )
+    policy = response.headers["content-security-policy"]
+    assert "img-src 'self' https://app.example.test;" in policy
+    assert "img-src 'self' https:;" not in policy
+    assert "http://localhost:3000" not in policy
+    assert "script-src 'none'" in policy
+
+
+@pytest.mark.parametrize("malformed", [
+    "https://app.example.test;script-src'unsafe-inline'",
+    "https://app.example.test whitespace",
+    "https://app.example.test\r\nX-CSP-Bypass: true",
+    "https://app.example.test%3bscript-src",
+])
+def test_csp_origin_host_rejects_http_header_injection(monkeypatch, malformed):
+    monkeypatch.setenv("PUBLIC_APP_URL", malformed)
+    with pytest.raises(ValueError):
+        share._app_origin()
