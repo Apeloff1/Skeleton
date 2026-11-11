@@ -40,7 +40,12 @@ async def create_session(body: CreateSessionBody):
     brief = bound_text(body.brief, max_len=8000)
     result = get_orchestrator().create_session(brief, era=body.era, actor="api")
     if not result.get("ok"):
-        raise HTTPException(status_code=400, detail=result.get("reason", "bad_request"))
+        reason = result.get("reason", "bad_request")
+        if reason in ("session_capacity", "session_id_collision"):
+            raise HTTPException(status_code=503, detail=reason)
+        if reason == "rate_limited":
+            raise HTTPException(status_code=429, detail=reason)
+        raise HTTPException(status_code=400, detail=reason)
     return result
 
 
@@ -51,6 +56,8 @@ async def run_session(body: RunBody):
         raise HTTPException(status_code=404, detail=result.get("reason"))
     if not result.get("ok") and result.get("reason") == "studio_busy":
         raise HTTPException(status_code=409, detail="studio_busy")
+    if not result.get("ok") and result.get("reason") == "rate_limited":
+        raise HTTPException(status_code=429, detail="rate_limited")
     return result
 
 
@@ -78,4 +85,4 @@ async def list_sessions(limit: int = 20):
 @router.get("/studio/status")
 async def studio_status():
     orch = get_orchestrator()
-    return {"ok": True, "studio": orch.studio.status(), "sessions": len(orch.sessions)}
+    return {"ok": True, "studio": orch.studio.status(), "sessions": orch.session_count()}

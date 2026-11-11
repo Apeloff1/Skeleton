@@ -21,10 +21,12 @@ elif __package__ == "backend.core":
 else:
     raise ImportError("unsupported ecosystem orchestrator package layout")
 
-try:
-    from skeleton.jeeves.studio.integrated_studio import IntegratedStudio
-except Exception:  # pragma: no cover - import path differs by cwd
-    from jeeves.studio.integrated_studio import IntegratedStudio  # type: ignore[no-redef]
+# Both the checkout and production Docker image vendor skeleton/.
+# Import errors in the studio must propagate, never trigger a silent fallback.
+from skeleton.jeeves.studio.integrated_studio import IntegratedStudio
+
+MAX_SESSIONS = 256
+_TERMINAL_STATUSES = frozenset({"sealed", "incomplete", "failed"})
 
 
 @dataclass
@@ -46,6 +48,7 @@ class EcosystemOrchestrator:
         self.rate = RateWindow(limit=30, window_sec=60.0)
         self.audit = AuditTrail(max_entries=5000)
         self.sessions: dict[str, EcosystemSession] = {}
+        self._sessions_lock = Lock()
         self.studio = IntegratedStudio()
         # The studio mutates its era and pipeline state; admit one run at a time.
         self._run_lock = Lock()
@@ -56,37 +59,52 @@ class EcosystemOrchestrator:
             return {"ok": False, "reason": "brief_too_short"}
         if era and not is_safe_identifier(era):
             return {"ok": False, "reason": "invalid_era"}
-        if not self.rate.allow(actor):
-            return {"ok": False, "reason": "rate_limited"}
-
-        session_id = uuid.uuid4().hex[:16]
-        session = EcosystemSession(session_id=session_id, brief=brief, era=era or "ash")
-        self.sessions[session_id] = session
-        self.audit.record(actor, "session.create", session_id)
-        return {"ok": True, "session_id": session_id, "era": session.era}
+        with self._sessions_lock:
+            if not self.rate.allow(actor):
+                return {"ok": False, "reason": "rate_limited"}
+            # Bound in-memory session/export custody. Evict completed work only,
+            # oldest first; never discard a created or running session.
+            if len(self.sessions) >= MAX_SESSIONS:
+                for old_id, old_session in tuple(self.sessions.items()):
+                    if old_session.status in _TERMINAL_STATUSES:
+                        del self.sessions[old_id]
+                        if len(self.sessions) < MAX_SESSIONS:
+                            break
+                if len(self.sessions) >= MAX_SESSIONS:
+                    return {"ok": False, "reason": "session_capacity"}
+            session_id = uuid.uuid4().hex[:16]
+            if session_id in self.sessions:
+                return {"ok": False, "reason": "session_id_collision"}
+            session = EcosystemSession(session_id=session_id, brief=brief, era=era or "ash")
+            self.sessions[session_id] = session
+            self.audit.record(actor, "session.create", session_id)
+            return {"ok": True, "session_id": session_id, "era": session.era}
 
     def run(self, session_id: str, actor: str = "api") -> dict[str, Any]:
         if not is_safe_identifier(session_id):
             return {"ok": False, "reason": "invalid_session"}
-        session = self.sessions.get(session_id)
-        if session is None:
-            return {"ok": False, "reason": "session_not_found"}
-        if not self.rate.allow(actor):
-            return {"ok": False, "reason": "rate_limited"}
+        with self._sessions_lock:
+            session = self.sessions.get(session_id)
+            if session is None:
+                return {"ok": False, "reason": "session_not_found"}
+            if not self.rate.allow(actor):
+                return {"ok": False, "reason": "rate_limited"}
 
         if not self._run_lock.acquire(blocking=False):
             return {"ok": False, "session_id": session_id, "reason": "studio_busy"}
         try:
-            if session.status != "created":
-                return {"ok": False, "session_id": session_id, "reason": "session_already_run"}
-            session.status = "running"
+            with self._sessions_lock:
+                if session.status != "created":
+                    return {"ok": False, "session_id": session_id, "reason": "session_already_run"}
+                session.status = "running"
             self.studio.set_era(session.era)
             result = self.studio.run_pipeline(session.brief)
-            session.result = result
-            session.godot_files = list(result.get("godot_files") or [])
-            session.status = "sealed" if result.get("ok") and result.get("sealed") else "incomplete"
-            session.error = None if result.get("ok") else result.get("reason")
-            self.audit.record(actor, "session.run", f"{session_id}:{session.status}")
+            with self._sessions_lock:
+                session.result = result
+                session.godot_files = list(result.get("godot_files") or [])
+                session.status = "sealed" if result.get("ok") and result.get("sealed") else "incomplete"
+                session.error = None if result.get("ok") else result.get("reason")
+                self.audit.record(actor, "session.run", f"{session_id}:{session.status}")
             return {
                 "ok": bool(result.get("ok")),
                 "session_id": session_id,
@@ -100,9 +118,10 @@ class EcosystemOrchestrator:
                 "reason": result.get("reason"),
             }
         except Exception as exc:  # noqa: BLE001
-            session.status = "failed"
-            session.error = redact_error(exc)
-            self.audit.record(actor, "session.fail", session_id)
+            with self._sessions_lock:
+                session.status = "failed"
+                session.error = redact_error(exc)
+                self.audit.record(actor, "session.fail", session_id)
             return {"ok": False, "session_id": session_id, "reason": "internal_error"}
         finally:
             self._run_lock.release()
@@ -110,33 +129,36 @@ class EcosystemOrchestrator:
     def status(self, session_id: str) -> dict[str, Any]:
         if not is_safe_identifier(session_id):
             return {"ok": False, "reason": "invalid_session"}
-        session = self.sessions.get(session_id)
-        if session is None:
-            return {"ok": False, "reason": "session_not_found"}
-        return {
-            "ok": True,
-            "session_id": session.session_id,
-            "status": session.status,
-            "era": session.era,
-            "brief": session.brief[:240],
-            "godot_count": len(session.godot_files),
-            "created_at": session.created_at,
-            "error": session.error,
-        }
+        with self._sessions_lock:
+            session = self.sessions.get(session_id)
+            if session is None:
+                return {"ok": False, "reason": "session_not_found"}
+            return {
+                "ok": True,
+                "session_id": session.session_id,
+                "status": session.status,
+                "era": session.era,
+                "brief": session.brief[:240],
+                "godot_count": len(session.godot_files),
+                "created_at": session.created_at,
+                "error": session.error,
+            }
 
     def export_godot(self, session_id: str) -> dict[str, Any]:
         if not is_safe_identifier(session_id):
             return {"ok": False, "reason": "invalid_session"}
-        session = self.sessions.get(session_id)
-        if session is None:
-            return {"ok": False, "reason": "session_not_found"}
-        if not session.godot_files:
-            return {"ok": False, "reason": "no_export"}
-        return {"ok": True, "session_id": session_id, "files": session.godot_files}
+        with self._sessions_lock:
+            session = self.sessions.get(session_id)
+            if session is None:
+                return {"ok": False, "reason": "session_not_found"}
+            if not session.godot_files:
+                return {"ok": False, "reason": "no_export"}
+            return {"ok": True, "session_id": session_id, "files": [dict(item) for item in session.godot_files]}
 
     def list_sessions(self, limit: int = 20) -> dict[str, Any]:
         limit = max(1, min(100, int(limit)))
-        rows = list(self.sessions.values())[-limit:]
+        with self._sessions_lock:
+            rows = list(self.sessions.values())[-limit:]
         return {
             "ok": True,
             "count": len(rows),
@@ -146,18 +168,24 @@ class EcosystemOrchestrator:
             ],
         }
 
+    def session_count(self) -> int:
+        with self._sessions_lock:
+            return len(self.sessions)
+
     def health(self) -> dict[str, Any]:
         base = health_probe()
-        base["sessions"] = len(self.sessions)
+        base["sessions"] = self.session_count()
         base["studio"] = self.studio.status()
         return base
 
 
 _ORCH: EcosystemOrchestrator | None = None
+_ORCH_LOCK = Lock()
 
 
 def get_orchestrator() -> EcosystemOrchestrator:
     global _ORCH
-    if _ORCH is None:
-        _ORCH = EcosystemOrchestrator()
-    return _ORCH
+    with _ORCH_LOCK:
+        if _ORCH is None:
+            _ORCH = EcosystemOrchestrator()
+        return _ORCH
