@@ -355,7 +355,7 @@ def test_unhandled_exception_handler_redacts_detail() -> None:
     app = FastAPI()
     before = app.exception_handlers.get(StarletteHTTPException)
     install_public_error_handlers(app)
-    assert app.exception_handlers.get(StarletteHTTPException) is before
+    assert app.exception_handlers.get(StarletteHTTPException) is not before
     handler = app.exception_handlers[Exception]
     response = asyncio.run(handler(None, RuntimeError(_PRIVATE)))
     assert response.status_code == 500
@@ -402,3 +402,33 @@ def test_server_health_envelopes_do_not_stringify_exceptions() -> None:
     assert "execution_failed" in source
     assert 'entry["error"] = f"{type(e).__name__}: {str(e)[:200]}"' not in source
     assert "result.error = str(e)" not in source
+
+
+def test_global_error_boundary_hides_declared_5xx_and_sensitive_headers() -> None:
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+    install_public_error_handlers(app)
+
+    @app.get("/error/{status}")
+    async def protected(status: int):
+        if status >= 500:
+            raise HTTPException(
+                status, detail={"token": "sensitive-production-token"},
+                headers={"X-Debug-Token": "private-header"},
+            )
+        raise HTTPException(status, detail={"message": "public client error"},
+                            headers={"Retry-After": "45"})
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        for status in (500, 502, 503):
+            response = client.get(f"/error/{status}")
+            assert response.status_code == status
+            assert response.json() == {"detail": PUBLIC_INTERNAL_ERROR}
+            assert "sensitive-production-token" not in response.text
+            assert "X-Debug-Token" not in response.headers
+            assert response.headers["cache-control"] == "no-store"
+        response = client.get("/error/429")
+        assert response.status_code == 429
+        assert response.json() == {"detail": {"message": "public client error"}}
+        assert response.headers["retry-after"] == "45"
