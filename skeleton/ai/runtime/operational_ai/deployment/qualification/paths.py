@@ -60,7 +60,7 @@ def _bounded_ascii_json_string_size(value: str, budget: int) -> int:
             size += 2
         elif codepoint < 0x20:
             size += 2 if codepoint in (8, 9, 10, 12, 13) else 6
-        elif codepoint < 0x80:
+        elif codepoint < 0x7F:
             size += 1
         elif codepoint <= 0xFFFF:
             size += 6
