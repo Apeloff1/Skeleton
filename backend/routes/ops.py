@@ -4,7 +4,7 @@ canonical governed product-control seam.
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database
+from routes.playable_access import _GuardedPrivateProjectRoute, project_router, scoped_database
 from routes import gameforge_auth as auth
 
 from dataclasses import asdict
@@ -37,6 +37,7 @@ router = project_router(
     prefix="/api/admin/ops",
     tags=["ops"],
     dependencies=[Depends(auth.require_role("admin"))],
+    route_class=_GuardedPrivateProjectRoute,
 )
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
 _db = scoped_database(_db)
