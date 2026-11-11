@@ -48,11 +48,28 @@ def _authorize_scim_write(x_scim_secret, principal, tenant_id) -> str:
         raise HTTPException(status_code=403, detail="SCIM tenant admin required") from None
     return principal.user_id
 
+async def get_scim_webhook_principal(
+    x_scim_secret: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+    x_user_id: Optional[str] = Header(default=None),
+) -> Principal:
+    """Authenticate machine webhooks by configured secret, without a bearer.
+
+    Other SCIM endpoints retain their standard get_principal dependency. A
+    wrong provided secret never silently falls back to developer/user auth.
+    """
+    if _secret_ok(x_scim_secret):
+        return Principal(
+            user_id="scim-webhook", roles=["admin"], auth_method="scim_secret"
+        )
+    return await get_principal(authorization=authorization, x_user_id=x_user_id)
+
+
 @router.post("/webhook")
 async def scim_webhook(
     payload: Dict[str, Any],
     x_scim_secret: Optional[str] = Header(default=None),
-    principal: Principal = Depends(get_principal),
+    principal: Principal = Depends(get_scim_webhook_principal),
 ):
     secret_mode = False
     try:
