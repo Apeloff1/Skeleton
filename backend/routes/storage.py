@@ -7,12 +7,14 @@ POST /api/storage/cache/purge → drop the decompress-on-demand cache
 """
 from __future__ import annotations
 
+from core.public_exception_route import PublicExceptionRoute
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from core import unbulk
 
-router = APIRouter(prefix="/api/storage", tags=["storage-unbulk"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/storage", tags=["storage-unbulk"])
 
 
 @router.get("/savings")

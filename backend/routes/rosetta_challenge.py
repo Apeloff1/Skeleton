@@ -1,4 +1,5 @@
 """Rosetta Challenge Mode — Translate code between languages, auto-graded via playground"""
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -15,7 +16,7 @@ from routes.gameforge_auth import get_current_user
 
 load_dotenv(Path(__file__).parent.parent / '.env')
 
-router = APIRouter(prefix="/api/rosetta-challenge", tags=["rosetta-challenge"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/rosetta-challenge", tags=["rosetta-challenge"])
 _client = _SHARED_MONGO_CLIENT  # consolidated → core.databases.client
 _db = _client[os.environ.get('DB_NAME', 'codedock')]
 PROJ = {"_id": 0}

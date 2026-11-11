@@ -237,6 +237,7 @@ def _snapshot_matches(
         immutable_identity_equal(original.identity, current.identity)
         and original.diff == current.diff
         and original.labels == current.labels
+        and original.explicit_merge_hold == current.explicit_merge_hold
         and original.unresolved_threads == current.unresolved_threads
         and original.reviews == current.reviews
     )

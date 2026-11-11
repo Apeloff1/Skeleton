@@ -5,6 +5,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/app-foundation-e2e.yml"
 DOCKERFILE = ROOT / "frontend/Dockerfile"
+GUARD = ROOT / "frontend/scripts/guarded-expo-export.cjs"
+GUARD_TEST = ROOT / "frontend/scripts/test-guarded-expo-export.cjs"
 
 
 class AppFoundationBuildIsolationTests(unittest.TestCase):
@@ -36,17 +38,42 @@ class AppFoundationBuildIsolationTests(unittest.TestCase):
         self.assertIn("EXPO_NO_TELEMETRY=1", builder)
         self.assertIn("node --test scripts/test-guarded-expo-export.cjs", builder)
         self.assertIn("node scripts/guarded-expo-export.cjs", builder)
-        guard = (ROOT / "frontend/scripts/guarded-expo-export.cjs").read_text(encoding="utf-8")
-        self.assertIn("maxMs ?? 15 * 60 * 1000", guard)
-        self.assertIn("async function reap()", guard)
-        self.assertIn('echo "frontend-export-supervision-verified"', builder)
+        self.assertIn('echo "frontend-export-supervision-complete"', builder)
         self.assertIn("test -s /app/dist/index.html", builder)
         self.assertIn("test -s /app/dist/setup.html || test -s /app/dist/setup/index.html", builder)
         self.assertIn('echo "frontend-index-and-setup-artifacts-verified"', builder)
-        self.assertLess(builder.index("node scripts/guarded-expo-export.cjs"), builder.index("frontend-export-supervision-verified"))
-        self.assertLess(builder.index("frontend-export-supervision-verified"), builder.index("frontend-index-and-setup-artifacts-verified"))
+        self.assertLess(builder.index("test-guarded-expo-export.cjs"), builder.index("node scripts/guarded-expo-export.cjs"))
+        self.assertLess(builder.index("frontend-export-supervision-complete"), builder.index("frontend-index-and-setup-artifacts-verified"))
         self.assertNotIn("|| true", builder)
         self.assertNotIn("EXPO_NO_METRO_LAZY", builder)
+
+    def test_guarded_export_supervisor_is_bounded_and_source_bound(self):
+        source = DOCKERFILE.read_text(encoding="utf-8")
+        builder = source.split("FROM deps AS builder", 1)[1].split("FROM nginx:", 1)[0]
+        self.assertIn("node --test scripts/test-guarded-expo-export.cjs", builder)
+        self.assertIn("node scripts/guarded-expo-export.cjs", builder)
+        self.assertIn("test -s /app/dist/index.html", builder)
+        self.assertIn("test -s /app/dist/setup.html", builder)
+        self.assertNotIn("yarn export:web", builder)
+        self.assertNotIn("|| true", builder)
+        guard = GUARD.read_text(encoding="utf-8")
+        tests = GUARD_TEST.read_text(encoding="utf-8")
+        for contract in (
+            "CI: '1'",
+            "EXPO_NO_TELEMETRY: '1'",
+            "stale dist is not qualifying evidence",
+            "if (code !== 0 || signal)",
+            "export hard deadline exceeded",
+            "export output is not stable",
+            "pinnedExpoInvocation",
+        ):
+            self.assertIn(contract, guard)
+        for assertion in (
+            "stalled exporter requires stable output",
+            "a nonzero exporter exit cannot be masked",
+            "default production invocation uses the pinned Expo CLI",
+        ):
+            self.assertIn(assertion, tests)
 
 
 if __name__ == "__main__":

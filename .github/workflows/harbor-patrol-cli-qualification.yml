@@ -1,0 +1,46 @@
+name: Harbor Patrol CLI Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - '.github/workflows/harbor-patrol-cli-qualification.yml'
+      - 'skeleton/game/gameplay/harbor_crafting_patrol_cli.py'
+      - 'skeleton/testing/test_harbor_patrol_cli_dispatch_20261111.py'
+      - 'skeleton/testing/test_harbor_crafting_patrol_guidance.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harbor-patrol-cli-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  source_qualification:
+    name: Harbor Patrol CLI Qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR source head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up pinned Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test runner
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Compile patrol CLI
+        run: python -m compileall -q skeleton/game/gameplay/harbor_crafting_patrol_cli.py
+      - name: Regress patrol command dispatch and real replay guidance
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_harbor_patrol_cli_dispatch_20261111.py
+          skeleton/testing/test_harbor_crafting_patrol_guidance.py

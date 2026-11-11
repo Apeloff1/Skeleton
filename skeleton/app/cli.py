@@ -424,6 +424,12 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     """Run the application assembly CLI and return a process-style exit code."""
 
     arguments = list(argv or ())
+    # The original-game authoring CLI owns its own strict argument validation,
+    # source-bound replay and exclusive save-custody rules. Do not duplicate
+    # those operations in the assembly shell's argument parser.
+    if arguments and arguments[0] == "game-project":
+        from scripts.game.game_project import main as game_project_main
+        return game_project_main(arguments[1:])
     # The same pinned Jeeves candidate optimizer owns multidomain specialization.
     if arguments and arguments[0] == "training-modules":
         from skeleton.ai.training.jeeves_parallel_mirrors import main as training_main

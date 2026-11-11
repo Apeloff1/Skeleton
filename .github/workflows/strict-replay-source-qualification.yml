@@ -1,37 +1,44 @@
 name: Strict Replay Source Qualification
 
+# The same exact source suite runs as a required Merge Readiness
+# quality_security step; avoid duplicate automatic PR/push admissions.
+# This workflow remains independently dispatchable for source qualification.
 on:
-  pull_request:
-    paths:
-      - skeleton/provider_environment.py
-      - skeleton/simulation/replay_checkpoint.py
-      - tests/test_postmerge_environment_checkpoint_custody.py
-      - .github/workflows/strict-replay-source-qualification.yml
-  push:
-    branches: [main]
-    paths:
-      - skeleton/provider_environment.py
-      - skeleton/simulation/replay_checkpoint.py
-      - tests/test_postmerge_environment_checkpoint_custody.py
-      - .github/workflows/strict-replay-source-qualification.yml
+  # Manual evidence is limited to the reviewed main revision.
+  # Caller-provided candidate commits must use unprivileged PR checks.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: strict-replay-source-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: strict-replay-source-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   offline-source:
     name: Strict Replay Source and Environment Custody
+    if: github.repository == 'Apeloff1/Skeleton' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout exact candidate source
+      - name: Admit only the trusted dispatch commit
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'invalid immutable source SHA'; exit 2; }
+      - name: Checkout trusted main commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Verify exact trusted source checkout
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
       - name: Install pinned Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:

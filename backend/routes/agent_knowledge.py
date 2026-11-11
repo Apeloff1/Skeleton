@@ -15,6 +15,7 @@
 from __future__ import annotations
 import logging
 from typing import Optional
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, Query
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
@@ -27,7 +28,7 @@ load_dotenv(Path(__file__).parent.parent / '.env')
 
 log = logging.getLogger("agent.knowledge")
 
-router = APIRouter(prefix="/api/knowledge", tags=["Agent Knowledge"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/knowledge", tags=["Agent Knowledge"])
 _client = _SHARED_MONGO_CLIENT  # consolidated → core.databases.client
 _db = _client[os.environ.get("DB_NAME", "codedock")]
 PROJ = {"_id": 0}
