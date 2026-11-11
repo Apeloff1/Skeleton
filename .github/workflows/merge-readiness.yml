@@ -264,6 +264,15 @@ jobs:
         run: python -m pytest -q --noconftest tests/test_telemetry_privacy_boundary.py
       - name: Verify frontend offline telemetry scrubbing
         run: node --test frontend/scripts/test-telemetry-privacy.mjs
+      - name: Verify bounded SSRF gateway DNS and resource custody
+        working-directory: backend
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_room_api_gateway_security.py
+          tests/test_room_api_dns_pin.py
+          tests/test_room_api_egress_resource_limits.py
       # Full repository Ruff lint runs in the canonical quality gate below; avoid a second backend-only pass.
       - name: Canonical lint, type, and high-confidence security gates
         run: bash scripts/quality-gates.sh
