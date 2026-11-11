@@ -125,7 +125,11 @@ class ScimUserDirectory:
                 if name in {"replace", "add"} and "role" in path:
                     role_raw = value
                 if name in {"replace", "add"} and "tenant" in path:
-                    tenant_id = value
+                    # A route may have authorized "blue" before entering the
+                    # directory. Never let a nested SCIM operation switch the
+                    # tenant to "red" after that authorization decision.
+                    if value != tenant_id:
+                        raise ValueError("SCIM operation cannot change tenant scope")
         # Implicit global user lookup may pick a tenant the operator does not
         # control. SCIM mutations require an explicit tenant in their payload.
         if not isinstance(tenant_id, str) or not tenant_id:
