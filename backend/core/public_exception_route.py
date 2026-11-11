@@ -28,7 +28,24 @@ class PublicExceptionRoute(APIRoute):
 
         async def protected(request: Request) -> Response:
             try:
-                return await original(request)
+                response = await original(request)
+                # Legacy handlers sometimes catch their own exception and
+                # return JSONResponse(500, {"error": str(exc)}). Such responses
+                # never reach an exception handler. Redact the entire 5xx
+                # envelope, including debug and cookie headers, before sending.
+                if response.status_code >= 500:
+                    _logger.warning(
+                        "returned server failure at %s (status=%s)",
+                        self.path,
+                        response.status_code,
+                    )
+                    return Response(
+                        content='{"detail":"internal server error"}',
+                        status_code=response.status_code,
+                        media_type="application/json",
+                        headers={"Cache-Control": "no-store"},
+                    )
+                return response
             except RequestValidationError:
                 # Keep FastAPI's structured 422 validation response intact.
                 raise
