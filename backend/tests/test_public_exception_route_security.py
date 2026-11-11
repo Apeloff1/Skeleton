@@ -24,6 +24,14 @@ def _app() -> FastAPI:
             raise HTTPException(404, "known public error")
         return {"ok": True}
 
+    @router.get("/declared-server-error/{status}")
+    async def declared_server_error(status: int):
+        raise HTTPException(
+            status_code=status,
+            detail={"database_password": "private-db-password-do-not-leak"},
+            headers={"X-Debug-Token": "private-debug-secret-do-not-leak"},
+        )
+
     class Payload(BaseModel):
         count: int
 
@@ -49,6 +57,23 @@ def test_explicit_public_http_errors_are_preserved():
         response = client.get("/known/404")
     assert response.status_code == 404
     assert response.json() == {"detail": "known public error"}
+
+
+def test_explicit_server_http_errors_do_not_leak_details_or_headers():
+    for status in (500, 502, 503):
+        with TestClient(_app(), raise_server_exceptions=False) as client:
+            response = client.get(f"/declared-server-error/{status}")
+        assert response.status_code == status
+        assert response.json() == {"detail": "internal server error"}
+        assert "private-db-password" not in response.text
+        assert "x-debug-token" not in response.headers
+
+
+def test_explicit_public_client_errors_remain_unchanged():
+    with TestClient(_app(), raise_server_exceptions=False) as client:
+        response = client.get("/declared-server-error/429")
+    assert response.status_code == 429
+    assert response.json()["detail"]["database_password"] == "private-db-password-do-not-leak"
 
 
 def test_request_validation_remains_http_422():
