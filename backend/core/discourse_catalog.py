@@ -83,8 +83,12 @@ def _catalog_panel(
     maximum: int = 5,
 ) -> DeclaredPanel:
     _validate_panel_request(selected, judge_key, maximum)
+    if not isinstance(catalog, Mapping):
+        raise PanelUnavailable("engine_model_inventory_unavailable")
     rows = catalog.get("models")
-    if not isinstance(rows, list):
+    # A truncated catalog could conceal duplicate or conflicting identities.
+    # Reject oversized direct-call inventories instead of trusting a prefix.
+    if not isinstance(rows, list) or len(rows) > 64:
         raise PanelUnavailable("engine_model_inventory_unavailable")
     ready: dict[str, DeclaredModel] = {}
     for item in rows[:64]:
@@ -149,8 +153,13 @@ async def tenant_panel(
 ) -> DeclaredPanel:
     """Resolve one model snapshot from explicit engine-side authorization."""
     # Direct Python callers do not pass through the HTTP admission layer.
-    # Invalid identities must not instantiate the engine or query inventory.
+    # Validate both request and tenant authority before constructing the engine.
     _validate_panel_request(selected, judge_key, maximum)
+    for identity in (tenant_id, actor_id):
+        if (type(identity) is not str or not 1 <= len(identity) <= 512
+                or identity != identity.strip()
+                or any(ord(char) < 32 for char in identity)):
+            raise PanelUnavailable("invalid_panel_identity")
     try:
         client = EngineClient.from_env()
         catalog = await model_catalog(client, tenant_id=tenant_id, actor_id=actor_id)
