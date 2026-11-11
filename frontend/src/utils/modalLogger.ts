@@ -166,7 +166,7 @@ export function useModalLogger(modalId: string) {
     action:  (name: string, detail?: any)               => recordEvent(modalId, `action:${name}`, 'info', detail),
     nav:     (to: string)                               => recordEvent(modalId, 'nav', 'info', { to }),
     metric:  (name: string, value: number, unit?: string)=> recordEvent(modalId, `metric:${name}`, 'info', { value, unit }),
-    warn:    (msg: string, detail?: any)                => recordEvent(modalId, 'warn', 'warn', { msg, ...detail }),
+    warn:    (msg: string, detail?: any)                => recordEvent(modalId, 'warn', 'warn', { msg, context: sanitizeTelemetryDetail(detail) }),
     error:   (err: any, detail?: any)                   => {
       // Exception message/stack can embed bearer tokens, source code and private
       // filesystem paths; do not retain or upload them at all.
