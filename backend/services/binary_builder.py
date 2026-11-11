@@ -688,7 +688,7 @@ def _build_real_apk(build: dict, out_path: Path) -> tuple[int, int, str, bool]:
             # if PNG generation hits an unexpected stdlib quirk; the
             # apksigner verify path will still produce a valid APK and
             # most launchers will fall back to a generic icon.
-            print(f"[binary_builder] icon generation warning: {e}")
+            print(f"[binary_builder] icon generation warning: {type(e).__name__}")
 
         # 5. Manifest ────────────────────────────────────────────
         manifest_path = td / "AndroidManifest.xml"
@@ -840,7 +840,7 @@ def build_apk(build: dict) -> dict:
             file_count, total_bytes, sig_info, verified = _build_real_apk(build, out_path)
             is_real = bool(verified)
         except Exception as e:
-            sig_info = f"toolchain error: {e}"
+            sig_info = f"toolchain error: {type(e).__name__}"
             is_real = False
             file_count = 0
             total_bytes = 0
@@ -920,7 +920,7 @@ async def package_build(build: dict, kinds: list[str] | None = None) -> dict:
     errors = []
     for r in results:
         if isinstance(r, Exception):
-            errors.append(f"{type(r).__name__}: {r}")
+            errors.append(f"{type(r).__name__}: package build failed")
         elif isinstance(r, dict) and r.get("artifact_id") and r.get("path"):
             artifacts.append(r)
             if r.get("kind") == "apk" and not r.get("is_installable"):
@@ -929,7 +929,7 @@ async def package_build(build: dict, kinds: list[str] | None = None) -> dict:
                     "configure the Android build toolchain and rebuild."
                 )
         elif isinstance(r, dict):
-            errors.append(str(r.get("error") or "packager returned no artifact"))
+            errors.append("packager returned no artifact")
         else:
             errors.append("packager returned an invalid result")
     return {"artifacts": artifacts, "errors": errors}
