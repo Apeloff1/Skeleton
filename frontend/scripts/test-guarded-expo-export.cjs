@@ -137,3 +137,42 @@ test('file contents, not only path metadata, determine export evidence', t => {
   assert.equal(snapshot(dir).bytes, first.bytes);
   assert.notEqual(snapshot(dir).digest, first.digest);
 });
+
+
+function markerProbe(t, logStatements) {
+  const dir = root(t);
+  const source = [
+    'const fs = require("node:fs");',
+    'fs.mkdirSync("dist");',
+    'fs.writeFileSync("dist/setup.html", "<html>setup</html>");',
+    logStatements,
+    'setInterval(() => {}, 1000);',
+  ].join('\n');
+  return supervise({
+    cwd: dir, command: process.execPath, args: ['-e', source],
+    echo: false, maxMs: 1000, graceMs: 100, stableMs: 60,
+    pollMs: 20, terminateMs: 500,
+  });
+}
+
+test('separate stdout/stderr fragments cannot fabricate an export marker', async t => {
+  await assert.rejects(
+    markerProbe(t, String.raw`process.stdout.write('Exported: '); setTimeout(() => process.stderr.write('dist\n'), 80);`),
+    /export hard deadline exceeded/,
+  );
+});
+
+test('unfinished marker prefix cannot qualify a later non-marker line', async t => {
+  await assert.rejects(
+    markerProbe(t, String.raw`process.stdout.write('Exported: dist'); setTimeout(() => process.stdout.write(' not complete\n'), 80);`),
+    /export hard deadline exceeded/,
+  );
+});
+
+test('one stdout marker fragmented across writes still qualifies', async t => {
+  const result = await markerProbe(
+    t, String.raw`process.stdout.write('Exported: '); setTimeout(() => process.stdout.write('dist\n'), 80);`,
+  );
+  assert.equal(result.mode, 'supervised-post-export-exit');
+  assert.equal(result.files, 1);
+});
