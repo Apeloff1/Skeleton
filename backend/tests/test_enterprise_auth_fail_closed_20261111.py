@@ -49,6 +49,7 @@ def test_production_real_service_token_cannot_spoof_user_id(monkeypatch):
 
 def test_development_preserves_explicit_local_workflow(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("GAMEFORGE_DEV_OPEN", "1")
     service = auth_mod.AuthService()
     assert service.dev_open
     principal = asyncio.run(service.resolve(x_user_id="local"))
@@ -103,3 +104,23 @@ def test_scim_never_serializes_backend_exception_into_api_response(monkeypatch):
         ))
     assert error.value.status_code == 400
     assert "private" not in str(error.value.detail)
+
+
+def test_unconfigured_environment_is_never_anonymous_admin():
+    service = auth_mod.AuthService()
+    assert service.dev_open is False
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(service.resolve())
+    assert error.value.status_code == 401
+
+
+def test_oidc_settings_agree_with_effective_production_auth_policy(monkeypatch):
+    from gameforge.enterprise.oidc_config import load_oidc_settings
+
+    monkeypatch.setenv("GAMEFORGE_DEV_OPEN", "1")
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    assert auth_mod.AuthService().dev_open is False
+    assert load_oidc_settings().dev_open is False
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    assert auth_mod.AuthService().dev_open is True
+    assert load_oidc_settings().dev_open is True
