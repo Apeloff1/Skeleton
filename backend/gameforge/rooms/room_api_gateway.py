@@ -172,7 +172,7 @@ def _safe_headers(value: Any) -> dict[str, str] | None:
         if name.lower() in _FORBIDDEN_FORWARD_HEADERS:
             raise ValueError("external API contains a forbidden forwarding header")
         if len(raw_value) > 1024 or any(
-            ord(ch) < 32 or ord(ch) == 127 for ch in raw_value
+            ord(ch) < 32 or ord(ch) > 126 for ch in raw_value
         ):
             raise ValueError("external API header contains unsafe characters")
         headers[name] = raw_value
