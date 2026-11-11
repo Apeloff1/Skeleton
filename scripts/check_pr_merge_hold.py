@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import unicodedata
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -21,6 +22,16 @@ MAX_EVENT_BYTES = 4 * 1024 * 1024
 MAX_API_BYTES = 2 * 1024 * 1024
 REPOSITORY_RE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 SHA_RE = re.compile(r"[0-9a-f]{40}\Z")
+# A merge restriction is not advisory. Both the trusted-target gate and
+# the separate auto-merge policy must enforce the current live labels.
+EXPLICIT_HOLD_LABELS = frozenset({
+    "do-not-merge",
+    "no-merge",
+    "security-hold",
+    "release-hold",
+    "automerge:off",
+    "do-not-auto-merge",
+})
 
 
 class MergeHoldGateError(ValueError):
@@ -62,7 +73,7 @@ def _text(value: object, field: str, *, optional: bool = False) -> str | None:
     return value
 
 
-def _pr_fields(payload: object, repository: str, number: int) -> tuple[str, str | None, str, str]:
+def _pr_fields(payload: object, repository: str, number: int) -> tuple[str, str | None, str, str, tuple[str, ...]]:
     pr = _object(payload, "pull_request")
     if type(pr.get("number")) is not int or pr["number"] != number:
         raise MergeHoldGateError("PR number mismatch")
@@ -81,7 +92,22 @@ def _pr_fields(payload: object, repository: str, number: int) -> tuple[str, str 
         raise MergeHoldGateError("invalid PR head SHA")
     if not isinstance(base_sha, str) or not SHA_RE.fullmatch(base_sha):
         raise MergeHoldGateError("invalid PR base SHA")
-    return title, body, head_sha, base_sha
+    # GitHub's live pull-request API always provides a label array. Reject
+    # absent, malformed or oversized labels instead of quietly treating them
+    # as an empty allowlist (which would make a hold fail open).
+    labels = pr.get("labels")
+    if not isinstance(labels, list) or len(labels) > 100:
+        raise MergeHoldGateError("PR labels are absent or malformed")
+    label_names: set[str] = set()
+    for label in labels:
+        item = _object(label, "label")
+        name = _text(item.get("name"), "label name")
+        if not isinstance(name, str) or not 1 <= len(name) <= 100:
+            raise MergeHoldGateError("invalid PR label name")
+        if any(ord(ch) < 32 or ord(ch) == 127 for ch in name):
+            raise MergeHoldGateError("PR label contains control characters")
+        label_names.add(unicodedata.normalize("NFKC", name).casefold().strip())
+    return title, body, head_sha, base_sha, tuple(sorted(label_names))
 
 
 def validate_current_pr(event: dict, current_pr: dict, repository: str) -> None:
@@ -95,13 +121,17 @@ def validate_current_pr(event: dict, current_pr: dict, repository: str) -> None:
     if type(number) is not int or number <= 0:
         raise MergeHoldGateError("invalid event PR number")
     event_pr = _object(event.get("pull_request"), "event.pull_request")
-    old_title, old_body, old_head, old_base = _pr_fields(event_pr, repository, number)
-    title, body, head, base = _pr_fields(current_pr, repository, number)
-    if (old_title, old_body, old_head, old_base) != (title, body, head, base):
+    old_title, old_body, old_head, old_base, old_labels = _pr_fields(event_pr, repository, number)
+    title, body, head, base, labels = _pr_fields(current_pr, repository, number)
+    if (old_title, old_body, old_head, old_base, old_labels) != (
+        title, body, head, base, labels
+    ):
         raise MergeHoldGateError("PR metadata changed since workflow event")
+    if labels and EXPLICIT_HOLD_LABELS.intersection(labels):
+        raise MergeHoldGateError("explicit PR label merge hold")
     if has_explicit_merge_hold(title, body):
         raise MergeHoldGateError("explicit PR title/body merge hold")
-    print(f"PR #{number}: no explicit title/body merge hold at current head {head}")
+    print(f"PR #{number}: no explicit title, body or label merge hold at current head {head}")
 
 
 def fetch_current_pr(repository: str, number: int, token: str) -> dict:
