@@ -51,7 +51,7 @@ from routes.galaxy_studio_access import galaxy_request_access, record_identity, 
 
 load_dotenv()
 
-router = APIRouter(route_class=PublicExceptionRoute, 
+router = APIRouter(route_class=PublicExceptionRoute,
     prefix="/api/galaxy-studio", tags=["galaxy-studio"],
     dependencies=[Depends(galaxy_request_access)],
 )

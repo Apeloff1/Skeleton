@@ -39,7 +39,7 @@ _editor = require_role("editor")
 _admin = require_role("admin")
 # Apply the viewer floor to *all* CNS routes, including oversight/read
 # endpoints. Mutating routes retain their stronger editor/admin dependencies.
-router = APIRouter(route_class=PublicExceptionRoute, 
+router = APIRouter(route_class=PublicExceptionRoute,
     prefix="/api/gameforge/studio",
     tags=["gameforge-studio"],
     dependencies=[Depends(_viewer)],
