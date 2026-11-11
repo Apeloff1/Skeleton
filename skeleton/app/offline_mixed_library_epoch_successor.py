@@ -207,12 +207,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     ):
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
+    # The library audit is also called in-process by the app shell. Keep
+    # malformed CLI arguments fail-closed without aborting the whole process.
     try:
         args = parser.parse_args(argv)
     except SystemExit as exc:
-        # Argparse writes usage and raises; the public app CLI promises an
-        # integer failure result instead of escaping this admission boundary.
-        return int(exc.code) if type(exc.code) is int else 2
+        return int(exc.code)
     try:
         if not args.trusted_local_operator:
             raise PermissionError("trusted local operator acknowledgement required")

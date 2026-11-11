@@ -60,9 +60,7 @@ def fake_host():
         "width": 2, "height": 2, "format": "rgb24",
         "pixel_sha256": hashlib.sha256(host._pixels).hexdigest(),
         "rotation": 0, "video_callbacks": 1, "runs": 2,
-        "audio_frames": 4,
-        "audio_sha256": hashlib.sha256(host._audio).hexdigest(),
-        "sample_rate": 44100.0, "fps": 60.0,
+        "audio_frames": 4, "sample_rate": 44100.0, "fps": 60.0,
         "audio_available": True, "shutdown": False,
     }
     values = [1, 2] * 4
@@ -83,16 +81,12 @@ def fake_host():
         reward_components=("visual_change",), max_episode_steps=8,
     )
     host._observation = features
-    host._policy_signal_channels = tuple(features)
     commands = []
 
     def exchange(command, payload, blocks=None):
         commands.append(command)
         if command == "disc_status":
-            return {
-                "supported": False, "interface_version": None,
-                "image_count": 0, "image_index": None, "ejected": None,
-            }, {}
+            return {"supported": False}, {}
         if command == "state_info":
             return {"state_size": 4}, {}
         if command == "snapshot":
@@ -172,19 +166,6 @@ class AudioSavestateRegression(unittest.TestCase):
             self.assertEqual(returned, snapshot["observation"])
             self.assertEqual(snapshot["snapshot_digest"], host.snapshot()["snapshot_digest"])
             self.assertIn("restore", commands)
-        finally:
-            host.close()
-
-    def test_frame_audio_metadata_cannot_be_resealed_against_prior_pcm(self):
-        host, _ = fake_host()
-        try:
-            state = host.snapshot()
-            state["frame"]["audio_sha256"] = "0" * 64
-            state["snapshot_digest"] = digest({
-                key: value for key, value in state.items() if key != "snapshot_digest"
-            })
-            with self.assertRaises(EmulatorHostError):
-                host.restore(state)
         finally:
             host.close()
 

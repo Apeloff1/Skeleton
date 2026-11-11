@@ -206,5 +206,33 @@ class TestHypothesisEngine(unittest.TestCase):
         with self.assertRaises(HypothesisError):
             _hyp("H.OVERFLOW", prior=10 ** 1000)
 
+    def test_unobserved_high_prior_cannot_defeat_observed_low_prior_as_winner(self):
+        ledger = HypothesisLedger(self.sources)
+        ledger.register(_hyp("H.A", prior=0.95))
+        ledger.register(_hyp("H.B", prior=0.05))
+        digest = _source(self.sources, "SRC.B")
+        ledger.record(_event("SRC.B", digest, "H.B", ratio=3.0))
+        comparison = ledger.compare("QUESTION.A")
+        self.assertEqual(comparison.rankings[0].hypothesis_id, "H.A")
+        self.assertEqual(comparison.rankings[0].observed_sources, ())
+        self.assertEqual(comparison.rankings[1].observed_sources, ("SRC.B",))
+        self.assertIsNone(comparison.winner)
+        self.assertEqual(comparison.resolution, "unresolved")
+
+    def test_event_limits_cannot_crash_on_unhashable_or_ambiguous_strings(self):
+        event = _event("SRC.A", "a" * 64)
+        with self.assertRaisesRegex(HypothesisError, "limitation"):
+            replace(event, limitations=(["unhashable"],))
+        with self.assertRaisesRegex(HypothesisError, "duplicate limitations"):
+            replace(event, limitations=(" source-restricted ", "source-restricted"))
+        normalized = replace(event, limitations=(" source-restricted ",))
+        self.assertEqual(normalized.limitations, ("source-restricted",))
+
+    def test_numeric_receipts_are_canonical_across_integer_and_float_inputs(self):
+        first = _event("SRC.A", "a" * 64, ratio=3)
+        second = _event("SRC.A", "a" * 64, ratio=3.0)
+        self.assertIsInstance(first.likelihood_ratio, float)
+        self.assertEqual(first.digest, second.digest)
+
 if __name__ == "__main__":
     unittest.main()

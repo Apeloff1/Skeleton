@@ -1,22 +1,32 @@
 """Approved evaluation measurements and strict local lookup."""
-from importlib import import_module
 ALLOWED=frozenset(('accuracy', 'precision', 'recall', 'specificity', 'f1', 'balanced_accuracy', 'brier', 'mean_absolute_error', 'false_accept_rate', 'false_reject_rate', 'latency_guard', 'regression_delta'))
-_LOADERS = {
-    "accuracy": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.accuracy"),
-    "precision": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.precision"),
-    "recall": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.recall"),
-    "specificity": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.specificity"),
-    "f1": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.f1"),
-    "balanced_accuracy": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.balanced_accuracy"),
-    "brier": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.brier"),
-    "mean_absolute_error": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.mean_absolute_error"),
-    "false_accept_rate": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.false_accept_rate"),
-    "false_reject_rate": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.false_reject_rate"),
-    "latency_guard": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.latency_guard"),
-    "regression_delta": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.evaluation.regression_delta"),
-}
-
 def measure(name,observations):
-    if name not in ALLOWED:raise ValueError('unknown measurement contract')
-    module=_LOADERS[name]()
+    if type(name) is not str or name not in ALLOWED:
+        raise ValueError('unknown measurement contract')
+    if name == "accuracy":
+        from . import accuracy as module
+    elif name == "precision":
+        from . import precision as module
+    elif name == "recall":
+        from . import recall as module
+    elif name == "specificity":
+        from . import specificity as module
+    elif name == "f1":
+        from . import f1 as module
+    elif name == "balanced_accuracy":
+        from . import balanced_accuracy as module
+    elif name == "brier":
+        from . import brier as module
+    elif name == "mean_absolute_error":
+        from . import mean_absolute_error as module
+    elif name == "false_accept_rate":
+        from . import false_accept_rate as module
+    elif name == "false_reject_rate":
+        from . import false_reject_rate as module
+    elif name == "latency_guard":
+        from . import latency_guard as module
+    elif name == "regression_delta":
+        from . import regression_delta as module
+    else:
+        raise ValueError('unknown measurement contract')
     return module.measure(observations)

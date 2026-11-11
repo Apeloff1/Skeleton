@@ -107,7 +107,7 @@ def test_atomic_edits_revoke_approval_and_preserve_source():
     assert canonical(data) == original
     with pytest.raises(CanonError, match="unsupported_faction_edit"):
         edit_factions(data, world(), {"action": "execute_python", "value": {}})
-    with pytest.raises(CanonError, match="empty_faction_rules"):
+    with pytest.raises(CanonError, match="unknown_faction"):
         edit_factions(data, world(), {"action": "remove_faction",
                                       "value": {"id": "ferrymen"}})
 

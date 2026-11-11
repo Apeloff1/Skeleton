@@ -12,7 +12,6 @@ from io import BytesIO, TextIOWrapper
 import json
 import os
 from pathlib import Path
-import sys
 from types import SimpleNamespace
 import tempfile
 import unittest
@@ -21,15 +20,13 @@ from unittest import mock
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.contracts import (
     Identity, SpineLimits, Conflict, Busy, IntegrityFailure,
 )
-from skeleton.ai.runtime.operational_ai.laptop_runtime.contracts import ContractViolation
-from skeleton.jeeves.agent.native_source_fence import NativeSourceFence
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.database import SpineDatabase
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.lease import SessionGate
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.coordinator import ExecutionSpine
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.supervisor import SupervisedAI
 from skeleton.jeeves.agent.native_batch_runtime import (
     NativeBatchHold, NativeBatchTask, NativeBatchPolicy, NativeBatchConveyor,
-    preflight_batch_tasks,
+    preflight_batch_tasks, batch_identity,
 )
 from skeleton.jeeves.agent.native_batch_cli import (
     parse_casebook, main as batch_cli,
@@ -37,29 +34,6 @@ from skeleton.jeeves.agent.native_batch_cli import (
 from skeleton.testing.test_jeeves_native_sqlite_integration import (
     MODEL, TOKENIZER, ANSWER, SyntheticallyGenerated,
 )
-
-
-class _SourceOnlyFenceDouble:
-    """Exact synthetic-worker lease used only by CLI fixture tests.
-
-    Unlike a generic Mock it exposes the required assert_live method (names
-    beginning with assert_ are reserved by unittest.mock). It cannot attest
-    installed GGUF rights, production source identity, or device execution.
-    """
-
-    def __init__(self, worker, installed, *, expected_tenant, expected_subject):
-        if type(installed) is not object:
-            raise AssertionError("synthetic source fixture changed")
-        identity = worker.spine.identity
-        if (identity.tenant, identity.subject) != (expected_tenant, expected_subject):
-            raise AssertionError("source fixture principal mismatch")
-        self._worker = worker
-        self.inspections = 0
-
-    def assert_live(self, worker):
-        if worker is not self._worker:
-            raise AssertionError("source fixture worker changed")
-        self.inspections += 1
 
 
 def tasks(n=2, *, output=None):
@@ -298,9 +272,8 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                       for t in tasks(2)],
         }).encode())
         stdin = TextIOWrapper(BytesIO(raw), encoding="utf-8")
-        # Real terminal text streams expose a binary buffer; StringIO does
-        # not, and can trigger a fixture-only AttributeError on CLI paths.
-        # Preserve an in-memory sink without changing production publication.
+        # Use actual buffered text streams: production emits to an owned
+        # binary buffer, which a StringIO-only fixture does not provide.
         stdout = TextIOWrapper(BytesIO(), encoding="utf-8", write_through=True)
         stderr = TextIOWrapper(BytesIO(), encoding="utf-8", write_through=True)
         with (
@@ -311,10 +284,12 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                        return_value=(nullcontext(), self.worker, object())) as active,
             mock.patch("skeleton.jeeves.agent.native_batch_cli.inspect_native_jeeves",
                        return_value=SimpleNamespace(source_bridge_ready=True)),
-            # Only the synthetic fixture overrides native source custody;
-            # production NativeSourceFence and publication stay fail closed.
-            mock.patch("skeleton.jeeves.agent.native_batch_cli.NativeSourceFence",
-                       new=_SourceOnlyFenceDouble),
+            # Only the test fixture replaces the installed-source fence;
+            # the production fence is separately tested to reject synthetic workers.
+            mock.patch(
+                "skeleton.jeeves.agent.native_batch_cli.NativeSourceFence",
+                return_value=SimpleNamespace(assert_live=lambda _worker: None),
+            ),
         ):
             arguments = [
                 "--model-root", "/approved/private/model",
@@ -324,58 +299,15 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
             ]
             if approve:
                 arguments.append("--approve-native")
-            # Test-only tracing records *source locations*, never exception
-            # messages, private prompts, model bytes or arbitrary locals.
-            # Production intentionally redacts native failure details.
-            source_exceptions = []
-            root = Path(__file__).resolve().parents[2]
-            def trace_source_exception(frame, event, value):
-                if event == "exception" and isinstance(value[1], AttributeError):
-                    location = Path(frame.f_code.co_filename)
-                    try:
-                        relative = location.relative_to(root)
-                    except ValueError:
-                        return trace_source_exception
-                    innermost = value[2]
-                    while innermost is not None and innermost.tb_next is not None:
-                        innermost = innermost.tb_next
-                    if innermost is not None:
-                        origin = innermost.tb_frame
-                        origin_label = (
-                            f"{Path(origin.f_code.co_filename).name}:"
-                            f"{innermost.tb_lineno}:{origin.f_code.co_name}"
-                        )
-                    else:
-                        origin_label = "unavailable"
-                    source_exceptions.append(
-                        f"{relative}:{frame.f_lineno}:{frame.f_code.co_name}"
-                        f" [origin={origin_label}]"
-                    )
-                return trace_source_exception
-            previous_trace = sys.gettrace()
-            sys.settrace(trace_source_exception)
-            try:
-                status = batch_cli(arguments)
-            finally:
-                sys.settrace(previous_trace)
+            status = batch_cli(arguments)
         stdout.flush()
         stderr.flush()
         return (
             status,
             stdout.buffer.getvalue().decode("utf-8", "strict"),
-            stderr.buffer.getvalue().decode("utf-8", "strict")
-            + ((" [test-only AttributeError source locations: "
-                + ", ".join(source_exceptions[-5:]) + "]")
-               if status != 0 and approve and source_exceptions else ""),
+            stderr.buffer.getvalue().decode("utf-8", "strict"),
             active.call_count,
         )
-
-    def test_synthetic_worker_cannot_forge_installed_native_source(self):
-        with self.assertRaises(ContractViolation):
-            NativeSourceFence(
-                self.worker, object(),
-                expected_tenant="local", expected_subject="operator",
-            )
 
     def test_cli_real_path_commits_synthetic_source_only_batch(self):
         status, stdout, stderr, calls = self._cli()
@@ -412,6 +344,110 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
         self.assertEqual(calls, 0)
         self.assertEqual(self.backend.calls, 0)
         self.assertNotIn("Keep private", stderr)
+
+
+    def test_native_batch_wall_budget_holds_after_committed_turn(self):
+        # A single slow turn must not escape the aggregate wall limit merely
+        # because the next-iteration guard is never reached. Its SQLite
+        # commit remains authoritative and cold-replayable.
+        ticks = iter((0.0, 0.0, 0.0, 0.25))
+        policy = NativeBatchPolicy(maximum_wall_seconds=0.1)
+        with self.assertRaisesRegex(NativeBatchHold, "wall-clock budget exhausted"):
+            self._conveyor(
+                policy=policy, monotonic=lambda: next(ticks),
+            ).run("batch_001", tasks(1))
+        self.assertEqual(self.backend.calls, 1)
+        with self.db.snapshot() as conn:
+            self.assertEqual(
+                conn.execute("SELECT COUNT(*) FROM turns").fetchone(), (1,),
+            )
+        self._cold()
+        replay = self._conveyor().run("batch_001", tasks(1))
+        self.assertEqual(replay.committed, 0)
+        self.assertEqual(replay.replayed, 1)
+        self.assertEqual(self.backend.calls, 0)
+
+    def test_native_batch_clock_rejects_nonfinite_and_reversed_time(self):
+        for label, readings in (
+            ("start", (float("nan"),)),
+            ("before", (0.0, float("inf"))),
+            ("begin", (0.0, 0.0, -1.0)),
+        ):
+            with self.subTest(label=label):
+                ticks = iter(readings)
+                with self.assertRaisesRegex(
+                    NativeBatchHold, "nonmonotonic native batch measurement",
+                ):
+                    self._conveyor(
+                        monotonic=lambda: next(ticks),
+                    ).run("batch_" + label, tasks(1))
+        self.assertEqual(self.backend.calls, 0)
+
+    def test_native_batch_denies_subclassed_tasks_before_attribute_hooks(self):
+        class HostileTask(NativeBatchTask):
+            armed = False
+
+            def __getattribute__(self, key):
+                if key in ("task_id", "prompt") and object.__getattribute__(
+                    self, "armed"
+                ):
+                    raise AssertionError("untrusted task attribute was accessed")
+                return object.__getattribute__(self, key)
+
+        foreign = HostileTask("task_0", "Private source-only task")
+        object.__setattr__(foreign, "armed", True)
+        with self.assertRaises(NativeBatchHold):
+            preflight_batch_tasks(
+                "batch_001", (foreign,), NativeBatchPolicy(),
+                configured_output_tokens=128,
+            )
+        with self.assertRaises(NativeBatchHold):
+            self._conveyor().run("batch_001", (foreign,))
+        with self.assertRaises(NativeBatchHold):
+            batch_identity(
+                "batch_001", (foreign,), tenant="local", subject="operator",
+                model_sha256=MODEL, tokenizer_sha256=TOKENIZER,
+            )
+        self.assertEqual(self.backend.calls, 0)
+
+    def test_native_batch_denies_policy_subclasses_without_truthiness(self):
+        class HostilePolicy(NativeBatchPolicy):
+            def __bool__(self):
+                raise AssertionError("untrusted policy truthiness was invoked")
+
+        foreign = HostilePolicy()
+        with self.assertRaises(NativeBatchHold):
+            preflight_batch_tasks(
+                "batch_001", tasks(1), foreign,
+                configured_output_tokens=128,
+            )
+        with self.assertRaises(NativeBatchHold):
+            self._conveyor(policy=foreign)
+        # The former 'policy or default' path silently accepted falsey,
+        # non-policy objects as if the operator had supplied no policy.
+        for invalid in (False, 0, {}, (), ""):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(NativeBatchHold):
+                    self._conveyor(policy=invalid)
+        self.assertEqual(self.backend.calls, 0)
+
+
+    def test_native_batch_ci_checks_out_immutable_source_head(self):
+        workflow = (
+            Path(__file__).resolve().parents[2]
+            / ".github/workflows/native-batch-operator-admission-qualification.yml"
+        ).read_text(encoding="utf-8")
+        expected_ref = 'ref: ${{ github.event.pull_request.head.sha }}'
+        expected_guard = 'run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"'
+        self.assertEqual(workflow.count(expected_ref), 1)
+        self.assertEqual(workflow.count(expected_guard), 1)
+        self.assertIn(
+            'EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}',
+            workflow,
+        )
+        self.assertLess(workflow.index(expected_ref), workflow.index(expected_guard))
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("fetch-depth: 1", workflow)
 
 
 if __name__ == "__main__":

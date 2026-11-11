@@ -34,17 +34,67 @@ MAX_PAYLOAD_DEPTH = 32
 MAX_ENCODED_ITEMS = 50000
 
 
+def _validate_json_shape(value: object) -> None:
+    """Bound nesting and element count *before* JSON generation begins.
+
+    JSON can silently coerce non-string object keys and it can construct very
+    large intermediate strings before a post-serialization byte check. Only
+    exact JSON-compatible primitives/containers are admitted. Shared values
+    are allowed; cycles cannot pass the bounded depth traversal.
+    """
+    pending: list[tuple[object, int]] = [(value, 0)]
+    visited = 0
+    while pending:
+        item, depth = pending.pop()
+        visited += 1
+        if visited > MAX_ENCODED_ITEMS or depth > MAX_PAYLOAD_DEPTH:
+            raise ValueError("replay JSON node/depth budget exhausted")
+        if type(item) is dict:
+            if len(item) > MAX_ENCODED_ITEMS - visited:
+                raise ValueError("replay JSON node budget exhausted")
+            for key, child in item.items():
+                if type(key) is not str or len(key) > MAX_RECORD_BYTES:
+                    raise ValueError("replay JSON requires bounded string keys")
+                pending.append((child, depth + 1))
+        elif type(item) in (tuple, list):
+            if len(item) > MAX_ENCODED_ITEMS - visited:
+                raise ValueError("replay JSON node budget exhausted")
+            pending.extend((child, depth + 1) for child in item)
+        elif item is None or type(item) is bool:
+            continue
+        elif type(item) is str:
+            if len(item) > MAX_RECORD_BYTES:
+                raise ValueError("replay JSON string exceeds byte budget")
+        elif type(item) is int:
+            # Far more than ordinary JSON number precision, but rejects a
+            # pathological integer before expensive decimal conversion.
+            if item.bit_length() > 16384:
+                raise ValueError("replay JSON integer exceeds numeric budget")
+        elif type(item) is float:
+            if not math.isfinite(item):
+                raise ValueError("replay requires finite JSON numbers")
+        else:
+            raise ValueError("replay requires strict canonical JSON data")
+
+
 def _canonical(value: object) -> bytes:
-    """Only bounded strict JSON values cross the replay/training custody boundary."""
+    """Canonical, alias-free bytes under hard element, depth and byte bounds."""
+    _validate_json_shape(value)
+    payload = bytearray()
     try:
-        payload = json.dumps(value, sort_keys=True, separators=(",", ":"),
-                             ensure_ascii=True, allow_nan=False).encode("ascii")
-    except (ValueError, TypeError, OverflowError, RecursionError) as exc:
+        encoder = json.JSONEncoder(
+            sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+            allow_nan=False,
+        )
+        for chunk in encoder.iterencode(value):
+            # ensure_ascii guarantees ASCII. Check character count first so
+            # an oversized single string chunk is never copied to the buffer.
+            if len(chunk) > MAX_RECORD_BYTES - len(payload):
+                raise ValueError("replay payload exceeds strict byte bound")
+            payload.extend(chunk.encode("ascii"))
+    except (TypeError, OverflowError, RecursionError, UnicodeError) as exc:
         raise ValueError("replay requires strict canonical JSON data") from exc
-    if len(payload) > MAX_RECORD_BYTES:
-        raise ValueError("replay payload exceeds strict byte bound")
-    # JSON round-trip also makes JSON type coercion and object aliasing explicit.
-    return payload
+    return bytes(payload)
 
 
 def _digest(value: object) -> str:
@@ -80,9 +130,14 @@ class ExactEnvironmentRegistry:
         self._lock = threading.RLock()
 
     def register(self, identity: EnvironmentIdentity, adapter: EnvironmentAdapter) -> None:
+        if not isinstance(identity, EnvironmentIdentity):
+            raise TypeError("registry requires exact EnvironmentIdentity")
         if not isinstance(adapter, EnvironmentAdapter):
             raise TypeError("adapter does not implement EnvironmentAdapter")
-        if adapter.simulation_id != identity.simulation_id or adapter.seed != identity.seed:
+        if (type(adapter.simulation_id) is not str
+                or type(adapter.seed) is not int
+                or adapter.simulation_id != identity.simulation_id
+                or adapter.seed != identity.seed):
             raise EnvironmentMismatchError("adapter does not match declared identity")
         with self._lock:
             if identity.key() not in self._items and len(self._items) >= self.max_environments:
@@ -92,11 +147,22 @@ class ExactEnvironmentRegistry:
             self._items[identity.key()] = (identity, adapter)
 
     def resolve(self, identity: EnvironmentIdentity) -> EnvironmentAdapter:
+        if not isinstance(identity, EnvironmentIdentity):
+            raise TypeError("resolution requires exact EnvironmentIdentity")
         with self._lock:
             entry = self._items.get(identity.key())
-        if entry is None:
-            raise EnvironmentMismatchError(f"no exact environment for {identity.key()}")
-        return entry[1]
+            if entry is None:
+                raise EnvironmentMismatchError(f"no exact environment for {identity.key()}")
+            registered, adapter = entry
+            # A previously admitted adapter is mutable. Refuse a lookup if
+            # its identifier or seed has drifted since the registration.
+            if (registered != identity
+                    or type(adapter.simulation_id) is not str
+                    or type(adapter.seed) is not int
+                    or adapter.simulation_id != identity.simulation_id
+                    or adapter.seed != identity.seed):
+                raise EnvironmentMismatchError("registered adapter identity changed")
+            return adapter
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +223,8 @@ class BoundedRecordBuffer:
             raise ValueError("invalid replay record descriptor")
         # Snapshot and verify before admitting; callers cannot poison retention
         # or sampling after insertion by mutating the source dictionary.
+        if len(record.payload) > MAX_ENCODED_ITEMS:
+            raise ValueError("replay mapping exceeds element budget")
         normalized = json.loads(_canonical(dict(record.payload)))
         digest = _digest(normalized)
         if digest != record.payload_digest:
@@ -176,14 +244,35 @@ class BoundedRecordBuffer:
         with self._lock:
             return len(self._records)
 
+    def _records_locked(self) -> tuple[ReplayRecord, ...]:
+        return tuple(
+            ReplayRecord(
+                record.example_id, record.environment_key, record.payload_digest,
+                json.loads(_canonical(record.payload)),
+            )
+            for record in self._records
+        )
+
+    def _digest_locked(self) -> str:
+        # Preserve json.dumps(sort_keys=True, separators=(",", ":")) digest
+        # compatibility while avoiding a materialized 100k-item list and a
+        # second full deep-copy of each retained record.
+        digest = hashlib.sha256()
+        digest.update(b"[")
+        for index, record in enumerate(self._records):
+            if index:
+                digest.update(b",")
+            digest.update(_canonical((record.example_id, record.payload_digest)))
+        digest.update(b"]")
+        return digest.hexdigest()
+
     def records(self) -> tuple[ReplayRecord, ...]:
         with self._lock:
-            return tuple(ReplayRecord(r.example_id, r.environment_key,
-                                      r.payload_digest, json.loads(_canonical(dict(r.payload))))
-                         for r in self._records)
+            return self._records_locked()
 
     def digest(self) -> str:
-        return _digest([(r.example_id, r.payload_digest) for r in self.records()])
+        with self._lock:
+            return self._digest_locked()
 
 
 class HoldoutBuffer(BoundedRecordBuffer):
@@ -214,10 +303,16 @@ class DeterministicReplayBuffer(BoundedRecordBuffer):
         self._append(record)
 
     def sample(self, k: int, *, seed: int) -> tuple[ReplayRecord, ...]:
-        if type(k) is not int or not 0 <= k <= 100000 or type(seed) is not int or seed.bit_length() > 256:
+        if (type(k) is not int or not 0 <= k <= 100000
+                or type(seed) is not int or not 0 <= seed < 2**256):
             raise ValueError("bounded reproducible sampling coordinates required")
-        items = self.records()
-        rng = random.Random(f"{seed}:{self.digest()}")
+        # The sample and its randomness seed must refer to the SAME buffer
+        # generation. Two independent reads could race a writer/eviction and
+        # silently assign a different replay digest to the returned records.
+        with self._lock:
+            items = self._records_locked()
+            snapshot_digest = self._digest_locked()
+        rng = random.Random(f"{seed}:{snapshot_digest}")
         return tuple(rng.sample(items, min(k, len(items))))
 
 
@@ -259,6 +354,8 @@ def make_record(example_id: str, identity: EnvironmentIdentity, payload: Mapping
         raise ValueError("invalid bounded replay example identity")
     if not isinstance(identity, EnvironmentIdentity) or not isinstance(payload, Mapping):
         raise ValueError("invalid replay source identity or payload")
+    if len(payload) > MAX_ENCODED_ITEMS:
+        raise ValueError("replay payload mapping exceeds element budget")
     copied = json.loads(_canonical(dict(payload)))
     return ReplayRecord(example_id, identity.key(), _digest(copied), copied)
 

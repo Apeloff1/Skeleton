@@ -55,6 +55,26 @@ def _model_row(item: object) -> DeclaredModel | None:
     return DeclaredModel(key, provider, model, item.get("active") is True)
 
 
+def _validate_panel_request(
+    selected: list[str] | tuple[str, ...] | None,
+    judge_key: str | None,
+    maximum: int,
+) -> None:
+    """Reject malformed direct callers before engine or catalog I/O."""
+    if type(maximum) is not int or not 1 <= maximum <= 5:
+        raise PanelUnavailable("invalid_panel_limit")
+    if selected is not None and (
+        type(selected) not in (list, tuple)
+        or len(selected) > maximum
+        or any(type(key) is not str or not 1 <= len(key) <= 385 for key in selected)
+    ):
+        raise PanelUnavailable("invalid_panel_selection")
+    if judge_key is not None and (
+        type(judge_key) is not str or len(judge_key) > 385
+    ):
+        raise PanelUnavailable("invalid_judge_selection")
+
+
 def _catalog_panel(
     catalog: Mapping[str, Any],
     *,
@@ -62,8 +82,13 @@ def _catalog_panel(
     judge_key: str | None,
     maximum: int = 5,
 ) -> DeclaredPanel:
+    _validate_panel_request(selected, judge_key, maximum)
+    if not isinstance(catalog, Mapping):
+        raise PanelUnavailable("engine_model_inventory_unavailable")
     rows = catalog.get("models")
-    if not isinstance(rows, list) or not 1 <= maximum <= 5:
+    # A truncated catalog could conceal duplicate or conflicting identities.
+    # Reject oversized direct-call inventories instead of trusting a prefix.
+    if not isinstance(rows, list) or len(rows) > 64:
         raise PanelUnavailable("engine_model_inventory_unavailable")
     ready: dict[str, DeclaredModel] = {}
     for item in rows[:64]:
@@ -127,6 +152,14 @@ async def tenant_panel(
     maximum: int = 5,
 ) -> DeclaredPanel:
     """Resolve one model snapshot from explicit engine-side authorization."""
+    # Direct Python callers do not pass through the HTTP admission layer.
+    # Validate both request and tenant authority before constructing the engine.
+    _validate_panel_request(selected, judge_key, maximum)
+    for identity in (tenant_id, actor_id):
+        if (type(identity) is not str or not 1 <= len(identity) <= 512
+                or identity != identity.strip()
+                or any(ord(char) < 32 for char in identity)):
+            raise PanelUnavailable("invalid_panel_identity")
     try:
         client = EngineClient.from_env()
         catalog = await model_catalog(client, tenant_id=tenant_id, actor_id=actor_id)

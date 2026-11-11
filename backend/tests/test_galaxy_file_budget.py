@@ -172,6 +172,91 @@ def test_nested_eager_helpers_share_the_same_finite_pending_owner(bounded_build,
     assert not build.get("completed_at")
 
 
+def test_pending_vault_paths_are_type_checked_before_hash_or_equality(bounded_build):
+    build = bounded_build(4)
+
+    class ForeignPath:
+        def __hash__(self):
+            pytest.fail("untrusted path hash must not execute")
+
+        def __eq__(self, _other):
+            pytest.fail("untrusted path equality must not execute")
+
+    class ForeignString(str):
+        def __hash__(self):
+            pytest.fail("subclass path hash must not execute")
+
+        def __eq__(self, _other):
+            pytest.fail("subclass path equality must not execute")
+
+    for hostile in (ForeignPath(), ForeignString("first.txt")):
+        with pytest.raises(ValueError, match="pending vault paths must be strings"):
+            vault.get_file_count(build["build_id"], pending_paths=(hostile,))
+    assert vault.get_file_paths(build["build_id"]) == ()
+    assert vault.get_file_count(build["build_id"]) == 0
+
+
+def test_pending_vault_paths_deduplicate_without_mutating_durable_snapshot(bounded_build):
+    build = bounded_build(4)
+    build_id = build["build_id"]
+    assert vault.get_file_count(build_id, pending_paths=("a.txt", "a.txt", "b.txt")) == 2
+    assert vault.get_file_paths(build_id) == ()
+    vault.append_files(build_id, {"a.txt": "durable source"})
+    assert vault.get_file_paths(build_id) == ("a.txt",)
+    assert vault.get_file_count(build_id, pending_paths=("a.txt", "b.txt", "b.txt")) == 2
+    assert vault.get_file_paths(build_id) == ("a.txt",)
+
+
+def test_pending_vault_snapshot_rejects_nonterminating_duplicates(bounded_build, monkeypatch):
+    build = bounded_build(4)
+    monkeypatch.setattr(vault, "_MAX_PENDING_PATHS", 3)
+    consumed = []
+
+    def infinite_duplicates():
+        while True:
+            consumed.append("same.txt")
+            yield "same.txt"
+
+    with pytest.raises(ValueError, match="snapshot exceeds admission"):
+        vault.get_file_count(build["build_id"], pending_paths=infinite_duplicates())
+    # Exactly one over-limit element is consumed, never an unbounded loop.
+    assert len(consumed) == 4
+    assert vault.get_file_paths(build["build_id"]) == ()
+    assert vault.get_file_count(build["build_id"], pending_paths=("a", "b", "b")) == 2
+
+
+def test_pending_vault_snapshot_caps_total_entries_not_only_unique_keys(bounded_build, monkeypatch):
+    build = bounded_build(4)
+    monkeypatch.setattr(vault, "_MAX_PENDING_PATHS", 3)
+    assert vault.get_file_count(build["build_id"], pending_paths=iter(("a", "a", "b"))) == 2
+    with pytest.raises(ValueError, match="snapshot exceeds admission"):
+        vault.get_file_count(build["build_id"], pending_paths=iter(("a", "a", "a", "a")))
+    # Valid mapping keys remain a supported pending-path snapshot.
+    assert vault.get_file_count(build["build_id"], pending_paths={"a": 1, "b": 2}) == 2
+
+
+def test_pending_vault_snapshot_bounds_total_utf8_bytes(bounded_build, monkeypatch):
+    build = bounded_build(4)
+    monkeypatch.setattr(vault, "_MAX_PENDING_PATH_BYTES", 10)
+    assert vault.get_file_count(build["build_id"], pending_paths=("abc", "de")) == 2
+    with pytest.raises(ValueError, match="path bytes exceed admission"):
+        vault.get_file_count(build["build_id"], pending_paths=("123456", "abcdef"))
+    # Unicode code points are not interchangeable with UTF-8 storage bytes.
+    with pytest.raises(ValueError, match="path bytes exceed admission"):
+        vault.get_file_count(build["build_id"], pending_paths=("€" * 4,))
+    assert vault.get_file_paths(build["build_id"]) == ()
+
+
+def test_pending_vault_snapshot_rejects_single_oversized_path(bounded_build):
+    build = bounded_build(4)
+    with pytest.raises(ValueError, match="path exceeds admission"):
+        vault.get_file_count(
+            build["build_id"], pending_paths=("x" * (vault._MAX_ARCHIVE_MEMBER_LENGTH + 1),)
+        )
+    assert vault.get_file_count(build["build_id"], pending_paths=("a.txt",)) == 1
+    assert vault.get_file_paths(build["build_id"]) == ()
+
+
 def test_global_upper_bound_still_applies_to_explicit_requests(bounded_build, monkeypatch):
     monkeypatch.setattr(galaxy, "GLOBAL_FILE_BUDGET", 2)
     build = bounded_build(1_000_000)
@@ -212,7 +297,7 @@ def test_unavailable_generation_fails_closed_without_stub_or_fallback_files(boun
     assert build["status"] == build["_bg_status"] == "failed"
     assert build["_bg_stop_reason"] == "phase_generation_failed"
     assert vault.get_file_count(build["build_id"]) == build["file_count"] == 0
-    assert vault.get_file_paths(build["build_id"]) == []
+    assert vault.get_file_paths(build["build_id"]) == ()
     assert build["files"] == {}
     assert build["_bg_partial_artifacts"] is False
     assert not any(phase["status"] == "completed" for phase in build["phases"])

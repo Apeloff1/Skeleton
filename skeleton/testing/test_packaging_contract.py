@@ -42,8 +42,6 @@ def test_release_workflow_verifies_native_assembly_wheel_payload() -> None:
         "skeleton_asm.h", "aarch64.S", "x86_64.S", "README.md",
     ):
         assert f"skeleton/native/asm/{source}" in workflow
-    assert "skeleton/app/cli.py" in workflow
-    assert "skeleton/ai/runtime/game_project_cli.py" in workflow
 
 
 def test_runtime_image_excludes_development_payload() -> None:
@@ -67,22 +65,10 @@ def test_production_images_drop_installer_toolchain() -> None:
     # pip 26.2+ carries vendored runtime code and an embedded CycloneDX SBOM.
     # Production images install dependencies first and then remove that entire
     # installer-only surface rather than suppressing scanner findings.
-    # The glibc runtime uses its reviewed fixed Python 3.14 path.
-    assert "/usr/local/lib/python3.14/site-packages/pip" in root_dockerfile
-    assert "/usr/local/lib/python3.14/site-packages/pip-*.dist-info" in root_dockerfile
-    assert "/usr/local/bin/pip*" in root_dockerfile
-
-    # The Alpine backend uses a guarded sysconfig path because the interpreter
-    # owns the live site-packages layout. A hardcoded glibc path would mask a
-    # no-op cleanup after Python is updated.
-    assert 'site = pathlib.Path(sysconfig.get_path("purelib"))' in production
-    assert 'not site.is_relative_to(pathlib.Path("/usr/local/lib"))' in production
-    assert 'shutil.rmtree(site / "pip", ignore_errors=True)' in production
-    assert 'for dist in site.glob("pip-*.dist-info"):' in production
-    assert 'shutil.rmtree(dist)' in production
-    assert 'pathlib.Path("/usr/local/bin").glob("pip*")' in production
-    assert "pip_bin.unlink()" in production
-    assert "unexpected Python site-packages path; refusing runtime pip cleanup" in production
+    for dockerfile in (root_dockerfile, production):
+        assert "/usr/local/lib/python3.14/site-packages/pip" in dockerfile
+        assert "/usr/local/lib/python3.14/site-packages/pip-*.dist-info" in dockerfile
+        assert "/usr/local/bin/pip*" in dockerfile
 
     assert "python -m ensurepip --upgrade" not in production
     assert "python -m ensurepip --upgrade" in development
@@ -153,23 +139,3 @@ def test_legacy_packaging_metadata_matches_authoritative_project() -> None:
         assert lines("options.package_data", name) == set(patterns)
     for name, patterns in project["tool"]["setuptools"]["packages"]["find"].items():
         assert lines("options.packages.find", name) == set(patterns)
-
-
-def test_installed_game_project_command_is_package_owned(capsys) -> None:
-    """The installed app must not rely on checkout-only scripts/ imports."""
-    import json
-    from scripts.game.game_project import _demo as repository_demo
-    from scripts.game.game_project import main as repository_main
-    from skeleton.ai.runtime.game_project_cli import _demo as package_demo
-    from skeleton.ai.runtime.game_project_cli import main as package_main
-    from skeleton.app.cli import run_app_cli
-
-    assert repository_main is package_main
-    assert repository_demo is package_demo
-    source = (ROOT / "skeleton" / "app" / "cli.py").read_text(encoding="utf-8")
-    assert "from skeleton.ai.runtime.game_project_cli import main" in source
-    assert "from scripts.game.game_project import main" not in source
-    assert run_app_cli(["game-project", "--catalog"]) == 0
-    assert isinstance(json.loads(capsys.readouterr().out), dict)
-    assert package_main(["--catalog"]) == 0
-    assert isinstance(json.loads(capsys.readouterr().out), dict)

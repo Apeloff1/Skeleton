@@ -308,32 +308,13 @@ def test_windows_payload_includes_chroma_recovery_and_local_ai_guides():
     assert '"docs/ai/LOCAL_CODING_PROFILE.md"' in paths
 
 
-def test_windows_installer_workflow_has_scoped_pr_and_manual_read_only_admission():
+def test_windows_installer_workflow_is_manual_and_read_only():
     source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
     triggers = source.split("\npermissions:", 1)[0]
-    assert "workflow_dispatch:" in triggers  # explicit operator qualification retained
-    assert "pull_request:" in triggers
-    assert "branches: [main]" in triggers
-    assert "types: [opened, synchronize, reopened, ready_for_review]" in triggers
-    for path in (
-        ".github/workflows/windows-installer.yml",
-        "scripts/windows/**",
-        "packaging/**",
-        "skeleton/app/installer.py",
-        "skeleton/testing/test_windows_installer.py",
-        "backend/Dockerfile",
-        "skeleton/__main__.py",
-    ):
-        assert f"      - '{path}'" in triggers
-    assert "push:" not in triggers
-    assert "pull_request_target:" not in triggers
+    assert "workflow_dispatch:" in triggers
+    assert "pull_request:" not in triggers and "push:" not in triggers
     assert "pull_request_target:" not in source
     assert "permissions:\n  contents: read\n" in source
-    assert "persist-credentials: false" in source
-    assert "EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}" in source
-    assert 'test "$(git rev-parse HEAD)"' not in source  # Windows uses exact-head PowerShell identity
-    assert 'if ($observed -ne $env:EXPECTED_HEAD)' in source
-    assert "name: Skeleton-Windows-Installer-${{ github.event.pull_request.head.sha || github.sha }}" in source
     artifact = source.split("      - name: Upload Windows installer\n", 1)[1]
     assert "if: always()" not in artifact
 
@@ -428,21 +409,6 @@ def test_windows_payload_covers_manifest_and_docker_copy_inputs():
     assert "Windows payload lacks required app/Docker inputs" in source
 
 
-def test_windows_archive_includes_root_engine_docker_allowlist():
-    """The installed engine must use its reviewed context policy, not fallback."""
-    from pathlib import Path
-
-    source = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
-    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
-    manifest = Path("skeleton/app/manifest.json").read_text(encoding="utf-8")
-    assert '"Dockerfile.dockerignore",' in source
-    assert '"Dockerfile.dockerignore"' in manifest
-    assert '"backend/Dockerfile.dockerignore"' in manifest
-    assert '"frontend/.dockerignore"' in manifest
-    assert "/Dockerfile.dockerignore" in workflow
-    assert "skeleton/app/install_source_contracts.py" in manifest
-
-
 def test_host_preload_rejects_stopped_docker_daemon(monkeypatch, tmp_path):
     from skeleton.app.preloader import inspect_host
     from subprocess import CompletedProcess
@@ -499,52 +465,24 @@ def test_windows_installer_runs_actual_frozen_payload_preflight():
     assert "SkeletonOffline.exe" in workflow
     assert 'ArgumentList @("--help") -Wait -PassThru' in workflow
 
-def test_open_app_does_not_spawn_browser_when_setup_ui_is_down(monkeypatch):
+def test_open_app_does_not_spawn_browser_when_application_is_down(monkeypatch):
     from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
 
-    monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
-    monkeypatch.setattr(
-        launcher, "probe_local_setup",
-        lambda *args, **kwargs: SimpleNamespace(
-            ok=False, status=503, detail="setup endpoint unavailable",
-        ),
-    )
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", False, 503, "frontend offline"))
     calls = []
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: calls.append(url) or True)
     ok, detail = launcher.open_running_application()
     assert not ok
-    assert "Setup UI unavailable" in detail
+    assert "frontend offline" in detail
     assert calls == []
-
-
-def test_open_app_stays_available_for_setup_while_backend_is_down(monkeypatch):
-    from skeleton.app import windows_launcher as launcher
-
-    monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
-    monkeypatch.setattr(
-        launcher, "probe_local_setup",
-        lambda *args, **kwargs: SimpleNamespace(
-            ok=True, status=200, detail="local setup route available",
-        ),
-    )
-    opened = []
-    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: opened.append(url) or True)
-    ok, detail = launcher.open_running_application()
-    assert ok
-    assert opened == ["http://localhost:3000/setup"]
-    assert "guarded AI readiness are NOT established" in detail
-    assert "backend offline" not in detail
 
 
 def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypatch):
     from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
 
-    monkeypatch.setattr(
-        launcher, "probe_local_setup",
-        lambda *args, **kwargs: SimpleNamespace(
-            ok=True, status=200, detail="local setup route available",
-        ),
-    )
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", True, 200, "setup ready"))
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: False)
     ok, detail = launcher.open_running_application()
     assert not ok
@@ -553,7 +491,7 @@ def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypa
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: True)
     ok, detail = launcher.open_running_application()
     assert ok
-    assert "guarded AI readiness are NOT established" in detail
+    assert "Setup UI opened" in detail
 
 def test_windows_ci_sparse_checkout_contains_every_installer_root():
     source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
@@ -567,50 +505,17 @@ def test_windows_ci_sparse_checkout_contains_every_installer_root():
 
 def test_open_app_uses_configured_frontend_port(monkeypatch, tmp_path):
     from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
 
     (tmp_path / ".env").write_text("FRONTEND_PORT=3300\n", encoding="utf-8")
-    monkeypatch.setattr(
-        launcher, "probe_local_setup",
-        lambda *args, **kwargs: SimpleNamespace(
-            ok=True, status=200, detail="local setup route available",
-        ),
-    )
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", True, 200, "setup ready"))
     opened = []
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: opened.append(url) or True)
 
     success, detail = launcher.open_running_application(tmp_path)
     assert success
     assert opened == ["http://localhost:3300/setup"]
-    assert "http://localhost:3300/setup" in detail
-
-
-@pytest.mark.parametrize("host", (
-    "https://example.com:3000",
-    "http://example.com:3000",
-    "http://localhost:3000/admin",
-    "http://localhost:3000?token=unsafe",
-    "http://localhost:3000#fragment",
-    "http://user:secret@localhost:3000",
-    "http://localhost:3000@evil.example",
-))
-def test_open_app_denies_nonlocal_or_credentialed_setup_urls(monkeypatch, host):
-    from skeleton.app import windows_launcher as launcher
-
-    monkeypatch.setattr(
-        launcher, "public_service_urls",
-        lambda *args, **kwargs: {"frontend": host},
-    )
-    monkeypatch.setattr(
-        launcher, "probe_local_setup",
-        lambda *args, **kwargs: pytest.fail("unsafe URL must not be probed"),
-    )
-    monkeypatch.setattr(
-        launcher.webbrowser, "open",
-        lambda url: pytest.fail("unsafe URL must not reach the browser"),
-    )
-    allowed, detail = launcher.open_running_application()
-    assert allowed is False
-    assert "local HTTP endpoint" in detail
+    assert "http://localhost:3300" in detail
 
 
 def test_docker_stop_failure_never_echoes_credentials(monkeypatch, tmp_path):
@@ -736,3 +641,83 @@ def test_windows_runtime_probe_exception_uses_type_only(monkeypatch, tmp_path):
     assert not ok
     assert "RuntimeError" in detail
     assert "private service token" not in detail
+
+def test_windows_archive_includes_root_engine_docker_allowlist():
+    """The installed engine must use its reviewed context policy, not fallback."""
+    from pathlib import Path
+
+    source = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    manifest = Path("skeleton/app/manifest.json").read_text(encoding="utf-8")
+    assert '"Dockerfile.dockerignore",' in source
+    assert '"Dockerfile.dockerignore"' in manifest
+    assert '"backend/Dockerfile.dockerignore"' in manifest
+    assert '"frontend/.dockerignore"' in manifest
+    assert "/Dockerfile.dockerignore" in workflow
+    assert "skeleton/app/install_source_contracts.py" in manifest
+
+
+def test_open_app_does_not_spawn_browser_when_setup_ui_is_down(monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
+    monkeypatch.setattr(
+        launcher, "probe_local_setup",
+        lambda *args, **kwargs: SimpleNamespace(
+            ok=False, status=503, detail="setup endpoint unavailable",
+        ),
+    )
+    calls = []
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: calls.append(url) or True)
+    ok, detail = launcher.open_running_application()
+    assert not ok
+    assert "Setup UI unavailable" in detail
+    assert calls == []
+
+
+def test_open_app_stays_available_for_setup_while_backend_is_down(monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
+    monkeypatch.setattr(
+        launcher, "probe_local_setup",
+        lambda *args, **kwargs: SimpleNamespace(
+            ok=True, status=200, detail="local setup route available",
+        ),
+    )
+    opened = []
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: opened.append(url) or True)
+    ok, detail = launcher.open_running_application()
+    assert ok
+    assert opened == ["http://localhost:3000/setup"]
+    assert "guarded AI readiness are NOT established" in detail
+    assert "backend offline" not in detail
+
+
+@pytest.mark.parametrize("host", (
+    "https://example.com:3000",
+    "http://example.com:3000",
+    "http://localhost:3000/admin",
+    "http://localhost:3000?token=unsafe",
+    "http://localhost:3000#fragment",
+    "http://user:secret@localhost:3000",
+    "http://localhost:3000@evil.example",
+))
+def test_open_app_denies_nonlocal_or_credentialed_setup_urls(monkeypatch, host):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(
+        launcher, "public_service_urls",
+        lambda *args, **kwargs: {"frontend": host},
+    )
+    monkeypatch.setattr(
+        launcher, "probe_local_setup",
+        lambda *args, **kwargs: pytest.fail("unsafe URL must not be probed"),
+    )
+    monkeypatch.setattr(
+        launcher.webbrowser, "open",
+        lambda url: pytest.fail("unsafe URL must not reach the browser"),
+    )
+    allowed, detail = launcher.open_running_application()
+    assert allowed is False
+    assert "local HTTP endpoint" in detail

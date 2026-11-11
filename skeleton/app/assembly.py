@@ -655,23 +655,18 @@ def preflight(
 
     from skeleton.app.install_source_contracts import _bounded_source_text, build_source_errors
 
-    build_errors = build_source_errors(root)
-    checks.append(
-        AssemblyCheck(
-            code="image:build-inputs",
-            ok=not build_errors,
-            message=(
-                "all declared Docker COPY inputs and context exclusions are present"
-                if not build_errors
-                else "; ".join(build_errors[:6])
-            ),
-        )
-    )
+    source_errors = build_source_errors(root)
+    checks.append(AssemblyCheck(
+        code="image:build-inputs",
+        ok=not source_errors,
+        message=("declared Docker context inputs are bounded and present"
+                 if not source_errors else "; ".join(source_errors[:6])),
+    ))
 
     backend_dockerfile = root / "backend/Dockerfile"
     try:
-        # Reuse the descriptor-anchored, bounded reader. A changing Dockerfile
-        # must never be treated as compatible by a stale source snapshot.
+        # Small, bounded, source-only inspection; no Docker invocation and
+        # no host mutations before the existing setup process lock.
         image_errors = backend_python_image_errors(
             _bounded_source_text(backend_dockerfile)
         )

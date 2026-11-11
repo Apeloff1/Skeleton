@@ -340,6 +340,9 @@ async def deliberate(task: str, prompt: str, system: str = "",
     if (
         type(winner_idx) is not int or not 0 <= winner_idx < len(candidates)
         or "score" not in candidates[winner_idx]
+        # The judge's claimed winner must agree with its validated weighted
+        # scores. Keep its tie choice, but never publish a lower-scored winner.
+        or candidates[winner_idx]["score"] < max(score for score, _ in scored)
     ):
         winner_idx = max(scored)[1]
 

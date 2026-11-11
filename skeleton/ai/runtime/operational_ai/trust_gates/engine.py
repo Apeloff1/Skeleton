@@ -1,6 +1,6 @@
 """Known-name gate dispatcher and SHA256-bound acceptance receipts."""
 from functools import lru_cache
-from importlib import import_module,resources
+from importlib import resources
 from .contracts import GateViolation,canonical,digest,fail,load_json
 from .schema import verify
 
@@ -15,33 +15,52 @@ def _schema(name):
     if type(schema) is not dict or set(schema)!={"type","fields"} or schema["type"]!="object": fail("corrupt schema")
     return schema
 
-_SEMANTICS = {
-    "actor": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.actor"),
-    "artifact": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.artifact"),
-    "tokenizer": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.tokenizer"),
-    "conversation": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.conversation"),
-    "sampling": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.sampling"),
-    "admission": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.admission"),
-    "quota": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.quota"),
-    "stream": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.stream"),
-    "grant": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.grant"),
-    "tool": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.tool"),
-    "memory": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.memory"),
-    "retrieval": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.retrieval"),
-    "journal": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.journal"),
-    "replay": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.replay"),
-    "path": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.path"),
-    "transport": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.transport"),
-    "checkpoint": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.checkpoint"),
-    "cancel": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.cancel"),
-    "evaluation": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.evaluation"),
-    "promotion": lambda: import_module("skeleton.ai.runtime.operational_ai.trust_gates.semantics.promotion"),
-}
-
 def validate(name,payload):
     if name not in _NAMES: fail("unknown trust gate")
     raw=canonical(payload)
     verify(payload,_schema(name))
-    _SEMANTICS[name]().check(payload)
+    if name == "actor":
+        from .semantics import actor as semantic
+    elif name == "artifact":
+        from .semantics import artifact as semantic
+    elif name == "tokenizer":
+        from .semantics import tokenizer as semantic
+    elif name == "conversation":
+        from .semantics import conversation as semantic
+    elif name == "sampling":
+        from .semantics import sampling as semantic
+    elif name == "admission":
+        from .semantics import admission as semantic
+    elif name == "quota":
+        from .semantics import quota as semantic
+    elif name == "stream":
+        from .semantics import stream as semantic
+    elif name == "grant":
+        from .semantics import grant as semantic
+    elif name == "tool":
+        from .semantics import tool as semantic
+    elif name == "memory":
+        from .semantics import memory as semantic
+    elif name == "retrieval":
+        from .semantics import retrieval as semantic
+    elif name == "journal":
+        from .semantics import journal as semantic
+    elif name == "replay":
+        from .semantics import replay as semantic
+    elif name == "path":
+        from .semantics import path as semantic
+    elif name == "transport":
+        from .semantics import transport as semantic
+    elif name == "checkpoint":
+        from .semantics import checkpoint as semantic
+    elif name == "cancel":
+        from .semantics import cancel as semantic
+    elif name == "evaluation":
+        from .semantics import evaluation as semantic
+    elif name == "promotion":
+        from .semantics import promotion as semantic
+    else:
+        fail('unknown trust gate')
+    semantic.check(payload)
     return {"schema":"ai-trust-receipt.v1","gate":name,"status":"accepted",
             "input_sha256":digest(raw),"input_bytes":len(raw)}

@@ -5,21 +5,22 @@ Subcommands (exit 0 = pass, 1 = gate failed / invalid evidence, 2 = usage error)
 * ``frames``  read frame durations (JSON list of ms, file or ``-``), print stats
   (percentiles from main's observability profiler) and fail if the hitch ratio
   exceeds ``--max-hitch-ratio``. Empty input fails closed.
-* ``alloc``   call ``module:function`` (no args) under the allocation tracker
+* ``alloc``   call preloaded ``module:function`` (no args) under the allocation tracker
   and fail if net ``alloc_bytes`` or ``peak_bytes`` exceed limits. This runs
   trusted local code only with ``SKELETON_PERF_TRUSTED_EXECUTION=1`` and
-  ``--allow-local-callable``; the profiler is not a sandbox.
+  ``--allow-local-callable``; the trusted embedding must preload the module.
+  The profiler is not a sandbox.
 * ``verify``  check the sha256 seal of a load report written by ``LoadTimer``.
 """
 from __future__ import annotations
 
 import argparse
-import importlib as importlib  # Stable diagnostics hook; no runtime-selected imports.
 import json
 import math
 import os
 import re
 import sys
+from types import ModuleType
 from typing import Any, Callable, List, Optional, Sequence
 
 from .alloc import AllocationTracker
@@ -57,19 +58,15 @@ def _resolve(target: str) -> Callable[[], Any]:
         r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*:[A-Za-z_][A-Za-z0-9_]*", target
     ):
         raise UsageError("target must be a bounded 'package.module:function' identifier")
-    # The operator's environment allowlist does not grant authority to import
-    # new modules by name. Profiling is limited to already-loaded local code.
-    # This intentionally prevents runtime-selected imports from being a plugin
-    # loader or a backdoor into otherwise unreferenced code.
+    # Never import a module selected by command-line or environment input.
+    # A trusted embedding must load the module itself before invoking main().
+    # This also avoids executing module-level __getattr__ during resolution.
     module = sys.modules.get(module_name)
-    if module is None:
-        raise UsageError("trusted callable module must already be loaded")
-    try:
-        fn = getattr(module, attr)
-    except AttributeError as exc:
-        raise UsageError(f"cannot resolve {target}: {exc}") from exc
+    if not isinstance(module, ModuleType):
+        raise UsageError("trusted target module must already be preloaded")
+    fn = vars(module).get(attr)
     if not callable(fn):
-        raise UsageError(f"{target} is not callable")
+        raise UsageError("trusted target must be a preloaded callable")
     return fn
 
 
@@ -139,7 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
     frames.add_argument("--max-hitch-ratio", type=float, default=0.0)
     frames.set_defaults(func=_cmd_frames)
 
-    alloc = sub.add_parser("alloc", help="allocation profile of module:function")
+    alloc = sub.add_parser("alloc", help="allocation profile of a trusted, preloaded module:function")
     alloc.add_argument("target")
     alloc.add_argument("--allow-local-callable", action="store_true",
                        help="explicitly run trusted local Python code (never expose to remote input)")

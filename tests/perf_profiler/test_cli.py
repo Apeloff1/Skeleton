@@ -75,14 +75,54 @@ def test_alloc_rejects_unpinned_target_before_import(monkeypatch):
     assert main(["alloc", "untrusted.module:run", "--allow-local-callable"]) == 2
 
 
-def test_alloc_refuses_to_import_even_allowlisted_unloaded_module(monkeypatch):
+
+def test_alloc_allowlisted_but_unloaded_module_is_not_imported(monkeypatch, capsys):
+    import importlib
     from skeleton.perf_profiler import cli
 
+    target = "never_loaded_perf_target.worker:run"
     monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
-    monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", "never_loaded.local_module:run")
-    assert cli.main(["alloc", "never_loaded.local_module:run",
-                     "--allow-local-callable"]) == 2
+    monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", target)
 
+    def forbidden_import(*_args, **_kwargs):
+        raise AssertionError("allowlisted CLI input must not trigger an import")
+
+    monkeypatch.setattr(importlib, "import_module", forbidden_import)
+    assert cli.main(["alloc", target, "--allow-local-callable"]) == 2
+    assert "preloaded" in capsys.readouterr().err
+
+
+def test_alloc_does_not_evaluate_module_getattr(monkeypatch, capsys):
+    import sys
+    from types import ModuleType
+    from skeleton.perf_profiler import cli
+
+    name = "perf_profiler_preloaded_module_without_callable"
+    module = ModuleType(name)
+
+    def forbidden_getattr(_attr):
+        raise AssertionError("module __getattr__ must not execute")
+
+    module.__getattr__ = forbidden_getattr
+    monkeypatch.setitem(sys.modules, name, module)
+    target = f"{name}:run"
+    monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
+    monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", target)
+    assert cli.main(["alloc", target, "--allow-local-callable"]) == 2
+    assert "preloaded callable" in capsys.readouterr().err
+
+
+def test_alloc_rejects_fake_preloaded_module(monkeypatch, capsys):
+    import sys
+    from skeleton.perf_profiler import cli
+
+    name = "perf_profiler_fake_module"
+    monkeypatch.setitem(sys.modules, name, object())
+    target = f"{name}:run"
+    monkeypatch.setenv("SKELETON_PERF_TRUSTED_EXECUTION", "1")
+    monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", target)
+    assert cli.main(["alloc", target, "--allow-local-callable"]) == 2
+    assert "preloaded" in capsys.readouterr().err
 
 def test_verify(tmp_path):
     t = LoadTimer(clock=DeterministicClock(script=[5]))
@@ -126,3 +166,12 @@ def test_cli_rejects_nonfinite_ratio_and_invalid_allocation_limits(tmp_path, mon
     monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", "json:dumps")
     assert cli.main(["alloc", "json:dumps", "--allow-local-callable", "--top", "101"]) == 2
     assert cli.main(["alloc", "json:dumps", "--allow-local-callable", "--max-peak-bytes", "-1"]) == 2
+
+
+def test_cli_rejects_overflowing_frame_threshold_without_traceback(tmp_path, capsys):
+    path = tmp_path / "frames.json"
+    path.write_text("[10, 20]")
+    assert main(["frames", str(path), "--budget-ms", "1e308", "--hitch-factor", "2"]) == 2
+    captured = capsys.readouterr()
+    assert "hitch threshold must be finite" in captured.err
+    assert "Traceback" not in captured.err

@@ -67,7 +67,7 @@ def test_invalid_audit_budget_rejected(field, value) -> None:
 @pytest.mark.parametrize("key,value", [
     ("checksum", "0" * 64),
     ("all_endings_playable", False),
-    ("counts", {"solved": 999, "unreachable": 0, "inconclusive": 0}),
+    ("counts", {"solved": 2, "unreachable": 0, "inconclusive": 0}),
     ("player_id", "forged_player"),
 ])
 def test_tampered_coverage_rejected(key, value) -> None:

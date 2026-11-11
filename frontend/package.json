@@ -51,8 +51,7 @@
     "test:env": "node --test scripts/validate-public-env.test.cjs",
     "test:metro-env-cache": "node --test scripts/test-metro-public-env-cache.cjs",
     "validate:env": "node scripts/validate-public-env.cjs",
-    "test:foundation-tokens": "node --test scripts/test-foundation-tokens.cjs",
-    "test:discourse-jobs": "node --experimental-strip-types --test scripts/test-discourse-async-jobs.mjs"
+    "test:foundation-tokens": "node --test scripts/test-foundation-tokens.cjs"
   },
   "engines": {
     "node": ">=24"

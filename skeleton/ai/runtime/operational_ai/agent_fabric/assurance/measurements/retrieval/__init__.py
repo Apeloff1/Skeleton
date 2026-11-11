@@ -1,22 +1,32 @@
 """Approved retrieval measurements and strict local lookup."""
-from importlib import import_module
 ALLOWED=frozenset(('precision_k', 'recall_k', 'mrr', 'ndcg_k', 'query_coverage', 'stale_source_fraction', 'chunk_overlap_ratio', 'evidence_bytes_per_hit', 'unique_document_fraction', 'source_revocation_rate', 'index_density', 'citation_identifier_validity'))
-_LOADERS = {
-    "precision_k": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.precision_k"),
-    "recall_k": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.recall_k"),
-    "mrr": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.mrr"),
-    "ndcg_k": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.ndcg_k"),
-    "query_coverage": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.query_coverage"),
-    "stale_source_fraction": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.stale_source_fraction"),
-    "chunk_overlap_ratio": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.chunk_overlap_ratio"),
-    "evidence_bytes_per_hit": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.evidence_bytes_per_hit"),
-    "unique_document_fraction": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.unique_document_fraction"),
-    "source_revocation_rate": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.source_revocation_rate"),
-    "index_density": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.index_density"),
-    "citation_identifier_validity": lambda: import_module("skeleton.ai.runtime.operational_ai.agent_fabric.assurance.measurements.retrieval.citation_identifier_validity"),
-}
-
 def measure(name,observations):
-    if name not in ALLOWED:raise ValueError('unknown measurement contract')
-    module=_LOADERS[name]()
+    if type(name) is not str or name not in ALLOWED:
+        raise ValueError('unknown measurement contract')
+    if name == "precision_k":
+        from . import precision_k as module
+    elif name == "recall_k":
+        from . import recall_k as module
+    elif name == "mrr":
+        from . import mrr as module
+    elif name == "ndcg_k":
+        from . import ndcg_k as module
+    elif name == "query_coverage":
+        from . import query_coverage as module
+    elif name == "stale_source_fraction":
+        from . import stale_source_fraction as module
+    elif name == "chunk_overlap_ratio":
+        from . import chunk_overlap_ratio as module
+    elif name == "evidence_bytes_per_hit":
+        from . import evidence_bytes_per_hit as module
+    elif name == "unique_document_fraction":
+        from . import unique_document_fraction as module
+    elif name == "source_revocation_rate":
+        from . import source_revocation_rate as module
+    elif name == "index_density":
+        from . import index_density as module
+    elif name == "citation_identifier_validity":
+        from . import citation_identifier_validity as module
+    else:
+        raise ValueError('unknown measurement contract')
     return module.measure(observations)

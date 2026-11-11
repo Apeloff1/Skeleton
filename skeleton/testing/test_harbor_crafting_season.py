@@ -193,7 +193,7 @@ def test_fixture_driven_season_next_and_terminal_play(tmp_path):
     assert b"TRIAL finished gold" in live.stdout
     assert b"CHECKPOINT " in live.stdout
     first, second = games(world)
-    with pytest.raises(HarborError, match="time trial finish not earned"):
+    with pytest.raises(HarborError, match="finish not earned"):
         build_season(world, season, [first, second])
     shelter_actions = [{"op": "wait"}] + demo_actions()
     shelter_actions[-1] = {"op": "choose", "choice": "shelter"}

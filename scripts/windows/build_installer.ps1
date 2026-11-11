@@ -150,8 +150,9 @@ if ($LASTEXITCODE -ne 0) {
 # paths can collide on Windows, use reserved names, or exceed the installer's
 # portable path budget; rejecting them after extraction is too late.
 # The ZIP admission policy is part of the archived source contract. Never
-# validate one revision's payload using a different working-tree script.
-# Stage the checker from the exact archived commit before extraction.
+# validate one revision's payload with a different working-tree script.
+# Materialize the exact committed checker outside the untrusted ZIP before
+# extracting any archive member.
 $ArchivePreflight = Join-Path $BuildRoot "check_payload_zip.py"
 $ArchivePreflightText = & git -C $RepoRoot show "$($SourceCommit):scripts/windows/check_payload_zip.py"
 if ($LASTEXITCODE -ne 0 -or -not $ArchivePreflightText) {

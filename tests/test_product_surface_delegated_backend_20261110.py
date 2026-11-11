@@ -1,5 +1,6 @@
 """Fail-closed source evidence for authenticated delegated Discourse endpoints."""
 from copy import deepcopy
+import hashlib
 import json
 from unittest.mock import patch
 
@@ -26,6 +27,29 @@ def test_current_delegated_backend_is_source_bound_without_runtime_ready_claim()
         "/api/discourse/deliberate/async", "/api/discourse/jobs", "/api/discourse/result/",
     ]
     assert _errors(payload) == []
+
+
+def test_discourse_and_frontier_navigation_use_exact_source_digests():
+    payload, row = _candidate()
+    catalog = {item["surface_id"]: item for item in payload["surfaces"]}
+    assert row is catalog["route:discourse"]
+    for route_id in ("route:discourse", "route:frontier-navigation"):
+        candidate = catalog[route_id]
+        source = surfaces.ROOT / candidate["source"]
+        assert source.is_file()
+        assert hashlib.sha256(source.read_bytes()).hexdigest() == candidate["source_sha256"]
+    delegate = row["backend_delegates"][0]
+    helper = surfaces.ROOT / delegate["source"]
+    assert helper.is_file()
+    assert hashlib.sha256(helper.read_bytes()).hexdigest() == delegate["source_sha256"]
+
+
+def test_frontier_navigation_digest_drift_fails_closed():
+    payload, _row = _candidate()
+    frontier = next(item for item in payload["surfaces"]
+                    if item["surface_id"] == "route:frontier-navigation")
+    frontier["source_sha256"] = "0" * 64
+    assert any("source_sha256 drift" in message for message in _errors(payload))
 
 
 def test_helper_digest_drift_fails_closed():

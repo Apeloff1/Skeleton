@@ -10,7 +10,7 @@ from skeleton.jeeves.native_fabric.laptop_ops.contracts import (
 )
 from skeleton.jeeves.native_fabric.laptop_ops.predicates import required_keys
 from skeleton.jeeves.native_fabric.laptop_ops.runner import (
-    domain_coverage, list_domains, registry,
+    domain_coverage, list_domains, registry_module,
 )
 from .limits import DOMAIN_COUNT, STAGES_PER_DOMAIN
 
@@ -28,7 +28,7 @@ def manifest() -> dict[str, object]:
     declaration: list[dict[str, object]] = []
     for domain in domains:
         try:
-            module = registry(domain)
+            module = registry_module(domain)
             names = module.STAGES
             kinds = module.STAGE_TYPES
             docs = module.contracts()

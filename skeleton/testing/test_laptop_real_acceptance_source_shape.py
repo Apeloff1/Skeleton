@@ -15,7 +15,7 @@ from skeleton.testing.laptop_runtime_test_support import FakeWorker, MODEL, TOKE
 from skeleton.testing.test_laptop_cold_reopen_source_custody import SOURCE
 
 
-def _run_source_turn(worker, **overrides):
+def test_turn(worker, **overrides):
     args={
         "prompt":"  local model task\n",
         "approved":True,
@@ -41,7 +41,7 @@ class FirstTurnSourceShapeTests(unittest.TestCase):
                 return_value=proof,
             ) as source:
                 with self.assertRaises(ContractViolation):
-                    _run_source_turn(self.worker)
+                    test_turn(self.worker)
                 self.assertEqual(source.call_count,1)
                 self.assertEqual(self.worker.generation_calls,0)
                 self.assertFalse(self.worker.spine.created)
@@ -54,7 +54,7 @@ class FirstTurnSourceShapeTests(unittest.TestCase):
                 side_effect=[dict(SOURCE),proof],
             ):
                 with self.assertRaises(ContractViolation):
-                    _run_source_turn(worker)
+                    test_turn(worker)
             self.assertEqual(worker.generation_calls,1)
             self.assertEqual(len(worker.spine.receipts),1)
 
@@ -86,7 +86,7 @@ class FirstTurnSourceShapeTests(unittest.TestCase):
             first_turn_acceptance,"require_activated_source",
             return_value=dict(SOURCE),
         ) as witness:
-            receipt=_run_source_turn(self.worker,prompt=private_prompt)
+            receipt=test_turn(self.worker,prompt=private_prompt)
         self.assertEqual(witness.call_count,2)
         self.assertNotIn("prompt",receipt)
         self.assertNotIn("text",receipt)
@@ -101,7 +101,7 @@ class FirstTurnSourceShapeTests(unittest.TestCase):
                 return_value=dict(SOURCE),
             ):
                 with self.assertRaises(ContractViolation):
-                    _run_source_turn(self.worker,prompt=prompt)
+                    test_turn(self.worker,prompt=prompt)
                 self.assertEqual(self.worker.generation_calls,0)
                 self.assertFalse(self.worker.spine.created)
 

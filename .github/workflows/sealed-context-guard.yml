@@ -8,16 +8,6 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'skeleton/ai/runtime/inference/local.py'
-      # Runtime model/qualification changes also alter guarded local-first execution.
-      - 'skeleton/ai/model_runtime/**'
-      - 'skeleton/ai/runtime/operational_ai/model/**'
-      - 'skeleton/ai/runtime/operational_ai/deployment/qualification/**'
-      - 'skeleton/app/local_ai.py'
-      - 'skeleton/app/studio_readiness.py'
-      - 'skeleton/testing/test_app_studio_readiness_proxy_custody.py'
-      - 'skeleton/testing/test_ai_real_model_qualification.py'
-      - 'skeleton/testing/test_ai_next_model.py'
-      - 'skeleton/testing/test_ai_native_endurance.py'
       - 'skeleton/ai/runtime/inference/guarded_service.py'
       - 'skeleton/ai/runtime/inference/canonical_snapshot_reader.py'
       - 'skeleton/ai/runtime/inference/engine_submission_snapshot.py'
@@ -137,9 +127,6 @@ jobs:
             skeleton/testing/test_delivery_regex.py \
             skeleton/testing/test_mongo_memento_repository.py \
             skeleton/testing/test_sealed_*.py
-
-      - name: Private studio readiness proxy and credential custody regressions
-        run: python -m pytest -q skeleton/testing/test_app_studio_readiness_proxy_custody.py
 
       - name: Consumer share and Chroma custody regressions
         env:

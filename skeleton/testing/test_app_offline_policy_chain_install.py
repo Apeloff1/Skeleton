@@ -12,10 +12,9 @@ from skeleton.app.offline_policy_chain_install import (
     PolicyChainSignedInstallError, install_policy_chain_signed_game_source,
 )
 from skeleton.app.offline_source_trust_policy import SCHEMA as POLICY_SCHEMA
-# Explicit transitive pytest fixtures for isolated canonical domain shards.
-from skeleton.testing.test_app_offline_archive_signature import signed
-from skeleton.testing.test_app_offline_signed_progress_migration import migration
 from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
 

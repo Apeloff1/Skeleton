@@ -86,6 +86,10 @@ def _keys(value: Any, required: set[str], optional: set[str] = frozenset()) -> d
 def _text(value: Any, field: str, limit: int = 400) -> str:
     if type(value) is not str or not value or len(value) > limit:
         raise CanonError("invalid_text", field)
+    # Lone UTF-16 surrogates are valid Python str values but cannot be
+    # serialized as UTF-8. Reject at the typed boundary, not during publish.
+    if any(0xD800 <= ord(ch) <= 0xDFFF for ch in value):
+        raise CanonError("invalid_unicode_scalar", field)
     if unicodedata.normalize("NFC", value) != value:
         raise CanonError("noncanonical_unicode", field)
     if any(ord(ch) < 32 and ch not in "\n\t" for ch in value):
@@ -195,10 +199,14 @@ def prove(source: Any) -> Proof:
     visited = {initial}
     scene_seen: set[str] = set()
     witnesses: dict[str, tuple[str, ...]] = {}
+    # Keep all transitions, even edges to previously visited states.
+    predecessors: dict[tuple[str, frozenset[str]], set[tuple[str, frozenset[str]]]] = {}
+    terminal_states: set[tuple[str, frozenset[str]]] = set()
     while queue:
         (scene, flags), path = queue.popleft()
         scene_seen.add(scene)
         if scene in endings:
+            terminal_states.add((scene, flags))
             witnesses.setdefault(scene, path)
             continue
         outgoing = edges.get(scene, [])
@@ -207,6 +215,7 @@ def prove(source: Any) -> Proof:
             raise CanonError("reachable_dead_end", scene)
         for edge in enabled:
             state = (edge["to"], flags | frozenset(edge["grants"]))
+            predecessors.setdefault(state, set()).add((scene, flags))
             if state not in visited:
                 visited.add(state)
                 if len(visited) > MAX_STATES:
@@ -217,6 +226,19 @@ def prove(source: Any) -> Proof:
                          ",".join(sorted({s["id"] for s in world["scenes"]} - scene_seen)))
     if set(witnesses) != endings:
         raise CanonError("unreachable_endings", ",".join(sorted(endings - set(witnesses))))
+    # Every reachable state must be able to reach a genuine terminal state.
+    can_finish = set(terminal_states)
+    frontier = deque(sorted(terminal_states))
+    while frontier:
+        state = frontier.popleft()
+        for previous in sorted(predecessors.get(state, ())):
+            if previous not in can_finish:
+                can_finish.add(previous)
+                frontier.append(previous)
+    stranded = visited - can_finish
+    if stranded:
+        raise CanonError("nonterminating_world_state",
+                         ",".join(sorted({scene for scene, _ in stranded})))
     return Proof(digest(world), tuple(sorted(scene_seen)), witnesses, len(visited))
 
 
@@ -313,12 +335,8 @@ _PLAYER_JS = r"""
 "use strict";
 const model = JSON.parse(document.getElementById("world-data").textContent);
 const world = model.world;
-const sourceDigest = model.proof.source_digest;
 const byId = new Map(world.scenes.map(s => [s.id, s]));
 const ending = new Map(world.endings.map(e => [e.scene, e.label]));
-const byChoice = new Map(world.choices.map(c => [c.id, c]));
-const storageKey = "skeleton:world-save:v1:" + world.id + ":" + sourceDigest;
-const MAX_SAVE_BYTES = 16384;
 let current = world.start;
 let flags = new Set();
 let trace = [];
@@ -327,62 +345,6 @@ function element(tag, text) {
   const node = document.createElement(tag);
   node.textContent = text;
   return node;
-}
-function status(message) {
-  const note = element("p", message);
-  note.setAttribute("role", "status");
-  root.append(note);
-}
-function replay(steps) {
-  if (!Array.isArray(steps) || steps.length > 4096 ||
-      steps.some(id => typeof id !== "string" || id.length > 128)) {
-    throw Error("invalid_save_trace");
-  }
-  let scene = world.start;
-  const acquired = new Set();
-  for (const id of steps) {
-    if (ending.has(scene)) throw Error("save_after_ending");
-    const choice = byChoice.get(id);
-    if (!choice || choice.from !== scene ||
-        !choice.requires.every(flag => acquired.has(flag))) {
-      throw Error("invalid_save_transition");
-    }
-    for (const flag of choice.grants) acquired.add(flag);
-    scene = choice.to;
-  }
-  return {scene, acquired};
-}
-function save() {
-  try {
-    const payload = JSON.stringify({
-      schema: "jeeves.world.browser_save.v1",
-      source_digest: sourceDigest, trace
-    });
-    if (payload.length > MAX_SAVE_BYTES) throw Error("save_budget_exceeded");
-    localStorage.setItem(storageKey, payload);
-    status("Progress saved on this device.");
-  } catch (_error) {
-    status("Save unavailable. Your current game remains playable.");
-  }
-}
-function restore() {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (raw === null || raw.length > MAX_SAVE_BYTES) throw Error("save_missing");
-    const data = JSON.parse(raw);
-    if (!data || Array.isArray(data) || Object.keys(data).sort().join(",") !==
-        "schema,source_digest,trace" ||
-        data.schema !== "jeeves.world.browser_save.v1" ||
-        data.source_digest !== sourceDigest) throw Error("save_source_mismatch");
-    const restored = replay(data.trace);
-    trace = data.trace.slice();
-    flags = restored.acquired;
-    current = restored.scene;
-    render();
-    status("Saved progress restored.");
-  } catch (_error) {
-    status("No valid save for this exact world revision.");
-  }
 }
 function render() {
   root.replaceChildren();
@@ -397,41 +359,23 @@ function render() {
       current = world.start; flags = new Set(); trace = []; render();
     });
     root.append(restart);
-  } else {
-    const choices = world.choices.filter(c => c.from === current &&
-      c.requires.every(f => flags.has(f)));
-    choices.forEach((choice, index) => {
-      // The rendered button retains native keyboard and screen-reader access.
-      const button = element("button",
-        (index < 9 ? (index + 1) + ". " : "") + choice.label);
-      button.dataset.choiceIndex = String(index);
-      button.addEventListener("click", () => {
-        for (const flag of choice.grants) flags.add(flag);
-        trace.push(choice.id);
-        current = choice.to;
-        render();
-      });
-      root.append(button);
-    });
+    return;
   }
-  const saveButton = element("button", "Save progress");
-  saveButton.addEventListener("click", save);
-  root.append(saveButton);
-  const restoreButton = element("button", "Restore saved progress");
-  restoreButton.addEventListener("click", restore);
-  root.append(restoreButton);
-  const clearButton = element("button", "Delete saved progress");
-  clearButton.addEventListener("click", () => {
-    try {
-      localStorage.removeItem(storageKey);
-      status("Saved progress deleted.");
-    } catch (_error) {
-      status("Save storage unavailable.");
-    }
+  const choices = world.choices.filter(c => c.from === current &&
+    c.requires.every(f => flags.has(f)));
+  choices.forEach((choice, index) => {
+    const button = element("button", (index < 9 ? (index + 1) + ". " : "") + choice.label);
+    button.dataset.choiceIndex = String(index);
+    button.addEventListener("click", () => {
+      for (const flag of choice.grants) flags.add(flag);
+      trace.push(choice.id);
+      current = choice.to;
+      render();
+    });
+    root.append(button);
   });
-  root.append(clearButton);
 }
-// Digit shortcuts inspect the current rendered scene, never stale choice data.
+// Digit shortcuts operate on the CURRENT rendered scene, never stale choices.
 // Native buttons remain the accessible mouse, keyboard and assistive-tech path.
 document.addEventListener("keydown", event => {
   if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey ||
@@ -475,22 +419,48 @@ class WorldStore:
     than quietly falling back to symlink-following path operations.
     """
     def __init__(self, root: str | os.PathLike[str]) -> None:
-        if not hasattr(os, "O_NOFOLLOW") or os.open not in os.supports_dir_fd:
+        if (not all(hasattr(os, attr) for attr in ("O_NOFOLLOW", "O_DIRECTORY"))
+                or os.open not in os.supports_dir_fd
+                or os.mkdir not in os.supports_dir_fd):
             raise CanonError("platform_not_supported")
-        path = Path(root)
-        if path.is_symlink():
-            raise CanonError("symlink_root")
-        path.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if path.is_symlink():
-            raise CanonError("symlink_root")
-        self.root = path
+        self.root = Path(os.path.abspath(root))
+        # Create the requested root one directory descriptor at a time.
+        # Calling Path.mkdir(parents=True) first could follow a symlinked
+        # ancestor and create private world material outside the intended root.
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        fd = os.open("/", flags)
+        try:
+            for part in self.root.parts[1:]:
+                try:
+                    os.mkdir(part, mode=0o700, dir_fd=fd)
+                except FileExistsError:
+                    pass
+                child = os.open(part, flags, dir_fd=fd)
+                os.close(fd)
+                fd = child
+            if not stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise CanonError("not_directory")
+        except OSError as exc:
+            raise CanonError("symlink_or_untrusted_root") from exc
+        finally:
+            os.close(fd)
 
     def _directory(self) -> int:
-        fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-        if not stat.S_ISDIR(os.fstat(fd).st_mode):
+        # Every reopen traverses descriptor-anchored, no-follow components;
+        # a later ancestor replacement cannot redirect a read or publication.
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        fd = os.open("/", flags)
+        try:
+            for part in self.root.parts[1:]:
+                child = os.open(part, flags, dir_fd=fd)
+                os.close(fd)
+                fd = child
+            if not stat.S_ISDIR(os.fstat(fd).st_mode):
+                raise CanonError("not_directory")
+            return fd
+        except BaseException:
             os.close(fd)
-            raise CanonError("not_directory")
-        return fd
+            raise
 
     @staticmethod
     def _read(fd: int, name: str) -> bytes:
@@ -516,10 +486,13 @@ class WorldStore:
             except OSError as exc:
                 raise CanonError("source_replaced_during_read", name) from exc
             after = os.fstat(handle)
-            if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1 or
-                    (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino) or
-                    (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) !=
-                    (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)):
+            fields = ("st_dev", "st_ino", "st_mode", "st_nlink",
+                      "st_size", "st_mtime_ns", "st_ctime_ns")
+            identity = lambda s: tuple(getattr(s, field) for field in fields)
+            if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1
+                    or len(data) != info.st_size
+                    or identity(info) != identity(after)
+                    or identity(after) != identity(current)):
                 raise CanonError("source_replaced_during_read", name)
             return data
         finally:
@@ -578,6 +551,8 @@ class WorldStore:
                 os.close(lock_fd)
                 try:
                     existing = strict_json(self._read(fd, world_id + ".json"))
+                    if existing["id"] != world_id:
+                        raise CanonError("identity_mismatch")
                     old_digest = prove(existing).source_digest
                 except CanonError as exc:
                     if exc.code != "not_found":

@@ -278,7 +278,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "502ea2af6d42ff58dc2a4f1b5e01b2c3e98a336f",
+      "source_git_object_sha": "c2ad7951bc3b6d2be1631f080f77b585e3cb9abf",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -508,7 +508,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "f73bfefb5297d6f2e299f6b0c18564496fc3b586",
+      "source_git_object_sha": "8838d5416d0aab19a840b9146abe4f2ec4651d9d",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -735,7 +735,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "0c4c6b06b32c10df770c978606f1c914359c8135",
+      "source_git_object_sha": "210885ccab579802f44bd6ba1dbb69a2b47af6e8",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1455,7 +1455,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "f09590ab72aa13bc764d6ec7b1427798d3583eb8",
+      "source_git_object_sha": "c17c39ce784ae05ddae2a0efdc0b468887870fd1",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "731609c17eb88524e0eec50e1f7db04fddffe637",
+      "source_git_object_sha": "604551f6ce80fe74cfbf93dc073e306d9aa14fa6",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -2199,7 +2199,7 @@
       "source": "skeleton/pr_automation",
       "destination": "skeleton/ai/build/pr_automation",
       "kind": "tree",
-      "source_git_object_sha": "3df606ef721a256881d0656737c77649b47f522b",
+      "source_git_object_sha": "5ebd1c49e3adf6b9260debec0fd62f17f1150b90",
       "role": "Automerge, runner, queue, policy, evidence, and hygiene logic is autonomous repository-engineering/build-control code.",
       "work_package_refs": [
         "WP-W15",
@@ -2777,7 +2777,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "30163f58e19a14d76b46b2e84761dedb2ee1a04b",
+      "source_git_object_sha": "ea2f401f7501951ad534b37848b6425417a2549e",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "1256eba56b57dafa77e7c2ce49045353971d6750"
+      "source_git_object_sha": "ce7c1908fa42a17bc146b6e1b1f7356fb9af855a"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
@@ -7240,8 +7240,8 @@
     },
     {
       "path": "skeleton/mass_build",
-      "owner": "App-wide game-build evidence and security batch contracts",
-      "reason": "Mass-build batches are deterministic game-production and security evidence, not a credentialed AI provider or canonical model runtime; retain the existing owner until an approved capability-level import and authority cutover."
+      "owner": "delivery-plane / batch build orchestration",
+      "reason": "Git-tracked batch build execution and build-manifest tooling stay under the governed delivery plane; source is retained and never treated as AI runtime cutover or completed work-package evidence."
     },
     {
       "path": "skeleton/masterplan",
@@ -7335,8 +7335,8 @@
     },
     {
       "path": "skeleton/perf_profiler",
-      "owner": "Shared application performance instrumentation",
-      "reason": "The stdlib allocation, frame and load-time profiling CLI measures both game and AI surfaces but does not own inference, providers or canonical AI state; retain shared application tooling until an explicit owner migration is verified."
+      "owner": "platform-runtime / observability",
+      "reason": "Canonical CPU and runtime profiling instrumentation belongs to the platform observability substrate and remains outside AI-tree implementation ownership until an explicit, independently qualified cutover."
     },
     {
       "path": "skeleton/perfgate",
@@ -7380,8 +7380,8 @@
     },
     {
       "path": "skeleton/provider_environment.py",
-      "owner": "deterministic game-environment and replay adapter",
-      "reason": "Canonical bounded deterministic game-environment source remains outside credential-provider AI tree; replay and holdout custody are retained under game simulation ownership until an independently reviewed mirror and cutover"
+      "owner": "game-environment simulation and deterministic replay",
+      "reason": "The deterministic game-world adapter and holdout/replay buffers remain outside credential-provider AI tree authority; this module has no model credential custody or provider runtime ownership."
     },
     {
       "path": "skeleton/providers",
@@ -7568,8 +7568,8 @@
     "status": "reconciled_retained_standalone_and_shared_roots_pending_verified_cutover",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
     "source_head": "40e81412e995a9b153a02ff39f3ae1aec187de25",
-    "newly_classified": 32,
-    "verification_note": "32 previously unclassified tracked roots retain explicit non-canonical owners, including app-wide mass-build evidence and shared performance profiling; parity validation and runtime promotion requirements remain enforced."
+    "newly_classified": 30,
+    "verification_note": "30 previously unclassified tracked roots retain explicit non-canonical owners; parity validation and runtime promotion requirements remain enforced."
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",
@@ -7797,7 +7797,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 157,
+    "retained_outside_ai_tree_count": 164,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,

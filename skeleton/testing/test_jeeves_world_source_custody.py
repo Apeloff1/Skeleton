@@ -46,6 +46,40 @@ class WorldSourceCustodyTests(unittest.TestCase):
         with self.assertRaises(OSError):
             self.read()
 
+    def test_symlinked_ancestor_cannot_redirect_private_world_creation(self):
+        actual = self.root / "actual-parent"
+        actual.mkdir()
+        linked = self.root / "linked-parent"
+        linked.symlink_to(actual, target_is_directory=True)
+        with self.assertRaises(CanonError):
+            WorldStore(linked / "world-store")
+        self.assertFalse((actual / "world-store").exists())
+
+    def test_same_size_mutation_with_restored_mtime_is_rejected(self):
+        import time
+        source = self.root / "original.json"
+        source.write_bytes(b"original")
+        before = source.stat()
+        real_stat = os.stat
+        tampered = False
+
+        def rewrite(path, *args, **kwargs):
+            nonlocal tampered
+            if path == "original.json" and not tampered:
+                tampered = True
+                # Restore mtime deliberately; ctime remains non-replayable.
+                time.sleep(0.003)
+                with source.open("r+b") as stream:
+                    stream.write(b"altered!")
+                os.utime(source, ns=(before.st_atime_ns, before.st_mtime_ns))
+            return real_stat(path, *args, **kwargs)
+
+        with patch("skeleton.jeeves.worlds.world_canon.os.stat", side_effect=rewrite):
+            with self.assertRaises(CanonError) as raised:
+                self.read()
+        self.assertEqual(raised.exception.code, "source_replaced_during_read")
+        self.assertTrue(tampered)
+
     def test_replacement_between_open_and_validation_rejected(self):
         source = self.root / "original.json"
         source.write_bytes(b"old")

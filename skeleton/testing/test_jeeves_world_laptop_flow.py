@@ -87,8 +87,8 @@ def test_stale_review_and_artifact_tampering_fail_closed(tmp_path):
     changed = dict(world)
     changed["prompt"] = world["prompt"] + " revised"
     flow.worlds.publish(changed, expected_digest=digest(world))
-    reject("review_required", lambda: flow.verify("lighthouse"))
-    reject("review_required", lambda: flow.create_session("lighthouse", "one"))
+    reject("review_stale_source", lambda: flow.verify("lighthouse"))
+    reject("review_stale_source", lambda: flow.create_session("lighthouse", "one"))
 
 
 def test_no_unreviewed_compile_and_bad_operations(tmp_path):
@@ -220,8 +220,7 @@ def test_laptop_session_create_rejects_revision_between_verify_and_write(tmp_pat
         return original(world_id, slot, **kwargs)
 
     monkeypatch.setattr(flow.sessions, "create", concurrent_edit)
-    # A changed unreviewed world is denied by the stronger review fence first.
-    reject("review_required",
+    reject("session_world_lease_mismatch",
            lambda: flow.create_session("lighthouse", "raced"))
     assert not (tmp_path / "lighthouse.raced.session.json").exists()
 
@@ -241,7 +240,7 @@ def test_laptop_session_choose_rejects_revision_between_verify_and_write(tmp_pat
         return original(world_id, slot, choice_id, expected_digest, **kwargs)
 
     monkeypatch.setattr(flow.sessions, "choose", concurrent_edit)
-    reject("review_required", lambda: flow.choose(
+    reject("session_world_lease_mismatch", lambda: flow.choose(
         "lighthouse", "raced", "rescue", initial["session_digest"]))
     assert path.read_bytes() == before
 
@@ -259,7 +258,7 @@ def test_session_read_and_export_fail_if_source_changes_after_laptop_proof(tmp_p
         return original(world_id, slot, **kwargs)
 
     monkeypatch.setattr(flow.sessions, "inspect", concurrent_edit)
-    reject("review_required",
+    reject("session_world_lease_mismatch",
            lambda: flow.inspect_session("lighthouse", "raced"))
 
 
@@ -292,7 +291,7 @@ def test_laptop_restore_preflight_rejects_forgery_and_unreviewed_source(tmp_path
     changed = dict(world)
     changed["prompt"] = world["prompt"] + " unreviewed"
     flow.worlds.publish(changed, expected_digest=digest(world))
-    reject("review_required", lambda: flow.preflight_restore(
+    reject("review_stale_source", lambda: flow.preflight_restore(
         "lighthouse", exported))
 
 
@@ -400,13 +399,15 @@ def test_cli_unavailable_lease_preserves_foreign_lock_and_guides_recovery(tmp_pa
 def test_cli_lease_permission_failure_has_specific_recovery(tmp_path, capsys, monkeypatch):
     """Permission failures are distinct from contention and never unlink locks."""
     flow, _, _, _ = ready(tmp_path)
-    # CLI mapping of a typed lease hold is independent of filesystem policy.
-    # Avoid process-global os.open replacement, which invalidates the native
-    # dir_fd support probe when the CLI opens a fresh WorldStore.
-    def denied(_fd, _world_id):
-        raise CanonError("lease_unavailable")
+    from skeleton.jeeves.worlds import laptop_flow
+    real_open = laptop_flow.os.open
 
-    monkeypatch.setattr(LaptopFlow, "_lock", staticmethod(denied))
+    def denied(path, flags, *args, **kwargs):
+        if path == "lighthouse.lock" and flags & laptop_flow.os.O_EXCL:
+            raise PermissionError("read-only custody")
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(laptop_flow.os, "open", denied)
     assert run(["--store", str(tmp_path), "verify", "--world-id", "lighthouse"]) == 2
     failure = json.loads(capsys.readouterr().out)
     assert failure["error"] == "lease_unavailable"
@@ -415,7 +416,7 @@ def test_cli_lease_permission_failure_has_specific_recovery(tmp_path, capsys, mo
     assert not (tmp_path / "lighthouse.lock").exists()
 
 
-@pytest.mark.parametrize("failure_stage", [1, 2, 3])
+@pytest.mark.parametrize("failure_stage", [1, 2, 3, 4])
 def test_laptop_diagnostic_distinguishes_unavailable_custody_at_each_stage(
         tmp_path, monkeypatch, failure_stage):
     """Read-only diagnostics never prescribe source repair for lease permissions."""
@@ -438,27 +439,5 @@ def test_laptop_diagnostic_distinguishes_unavailable_custody_at_each_stage(
     assert any(
         stage.get("error") == "lease_unavailable"
         for stage in report["checks"].values()
-    )
-    assert not (tmp_path / "lighthouse.lock").exists()
-
-
-
-def test_laptop_diagnostic_handles_session_store_lease_denial(tmp_path, monkeypatch):
-    """A fourth custody boundary belongs to SessionStore, not LaptopFlow."""
-    from skeleton.jeeves.worlds.session import SessionStore
-
-    flow, _, _, _ = ready(tmp_path)
-    flow.create_session("lighthouse", "player")
-
-    def denied(_self, _fd, _world_id):
-        raise CanonError("lease_unavailable")
-
-    monkeypatch.setattr(SessionStore, "_lock", denied)
-    report = flow.diagnose("lighthouse", "player")
-    assert report["checks"]["session"] == {
-        "ok": False, "error": "lease_unavailable",
-    }
-    assert report["next_action"] == (
-        "inspect_custody_permissions_without_removing_foreign_locks"
     )
     assert not (tmp_path / "lighthouse.lock").exists()

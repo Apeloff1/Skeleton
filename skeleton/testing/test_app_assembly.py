@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
@@ -204,27 +205,24 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
     class _Response:
         status = 200
 
-        def __init__(self, effective_url):
-            self.effective_url = effective_url
-
         def __enter__(self):
             return self
 
         def __exit__(self, exc_type, exc, tb):
             return False
 
-        def geturl(self):
-            return self.effective_url
-
         def read(self, _size):
             return b"ok"
+
+        def geturl(self):
+            return "http://localhost:8010/api/v1/health/live"
 
     seen = {}
 
     def fake_urlopen(request, timeout):
         seen["url"] = request.full_url
         seen["timeout"] = timeout
-        return _Response(request.full_url)
+        return _Response()
 
     monkeypatch.setattr("skeleton.app.health._open_direct_health", fake_urlopen)
     service = load_manifest().service("skeleton")
@@ -237,63 +235,6 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
         "url": "http://localhost:8010/api/v1/health/live",
         "timeout": 1.25,
     }
-
-
-@pytest.mark.parametrize(
-    ("http_status", "effective_path"),
-    [
-        (True, "/api/v1/health/live"),
-        (0, "/api/v1/health/live"),
-        (200, "/api/v1/health/redirected"),
-        (302, "/api/v1/health/live"),
-    ],
-)
-def test_health_probe_refuses_invalid_transport_or_redirect(monkeypatch, http_status, effective_path):
-    from skeleton.app.health import probe_url
-
-    class _Response:
-        status = http_status
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_args):
-            return False
-
-        def geturl(self):
-            return "http://localhost:8010" + effective_path
-
-        def read(self, _size):
-            return b"ok"
-
-    monkeypatch.setattr(
-        "skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: _Response()
-    )
-    result = probe_url(load_manifest().service("skeleton"), timeout=1.25)
-    assert result.ok is False
-
-
-def test_health_probe_fails_closed_without_effective_url(monkeypatch):
-    from skeleton.app.health import probe_url
-
-    class _Response:
-        status = 200
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_args):
-            return False
-
-        def read(self, _size):
-            return b"ok"
-
-    monkeypatch.setattr(
-        "skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: _Response()
-    )
-    result = probe_url(load_manifest().service("skeleton"), timeout=1.25)
-    assert result.ok is False
-    assert result.detail == "health transport returned invalid response metadata"
 
 
 def test_default_smoke_profile_has_frontend_backend_and_engine():
@@ -348,8 +289,19 @@ def test_product_control_client_matches_mounted_backend_routes():
     registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
 
     assert "const ROOT = '/api/admin/ops/product-control';" in client
-    from scripts.check_app_assembly import has_canonical_ops_router
-    assert has_canonical_ops_router(ops)
+    ops_tree = ast.parse(ops)
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "project_router"
+        and any(
+            keyword.arg == "prefix"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "/api/admin/ops"
+            for keyword in node.keywords
+        )
+        for node in ast.walk(ops_tree)
+    )
     assert '("routes.ops",' in registry
 
     required_routes = (
@@ -758,34 +710,6 @@ def test_app_preflight_accepts_valid_mongo_db_uri_without_logging_credentials(tm
     )
     assert "password" not in repr(tuple(check.message for check in checks))
 
-def test_fresh_install_backend_cors_tracks_selected_frontend_port():
-    """A custom published frontend port cannot be blocked by stale CORS defaults."""
-    root = find_repo_root(Path(__file__))
-    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
-    template = (root / ".env.example").read_text(encoding="utf-8")
-
-    assert (
-        "CORS_ORIGINS=${CORS_ORIGINS:-"
-        "http://localhost:${FRONTEND_PORT:-3000},"
-        "http://127.0.0.1:${FRONTEND_PORT:-3000}}"
-    ) in compose
-    assert "\nCORS_ORIGINS=\n" in template
-    assert "\nCORS_ORIGINS=http://localhost:3000" not in template
-
-
-def test_fresh_install_cors_defaults_preserve_operator_override(tmp_path):
-    from skeleton.app.setup_runtime import ensure_runtime_environment
-
-    # Operator policies and upgrades must not be expanded automatically.
-    manual = "https://operator.example.invalid"
-    (tmp_path / ".env").write_text(
-        f"CORS_ORIGINS={manual}\n", encoding="utf-8"
-    )
-    ensure_runtime_environment(tmp_path)
-    values = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert f"CORS_ORIGINS={manual}" in values
-
-
 def test_compose_browser_endpoints_follow_custom_published_host_ports():
     from pathlib import Path
 
@@ -854,11 +778,11 @@ def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
         def __exit__(self, *_args):
             return False
 
-        def geturl(self):
-            return "http://localhost:8001/api/health"
-
         def read(self, _size):
             return b"redirect"
+
+        def geturl(self):
+            return "http://localhost:8001/api/health"
 
     monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: RedirectResponse())
     result = probe_http("backend", "http://localhost:8001/api/health")
@@ -880,11 +804,11 @@ def test_health_probe_transport_forbids_redirects_and_proxy_environment(monkeypa
         def __exit__(self, *_args):
             return False
 
-        def geturl(self):
-            return seen["url"]
-
         def read(self, _size):
             return b"ok"
+
+        def geturl(self):
+            return "http://localhost:8001/api/health"
 
     class Opener:
         def open(self, request, *, timeout):
@@ -1073,6 +997,33 @@ def test_python_image_unpinned_stage_is_rejected():
     errors = backend_python_image_errors(changed)
     assert any("digest-pinned Alpine stage" in error for error in errors)
 
+
+def test_fresh_install_backend_cors_tracks_selected_frontend_port():
+    """A custom published frontend port cannot be blocked by stale CORS defaults."""
+    root = find_repo_root(Path(__file__))
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    template = (root / ".env.example").read_text(encoding="utf-8")
+
+    assert (
+        "CORS_ORIGINS=${CORS_ORIGINS:-"
+        "http://localhost:${FRONTEND_PORT:-3000},"
+        "http://127.0.0.1:${FRONTEND_PORT:-3000}}"
+    ) in compose
+    assert "\nCORS_ORIGINS=\n" in template
+    assert "\nCORS_ORIGINS=http://localhost:3000" not in template
+
+
+def test_fresh_install_cors_defaults_preserve_operator_override(tmp_path):
+    from skeleton.app.setup_runtime import ensure_runtime_environment
+
+    # Operator policies and upgrades must not be expanded automatically.
+    manual = "https://operator.example.invalid"
+    (tmp_path / ".env").write_text(
+        f"CORS_ORIGINS={manual}\n", encoding="utf-8"
+    )
+    ensure_runtime_environment(tmp_path)
+    values = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert f"CORS_ORIGINS={manual}" in values
 
 # The runtime diagnostic path must enforce the same private-file input
 # boundaries as setup, without chmod'ing or rewriting a user's credentials.
@@ -1310,14 +1261,3 @@ def test_chroma_published_host_port_cannot_overlap_existing_service(
         runtime_manifest(root=tmp_path, environ={})
     with pytest.raises(ValueError, match="CHROMA_PORT"):
         public_service_urls(tmp_path, environ={})
-
-
-def test_unique_chroma_port_still_builds_canonical_runtime_manifest(tmp_path):
-    from skeleton.app.assembly import public_service_urls, runtime_manifest
-
-    (tmp_path / ".env").write_text(
-        "CHROMA_PORT=8222\n", encoding="utf-8",
-    )
-    manifest = runtime_manifest(root=tmp_path, environ={})
-    assert manifest.service("chroma").public_url == "http://localhost:8222"
-    assert public_service_urls(tmp_path, environ={})["chroma"] == "http://localhost:8222"

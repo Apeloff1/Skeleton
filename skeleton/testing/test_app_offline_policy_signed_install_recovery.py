@@ -13,7 +13,7 @@ from skeleton.app.offline_policy_signed_install_recovery import (
 )
 from skeleton.app.offline_source_trust_policy import SCHEMA
 from skeleton.testing.test_app_offline_signed_install_recovery import recovery
-from skeleton.testing.test_app_offline_archive_signature import signed
+from skeleton.testing.test_app_offline_signed_install_recovery import signed  # noqa: F401  (transitive fixture)
 
 
 @pytest.fixture

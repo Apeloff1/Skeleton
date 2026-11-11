@@ -482,19 +482,17 @@ def test_free_model_discards_response_that_arrives_after_cancel(
     monkeypatch.setattr(free_model, "load_provider_architecture", lambda *a, **k: _provider_receipt())
     token = CancellationToken()
     payload = {"choices": [{"message": {"content": "late-authoritative-text"}}]}
-    def controlled_opener(*handlers):
-        # Exercise the redirect-denying transport actually used by FreeModelClient.
-        assert any(isinstance(handler, free_model._RejectRedirects)
-                   for handler in handlers)
-        return SimpleNamespace(open=lambda *a, **k: _Response(
+    monkeypatch.setattr(
+        free_model.urllib.request,
+        "urlopen",
+        lambda *a, **k: _Response(
             payload,
             on_read=lambda: token.cancel(
                 CancellationReason.SUPERSEDED,
                 detail="newer run owns authority",
             ),
-        ))
-
-    monkeypatch.setattr(free_model.urllib.request, "build_opener", controlled_opener)
+        ),
+    )
     client = FreeModelClient()
 
     with pytest.raises(CancellationError):

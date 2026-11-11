@@ -221,16 +221,6 @@ def _read_existing_env(path: Path, *, label: str = "runtime .env", private: bool
         current = os.lstat(path)
         if (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino) or not stat.S_ISREG(current.st_mode):
             raise ValueError(f"{label} identity changed during read")
-    # A pathname can change while the read descriptor is being closed.
-    # Revalidate the admitted inode at the handoff to parsed config.
-    try:
-        final_named = os.lstat(path)
-    except OSError as exc:
-        raise ValueError(f"{label} identity changed during read") from exc
-    if (not stat.S_ISREG(final_named.st_mode)
-            or (final_named.st_dev, final_named.st_ino) !=
-               (opened.st_dev, opened.st_ino)):
-        raise ValueError(f"{label} identity changed during read")
     if len(raw) > _MAX_ENV_BYTES:
         raise ValueError("runtime .env exceeds the 256 KiB input limit")
     return raw.decode("utf-8"), repaired_permissions
@@ -381,16 +371,6 @@ def _operator_admin(email: str | None, password_file: Path | None) -> tuple[str,
         current = os.lstat(password_path)
         if not stat.S_ISREG(current.st_mode) or (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
             raise ValueError("admin password input identity changed during read")
-    # The opened descriptor can remain valid after its published name was
-    # replaced. The parsed secret must still belong to that original inode.
-    try:
-        final_named = os.lstat(password_path)
-    except OSError as exc:
-        raise ValueError("admin password input identity changed during read") from exc
-    if (not stat.S_ISREG(final_named.st_mode)
-            or (final_named.st_dev, final_named.st_ino) !=
-               (info.st_dev, info.st_ino)):
-        raise ValueError("admin password input identity changed during read")
     if len(raw) > 4096:
         raise ValueError("admin password file exceeds 4096 bytes")
     try:

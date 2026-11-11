@@ -15,7 +15,7 @@ from skeleton.testing.laptop_runtime_test_support import FakeWorker, MODEL, TOKE
 from skeleton.testing.test_laptop_cold_reopen_source_custody import SOURCE
 
 
-def _run_turn(worker, **overrides):
+def test_turn(worker, **overrides):
     args={
         "prompt":"  local model task\n",
         "approved":True,
@@ -35,7 +35,7 @@ class FinalInstalledSourceWitnessTests(unittest.TestCase):
             first_turn_acceptance,"require_activated_source",
             side_effect=[dict(SOURCE),dict(SOURCE)],
         ) as source:
-            record=_run_turn(self.worker)
+            record=test_turn(self.worker)
         self.assertEqual(source.call_count,2)
         self.assertEqual(record["model_sha256"],MODEL)
         self.assertEqual(record["tokenizer_sha256"],TOKENIZER)
@@ -57,7 +57,7 @@ class FinalInstalledSourceWitnessTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 ContractViolation,"source changed after model generation"
             ):
-                _run_turn(self.worker)
+                test_turn(self.worker)
         self.assertEqual(source.call_count,2)
         self.assertEqual(self.worker.generation_calls,1)
         self.assertEqual(len(self.worker.spine.receipts),1)
@@ -74,7 +74,7 @@ class FinalInstalledSourceWitnessTests(unittest.TestCase):
                 side_effect=[dict(SOURCE),{**SOURCE,key:value}],
             ):
                 with self.assertRaises(ContractViolation):
-                    _run_turn(worker)
+                    test_turn(worker)
             self.assertEqual(worker.generation_calls,1)
             self.assertEqual(len(worker.spine.receipts),1)
 
@@ -87,7 +87,7 @@ class FinalInstalledSourceWitnessTests(unittest.TestCase):
             ],
         ):
             with self.assertRaisesRegex(ContractViolation,"lease expired"):
-                _run_turn(self.worker)
+                test_turn(self.worker)
         self.assertEqual(self.worker.generation_calls,1)
         self.assertEqual(len(self.worker.spine.receipts),1)
 
@@ -105,7 +105,7 @@ class FinalInstalledSourceWitnessTests(unittest.TestCase):
             # The canonical identity checker can reject the changed
             # tokenizer earlier as an active-backend/principal mismatch.
             with self.assertRaises(ContractViolation):
-                _run_turn(self.worker)
+                test_turn(self.worker)
         self.assertEqual(counter["count"],2)
         self.assertEqual(self.worker.generation_calls,1)
 
@@ -121,7 +121,7 @@ class FinalInstalledSourceWitnessTests(unittest.TestCase):
             side_effect=observe,
         ):
             with self.assertRaisesRegex(ContractViolation,"principal changed"):
-                _run_turn(self.worker)
+                test_turn(self.worker)
         self.assertEqual(observe.count,2)
         self.assertEqual(self.worker.generation_calls,1)
 
@@ -141,7 +141,7 @@ class FinalInstalledSourceWitnessTests(unittest.TestCase):
             ) as source,
         ):
             with self.assertRaises(ContractViolation):
-                _run_turn(self.worker)
+                test_turn(self.worker)
         self.assertEqual(source.call_count,1)
         self.assertEqual(self.worker.generation_calls,1)
         self.assertFalse(self.worker.spine.receipts)

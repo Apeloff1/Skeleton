@@ -52,9 +52,7 @@ def test_play_is_actual_canonical_gameplay_not_claimed_score():
     world, board = inputs()
     root = build_save(world, board, [])
     partial = play_save(root, demo_actions(), expected_digest=root["save_digest"])
-    # The earlier duplicate-replay fence rejects this repeated canonical
-    # journey before the ending-consequence check may be reached.
-    with pytest.raises(HarborError, match="duplicate contract replay"):
+    with pytest.raises(HarborError, match="consequence"):
         play_save(partial, demo_actions(), expected_digest=partial["save_digest"])
     shelter = [{"op": "wait"}] + demo_actions()
     shelter[-1] = {"op": "choose", "choice": "shelter"}
@@ -62,7 +60,7 @@ def test_play_is_actual_canonical_gameplay_not_claimed_score():
 
 
 @pytest.mark.parametrize("field,value", [
-    ("deadline", 17), ("ending", "shelter"), ("min_gathers", 5),
+    ("deadline", 17), ("ending", "shelter"), ("min_gathers", 4),
     ("min_crafts", 3), ("max_waits", -1), ("min_coins", 65),
 ])
 def test_contract_constraints_fail_closed(field, value):

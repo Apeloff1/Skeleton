@@ -1,7 +1,7 @@
 """Validated input claim receipts with actual per-domain semantic checking."""
 from __future__ import annotations
 from functools import lru_cache
-from importlib import resources,import_module
+from importlib import resources
 from .contracts import Rejected,fail,canonical,sha256,strict_json
 from .catalog import domains
 
@@ -13,49 +13,6 @@ def _schema(name):
     if type(spec) is not dict or set(spec)!={"type","fields"} or spec["type"]!="object":
         fail("invalid audited source schema")
     return spec
-
-_POLICIES = {
-    "native_identity": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.native_identity"),
-    "weight_custody": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.weight_custody"),
-    "tokenizer_custody": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.tokenizer_custody"),
-    "model_capacity": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.model_capacity"),
-    "memory_pressure": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.memory_pressure"),
-    "admission_queue": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.admission_queue"),
-    "request_dedupe": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.request_dedupe"),
-    "context_packing": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.context_packing"),
-    "prompt_roles": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.prompt_roles"),
-    "output_receipt": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.output_receipt"),
-    "stream_sequence": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.stream_sequence"),
-    "stream_backpressure": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.stream_backpressure"),
-    "cancellation": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.cancellation"),
-    "retry_budget": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.retry_budget"),
-    "session_scope": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.session_scope"),
-    "memory_consent": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.memory_consent"),
-    "memory_deletion": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.memory_deletion"),
-    "retrieval_integrity": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.retrieval_integrity"),
-    "citation_provenance": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.citation_provenance"),
-    "tool_grant": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.tool_grant"),
-    "tool_intent": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.tool_intent"),
-    "audit_journal": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.audit_journal"),
-    "outbox_ack": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.outbox_ack"),
-    "snapshot_cas": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.snapshot_cas"),
-    "backup_integrity": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.backup_integrity"),
-    "restore_order": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.restore_order"),
-    "key_rotation": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.key_rotation"),
-    "lease_epoch": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.lease_epoch"),
-    "transport_local": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.transport_local"),
-    "http_framing": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.http_framing"),
-    "device_probe": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.device_probe"),
-    "installer_attestation": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.installer_attestation"),
-    "process_isolation": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.process_isolation"),
-    "health_circuit": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.health_circuit"),
-    "metrics_sampling": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.metrics_sampling"),
-    "evaluation_evidence": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.evaluation_evidence"),
-    "canary_evidence": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.canary_evidence"),
-    "rollout_authority": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.rollout_authority"),
-    "release_qualification": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.release_qualification"),
-    "privacy_boundary": lambda: import_module("skeleton.ai.runtime.operational_ai.reliability_fabric.policies.privacy_boundary"),
-}
 
 def validate(name,record):
     if name not in domains():fail("unknown AI fabric boundary")
@@ -79,7 +36,88 @@ def validate(name,record):
         fail("unapproved external evidence")
     if approval["source_sha256"]=="0"*64:
         fail("zero source digest")
-    policy=_POLICIES[name]()
+    if name == "native_identity":
+        from .policies import native_identity as policy
+    elif name == "weight_custody":
+        from .policies import weight_custody as policy
+    elif name == "tokenizer_custody":
+        from .policies import tokenizer_custody as policy
+    elif name == "model_capacity":
+        from .policies import model_capacity as policy
+    elif name == "memory_pressure":
+        from .policies import memory_pressure as policy
+    elif name == "admission_queue":
+        from .policies import admission_queue as policy
+    elif name == "request_dedupe":
+        from .policies import request_dedupe as policy
+    elif name == "context_packing":
+        from .policies import context_packing as policy
+    elif name == "prompt_roles":
+        from .policies import prompt_roles as policy
+    elif name == "output_receipt":
+        from .policies import output_receipt as policy
+    elif name == "stream_sequence":
+        from .policies import stream_sequence as policy
+    elif name == "stream_backpressure":
+        from .policies import stream_backpressure as policy
+    elif name == "cancellation":
+        from .policies import cancellation as policy
+    elif name == "retry_budget":
+        from .policies import retry_budget as policy
+    elif name == "session_scope":
+        from .policies import session_scope as policy
+    elif name == "memory_consent":
+        from .policies import memory_consent as policy
+    elif name == "memory_deletion":
+        from .policies import memory_deletion as policy
+    elif name == "retrieval_integrity":
+        from .policies import retrieval_integrity as policy
+    elif name == "citation_provenance":
+        from .policies import citation_provenance as policy
+    elif name == "tool_grant":
+        from .policies import tool_grant as policy
+    elif name == "tool_intent":
+        from .policies import tool_intent as policy
+    elif name == "audit_journal":
+        from .policies import audit_journal as policy
+    elif name == "outbox_ack":
+        from .policies import outbox_ack as policy
+    elif name == "snapshot_cas":
+        from .policies import snapshot_cas as policy
+    elif name == "backup_integrity":
+        from .policies import backup_integrity as policy
+    elif name == "restore_order":
+        from .policies import restore_order as policy
+    elif name == "key_rotation":
+        from .policies import key_rotation as policy
+    elif name == "lease_epoch":
+        from .policies import lease_epoch as policy
+    elif name == "transport_local":
+        from .policies import transport_local as policy
+    elif name == "http_framing":
+        from .policies import http_framing as policy
+    elif name == "device_probe":
+        from .policies import device_probe as policy
+    elif name == "installer_attestation":
+        from .policies import installer_attestation as policy
+    elif name == "process_isolation":
+        from .policies import process_isolation as policy
+    elif name == "health_circuit":
+        from .policies import health_circuit as policy
+    elif name == "metrics_sampling":
+        from .policies import metrics_sampling as policy
+    elif name == "evaluation_evidence":
+        from .policies import evaluation_evidence as policy
+    elif name == "canary_evidence":
+        from .policies import canary_evidence as policy
+    elif name == "rollout_authority":
+        from .policies import rollout_authority as policy
+    elif name == "release_qualification":
+        from .policies import release_qualification as policy
+    elif name == "privacy_boundary":
+        from .policies import privacy_boundary as policy
+    else:
+        fail('unregistered AI fabric domain')
     policy.check(record)
     return {"schema":"ai-reliability-receipt.v1","domain":name,
             "status":"input-claim-validated-not-proven",

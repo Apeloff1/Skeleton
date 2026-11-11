@@ -143,26 +143,15 @@ def test_unpinned_partial_publication_requires_quarantine(
 ):
     jobs = jobs_for(original_games, tmp_path)
     Path(jobs[0].archive).write_bytes(b"untrusted")
-    Path(jobs[0].archive).chmod(0o600)  # occupied but custody-safe partial publication
+    # Model a genuine interrupted publication: the publisher writes owner-only
+    # files, so a group/world-readable leftover would be (correctly) "unsafe".
+    Path(jobs[0].archive).chmod(0o600)
     result = triage_first_playable_delivery_batch(
         jobs, tmp_path / "cohort.json", authorized=True,
     )
     assert result["jobs"][0]["state"] == "partial_publication_quarantine"
     assert result["resume_eligible_with_independent_pins"] is False
     assert Path(jobs[0].archive).read_bytes() == b"untrusted"
-
-
-def test_world_readable_partial_archive_is_unsafe_quarantine(original_games, tmp_path):
-    jobs = jobs_for(original_games, tmp_path)
-    archive = Path(jobs[0].archive)
-    archive.write_bytes(b"owner-private pending artifact")
-    archive.chmod(0o644)
-    result = triage_first_playable_delivery_batch(
-        jobs, tmp_path / "cohort.json", authorized=True,
-    )
-    assert result["jobs"][0]["state"] == "unsafe_custody_quarantine"
-    assert result["resume_eligible_with_independent_pins"] is False
-    assert archive.read_bytes() == b"owner-private pending artifact"
 
 
 def test_symlinked_archive_is_unsafe_and_never_followed(

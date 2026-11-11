@@ -173,4 +173,149 @@ class EnduranceTests(unittest.TestCase):
             Path(path).chmod(0o755)
             with self.assertRaises(Exception):publish_private(path,'ok.json',{'ok':True})
 
+    def test_subclass_policy_and_hostile_backend_digests_hold_before_native_io(self):
+        class HostileDigest(str):
+            def __eq__(self, other):
+                raise AssertionError('untrusted digest equality executed')
+            def __ne__(self, other):
+                raise AssertionError('untrusted digest inequality executed')
+
+        class SubclassPolicy(BurnInPolicy):
+            pass
+
+        backend = FixtureOnlyBackend()
+        with self.assertRaises(QualificationHeld):
+            measure(backend, SubclassPolicy(trials=1), clock=self.clock())
+        self.assertEqual((backend.admits, backend.calls), (0, 0))
+        for attr in ('model_digest', 'tokenizer_digest'):
+            backend = FixtureOnlyBackend()
+            setattr(backend, attr, HostileDigest(MODEL))
+            with self.subTest(attr=attr), self.assertRaises(QualificationHeld):
+                measure(backend, self.new_policy(trials=1), clock=self.clock())
+            self.assertEqual((backend.admits, backend.calls), (0, 0))
+
+    def test_invalid_monotonic_clocks_hold_without_retry(self):
+        class HostileInt(int):
+            def __sub__(self, other):
+                raise AssertionError('untrusted clock arithmetic executed')
+
+        for reading in (True, 1.5, HostileInt(10), -1):
+            backend = FixtureOnlyBackend()
+            with self.subTest(reading=reading), self.assertRaises(QualificationHeld):
+                measure(backend, self.new_policy(trials=1), clock=lambda: reading)
+            self.assertEqual(backend.calls, 0)
+        for ending in (True, 1.5, HostileInt(20), 9):
+            backend = FixtureOnlyBackend()
+            readings = iter((10, ending))
+            with self.subTest(ending=ending), self.assertRaises(QualificationHeld):
+                measure(backend, self.new_policy(trials=1), clock=lambda: next(readings))
+            self.assertEqual(backend.calls, 1)
+
+    def test_forged_native_receipt_fields_rejected_before_hostile_hooks(self):
+        class HostileDigest(str):
+            def __eq__(self, other):
+                raise AssertionError('untrusted receipt equality executed')
+            def __ne__(self, other):
+                raise AssertionError('untrusted receipt inequality executed')
+
+        class HostileText(str):
+            def strip(self, *args, **kwargs):
+                raise AssertionError('untrusted receipt strip executed')
+            def encode(self, *args, **kwargs):
+                raise AssertionError('untrusted receipt encode executed')
+
+        def valid():
+            text = 'Synthetic bounded output'
+            return Generated(text, 8, 4, sha256(text.encode()).hexdigest(),
+                             MODEL, TOKEN, 'stop')
+
+        for field, value in (
+            ('model_digest', HostileDigest(MODEL)),
+            ('tokenizer_digest', HostileDigest(TOKEN)),
+            ('output_digest', HostileDigest('a' * 64)),
+            ('text', HostileText('Synthetic bounded output')),
+            ('finish_reason', HostileDigest('stop')),
+            ('prompt_tokens', 131073),
+        ):
+            receipt = valid()
+            object.__setattr__(receipt, field, value)
+            with self.subTest(field=field), self.assertRaises(QualificationHeld):
+                trial_record(1, 25_000_000, receipt, MODEL, TOKEN, 48)
+
+        class SubclassGenerated(Generated):
+            pass
+
+        with self.assertRaises(QualificationHeld):
+            trial_record(1, 25_000_000,
+                         SubclassGenerated('safe', 1, 1, sha256(b'safe').hexdigest(),
+                                           MODEL, TOKEN, 'stop'), MODEL, TOKEN, 48)
+
+    def test_oversized_exact_integer_clock_holds_without_bigint_arithmetic(self):
+        # Native clocks are bounded to signed 64-bit nanoseconds.  A foreign
+        # clock can return an exact builtin int with enormous bit length.
+        enormous = 1 << 100000
+        backend = FixtureOnlyBackend()
+        with self.assertRaisesRegex(QualificationHeld, 'invalid monotonic trial clock'):
+            measure(backend, self.new_policy(trials=1), clock=lambda: enormous)
+        self.assertEqual((backend.admits, backend.calls), (1, 0))
+
+        backend = FixtureOnlyBackend()
+        readings = iter((10, enormous))
+        with self.assertRaisesRegex(QualificationHeld, 'missed monotonic deadline'):
+            measure(backend, self.new_policy(trials=1), clock=lambda: next(readings))
+        self.assertEqual(backend.calls, 1)  # never retry a completed native call
+
+    def test_forged_surrogate_receipt_holds_without_unicode_exception_or_retry(self):
+        text = 'Synthetic bounded output'
+        receipt = Generated(text, 8, 4, sha256(text.encode()).hexdigest(),
+                            MODEL, TOKEN, 'stop')
+        object.__setattr__(receipt, 'text', '\ud800')
+        with self.assertRaisesRegex(QualificationHeld, 'invalid native generated text encoding'):
+            trial_record(1, 25_000_000, receipt, MODEL, TOKEN, 48)
+
+        class ForgedTextBackend(FixtureOnlyBackend):
+            def generate(self, *args, **kwargs):
+                self.calls += 1
+                return receipt
+
+        backend = ForgedTextBackend()
+        with self.assertRaisesRegex(QualificationHeld, 'invalid native generated text encoding'):
+            measure(backend, self.new_policy(trials=1), clock=self.clock())
+        self.assertEqual(backend.calls, 1)
+
+    def test_private_report_reconciles_metrics_and_policy_before_publication(self):
+        for change in ('summary', 'policy', 'trial', 'digest', 'finish', 'keys', 'rate'):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as path:
+                root = Path(path) / 'private'
+                root.mkdir(mode=0o700)
+                report = measure(FixtureOnlyBackend(), self.new_policy(), clock=self.clock())
+                if change == 'summary':
+                    report['summary']['generated_tokens'] += 1
+                elif change == 'rate':
+                    report['summary']['generated_tokens_per_second'] = 1 << 10000
+                elif change == 'policy':
+                    report['policy']['max_output_tokens'] = 0
+                elif change == 'trial':
+                    report['trials'][0]['prompt_tokens'] = 1 << 10000
+                elif change == 'digest':
+                    class HostileDigest(str):
+                        def __eq__(self, other):
+                            raise AssertionError('untrusted digest equality executed')
+                    report['model_sha256'] = HostileDigest(MODEL)
+                elif change == 'finish':
+                    class HostileFinish(str):
+                        def __eq__(self, other):
+                            raise AssertionError('untrusted finish equality executed')
+                    report['trials'][0]['finish_reason'] = HostileFinish('stop')
+                else:
+                    class ForeignKey:
+                        def __hash__(self):
+                            return 123456789123456789
+                        def __eq__(self, other):
+                            raise AssertionError('untrusted mapping equality executed')
+                    report['trials'][0][ForeignKey()] = 'forged'
+                with self.assertRaises(QualificationHeld):
+                    publish_private(root, 'rejected.json', report)
+                self.assertEqual(list(root.iterdir()), [])
+
 if __name__=='__main__':unittest.main()

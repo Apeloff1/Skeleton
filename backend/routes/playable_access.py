@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from core.public_exception_route import PublicExceptionRoute
 from fastapi.routing import APIRoute
 
 from routes import gameforge_auth as auth
@@ -223,7 +224,7 @@ async def project_request_access(
         _current.reset(access_token)
 
 
-class _PrivateProjectRoute(APIRoute):
+class _PrivateProjectRoute(PublicExceptionRoute):
     def get_route_handler(self):
         original = super().get_route_handler()
 

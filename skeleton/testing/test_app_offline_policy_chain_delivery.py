@@ -12,11 +12,10 @@ from skeleton.app.offline_policy_chain_delivery import (
     PolicyChainSignedDeliveryError, assure_policy_chain_signed_delivery,
 )
 from skeleton.app.offline_source_trust_policy import SCHEMA as POLICY_SCHEMA
-# Explicit recursive fixture dependencies for isolated test shards.
-from skeleton.testing.test_app_offline_archive_signature import signed
-from skeleton.testing.test_app_offline_signed_progress_migration import migration
-from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
 from skeleton.testing.test_app_offline_policy_signed_delivery import delivered
+from skeleton.testing.test_app_offline_policy_signed_delivery import policy_migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor custody")
 

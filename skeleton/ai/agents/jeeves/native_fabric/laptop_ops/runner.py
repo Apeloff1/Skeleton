@@ -1,5 +1,6 @@
 """Allowlisted domain dispatcher with deterministic all-stages-required results."""
 from __future__ import annotations
+import importlib
 from .contracts import LaptopGateHold, DomainVerdict, fingerprint, name
 
 DOMAINS = frozenset((
@@ -11,56 +12,40 @@ DOMAINS = frozenset((
 ))
 
 
+# Literal-only lazy registry table: never derive an import path from caller input.
+_REGISTRY_LOADERS = {
+    "bootstrap": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.bootstrap.registry"),
+    "model_manifest": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.model_manifest.registry"),
+    "tokenizer_identity": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.tokenizer_identity.registry"),
+    "memory_capacity": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.memory_capacity.registry"),
+    "cpu_admission": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.cpu_admission.registry"),
+    "gpu_admission": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.gpu_admission.registry"),
+    "context_window": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.context_window.registry"),
+    "native_session": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.native_session.registry"),
+    "generation_budget": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.generation_budget.registry"),
+    "output_receipt": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.output_receipt.registry"),
+    "sqlite_replay": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.sqlite_replay.registry"),
+    "signed_sources": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.signed_sources.registry"),
+    "source_retrieval": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.source_retrieval.registry"),
+    "tool_grants": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.tool_grants.registry"),
+    "memory_consent": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.memory_consent.registry"),
+    "pressure_recovery": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.pressure_recovery.registry"),
+    "cancellation": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.cancellation.registry"),
+    "cold_restart": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.cold_restart.registry"),
+    "first_turn": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.first_turn.registry"),
+    "release_gates": lambda: importlib.import_module("skeleton.jeeves.native_fabric.laptop_ops.domains.release_gates.registry"),
+}
+
+
+def registry_module(domain: str):
+    if type(domain) is not str or domain not in DOMAINS:
+        raise LaptopGateHold("unregistered first-laptop domain")
+    return _REGISTRY_LOADERS[domain]()
+
+
 def list_domains() -> tuple[str, ...]:
     return tuple(sorted(DOMAINS))
 
-
-
-def registry(domain: str):
-    """Load only explicitly approved source-domain registries (no computed import names)."""
-    if domain not in DOMAINS:
-        raise LaptopGateHold("unregistered first-laptop domain")
-    if domain == "bootstrap":
-        from .domains.bootstrap import registry as module
-    elif domain == "model_manifest":
-        from .domains.model_manifest import registry as module
-    elif domain == "tokenizer_identity":
-        from .domains.tokenizer_identity import registry as module
-    elif domain == "memory_capacity":
-        from .domains.memory_capacity import registry as module
-    elif domain == "cpu_admission":
-        from .domains.cpu_admission import registry as module
-    elif domain == "gpu_admission":
-        from .domains.gpu_admission import registry as module
-    elif domain == "context_window":
-        from .domains.context_window import registry as module
-    elif domain == "native_session":
-        from .domains.native_session import registry as module
-    elif domain == "generation_budget":
-        from .domains.generation_budget import registry as module
-    elif domain == "output_receipt":
-        from .domains.output_receipt import registry as module
-    elif domain == "sqlite_replay":
-        from .domains.sqlite_replay import registry as module
-    elif domain == "signed_sources":
-        from .domains.signed_sources import registry as module
-    elif domain == "source_retrieval":
-        from .domains.source_retrieval import registry as module
-    elif domain == "tool_grants":
-        from .domains.tool_grants import registry as module
-    elif domain == "memory_consent":
-        from .domains.memory_consent import registry as module
-    elif domain == "pressure_recovery":
-        from .domains.pressure_recovery import registry as module
-    elif domain == "cancellation":
-        from .domains.cancellation import registry as module
-    elif domain == "cold_restart":
-        from .domains.cold_restart import registry as module
-    elif domain == "first_turn":
-        from .domains.first_turn import registry as module
-    elif domain == "release_gates":
-        from .domains.release_gates import registry as module
-    return module
 
 
 def domain_coverage() -> tuple[dict[str, object], ...]:
@@ -75,7 +60,7 @@ def domain_coverage() -> tuple[dict[str, object], ...]:
     for domain in list_domains():
         implemented = False
         try:
-            module = registry(domain)
+            module = registry_module(domain)
             stages = getattr(module, "STAGES")
             stage_types = getattr(module, "STAGE_TYPES")
             handlers = getattr(module, "HANDLERS")
@@ -113,7 +98,7 @@ def evaluate_domain(domain: str, evidence: object) -> DomainVerdict:
         raise LaptopGateHold("domain evidence mapping required")
     # Missing incremental modules are explicitly held, not silently skipped.
     try:
-        module = registry(domain)
+        module = registry_module(domain)
     except (ImportError, ModuleNotFoundError) as exc:
         raise LaptopGateHold("required domain module unavailable") from exc
     stages = module.evaluate(evidence)

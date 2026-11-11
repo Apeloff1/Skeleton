@@ -166,11 +166,11 @@ def publish_verified_receipt(
         # Never unlink the published name: another process may already have
         # observed it. Preserve it for owner-controlled quarantine/recovery;
         # a retry must fail the existing-name no-clobber check.
+        # Authorization is checked before the publication transaction.
+        # EPERM from descriptor-bound filesystem IO is a custody failure,
+        # not an authorization denial: always normalize it for callers.
         if isinstance(exc, ReceiptPublicationError):
             raise
-        # OSError subclasses such as PermissionError must be normalized to
-        # the published contract while preserving the original exception as
-        # a cause; never retry, unlink, or mask an uncertain hardlink commit.
         if isinstance(exc, DualRuntimeVerificationError):
             raise ReceiptPublicationError("receipt destination changed during publication") from exc
         if isinstance(exc, OSError):

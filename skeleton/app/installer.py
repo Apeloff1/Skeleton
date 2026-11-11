@@ -428,8 +428,13 @@ def install_application(
             manifest=manifest,
             full=full,
             timeout=3.0,
-            attempts=12,
-            delay=1.0,
+            # Cold production startup is dependency ordered: Mongo must become
+            # healthy before the engine starts, and the backend waits for both.
+            # Their image health checks allow a 60-second start period, so the
+            # old twelve-second budget routinely called a healthy first install
+            # failed while containers were still inside their declared grace.
+            attempts=60,
+            delay=2.0,
             public_url_overrides=host_urls,
         )
         if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
@@ -454,8 +459,7 @@ def install_application(
             # public_service_urls is intentionally a sparse *override* map.
             # On a clean install with default ports it has no "backend" key;
             # use the already resolved canonical manifest URL as the fallback.
-            backend_url = (host_urls["backend"] if "backend" in host_urls
-                           else manifest.service("backend").public_url)
+            backend_url = host_urls["backend"] if "backend" in host_urls else manifest.service("backend").public_url
             route_status = critical_backend_route_report(backend_url, timeout=3.0)
             routes_ready = route_status["ready"] is True
             phases.append(

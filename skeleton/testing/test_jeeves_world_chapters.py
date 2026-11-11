@@ -73,9 +73,7 @@ def test_schema_coverage_and_duplicates_fail_closed(tmp_path):
 def test_review_compile_verify_player_and_editor(tmp_path):
     world, store, source = setup(tmp_path)
     first = store.publish(world["id"], source, create=True)
-    persisted = store.inspect(world["id"])["chapters"]
-    assert persisted["approved"] is False
-    assert first == digest(persisted)
+    assert first == digest(source)
     assert_code("chapters_review_required",
                 lambda: store.compile(world["id"], first))
     approved = store.approve(world["id"], first, "Author reviewed chapter structure")

@@ -183,11 +183,14 @@ def first_install_report(
             and len(status["providers"]) <= 32
             and all(type(name) is str and 0 < len(name) <= 64
                     for name in status["providers"])
-            # Provider readiness must be witnessed for the configured identity,
-            # not inferred from another healthy provider or an empty catalogue.
+            # The active provider must actually exist in the canonical
+            # advertised inventory; an inconsistent response cannot attest
+            # configured local or hosted model availability.
             and provider in status["providers"]
             and type(status.get("llm_available")) is bool
             and status.get("availability_observed") is True
+            # A healthy *different* provider must never certify the selected
+            # provider. The active provider is an exact canonical identity.
             and status.get("active") == provider
             and configured
         ):

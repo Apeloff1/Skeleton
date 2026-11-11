@@ -18,12 +18,11 @@ from skeleton.testing.test_app_offline_mixed_library_epoch_chain import (
     _epoch, catalog,
 )
 from skeleton.testing.test_app_offline_mixed_game_library_continuity import _advance
-# Expose the full signed-custody fixture graph to individually sharded pytest.
-from skeleton.testing.test_app_offline_archive_signature import signed
-from skeleton.testing.test_app_offline_signed_progress_migration import migration
-from skeleton.testing.test_app_offline_policy_signed_progress_migration import policy_migration
-from skeleton.testing.test_app_offline_policy_signed_delivery import delivered
-from skeleton.testing.test_app_offline_policy_chain_delivery import chain_delivery
+from skeleton.testing.test_app_offline_mixed_game_library_continuity import chain_delivery  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_policy_chain_delivery import delivered  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_policy_signed_delivery import policy_migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX private custody")
 

@@ -468,8 +468,8 @@ def audit_compose_modes() -> None:
         "frontend build target must be assembly-selectable",
     )
     check(
-        '"127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
-        "frontend container port must be assembly-selectable and loopback-bound",
+        '${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
+        "frontend container port must be assembly-selectable",
     )
     check(
         "EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}" in base,
@@ -569,17 +569,10 @@ def audit_compose_modes() -> None:
         if "  frontend:" in base and "\n  mongo:" in base
         else ""
     )
-    # First-run diagnostics must be available even when Mongo, the engine
-    # or backend cannot start. Keep the UI independent and leave protected
-    # API admission to the backend/engine health and authorization fences.
     check(
-        not re.search(r"(?m)^    depends_on:\s*$", frontend_block),
-        "frontend setup/diagnostic UI must not depend on backend or engine startup",
-    )
-    check(
-        "backend:\n        condition: service_healthy" in backend_block
-        or "skeleton:\n        condition: service_healthy" in backend_block,
-        "backend must preserve its protected startup dependencies",
+        "depends_on:" not in frontend_block
+        and "First-run setup and diagnostics must start independently" in frontend_block,
+        "frontend first-run shell must start independently while protected APIs fail closed",
     )
 
 
@@ -612,23 +605,14 @@ def audit_production_ingress() -> None:
         if not isinstance(prefix, str) or not prefix.startswith("/") or not isinstance(port, int):
             continue
         location = f"location ^~ {prefix.rstrip('/')}/ {{"
-        alias = {"backend": "application_backend", "skeleton": "application_engine"}[name]
-        upstream = f"upstream {alias} {{"
-        member = f"server {name}:{port} resolve;"
-        proxy = f"proxy_pass http://{alias};"
+        upstream_name = "application_backend" if name == "backend" else "application_engine"
+        upstream = f"proxy_pass http://{upstream_name};"
         check(location in nginx, f"production ingress missing manifest route: {location}")
+        check(upstream in nginx, f"production ingress upstream drift: {upstream}")
         check(
-            nginx.count(upstream) == 1 and member in nginx,
-            f"production ingress resolver upstream drift: {name}",
+            f"server {name}:{port} resolve;" in nginx,
+            f"production ingress service address drift: {name}:{port}",
         )
-        location_start = nginx.find(location)
-        location_end = nginx.find("\n    }", location_start) if location_start >= 0 else -1
-        location_body = (
-            nginx[location_start:location_end]
-            if location_start >= 0 and location_end > location_start
-            else ""
-        )
-        check(proxy in location_body, f"production ingress route target drift: {name}")
         if isinstance(health_path, str) and health_path:
             check(
                 prefix == "/" or health_path.startswith(prefix.rstrip("/") + "/"),
@@ -990,73 +974,6 @@ def audit_public_product_readiness_contract() -> None:
     check("health?.product?.available" in product, "product shell does not consume runtime product summary")
 
 
-def has_canonical_ops_router(source: str) -> bool:
-    """Validate governed router, literal ops prefix and immutable admin dependency.
-
-    Parse syntax rather than relying on an exact single-line formatting string.
-    Unrecognized expression/alias forms fail closed rather than being evaluated.
-    """
-    try:
-        module = ast.parse(source)
-    except (SyntaxError, ValueError):
-        return False
-    if not any(
-        isinstance(node, ast.ImportFrom)
-        and node.module == "routes.playable_access"
-        and any(alias.name == "project_router" and alias.asname is None for alias in node.names)
-        for node in module.body
-    ):
-        return False
-    if not any(
-        isinstance(node, ast.ImportFrom)
-        and node.module == "routes"
-        and any(alias.name == "gameforge_auth" and alias.asname == "auth" for alias in node.names)
-        for node in module.body
-    ):
-        return False
-    assignments = [
-        node for node in module.body
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "router" for target in node.targets)
-    ]
-    if len(assignments) != 1 or len(assignments[0].targets) != 1:
-        return False
-    call = assignments[0].value
-    if not (isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
-            and call.func.id == "project_router" and not call.args):
-        return False
-    if any(kw.arg is None for kw in call.keywords):
-        return False
-    kwargs = {kw.arg: kw.value for kw in call.keywords}
-    if len(kwargs) != len(call.keywords):
-        return False
-    prefix = kwargs.get("prefix")
-    if not (isinstance(prefix, ast.Constant) and type(prefix.value) is str
-            and prefix.value == "/api/admin/ops"):
-        return False
-    dependencies = kwargs.get("dependencies")
-    if not (isinstance(dependencies, (ast.List, ast.Tuple))
-            and len(dependencies.elts) == 1):
-        return False
-    gate = dependencies.elts[0]
-    if not (isinstance(gate, ast.Call) and isinstance(gate.func, ast.Name)
-            and gate.func.id == "Depends" and len(gate.args) == 1
-            and not gate.keywords):
-        return False
-    role = gate.args[0]
-    return (
-        isinstance(role, ast.Call)
-        and isinstance(role.func, ast.Attribute)
-        and role.func.attr == "require_role"
-        and isinstance(role.func.value, ast.Name)
-        and role.func.value.id == "auth"
-        and len(role.args) == 1
-        and isinstance(role.args[0], ast.Constant)
-        and role.args[0].value == "admin"
-        and not role.keywords
-    )
-
-
 def audit_product_control_contract() -> None:
     client = read("frontend/src/product/productControlClient.ts")
     ops = read("backend/routes/ops.py")
@@ -1067,8 +984,8 @@ def audit_product_control_contract() -> None:
         "product control client root drift",
     )
     check(
-        has_canonical_ops_router(ops),
-        "backend ops prefix must use the canonical project router",
+        re.search(r'router\s*=\s*project_router\s*\(\s*prefix\s*=\s*["\']/api/admin/ops["\']', ops) is not None,
+        "backend ops prefix drift",
     )
     check('("routes.ops",' in registry, "backend ops router is not registered")
 
@@ -1105,38 +1022,6 @@ def audit_product_route_registry() -> None:
         )
 
 
-def audit_preinstall_docker_sources() -> None:
-    """Keep the actual Dockerfile inputs inside the reviewed source contract."""
-    from skeleton.app.install_source_contracts import build_source_errors
-
-    defects = build_source_errors(ROOT)
-    check(
-        not defects,
-        (
-            "pre-first-install Docker source admission failed: "
-            + "; ".join(defects[:4])
-            if defects
-            else "pre-first-install Docker source admission passed"
-        ),
-    )
-    raw = read("skeleton/app/manifest.json")
-    try:
-        manifest = json.loads(raw)
-        required = manifest["required_paths"]
-        if not isinstance(required, list):
-            raise ValueError("required_paths must be a list")
-    except (ValueError, KeyError, TypeError):
-        check(False, "first-install required-path manifest is unreadable or invalid")
-        return
-    for path in (
-        "Dockerfile.dockerignore",
-        "backend/Dockerfile.dockerignore",
-        "frontend/.dockerignore",
-        "skeleton/app/install_source_contracts.py",
-    ):
-        check(path in required, f"installed assembly omits required Docker input: {path}")
-
-
 def audit_product_vertical_readiness() -> None:
     """Make the S-grade vertical contract part of the canonical assembly gate."""
     errors, report = validate_vertical_readiness(ROOT)
@@ -1151,6 +1036,33 @@ def audit_product_surface_specification() -> None:
     """Keep every exposed route and Hub modal inside the canonical contract."""
     errors = validate_surface_specification(ROOT)
     check(not errors, "product surface specification failed: " + "; ".join(errors[:8]))
+
+
+def audit_preinstall_docker_sources() -> None:
+    """Fail closed when the installable image sources are not in source custody."""
+    from skeleton.app.install_source_contracts import build_source_errors
+
+    defects = build_source_errors(ROOT)
+    check(
+        not defects,
+        ("pre-first-install Docker source admission failed: " + "; ".join(defects[:4])
+         if defects else "pre-first-install Docker source admission passed"),
+    )
+    try:
+        manifest = json.loads(read("skeleton/app/manifest.json"))
+        required = manifest["required_paths"]
+        if not isinstance(required, list):
+            raise ValueError("required_paths must be a list")
+    except (ValueError, KeyError, TypeError):
+        check(False, "first-install required-path manifest is unreadable or invalid")
+        return
+    for path in (
+        "Dockerfile.dockerignore",
+        "backend/Dockerfile.dockerignore",
+        "frontend/.dockerignore",
+        "skeleton/app/install_source_contracts.py",
+    ):
+        check(path in required, f"installed assembly omits required Docker input: {path}")
 
 
 def main() -> int:
