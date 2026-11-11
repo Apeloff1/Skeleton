@@ -6,7 +6,6 @@ path, traverse symlinks, decompress unbounded data or cause arbitrary file reads
 """
 from __future__ import annotations
 
-import ipaddress
 import json
 import os
 import re
@@ -29,7 +28,7 @@ _MAX_EXPANDED_SCAN_BYTES = 64 * 1024 * 1024
 _MAX_LINE_BYTES = 1024 * 1024
 _MAX_RESULTS = 100
 _MAX_COLLECTIONS = 20_000
-_VALID_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\\Z", re.ASCII)
+_VALID_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\Z", re.ASCII)
 
 
 def _validate_collection(value: str) -> str:
@@ -52,8 +51,10 @@ def _valid_limit(value: int) -> int:
 def _safe_vault_names(directory: int) -> list[str]:
     """List only bounded single-link regular compressed shards under the pinned fd."""
     names = []
+    inspected = 0
     for name in os.listdir(directory):
-        if len(names) >= _MAX_COLLECTIONS:
+        inspected += 1
+        if inspected > _MAX_COLLECTIONS:
             raise ValueError("vault collection inventory exceeds limit")
         if not name.endswith(".jsonl.zst"):
             continue
@@ -137,8 +138,8 @@ def _iter_jsonl(path: Path, limit: int = 50) -> Iterator[dict]:
                     if expanded > _MAX_EXPANDED_SCAN_BYTES:
                         raise ValueError("vault decompression exceeds byte limit")
                     pending += chunk
-                    while b"\\n" in pending and produced < limit:
-                        line, pending = pending.split(b"\\n", 1)
+                    while b"\n" in pending and produced < limit:
+                        line, pending = pending.split(b"\n", 1)
                         if not line.strip():
                             continue
                         row = _decode_row(line)
