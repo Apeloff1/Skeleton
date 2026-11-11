@@ -116,21 +116,26 @@ async function supervise(opts = {}) {
     env: { ...process.env, CI: '1', EXPO_NO_TELEMETRY: '1' },
   });
   let exited = false, code = null, signal = null, spawnError = false;
-  let markerTime = null, tail = '';
+  let markerTime = null;
+  // A completion marker is evidence from one complete exporter log line,
+  // never a synthetic concatenation of stdout/stderr or an unfinished line.
+  const pendingOutput = { stdout: '', stderr: '' };
   const done = new Promise(resolve => child.on('close', (c, s) => {
     exited = true; code = c; signal = s; resolve();
   }));
   child.on('error', () => { spawnError = true; });
-  function read(chunk, target) {
+  function read(chunk, target, channel) {
     if (opts.echo !== false) target.write(chunk);
-    tail = (tail + chunk.toString('utf8')).slice(-8192);
-    if (tail.replace(/\x1b\[[0-9;]*m/g, '').split(/\r?\n/)
-      .some(line => line.trim() === 'Exported: dist') && markerTime === null) {
+    const lines = (pendingOutput[channel] + chunk.toString('utf8'))
+      .split(/\r\n|\r|\n/);
+    pendingOutput[channel] = lines.pop().slice(-8192);
+    if (markerTime === null && lines.some(line =>
+      line.replace(/\x1b\[[0-9;]*m/g, '').trim() === 'Exported: dist')) {
       markerTime = Date.now();
     }
   }
-  child.stdout.on('data', c => read(c, process.stdout));
-  child.stderr.on('data', c => read(c, process.stderr));
+  child.stdout.on('data', c => read(c, process.stdout, 'stdout'));
+  child.stderr.on('data', c => read(c, process.stderr, 'stderr'));
   function kill(sig) {
     if (child.pid && process.platform !== 'win32') {
       try { process.kill(-child.pid, sig); return true; } catch {}
