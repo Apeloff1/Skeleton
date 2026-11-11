@@ -247,6 +247,13 @@ jobs:
           python -m unittest discover -s tests -p test_environment_replay_admission_bounds.py -v
       - name: Install frontend dependencies
         run: yarn --cwd frontend install --ignore-scripts --non-interactive
+      - name: Verify filesystem and encrypted compliance CodeQL regressions
+        working-directory: backend
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest tests/test_codeql_storage_security_20261111.py
+      - name: Verify native-secure frontend session identities
+        run: node --test frontend/scripts/test-secure-session-identifiers.cjs
       # Full repository Ruff lint runs in the canonical quality gate below; avoid a second backend-only pass.
       - name: Canonical lint, type, and high-confidence security gates
         run: bash scripts/quality-gates.sh
