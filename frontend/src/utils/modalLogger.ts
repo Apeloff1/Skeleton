@@ -15,6 +15,7 @@ import { API_BASE as CANONICAL_API_BASE } from './apiBase';
  */
 import { useEffect, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 
 const BACKEND  = CANONICAL_API_BASE;
 const FLUSH_MS = 5000;
@@ -22,15 +23,10 @@ const QUEUE_KEY = '@telemetry/queue';
 
 // One session id per app launch — persists across route changes.
 let _sessionId: string | null = null;
-let _sessionSequence = 0;
-
 function createSessionId(): string {
-  const cryptoObject = (globalThis as any).crypto;
-  if (cryptoObject && typeof cryptoObject.randomUUID === 'function') {
-    return `s_${cryptoObject.randomUUID()}`;
-  }
-  _sessionSequence += 1;
-  return `s_${Date.now().toString(36)}_${_sessionSequence.toString(36)}`;
+  // Telemetry identifiers can correlate user activity across screens.
+  // Never use enumerable timestamps or counters as a fallback.
+  return `s_${Crypto.randomUUID()}`;
 }
 
 function sessionId(): string {

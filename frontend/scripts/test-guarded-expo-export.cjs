@@ -104,3 +104,107 @@ test('changed output cannot pass repeated digest verification', t => {
   fs.writeFileSync(html, '<html>changed</html>');
   assert.notEqual(first, snapshot(dir).digest);
 });
+
+test('same-size content rewrite with restored timestamp changes evidence digest', t => {
+  const dir = path.join(root(t), 'dist');
+  fs.mkdirSync(dir);
+  const html = path.join(dir, 'setup.html');
+  fs.writeFileSync(html, '<html>a</html>');
+  const first = snapshot(dir).digest;
+  const before = fs.statSync(html);
+  fs.writeFileSync(html, '<html>b</html>');
+  fs.utimesSync(html, before.atime, before.mtime);
+  assert.equal(fs.statSync(html).size, before.size);
+  assert.notEqual(snapshot(dir).digest, first);
+});
+
+test('hard-linked export members cannot be used as ambiguous evidence', t => {
+  const dir = path.join(root(t), 'dist');
+  fs.mkdirSync(dir);
+  const html = path.join(dir, 'setup.html');
+  fs.writeFileSync(html, '<html>setup</html>');
+  fs.linkSync(html, path.join(dir, 'alias.html'));
+  assert.throws(() => snapshot(dir), /unsafe export member/);
+});
+
+test('file contents, not only path metadata, determine export evidence', t => {
+  const dir = path.join(root(t), 'dist');
+  fs.mkdirSync(dir);
+  const html = path.join(dir, 'setup.html');
+  fs.writeFileSync(html, 'ABCD');
+  const first = snapshot(dir);
+  fs.writeFileSync(html, 'WXYZ');
+  assert.equal(snapshot(dir).bytes, first.bytes);
+  assert.notEqual(snapshot(dir).digest, first.digest);
+});
+
+
+function markerProbe(t, logStatements) {
+  const dir = root(t);
+  const source = [
+    'const fs = require("node:fs");',
+    'fs.mkdirSync("dist");',
+    'fs.writeFileSync("dist/setup.html", "<html>setup</html>");',
+    logStatements,
+    'setInterval(() => {}, 1000);',
+  ].join('\n');
+  return supervise({
+    cwd: dir, command: process.execPath, args: ['-e', source],
+    echo: false, maxMs: 1000, graceMs: 100, stableMs: 60,
+    pollMs: 20, terminateMs: 500,
+  });
+}
+
+test('separate stdout/stderr fragments cannot fabricate an export marker', async t => {
+  await assert.rejects(
+    markerProbe(t, String.raw`process.stdout.write('Exported: '); setTimeout(() => process.stderr.write('dist\n'), 80);`),
+    /export hard deadline exceeded/,
+  );
+});
+
+test('unfinished marker prefix cannot qualify a later non-marker line', async t => {
+  await assert.rejects(
+    markerProbe(t, String.raw`process.stdout.write('Exported: dist'); setTimeout(() => process.stdout.write(' not complete\n'), 80);`),
+    /export hard deadline exceeded/,
+  );
+});
+
+test('one stdout marker fragmented across writes still qualifies', async t => {
+  const result = await markerProbe(
+    t, String.raw`process.stdout.write('Exported: '); setTimeout(() => process.stdout.write('dist\n'), 80);`,
+  );
+  assert.equal(result.mode, 'supervised-post-export-exit');
+  assert.equal(result.files, 1);
+});
+
+
+function markerExitProbe(t, logStatements) {
+  const dir = root(t);
+  const source = [
+    'const fs = require("node:fs");',
+    'fs.mkdirSync("dist");',
+    'fs.writeFileSync("dist/setup.html", "<html>setup</html>");',
+    logStatements,
+  ].join('\n');
+  return supervise({
+    cwd: dir, command: process.execPath, args: ['-e', source],
+    echo: false, maxMs: 1500, pollMs: 20, terminateMs: 500,
+  });
+}
+
+test('clean EOF accepts an exact final marker without a trailing newline', async t => {
+  const result = await markerExitProbe(
+    t, String.raw`process.stdout.write('Exported: dist');`,
+  );
+  assert.equal(result.mode, 'normal-exit');
+  assert.equal(result.files, 1);
+});
+
+test('clean EOF cannot join unfinished marker fragments across streams', async t => {
+  await assert.rejects(
+    markerExitProbe(
+      t, String.raw`process.stdout.write('Exported: '); process.stderr.write('dist');`,
+    ),
+    /completion marker missing/,
+  );
+});

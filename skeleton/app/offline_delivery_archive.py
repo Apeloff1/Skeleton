@@ -356,15 +356,15 @@ def inspect_offline_game_archive(
             if studio:
                 try:
                     verify_studio_release_evidence(files)
-                    # Source and archive admission must enforce the same Studio
-                    # pipeline custody claims. A newly re-pinned ZIP alone
-                    # cannot authorize forged publication or project identity.
+                    # A re-signed source ZIP is not a studio export authority.
+                    # Preserve the same original-game/project denial checks
+                    # enforced by verify_exported_package on live source trees.
                     pipeline = _json(files["studio/pipeline.json"], _MAX_MANIFEST)
                     if (pipeline.get("schema") != "skeleton.game_builder.studio_pipeline.v1"
                             or pipeline.get("not_automatically_published") is not True
                             or pipeline.get("original_game_claim") != "generated-or-user-authored-geometry"
                             or pipeline.get("project_id") != manifest.get("project_id")):
-                        raise OfflineGameArchiveError("invalid archived Studio provenance")
+                        raise DualRuntimeVerificationError("archived studio source custody invalid")
                 except DualRuntimeVerificationError as exc:
                     raise OfflineGameArchiveError("archived studio evidence rejected") from exc
         if not hmac.compare_digest(_canonical_zip(files), raw):

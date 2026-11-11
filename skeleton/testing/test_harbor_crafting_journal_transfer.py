@@ -34,9 +34,6 @@ def inputs():
 
 def game_journal(source, actions):
     root = create_journal(export_bundle(source, []))
-    # Empty history is already a valid journal root. Production CAS append
-    # intentionally rejects zero-action revisions; do not weaken that guard
-    # merely to construct a foreign-world negative fixture.
     if not actions:
         return root
     return append_journal(

@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from core.exec_guard import execution_disabled_message, require_execution_allowed
+from core.vault_secure_fs import VaultPathError, anchored_directory, ensure_directory, read_regular
 
 ARTIFACTS_ROOT = Path("/app/backend/data/build_artifacts")
 
@@ -31,8 +32,7 @@ ARTIFACTS_ROOT = Path("/app/backend/data/build_artifacts")
 def _ensure_artifacts_root() -> Path:
     """Create the artifact root only when an artifact write is authorized."""
 
-    ARTIFACTS_ROOT.mkdir(parents=True, exist_ok=True)
-    return ARTIFACTS_ROOT
+    return ensure_directory(ARTIFACTS_ROOT)
 
 # ─── Android toolchain detection ───
 ANDROID_SDK = Path(os.environ.get("ANDROID_SDK_ROOT", "/opt/android-sdk"))
@@ -97,16 +97,14 @@ def _sanitize_path(p: str) -> str:
 
 
 def _safe_build_id(value: object) -> str:
-    build_id = str(value or "").strip()
+    """Use only bounded ASCII identifiers across packaging and download paths."""
     if (
-        not build_id
-        or build_id in {".", ".."}
-        or ".." in build_id
-        or "/" in build_id
-        or "\\" in build_id
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 128
+        or any(not (ch.isascii() and (ch.isalnum() or ch in {"-", "_"})) for ch in value)
     ):
-        raise ValueError("build_id must be a relative identifier")
-    return build_id
+        raise ValueError("build_id must be a bounded ASCII identifier")
+    return value
 
 
 def _safe_pkg_segment(seg: str) -> str:
@@ -690,7 +688,7 @@ def _build_real_apk(build: dict, out_path: Path) -> tuple[int, int, str, bool]:
             # if PNG generation hits an unexpected stdlib quirk; the
             # apksigner verify path will still produce a valid APK and
             # most launchers will fall back to a generic icon.
-            print(f"[binary_builder] icon generation warning: {e}")
+            print(f"[binary_builder] icon generation warning: {type(e).__name__}")
 
         # 5. Manifest ────────────────────────────────────────────
         manifest_path = td / "AndroidManifest.xml"
@@ -842,7 +840,7 @@ def build_apk(build: dict) -> dict:
             file_count, total_bytes, sig_info, verified = _build_real_apk(build, out_path)
             is_real = bool(verified)
         except Exception as e:
-            sig_info = f"toolchain error: {e}"
+            sig_info = f"toolchain error: {type(e).__name__}"
             is_real = False
             file_count = 0
             total_bytes = 0
@@ -922,7 +920,7 @@ async def package_build(build: dict, kinds: list[str] | None = None) -> dict:
     errors = []
     for r in results:
         if isinstance(r, Exception):
-            errors.append(f"{type(r).__name__}: {r}")
+            errors.append(f"{type(r).__name__}: package build failed")
         elif isinstance(r, dict) and r.get("artifact_id") and r.get("path"):
             artifacts.append(r)
             if r.get("kind") == "apk" and not r.get("is_installable"):
@@ -931,27 +929,41 @@ async def package_build(build: dict, kinds: list[str] | None = None) -> dict:
                     "configure the Android build toolchain and rebuild."
                 )
         elif isinstance(r, dict):
-            errors.append(str(r.get("error") or "packager returned no artifact"))
+            errors.append("packager returned no artifact")
         else:
             errors.append("packager returned an invalid result")
     return {"artifacts": artifacts, "errors": errors}
 
 
-def find_artifact_path(build_id: str, kind: str) -> Optional[Path]:
+
+
+def open_artifact_for_download(build_id: str, kind: str):
+    """Return an already-open verified regular file, never a path-only check.
+
+    All directory ancestors and the artifact leaf are opened O_NOFOLLOW.
+    Duplicating the verified descriptor ensures a replacement of the pathname
+    after validation cannot switch which file the response serves.
+    Callers own and must close the returned binary stream.
+    """
     if kind not in {"zip", "apk"}:
         return None
-    if (
-        not isinstance(build_id, str)
-        or not build_id
-        or len(build_id) > 128
-        or any(not (ch.isascii() and (ch.isalnum() or ch in {"-", "_"})) for ch in build_id)
-    ):
+    try:
+        safe_id = _safe_build_id(build_id)
+        with anchored_directory(ARTIFACTS_ROOT) as directory:
+            with read_regular(
+                directory,
+                f"{safe_id}.{kind}",
+                max_bytes=2 * 1024 * 1024 * 1024,
+            ) as source:
+                return os.fdopen(os.dup(source.fileno()), "rb")
+    except (ValueError, VaultPathError, FileNotFoundError, NotADirectoryError, OSError):
         return None
 
-    root = ARTIFACTS_ROOT.resolve()
-    candidate = (root / f"{build_id}.{kind}").resolve()
-    try:
-        candidate.relative_to(root)
-    except ValueError:
-        return None
-    return candidate if candidate.is_file() else None
+def find_artifact_path(build_id: str, kind: str) -> Optional[Path]:
+    """Deprecated unsafe path-only API: fail closed.
+
+    Returning a checked pathname allows a symlink or parent-directory swap
+    between validation and FileResponse. Use open_artifact_for_download()
+    to obtain and serve a verified descriptor instead.
+    """
+    return None
