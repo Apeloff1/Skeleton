@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
+import sys
 import unittest
 from unittest import mock
 
@@ -307,8 +308,21 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
         )
 
     def test_cli_real_path_commits_synthetic_source_only_batch(self):
-        status, stdout, stderr, calls = self._cli()
-        self.assertEqual(status, 0, stderr)
+        # CI diagnosis reports only source function/line, never private data.
+        # The operator CLI intentionally redacts exception text.
+        attribute_sites = []
+        def trace(frame, event, arg):
+            if (event == "exception" and isinstance(arg[1], AttributeError)
+                    and "/skeleton/" in frame.f_code.co_filename):
+                attribute_sites.append((frame.f_code.co_name, frame.f_lineno))
+            return trace
+        prior_trace = sys.gettrace()
+        try:
+            sys.settrace(trace)
+            status, stdout, stderr, calls = self._cli()
+        finally:
+            sys.settrace(prior_trace)
+        self.assertEqual(status, 0, stderr + " attribute_sites=" + repr(attribute_sites[-20:]))
         self.assertEqual(calls, 1)
         public = json.loads(stdout)
         self.assertEqual(public["committed_jobs"], 2)
