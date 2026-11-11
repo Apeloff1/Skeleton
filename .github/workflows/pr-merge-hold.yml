@@ -42,7 +42,9 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11.16"
+      - name: Regress trusted-base import and fail-closed event custody
+        run: python -m unittest -q tests.test_pr_merge_hold_entrypoint_20261111
       - name: Verify current PR title/body against live GitHub API
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python scripts/check_pr_merge_hold.py
+        run: python -m scripts.check_pr_merge_hold
