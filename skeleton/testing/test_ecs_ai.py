@@ -95,7 +95,7 @@ def test_utility_curves_and_choice() -> None:
     assert curve("linear", 1.0) == 1.0
     # Out-of-domain utility samples must not be silently clamped into a
     # seemingly valid decision score; the bounded model fails closed.
-    with pytest.raises(ValidationError, match="within \\[0, 1\\]"):
+    with pytest.raises(ValidationError, match=r"within \\[0, 1\\]"):
         curve("linear", 7)
     with pytest.raises(ValidationError):
         curve("cubic", 0.5)
