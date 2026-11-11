@@ -166,3 +166,12 @@ def test_cli_rejects_nonfinite_ratio_and_invalid_allocation_limits(tmp_path, mon
     monkeypatch.setenv("SKELETON_PERF_ALLOWED_TARGETS", "json:dumps")
     assert cli.main(["alloc", "json:dumps", "--allow-local-callable", "--top", "101"]) == 2
     assert cli.main(["alloc", "json:dumps", "--allow-local-callable", "--max-peak-bytes", "-1"]) == 2
+
+
+def test_cli_rejects_overflowing_frame_threshold_without_traceback(tmp_path, capsys):
+    path = tmp_path / "frames.json"
+    path.write_text("[10, 20]")
+    assert main(["frames", str(path), "--budget-ms", "1e308", "--hitch-factor", "2"]) == 2
+    captured = capsys.readouterr()
+    assert "hitch threshold must be finite" in captured.err
+    assert "Traceback" not in captured.err
