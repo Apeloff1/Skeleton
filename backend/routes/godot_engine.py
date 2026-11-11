@@ -175,8 +175,8 @@ async def create_project(req: ProjectCreateRequest) -> dict:
             409,
             "Project already exists — set overwrite=true to replace it",
         ) from None
-    except ValueError as e:
-        raise HTTPException(422, str(e)) from e
+    except ValueError:
+        raise HTTPException(422, "Invalid Godot project parameters") from None
     return result.to_dict()
 
 
