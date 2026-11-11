@@ -1,6 +1,6 @@
 import pytest
 
-from skeleton.perf_profiler.clock import DeterministicClock, MonotonicClock
+from skeleton.perf_profiler.clock import MAX_SCRIPT_STEPS, DeterministicClock, MonotonicClock
 
 
 def test_deterministic_clock_only_moves_when_told():
@@ -55,3 +55,50 @@ def test_clock_overflow_is_atomic_for_manual_and_scripted_advance():
     with pytest.raises(ValueError, match="finite bound"):
         scripted.now_ms()
     assert scripted.remaining_script == 1
+
+
+def test_script_rejects_infinite_input_after_bounded_reads():
+    class UnendingScript:
+        reads = 0
+
+        def __iter__(self):
+            while True:
+                self.reads += 1
+                yield 1.0
+
+    script = UnendingScript()
+    with pytest.raises(ValueError, match="bounded step count"):
+        DeterministicClock(script=script)
+    assert script.reads == MAX_SCRIPT_STEPS + 1
+
+
+def test_script_rejects_oversized_finite_input():
+    with pytest.raises(ValueError, match="bounded step count"):
+        DeterministicClock(script=(1.0 for _ in range(MAX_SCRIPT_STEPS + 1)))
+
+
+def test_bounded_script_replay_consumes_in_order():
+    clock = DeterministicClock(start_ms=5.0, script=(0.25 for _ in range(5000)))
+    assert clock.remaining_script == 5000
+    assert clock.now_ms() == 5.0
+    for step in range(1, 5001):
+        assert clock.now_ms() == 5.0 + 0.25 * step
+    assert clock.remaining_script == 0
+    assert clock.now_ms() == 1255.0
+
+
+def test_script_validation_rejects_first_bad_delta_without_draining_generator():
+    class BadThenInfinite:
+        reads = 0
+
+        def __iter__(self):
+            self.reads += 1
+            yield float("nan")
+            while True:
+                self.reads += 1
+                yield 1.0
+
+    script = BadThenInfinite()
+    with pytest.raises(ValueError, match="finite"):
+        DeterministicClock(script=script)
+    assert script.reads == 1
