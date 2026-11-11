@@ -36,12 +36,19 @@ class DeterministicClock:
 
     def advance(self, delta_ms: float) -> float:
         _check_delta(delta_ms)
-        self._now += float(delta_ms)
+        updated = self._now + float(delta_ms)
+        if not math.isfinite(updated):
+            raise ValueError("clock time exceeds finite bound")
+        self._now = updated
         return self._now
 
     def now_ms(self) -> float:
         if self._primed and self._script:
-            self._now += self._script.pop(0)
+            updated = self._now + self._script[0]
+            if not math.isfinite(updated):
+                raise ValueError("scripted clock time exceeds finite bound")
+            self._now = updated
+            self._script.pop(0)
         self._primed = True
         return self._now
 
@@ -51,8 +58,14 @@ class DeterministicClock:
 
 
 def _check_finite(value: float, name: str) -> None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-        raise ValueError(f"{name} must be a finite number, got {value!r}")
+    if type(value) not in (int, float):
+        raise ValueError(f"{name} must be a finite number")
+    try:
+        finite = math.isfinite(float(value))
+    except OverflowError:
+        finite = False
+    if not finite:
+        raise ValueError(f"{name} must be a finite number")
 
 
 def _check_delta(delta: float) -> None:

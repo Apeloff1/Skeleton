@@ -32,3 +32,26 @@ def test_monotonic_clock_is_non_decreasing():
     clock = MonotonicClock()
     a = clock.now_ms()
     assert clock.now_ms() >= a
+
+
+@pytest.mark.parametrize("bad", [10**1000, True, "100", float("nan")])
+def test_clock_rejects_unbounded_timestamps_and_deltas(bad):
+    with pytest.raises(ValueError, match="finite"):
+        DeterministicClock(start_ms=bad)
+    with pytest.raises(ValueError, match="finite"):
+        DeterministicClock().advance(bad)
+    with pytest.raises(ValueError, match="finite"):
+        DeterministicClock(script=[bad])
+
+
+def test_clock_overflow_is_atomic_for_manual_and_scripted_advance():
+    clock = DeterministicClock(start_ms=1e308)
+    with pytest.raises(ValueError, match="finite bound"):
+        clock.advance(1e308)
+    assert clock.now_ms() == 1e308
+
+    scripted = DeterministicClock(start_ms=1e308, script=[1e308])
+    assert scripted.now_ms() == 1e308
+    with pytest.raises(ValueError, match="finite bound"):
+        scripted.now_ms()
+    assert scripted.remaining_script == 1
