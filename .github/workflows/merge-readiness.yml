@@ -259,6 +259,7 @@ jobs:
           tests/test_room_api_dns_pin.py
           tests/test_room_api_admission_security.py
           tests/test_binary_atomic_security_20261111.py
+          tests/test_api_token_and_enum_security.py
       - name: Qualify secure session, telemetry, prototype and guest VM custody
         run: >-
           node --test
