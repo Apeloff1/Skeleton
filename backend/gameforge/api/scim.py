@@ -66,8 +66,10 @@ async def scim_webhook(
         raise HTTPException(status_code=400, detail="Invalid SCIM request") from None
     results = []
     for event in events:
-        if not secret_mode and event.tenant_id:
-            TENANT_REGISTRY.require_access(event.tenant_id, principal.user_id, "admin")
+        if not secret_mode:
+            if not isinstance(event.tenant_id, str) or not event.tenant_id:
+                raise HTTPException(status_code=403, detail="Explicit SCIM tenant required")
+            _authorize_scim_write(None, principal, event.tenant_id)
         actor = "scim-webhook" if secret_mode else principal.user_id
         try:
             results.append(await processor.apply(event, actor_user_id=actor))
