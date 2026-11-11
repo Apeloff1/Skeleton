@@ -69,6 +69,14 @@ test('circular objects, deep payloads and unsupported values are bounded', () =>
   assert.equal(privacy.sanitizeTelemetryDetail(vm.runInContext('new Date()', context)), '[UNSUPPORTED]');
 });
 
+test('hostile proxy reflection fails closed without throwing or revealing values', () => {
+  const hostile = vm.runInContext(
+    'new Proxy({}, {getPrototypeOf() { throw new Error("private trap"); }})',
+    context,
+  );
+  assert.equal(privacy.sanitizeTelemetryDetail(hostile), '[UNSUPPORTED]');
+});
+
 test('tampered persisted events are admitted only after sanitization', () => {
   const event = vm.runInContext(
     '({modal_id:"safe_modal",session_id:"s_secure",event:"error",severity:"fatal",detail:{token:"private",message:"Bearer private"},duration_ms:300})',
