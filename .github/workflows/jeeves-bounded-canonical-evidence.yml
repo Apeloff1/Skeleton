@@ -1,0 +1,46 @@
+name: Jeeves Bounded Canonical Evidence Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/jeeves/native_fabric/laptop_ops/contracts.py"
+      - "skeleton/ai/agents/jeeves/native_fabric/laptop_ops/contracts.py"
+      - "skeleton/testing/test_jeeves_laptop_canonical_bounds_20261111.py"
+      - ".github/workflows/jeeves-bounded-canonical-evidence.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-bounded-evidence-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  canonical_evidence_preflight:
+    name: Bounded source evidence and mirror parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout PR head without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Use canonical Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Compile canonical source, mirror and focused regressions
+        run: |
+          python -m compileall -q \
+            skeleton/jeeves/native_fabric/laptop_ops/contracts.py \
+            skeleton/ai/agents/jeeves/native_fabric/laptop_ops/contracts.py \
+            skeleton/testing/test_jeeves_laptop_canonical_bounds_20261111.py
+      - name: Verify bounded canonical evidence and malicious-input denials
+        env:
+          PYTHONPATH: "."
+        run: python -m unittest -q skeleton.testing.test_jeeves_laptop_canonical_bounds_20261111
+      - name: Verify canonical AI-tree source and mirror parity
+        run: python scripts/check_ai_file_tree.py
+      - name: Verify architecture boundaries
+        run: python scripts/check_architecture_boundaries.py
