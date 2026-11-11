@@ -284,60 +284,86 @@ async def _mcp_query(query: str, sources: list[str] | None) -> dict:
 
 
 async def _api_query(target: dict) -> dict:
-    """Call one explicitly allowlisted external API."""
-    url = target.get("url", "")
-    name = target.get("name", url)
+    """Call one explicitly allowlisted HTTPS endpoint under strict limits."""
+    if type(target) is not dict:
+        return {"channel": "api", "target": "external_api", "ok": False,
+                "error": "api_query_failed"}
+    # Never echo an entire caller-controlled URL containing bearer tokens.
+    raw_name = target.get("name", "external_api")
+    name = raw_name if type(raw_name) is str and 1 <= len(raw_name) <= 80 else "external_api"
     if not _EXTERNAL_ENABLED:
         return {"channel": "api", "target": name, "ok": True, "disabled": True,
                 "note": "external APIs disabled (inward-focused); set GAMEFORGE_ENABLE_EXTERNAL_APIS=1"}
     try:
-        base_url, request_target = _prepare_external_request(url)
+        url = target.get("url", "")
+        # DNS is blocking; neither resolution can hold the event loop hostage.
+        base_url, request_target = await asyncio.wait_for(
+            asyncio.to_thread(_prepare_external_request, url), timeout=5.0
+        )
         method = _safe_method(target.get("method", "GET"))
         timeout = _safe_timeout(target.get("timeout", 8))
         headers = _safe_headers(target.get("headers")) or {}
+        parameters = _safe_params(target.get("params"))
+        body_json = _bounded_json(target.get("json"))
         hostname = urlsplit(base_url).hostname
         if hostname is None:
             raise ValueError("external API host is missing")
-        # Use the checked address as the HTTP connection authority. HTTPX's
-        # documented SNI extension verifies the HTTPS certificate against the
-        # original allowlisted hostname, while Host preserves virtual hosting.
-        # Disable environment proxy handling so the selected IP cannot be
-        # redirected through an uncontrolled proxy or resolver.
-        pinned_ip = _resolve_public_host(hostname)
+        # Recheck DNS and connect to exactly that vetted public IP. No HTTPX
+        # DNS re-resolution, redirect, environment proxy or credentials.
+        pinned_ip = await asyncio.wait_for(
+            asyncio.to_thread(_resolve_public_host, hostname), timeout=5.0
+        )
         headers["Host"] = hostname
         import httpx
+
         async with httpx.AsyncClient(
             base_url=_origin_for_host(pinned_ip),
             timeout=timeout,
             follow_redirects=False,
             trust_env=False,
-        ) as c:
-            r = await c.request(
+        ) as client:
+            async with client.stream(
                 method,
                 request_target,
-                params=target.get("params"),
+                params=parameters,
                 headers=headers,
-                json=target.get("json"),
+                json=body_json,
                 extensions={"sni_hostname": hostname},
-            )
-            body = r.text[:2000]
-            return {"channel": "api", "target": name, "ok": r.is_success,
-                    "status": r.status_code, "body": body}
+            ) as response:
+                body = await _bounded_http_body(response)
+                return {"channel": "api", "target": name, "ok": response.is_success,
+                        "status": response.status_code, "body": body}
     except Exception:  # noqa: BLE001
         return {"channel": "api", "target": name, "ok": False, "error": "api_query_failed"}
-
 
 async def query_concurrent(room_id: str, mcp_queries: list[str] | None = None,
                            api_targets: list[dict] | None = None,
                            sources: list[str] | None = None) -> dict:
     """Fan every MCP query + external API target out CONCURRENTLY for a room.
     Returns per-channel results plus timing so callers can see the parallelism."""
-    mcp_queries = mcp_queries or []
-    api_targets = api_targets or []
+    mcp_queries = mcp_queries if mcp_queries is not None else []
+    api_targets = api_targets if api_targets is not None else []
+    if (type(room_id) is not str or not 1 <= len(room_id) <= 128
+            or type(mcp_queries) is not list or len(mcp_queries) > _MAX_MCP_QUERIES
+            or type(api_targets) is not list or len(api_targets) > _MAX_API_TARGETS
+            or any(type(q) is not str or not 1 <= len(q) <= 4096 for q in mcp_queries)
+            or any(type(target) is not dict for target in api_targets)
+            or (sources is not None and (
+                type(sources) is not list or len(sources) > _MAX_SOURCES
+                or any(type(s) is not str or not 1 <= len(s) <= 128 for s in sources)
+            ))):
+        raise ValueError("room fanout request exceeds admission budget")
     t0 = time.perf_counter()
 
-    tasks = [_mcp_query(q, sources) for q in mcp_queries]
-    tasks += [_api_query(t) for t in api_targets]
+    # No unbounded connection/thread fanout for a room.
+    slots = asyncio.Semaphore(_MAX_CONCURRENT_QUERIES)
+
+    async def bounded(operation):
+        async with slots:
+            return await operation
+
+    tasks = [bounded(_mcp_query(q, sources)) for q in mcp_queries]
+    tasks += [bounded(_api_query(t)) for t in api_targets]
     results = await asyncio.gather(*tasks) if tasks else []
 
     mcp_res = [r for r in results if r["channel"] == "mcp"]
