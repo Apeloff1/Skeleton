@@ -17,6 +17,8 @@ Endpoints:
   POST   /api/jeeves/consult                     — direct in-process Jeeves query
 """
 from __future__ import annotations
+
+from core.public_exception_route import PublicExceptionRoute
 import os
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
@@ -29,7 +31,7 @@ from core.databases import client as _SHARED_MONGO_CLIENT
 from services import binary_builder, vault_loader, tool_registry, jeeves_consultant
 from core.exec_guard import code_execution_enabled, execution_disabled_response
 
-router = APIRouter()
+router = APIRouter(route_class=PublicExceptionRoute, )
 
 _MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 _DB_NAME = os.environ.get("DB_NAME", "test_database")
@@ -77,11 +79,32 @@ async def binary_download(build_id: str, kind: str):
         or any(not (ch.isascii() and (ch.isalnum() or ch in {"-", "_"})) for ch in build_id)
     ):
         raise HTTPException(400, "invalid build_id")
-    path = binary_builder.find_artifact_path(build_id, kind)
-    if not path:
-        raise HTTPException(404, f"artifact not found — call /api/binary/package first")
+    opened = binary_builder.open_artifact_for_download(build_id, kind)
+    if opened is None:
+        raise HTTPException(404, "artifact not found")
     media = "application/zip" if kind == "zip" else "application/vnd.android.package-archive"
-    return FileResponse(str(path), media_type=media, filename=f"galaxy_{build_id}.{kind}")
+
+    def _chunks():
+        # Read the verified descriptor instead of re-opening its pathname.
+        # This closes the symlink/parent replacement race in FileResponse.
+        try:
+            while True:
+                chunk = opened.read(1024 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            opened.close()
+
+    return StreamingResponse(
+        _chunks(),
+        media_type=media,
+        headers={
+            "Content-Disposition": f'attachment; filename="galaxy_{build_id}.{kind}"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 @router.get("/binary/artifacts/{build_id}")
