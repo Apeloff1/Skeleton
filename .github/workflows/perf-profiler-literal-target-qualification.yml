@@ -44,6 +44,8 @@ jobs:
           python scripts/check_ai_file_tree.py
       - name: Run profiler focused regression suite
         run: python -m pytest -q tests/perf_profiler
+      - name: Qualify repository-wide dynamic import policy
+        run: python scripts/check_repository_dynamic_import_safety.py
       - name: Reject runtime-selected import in profiler CLI
         run: |
           python - <<'PY'
