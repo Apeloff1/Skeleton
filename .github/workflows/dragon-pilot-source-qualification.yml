@@ -13,6 +13,9 @@ on:
       - ".github/workflows/malware-gate.yml"
       - ".github/workflows/artifact-policy.yml"
       - "tests/test_dragon_pilot_release_gate_admission.py"
+      - "tests/test_dragon_e2e_editor_admission.py"
+      - "scripts/qualify_e2e_dragon_editor.py"
+      - "tests/e2e/app-foundation/dragon-crawler-pilot.spec.mjs"
   workflow_dispatch:
 
 permissions:
@@ -54,6 +57,8 @@ jobs:
         run: python -m unittest discover -s backend/tests -p 'test_dragon_campaign_pilot_qualification.py' -v
       - name: Verify review-only malware and artifact admission remains fail closed
         run: python -m unittest discover -s tests -p 'test_dragon_pilot_release_gate_admission.py' -v
+      - name: Verify CI-only editor token custody and least-authority role grant
+        run: python -m unittest discover -s tests -p 'test_dragon_e2e_editor_admission.py' -v
       - name: Verify patch whitespace against fetched parent
         run: |
           test "$(git rev-list --count HEAD)" -ge 2

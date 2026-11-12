@@ -292,3 +292,57 @@ test('real Playwright first-install smoke never mistakes sign-in for crawler aut
   assert.match(source, /crawlerWrites/);
   assert.match(source, /Release authorized: NO/);
 });
+
+test('unverifiable owner refresh clears retained evidence before any retry', () => {
+  const screen = read('src/features/Jeeves/CrawlerReleasePrototype.tsx');
+  const start = screen.indexOf('const reload = useCallback');
+  const end = screen.indexOf('const overview = useCallback', start);
+  assert.ok(start >= 0 && end > start);
+  const reload = screen.slice(start, end);
+  const sourceRead = reload.indexOf('const page = await listCrawlSources');
+  assert.ok(reload.indexOf('const current = await getCrawl(id, abort.signal)') < sourceRead);
+  assert.ok(reload.indexOf('setAtlas(null); setAtlasWitness(null); setReviewDraft(null)') <
+    reload.indexOf('const current = await getCrawl(id, abort.signal)'));
+  assert.ok(reload.includes('sessionRef.current = null;'));
+  assert.ok(reload.includes('setSessions([]);'));
+  assert.ok(reload.includes('setSources([]); setSourceCursor(null); setReviewDraft(null);'));
+  assert.ok(reload.includes('setReadiness(null);'));
+});
+
+test('source withdrawal and new commands revoke any pending receipt share', () => {
+  const screen = read('src/features/Jeeves/CrawlerReleasePrototype.tsx');
+  assert.match(screen, /shareAbort.current\?\.abort\(\)/);
+  assert.match(screen, /before\.consent_current !== value\.consent_current/);
+  assert.match(screen, /before\.status !== value\.status/);
+  assert.match(screen, /pending\.current \|\| lock\.current \|\| preflightLock\.current \|\| shareLock\.current/);
+  assert.match(screen, /policyChanged=\{value => \{[\s\S]*?shareAbort\.current\?\.abort\(\)/);
+});
+
+test('authorization refresh destroys retained source text and pending source reads', () => {
+  const screen = read('src/features/Jeeves/CrawlerReleasePrototype.tsx');
+  const library = read('src/features/Jeeves/CrawlerSourceLibrary.tsx');
+  assert.match(screen, /key=\{session\.session_id \+ ':' \+ sourceViewEpoch\}/);
+  assert.match(screen, /setSourceViewEpoch\(value => value \+ 1\)/);
+  assert.match(screen, /setSourceViewEpoch\(epoch => epoch \+ 1\)/);
+  assert.match(library, /const \[page, setPage\] = useState/);
+  assert.match(library, /const \[selected, setSelected\] = useState/);
+  assert.match(library, /return \(\) => \{ generation\.current\+\+; readRequest\.current\?\.abort\(\)/);
+});
+
+test('real editor browser flow preserves public viewer role and requires scoped CI grant', () => {
+  const spec = read('../tests/e2e/app-foundation/dragon-crawler-pilot.spec.mjs');
+  const qualifier = read('../scripts/qualify_e2e_dragon_editor.py');
+  assert.match(spec, /authorizeScopedEditor\(account\.email\)/);
+  assert.match(spec, /SKELETON_E2E_OPERATOR_TOKEN_FILE/);
+  assert.match(spec, /CI zero-network research/);
+  assert.match(spec, /await page\.reload\(\)/);
+  assert.match(spec, /toBeDisabled\(\)/);
+  assert.match(spec, /toBeEnabled\(\)/);
+  assert.match(spec, /actions\[0\]/);
+  assert.match(qualifier, /GITHUB_ACTIONS/);
+  assert.match(qualifier, /O_NOFOLLOW/);
+  assert.match(qualifier, /role.*editor/);
+  assert.match(qualifier, /api\/auth\/set-role/);
+  assert.ok(!spec.includes("get_header('Authorization')"),
+    'admin bearer token must stay out of browser traces');
+});

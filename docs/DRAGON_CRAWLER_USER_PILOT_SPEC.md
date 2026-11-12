@@ -337,3 +337,60 @@ dependency aggregation. CodeQL security alert closure, independent device
 installation, system recovery, source-rights review, signing and rollback remain
 unqualified until their own executed current-head evidence exists. No skipped
 gate is counted as success.
+
+## Revocation and uncertain-owner-read privacy boundary
+
+In the guided pilot, a source-list refresh is never treated as permission to
+retain a previously read source body. Starting a canonical owner refresh
+immediately clears the parent Atlas report, source rows, review draft and
+portable receipt witness and aborts an in-flight share check. The visible
+source-library component is also re-keyed, since it privately caches search
+results, full text pages, preserved previews and selected source passages.
+Re-keying unmounts the previous library and aborts its outstanding source
+fetch/search requests. This is essential: passing `sources=[]` alone does
+**not** clear that component's private `page` and `selected` state.
+
+If the authenticated `getCrawl` read fails or source ownership can no longer
+be demonstrated, clear local mission details and catalogue, readiness,
+source text, Atlas and receipt; require a new authenticated catalogue refresh.
+A successful session read followed by a failed source-list read may retain
+authoritatively confirmed session counters, but must not retain source content
+or any reviewed-knowledge selection. Mutations and fresh receipt sharing
+cannot interleave while a share check is in flight; revision, consent, policy
+and session switches abort a pending share. A copy already sent to a device
+share sheet cannot be revoked remotely.
+
+These are client-side containment measures. Backend tenant authentication,
+source-use checks, CAS identity, fail-closed SSRF boundaries, and explicit
+human review remain the actual authority.
+
+## Authorized editor's real first-mission persistence acceptance
+
+The existing RBAC policy deliberately provisions public signups as `viewer`,
+which can inspect permitted evidence but **cannot** create crawler missions.
+The pilot does not auto-promote users. A full-production-stack Playwright case
+now verifies the separate, authorized editor journey without sending a single
+public-source HTTP request.
+
+An isolated, freshly registered viewer is explicitly upgraded to `editor`
+through the backend's existing `/api/auth/set-role` admin endpoint, using
+only the independently seeded CI operator token. The role-grant utility
+requires GitHub Actions, the precise 127.0.0.1:8001 stack, a per-run scoped
+viewer email and a private `RUNNER_TEMP` token file that is regular, 0600,
+single-link, owned by the runner, bounded in size and opened with
+`O_NOFOLLOW`. Tokens are never copied into Playwright's browser, network
+fixture, screenshots or trace. No normal user or remote app can call this
+CI helper.
+
+The editor must still enter a public HTTPS seed and explicitly acknowledge
+both capture consent and rights before the create button can enable. The
+test asserts exactly **one** signed-in session-creation POST, no network crawl
+slice, no automatic worker activation, zero committed capture requests, and
+successful reload/resume from the canonical Mongo owner-session catalogue.
+Failure at any step keeps actual first-mission qualification **red**.
+
+This test is not a substitute for a separate live-network/robots/DNS trial
+in a permitted external environment, a multi-user tenant-isolation
+penetration test, a source-rights approval, or independent native hardware
+installation. The isolated proof is about correct authorization, persistence
+and zero unrequested network activity.

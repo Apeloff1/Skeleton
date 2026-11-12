@@ -86,6 +86,10 @@ function PilotContent() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [session, setSession] = useState<CrawlSession | null>(null);
   const [sources, setSources] = useState<CapturedSource[]>([]);
+  // Re-key the source-library component on every authority refresh. It owns
+  // separately cached full text, search hits and review selections that a
+  // mere sources=[] prop update would NOT clear.
+  const [sourceViewEpoch, setSourceViewEpoch] = useState(0);
   const [sourceCursor, setSourceCursor] = useState<string | null>(null);
   const [reviewDraft, setReviewDraft] = useState<CrawlPassageSelection | null>(null);
   const [atlas, setAtlas] = useState<CrawlAtlasReport | null>(null);
@@ -126,8 +130,13 @@ function PilotContent() {
       before.version !== value.version ||
       before.consent_current !== value.consent_current ||
       before.status !== value.status)) {
+      // Revoked consent, revision and owner/session changes invalidate any
+      // share already waiting on a server re-read. No stale receipt leaves.
+      shareAbort.current?.abort();
+      setSourceViewEpoch(value => value + 1);
       setAtlas(null);
       setAtlasWitness(null);
+      setReviewDraft(null);
     }
   }, []);
 
@@ -135,6 +144,13 @@ function PilotContent() {
     reads.current?.abort();
     const abort = new AbortController(); reads.current = abort;
     const token = account.current;
+    // Unverified evidence is not retained while source authorization is
+    // checked. Session titles/counters are separately preserved only after a
+    // successful authenticated session read.
+    shareAbort.current?.abort();
+    setSourceViewEpoch(value => value + 1);
+    setAtlas(null); setAtlasWitness(null); setReviewDraft(null);
+    setSources([]); setSourceCursor(null);
     try {
       // A denied or unavailable source-library request must not hide the
       // authoritative session revision, counters or revoked consent. First
@@ -158,8 +174,18 @@ function PilotContent() {
         }
       }
     } catch {
-      if (fresh(abort.signal, token)) {
-        setError('The canonical session could not be refreshed. Last displayed state may be stale; do not retry a new command until it is reconciled.');
+      if (fresh(abort.signal, token) && sessionRef.current?.session_id === id) {
+        // A refused owner read is not permission to keep showing previous
+        // mission metadata, source content or a cached Atlas qualification.
+        // Durable server state remains available through a fresh catalogue.
+        sessionRef.current = null;
+        setSession(null);
+        setSessions([]);
+        setNextCursor(null);
+        setReadiness(null);
+        setSources([]); setSourceCursor(null); setReviewDraft(null);
+        setAtlas(null); setAtlasWitness(null);
+        setError('This owned session or its current permissions could not be verified. Cached session metadata and evidence were cleared. Refresh authenticated admission before continuing.');
       }
     } finally {
       if (reads.current === abort) reads.current = null;
@@ -231,8 +257,10 @@ function PilotContent() {
   }, []);
 
   const select = (row: CrawlSession) => {
-    if (lock.current || preflightLock.current || busy || pending.current) return;
+    if (lock.current || preflightLock.current || busy || pending.current || shareLock.current) return;
     reads.current?.abort();
+    shareAbort.current?.abort();
+    setSourceViewEpoch(value => value + 1);
     sessionRef.current = row;
     setSession(row); setSources([]); setSourceCursor(null);
     setAtlas(null); setAtlasWitness(null);
@@ -278,7 +306,7 @@ function PilotContent() {
   };
 
   const create = () => {
-    if (!canWrite || readiness?.available !== true || pending.current || lock.current || preflightLock.current) {
+    if (!canWrite || readiness?.available !== true || pending.current || lock.current || preflightLock.current || shareLock.current) {
       setError('An editor account, configured crawler and fully resolved previous command are required.');
       return;
     }
@@ -294,7 +322,7 @@ function PilotContent() {
   const execute = async (kind: 'run' | 'pause' | 'resume') => {
     const current = sessionRef.current;
     if (!current || !current.consent_current || !canWrite
-      || readiness?.available !== true || pending.current || lock.current || preflightLock.current) {
+      || readiness?.available !== true || pending.current || lock.current || preflightLock.current || shareLock.current) {
       setError('Resolve consent, admission, account authority or the previous command before continuing.');
       return;
     }
@@ -605,7 +633,7 @@ function PilotContent() {
               <Button title="Refresh current source policy" onPress={() => void reload(session.session_id)} />
             </View>}
         </View>
-        {session && <CrawlerSourceLibrary key={session.session_id} session={session}
+        {session && <CrawlerSourceLibrary key={session.session_id + ':' + sourceViewEpoch} session={session}
           sources={sources} more={!!sourceCursor} busy={!!busy || exporting}
           canWrite={canWrite} loadMore={() => void moreSources()}
           refresh={() => void reload(session.session_id)}
@@ -616,6 +644,8 @@ function PilotContent() {
             if (value.session.version < sessionRef.current.version) {
               void reload(value.session.session_id); return;
             }
+            shareAbort.current?.abort();
+            setSourceViewEpoch(epoch => epoch + 1);
             update(value.session); setAtlas(null); setAtlasWitness(null); setReviewDraft(null);
             setSources(rows => rows.map(row =>
               row.source_id === value.source.source_id ? value.source : row));
