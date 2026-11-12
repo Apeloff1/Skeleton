@@ -511,62 +511,62 @@ class OfflineHTTPApplication:
                     if peer_replay is not None:
                         return self._replayed_result(session_id, rid, peer_replay)
                     self._session(session_id)
-                chat = DurableOfflineAISession(
-                    self.backend, database=self.database, session_id=session_id
-                )
-                try:
-                    # Runtime adaptation and durability CAS are controlled by
-                    # DurableOfflineAISession. A failed turn leaves no partial text.
-                    async def generate():
-                        if turn is not None:
-                            with self._turn_lock:
-                                turn.loop = asyncio.get_running_loop()
-                                turn.task = asyncio.current_task()
-                                if turn.cancel_requested:
-                                    raise asyncio.CancelledError()
-                        return await chat.ask(
-                            text, max_output_tokens=budget, request_id=rid,
-                            evidence_manifest=manifest,
-                        )
-                    try:
-                        generated_answer = asyncio.run(generate())
-                    except (LlamaCppRuntimeError, NativeRuntimeBackendError,
-                            TimeoutError, OSError):
-                        # Count genuine local runtime failures, not invalid user
-                        # prompts, explicit cancellations or SQLite replay.
-                        self._inference_circuit.record_failure()
-                        raise
-                    else:
-                        self._inference_circuit.record_success()
-                finally:
-                    chat.close()
-                receipt = self._store.replay(session_id, rid, digest)
-                if receipt is None:
-                    raise RuntimeContractError("local generation receipt was not committed")
-                execution_receipt = self._store.local_execution_receipt(
-                    session_id, rid, self.model_digest, self.tokenizer_digest,
-                )
-                if (execution_receipt is None
-                        or execution_receipt["execution_receipt_digest"]
-                        != generated_answer.execution_receipt_digest
-                        or execution_receipt["output_sha256"] != receipt.output_digest):
-                    raise RuntimeContractError(
-                        "local native generation receipt differs from its committed SQLite response"
+                    chat = DurableOfflineAISession(
+                        self.backend, database=self.database, session_id=session_id
                     )
-                committed_evidence = self._store.turn_evidence(
-                    session_id, self.model_digest, self.tokenizer_digest,
-                )[receipt.revision - 1]
-                return {
-                    "session_id": session_id, "request_id": rid,
-                    "revision": receipt.revision, "text": receipt.text,
-                    "output_digest": receipt.output_digest,
-                    "input_tokens": receipt.prompt_tokens,
-                    "output_tokens": receipt.generated_tokens,
-                    "replayed": False, "model_digest": self.model_digest,
-                    "local_execution_receipt": execution_receipt,
-                    "evidence": committed_evidence,
-                    **_audit_pair(receipt.text, committed_evidence),
-                }
+                    try:
+                        # Runtime adaptation and durability CAS are controlled by
+                        # DurableOfflineAISession. A failed turn leaves no partial text.
+                        async def generate():
+                            if turn is not None:
+                                with self._turn_lock:
+                                    turn.loop = asyncio.get_running_loop()
+                                    turn.task = asyncio.current_task()
+                                    if turn.cancel_requested:
+                                        raise asyncio.CancelledError()
+                            return await chat.ask(
+                                text, max_output_tokens=budget, request_id=rid,
+                                evidence_manifest=manifest,
+                            )
+                        try:
+                            generated_answer = asyncio.run(generate())
+                        except (LlamaCppRuntimeError, NativeRuntimeBackendError,
+                                TimeoutError, OSError):
+                            # Count genuine local runtime failures, not invalid user
+                            # prompts, explicit cancellations or SQLite replay.
+                            self._inference_circuit.record_failure()
+                            raise
+                        else:
+                            self._inference_circuit.record_success()
+                    finally:
+                        chat.close()
+                    receipt = self._store.replay(session_id, rid, digest)
+                    if receipt is None:
+                        raise RuntimeContractError("local generation receipt was not committed")
+                    execution_receipt = self._store.local_execution_receipt(
+                        session_id, rid, self.model_digest, self.tokenizer_digest,
+                    )
+                    if (execution_receipt is None
+                            or execution_receipt["execution_receipt_digest"]
+                            != generated_answer.execution_receipt_digest
+                            or execution_receipt["output_sha256"] != receipt.output_digest):
+                        raise RuntimeContractError(
+                            "local native generation receipt differs from its committed SQLite response"
+                        )
+                    committed_evidence = self._store.turn_evidence(
+                        session_id, self.model_digest, self.tokenizer_digest,
+                    )[receipt.revision - 1]
+                    return {
+                        "session_id": session_id, "request_id": rid,
+                        "revision": receipt.revision, "text": receipt.text,
+                        "output_digest": receipt.output_digest,
+                        "input_tokens": receipt.prompt_tokens,
+                        "output_tokens": receipt.generated_tokens,
+                        "replayed": False, "model_digest": self.model_digest,
+                        "local_execution_receipt": execution_receipt,
+                        "evidence": committed_evidence,
+                        **_audit_pair(receipt.text, committed_evidence),
+                    }
             except LocalInferenceLeaseBusy:
                 raise OfflineHTTPError(
                     423, "another local service owns the inference execution slot"
