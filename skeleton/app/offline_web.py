@@ -599,6 +599,7 @@ JAVASCRIPT = r"""'use strict';
         'Status unavailable. No new generation was requested. ' + error.message);
       if (error.status === 404) {
         state.turn = {...observed, state: 'failed', terminal: true, error: 'ticket unavailable'};
+        await completeSelfTest(state.turn, epoch);
       } else if (state.pollErrors < 8) schedulePoll(Math.min(8000, 1000 * 2 ** state.pollErrors));
     } finally {
       if (epoch === state.epoch) {
@@ -682,7 +683,7 @@ JAVASCRIPT = r"""'use strict';
     }
   }
   async function startSelfTest() {
-    if (!state.connected || state.busy || unresolved() || state.health?.ready !== true)
+    if (!state.connected || unresolved() || state.health?.ready !== true)
       throw new Error('A ready idle local model is required for the live check.');
     if (state.selfTest) throw new Error('The previous self-test must finish before another.');
     const epoch = state.epoch;
