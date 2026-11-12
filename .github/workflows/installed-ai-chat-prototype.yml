@@ -54,7 +54,8 @@ jobs:
       - name: Verify authenticated backend-to-engine HTTP chat with durable local fixture
         env:
           PYTHONPATH: ".:backend"
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "0"
+          # Pytest asyncio must be discovered normally: any value of
+          # PYTEST_DISABLE_PLUGIN_AUTOLOAD (even "0") disables plugins.
         run: >-
           python -m pytest -q --noconftest
           backend/tests/test_ai_chat_local_engine_e2e.py::test_backend_chat_crosses_real_engine_http_boundary_and_commits_local_result_consumer_runtime
