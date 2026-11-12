@@ -226,6 +226,12 @@ def _qualify_actual_local_http(
     token = secrets.token_urlsafe(40)
     first_request_id = "jeeves-qual-" + secrets.token_hex(12)
     second_request_id = "jeeves-qual-" + secrets.token_hex(12)
+    second_prompt = (
+        "Continue the local Jeeves conversation in one sentence without any cloud model."
+    )
+    # The same second request ID is first tested against a busy peer and
+    # subsequently used for genuine execution after the original server
+    # restarts. Denial must not reserve a durable request ID or generate text.
     with TemporaryDirectory(prefix="jeeves-local-http-") as root:
         database = Path(root) / "jeeves.sqlite3"
         with _LiveServer(model, database, token) as instance:
@@ -270,6 +276,39 @@ def _qualify_actual_local_http(
                 raise LiveJeevesFailure("committed local request identity was mutable")
             _assert_transcript(instance.port, token, session_id, replies=[first["result"]])
 
+            # Exercise two independently authenticated LOCAL HTTP applications
+            # sharing one private SQLite workspace. While the first holds its
+            # operating-system lease, the other must reject a NEW model turn
+            # with HTTP 423, never answer from a second backend, and leave the
+            # original saved conversation untouched. No mock responses or
+            # external inference service are involved.
+            peer_token = secrets.token_urlsafe(40)
+            with _LiveServer(model, database, peer_token) as peer:
+                _expect_model(peer.port, peer_token, digest)
+                with instance.app._inference_lease.hold():
+                    denied_status, busy = _request(
+                        peer.port, peer_token, "POST",
+                        "/v1/sessions/" + session_id + "/turn",
+                        {
+                            "request_id": second_request_id,
+                            "message": second_prompt,
+                            "max_output_tokens": output_tokens,
+                        },
+                        allowed_error_status=423,
+                    )
+                    if (denied_status != 423 or not isinstance(busy.get("error"), str)
+                            or busy.get("text") is not None
+                            or busy.get("result") is not None):
+                        raise LiveJeevesFailure(
+                            "a second localhost service bypassed the exclusive native inference lease"
+                        )
+                    _assert_transcript(
+                        peer.port, peer_token, session_id, replies=[first["result"]],
+                    )
+                _assert_transcript(
+                    peer.port, peer_token, session_id, replies=[first["result"]],
+                )
+
         # Fully close the socket, worker, and SQLite handle. A fresh app
         # instance must reconstruct the same source-bound conversation.
         with _LiveServer(model, database, token) as restarted:
@@ -288,9 +327,6 @@ def _qualify_actual_local_http(
                     or historical["local_execution_receipt"].get("execution_receipt_digest")
                        != first["local_execution_receipt_sha256"]):
                 raise LiveJeevesFailure("saved local turn could not be recovered after process restart")
-            second_prompt = (
-                "Continue the local Jeeves conversation in one sentence without any cloud model."
-            )
             # A second completed response alone proves no context continuity:
             # a truncated or reset session could have generated it. Independently
             # re-open the canonical SQLite authority and verify the deterministic
@@ -359,6 +395,8 @@ def _qualify_actual_local_http(
         "runtime_receipts_survived_restart": True,
         "unauthenticated_local_query_denied": True,
         "committed_request_rewrite_denied": True,
+        "competing_local_service_inference_denied": True,
+        "denied_peer_request_committed_after_restart": True,
         "turn_metrics": [
             {"elapsed_seconds": t["elapsed_seconds"],
              "observed_output_tokens_per_second": t["output_tokens_per_second_observed"],
