@@ -131,3 +131,35 @@ def test_cli_defaults_to_no_configuration_write(capsys):
     content = capsys.readouterr().out
     assert '"applied": false' in content
     assert EXAMPLE_KEY not in content
+
+
+
+def test_headless_provider_prompt_never_falls_back_to_echo(monkeypatch):
+    from scripts import configure_ai_chat_hosted as config
+
+    class HeadlessInput:
+        def isatty(self):
+            return False
+
+    monkeypatch.setattr(config.sys, "stdin", HeadlessInput())
+    monkeypatch.setattr(config, "getpass", lambda _: pytest.fail("a key must never be requested from headless stdin"))
+    with pytest.raises(ActivationError, match="requires a terminal"):
+        config.prompted_provider_key()
+
+
+def test_interactive_provider_prompt_cancellation_is_safe(monkeypatch):
+    from scripts import configure_ai_chat_hosted as config
+
+    class PrivateTerminal:
+        def isatty(self):
+            return True
+
+    monkeypatch.setattr(config.sys, "stdin", PrivateTerminal())
+
+    def cancelled(_):
+        raise EOFError("sensitive-transport-path")
+
+    monkeypatch.setattr(config, "getpass", cancelled)
+    with pytest.raises(ActivationError, match="was cancelled") as result:
+        config.prompted_provider_key()
+    assert "sensitive-transport-path" not in str(result.value)
