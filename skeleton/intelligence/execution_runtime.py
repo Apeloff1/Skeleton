@@ -8,7 +8,7 @@ import json
 import math
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import asdict, dataclass, replace
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from skeleton.contracts.ai_execution import (
