@@ -742,6 +742,9 @@ class OfflineHTTPApplication:
                 "model_readiness_code": code,
                 "readiness_is_live_inference_proof": False,
                 "inference_circuit": self._inference_circuit.status(),
+                # A local OS lock observation is not an execution receipt.
+                # It cannot authorize a model or override the readiness guard.
+                "inference_lease": self._inference_lease.inspect(),
                 "runtime_kind": ("native" if hasattr(self.backend, "runtime")
                                  else "llama.cpp"),
                 "adaptive_metal_launch": getattr(
