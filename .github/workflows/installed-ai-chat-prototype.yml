@@ -60,6 +60,15 @@ jobs:
           python -m pytest -q --noconftest
           backend/tests/test_ai_chat_local_engine_e2e.py::test_backend_chat_crosses_real_engine_http_boundary_and_commits_local_result_consumer_runtime
           backend/tests/test_ai_chat_local_engine_e2e.py::test_deferred_chat_reconnect_finalizes_from_engine_handoff_without_original_context_consumer_runtime
+      - name: Verify hosted OpenAI provider request and secret-safe failure contracts
+        env:
+          PYTHONPATH: ".:backend"
+        run: >-
+          python -m pytest -q --noconftest
+          backend/tests/test_ai_provider_adapter.py::test_openai_adapter_normalizes_response_and_preserves_history
+          backend/tests/test_ai_provider_adapter.py::test_openai_adapter_rejects_empty_model_output
+          backend/tests/test_ai_provider_reliability.py::test_timeout_burst_is_bounded_and_sanitized
+          backend/tests/test_ai_provider_reliability.py::test_sdk_client_receives_explicit_timeout_and_retry_bounds
       - name: Set up Node 24
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
