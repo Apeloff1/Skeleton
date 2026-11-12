@@ -118,6 +118,17 @@ def activate_hosted_ai(
         except (OSError, UnicodeError, ValueError):
             raise ActivationError("The installed private .env cannot be safely read.") from None
         values = _parse_env(text)
+        # A configured Jeeves installation is permanently local-only through
+        # this activation command, irrespective of legacy switch/rotation flags.
+        from skeleton.ai.jeeves_local_policy import JeevesLocalPolicyError, is_local_only
+        try:
+            jeeves_only = is_local_only(values)
+        except JeevesLocalPolicyError:
+            raise ActivationError("The Jeeves local-only policy is invalid; hosted activation refused.") from None
+        if jeeves_only:
+            raise ActivationError(
+                "Jeeves is a local-only primary model. Hosted activation and online fallback are disabled."
+            )
         active = values.get("AI_PROVIDER", "").strip().lower()
         existing_key = values.get("OPENAI_API_KEY", "").strip()
         if _is_placeholder(existing_key):
