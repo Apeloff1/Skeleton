@@ -350,8 +350,31 @@ function patchNodeForgeNestedDigestAlgorithm() {
   // Reviewed exact published versions. The 1.4.2 RSA parser still validates
   // the outer DigestInfo count without validating nested DigestAlgorithm arity.
   // Never silently trust a version bump as proof of this security fix.
-  if (!new Set(['1.4.0', '1.4.2']).has(version)) {
+  if (!new Set(['1.4.0', '1.4.2', '1.4.3']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
+  }
+  if (version === '1.4.3') {
+    // The upstream 1.4.3 verifier uses a stronger canonical DER
+    // DigestInfo re-encoding check, not our earlier nested-arity patch.
+    // Require the exact verification structure before allowing this
+    // security-sensitive version. A version string alone is NEVER proof.
+    const source = fs.readFileSync(
+      path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
+    const required = [
+      /var _encodeDigestInfo = function\(oid, digest, withParameters\) \{/,
+      /parseAllBytes: options\._parseAllDigestBytes/,
+      /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\)/,
+      /var withParameters = _encodeDigestInfo\(oid, capture\.digest, true\);/,
+      /var withoutParameters =\s*_encodeDigestInfo\(oid, capture\.digest, false\);/,
+      /if\(d\.substring\(0, withParameters\.length\) !== withParameters &&\s*d\.substring\(0, withoutParameters\.length\) !== withoutParameters\)/,
+    ];
+    if (required.some(pattern => !pattern.test(source))
+        || source.includes('skeleton GHSA-86w9-cpqp-85rv')
+        || source.includes('obj.value[0].value.length !==')) {
+      throw new Error('[patch-node-modules] node-forge 1.4.3 canonical DER verifier changed; security review required');
+    }
+    console.log('[patch-node-modules] ✓ node-forge 1.4.3 upstream canonical DER RSA verifier qualified');
+    return;
   }
 
   // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: preserve the exact reviewed
