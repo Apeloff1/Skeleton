@@ -31,7 +31,7 @@ class FakeApi:
                 "models": {
                     "automatic_available": False,
                     "models": [{"available": self.ready, "selectable": True,
-                                "provider_id": "openai", "model_id": "qualified-text",
+                                "provider_id": "local", "model_id": "jeeves",
                                 "max_output_tokens": 512}],
                 },
             }
@@ -40,13 +40,13 @@ class FakeApi:
         if method == "POST" and path == "/api/ai/chat":
             assert body["response_mode"] == "deferred"
             assert body["expected_thread_version"] == 1
-            assert body["provider_id"] == "openai"
-            assert body["model_id"] == "qualified-text"
+            assert body["provider_id"] == "local"
+            assert body["model_id"] == "jeeves"
             assert body["max_output_tokens"] == 128
             self.key = body["idempotency_key"]
             return {"accepted": True}
         if path.startswith("/api/ai/chat/turns/"):
-            refs = ["provider:openai:receipt"] if self.receipts else []
+            refs = ["provider:local:receipt"] if self.receipts else []
             response = "A real reply." if self.replay or not getattr(self, "_replayed", False) else "A different reply."
             self._replayed = True
             return {
@@ -59,7 +59,7 @@ class FakeApi:
         if path.startswith("/api/v1/conversations/"):
             return {"messages": ([{
                 "message_id": "answer-1", "content": "A real reply.",
-                "provider_receipt_refs": ["provider:openai:receipt"],
+                "provider_receipt_refs": ["provider:local:receipt"],
             }] if self.durable else [])}
         raise AssertionError((method, path))
 
@@ -227,3 +227,49 @@ def test_interactive_login_cancellation_is_sanitized(monkeypatch):
     with pytest.raises(smoke.ProbeFailure, match="was cancelled") as result:
         smoke.interactive_login(FakeApi(), "owner@example.org")
     assert "private-account-password" not in str(result.value)
+
+
+@pytest.mark.parametrize("provider,model", [
+    ("openai", "gpt-5.5"), ("local", "qwen3"),
+    ("external", "jeeves"), ("openai", "jeeves"),
+])
+def test_foreign_or_advisory_primary_model_cannot_claim_local_readiness(provider, model):
+    class Foreign(FakeApi):
+        def request(self, method, path, body=None):
+            response = super().request(method, path, body)
+            if path == "/api/ai/chat/readiness":
+                response["models"]["models"][0]["provider_id"] = provider
+                response["models"]["models"][0]["model_id"] = model
+            return response
+    with pytest.raises(smoke.ProbeFailure, match="foreign or advisory"):
+        smoke.readiness(Foreign())
+
+
+def test_automatic_catalog_still_pins_explicit_jeeves_and_never_routes_hosted():
+    class Automatic(FakeApi):
+        def request(self, method, path, body=None):
+            response = super().request(method, path, body)
+            if path == "/api/ai/chat/readiness":
+                response["models"]["automatic_available"] = True
+            return response
+    api = Automatic()
+    snap = smoke.readiness(api)
+    assert snap["automatic_available"] is True
+    smoke.exercise(api, snap, seconds=10, prompt="Hi")
+    posts = [payload for method, path, payload in api.calls
+             if method == "POST" and path == "/api/ai/chat"]
+    assert len(posts) == 1
+    assert posts[0]["provider_id"] == "local"
+    assert posts[0]["model_id"] == "jeeves"
+
+
+def test_remote_provider_receipt_denied_even_after_real_saved_text():
+    class ForeignReceipt(FakeApi):
+        def request(self, method, path, body=None):
+            response = super().request(method, path, body)
+            if path.startswith("/api/ai/chat/turns/"):
+                response["engine_provider_receipts"] = ["provider:openai:receipt"]
+            return response
+    api = ForeignReceipt()
+    with pytest.raises(smoke.ProbeFailure, match="provider receipts"):
+        smoke.exercise(api, smoke.readiness(api), seconds=10, prompt="Hi")
