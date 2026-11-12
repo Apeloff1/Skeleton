@@ -192,6 +192,37 @@ def build(
             application_chat_verified=False,
         )
 
+    if getattr(args, "live_local_suite", False):
+        # Independent REAL localhost acceptance: two model generations, a
+        # complete SQLite/server restart and exact historical replay.
+        # It is not a substitute for the protected multi-service guard.
+        from scripts.qualify_jeeves_live_local import qualify_jeeves_live_local
+        from skeleton.app.local_ai import load_gguf_deployment
+        loaded = load_gguf_deployment(source)
+        if loaded.model_id != "jeeves" or loaded.model_digest != manifest.model_sha256:
+            raise InstallationBlocked("Advanced local qualification loaded a different model identity.")
+        accepted = qualify_jeeves_live_local(
+            loaded, timeout_seconds=args.timeout, output_tokens=16,
+        )
+        if (
+            accepted.get("qualified") is not True
+            or accepted.get("model_digest") != manifest.model_sha256
+            or accepted.get("actual_model_turns") != 2
+            or accepted.get("durable_recovery_verified") is not True
+            or accepted.get("read_only_replay_verified") is not True
+            or accepted.get("hosted_provider_used") is not False
+            or accepted.get("protected_backend_verified") is not False
+        ):
+            raise InstallationBlocked("Two-turn local inference, restart or recovery failed.")
+        _stage(
+            "advanced-local-live", True, model_id="jeeves",
+            model_sha256=manifest.model_sha256,
+            real_model_turns=accepted["actual_model_turns"],
+            sqlite_restart_recovered=True, historical_replay_verified=True,
+            measured_turn_metrics=accepted["turn_metrics"],
+            inference_verified=True, application_chat_verified=False,
+        )
+
     env_file = Path(args.env_file).expanduser().absolute()
     cmd = [
         "--env-file", str(env_file), "--provider", "local",
@@ -263,6 +294,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--force", action="store_true", help="explicitly reconcile existing private configuration without rotating persistent identities")
     parser.add_argument("--start", action="store_true", help="validate and start local Compose engine, backend and frontend")
     parser.add_argument("--live-local", action="store_true", help="execute real offline llama.cpp on this host, verifying a bound completion receipt")
+    parser.add_argument("--live-local-suite", action="store_true", help="two real offline model turns across authenticated localhost HTTP, durable SQLite restart and replay")
     parser.add_argument("--admin-email", help="optional pre-approved operator email")
     parser.add_argument("--admin-password-file", type=Path, help="optional owner-private password file")
     parser.add_argument("--exercise", action="store_true", help="one real authenticated canonical application chat completion")
