@@ -632,3 +632,81 @@ def test_real_model_reference_receipt_matches_selftest_browser_integrity_contrac
             assert [m["content"] for m in stored["messages"] if m["role"] == "assistant"][-1] == turn["text"]
         finally:
             app.close()
+
+
+def test_local_browser_dragon_bridge_is_explicitly_reviewed_source_bound_and_never_primary():
+    """The existing advisory endpoint is actually used by the import control."""
+    from skeleton.app.offline_web import HTML, JAVASCRIPT
+
+    for element in ("dragon-bundle-file", "dragon-bundle-source",
+                    "dragon-bundle-review", "dragon-bundle-preview",
+                    "dragon-bundle-admit", "dragon-bundle-receipt"):
+        assert f'id="{element}"' in HTML
+    assert "skeleton.dragon.owner_evidence_bundle.v1" in JAVASCRIPT
+    assert "data.mode !== 'authorized_source_bodies'" in JAVASCRIPT
+    assert "data.release_authorized !== false" in JAVASCRIPT
+    assert "data.training_authorized !== false" in JAVASCRIPT
+    assert "data.captured_source_rights_require_revalidation !== true" in JAVASCRIPT
+    assert "entry.authorized_export_media_type !== 'application/json'" in JAVASCRIPT
+    assert "await exactLocalSha256(entry.authorized_export_body)" in JAVASCRIPT
+    assert "entry.authorized_export_sha256" in JAVASCRIPT
+    assert "body.source_id !== entry.source_id" in JAVASCRIPT
+    assert "body.content_digest !== entry.captured_content_sha256" in JAVASCRIPT
+    assert "body.use_policy?.enabled !== true" in JAVASCRIPT
+    assert "new TextEncoder().encode(body.text).byteLength > 12288" in JAVASCRIPT
+    assert "get('dragon-bundle-review').checked" in JAVASCRIPT
+    assert "'/v1/advisory/ingest'" in JAVASCRIPT
+    assert "modality: 'crawler-excerpt'" in JAVASCRIPT
+    assert "generation_performed !== false" in JAVASCRIPT
+    assert "remote_provider_called !== false" in JAVASCRIPT
+    assert "Grounding is not enabled until you explicitly select it" in JAVASCRIPT
+    assert "<script src=\"/app.js\" defer></script>" in HTML
+
+
+def test_genuine_local_advisory_dragon_excerpt_persists_without_generating_second_model(tmp_path):
+    """A human reviewed excerpt actually reaches the model-scoped SQLite library."""
+    from hashlib import sha256
+    from skeleton.app.offline_http import OfflineHTTPApplication, OfflineHTTPError
+
+    app = OfflineHTTPApplication(
+        native_model(), tmp_path / "dragon-jeeves-bridge.sqlite3", token="t" * 64,
+    )
+    text = "Review-only source fragment: Dragon evidence is data, never operator policy."
+    request = {
+        "schema_version": "skeleton.jeeves.advisory.v1",
+        "modality": "crawler-excerpt",
+        "title": "Dragon 0123456789abcdef",
+        "observation": text,
+        "observation_sha256": sha256(text.encode("utf-8")).hexdigest(),
+        "source_sha256": "f" * 64,
+        "reviewed": True,
+    }
+    try:
+        with pytest.raises(OfflineHTTPError) as denied:
+            app.dispatch("POST", "/v1/advisory/ingest", {
+                **request, "reviewed": False,
+            })
+        assert denied.value.status == 403
+        status, accepted = app.dispatch("POST", "/v1/advisory/ingest", request)
+        assert status == 201
+        assert accepted["advisory_only"] is True
+        assert accepted["primary_model_unchanged"] is True
+        assert accepted["generation_performed"] is False
+        assert accepted["remote_provider_called"] is False
+        assert accepted["source_digest_authority"] == "caller-declared-not-media-verified"
+        assert accepted["observation_digest_authority"] == "server-verified-exact-text"
+        assert accepted["observation_sha256"] == request["observation_sha256"]
+        status, replay = app.dispatch("POST", "/v1/advisory/ingest", request)
+        assert status == 200 and replay["reused"] is True
+        assert replay["document_id"] == accepted["document_id"]
+        status, doc = app.dispatch("GET", "/v1/knowledge/documents/" + accepted["document_id"])
+        assert status == 200
+        assert "UNTRUSTED JEEVES ADVISORY" in doc["text"]
+        assert text in doc["text"]
+        assert "Caller-declared source SHA-256" in doc["text"]
+        # Admission never silently starts a chat session, a model job or a
+        # privileged operation; grounding needs a separate explicit turn.
+        status, sessions = app.dispatch("GET", "/v1/sessions")
+        assert status == 200 and sessions["sessions"] == []
+    finally:
+        app.close()
