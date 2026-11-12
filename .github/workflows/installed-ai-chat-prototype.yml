@@ -1,4 +1,4 @@
-name: Installed AI Chat Prototype Source Qualification
+name: Jeeves Local-Only Live Inference Source Qualification
 
 on:
   pull_request:
@@ -7,9 +7,19 @@ on:
       - "scripts/ai_chat_installed_smoke.py"
       - "scripts/install_ai_chat.py"
       - "scripts/configure_ai_chat_hosted.py"
+      - "scripts/configure_ai_chat.py"
+      - "scripts/build_jeeves_local_manifest.py"
+      - "skeleton/ai/jeeves_local_policy.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/app/setup_runtime.py"
+      - "backend/routes/ai.py"
+      - "backend/tests/test_ai_chat_local_engine_e2e.py"
+      - "docker-compose.yml"
+      - "docs/ai/INSTALLED_AI_CHAT_PROTOTYPE.md"
       - "tests/test_ai_chat_installed_smoke.py"
       - "tests/test_install_ai_chat.py"
-      - "tests/test_hosted_chat_provider_contract.py"
+      - "tests/test_jeeves_local_policy.py"
+      - "tests/test_build_jeeves_local_manifest.py"
       - "tests/test_configure_ai_chat_hosted.py"
       - "frontend/**"
       - ".github/workflows/installed-ai-chat-prototype.yml"
@@ -24,7 +34,7 @@ concurrency:
 
 jobs:
   source-only:
-    name: Exact-head installed chat security and transport contracts (not live inference)
+    name: Exact-head protected local Jeeves and genuine native inference plumbing (not operator GGUF)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -44,16 +54,16 @@ jobs:
         with:
           python-version: "3.11.16"
       - name: Install source test dependencies
-        run: python -m pip install --disable-pip-version-check --no-input -e ".[hosted-inference]" "pytest>=8,<9" "pytest-asyncio>=1.4,<2"
-      - name: Verify hosted SDK is installable with the actual engine runtime extra
-        run: python -c "from openai import AsyncOpenAI; from skeleton.provider_runtime import OpenAIProviderAdapter; assert OpenAIProviderAdapter.provider_id == 'openai'"
+        run: python -m pip install --disable-pip-version-check --no-input -e . "pytest>=8,<9" "pytest-asyncio>=1.4,<2"
+      - name: Verify Jeeves primary is a local-only policy
+        run: python -c "from skeleton.ai.jeeves_local_policy import MODEL_ID; assert MODEL_ID == 'jeeves'"
       - name: Compile first-install operator entrypoints
-        run: python -m compileall -q scripts/ai_chat_installed_smoke.py scripts/configure_ai_chat_hosted.py scripts/install_ai_chat.py
-      - name: Verify chat real-receipt, persistence, credential and hosted activation contracts
+        run: python -m compileall -q scripts/ai_chat_installed_smoke.py scripts/configure_ai_chat.py scripts/configure_ai_chat_hosted.py scripts/build_jeeves_local_manifest.py scripts/install_ai_chat.py skeleton/ai/jeeves_local_policy.py backend/routes/ai.py
+      - name: Verify local-only chat receipts, guard policy, provisioning and secret-safe legacy refusal
         env:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_hosted_chat_provider_contract.py
+        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py
       - name: Verify authenticated backend-to-engine HTTP chat with durable local fixture
         env:
           PYTHONPATH: ".:backend"
@@ -63,13 +73,16 @@ jobs:
           python -m pytest -q --noconftest
           backend/tests/test_ai_chat_local_engine_e2e.py::test_backend_chat_crosses_real_engine_http_boundary_and_commits_local_result_consumer_runtime
           backend/tests/test_ai_chat_local_engine_e2e.py::test_deferred_chat_reconnect_finalizes_from_engine_handoff_without_original_context_consumer_runtime
-      - name: Verify hosted OpenAI provider request and secret-safe failure contracts
+          backend/tests/test_ai_chat_local_engine_e2e.py::test_jeeves_local_only_rejects_hosted_chat_before_any_storage_write
+          backend/tests/test_ai_chat_local_engine_e2e.py::test_jeeves_local_only_never_discloses_foreign_model_inventory
+      - name: Execute real offline native transformer generation and SQLite replay
         env:
-          PYTHONPATH: ".:backend"
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
           python -m pytest -q --noconftest
-          backend/tests/test_ai_provider_adapter.py::test_openai_adapter_normalizes_response_and_preserves_history
-          backend/tests/test_ai_provider_adapter.py::test_openai_adapter_rejects_empty_model_output
+          tests/test_app_offline_chat_cli.py::HeadlessOfflineChatTests::test_full_local_chat_and_backup_management
+          tests/test_ai_offline_native_chat.py::OfflineNativeChatTests::test_create_generate_and_reopen_durable_session
       - name: Set up Node 24
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -86,4 +99,4 @@ jobs:
         working-directory: frontend
         run: yarn typecheck
       - name: Clarify source-only evidence
-        run: echo "No actual model inference or physical-device qualification was performed."
+        run: echo "Native tiny-transformer inference is executed; no operator-owned production GGUF, protected bootstrap or physical-device qualification was performed."
