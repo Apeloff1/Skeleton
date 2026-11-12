@@ -88,6 +88,12 @@ def _validate_complete_history(transcript: ChatTranscript,
             user.role != "user" or not user.content.strip()
             or assistant.role != "assistant" or not assistant.content.strip()
             or assistant.content != turn["text"]
+            # Every historical/imported turn must bind its claimed output
+            # digest to the *actual* archived assistant bytes. The portable
+            # bundle checksum is not a substitute for per-turn consistency.
+            or not isinstance(turn.get("output_digest"), str)
+            or sha256(assistant.content.encode("utf-8")).hexdigest()
+                != turn["output_digest"]
             or type(turn["revision"]) is not int
             or turn["revision"] != index + 1
         ):
@@ -386,9 +392,13 @@ class OfflineChatStore:
                     "FROM offline_sessions WHERE session_id=?", (sid,)
                 ).fetchone()
                 rows = self._db.execute(
-                    "SELECT request_id, request_digest, revision, text, output_digest, "
-                    "prompt_tokens, generated_tokens, grounded FROM offline_turns "
-                    "WHERE session_id=? ORDER BY revision", (sid,),
+                    "SELECT t.request_id, t.request_digest, t.revision, t.text, "
+                    "t.output_digest, t.prompt_tokens, t.generated_tokens, t.grounded, "
+                    "t.runtime_receipt_required, e.revision, e.model_digest, "
+                    "e.tokenizer_digest, e.output_sha256, e.execution_receipt_digest "
+                    "FROM offline_turns t LEFT JOIN offline_turn_execution_receipts e "
+                    "ON t.session_id=e.session_id AND t.request_id=e.request_id "
+                    "WHERE t.session_id=? ORDER BY t.revision", (sid,),
                 ).fetchall()
                 evidence_rows = self._db.execute(
                     "SELECT e.request_id, e.evidence_json, e.evidence_digest "
@@ -429,6 +439,32 @@ class OfflineChatStore:
                 prompt_tokens=item[5], generated_tokens=item[6],
             ))
         _validate_complete_history(transcript, turns)
+        # A missing native receipt in *any* earlier turn is a corrupted
+        # conversation even if the caller only loads the last answer. Validate
+        # the whole execution lineage under the same SQLite read snapshot.
+        for item in rows:
+            required = item[8]
+            if type(required) is not int or required not in (0, 1):
+                raise RuntimeContractError("invalid native execution custody marker")
+            if item[9] is None:
+                if required:
+                    raise RuntimeContractError("required local execution receipt is missing")
+                continue
+            if not required:
+                raise RuntimeContractError(
+                    "an unverified historical turn cannot acquire a runtime receipt"
+                )
+            if (
+                type(item[9]) is not int or item[9] != item[2]
+                or item[10] != model_digest or item[11] != tokenizer_digest
+                or item[12] != item[4]
+                or type(item[13]) is not str
+                or len(item[13]) != 64
+                or any(ch not in "0123456789abcdef" for ch in item[13])
+            ):
+                raise RuntimeContractError(
+                    "local execution receipt is not bound to committed model output"
+                )
         evidence_index = {item["request_id"]: item for item in turns}
         evidence_ids = {receipt_id for receipt_id, _, _ in evidence_rows}
         for item in rows:
