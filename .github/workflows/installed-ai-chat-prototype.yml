@@ -14,6 +14,8 @@ on:
       - "skeleton/app/offline_http.py"
       - "tests/test_jeeves_advisory.py"
       - "tests/test_jeeves_live_local_advanced.py"
+      - "tests/test_jeeves_inference_circuit.py"
+      - "skeleton/app/jeeves_inference_circuit.py"
       - "skeleton/ai/jeeves_local_policy.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/app/setup_runtime.py"
@@ -63,12 +65,12 @@ jobs:
       - name: Verify Jeeves primary is a local-only policy
         run: python -c "from skeleton.ai.jeeves_local_policy import MODEL_ID; assert MODEL_ID == 'jeeves'"
       - name: Compile first-install operator entrypoints
-        run: python -m compileall -q scripts/ai_chat_installed_smoke.py scripts/configure_ai_chat.py scripts/configure_ai_chat_hosted.py scripts/build_jeeves_local_manifest.py scripts/install_ai_chat.py scripts/qualify_jeeves_live_local.py skeleton/ai/jeeves_local_policy.py skeleton/app/jeeves_advisory.py skeleton/app/offline_http.py backend/routes/ai.py
+        run: python -m compileall -q scripts/ai_chat_installed_smoke.py scripts/configure_ai_chat.py scripts/configure_ai_chat_hosted.py scripts/build_jeeves_local_manifest.py scripts/install_ai_chat.py scripts/qualify_jeeves_live_local.py skeleton/ai/jeeves_local_policy.py skeleton/app/jeeves_advisory.py skeleton/app/jeeves_inference_circuit.py skeleton/app/offline_http.py backend/routes/ai.py
       - name: Verify local-only chat receipts, guard policy, provisioning and secret-safe legacy refusal
         env:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py tests/test_jeeves_advisory.py tests/test_jeeves_live_local_advanced.py
+        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py tests/test_jeeves_advisory.py tests/test_jeeves_live_local_advanced.py tests/test_jeeves_inference_circuit.py
       - name: Verify authenticated backend-to-engine HTTP chat with durable local fixture
         env:
           PYTHONPATH: ".:backend"
