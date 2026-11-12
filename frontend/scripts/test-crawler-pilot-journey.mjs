@@ -1,4 +1,6 @@
 import test from 'node:test';
+import { createHash } from 'node:crypto';
+import { buildCrawlerEvidenceBundle, CrawlerBundleRefused } from '../src/product/crawlerEvidenceBundle.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -345,4 +347,135 @@ test('real editor browser flow preserves public viewer role and requires scoped 
   assert.match(qualifier, /api\/auth\/set-role/);
   assert.ok(!spec.includes("get_header('Authorization')"),
     'admin bearer token must stay out of browser traces');
+});
+
+
+const checksum = text => createHash('sha256').update(text, 'utf8').digest('hex');
+const bundleSession = () => ({
+  ...liveSession(), status: 'paused', source_count: 2,
+  counters: { requests: 2, documents: 2, bytes: 500, failures: 0 },
+});
+function bundleOptions(overrides = {}) {
+  const session = bundleSession();
+  const records = Object.fromEntries(['a'.repeat(64), 'b'.repeat(64)].map(source_id =>
+    [source_id, {
+      source_id, title: 'Untrusted remote title', url: 'https://private.example/doc',
+      content_digest: source_id, review_state: 'unreviewed', provenance: {},
+      use_policy: { enabled: true, version: 2, max_age_seconds: 3600, changed_at: '2026-11-12T20:00:00Z' },
+      freshness: { usable: true, state: 'current', remote_freshness_verified: false },
+    }]));
+  const sourceContent = id => JSON.stringify({ source_id: id, extracted: 'UNTRUSTED_SOURCE_BODY_DO_NOT_EXECUTE' });
+  return {
+    session, sourceIds: Object.keys(records), includeBodies: false,
+    checkScope: () => true, sha256: async text => checksum(text),
+    getSession: async () => ({ ...session }),
+    getSource: async (_sid, id) => records[id],
+    exportSource: async (sid, id) => ({
+      session_id: sid, source_id: id, content: sourceContent(id),
+      filename: id + '.json', media_type: 'application/json',
+      content_digest: checksum(sourceContent(id)),
+    }),
+    ...overrides,
+  };
+}
+test('real owner-scoped multi-source provenance bundle is bounded and contains no source bodies or URLs', async () => {
+  const output = await buildCrawlerEvidenceBundle(bundleOptions());
+  const payload = JSON.parse(output.content);
+  assert.equal(output.content_digest, checksum(output.content));
+  assert.equal(payload.schema, 'skeleton.dragon.owner_evidence_bundle.v1');
+  assert.equal(payload.mode, 'metadata_only');
+  assert.equal(payload.sources.length, 2);
+  assert.equal(payload.release_authorized, false);
+  assert.equal(payload.publication_authorized, false);
+  assert.equal(payload.training_authorized, false);
+  assert.ok(!output.content.includes('UNTRUSTED_SOURCE_BODY_DO_NOT_EXECUTE'));
+  assert.ok(!output.content.includes('https://private.example/'));
+  assert.ok(!output.content.includes('Untrusted remote title'));
+  assert.deepEqual(payload.sources.map(x => x.source_id), ['a'.repeat(64), 'b'.repeat(64)]);
+});
+test('body-mode packet contains actual independently rights-checked source export content and hashes', async () => {
+  let readCount = 0, exportCount = 0, sessionCount = 0;
+  const original = bundleOptions();
+  const result = await buildCrawlerEvidenceBundle(bundleOptions({
+    includeBodies: true,
+    getSession: async id => { sessionCount++; return original.getSession(id); },
+    getSource: async (sid, id) => { readCount++; return original.getSource(sid, id); },
+    exportSource: async (sid, id) => { exportCount++; return original.exportSource(sid, id); },
+  }));
+  const packet = JSON.parse(result.content);
+  assert.equal(packet.mode, 'authorized_source_bodies');
+  assert.equal(readCount, 2); assert.equal(exportCount, 2); assert.equal(sessionCount, 2);
+  assert.ok(result.content.includes('UNTRUSTED_SOURCE_BODY_DO_NOT_EXECUTE'));
+  for (const item of packet.sources) {
+    assert.equal(checksum(item.authorized_export_body), item.authorized_export_sha256);
+    assert.equal(item.authorized_export_media_type, 'application/json');
+  }
+});
+test('stale consent or changed session revision rejects bundle before any export', async () => {
+  for (const broken of [
+    { consent_current: false }, { version: 10 }, { source_count: 3 },
+    { counters: { requests: 3, documents: 2, bytes: 500, failures: 0 } },
+  ]) {
+    let copies = 0;
+    const opts = bundleOptions({
+      getSession: async () => ({ ...bundleSession(), ...broken }),
+      exportSource: async () => { copies++; throw Error('should not happen'); },
+    });
+    await assert.rejects(buildCrawlerEvidenceBundle(opts), CrawlerBundleRefused);
+    assert.equal(copies, 0);
+  }
+});
+test('one unauthorized, withdrawn, missing or falsified source fails the entire packet', async () => {
+  const scenarios = [
+    original => ({ ...original, freshness: { ...original.freshness, usable: false, state: 'withdrawn' } }),
+    original => ({ ...original, use_policy: { ...original.use_policy, enabled: false } }),
+    original => ({ ...original, content_digest: 'not-a-sha' }),
+    original => ({ ...original, source_id: 'wrong' }),
+  ];
+  for (const mutate of scenarios) {
+    const baseline = bundleOptions();
+    await assert.rejects(buildCrawlerEvidenceBundle({
+      ...baseline,
+      getSource: async (sid, id) => mutate(await baseline.getSource(sid, id)),
+    }), CrawlerBundleRefused);
+  }
+});
+test('bundle blocks account revocation, altered source export checksum and post-export revision race', async () => {
+  const base = bundleOptions();
+  await assert.rejects(buildCrawlerEvidenceBundle(bundleOptions({ checkScope: () => false })), CrawlerBundleRefused);
+  await assert.rejects(buildCrawlerEvidenceBundle(bundleOptions({
+    includeBodies: true,
+    exportSource: async (sid, id) => ({ ...(await base.exportSource(sid, id)), content_digest: 'f'.repeat(64) }),
+  })), CrawlerBundleRefused);
+  let reads = 0;
+  await assert.rejects(buildCrawlerEvidenceBundle(bundleOptions({
+    getSession: async () => ({ ...bundleSession(), version: ++reads === 1 ? 9 : 10 }),
+  })), CrawlerBundleRefused);
+});
+test('enforces max eight sources, rejects duplicate IDs and guards oversized export bodies', async () => {
+  await assert.rejects(buildCrawlerEvidenceBundle(bundleOptions({
+    sourceIds: Array.from({ length: 9 }, (_, i) => String(i)),
+  })), CrawlerBundleRefused);
+  await assert.rejects(buildCrawlerEvidenceBundle(bundleOptions({
+    sourceIds: ['a'.repeat(64), 'a'.repeat(64)],
+  })), CrawlerBundleRefused);
+  const base = bundleOptions();
+  await assert.rejects(buildCrawlerEvidenceBundle(bundleOptions({
+    includeBodies: true,
+    exportSource: async (sid, id) => ({
+      ...(await base.exportSource(sid, id)),
+      content: 'x'.repeat(225001), content_digest: checksum('x'.repeat(225001)),
+    }),
+  })), CrawlerBundleRefused);
+});
+test('guided pilot exposes actual audited evidence bundle actions and client-side verification', () => {
+  const screen = read('src/features/Jeeves/CrawlerReleasePrototype.tsx');
+  const module = read('src/product/crawlerEvidenceBundle.ts');
+  assert.match(screen, /dragon-export-metadata-bundle/);
+  assert.match(screen, /dragon-export-authorized-bundle/);
+  assert.match(screen, /getSource: getCrawlSource/);
+  assert.match(screen, /exportSource: exportCrawlSource/);
+  assert.match(module, /const after = await options.getSession/);
+  assert.match(module, /record\.use_policy\?\.enabled !== true/);
+  assert.match(module, /record\.freshness\?\.usable !== true/);
 });
