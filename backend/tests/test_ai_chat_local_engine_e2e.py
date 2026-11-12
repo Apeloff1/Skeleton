@@ -1390,6 +1390,37 @@ def _consumer_load_backend_ai_route(monkeypatch):
                 return target(*args, **kwargs)
             return invoke
     monkeypatch.setattr(route, 'chat_turn_lifecycle', ChatTurnLifecycle(_AsyncChatTurnAuthority(SQLiteChatTurnRepository())))
+
+    async def verify_reference_storage_indexes():
+        """Check actual fixture SQLite custody, not production Mongo substitutes.
+
+        A consumer HTTP test intentionally uses SQLite reference stores. The
+        production initializer depends on live Motor indexes; asserting those
+        against a placeholder would test nothing. Verify real SQLite schema
+        and owner identity before any chat request can start.
+        """
+        owner = route.conversation_authority
+        if not isinstance(owner, _consumer_SQLiteAsyncConversationAuthority):
+            raise RuntimeError('consumer conversation authority is not bound')
+        conversation = owner.repository
+        turn = route.chat_turn_lifecycle.authority.repository
+        expected = (
+            (conversation, {'conversation_thread', 'conversation_message', 'fixture_chat_execution',
+                            'idx_conversation_thread_owner', 'idx_conversation_message_thread'}),
+            (turn, {'ai_chat_turn_operation', 'ai_chat_turn_event',
+                    'ai_chat_turn_ownership_audit', 'idx_ai_chat_turn_owner',
+                    'idx_ai_chat_turn_event_order'}),
+        )
+        for store, required in expected:
+            with store._lock:
+                found = {row[0] for row in store._connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type IN ('table', 'index')"
+                ).fetchall()}
+                foreign_keys = store._connection.execute('PRAGMA foreign_keys').fetchone()[0]
+            if not required.issubset(found) or foreign_keys != 1:
+                raise RuntimeError('canonical test storage and event custody indexes are unavailable')
+
+    monkeypatch.setattr(route, 'initialize_chat_runtime', verify_reference_storage_indexes)
     return route
 
 
