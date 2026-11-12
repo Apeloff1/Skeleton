@@ -137,6 +137,12 @@ class OfflineHTTPApplication:
                  *, token: str) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
+        # The generic offline desktop still supports native model fixtures.
+        # A Jeeves-marked deployment must never accept a second local model
+        # under the same loopback chat surface.
+        from skeleton.ai.jeeves_local_policy import is_local_only, primary_model_id
+        if is_local_only() and getattr(backend, "model_id", None) != primary_model_id():
+            raise OfflineHTTPError(403, "Jeeves local-only HTTP requires the exact jeeves model")
         self.backend = backend
         self.database = Path(database)
         self.resource_fabric = AdaptiveResourceFabric(self.database)
@@ -582,6 +588,29 @@ class OfflineHTTPApplication:
                 "message_bytes": 4096,
                 "grounded_query_bytes": 1024,
             }
+        if path == "/v1/advisory/status" and method == "GET":
+            from skeleton.app.jeeves_advisory import SCHEMA
+            return 200, {
+                "schema_version": SCHEMA, "primary_inference": "local-model-only",
+                "advisory_modalities": [
+                    "image-caption", "audio-transcript", "video-frames",
+                    "crawler-excerpt", "text-reference",
+                ],
+                "review_required": True, "raw_media_decoding": False,
+                "network_provider_dispatch": False,
+                "advisory_never_primary_model": True,
+                "explicit_grounded_turn_required": True,
+            }
+        if path == "/v1/advisory/ingest" and method == "POST":
+            from skeleton.app.jeeves_advisory import (
+                AdvisoryRejected, admit_local_advisory,
+            )
+            try:
+                item = admit_local_advisory(self.knowledge, body)
+            except AdvisoryRejected as exc:
+                raise OfflineHTTPError(403 if "requires explicit owner review" in str(exc)
+                                      else 400, str(exc)) from None
+            return (200 if item["reused"] else 201), item
         if path == "/v1/knowledge/documents":
             if method == "GET":
                 return 200, {"documents": self.knowledge.list_documents()}
