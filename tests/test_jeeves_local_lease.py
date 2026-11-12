@@ -59,7 +59,7 @@ def test_lease_crash_releases_kernel_lock_to_new_process(tmp_path: Path):
     database = tmp_path / "shared.sqlite3"
     ready = tmp_path / "child-ready"
     root = str(Path(__file__).resolve().parents[1])
-    child_script = "\\n".join([
+    child_script = "\n".join([
         "from pathlib import Path",
         "import sys",
         "import time",
