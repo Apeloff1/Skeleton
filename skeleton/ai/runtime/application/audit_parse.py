@@ -1629,11 +1629,17 @@ def idempotency_handler_rows() -> list[dict[str, object]]:
             replay, remember = (
                 (wrapper_replay, wrapper_remember) if wrapped else _idempotency_attrs(node)
             )
-            # Preserve the queued build contract without masking broken decorators.
-            if not wrapped and module == "skeleton.api.routes" and node.name == "game_build" and _queued_build_idempotency_verified(node):
-                replay, remember = True, True
-            # An invalid/missing wrapper must still produce a failing audit row.
-            if not wrapped and not replay and not remember:
+            # Durable game_build uses independently scoped queue idempotency,
+            # not the forge decorator. Never hide it when its guard disappears.
+            queued_build = (
+                not wrapped and module == "skeleton.api.routes"
+                and node.name == "game_build"
+            )
+            if queued_build:
+                guarded = _queued_build_idempotency_verified(node)
+                replay, remember = guarded, guarded
+            # Broken queued builds must be visible to the fail-closed audit.
+            if not queued_build and not wrapped and not replay and not remember:
                 continue
             for decorator in node.decorator_list:
                 parsed = _decorator_route(decorator)
