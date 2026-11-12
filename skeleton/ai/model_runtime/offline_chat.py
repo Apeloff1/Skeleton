@@ -248,6 +248,22 @@ class OfflineChatStore:
                     REFERENCES offline_turns(session_id, request_id)
                     ON DELETE CASCADE
             )""")
+            # Additive SQLite custody for native/GGUF execution receipts.
+            # Imported or historical turns without a runtime receipt are
+            # never falsely represented as newly verified native inference.
+            self._db.execute("""CREATE TABLE IF NOT EXISTS offline_turn_execution_receipts (
+                session_id TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                revision INTEGER NOT NULL CHECK (revision >= 1),
+                model_digest TEXT NOT NULL,
+                tokenizer_digest TEXT NOT NULL,
+                output_sha256 TEXT NOT NULL,
+                execution_receipt_digest TEXT NOT NULL,
+                PRIMARY KEY (session_id, request_id),
+                FOREIGN KEY (session_id, request_id)
+                    REFERENCES offline_turns(session_id, request_id)
+                    ON DELETE CASCADE
+            )""")
             # Upgrade existing chat stores in place, including databases
             # created by early grounding prototypes. Once present, this
             # durable marker makes dropped evidence detectable on every load.
@@ -857,6 +873,51 @@ class OfflineChatStore:
             evidence = self.turn_evidence(saved.session_id, model_digest, tokenizer_digest)
             return receipt, evidence[receipt.revision - 1]
 
+    def local_execution_receipt(
+        self, session_id: str, request_id: str,
+        model_digest: str, tokenizer_digest: str,
+    ) -> dict[str, Any] | None:
+        """Read an exact locally produced execution digest after restart.
+
+        This is a model/runtime-bound receipt, not a hardware enclave
+        attestation or an externally signed model-quality guarantee. No
+        fabricated receipt is returned for imported or historical turns.
+        """
+        sid = _identifier("session id", session_id)
+        rid = _identifier("request id", request_id)
+        _sha256(model_digest, "model digest")
+        _sha256(tokenizer_digest, "tokenizer digest")
+        with self.read_snapshot():
+            self.load(sid, model_digest, tokenizer_digest)
+            row = self._db.execute(
+                "SELECT e.revision, e.model_digest, e.tokenizer_digest, "
+                "e.output_sha256, e.execution_receipt_digest, "
+                "t.revision, t.output_digest, t.text "
+                "FROM offline_turns t LEFT JOIN offline_turn_execution_receipts e "
+                "ON e.session_id=t.session_id AND e.request_id=t.request_id "
+                "WHERE t.session_id=? AND t.request_id=?",
+                (sid, rid),
+            ).fetchone()
+            if row is None or row[0] is None:
+                return None
+            revision, saved_model, saved_tokenizer, output, receipt, committed_revision, committed_output, text = row
+            if (type(revision) is not int or revision != committed_revision
+                    or saved_model != model_digest or saved_tokenizer != tokenizer_digest
+                    or type(text) is not str
+                    or sha256(text.encode("utf-8")).hexdigest() != committed_output
+                    or output != committed_output
+                    or type(receipt) is not str
+                    or len(receipt) != 64
+                    or any(ch not in "0123456789abcdef" for ch in receipt)):
+                raise RuntimeContractError("local execution receipt is not bound to committed model output")
+            return {
+                "schema": "skeleton.ai.local-runtime-receipt.v1",
+                "model_digest": model_digest, "tokenizer_digest": tokenizer_digest,
+                "revision": revision, "output_sha256": output,
+                "execution_receipt_digest": receipt,
+                "authority": "local-runtime-custody-not-independent-attestation",
+            }
+
     @staticmethod
     def ensure_can_append(session: StoredChat) -> None:
         """Preflight full-history room before spending CPU on a model turn.
@@ -876,7 +937,8 @@ class OfflineChatStore:
                request_digest: str, transcript: ChatTranscript, text: str,
                output_digest: str, prompt_tokens: int,
                generated_tokens: int,
-               evidence_manifest: dict[str, Any] | None = None) -> OfflineTurnReceipt:
+               evidence_manifest: dict[str, Any] | None = None,
+               execution_receipt_digest: str | None = None) -> OfflineTurnReceipt:
         rid = _identifier("request id", request_id)
         if (not isinstance(transcript, ChatTranscript) or not isinstance(text, str)
                 or not text.strip()):
@@ -900,6 +962,8 @@ class OfflineChatStore:
             raise RuntimeContractError("invalid native generation output digest")
         if any(type(n) is not int or n < 0 for n in (prompt_tokens, generated_tokens)):
             raise RuntimeContractError("invalid native generation token count")
+        if execution_receipt_digest is not None:
+            _sha256(execution_receipt_digest, "native execution receipt")
         stored_evidence = None
         if evidence_manifest is not None:
             from skeleton.app.offline_grounding import validate_evidence
@@ -940,6 +1004,15 @@ class OfflineChatStore:
                     "INSERT INTO offline_turn_evidence VALUES (?, ?, ?, ?)",
                     (session.session_id, rid, stored_evidence.decode("utf-8"),
                      sha256(stored_evidence).hexdigest()),
+                )
+            if execution_receipt_digest is not None:
+                self._db.execute(
+                    "INSERT INTO offline_turn_execution_receipts "
+                    "(session_id, request_id, revision, model_digest, tokenizer_digest, "
+                    "output_sha256, execution_receipt_digest) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (session.session_id, rid, session.revision + 1,
+                     session.model_digest, session.tokenizer_digest, output_digest,
+                     execution_receipt_digest),
                 )
             return OfflineTurnReceipt(session.session_id, rid, session.revision + 1,
                                       text, output_digest, prompt_tokens,
