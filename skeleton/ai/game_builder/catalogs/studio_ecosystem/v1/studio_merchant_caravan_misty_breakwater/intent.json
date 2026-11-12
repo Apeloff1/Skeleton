@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_merchant_caravan_misty_breakwater",
+  "title": "Misty Breakwater: The Last Trade Route",
+  "subtitle": "Original the last trade route design in Misty Breakwater; only the grid preview compiles today.",
+  "seed": 203010314960,
+  "width": 23,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 12,
+  "theme": "ocean",
+  "starting_health": 4
+}

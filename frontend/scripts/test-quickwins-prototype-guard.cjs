@@ -15,8 +15,8 @@ const compiled = ts.transpileModule(source, {
     target: ts.ScriptTarget.ES2022,
   },
 });
-const sandbox = { exports: {} };
-vm.runInNewContext(compiled.outputText, sandbox, { timeout: 5000 });
+const sandbox = vm.createContext({ exports: {} });
+vm.runInContext(compiled.outputText, sandbox, { timeout: 5000 });
 const utils = sandbox.exports;
 
 test('unsafe object paths cannot access inherited prototype graph', () => {
@@ -36,9 +36,9 @@ test('deepMerge never assigns attacker-controlled prototype keys', () => {
   // Keep fixtures in the same JS realm as transpiled utilities: the
   // isPlainObject contract intentionally excludes non-native prototypes.
   sandbox.untrustedInput = '{"__proto__":{"isAdmin":true},"constructor":{"prototype":{"isAdmin":true}},"safe":{"ok":true}}';
-  const payload = vm.runInNewContext('JSON.parse(untrustedInput)', sandbox);
+  const payload = vm.runInContext('JSON.parse(untrustedInput)', sandbox);
   sandbox.untrustedInput = '{"safe":{"valid":true}}';
-  const legitimate = vm.runInNewContext('JSON.parse(untrustedInput)', sandbox);
+  const legitimate = vm.runInContext('JSON.parse(untrustedInput)', sandbox);
   const merged = utils.deepMerge(payload, legitimate);
   assert.equal(merged.safe.ok, true);
   assert.equal(merged.safe.valid, true);

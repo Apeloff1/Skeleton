@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_copper_mesa",
+  "title": "Copper Mesa: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010315989,
+  "width": 19,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "desert",
+  "starting_health": 3
+}

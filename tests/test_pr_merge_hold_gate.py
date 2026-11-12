@@ -27,6 +27,7 @@ def pr(*, title="fix: qualified tests", body="No release approval implied.", num
         "state": "open",
         "title": title,
         "body": body,
+        "labels": [],
         "head": {"sha": HEAD},
         "base": {"ref": "main", "sha": BASE, "repo": {"full_name": REPOSITORY}},
     }
@@ -76,6 +77,56 @@ class PRMergeHoldGateTests(unittest.TestCase):
         candidate = pr(body="DO NOT MERGE")
         with self.assertRaisesRegex(MergeHoldGateError, "changed since workflow event"):
             validate_current_pr(event(candidate), pr(), REPOSITORY)
+
+    def test_do_not_merge_label_is_hard_block_even_without_body_hold(self):
+        candidate = pr(body="Ordinary release notes.")
+        candidate["labels"] = [{"name": "do-not-merge", "id": 123}]
+        with self.assertRaisesRegex(MergeHoldGateError, "label merge hold"):
+            validate_current_pr(event(candidate), candidate, REPOSITORY)
+
+    def test_automerge_off_label_is_hard_block(self):
+        candidate = pr()
+        candidate["labels"] = [{"name": "automerge:off"}]
+        with self.assertRaisesRegex(MergeHoldGateError, "label merge hold"):
+            validate_current_pr(event(candidate), candidate, REPOSITORY)
+
+    def test_unicode_label_confusable_cannot_bypass_hold(self):
+        candidate = pr()
+        candidate["labels"] = [{"name": "ＤＯ－ＮＯＴ－ＭＥＲＧＥ"}]
+        with self.assertRaisesRegex(MergeHoldGateError, "label merge hold"):
+            validate_current_pr(event(candidate), candidate, REPOSITORY)
+
+    def test_label_added_after_event_invalidates_old_check(self):
+        candidate = pr()
+        live = copy.deepcopy(candidate)
+        live["labels"] = [{"name": "do-not-merge"}]
+        with self.assertRaisesRegex(MergeHoldGateError, "changed since workflow"):
+            validate_current_pr(event(candidate), live, REPOSITORY)
+
+    def test_hold_label_removed_requires_fresh_event_and_check(self):
+        candidate = pr()
+        candidate["labels"] = [{"name": "do-not-merge"}]
+        live = pr()
+        with self.assertRaisesRegex(MergeHoldGateError, "changed since workflow"):
+            validate_current_pr(event(candidate), live, REPOSITORY)
+
+    def test_absent_or_malformed_live_labels_fail_closed(self):
+        for labels in (
+            None, "do-not-merge", [None], [{"name": None}],
+            [{"name": chr(10)}],
+        ):
+            candidate = pr()
+            if labels is None:
+                del candidate["labels"]
+            else:
+                candidate["labels"] = labels
+            with self.subTest(labels=labels), self.assertRaises(MergeHoldGateError):
+                validate_current_pr(event(candidate), candidate, REPOSITORY)
+
+    def test_ordinary_nonhold_labels_are_allowed(self):
+        candidate = pr()
+        candidate["labels"] = [{"name": "security-review-complete"}, {"name": "docs"}]
+        validate_current_pr(event(candidate), candidate, REPOSITORY)
 
     def test_changed_head_invalidates_old_success(self):
         candidate = pr()

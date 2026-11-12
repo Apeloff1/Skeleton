@@ -9,7 +9,7 @@ on:
 
 concurrency:
   group: codeql-remediation-source-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -67,7 +67,7 @@ jobs:
           PY
       - name: Exercise CodeQL source, exception, SSRF, XSS and vault regressions
         run: |
-          python -m pytest --noconftest -q \
+          python -m pytest --noconftest --import-mode=importlib --rootdir=. -q \
             backend/tests/test_codeql_exception_boundary_20261111.py \
             backend/tests/test_public_exception_route_security.py \
             backend/tests/test_http_error_redaction.py \
@@ -85,7 +85,8 @@ jobs:
             backend/tests/test_apk_atomic_publication_20261111.py \
             tests/test_codeql_lineage_contract_20261111.py \
             tests/test_full_security_alert_inventory_20261111.py \
-            tests/test_codeql_all_151_source_contracts_20261111.py
+            tests/test_codeql_all_151_source_contracts_20261111.py \
+            tests/test_ci_regression_suite_contract_20261111.py
 
   frontend-source:
     if: github.repository == 'Apeloff1/Skeleton'
@@ -100,7 +101,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '24'
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
       - name: Install frontend without dependency lifecycle scripts

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_luminous_marsh",
+  "title": "Luminous Marsh: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Luminous Marsh; only the grid preview compiles today.",
+  "seed": 203010312172,
+  "width": 25,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 13,
+  "theme": "forest",
+  "starting_health": 6
+}

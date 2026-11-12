@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_cooperative_rescue_salt_dunes",
+  "title": "Salt Dunes: Cooperative Rescue",
+  "subtitle": "An original cooperative rescue brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610303960,
+  "width": 25,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 4,
+  "theme": "desert",
+  "starting_health": 5
+}

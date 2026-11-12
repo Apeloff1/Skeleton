@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_celestial_navigation_copper_mesa",
+  "genre": "celestial_navigation",
+  "biome": "copper_mesa",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Copper Mesa",
+    "landmark": "abandoned observatory",
+    "era": "the public restoration age",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control solar mirrors while dust squalls destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "forensic"
+  },
+  "premise": "Orla Arden, a navigator with expertise in orbital windows, instrument calibration and coordinate inference, must locate a missing relay before a transit corridor fails before dust squalls reaches the abandoned observatory.",
+  "stakes": [
+    "Residents lose access to solar mirrors",
+    "a misleading navigation syndicate gains authority without independent evidence",
+    "The abandoned observatory becomes inaccessible beyond dry ravines"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured dust squalls closes the main approach",
+      "goal": "Acquire an independent account of solar mirrors",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "a misleading navigation syndicate challenges Orla Arden's mandate",
+      "goal": "Apply orbital windows, instrument calibration and coordinate inference in dry ravines",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of abandoned observatory",
+      "goal": "locate a missing relay before a transit corridor fails",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains abandoned observatory with auditable access to solar mirrors"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain fuel and measurement variance without a misleading navigation syndicate"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over solar mirrors persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "abandoned observatory",
+      "dry ravines",
+      "radiative heat"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}

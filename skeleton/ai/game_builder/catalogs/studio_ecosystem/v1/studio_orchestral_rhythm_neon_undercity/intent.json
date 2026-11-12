@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_neon_undercity",
+  "title": "Neon Undercity: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010310578,
+  "width": 25,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 5,
+  "theme": "arcade",
+  "starting_health": 4
+}
