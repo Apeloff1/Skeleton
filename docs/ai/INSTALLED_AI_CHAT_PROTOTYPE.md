@@ -513,3 +513,37 @@ This is separate from the in-process admission counter and failure circuit.
 This is **fail-closed execution ownership**, not an invitation to start a
 second unreviewed Jeeves model, bypass a held merge/release gate, or claim
 a remotely hosted fallback exists.
+
+
+## 12. Three-turn genuine GGUF operator acceptance with strict context (implemented)
+
+`python scripts/qualify_jeeves_live_local.py --manifest <operator-owned-local-gguf-manifest>`
+now executes **three actual native/local GGUF model turns** over independently
+authenticated localhost HTTP and persisted SQLite, rather than treating two
+replies as sufficient context-capacity evidence.
+
+1. First genuine reply with current SHA-pinned model and bound runtime receipt.
+2. Separate local service denied at the operating-system inference lease,
+   followed by owner restart, exact previous-history preflight, and second
+   genuine reply using the *same* previously denied request ID.
+3. New authenticated read-only `/context-preview` over all **four saved
+   user/assistant messages** confirms no older turn would be dropped, with
+   model digest, SQLite revision and conservative native/GGUF context limits.
+   An explicitly `require_full_history: true` third request then executes
+   real local inference, persists revision three, checks its exact UTF-8
+   answer digest, bound execution sidecar and all six transcript messages.
+   Reusing that strict request ID with bounded-recent mode must return HTTP
+   **409**, and the saved revision must remain unchanged.
+
+The JSON report adds `run_3_output_sha256`,
+`run_3_execution_receipt_sha256`,
+`strict_full_history_preview_verified`,
+`strict_full_history_real_generation_verified` and
+`strict_context_policy_idempotency_fence_verified`, and now reports
+`actual_model_turns: 3` with three separately timed token measurements.
+A tiny source-native transformer runs the same mechanics in CI but **does
+not** certify trained GGUF quality, Windows/WSL2 and Apple Metal host behavior,
+mobile inference, global GPU arbitration or release permission. The entrypoint
+with a real operator GGUF manifest remains mandatory for those hardware
+and model-specific claims. A failed strict context preflight is a **NO GO**
+result, never a reason to silently truncate history or switch provider.
