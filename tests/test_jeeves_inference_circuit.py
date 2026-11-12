@@ -303,3 +303,40 @@ def test_offline_workspace_displays_real_model_health_not_just_connected_socket(
     assert "LOCAL • DEGRADED" in JAVASCRIPT
     assert "No hosted fallback" in JAVASCRIPT or "no hosted fallback" in JAVASCRIPT
     assert "get('retry-turn').disabled = locked || working" in JAVASCRIPT
+
+
+def test_completed_live_ticket_requires_current_durable_execution_receipt(tmp_path):
+    """No in-memory 'complete' may survive corrupted SQLite execution custody."""
+    import time
+    from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+
+    app = OfflineHTTPApplication(
+        native_model(), tmp_path / "live-ticket-integrity.sqlite3", token="x" * 64
+    )
+    try:
+        _, session = app.dispatch("POST", "/v1/sessions", {})
+        sid = session["session_id"]
+        rid = "native-live-ticket-integrity"
+        status, queued = app.dispatch("POST", f"/v1/sessions/{sid}/turns", {
+            "message": "hello", "request_id": rid, "max_output_tokens": 2,
+        })
+        assert status == 202 and queued["request_id"] == rid
+        deadline = time.monotonic() + 10
+        while True:
+            verified = app.turn_status(sid, rid)
+            if verified["terminal"] or time.monotonic() >= deadline:
+                break
+            time.sleep(0.01)
+        assert verified["state"] == "complete"
+        assert verified["result"]["replayed"] is False
+        assert verified["result"]["local_execution_receipt"] is not None
+        with app._store._transaction():
+            removed = app._store._db.execute(
+                "DELETE FROM offline_turn_execution_receipts "
+                "WHERE session_id=? AND request_id=?", (sid, rid),
+            )
+            assert removed.rowcount == 1
+        with pytest.raises(RuntimeContractError, match="required local execution receipt"):
+            app.turn_status(sid, rid)
+    finally:
+        app.close()
