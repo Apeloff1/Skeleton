@@ -72,7 +72,7 @@ class GGUFArtifactQualificationTest(unittest.TestCase):
                 self.assertIsNone(loader.digest)
                 self.assertFalse(loader.loaded)
         loader = self.loader()
-        with self.assertRaises(ValueError, match="mismatch"):
+        with self.assertRaisesRegex(ValueError, "mismatch"):
             loader.load(AUTH, expected_sha256="0" * 64)
         self.assertFalse(loader.verify("0" * 64))
 

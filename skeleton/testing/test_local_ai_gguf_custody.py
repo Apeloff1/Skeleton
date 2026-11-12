@@ -63,21 +63,21 @@ class GGUFDescriptorCustodyTest(unittest.TestCase):
     def test_hardlinked_model_is_rejected_even_with_correct_digest(self):
         alias = self.private / "other.gguf"
         os.link(self.model, alias)
-        with self.assertRaises(ValueError, match="non-hardlinked"):
+        with self.assertRaisesRegex(ValueError, "non-hardlinked"):
             self.qualify(self.model)
-        with self.assertRaises(ValueError, match="non-hardlinked"):
+        with self.assertRaisesRegex(ValueError, "non-hardlinked"):
             self.qualify(alias)
 
     def test_explicit_parent_traversal_is_disallowed(self):
         unsafe = str(self.private) + "/../private/" + self.model.name
-        with self.assertRaises(ValueError, match="parent components"):
+        with self.assertRaisesRegex(ValueError, "parent components"):
             model_loader.ModelLoader(
                 unsafe, expected_sha256=self.digest, license_accepted=True
             ).load(AUTH)
 
     def test_unexpected_content_change_never_preserves_success(self):
         self.model.write_bytes(model_bytes(b"b"))
-        with self.assertRaises(ValueError, match="SHA-256 mismatch"):
+        with self.assertRaisesRegex(ValueError, "SHA-256 mismatch"):
             self.qualify()
 
     def test_rebound_model_file_between_final_open_and_rewalk_is_refused(self):
@@ -96,7 +96,7 @@ class GGUFDescriptorCustodyTest(unittest.TestCase):
         with mock.patch.object(
             model_loader, "_open_guarded_model", side_effect=swap_before_rewalk,
         ):
-            with self.assertRaises(OSError, match="rebound"):
+            with self.assertRaisesRegex(OSError, "rebound"):
                 self.qualify()
         self.assertEqual(calls, 2)
 
