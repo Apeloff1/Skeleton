@@ -158,7 +158,13 @@ def interactive_login(api: ChatApi, email: str) -> str:
     """Authenticate without command-line or stored-password exposure."""
     if not re.fullmatch(r"[^\s@]{1,120}@[^\s@]{1,120}", email):
         raise ProbeFailure("Supply one valid account email address.")
-    password = getpass("Skeleton account password: ")
+    # getpass can silently fall back to echoing stdin on headless hosts.
+    if not sys.stdin.isatty():
+        raise ProbeFailure("A private terminal is required for interactive login; use --token-file for headless acceptance.")
+    try:
+        password = getpass("Skeleton account password: ")
+    except (EOFError, KeyboardInterrupt):
+        raise ProbeFailure("Private account login was cancelled.") from None
     if not password:
         raise ProbeFailure("A nonempty account password is required.")
     response = api.request("POST", "/api/auth/login", {
