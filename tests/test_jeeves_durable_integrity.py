@@ -211,3 +211,51 @@ def test_historical_unverified_turn_cannot_gain_a_fabricated_receipt(tmp_path):
             app._store.load(fork_sid, app.model_digest, app.tokenizer_digest)
     finally:
         app.close()
+
+
+@pytest.mark.parametrize("invalid_digest", [
+    "a" * 64,
+    "A" * 64,
+    "a" * 63,
+    "z" * 64,
+])
+def test_commit_rejects_inconsistent_output_hash_before_any_cas_write(
+    tmp_path, invalid_digest,
+):
+    """A defective native adapter cannot persist internally corrupt output."""
+    model = native_model()
+    app = OfflineHTTPApplication(
+        model, tmp_path / "bad-commit.sqlite3", token="a" * 64
+    )
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        current = app._store.load(sid, app.model_digest, app.tokenizer_digest)
+        next_transcript = current.transcript.append("user", "hello").append(
+            "assistant", "real model output"
+        )
+        with pytest.raises(
+            RuntimeContractError, match="invalid native generation output digest",
+        ):
+            app._store.commit(
+                session=current,
+                request_id="reject-bad-digest",
+                request_digest="b" * 64,
+                transcript=next_transcript,
+                text="real model output",
+                output_digest=invalid_digest,
+                prompt_tokens=4,
+                generated_tokens=4,
+                execution_receipt_digest="c" * 64,
+            )
+        after = app._store.load(sid, app.model_digest, app.tokenizer_digest)
+        assert after.revision == 0
+        assert after.transcript.messages == ()
+        assert app._store.replay(sid, "reject-bad-digest", "b" * 64) is None
+        count = app._store._db.execute(
+            "SELECT COUNT(*) FROM offline_turn_execution_receipts WHERE session_id=?",
+            (sid,),
+        ).fetchone()[0]
+        assert count == 0
+    finally:
+        app.close()
