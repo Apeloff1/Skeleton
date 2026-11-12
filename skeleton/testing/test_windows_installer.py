@@ -174,7 +174,7 @@ def test_invalid_installer_source_preserves_existing_outputs(tmp_path, version_a
         marker.write_text("preserve", encoding="utf-8")
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     result = subprocess.run(
-        ["pwsh", "-NoProfile", "-File", str(script_dir / "build_installer.ps1"),
+        ["pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", str(script_dir / "build_installer.ps1"),
          "-SourceRef", "refs/heads/does-not-exist", *version_args],
         cwd=root, capture_output=True, text=True, timeout=30,
     )
@@ -199,7 +199,7 @@ def test_installer_output_collision_preserves_existing_release(tmp_path, existin
     output = root / "dist" / "windows" / f"Skeleton-Setup-1.2.3-windows-x64.exe{existing_suffix}"
     output.parent.mkdir(parents=True)
     output.write_text("preserve", encoding="utf-8")
-    result = subprocess.run(["pwsh", "-NoProfile", "-File", str(script_dir / "build_installer.ps1")],
+    result = subprocess.run(["pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", str(script_dir / "build_installer.ps1")],
                             cwd=root, capture_output=True, text=True, timeout=30)
     assert result.returncode != 0
     assert "Installer output already exists" in result.stderr
@@ -218,7 +218,7 @@ def test_installer_rejects_unsafe_source_version_before_cleanup(tmp_path):
     subprocess.run(["git", "-C", str(root), "add", "pyproject.toml"], check=True)
     subprocess.run(["git", "-C", str(root), "-c", "user.name=Installer Test", "-c",
                     "user.email=installer@example.invalid", "commit", "-qm", "fixture"], check=True)
-    result = subprocess.run(["pwsh", "-NoProfile", "-File", str(script_dir / "build_installer.ps1")],
+    result = subprocess.run(["pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", str(script_dir / "build_installer.ps1")],
                             cwd=root, capture_output=True, text=True, timeout=30)
     assert result.returncode != 0
     assert "filename-safe" in result.stderr
