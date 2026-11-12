@@ -603,3 +603,103 @@ def test_scoped_grounding_honors_live_peer_lease_and_sqlite_source_custody(tmp_p
     finally:
         peer.close()
         first.close()
+
+
+def test_real_media_advisory_is_non_inferential_during_lease_then_scoped_native_turn_commits(tmp_path: Path):
+    """End-user full path: raw local source -> review -> private knowledge -> model.
+
+    This uses two real independent local HTTP application owners backed by
+    one SQLite workspace and an actual source-native local transformer.
+    Media is admitted while another service owns the native executor lease,
+    without invoking a second model, and later generates exactly once.
+    """
+    import base64
+    from hashlib import sha256
+    from skeleton.app.jeeves_advisory import SCHEMA
+
+    model = native_model()
+    database = tmp_path / "media-owned-native.sqlite3"
+    first = OfflineHTTPApplication(model, database, token="a" * 64)
+    second = OfflineHTTPApplication(model, database, token="b" * 64)
+    raw = (b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" +
+           (8).to_bytes(4, "big") + (8).to_bytes(4, "big") +
+           b"\x08\x06\x00\x00\x00" + b"OWNER_ONLY_BYTES_NEVER_IN_SQLITE_" * 3)
+    statement = "The local rasterizer uses integer edge equations for coverage."
+    media = {
+        "schema_version": SCHEMA,
+        "title": "Reviewed local renderer screenshot",
+        "modality": "image-caption",
+        "observation": statement,
+        "observation_sha256": sha256(statement.encode("utf-8")).hexdigest(),
+        "source_sha256": sha256(raw).hexdigest(),
+        "media_type": "image/png",
+        "media_base64": base64.b64encode(raw).decode("ascii"),
+        "reviewed": True,
+    }
+    query = "How does rasterizer integer edge coverage work?"
+    try:
+        _, created = first.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        path = "/v1/sessions/" + sid
+        with first._inference_lease.hold():
+            code, accepted = second.dispatch("POST", "/v1/advisory/ingest", media)
+            assert code == 201
+            assert accepted["reviewed"] is True
+            assert accepted["source_digest_authority"] == "server-verified-transient-source-bytes"
+            assert accepted["media_attestation"]["media_bytes_persisted"] is False
+            assert accepted["generation_performed"] is False
+            assert accepted["primary_model_unchanged"] is True
+            assert accepted["remote_provider_called"] is False
+            chosen = accepted["document_id"]
+            request = {
+                "message": query,
+                "request_id": "media-reviewed-scoped-real-native",
+                "grounded": True,
+                "document_ids": [chosen],
+                "max_output_tokens": 2,
+                "require_full_history": True,
+            }
+            code, preview = second.dispatch("POST", path + "/context-preview", {
+                "message": query,
+                "grounded": True,
+                "document_ids": [chosen],
+                "require_full_history": True,
+                "max_output_tokens": 2,
+            })
+            assert code == 200
+            assert preview["read_only"] is True
+            assert preview["generation_performed"] is False
+            assert preview["document_scope"] == [chosen]
+            assert preview["grounding_preview"]["citations"]
+            assert all(c["document_id"] == chosen
+                       for c in preview["grounding_preview"]["citations"])
+            with pytest.raises(OfflineHTTPError) as locked:
+                second.dispatch("POST", path + "/turn", request)
+            assert locked.value.status == 423
+            _, before = first.dispatch("GET", path)
+            assert before["revision"] == 0
+            assert before["messages"] == [] and before["evidence"] == []
+        code, generated = second.dispatch("POST", path + "/turn", request)
+        assert code == 200
+        assert generated["replayed"] is False
+        assert generated["text"].strip()
+        assert generated["local_execution_receipt"]["output_sha256"] == generated["output_digest"]
+        assert generated["evidence"]["citations"]
+        assert all(c["document_id"] == chosen for c in generated["evidence"]["citations"])
+        code, replay = first.dispatch("POST", path + "/turn", request)
+        assert code == 200
+        assert replay["replayed"] is True
+        assert replay["text"] == generated["text"]
+        _, stored = first.dispatch("GET", path)
+        assert stored["revision"] == 1
+        assert stored["evidence"][0] == generated["evidence"]
+        _, reference = first.dispatch("GET", "/v1/knowledge/documents/" + chosen)
+        assert reference["sha256"] == accepted["advisory_sha256"]
+        assert "UNTRUSTED JEEVES ADVISORY" in reference["text"]
+        assert "Server-verified transient media SHA-256" in reference["text"]
+        assert media["media_base64"] not in reference["text"]
+        assert raw not in database.read_bytes()
+        assert media["media_base64"].encode("ascii") not in database.read_bytes()
+    finally:
+        second.close()
+        first.close()

@@ -745,3 +745,33 @@ mobile inference, global GPU arbitration or release permission. The entrypoint
 with a real operator GGUF manifest remains mandatory for those hardware
 and model-specific claims. A failed strict context preflight is a **NO GO**
 result, never a reason to silently truncate history or switch provider.
+
+
+## 17. Cross-service media advisory acceptance under native inference lease
+
+The stacked prototype additionally runs
+`tests/test_jeeves_local_lease.py::test_real_media_advisory_is_non_inferential_during_lease_then_scoped_native_turn_commits`.
+
+This full-path acceptance uses **two independent Jeeves HTTP application
+owners** against the same private SQLite model workspace, a genuinely
+hashed user-selected PNG byte stream, an explicitly reviewed local caption,
+and a real source-native transformer. While one service owns the kernel
+inference lease, the other must be able to authenticate/attest and save
+**only** reviewed advisory text, and obtain a read-only SHA-bound local
+source preview, without generating. Its attempted model turn receives
+HTTP **423**, leaving the canonical transcript revision at zero.
+
+Once the native lease releases, the **same previously denied request ID**
+must perform exactly one model generation with the selected advisory
+document as its sole grounding scope and strict full-history policy.
+A second application must recover and replay the exact committed SQLite
+receipt without generating another answer. The committed evidence retains
+the reviewed advisory citation while raw image bytes and Base64 do not
+appear in stored reference text or the SQLite database.
+
+The source-native model used for this contract is only an executable
+integration fixture. Its passing status is **not** production GGUF
+qualification, a GPU performance score, a claim of image understanding,
+a media decoder acceptance test, Windows process containment, or a
+release permit. The review-only PR retains all independently required
+CI, security, target hardware and first-install holds.
