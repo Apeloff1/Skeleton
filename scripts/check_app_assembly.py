@@ -468,7 +468,7 @@ def audit_compose_modes() -> None:
         "frontend build target must be assembly-selectable",
     )
     check(
-        '${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
+        '"127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
         "frontend container port must be assembly-selectable",
     )
     check(
