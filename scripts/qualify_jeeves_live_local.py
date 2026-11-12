@@ -154,12 +154,24 @@ def _send_turn(port: int, token: str, session_id: str, *,
             or answer.get("output_digest") != _digest(answer["text"])
             or answer.get("replayed") is not False):
         raise LiveJeevesFailure("real local generation produced no committed, hashed, nonempty answer")
+    proof = answer.get("local_execution_receipt")
+    if (not isinstance(proof, dict)
+            or proof.get("schema") != "skeleton.ai.local-runtime-receipt.v1"
+            or proof.get("authority") != "local-runtime-custody-not-independent-attestation"
+            or proof.get("model_digest") != answer.get("model_digest")
+            or proof.get("output_sha256") != answer["output_digest"]
+            or proof.get("revision") != answer["revision"]
+            or not isinstance(proof.get("execution_receipt_digest"), str)
+            or len(proof["execution_receipt_digest"]) != 64
+            or any(c not in "0123456789abcdef" for c in proof["execution_receipt_digest"])):
+        raise LiveJeevesFailure("a completed local model output lacks a verified runtime execution receipt")
     elapsed = max(0.000001, time.monotonic() - started)
     return {
         "result": answer,
         "elapsed_seconds": round(elapsed, 3),
         "output_tokens_per_second_observed": round(answer["output_tokens"] / elapsed, 3),
         "output_sha256": answer["output_digest"],
+        "local_execution_receipt_sha256": proof["execution_receipt_digest"],
     }
 
 
@@ -244,7 +256,10 @@ def _qualify_actual_local_http(
                     or recovered.get("recovered_from_store") is not True
                     or not isinstance(historical, dict)
                     or historical.get("output_digest") != first["output_sha256"]
-                    or historical.get("text") != first["result"]["text"]):
+                    or historical.get("text") != first["result"]["text"]
+                    or not isinstance(historical.get("local_execution_receipt"), dict)
+                    or historical["local_execution_receipt"].get("execution_receipt_digest")
+                       != first["local_execution_receipt_sha256"]):
                 raise LiveJeevesFailure("saved local turn could not be recovered after process restart")
             second_prompt = (
                 "Continue the local Jeeves conversation in one sentence without any cloud model."
@@ -295,8 +310,10 @@ def _qualify_actual_local_http(
                 restarted.port, token, "GET",
                 "/v1/sessions/" + session_id + "/turns/" + first_request_id,
             )
-            if same.get("result", {}).get("output_digest") != first["output_sha256"]:
-                raise LiveJeevesFailure("read-only historical replay no longer matches")
+            if (same.get("result", {}).get("output_digest") != first["output_sha256"]
+                    or same.get("result", {}).get("local_execution_receipt", {}).get(
+                        "execution_receipt_digest") != first["local_execution_receipt_sha256"]):
+                raise LiveJeevesFailure("read-only historical replay no longer matches local execution custody")
     return {
         "schema_version": _SCHEMA, "qualified": True,
         "model_id": model.model_id, "model_digest": digest,
@@ -310,6 +327,9 @@ def _qualify_actual_local_http(
         "context_preflight_is_generation_proof": False,
         "run_1_output_sha256": first["output_sha256"],
         "run_2_output_sha256": second["output_sha256"],
+        "run_1_execution_receipt_sha256": first["local_execution_receipt_sha256"],
+        "run_2_execution_receipt_sha256": second["local_execution_receipt_sha256"],
+        "runtime_receipts_survived_restart": True,
         "turn_metrics": [
             {"elapsed_seconds": t["elapsed_seconds"],
              "observed_output_tokens_per_second": t["output_tokens_per_second_observed"],
