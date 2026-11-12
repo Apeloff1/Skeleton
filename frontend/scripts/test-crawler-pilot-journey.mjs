@@ -1,6 +1,7 @@
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import { buildCrawlerEvidenceBundle, CrawlerBundleRefused } from '../src/product/crawlerEvidenceBundle.ts';
+import { eligibleForEvidenceBundle, toggleEvidenceBundleSelection } from '../src/product/crawlerBundleSelection.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -364,7 +365,9 @@ function bundleOptions(overrides = {}) {
       use_policy: { enabled: true, version: 2, max_age_seconds: 3600, changed_at: '2026-11-12T20:00:00Z' },
       freshness: { usable: true, state: 'current', remote_freshness_verified: false },
     }]));
-  const sourceContent = id => JSON.stringify({ source_id: id, extracted: 'UNTRUSTED_SOURCE_BODY_DO_NOT_EXECUTE' });
+  const sourceContent = id => JSON.stringify({
+    ...records[id], text: 'UNTRUSTED_SOURCE_BODY_DO_NOT_EXECUTE',
+  });
   return {
     session, sourceIds: Object.keys(records), includeBodies: false,
     checkScope: () => true, sha256: async text => checksum(text),
@@ -473,9 +476,65 @@ test('guided pilot exposes actual audited evidence bundle actions and client-sid
   const module = read('src/product/crawlerEvidenceBundle.ts');
   assert.match(screen, /dragon-export-metadata-bundle/);
   assert.match(screen, /dragon-export-authorized-bundle/);
+  assert.match(screen, /dragon-bundle-source-/);
+  assert.match(screen, /dragon-bundle-select-eligible/);
+  assert.match(screen, /dragon-bundle-clear-selection/);
+  assert.match(screen, /sourceIds: picked/);
+  assert.doesNotMatch(screen, /sourceIds: sources\.slice\(0, 8\)/);
   assert.match(screen, /getSource: getCrawlSource/);
   assert.match(screen, /exportSource: exportCrawlSource/);
   assert.match(module, /const after = await options.getSession/);
   assert.match(module, /record\.use_policy\?\.enabled !== true/);
   assert.match(module, /record\.freshness\?\.usable !== true/);
+});
+
+test('explicit Dragon evidence selection defaults to no sources and has finite eligible choices', () => {
+  const base = bundleOptions();
+  const item = base.getSource(undefined, 'a'.repeat(64));
+  return item.then(source => {
+    assert.equal(eligibleForEvidenceBundle(source), true);
+    const first = toggleEvidenceBundleSelection([], source);
+    assert.deepEqual(first, [source.source_id]);
+    assert.deepEqual(toggleEvidenceBundleSelection(first, source), []);
+    assert.equal(eligibleForEvidenceBundle({
+      ...source, freshness: {...source.freshness, state: 'withdrawn'},
+    }), false);
+    assert.throws(() => toggleEvidenceBundleSelection([], {
+      ...source, use_policy: {...source.use_policy, enabled: false},
+    }));
+    assert.throws(() => toggleEvidenceBundleSelection(
+      Array.from({length: 8}, (_, i) => String(i)), source,
+    ), /eight/);
+  });
+});
+test('authorized JSON must match the separately re-read source identity, policy and content hash', async () => {
+  const baseline = bundleOptions();
+  const substitutions = [
+    original => ({...original, source_id: 'f'.repeat(64)}),
+    original => ({...original, content_digest: 'f'.repeat(64)}),
+    original => ({...original, use_policy: {...original.use_policy, version: 4}}),
+    original => ({...original, use_policy: {...original.use_policy, enabled: false}}),
+    original => ({...original, freshness: {...original.freshness, state: 'stale'}}),
+    original => ({...original, text: ''}),
+  ];
+  for (const substitute of substitutions) {
+    await assert.rejects(buildCrawlerEvidenceBundle(bundleOptions({
+      includeBodies: true,
+      exportSource: async (sid, id) => {
+        const original = await baseline.exportSource(sid, id);
+        const changed = JSON.stringify(substitute(JSON.parse(original.content)));
+        return {...original, content: changed, content_digest: checksum(changed)};
+      },
+    })), CrawlerBundleRefused);
+  }
+});
+test('body export fails closed when previously valid JSON becomes invalid while retaining envelope SHA', async () => {
+  const base = bundleOptions();
+  await assert.rejects(buildCrawlerEvidenceBundle(bundleOptions({
+    includeBodies: true,
+    exportSource: async (sid, id) => {
+      const original = await base.exportSource(sid, id);
+      return {...original, content: '{', content_digest: checksum('{')};
+    },
+  })), CrawlerBundleRefused);
 });

@@ -58,7 +58,7 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
     || session.version < 1 || session.consent_current !== true
     || typeof includeBodies !== 'boolean' || !Array.isArray(sourceIds)
     || sourceIds.length < 1 || sourceIds.length > MAX_SOURCES
-    || sourceIds.some(id => typeof id !== 'string' || !ID.test(id))
+    || sourceIds.some(id => typeof id !== 'string' || !SHA.test(id))
     || new Set(sourceIds).size !== sourceIds.length) refuse('Select 1–8 distinct authorized sources.');
   const before = await options.getSession(session.session_id, signal);
   gate(options);
@@ -92,6 +92,7 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
       gate(options);
       if (exported.session_id !== session.session_id || exported.source_id !== sourceId
         || !SHA.test(exported.content_digest)
+        || typeof exported.media_type !== 'string'
         || exported.media_type.split(';')[0].trim() !== 'application/json'
         || typeof exported.content !== 'string') refuse('The source export identity is invalid.');
       const bytes = encoder.encode(exported.content).length;
@@ -102,6 +103,28 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
       // digest of captured text. The client verifies both independently.
       if (await options.sha256(exported.content) !== exported.content_digest)
         refuse('The authorized source export payload failed its checksum.');
+      // The payload's own JSON body must match the *independently re-read*
+      // source ID, capture hash and live authorization epoch. Verifying only
+      // the envelope SHA would allow a different valid JSON body to be
+      // substituted between GET and export.
+      let body: Partial<CapturedSource>;
+      try {
+        body = JSON.parse(exported.content) as Partial<CapturedSource>;
+      } catch {
+        refuse('The authorized source export is not valid JSON.');
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)
+        || body.source_id !== sourceId
+        || body.content_digest !== record.content_digest
+        || body.use_policy?.enabled !== true
+        || body.use_policy?.version !== record.use_policy.version
+        || body.freshness?.state !== 'current'
+        || body.freshness?.usable !== true
+        || body.freshness?.remote_freshness_verified !== false
+        || typeof body.text !== 'string' || !body.text.trim()
+        || encoder.encode(body.text).length > MAX_BODY_BYTES) {
+        refuse('A source changed between the authorized read and export.');
+      }
       row.authorized_export_sha256 = exported.content_digest;
       row.authorized_export_media_type = 'application/json';
       row.authorized_export_body = exported.content;

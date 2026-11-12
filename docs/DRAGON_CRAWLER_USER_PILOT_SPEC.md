@@ -507,3 +507,31 @@ is still separately gated on actual Merge Readiness, independent device
 installation, native-model capability, host/DNS/robots integration, recovery
 under pressure, CodeQL/security, signed provenance and human rights review.
 No amount of local scorecard success can override those requirements.
+
+## 2026 executable multi-source export (implemented on this review branch)
+
+The authenticated Source Library stage now exposes **explicit per-source selection**
+for up to eight current policy-eligible captured documents. The operator can
+choose individual records, select the first eight *eligible* records through
+an explicit button, or clear the selection. **Nothing is preselected**.
+Rights revoked, session changes, account switch, fresh reload and policy
+changes clear the selection; a selection mutation during an in-flight bundle
+aborts the attempt.
+
+**Export provenance only** produces the source ID, preserved-content SHA,
+use-policy version and historical capture-freshness class without copying the
+private URL, body, search topic or title. **Export authorized source copies**
+requests each source's existing authenticated per-source JSON export, confirms
+the full exported bytes' SHA-256, checks the inner source identity, captured
+content hash, current source-use policy, freshness and finite body length
+against the separately re-read source, then rechecks the campaign version
+and consent before offering the JSON bundle to the device. Failure of any
+one source rejects the *entire* bundle.
+
+Portable exports cannot retract downloaded copies and are not proof of a
+publisher's rights, current remote freshness, factual correctness or authority
+to train or publish. The adjacent #5282 Jeeves prototype can ingest a
+historical body bundle only after a new explicit human review of a bounded
+excerpt; it cannot treat the bundle checksum as authorization or a system
+instruction. The all-source checks are source-scope qualifications, not
+physical-device or production release evidence.

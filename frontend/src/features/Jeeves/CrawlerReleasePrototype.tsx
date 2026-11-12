@@ -20,6 +20,10 @@ import {
 } from '../../product/crawlerClient';
 import { saveCrawlerExport } from '../../product/crawlerExport';
 import { buildCrawlerEvidenceBundle } from '../../product/crawlerEvidenceBundle';
+import {
+  DRAGON_BUNDLE_MAX_SOURCES, eligibleForEvidenceBundle,
+  toggleEvidenceBundleSelection,
+} from '../../product/crawlerBundleSelection';
 import { portablePilotReceipt } from '../../product/crawlerPilotReceipt';
 import {
   bindPilotSnapshot, requireCurrentPilotSnapshot, type PilotSnapshotWitness,
@@ -88,6 +92,7 @@ function PilotContent() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [session, setSession] = useState<CrawlSession | null>(null);
   const [sources, setSources] = useState<CapturedSource[]>([]);
+  const [bundleSelected, setBundleSelected] = useState<string[]>([]);
   // Re-key the source-library component on every authority refresh. It owns
   // separately cached full text, search hits and review selections that a
   // mere sources=[] prop update would NOT clear.
@@ -116,6 +121,7 @@ function PilotContent() {
   const exportLock = useRef(false);
   const bundleLock = useRef(false);
   const bundleAbort = useRef<AbortController | null>(null);
+  const bundleSelectionRef = useRef<string[]>([]);
   const shareLock = useRef(false);
   const shareAbort = useRef<AbortController | null>(null);
   const epoch = useRef(0);
@@ -138,6 +144,7 @@ function PilotContent() {
       // Revoked consent, revision and owner/session changes invalidate any
       // share already waiting on a server re-read. No stale receipt leaves.
       shareAbort.current?.abort(); bundleAbort.current?.abort();
+      bundleSelectionRef.current = []; setBundleSelected([]);
       setSourceViewEpoch(value => value + 1);
       setAtlas(null);
       setAtlasWitness(null);
@@ -153,6 +160,7 @@ function PilotContent() {
     // checked. Session titles/counters are separately preserved only after a
     // successful authenticated session read.
     shareAbort.current?.abort(); bundleAbort.current?.abort();
+    bundleSelectionRef.current = []; setBundleSelected([]);
     setSourceViewEpoch(value => value + 1);
     setAtlas(null); setAtlasWitness(null); setReviewDraft(null);
     setSources([]); setSourceCursor(null);
@@ -244,6 +252,7 @@ function PilotContent() {
       preflightLock.current = false; exportLock.current = false; bundleLock.current = false; shareLock.current = false;
       sessionRef.current = null;
       setSession(null); setSources([]); setSessions([]); setNextCursor(null);
+      bundleSelectionRef.current = []; setBundleSelected([]);
       setSourceCursor(null); setReviewDraft(null); setAtlas(null); setAtlasWitness(null);
       setSharing(false); setBundling(false);
       setReadiness(null); setStage('scope'); setBusy(''); setLoaded(false);
@@ -267,6 +276,7 @@ function PilotContent() {
     shareAbort.current?.abort(); bundleAbort.current?.abort();
     setSourceViewEpoch(value => value + 1);
     sessionRef.current = row;
+    bundleSelectionRef.current = []; setBundleSelected([]);
     setSession(row); setSources([]); setSourceCursor(null);
     setAtlas(null); setAtlasWitness(null);
     setReviewDraft(null); setError(''); setNotice('');
@@ -388,9 +398,23 @@ function PilotContent() {
   };
 
 
+  const toggleBundleSource = (item: CapturedSource) => {
+    if (bundleLock.current || exportLock.current || shareLock.current || busy
+      || !sessionRef.current?.consent_current) return;
+    try {
+      const next = toggleEvidenceBundleSelection(bundleSelectionRef.current, item);
+      bundleSelectionRef.current = next;
+      setBundleSelected(next);
+      setError('');
+    } catch {
+      setError('Choose no more than eight sources with current authorizations. Refresh source policy if a source is ineligible.');
+    }
+  };
+
   const exportEvidenceBundle = async (includeBodies: boolean) => {
     const current = sessionRef.current;
-    if (!current || !current.consent_current || !fresh() || !sources.length
+    const picked = bundleSelectionRef.current.slice();
+    if (!current || !current.consent_current || !fresh() || !picked.length
       || bundleLock.current || exportLock.current || shareLock.current
       || lock.current || preflightLock.current || pending.current) return;
     bundleLock.current = true;
@@ -400,12 +424,14 @@ function PilotContent() {
     setBundling(true); setError(''); setNotice('');
     try {
       const packet = await buildCrawlerEvidenceBundle({
-        session: current, sourceIds: sources.slice(0, 8).map(row => row.source_id),
+        session: current, sourceIds: picked,
         includeBodies, signal: abort.signal,
         checkScope: () => fresh(abort.signal, token) && epoch.current === sourceEpoch
           && sessionRef.current?.session_id === identity
           && sessionRef.current?.version === originalVersion
-          && sessionRef.current?.consent_current === true,
+          && sessionRef.current?.consent_current === true
+          && bundleSelectionRef.current.join('|') === picked.join('|')
+          && picked.every(id => sources.some(row => row.source_id === id)),
         getSession: getCrawl, getSource: getCrawlSource,
         exportSource: exportCrawlSource,
         sha256: text => digestStringAsync(CryptoDigestAlgorithm.SHA256, text),
@@ -681,13 +707,43 @@ function PilotContent() {
         </View>
         {session && <View style={s.card}>
           <Heading title="Audited multi-source evidence bundle" help="Export up to 8 owned sources. Every source and the session are re-read, and content mode requires the server's per-source rights-checked export. A revision or consent change refuses the entire bundle." />
-          <Text style={s.small}>Sources loaded: {sources.length}. The first 8 authorized sources will be included. This is not permission to publish, train, or claim remote freshness.</Text>
+          <Text style={s.small}>Choose the exact current sources to export (up to {DRAGON_BUNDLE_MAX_SOURCES}). Selected: {bundleSelected.length} of {Math.min(sources.length, DRAGON_BUNDLE_MAX_SOURCES)} maximum. No source is exported by default. This is not permission to publish, train or claim remote freshness.</Text>
+          {sources.map((item, index) => {
+            const eligible = eligibleForEvidenceBundle(item) && session.consent_current;
+            const checked = bundleSelected.includes(item.source_id);
+            const disabled = !eligible || bundling || exporting || !!busy;
+            return <TouchableOpacity key={item.source_id}
+              testID={'dragon-bundle-source-' + item.source_id}
+              accessibilityRole="checkbox"
+              accessibilityLabel={'Source ' + (index + 1) + ': ' + item.title}
+              accessibilityState={{ checked, disabled }}
+              disabled={disabled}
+              onPress={() => toggleBundleSource(item)}
+              style={[s.check, checked && { borderLeftWidth: 3, borderColor: C.accent, paddingLeft: 10 }, disabled && s.disabled]}>
+              <Text style={s.label}>{checked ? 'Selected · ' : 'Not selected · '}{item.title.slice(0, 90)}</Text>
+              <Text style={s.small}>{item.source_id.slice(0, 16)}… · {eligible ? 'current source-use policy' : 'not currently eligible'}</Text>
+            </TouchableOpacity>;
+          })}
+          <View style={s.row}>
+            <Button testID="dragon-bundle-select-eligible" title="Select up to 8 eligible"
+              disabled={bundling || !!busy || !session.consent_current || !sources.some(eligibleForEvidenceBundle)}
+              onPress={() => {
+                const selected = sources.filter(eligibleForEvidenceBundle)
+                  .slice(0, DRAGON_BUNDLE_MAX_SOURCES).map(row => row.source_id);
+                bundleSelectionRef.current = selected; setBundleSelected(selected);
+              }} />
+            <Button testID="dragon-bundle-clear-selection" title="Clear selection"
+              disabled={bundling || !!busy || bundleSelected.length === 0}
+              onPress={() => {
+                bundleSelectionRef.current = []; setBundleSelected([]);
+              }} />
+          </View>
           <View style={s.row}>
             <Button testID="dragon-export-metadata-bundle" title={bundling ? 'Verifying sources…' : 'Export provenance only'}
-              disabled={bundling || exporting || !session.consent_current || sources.length === 0 || !!busy}
+              disabled={bundling || exporting || !session.consent_current || bundleSelected.length === 0 || !!busy}
               onPress={() => { void exportEvidenceBundle(false); }} />
             <Button testID="dragon-export-authorized-bundle" title={bundling ? 'Verifying rights…' : 'Export authorized source copies'}
-              disabled={bundling || exporting || !session.consent_current || sources.length === 0 || !!busy}
+              disabled={bundling || exporting || !session.consent_current || bundleSelected.length === 0 || !!busy}
               onPress={() => { void exportEvidenceBundle(true); }} />
           </View>
           {bundling && <ActivityIndicator color={C.accent} />}
@@ -704,6 +760,7 @@ function PilotContent() {
               void reload(value.session.session_id); return;
             }
             shareAbort.current?.abort(); bundleAbort.current?.abort();
+            bundleSelectionRef.current = []; setBundleSelected([]);
             setSourceViewEpoch(epoch => epoch + 1);
             update(value.session); setAtlas(null); setAtlasWitness(null); setReviewDraft(null);
             setSources(rows => rows.map(row =>
