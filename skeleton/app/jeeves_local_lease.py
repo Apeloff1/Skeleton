@@ -48,6 +48,23 @@ class LocalInferenceLease:
         self._thread_gate = threading.Lock()
 
     def _verified_descriptor(self) -> int:
+        # The pathname and its lock inode must remain anchored in a directory
+        # that arbitrary local users cannot replace while inference runs.
+        # A root-owned sticky /tmp is acceptable; unprotected shared
+        # directories are not. Windows ACL checks remain an installer duty.
+        try:
+            directory = self.path.parent.stat()
+            if not stat.S_ISDIR(directory.st_mode):
+                raise LocalInferenceLeaseUnavailable("local inference lease parent is not a directory")
+            if os.name == "posix":
+                if directory.st_uid not in (0, os.getuid()):
+                    raise LocalInferenceLeaseUnavailable("local inference lease parent has foreign owner")
+                writable = bool(directory.st_mode & 0o022)
+                sticky = bool(directory.st_mode & stat.S_ISVTX)
+                if writable and not (sticky and directory.st_uid in (0, os.getuid())):
+                    raise LocalInferenceLeaseUnavailable("local inference lease parent allows unsafe writes")
+        except OSError as exc:
+            raise LocalInferenceLeaseUnavailable("local inference lease directory is unavailable") from exc
         flags = os.O_CREAT | os.O_RDWR
         flags |= getattr(os, "O_CLOEXEC", 0)
         flags |= getattr(os, "O_NOFOLLOW", 0)
@@ -129,6 +146,14 @@ class LocalInferenceLease:
             fd = self._verified_descriptor()
             self._lock_fd(fd)
             locked = True
+            # A recreated sidecar must never be mistaken for the locked inode.
+            # Keep validating while the kernel lock is held, before launch.
+            observed = self.path.lstat()
+            owned = os.fstat(fd)
+            if (not stat.S_ISREG(observed.st_mode)
+                    or (observed.st_dev, observed.st_ino)
+                    != (owned.st_dev, owned.st_ino)):
+                raise LocalInferenceLeaseUnavailable("local inference lock path changed after acquisition")
             yield
         finally:
             if fd is not None:
