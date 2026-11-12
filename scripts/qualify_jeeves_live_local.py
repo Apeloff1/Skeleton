@@ -45,7 +45,8 @@ def _digest(text: str) -> str:
 
 
 def _request(port: int, token: str, method: str, path: str,
-             body: dict[str, Any] | None = None) -> tuple[int, dict[str, Any]]:
+             body: dict[str, Any] | None = None, *,
+             allowed_error_status: int | None = None) -> tuple[int, dict[str, Any]]:
     payload = None if body is None else json.dumps(
         body, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False,
     ).encode("utf-8")
@@ -74,7 +75,7 @@ def _request(port: int, token: str, method: str, path: str,
         raise LiveJeevesFailure("localhost inference returned an invalid JSON body") from None
     if not isinstance(result, dict):
         raise LiveJeevesFailure("localhost inference returned a nonobject response")
-    if status >= 400:
+    if status >= 400 and status != allowed_error_status:
         raise LiveJeevesFailure("local model request was rejected by the real loopback service")
     return status, result
 
@@ -242,6 +243,31 @@ def _qualify_actual_local_http(
             if first["result"].get("model_digest") != digest:
                 raise LiveJeevesFailure("Jeeves model identity changed during live inference")
             _assert_transcript(instance.port, token, session_id, replies=[first["result"]])
+            # Negative controls execute against the actual local service,
+            # not a mocked HTTP adapter. An absent/invalid bearer credential
+            # must never disclose model or conversation state.
+            status, denied = _request(
+                instance.port, "wrong-" + token, "GET", "/v1/status",
+                allowed_error_status=401,
+            )
+            if status != 401 or not isinstance(denied.get("error"), str):
+                raise LiveJeevesFailure("local model service admitted an unauthenticated query")
+            # Reusing a committed request ID with different prompt bytes must
+            # be denied without generation or a second durable revision. This
+            # is a real inference-host check of the idempotency/custody fence.
+            status, denied = _request(
+                instance.port, token, "POST",
+                "/v1/sessions/" + session_id + "/turns",
+                {
+                    "request_id": first_request_id,
+                    "message": "Do not replace the first committed local answer.",
+                    "max_output_tokens": output_tokens,
+                },
+                allowed_error_status=409,
+            )
+            if status != 409 or not isinstance(denied.get("error"), str):
+                raise LiveJeevesFailure("committed local request identity was mutable")
+            _assert_transcript(instance.port, token, session_id, replies=[first["result"]])
 
         # Fully close the socket, worker, and SQLite handle. A fresh app
         # instance must reconstruct the same source-bound conversation.
@@ -330,6 +356,8 @@ def _qualify_actual_local_http(
         "run_1_execution_receipt_sha256": first["local_execution_receipt_sha256"],
         "run_2_execution_receipt_sha256": second["local_execution_receipt_sha256"],
         "runtime_receipts_survived_restart": True,
+        "unauthenticated_local_query_denied": True,
+        "committed_request_rewrite_denied": True,
         "turn_metrics": [
             {"elapsed_seconds": t["elapsed_seconds"],
              "observed_output_tokens_per_second": t["output_tokens_per_second_observed"],
