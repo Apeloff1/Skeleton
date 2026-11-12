@@ -512,8 +512,12 @@ class OfflineHTTPApplication:
         rid = _identifier("request id", request["request_id"])
         budget = _budget(request, self.default_output_tokens)
         digest = _digest_request(text, GenerationConfig(max_new_tokens=budget))
+        # Citation manifests use the grounded QUESTION identity. Strict
+        # transcript-retention is a separate idempotency policy applied to
+        # the final SQLite turn identity, never to the referenced passages.
+        grounding_digest = grounded_request_digest(digest) if grounded else None
         if grounded:
-            digest = grounded_request_digest(digest)
+            digest = grounding_digest
         digest = _strict_context_digest(digest, strict)
         with self._lock:
             self._session(session_id)
@@ -548,7 +552,8 @@ class OfflineHTTPApplication:
                         422, "no local reference passages match this question"
                     )
                 manifest = prepare_evidence(
-                    text, digest, hits, self.model_digest, self.tokenizer_digest,
+                    text, grounding_digest, hits,
+                    self.model_digest, self.tokenizer_digest,
                 )
             chat = DurableOfflineAISession(
                 self.backend, database=self.database, session_id=session_id
