@@ -10,6 +10,7 @@ Credentials remain in an operator-private file and are never printed.
 from __future__ import annotations
 
 import argparse
+from getpass import getpass
 import json
 import os
 from pathlib import Path
@@ -38,14 +39,18 @@ class _NoRedirects(HTTPRedirectHandler):
 
 
 def backend_origin(value: str, *, allow_loopback_http: bool = False) -> str:
-    parsed = urlsplit(value)
-    host = (parsed.hostname or "").lower()
+    try:
+        parsed = urlsplit(value)
+        host = (parsed.hostname or "").lower()
+        port = parsed.port
+    except ValueError:
+        raise ProbeFailure("The supplied backend origin is malformed.") from None
     loopback = host in {"localhost", "127.0.0.1", "::1"}
     if (
         parsed.scheme not in {"http", "https"}
         or not host or parsed.username or parsed.password
         or parsed.query or parsed.fragment or parsed.path not in {"", "/"}
-        or parsed.port == 0
+        or port == 0
         or (parsed.scheme == "http" and (not loopback or not allow_loopback_http))
     ):
         raise ProbeFailure(
@@ -92,11 +97,12 @@ class ChatApi:
         if payload is not None and len(payload) > _MAX_REQUEST:
             raise ProbeFailure("The request exceeded the bounded smoke-test size.")
         headers = {
-            "Authorization": "Bearer " + self.token,
             "Accept": "application/json",
             "Accept-Encoding": "identity",
             "User-Agent": "Skeleton-installed-AI-chat-smoke/1",
         }
+        if self.token:
+            headers["Authorization"] = "Bearer " + self.token
         if payload is not None:
             headers["Content-Type"] = "application/json"
         request = Request(self.origin + path, data=payload, method=method, headers=headers)
@@ -122,6 +128,22 @@ class ChatApi:
         if not isinstance(document, dict):
             raise ProbeFailure("The API response has an incompatible shape.")
         return document
+
+
+def interactive_login(api: ChatApi, email: str) -> str:
+    """Authenticate without command-line or stored-password exposure."""
+    if not re.fullmatch(r"[^\s@]{1,120}@[^\s@]{1,120}", email):
+        raise ProbeFailure("Supply one valid account email address.")
+    password = getpass("Skeleton account password: ")
+    if not password:
+        raise ProbeFailure("A nonempty account password is required.")
+    response = api.request("POST", "/api/auth/login", {
+        "email": email.strip().lower(), "password": password,
+    })
+    token = response.get("access_token")
+    if not isinstance(token, str) or not 16 <= len(token) <= 8192 or not token.isascii() or any(ord(ch) <= 32 for ch in token):
+        raise ProbeFailure("The account login did not return a usable session token.")
+    return token
 
 
 def readiness(api: ChatApi) -> dict:
@@ -181,8 +203,14 @@ def exercise(api: ChatApi, snapshot: dict, *, seconds: int, prompt: str) -> dict
         "idempotency_key": key,
         "expected_thread_version": version,
         "response_mode": "deferred",
-        "max_output_tokens": min(128, selected.get("max_output_tokens", 128)),
+        "max_output_tokens": (
+            min(128, selected["max_output_tokens"])
+            if type(selected.get("max_output_tokens")) is int and selected["max_output_tokens"] > 0
+            else 0
+        ),
     }
+    if type(body["max_output_tokens"]) is not int or body["max_output_tokens"] < 1:
+        raise ProbeFailure("The selected model did not provide a valid output budget.")
     if not snapshot["automatic_available"]:
         body["provider_id"] = selected["provider_id"]
         body["model_id"] = selected["model_id"]
@@ -236,7 +264,9 @@ def exercise(api: ChatApi, snapshot: dict, *, seconds: int, prompt: str) -> dict
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", required=True, help="HTTPS origin for the installed application's backend API")
-    parser.add_argument("--token-file", required=True, type=Path, help="private UTF-8 bearer token file (0600 on POSIX)")
+    credentials = parser.add_mutually_exclusive_group(required=True)
+    credentials.add_argument("--token-file", type=Path, help="private UTF-8 bearer token file (0600 on POSIX)")
+    credentials.add_argument("--login-email", help="prompt privately for the account password (no token file needed)")
     parser.add_argument("--allow-loopback-http", action="store_true", help="allow unencrypted local tests ONLY to loopback")
     parser.add_argument("--exercise", action="store_true", help="submit exactly one real conversation turn and verify persistence")
     parser.add_argument("--timeout", type=int, default=180, help="overall chat completion wait, 10-600 seconds")
@@ -246,8 +276,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.timeout < 10 or args.timeout > 600 or not 1 <= len(args.prompt) <= 200:
             raise ProbeFailure("Timeout must be 10-600 seconds and the prompt must be 1-200 characters.")
         origin = backend_origin(args.base_url, allow_loopback_http=args.allow_loopback_http)
-        token = private_bearer_token(args.token_file)
-        api = ChatApi(origin, token)
+        api = ChatApi(origin, "")
+        token = private_bearer_token(args.token_file) if args.token_file else interactive_login(api, args.login_email)
+        api.token = token
         state = readiness(api)
         print(json.dumps({"phase": "readiness", **{k: v for k, v in state.items() if k != "selected"}}, sort_keys=True))
         if not args.exercise:
