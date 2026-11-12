@@ -350,6 +350,19 @@ function patchNodeForgeNestedDigestAlgorithm() {
   // Reviewed exact published versions. The 1.4.2 RSA parser still validates
   // the outer DigestInfo count without validating nested DigestAlgorithm arity.
   // Never silently trust a version bump as proof of this security fix.
+  // node-forge 1.4.3 enforces canonical DER DigestInfo rather than the older
+  // nested-arity repair. Admit only the reviewed upstream 1.4.3 RSA source:
+  // this attests to the actual verification code, not package metadata.
+  if (version === '1.4.3') {
+    const rsaPath = path.join(ROOT, 'node_modules/node-forge/lib/rsa.js');
+    const actual = crypto.createHash('sha256').update(fs.readFileSync(rsaPath)).digest('hex');
+    const approved = '6632e195295ce76f6bb9131ee770dcd6cc1ee4ffac7906302208b00faf95a87f';
+    if (actual !== approved) {
+      throw new Error('[patch-node-modules] node-forge 1.4.3 RSA verifier source changed: review required');
+    }
+    skipped++;
+    return;
+  }
   if (!new Set(['1.4.0', '1.4.2']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
   }
