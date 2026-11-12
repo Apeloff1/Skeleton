@@ -18,7 +18,7 @@ All four capabilities must work: (1) signed-in account and correct tenant; (2) d
 
 For a hosted provider, after the canonical installer has created the private .env, the owner can opt in through the new secret-safe activation command:
 
-    python scripts/configure_ai_chat_hosted.py --model YOUR_APPROVED_MODEL --prompt-key --apply
+    python scripts/configure_ai_chat_hosted.py --model gpt-4.1-mini --prompt-key --apply
 
 This validates the chosen model, accepts the server-side key through a hidden prompt, holds the setup lock, updates only AI_PROVIDER, AI_MODEL and OPENAI_API_KEY atomically in owner-private .env, and does not overwrite an existing key or configured local deployment without explicit rotation/switch flags. The command reports real_inference_verified=false and requires engine recreation. The provider receives chat content, so use this only when approved for your data policy. Keep provider credentials out of Expo EXPO_PUBLIC variables. The model must genuinely exist under your provider account, and the installer, owner/bootstrap, storage and engine scope requirements still apply. Refer to FIRST_INSTALL_AI_AND_CRAWLER.md.
 
