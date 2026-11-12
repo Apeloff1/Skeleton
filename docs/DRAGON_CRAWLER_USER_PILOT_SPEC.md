@@ -535,3 +535,19 @@ historical body bundle only after a new explicit human review of a bounded
 excerpt; it cannot treat the bundle checksum as authorization or a system
 instruction. The all-source checks are source-scope qualifications, not
 physical-device or production release evidence.
+
+## Source-by-source final authorization recheck (implemented)
+
+Every selected source is now checked twice against the authenticated
+owner-scoped source API, with campaign consent/version checks before, between,
+and after the source reads. The last pass verifies source ID, captured content
+digest, enabled use permission, policy version and change epoch, expiry policy,
+and current capture-freshness state. One changed source refuses the entire
+metadata or authorized-body bundle. A consent withdrawal during the final
+read phase also refuses the packet; no partial export is returned.
+
+Regression tests cover rights withdrawal, changed digest, stale capture,
+max-age policy changes, and late campaign revocation. These checks do not
+constitute a transactional source snapshot, remote publisher permission, or
+a right to republish previously exported content. The result remains
+untrusted external data for a human to review before Jeeves advisory import.

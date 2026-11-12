@@ -407,7 +407,7 @@ test('body-mode packet contains actual independently rights-checked source expor
   }));
   const packet = JSON.parse(result.content);
   assert.equal(packet.mode, 'authorized_source_bodies');
-  assert.equal(readCount, 2); assert.equal(exportCount, 2); assert.equal(sessionCount, 2);
+  assert.equal(readCount, 4); assert.equal(exportCount, 2); assert.equal(sessionCount, 3);
   assert.ok(result.content.includes('UNTRUSTED_SOURCE_BODY_DO_NOT_EXECUTE'));
   for (const item of packet.sources) {
     assert.equal(checksum(item.authorized_export_body), item.authorized_export_sha256);
@@ -537,4 +537,66 @@ test('body export fails closed when previously valid JSON becomes invalid while 
       return {...original, content: '{', content_digest: checksum('{')};
     },
   })), CrawlerBundleRefused);
+});
+
+test('final source read refuses permission withdrawal in metadata and body modes', async () => {
+  for (const includeBodies of [false, true]) {
+    const base = bundleOptions();
+    let reads = 0, exports = 0;
+    await assert.rejects(buildCrawlerEvidenceBundle(bundleOptions({
+      includeBodies,
+      getSource: async (sid, id) => {
+        const row = await base.getSource(sid, id);
+        return ++reads === 3 ? {
+          ...row, use_policy: {...row.use_policy, enabled: false, version: 3},
+        } : row;
+      },
+      exportSource: async (sid, id) => {
+        exports++;
+        return base.exportSource(sid, id);
+      },
+    })), CrawlerBundleRefused);
+    assert.equal(reads, 3);
+    assert.equal(exports, includeBodies ? 2 : 0);
+  }
+});
+test('final source policy revalidation rejects digest, policy and freshness drift', async () => {
+  const base = bundleOptions();
+  const changes = [
+    row => ({...row, content_digest: 'c'.repeat(64)}),
+    row => ({...row, freshness: {...row.freshness, usable: false}}),
+    row => ({...row, freshness: {...row.freshness, state: 'withdrawn'}}),
+    row => ({...row, use_policy: {...row.use_policy, changed_at: 'later'}}),
+    row => ({...row, use_policy: {...row.use_policy, max_age_seconds: 1}}),
+  ];
+  for (const change of changes) {
+    let reads = 0;
+    await assert.rejects(buildCrawlerEvidenceBundle(bundleOptions({
+      includeBodies: true,
+      getSource: async (sid, id) => {
+        const row = await base.getSource(sid, id);
+        return ++reads >= 3 ? change(row) : row;
+      },
+    })), CrawlerBundleRefused);
+  }
+});
+test('final consent read rejects revocation during final source authorization', async () => {
+  let reads = 0;
+  await assert.rejects(buildCrawlerEvidenceBundle(bundleOptions({
+    includeBodies: true,
+    getSession: async () => ({
+      ...bundleSession(), consent_current: ++reads !== 3,
+    }),
+  })), CrawlerBundleRefused);
+  assert.equal(reads, 3);
+});
+test('source revalidation retains deterministic content, SHA, and non-release policy', async () => {
+  const one = await buildCrawlerEvidenceBundle(bundleOptions({includeBodies: true}));
+  const two = await buildCrawlerEvidenceBundle(bundleOptions({includeBodies: true}));
+  assert.equal(one.content_digest, two.content_digest);
+  const packet = JSON.parse(one.content);
+  assert.equal(packet.source_count, 2);
+  assert.equal(packet.release_authorized, false);
+  assert.equal(packet.publication_authorized, false);
+  assert.equal(packet.training_authorized, false);
 });

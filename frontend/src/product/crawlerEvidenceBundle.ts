@@ -65,6 +65,7 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
   if (!sameSession(session, before)) refuse('The source session changed. Refresh before exporting.');
   const selected = [...sourceIds].sort();
   const rows: Array<Record<string, unknown>> = [];
+  const checked = new Map<string, CapturedSource>();
   let totalBodyBytes = 0;
   for (const sourceId of selected) {
     gate(options);
@@ -129,11 +130,36 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
       row.authorized_export_media_type = 'application/json';
       row.authorized_export_body = exported.content;
     }
+    checked.set(sourceId, record);
     rows.push(row);
   }
   const after = await options.getSession(session.session_id, signal);
   gate(options);
   if (!sameSession(before, after)) refuse('Source consent or campaign revision changed during export.');
+  // Re-read each source after the bounded export, not just the campaign:
+  // individual use policies may change without a campaign version change.
+  for (const sourceId of selected) {
+    gate(options);
+    const original = checked.get(sourceId);
+    const current = await options.getSource(session.session_id, sourceId, signal);
+    gate(options);
+    if (!original || !current || current.source_id !== sourceId
+      || current.content_digest !== original.content_digest
+      || !SHA.test(current.content_digest)
+      || current.use_policy?.enabled !== true
+      || current.use_policy.version !== original.use_policy.version
+      || current.use_policy.changed_at !== original.use_policy.changed_at
+      || current.use_policy.max_age_seconds !== original.use_policy.max_age_seconds
+      || current.freshness?.usable !== true
+      || current.freshness.state !== 'current'
+      || current.freshness.remote_freshness_verified !== false)
+      refuse('A source policy, provenance or freshness status changed during export.');
+  }
+  // A final campaign read fences withdrawal during those source rechecks.
+  const confirmed = await options.getSession(session.session_id, signal);
+  gate(options);
+  if (!sameSession(after, confirmed))
+    refuse('Campaign consent or revision changed during final source checks.');
   const packet = {
     schema: 'skeleton.dragon.owner_evidence_bundle.v1',
     mode: includeBodies ? 'authorized_source_bodies' : 'metadata_only',
