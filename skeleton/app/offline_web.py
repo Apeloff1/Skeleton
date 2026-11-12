@@ -118,7 +118,14 @@ HTML = r"""<!doctype html>
       <div><h1>Local model conversation</h1><p id="model">Not connected</p></div>
       <div id="indicator" class="indicator">LOCKED</div>
       <button id="health-refresh" class="small" disabled>Check model</button>
+      <button id="selftest-start" class="small" disabled>Run genuine local inference self-test</button>
     </header>
+    <section id="selftest-panel" class="selftest-panel" aria-label="Actual local model qualification" hidden>
+      <strong>Local inference acceptance</strong>
+      <p class="hint">This runs a real model-generated turn, verifies the saved SQLite answer and its execution receipt, and records measured elapsed time. It does not send a hosted model request or certify production language quality.</p>
+      <pre id="selftest-result" aria-live="polite">No live qualification performed.</pre>
+      <button id="selftest-export" class="small" disabled>Download nonsecret qualification receipt</button>
+    </section>
     <div id="turn-progress" class="turn-progress" role="status" hidden>
       <span id="turn-label">Ready</span><span id="turn-elapsed"></span>
       <button id="check-turn" class="small">Check status</button>
@@ -169,6 +176,7 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 .source-custody-item{white-space:pre-wrap;font-size:11px;margin-top:7px;color:#d0d9ed;background:#1e2d42;border:1px solid #344a68;border-radius:7px;padding:9px;max-height:180px;overflow:auto}
 [hidden]{display:none!important}.turn-progress{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#1c2943;border-bottom:1px solid #35466b;padding:12px 24px;font-size:12px}.turn-progress #turn-label{flex:1}.transcript-tools{display:flex;gap:8px;justify-content:center;margin:8px}.message-actions{display:flex;gap:7px;margin-top:12px;white-space:normal}.instructions{margin:12px 0;color:#b8c9e9;font-size:12px}.instructions textarea{width:100%;margin-top:9px;color:#eff2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:8px}.sidebar input[type=search]{min-width:0;flex:1;width:100%;color:#eef2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:9px}.reference-name{text-align:left;padding:4px;border:0;background:transparent;font-size:11px;overflow-wrap:anywhere}.session small:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}dialog{width:min(850px,94vw);max-height:86vh;overflow:auto;background:#131d2d;color:#ebf1ff;border:1px solid #526a95;border-radius:14px;padding:22px}dialog::backdrop{background:#000a}dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;background:#0b1321;padding:15px;border-radius:9px}dialog .hint{overflow-wrap:anywhere}:focus-visible{outline:2px solid #a1c1ff;outline-offset:3px}
 
+.selftest-panel{margin:9px auto 4px;width:calc(100% - 50px);max-width:870px;padding:12px 15px;border:1px solid #344a68;border-radius:10px;background:#17253a;color:#d9e6fc;font-size:12px}.selftest-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;color:#c8e8d6;font-size:12px}.selftest-panel button{width:auto}
 .shell{height:100vh;height:100dvh;overflow:hidden}.sidebar{min-height:0;height:100%;overflow-y:auto}.main{height:100%;min-height:0}.messages{overscroll-behavior:contain}.intro{flex-shrink:1;overflow:auto}.mobile-only,.sidebar-scrim{display:none}.bottom input[type=checkbox]{width:auto}.turn-progress #turn-elapsed{font-variant-numeric:tabular-nums}.knowledge-record .reference-name{min-width:0;flex-shrink:1;flex:1}.brand #sidebar-close{margin-left:auto}
 @media(max-width:720px){.shell{display:block;min-height:0}.sidebar{display:none}.main{height:100%}.topbar{flex-wrap:wrap;gap:8px}.topbar>div:first-of-type{flex:1;min-width:150px}.topbar h1{font-size:15px}.topbar p{overflow-wrap:anywhere}.mobile-only{display:inline-block}.library-open .sidebar{display:flex;position:fixed;top:0;bottom:0;left:0;width:min(350px,90vw);z-index:20;min-height:0;max-height:100dvh;overflow-y:auto;box-shadow:10px 0 40px #0007}.library-open .sidebar-scrim{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:19;background:#0009;border:0;border-radius:0}.sidebar .sessions{flex:none;max-height:25vh}.sidebar .knowledge-section{flex:none;max-height:48vh}.sidebar .sidebar-footer{display:grid}.composer{flex-shrink:0;margin:0 auto;padding:10px}.composer textarea{min-height:50px;max-height:24vh}.composer .bottom{gap:6px}.turn-progress{padding:8px 12px}.status{padding:9px 12px}.messages{padding:12px;gap:10px}.message{max-width:97%}.intro h2{font-size:23px}.intro .glow{font-size:30px}.intro .minor{font-size:11px}.intro{padding:12px}.transcript-tools{margin:5px}}
 
@@ -185,6 +193,7 @@ JAVASCRIPT = r"""'use strict';
     sessions: [], cursor: null, query: '', drafts: new Map(),
     pending: null, turn: null, timer: null, polling: false,
     writePending: null, writeRequest: '',
+    selfTest: null, selfTestReport: null,
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
     network: new AbortController(), resourceTimer: null, longformSourceId: null,
     longformWork: null, longformPendingRequest: null,
@@ -288,6 +297,8 @@ JAVASCRIPT = r"""'use strict';
     get('send').disabled = locked || working || !state.session || state.health?.ready !== true;
     get('connect').disabled = state.busy || state.connected;
     get('health-refresh').disabled = locked || state.busy;
+    get('selftest-start').disabled = locked || working || state.health?.ready !== true;
+    get('selftest-export').disabled = locked || !state.selfTestReport;
     get('disconnect').disabled = !state.connected && !state.token;
     get('resource-refresh').disabled = locked;
     get('resource-plan').disabled = locked;
@@ -331,6 +342,9 @@ JAVASCRIPT = r"""'use strict';
     get('longform-status').textContent = 'No staged source.';
     get('longform-work-status').textContent = 'No active work cursor.';
     get('longform-work-id').value = '';
+    state.selfTest = null; state.selfTestReport = null;
+    get('selftest-panel').hidden = true;
+    get('selftest-result').textContent = 'No live qualification performed.';
     state.longformSourceId = null;
     state.longformWork = null;
     state.longformPendingRequest = null;
@@ -563,10 +577,12 @@ JAVASCRIPT = r"""'use strict';
           }
           state.pending = null;
           await selectSession(ticket.session_id);
+          await completeSelfTest(ticket, epoch);
           const result = ticket.result;
           status('Reply saved' + (result?.replayed ? ' · recovered saved answer' : '') +
             (result ? ' · ' + result.output_tokens + ' output tokens' : '') + '.');
         } else {
+          await completeSelfTest(ticket, epoch);
           status(ticket.error || 'Cancelled without a completed reply. Retry original turn or edit your next request.');
         }
       } else {
@@ -589,6 +605,127 @@ JAVASCRIPT = r"""'use strict';
         state.polling = false; updateControls();
         if (superseded && state.turn) {stopPolling(); state.timer = setTimeout(() => void pollTurn(), 100);}
       }
+    }
+  }
+
+  function selfTestDisplay(message) {
+    get('selftest-panel').hidden = false;
+    get('selftest-result').textContent = message;
+    updateControls();
+  }
+  async function completeSelfTest(ticket, epoch) {
+    const claim = state.selfTest;
+    if (!claim || claim.session_id !== ticket.session_id
+      || claim.request_id !== ticket.request_id || epoch !== state.epoch) return;
+    state.selfTest = null;
+    if (ticket.state !== 'complete') {
+      state.selfTestReport = null;
+      selfTestDisplay('NOT QUALIFIED: local generation did not commit. State: ' +
+        (ticket.state === 'cancelled' ? 'cancelled' : 'failed') + '.');
+      return;
+    }
+    try {
+      const result = ticket.result;
+      const receipt = result?.local_execution_receipt;
+      if (!result || typeof result.text !== 'string' || !result.text.trim()
+          || !Number.isSafeInteger(result.output_tokens) || result.output_tokens < 1
+          || !/^[a-f0-9]{64}$/.test(result.output_digest || '')
+          || result.model_digest !== claim.model_digest
+          || result.replayed !== false
+          || receipt?.model_digest !== claim.model_digest
+          || receipt?.output_sha256 !== result.output_digest
+          || receipt?.revision !== result.revision
+          || !/^[a-f0-9]{64}$/.test(receipt?.execution_receipt_digest || '')) {
+        throw new Error('The live model receipt was incomplete.');
+      }
+      // Browser crypto is local WebCrypto: hash the exact UTF-8 answer.
+      const binary = new TextEncoder().encode(result.text);
+      const hashed = await crypto.subtle.digest('SHA-256', binary);
+      const outputDigest = Array.from(new Uint8Array(hashed),
+        byte => byte.toString(16).padStart(2, '0')).join('');
+      if (outputDigest !== result.output_digest)
+        throw new Error('The output bytes did not match the committed digest.');
+      const saved = await api('GET', '/v1/sessions/' + claim.session_id);
+      if (epoch !== state.epoch) return;
+      const assistantRows = Array.isArray(saved.messages)
+        ? saved.messages.filter(row => row.role === 'assistant') : [];
+      if (saved.session_id !== claim.session_id ||
+          saved.revision !== result.revision ||
+          !assistantRows.length ||
+          assistantRows[assistantRows.length - 1].content !== result.text)
+        throw new Error('The committed SQLite transcript did not match the local reply.');
+      const report = Object.freeze({
+        schema: 'skeleton.jeeves.local-browser-live-check.v1',
+        qualified: true, local_only: true, provider_fallback_used: false,
+        actual_model_execution: true,
+        model_digest: claim.model_digest,
+        runtime_kind: claim.runtime_kind,
+        session_revision: result.revision,
+        actual_output_tokens: result.output_tokens,
+        output_sha256: outputDigest,
+        execution_receipt_sha256: receipt.execution_receipt_digest,
+        sqlite_transcript_reverified: true,
+        observed_elapsed_ms: Math.max(0, Math.round(performance.now() - claim.started_at)),
+        operator_gguf_quality_certified: false,
+        independent_device_release_certified: false,
+      });
+      state.selfTestReport = report;
+      selfTestDisplay('QUALIFIED — real locally executed answer, SHA-256 verified, ' +
+        report.actual_output_tokens + ' tokens and SQLite revision ' +
+        report.session_revision + ' re-read. Elapsed ' +
+        report.observed_elapsed_ms + 'ms. Hardware and model quality remain unqualified.');
+      status('Actual local inference and immutable stored receipt verified.');
+    } catch {
+      if (epoch !== state.epoch) return;
+      state.selfTestReport = null;
+      selfTestDisplay('NOT QUALIFIED: live inference, receipt or saved-history verification failed. Nothing has been certified. Inspect the private local model diagnostics.');
+    }
+  }
+  async function startSelfTest() {
+    if (!state.connected || state.busy || unresolved() || state.health?.ready !== true)
+      throw new Error('A ready idle local model is required for the live check.');
+    if (state.selfTest) throw new Error('The previous self-test must finish before another.');
+    const epoch = state.epoch;
+    const observed = await api('GET', '/v1/status');
+    if (observed.ready !== true || observed.local_only !== true
+      || observed.model_digest !== state.health.model_digest)
+      throw new Error('Local model readiness or identity changed during admission.');
+    const created = await api('POST', '/v1/sessions', {});
+    if (epoch !== state.epoch) return;
+    await selectSession(created.session_id);
+    if (epoch !== state.epoch) return;
+    const request_id = crypto.randomUUID().replace(/-/g, '');
+    const request = {
+      session_id: created.session_id, request_id,
+      message: 'Local inference acceptance: respond with one brief sentence about offline computing.',
+      max_output_tokens: Math.max(1, Math.min(16, observed.max_output_tokens)),
+      grounded: false,
+    };
+    const started_at = performance.now();
+    state.selfTest = { session_id: created.session_id, request_id,
+      model_digest: observed.model_digest, runtime_kind: observed.runtime_kind,
+      started_at };
+    state.selfTestReport = null;
+    state.pending = request;
+    state.turn = { session_id: request.session_id, request_id,
+      state: 'unknown', terminal: false };
+    state.pollStarted = started_at; state.pollErrors = 0;
+    selfTestDisplay('Running a real local model turn. This saved test conversation is retained in your private SQLite history.');
+    try {
+      const {session_id, ...body} = request;
+      state.turn = await api('POST', '/v1/sessions/' + session_id + '/turns', body);
+      if (epoch !== state.epoch) return;
+      status('Local self-test admitted. Verification follows only after durable completion.');
+      void pollTurn();
+    } catch (error) {
+      if (epoch !== state.epoch) return;
+      // An uncertain transport must not silently resubmit and duplicate work.
+      selfTestDisplay('Live check submission was not confirmed. Use Check status or Retry original turn; no qualified result was recorded.');
+      state.pollStarted = performance.now();
+      schedulePoll(500);
+      throw error;
+    } finally {
+      if (epoch === state.epoch) updateControls();
     }
   }
   async function submit(retry = false) {
@@ -690,6 +827,12 @@ JAVASCRIPT = r"""'use strict';
   }));
   get('disconnect').addEventListener('click', lock);
   get('health-refresh').addEventListener('click', () => void refreshHealth());
+  get('selftest-start').addEventListener('click', () => run(startSelfTest));
+  get('selftest-export').addEventListener('click', () => {
+    if (!state.connected || !state.selfTestReport) return;
+    download(JSON.stringify(state.selfTestReport, null, 2) + '\n',
+      'jeeves-local-qualification.json', 'application/json');
+  });
   get('resource-refresh').addEventListener('click', refreshResources);
   get('resource-plan').addEventListener('click', () => run(async () => {
     const source_bytes = Number(get('resource-bytes').value);
