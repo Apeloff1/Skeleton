@@ -255,6 +255,14 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
     catalogSyncAttempt.current = { controller, key: observedCatalogKey };
     void controller.refreshModels();
   }, [controller, currentCatalogKey, observedCatalogKey, busy, loading, state.pending, state.ready]);
+  const refreshChatConnection = useCallback(async () => {
+    // A pending canonical turn retains its selected model and engine epoch.
+    if (controller.getSnapshot().pending) {
+      await refreshReadiness();
+      return;
+    }
+    await Promise.all([controller.refreshModels(), refreshReadiness()]);
+  }, [controller, refreshReadiness]);
   const selectedModel = state.models.find(model => model.id === state.selectedModelId);
   const observedModel = readiness?.models.models.find(model => model.id === selectedModel?.id);
   const modelReady = readiness?.available === true && !!selectedModel?.available && selectedModel.selectable
@@ -640,7 +648,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
           {state.activeThread && !narrow && <IconButton icon="ellipsis-horizontal" label="Conversation options" disabled={busy}
             onPress={() => { setManage({ thread: state.activeThread!, action: 'menu' }); setDialogError(null); }} />}
         </View>
-        <JeevesRuntimeStatus readiness={readiness} refresh={refreshReadiness} readinessError={readinessError?.message} observedAt={readinessObservedAt} />
+        <JeevesRuntimeStatus readiness={readiness} refresh={refreshChatConnection} readinessError={readinessError?.message} observedAt={readinessObservedAt} />
         <View style={s.companionToggle}><MiniButton icon="sparkles-outline" label={companionOpen ? 'Hide companion' : 'Show companion'} onPress={() => setCompanionOpen(open => !open)} /></View>
         </View>
         {companionOpen && <ScrollView style={[s.companionDock, { top: headerHeight + 8, bottom: composerHeight + 12 }, compact && s.companionDockCompact]} keyboardShouldPersistTaps="handled">
@@ -709,7 +717,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
             <Button icon="arrow-undo-outline" label="Restore conversation" onPress={() => run(() => controller.archive(false))} /></View> : <>
             {!busy && !loading && !pending && !modelReady && <View style={s.alert}>
               <Text accessibilityLiveRegion="polite" style={s.alertText}>{readinessError?.message || (readiness && !readiness.available ? chatReadinessMessage(readiness) : readiness?.available && !modelReady && state.models.some(model => model.available && model.selectable) ? 'The AI engine is ready, but the selected model is unavailable or belongs to a previous configuration. Choose a ready model explicitly; your draft and any saved turn are preserved.' : readiness?.models.readiness?.message || observedModel?.readiness.message) || 'A ready model and conversation storage are required. Your draft is preserved while you finish setup.'}</Text>
-              <View style={s.row}><MiniButton icon="refresh-outline" label="Check readiness & models" onPress={() => run(async () => { await Promise.all([refreshReadiness(), controller.refreshModels()]); })} /><MiniButton icon="settings-outline" label="Finish AI setup" onPress={() => router.push('/setup' as never)} /><MiniButton icon="hardware-chip-outline" label="Choose model" onPress={() => setModelsOpen(true)} /></View>
+              <View style={s.row}><MiniButton icon="refresh-outline" label="Check readiness & models" onPress={() => run(refreshChatConnection)} /><MiniButton icon="settings-outline" label="Finish AI setup" onPress={() => router.push('/setup' as never)} /><MiniButton icon="hardware-chip-outline" label="Choose model" onPress={() => setModelsOpen(true)} /></View>
             </View>}
             {!!uploadError && <View style={s.row}><Text style={[s.errorText, { flex: 1 }]} accessibilityRole="alert">{uploadError}</Text><IconButton icon="close-outline" label="Dismiss file error" onPress={() => setUploadError(null)} /></View>}
             <View style={[s.composer, focused && s.focusedComposer]}>
@@ -746,7 +754,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
             <ChatResponseReviewControl enabled={reviewResponse} change={setReviewResponse} disabled={busy || loading} available={reviewAvailable} answerTokenLimit={answerTokenLimit}
               policy={reviewPolicy} changePolicy={setReviewPolicy} models={readiness?.models.models ?? []} mainModel={observedModel}
               fieldError={reviewFieldError} changeFieldError={setReviewFieldError} issues={reviewIssues}
-              refreshModels={async () => { await Promise.all([controller.refreshModels(), refreshReadiness()]); }} />
+              refreshModels={refreshChatConnection} />
             <WorkflowTemplatePicker surface="chat" contextKey={workflowContextKey} disabled={!workflowDraftReady}
               unavailableReason={workflowUnavailableReason} onApply={applyWorkflowTemplate} />
             <Text style={s.composerHint}>{pending && !busy ? pending.stopRequested ? 'Stop intent is saved. Check the same turn or explicitly retry Stop; Resume will not resubmit it.' : 'Check the saved turn, explicitly resume it, or open another conversation. Its original request stays unchanged.' : reviewResponse && !reviewAvailable ? 'Response review is unavailable. Refresh readiness or turn off review to continue.' : !reviewBudgetReady ? reviewFieldError || reviewIssues[0] || 'Review the response settings before sending.' : busy ? 'You can draft your next message while Jeeves replies.' : modelReady ? Platform.OS === 'web' ? 'Enter to send · Shift + Enter for a new line' : 'Check important information.' : 'Choose an available model to start chatting.'}</Text>
@@ -773,7 +781,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
         </TouchableOpacity>)}
       </ScrollView>
       {selectedModel && <View style={{ gap: 8 }}><Text style={s.dialogBody}>Shared answer token budget · {answerTokenLimit.toLocaleString()}</Text><View style={[s.row, { flexWrap: 'wrap' }]}>{[128, 256, 512, 1024, 2048, 4096].filter(value => value <= (selectedModel.max_output_tokens ?? 0)).map(value => <MiniButton key={value} icon={answerTokenLimit === value ? 'checkmark-circle-outline' : 'ellipse-outline'} label={value.toLocaleString()} disabled={busy} onPress={() => setOutputTokens(value)} />)}</View></View>}
-      <Button icon="refresh-outline" label="Refresh models" disabled={busy} onPress={() => run(async () => { await Promise.all([controller.refreshModels(), refreshReadiness()]); })} />
+      <Button icon="refresh-outline" label="Refresh models" disabled={busy} onPress={() => run(refreshChatConnection)} />
     </Dialog>}
     {manage && <Dialog title={manage.action === 'rename' ? 'Rename conversation' : manage.action === 'delete' ? 'Delete conversation?' : manage.action === 'export' ? 'Export conversation' : 'Conversation options'} close={() => { if (!mutationBusy) setManage(null); }}>
       {manage.action === 'menu' ? <>
