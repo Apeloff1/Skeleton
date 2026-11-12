@@ -1145,7 +1145,12 @@ class OfflineChatProduct:
             request_digest=request_digest,
             transcript=full_transcript,
             text=generation.text,
-            output_digest=generation.output_digest,
+            # The generation digest describes native decoder material and is
+            # not necessarily SHA-256 of the visible assistant text. SQLite
+            # receipt custody is defined over the saved UTF-8 text bytes.
+            # Never weaken the store's whole-history integrity check to fit
+            # an unrelated engine-level digest.
+            output_digest=sha256(generation.text.encode("utf-8")).hexdigest(),
             prompt_tokens=result.prompt_tokens,
             generated_tokens=len(generation.generated_ids),
         )
