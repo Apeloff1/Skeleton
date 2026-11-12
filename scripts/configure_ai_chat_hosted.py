@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
 from skeleton.app.assembly import find_repo_root
 from skeleton.app.setup_runtime import (
     _atomic_write,
+    _is_placeholder,
     _parse_env,
     _read_existing_env,
     _replace_env_value,
@@ -108,6 +109,8 @@ def activate_hosted_ai(
         values = _parse_env(text)
         active = values.get("AI_PROVIDER", "").strip().lower()
         existing_key = values.get("OPENAI_API_KEY", "").strip()
+        if _is_placeholder(existing_key):
+            existing_key = ""
         local_model_present = any(values.get(name, "").strip() for name in _LOCAL_CONFIG)
         if active and active not in {"local", "openai"}:
             raise ActivationError("Existing nonlocal provider selection must be migrated explicitly.")
