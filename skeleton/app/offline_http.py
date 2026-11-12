@@ -527,11 +527,9 @@ class OfflineHTTPApplication:
         rid = _identifier("request id", request["request_id"])
         budget = _budget(request, self.default_output_tokens)
         digest = _digest_request(text, GenerationConfig(max_new_tokens=budget))
-        # Evidence manifest identity is deliberately independent of the
-        # stricter SQLite turn-policy identity.
-        grounding_digest = grounded_request_digest(digest) if grounded else None
         if grounded:
-            digest = grounding_digest
+            digest = grounded_request_digest(digest)
+        # Runtime evidence and SQLite must attest the same strict policy.
         digest = _strict_context_digest(digest, strict)
         with self._lock:
             self._session(session_id)
@@ -551,8 +549,7 @@ class OfflineHTTPApplication:
                         422, "no local reference passages match this question"
                     )
                 manifest = prepare_evidence(
-                    text, grounding_digest, hits,
-                    self.model_digest, self.tokenizer_digest,
+                    text, digest, hits, self.model_digest, self.tokenizer_digest,
                 )
             try:
                 # Acquire only for NEW generation. Already committed historical
@@ -992,9 +989,11 @@ class OfflineHTTPApplication:
                         raise OfflineHTTPError(
                             422, "no local reference passages match this question"
                         )
-                    digest = grounded_request_digest(_digest_request(
-                        query, GenerationConfig(max_new_tokens=budget)
-                    ))
+                    digest = _strict_context_digest(
+                        grounded_request_digest(_digest_request(
+                            query, GenerationConfig(max_new_tokens=budget)
+                        )), strict,
+                    )
                     manifest = prepare_evidence(
                         query, digest, hits, self.model_digest, self.tokenizer_digest
                     )
