@@ -487,3 +487,74 @@ def test_async_unexpected_worker_exit_never_leaks_or_strands_local_chat(
         assert app._session(sid).revision == 1
     finally:
         app.close()
+
+
+def test_browser_live_self_test_proves_actual_native_and_committed_history(tmp_path):
+    """The web acceptance feature is backed by real, nonmocked local inference."""
+    import time
+    from hashlib import sha256
+    from skeleton.app.offline_http import OfflineHTTPApplication
+
+    model = native_model()
+    app = OfflineHTTPApplication(model, tmp_path / "browser-live.sqlite3", token="t" * 64)
+    try:
+        status, observed = app.dispatch("GET", "/v1/status")
+        assert status == 200
+        assert observed["ready"] is True and observed["local_only"] is True
+        assert observed["readiness_is_live_inference_proof"] is False
+        assert observed["model_digest"] == model.model_digest
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        rid = "actual-browser-native-selftest-2026"
+        status, accepted = app.submit_turn(sid, {
+            "request_id": rid,
+            "message": "Local inference acceptance: respond with one brief sentence about offline computing.",
+            "max_output_tokens": 2,
+            "grounded": False,
+        })
+        assert status == 202
+        assert accepted["request_id"] == rid
+        deadline = time.monotonic() + 30
+        while True:
+            observed_turn = app.turn_status(sid, rid)
+            if observed_turn["terminal"] and observed_turn["finished_at"] is not None:
+                break
+            assert time.monotonic() < deadline, "local native worker did not settle"
+            time.sleep(0.02)
+        assert observed_turn["state"] == "complete"
+        response = observed_turn["result"]
+        assert response["replayed"] is False
+        assert response["text"] and response["output_tokens"] >= 1
+        assert response["model_digest"] == model.model_digest
+        assert response["output_digest"] == sha256(response["text"].encode("utf-8")).hexdigest()
+        receipt = response["local_execution_receipt"]
+        assert receipt["model_digest"] == model.model_digest
+        assert receipt["output_sha256"] == response["output_digest"]
+        assert receipt["revision"] == 1
+        assert len(receipt["execution_receipt_digest"]) == 64
+        _, readback = app.dispatch("GET", "/v1/sessions/" + sid)
+        assert readback["revision"] == 1
+        assistant = [r["content"] for r in readback["messages"] if r["role"] == "assistant"]
+        assert assistant == [response["text"]]
+        # This is the exact immutable verification performed by the browser.
+        # It never asks a remote provider to manufacture an acceptance reply.
+    finally:
+        app.close()
+
+
+def test_browser_self_test_is_user_triggered_private_and_never_fake_ready():
+    from skeleton.app.offline_web import HTML, JAVASCRIPT
+    assert 'id="selftest-start"' in HTML
+    assert 'id="selftest-export"' in HTML
+    assert 'id="selftest-result"' in HTML
+    assert "addEventListener('click', () => run(startSelfTest))" in JAVASCRIPT
+    assert "const observed = await api('GET', '/v1/status')" in JAVASCRIPT
+    assert "const created = await api('POST', '/v1/sessions', {})" in JAVASCRIPT
+    assert "state.turn = await api('POST', '/v1/sessions/' + session_id + '/turns', body)" in JAVASCRIPT
+    assert "const saved = await api('GET', '/v1/sessions/' + claim.session_id)" in JAVASCRIPT
+    assert "crypto.subtle.digest('SHA-256', binary)" in JAVASCRIPT
+    assert "provider_fallback_used: false" in JAVASCRIPT
+    assert "operator_gguf_quality_certified: false" in JAVASCRIPT
+    assert "if (!state.connected || unresolved() || state.health?.ready !== true)" in JAVASCRIPT
+    # A successful HTTP health GET alone must never certify model generation.
+    assert JAVASCRIPT.index("const saved = await api('GET', '/v1/sessions/' + claim.session_id)") > JAVASCRIPT.index("async function completeSelfTest(")
