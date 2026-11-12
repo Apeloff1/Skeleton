@@ -188,8 +188,20 @@ def readiness(api: ChatApi) -> dict:
             raise ProbeFailure("Chat readiness is missing a required prerequisite.")
         code = entry.get("code")
         verdict[name] = {"ready": entry["available"], "code": code if isinstance(code, str) and re.fullmatch("[a-z0-9_]{1,96}", code) else "invalid"}
-    selectable = [entry for entry in models.get("models", [])
-                  if isinstance(entry, dict) and entry.get("available") is True and entry.get("selectable") is True]
+    catalog = models.get("models")
+    if not isinstance(catalog, list) or len(catalog) > 16:
+        raise ProbeFailure("The engine did not expose a bounded valid model list.")
+    selectable = [
+        entry for entry in catalog
+        if isinstance(entry, dict)
+        and entry.get("available") is True and entry.get("selectable") is True
+        and isinstance(entry.get("provider_id"), str)
+        and 0 < len(entry["provider_id"]) <= 128
+        and isinstance(entry.get("model_id"), str)
+        and 0 < len(entry["model_id"]) <= 256
+        and type(entry.get("max_output_tokens")) is int
+        and 0 < entry["max_output_tokens"] <= 1000000
+    ]
     return {
         "ready": reply.get("available") is True and all(entry["ready"] for entry in verdict.values()) and bool(selectable),
         "checks": verdict,
@@ -312,14 +324,17 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.timeout < 10 or args.timeout > 600 or not 1 <= len(args.prompt) <= 200:
             raise ProbeFailure("Timeout must be 10-600 seconds and the prompt must be 1-200 characters.")
+        recovery = bool(args.recover_thread or args.recover_request)
+        if recovery and (not args.recover_thread or not args.recover_request or args.exercise):
+            raise ProbeFailure("Recovery needs both --recover-thread and --recover-request, without --exercise.")
+        if recovery:
+            _identity(args.recover_thread)
+            _identity(args.recover_request)
         origin = backend_origin(args.base_url, allow_loopback_http=args.allow_loopback_http)
         api = ChatApi(origin, "")
         token = private_bearer_token(args.token_file) if args.token_file else interactive_login(api, args.login_email)
         api.token = token
-        recovery = bool(args.recover_thread or args.recover_request)
         if recovery:
-            if not args.recover_thread or not args.recover_request or args.exercise:
-                raise ProbeFailure("Recovery needs both --recover-thread and --recover-request, without --exercise.")
             identity = api.request("GET", "/api/auth/me")
             if identity.get("authenticated") is not True or not isinstance(identity.get("user"), dict):
                 raise ProbeFailure("Account authentication is required to recover a saved turn.")
