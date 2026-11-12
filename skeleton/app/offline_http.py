@@ -422,17 +422,33 @@ class OfflineHTTPApplication:
                 if cancel:
                     self._request_cancel(turn)
                 observed = turn.public()
-                if turn.state == "complete":
-                    return observed
             else:
                 observed = None
         # A peer may commit the turn before our worker has finalized its
-        # in-memory ticket. Prefer actual durable truth even for 'running'.
+        # in-memory ticket. Even a completed *local* ticket must revalidate
+        # its durable text and native execution sidecar before being claimed
+        # as committed, rather than trusting a stale in-memory snapshot.
         committed = self._read_committed_turn(
             session_id, rid,
             expected_request_digest=turn.request_digest if turn else None,
             observed=observed,
         )
+        if observed is not None and observed["state"] == "complete":
+            if committed is None or not isinstance(observed["result"], dict):
+                raise RuntimeContractError("completed local turn is missing its durable receipt")
+            original = observed["result"]
+            verified = committed["result"]
+            if (
+                original.get("revision") != verified["revision"]
+                or original.get("text") != verified["text"]
+                or original.get("output_digest") != verified["output_digest"]
+                or original.get("local_execution_receipt")
+                    != verified["local_execution_receipt"]
+            ):
+                raise RuntimeContractError("local ticket does not match committed runtime custody")
+            # Preserve the original execution's replayed=False marker after
+            # confirming the SQLite receipt. A read-after-restart is replayed.
+            return observed
         if committed is not None:
             return committed
         if observed is not None:
