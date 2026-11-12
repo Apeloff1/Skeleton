@@ -227,3 +227,76 @@ def test_cancel_and_invalid_requests_do_not_trip_native_circuit(tmp_path, monkey
         assert app._inference_circuit.status()["recent_runtime_failures"] == 0
     finally:
         app.close()
+
+
+def test_sync_exact_replay_remains_available_while_different_turn_runs(
+    tmp_path, monkeypatch,
+):
+    """An active native worker cannot starve committed SQLite replay."""
+    import threading
+    model = native_model()
+    app = OfflineHTTPApplication(model, tmp_path / "active-replay.sqlite3", token="x" * 64)
+    begin = threading.Event()
+    release = threading.Event()
+    failures = []
+    try:
+        _, session = app.dispatch("POST", "/v1/sessions", {})
+        sid = session["session_id"]
+        original = {
+            "message": "hello", "request_id": "already-committed",
+            "max_output_tokens": 2,
+        }
+        _, first = app.dispatch("POST", f"/v1/sessions/{sid}/turn", original)
+        real_perform = app._perform_turn
+
+        def blocked_perform(session_id, body, *, turn=None):
+            if body["request_id"] == "competing-live-turn":
+                begin.set()
+                if not release.wait(timeout=10):
+                    raise RuntimeError("test fixture release not signalled")
+            return real_perform(session_id, body, turn=turn)
+
+        monkeypatch.setattr(app, "_perform_turn", blocked_perform)
+
+        def run_new_turn():
+            try:
+                app.dispatch("POST", f"/v1/sessions/{sid}/turn", {
+                    "message": "world", "request_id": "competing-live-turn",
+                    "max_output_tokens": 2,
+                })
+            except BaseException as exc:
+                failures.append(exc)
+
+        worker = threading.Thread(target=run_new_turn)
+        worker.start()
+        assert begin.wait(timeout=5)
+        # Read-only idempotent replay does not wait for the live worker.
+        status, old = app.dispatch("POST", f"/v1/sessions/{sid}/turn", original)
+        assert status == 200 and old["replayed"] is True
+        assert old["output_digest"] == first["output_digest"]
+        with pytest.raises(OfflineHTTPError) as concurrent:
+            app.dispatch("POST", f"/v1/sessions/{sid}/turn", {
+                "message": "another", "request_id": "competing-third-turn",
+                "max_output_tokens": 2,
+            })
+        assert concurrent.value.status == 409
+    finally:
+        release.set()
+        if "worker" in locals():
+            worker.join(timeout=12)
+            assert not worker.is_alive()
+        app.close()
+    assert not failures
+
+
+def test_offline_workspace_displays_real_model_health_not_just_connected_socket():
+    """New work is gated by measured readiness; saved sessions remain selectable."""
+    from skeleton.app.offline_web import HTML, JAVASCRIPT
+
+    assert 'id="health-refresh"' in HTML
+    assert "async function refreshHealth()" in JAVASCRIPT
+    assert "'local_execution_circuit_open'" in JAVASCRIPT
+    assert "state.health?.ready !== true" in JAVASCRIPT
+    assert "LOCAL • DEGRADED" in JAVASCRIPT
+    assert "No hosted fallback" in JAVASCRIPT or "no hosted fallback" in JAVASCRIPT
+    assert "get('retry-turn').disabled = locked || working" in JAVASCRIPT
