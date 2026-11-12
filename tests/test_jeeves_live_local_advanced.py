@@ -36,7 +36,7 @@ def test_real_offline_model_generates_across_loopback_http_then_recovers_sqlite(
     assert report["hosted_provider_used"] is False
     assert report["model_id"] == model.model_id
     assert report["model_digest"] == model.model_digest
-    assert report["actual_model_turns"] == 2
+    assert report["actual_model_turns"] == 3
     assert report["durable_recovery_verified"] is True
     assert report["read_only_replay_verified"] is True
     assert report["context_continuation_verified"] is True
@@ -44,12 +44,17 @@ def test_real_offline_model_generates_across_loopback_http_then_recovers_sqlite(
     assert report["committed_request_rewrite_denied"] is True
     assert report["competing_local_service_inference_denied"] is True
     assert report["denied_peer_request_committed_after_restart"] is True
+    assert report["strict_full_history_preview_verified"] is True
+    assert report["strict_full_history_real_generation_verified"] is True
+    assert report["strict_context_policy_idempotency_fence_verified"] is True
+    assert len(report["run_3_output_sha256"]) == 64
+    assert len(report["run_3_execution_receipt_sha256"]) == 64
     assert report["protected_backend_verified"] is False
     assert report["mobile_device_verified"] is False
     assert report["underlying_model_quality_certified"] is False
     assert len(report["run_1_output_sha256"]) == 64
     assert len(report["run_2_output_sha256"]) == 64
-    assert len(report["turn_metrics"]) == 2
+    assert len(report["turn_metrics"]) == 3
     assert all(r["actual_output_tokens"] == 2 for r in report["turn_metrics"])
 
 
@@ -201,7 +206,7 @@ def test_advanced_qualification_reports_context_preflight_not_cryptographic_gene
     result = _qualify_actual_local_http(native_model(), timeout_seconds=45, output_tokens=2)
     assert result["context_preflight_history_retained"] is True
     assert result["context_preflight_is_generation_proof"] is False
-    assert result["actual_model_turns"] == 2
+    assert result["actual_model_turns"] == 3
 
 
 
