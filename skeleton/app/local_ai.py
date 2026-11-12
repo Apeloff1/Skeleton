@@ -488,6 +488,9 @@ class DurableOfflineAISession(OfflineAISession):
                 prompt_tokens=answer.input_tokens,
                 generated_tokens=answer.output_tokens,
                 evidence_manifest=evidence_manifest,
+                # One real native/GGUF execution receipt, committed in the
+                # SAME transaction as the actual assistant response.
+                execution_receipt_digest=answer.execution_receipt_digest,
             )
             if committed.replayed:
                 # Another process won this request ID while our model ran.
