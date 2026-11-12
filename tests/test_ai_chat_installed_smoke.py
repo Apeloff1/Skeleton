@@ -197,3 +197,33 @@ def test_recovery_arguments_are_both_required_before_secret_is_read(monkeypatch)
         "--recover-thread", "thread-1",
     ]) == 2
     assert calls == []
+
+
+
+def test_interactive_login_refuses_headless_password_echo(monkeypatch):
+    class HeadlessInput:
+        def isatty(self):
+            return False
+
+    monkeypatch.setattr(smoke.sys, "stdin", HeadlessInput())
+    monkeypatch.setattr(smoke, "getpass", lambda _: pytest.fail("password prompt must not echo"))
+    api = FakeApi()
+    with pytest.raises(smoke.ProbeFailure, match="private terminal"):
+        smoke.interactive_login(api, "owner@example.org")
+    assert api.calls == []
+
+
+def test_interactive_login_cancellation_is_sanitized(monkeypatch):
+    class PrivateTerminal:
+        def isatty(self):
+            return True
+
+    monkeypatch.setattr(smoke.sys, "stdin", PrivateTerminal())
+
+    def cancelled(_):
+        raise KeyboardInterrupt("private-account-password")
+
+    monkeypatch.setattr(smoke, "getpass", cancelled)
+    with pytest.raises(smoke.ProbeFailure, match="was cancelled") as result:
+        smoke.interactive_login(FakeApi(), "owner@example.org")
+    assert "private-account-password" not in str(result.value)
