@@ -123,7 +123,7 @@ class TestLocalAIGGUFCustody(unittest.TestCase):
             return payload
 
         with patch.object(model_loader.os, "read", side_effect=replacing_read):
-            with self.assertRaisesRegex(OSError, "replaced during verification|path changed|path rebound"):
+            with self.assertRaisesRegex(OSError, "changed during verification|replaced during verification|path changed|path rebound"):
                 loader.load(_CAS)
         self.assertTrue(replaced)
         self.assertFalse(loader.loaded)
