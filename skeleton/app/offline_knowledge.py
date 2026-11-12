@@ -374,16 +374,30 @@ class OfflineKnowledgeLibrary:
                 }
         raise RuntimeContractError("unknown local reference document")
 
-    def search(self, query: str, *, limit: int = 6) -> list[dict[str, Any]]:
+    def search(self, query: str, *, limit: int = 6,
+               document_ids: tuple[str, ...] | list[str] | None = None
+               ) -> list[dict[str, Any]]:
         if (not isinstance(query, str) or not query.strip()
                 or len(query.encode("utf-8")) > MAX_QUERY_BYTES):
             raise RuntimeContractError("invalid local reference query")
         if type(limit) is not int or not 1 <= limit <= 12:
             raise RuntimeContractError("invalid reference search limit")
+        # Do not fall back to the entire library if an explicitly selected
+        # source was withdrawn, deleted or belongs to another model identity.
+        from .offline_grounding import normalized_document_scope
+        selected = normalized_document_scope(document_ids)
         terms = _terms(query)
+        if not terms and selected is None:
+            return []
+        documents, records = self._verified_snapshot()
+        if selected is not None:
+            known = {row[0] for row in documents}
+            if not set(selected).issubset(known):
+                raise RuntimeContractError("selected local grounding source is unavailable")
+            selected_set = set(selected)
+            records = [row for row in records if row[0] in selected_set]
         if not terms:
             return []
-        _, records = self._verified_snapshot()
         corpus: list[tuple[tuple[Any, ...], set[str], dict[str, int]]] = []
         df = {term: 0 for term in terms}
         for row in records:

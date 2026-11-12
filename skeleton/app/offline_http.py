@@ -56,7 +56,7 @@ from skeleton.app.offline_reference_write import (
 )
 from skeleton.app.offline_grounding import (
     audit_answer_citations, audit_answer_faithfulness, grounded_request_digest,
-    prepare_evidence,
+    normalized_document_scope, scoped_grounded_request_digest, prepare_evidence,
 )
 
 
@@ -131,6 +131,17 @@ def _budget(body: dict[str, Any], default: int) -> int:
     if type(value) is not int or not 1 <= value <= 8192:
         raise OfflineHTTPError(400, "invalid model output token budget")
     return value
+
+
+def _document_scope(body: dict[str, Any], grounded: bool) -> tuple[str, ...] | None:
+    if "document_ids" not in body:
+        return None
+    if type(body["document_ids"]) is not list or not grounded:
+        raise OfflineHTTPError(400, "explicit source selection requires grounded chat")
+    try:
+        return normalized_document_scope(body["document_ids"])
+    except RuntimeContractError:
+        raise OfflineHTTPError(400, "invalid bounded document selection") from None
 
 
 class OfflineHTTPApplication:
@@ -248,7 +259,7 @@ class OfflineHTTPApplication:
     @staticmethod
     def _turn_identity(request: dict[str, Any], default_budget: int) -> tuple[str, str]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history"},
+                          "require_full_history", "document_ids"},
                 {"message", "request_id"})
         message = request["message"]
         if (not isinstance(message, str) or not message.strip()
@@ -260,6 +271,7 @@ class OfflineHTTPApplication:
         strict = request.get("require_full_history", False)
         if type(strict) is not bool:
             raise OfflineHTTPError(400, "require_full_history must be a boolean")
+        document_ids = _document_scope(request, grounded)
         if grounded and len(message.strip().encode("utf-8")) > 1024:
             raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
         rid = _identifier("request id", request["request_id"])
@@ -268,6 +280,7 @@ class OfflineHTTPApplication:
         ))
         if grounded:
             digest = grounded_request_digest(digest)
+            digest = scoped_grounded_request_digest(digest, document_ids)
         return rid, _strict_context_digest(digest, strict)
 
     def submit_turn(self, session_id: str, body: dict[str, Any]) -> tuple[int, Any]:
@@ -496,7 +509,7 @@ class OfflineHTTPApplication:
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history"},
+                          "require_full_history", "document_ids"},
                 {"message", "request_id"})
         grounded = request.get("grounded", False)
         strict = request.get("require_full_history", False)
@@ -504,6 +517,7 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(400, "grounded must be a boolean")
         if type(strict) is not bool:
             raise OfflineHTTPError(400, "require_full_history must be a boolean")
+        document_ids = _document_scope(request, grounded)
         text = request["message"]
         if (not isinstance(text, str) or not text.strip()
                 or len(text.encode("utf-8", errors="strict")) > 4096):
@@ -514,6 +528,7 @@ class OfflineHTTPApplication:
         digest = _digest_request(text, GenerationConfig(max_new_tokens=budget))
         if grounded:
             digest = grounded_request_digest(digest)
+            digest = scoped_grounded_request_digest(digest, document_ids)
         # The citation manifest, execution request and durable receipt must
         # bind the same final strict/legacy idempotency identity.
         digest = _strict_context_digest(digest, strict)
@@ -544,7 +559,10 @@ class OfflineHTTPApplication:
             if grounded:
                 if len(text.encode("utf-8")) > 1024:
                     raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
-                hits = self.knowledge.search(text, limit=2)
+                try:
+                    hits = self.knowledge.search(text, limit=2, document_ids=document_ids)
+                except RuntimeContractError:
+                    raise OfflineHTTPError(422, "selected local reference unavailable") from None
                 if not hits:
                     raise OfflineHTTPError(
                         422, "no local reference passages match this question"
@@ -569,6 +587,8 @@ class OfflineHTTPApplication:
                         text, max_output_tokens=budget, request_id=rid,
                         evidence_manifest=manifest,
                         require_full_history=strict,
+                        **({"document_ids": document_ids}
+                           if document_ids is not None else {}),
                     )
                 try:
                     generated_answer = asyncio.run(generate())
@@ -854,10 +874,17 @@ class OfflineHTTPApplication:
             except (ReferenceReadRejected, ReferenceWriteRejected, LocalJobRejected) as exc:
                 raise OfflineHTTPError(400, str(exc)) from exc
         if path == "/v1/knowledge/search" and method == "POST":
-            _fields(body, {"query", "limit"}, {"query"})
-            return 200, {"hits": self.knowledge.search(
-                body["query"], limit=body.get("limit", 6)
-            )}
+            _fields(body, {"query", "limit", "document_ids"}, {"query"})
+            scope = _document_scope(body, True)
+            try:
+                hits = self.knowledge.search(
+                    body["query"], limit=body.get("limit", 6),
+                    document_ids=scope,
+                )
+            except RuntimeContractError:
+                raise OfflineHTTPError(422, "selected local reference unavailable") from None
+            return 200, {"hits": hits, **({"document_scope": list(scope)}
+                                          if scope is not None else {})}
         if path.startswith("/v1/knowledge/documents/") and method in {"GET", "DELETE"}:
             document_id = path[len("/v1/knowledge/documents/"):]
             if method == "GET":
@@ -948,7 +975,7 @@ class OfflineHTTPApplication:
             # Local-only read-only estimate; the actual new turn still
             # validates full-history retention and GGUF native admission.
             _fields(body, {"message", "max_output_tokens", "grounded",
-                           "require_full_history"}, {"message"})
+                           "require_full_history", "document_ids"}, {"message"})
             message = body["message"]
             if (not isinstance(message, str) or not message.strip()
                     or len(message.encode("utf-8")) > 4096):
@@ -957,6 +984,7 @@ class OfflineHTTPApplication:
             strict = body.get("require_full_history", True)
             if type(grounded) is not bool or type(strict) is not bool:
                 raise OfflineHTTPError(400, "context policy must be boolean")
+            document_ids = _document_scope(body, grounded)
             if grounded and len(message.strip().encode("utf-8")) > 1024:
                 raise OfflineHTTPError(400, "grounded preview exceeds 1024 bytes")
             budget = _budget(body, self.default_output_tokens)
@@ -966,15 +994,22 @@ class OfflineHTTPApplication:
                 manifest = None
                 if grounded:
                     query = message.strip()
-                    hits = self.knowledge.search(query, limit=2)
+                    try:
+                        hits = self.knowledge.search(
+                            query, limit=2, document_ids=document_ids,
+                        )
+                    except RuntimeContractError:
+                        raise OfflineHTTPError(422, "selected local reference unavailable") from None
                     if not hits:
                         raise OfflineHTTPError(
                             422, "no local reference passages match this question"
                         )
                     digest = _strict_context_digest(
-                        grounded_request_digest(_digest_request(
-                            query, GenerationConfig(max_new_tokens=budget)
-                        )), strict,
+                        scoped_grounded_request_digest(
+                            grounded_request_digest(_digest_request(
+                                query, GenerationConfig(max_new_tokens=budget)
+                            )), document_ids,
+                        ), strict,
                     )
                     manifest = prepare_evidence(
                         query, digest, hits, self.model_digest, self.tokenizer_digest
@@ -993,6 +1028,7 @@ class OfflineHTTPApplication:
                     report["session_id"] = sid
                     report["session_revision"] = saved.revision
                     report["grounded"] = grounded
+                    report["document_scope"] = list(document_ids) if document_ids else None
                     report["require_full_history"] = strict
                     report["may_submit_under_policy"] = (
                         report["fits_full_history"] or not strict
