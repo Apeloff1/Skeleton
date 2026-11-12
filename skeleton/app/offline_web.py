@@ -1307,20 +1307,29 @@ JAVASCRIPT = r"""'use strict';
       modality: 'crawler-excerpt', title: 'Dragon ' + source.id.slice(0, 30),
       observation: excerpt.text, observation_sha256,
       source_sha256: source.digest, reviewed: true,
+      source_span: {start: excerpt.start,
+        end: excerpt.start + excerpt.length, unit: 'unicode_code_points'},
     });
     if (epoch !== state.epoch) return;
     if (receipt.reviewed !== true || receipt.advisory_only !== true
       || receipt.primary_model_unchanged !== true
       || receipt.generation_performed !== false
       || receipt.remote_provider_called !== false
-      || receipt.observation_sha256 !== observation_sha256) {
+      || receipt.observation_sha256 !== observation_sha256
+      || receipt.source_span_authority !== 'caller-declared-not-source-reverified'
+      || receipt.source_span?.start !== excerpt.start
+      || receipt.source_span?.end !== excerpt.start + excerpt.length
+      || receipt.source_span?.unit !== 'unicode_code_points') {
       throw new Error('Jeeves advisory did not return a valid local custody receipt.');
     }
     get('dragon-bundle-review').checked = false;
     get('dragon-bundle-receipt').textContent =
       'Admitted verified observation ' + receipt.observation_sha256.slice(0, 20) +
-      '… into the private reference library. Source rights require revalidation. ' +
-      'Grounding is not enabled until you explicitly select it for a new turn.';
+      '… (declared span ' + receipt.source_span.start + '–' +
+      receipt.source_span.end + ' Unicode code points). Saved into the private ' +
+      'reference library. The source span is caller-declared, not independently ' +
+      'source-reverified; source rights still require revalidation. Grounding ' +
+      'is not enabled until you explicitly select it for a new turn.';
     await loadDocuments();
     status('Reviewed Dragon excerpt admitted locally as untrusted text, not as a second model or approved fact.');
   }));
