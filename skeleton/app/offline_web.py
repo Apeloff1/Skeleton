@@ -1080,6 +1080,8 @@ JAVASCRIPT = r"""'use strict';
   function clearDragonBundle() {
     state.dragonBundle = []; state.dragonBundleSession = ''; state.dragonExcerpt = null;
     get('dragon-bundle-review').checked = false;
+    get('dragon-excerpt-start').value = '0';
+    get('dragon-excerpt-length').value = '1500';
     get('dragon-bundle-source').replaceChildren();
     get('dragon-bundle-preview').textContent = 'No verified historical source text loaded.';
     get('dragon-bundle-receipt').textContent = 'Nothing imported.';
