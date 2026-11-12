@@ -295,3 +295,46 @@ cooldown, real native/SQLite replay during an open circuit, actual
 backend-error injection and cancellation non-escalation. These tests
 validate execution-plumbing behavior, **not** model-language quality,
 operator GGUF speed, independent protected-backend quorum or handset AI.
+
+
+## 2026 local execution custody: independent service-process safety
+
+The standalone authenticated Jeeves HTTP service now uses an additional
+**OS-backed, cross-process inference lease**. Each private SQLite workspace
+has one persistent `<database>.inference.lock` sidecar. Before a **new** native
+or GGUF generation, the service acquires a non-blocking exclusive operating
+system lock. It retains ownership from the pre-generation request replay
+check through model execution, SQLite commit and local receipt verification.
+This is separate from the in-process admission counter and failure circuit.
+
+- A concurrent service against the same private database receives **HTTP
+  423 Locked** (or a failed asynchronous ticket with a stable sanitized busy
+  category), **without executing a second model** and without mutating
+  the conversation. Exact previously committed requests remain readable.
+- POSIX uses a descriptor-backed `flock`; Windows uses `msvcrt`
+  non-blocking byte-range locking. A process kill closes its descriptor,
+  so it cannot leave a dead-process PID lease indefinitely blocking chat.
+  Do not delete the lock marker during normal operations: another process
+  could still hold the old inode, defeating exclusivity.
+- Lockfiles must be owned private regular files with one hard link and an
+  exact one-byte, nonsensitive marker. Symbolic/hard links, unsafe POSIX
+  permissions, replacement of an inode while acquiring it, or unprotected
+  shared parent directories fail closed. The marker contains **no prompts,
+  credentials, model paths, process identifiers, or user conversation data**.
+- The lock is **single-host and local-filesystem only**. It is not a
+  distributed leader-election service or proof of correct NFS/SMB locking.
+  Run the SQLite database and lock marker together on a trusted local disk.
+  A different database may have a different local inference workload; this
+  mechanism is not a global GPU scheduler or substitute for hardware
+  resource admission.
+- The `tests/test_jeeves_local_lease.py` suite exercises independent
+  in-process owners, a **real child process** holding the kernel lock,
+  immediate recovery after killing that process, unsafe lockfile attacks,
+  and an actual native model committing/replaying an answer after peer
+  contention. The source CI includes these tests, but running them does
+  not certify operator GGUF, protected bootstrap, Windows installer or
+  disconnected-phone inference.
+
+This is **fail-closed execution ownership**, not an invitation to start a
+second unreviewed Jeeves model, bypass a held merge/release gate, or claim
+a remotely hosted fallback exists.
