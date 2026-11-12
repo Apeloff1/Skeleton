@@ -47,6 +47,7 @@ HTML = r"""<!doctype html>
       <input type="file" id="knowledge-file" multiple accept=".txt,.md,.py,.js,.ts,.json,.toml,.yaml,.yml,.csv,text/plain,text/markdown">
       <div id="knowledge-documents" class="knowledge-documents" aria-label="Imported references"></div>
       <p id="knowledge-scope-status" class="hint" role="status">Grounding scope: all saved references. Select up to 8 for an explicit local source restriction.</p>
+      <button id="knowledge-scope-reset" class="small secondary" type="button">Explicitly use all references</button>
       <details id="dragon-bundle-panel">
         <summary>Import approved Dragon evidence (local only)</summary>
         <p class="hint">Select a previously exported Dragon authorized-source bundle. Its source bodies are untrusted, and past capture rights do not prove present rights. No network crawl, hosted model or publication is performed here.</p>
@@ -208,6 +209,7 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 [hidden]{display:none!important}.turn-progress{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#1c2943;border-bottom:1px solid #35466b;padding:12px 24px;font-size:12px}.turn-progress #turn-label{flex:1}.transcript-tools{display:flex;gap:8px;justify-content:center;margin:8px}.message-actions{display:flex;gap:7px;margin-top:12px;white-space:normal}.instructions{margin:12px 0;color:#b8c9e9;font-size:12px}.instructions textarea{width:100%;margin-top:9px;color:#eff2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:8px}.sidebar input[type=search]{min-width:0;flex:1;width:100%;color:#eef2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:9px}.reference-name{text-align:left;padding:4px;border:0;background:transparent;font-size:11px;overflow-wrap:anywhere}.session small:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}dialog{width:min(850px,94vw);max-height:86vh;overflow:auto;background:#131d2d;color:#ebf1ff;border:1px solid #526a95;border-radius:14px;padding:22px}dialog::backdrop{background:#000a}dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;background:#0b1321;padding:15px;border-radius:9px}dialog .hint{overflow-wrap:anywhere}:focus-visible{outline:2px solid #a1c1ff;outline-offset:3px}
 
 .context-report{font-size:12px;background:#18243a;border-top:1px solid #34415d;color:#c6ddf7;padding:8px 24px;overflow-wrap:anywhere}.context-report.warning{color:#ffd6a0;background:#302622}
+.knowledge-section #knowledge-scope-status.warning{color:#ffd6a0;background:#302622;border-radius:6px;padding:7px}
 .grounding-preview{margin:7px auto;padding:11px;max-width:860px;width:calc(100% - 48px);background:#14243a;border:1px solid #415572;border-radius:9px}.grounding-preview summary{cursor:pointer;font-size:13px;font-weight:650}.grounding-preview .grounding-passage{padding:11px;background:#0e1829;border-radius:7px;border:1px solid #31445e;margin-top:10px;overflow-wrap:anywhere}.grounding-preview .grounding-passage pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:240px;overflow:auto}.grounding-preview .grounding-passage code{font-size:11px;overflow-wrap:anywhere}
 .selftest-panel{margin:9px auto 4px;width:calc(100% - 50px);max-width:870px;padding:12px 15px;border:1px solid #344a68;border-radius:10px;background:#17253a;color:#d9e6fc;font-size:12px}.selftest-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;color:#c8e8d6;font-size:12px}.selftest-panel button{width:auto}
 .shell{height:100vh;height:100dvh;overflow:hidden}.sidebar{min-height:0;height:100%;overflow-y:auto}.main{height:100%;min-height:0}.messages{overscroll-behavior:contain}.intro{flex-shrink:1;overflow:auto}.mobile-only,.sidebar-scrim{display:none}.bottom input[type=checkbox]{width:auto}.turn-progress #turn-elapsed{font-variant-numeric:tabular-nums}.knowledge-record .reference-name{min-width:0;flex-shrink:1;flex:1}.brand #sidebar-close{margin-left:auto}
@@ -228,7 +230,8 @@ JAVASCRIPT = r"""'use strict';
     writePending: null, writeRequest: '',
     selfTest: null, selfTestReport: null,
     dragonBundle: [], dragonBundleSession: '', dragonExcerpt: null,
-    selectedKnowledgeIds: new Set(),
+    selectedKnowledgeIds: new Set(), availableKnowledgeIds: new Set(),
+    knowledgeScopeMode: 'all', knowledgeScopeVersion: 0, knowledgeListRequest: 0,
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
     network: new AbortController(), resourceTimer: null, longformSourceId: null,
     longformWork: null, longformPendingRequest: null,
@@ -330,7 +333,12 @@ JAVASCRIPT = r"""'use strict';
     });
     ['prompt', 'budget', 'grounded'].forEach(id => {get(id).disabled = locked || working;});
     get('send').disabled = locked || working || !state.session || state.health?.ready !== true;
-    get('context-preview').disabled = locked || working || !state.session;
+    const scopeBlocked = get('grounded').checked && state.knowledgeScopeMode === 'selected' &&
+      (state.selectedKnowledgeIds.size === 0 ||
+        [...state.selectedKnowledgeIds].some(id => !state.availableKnowledgeIds.has(id)));
+    if (scopeBlocked) get('send').disabled = true;
+    get('context-preview').disabled = locked || working || !state.session || scopeBlocked;
+    get('knowledge-scope-reset').disabled = locked || working;
     document.querySelectorAll('.knowledge-scope-picker').forEach(node => {
       node.disabled = locked || working;
     });
@@ -396,7 +404,9 @@ JAVASCRIPT = r"""'use strict';
     get('dragon-bundle-preview').textContent = 'Select a Dragon source bundle to review its exact text.';
     get('dragon-bundle-receipt').textContent = 'Nothing imported.';
     get('dragon-bundle-review').checked = false;
-    state.selectedKnowledgeIds.clear();
+    state.selectedKnowledgeIds.clear(); state.availableKnowledgeIds.clear();
+    state.knowledgeScopeMode = 'all'; state.knowledgeScopeVersion++;
+    state.knowledgeListRequest++;
     get('knowledge-documents').replaceChildren();
     get('knowledge-scope-status').textContent = 'Grounding scope: all saved references.';
     get('selftest-panel').hidden = true;
@@ -608,9 +618,9 @@ JAVASCRIPT = r"""'use strict';
     const result = await api('GET', '/v1/sessions/' + id);
     if (current !== id) {
       state.turn = null; state.pending = null; stopPolling();
-      state.selectedKnowledgeIds.clear();
-      get('knowledge-scope-status').textContent = 'Grounding scope: all saved references.';
-      document.querySelectorAll('.knowledge-scope-picker').forEach(node => {node.checked = false;});
+      // Preserve the explicit source restriction across conversations.
+      // Only the operator's reset control may broaden grounding.
+      knowledgeScopeStatus();
     }
     state.session = result.session_id; state.revision = result.revision;
     state.messages = result.messages; state.evidence = result.evidence || []; state.audits = result.citation_audits || [];
@@ -813,7 +823,8 @@ JAVASCRIPT = r"""'use strict';
     if (!state.session) throw new Error('Select a conversation first.');
     const epoch = state.epoch;
     const revision = state.revision;
-    const scope = grounded ? Array.from(state.selectedKnowledgeIds).sort() : [];
+    const scopeVersion = state.knowledgeScopeVersion;
+    const scope = selectedGroundingScope(grounded);
     const payload = await api('POST', '/v1/sessions/' + state.session + '/context-preview', {
       message, max_output_tokens, grounded, require_full_history,
       ...(scope.length ? {document_ids: scope} : {}),
@@ -826,9 +837,8 @@ JAVASCRIPT = r"""'use strict';
       payload.require_full_history !== require_full_history ||
       payload.grounded !== grounded ||
       JSON.stringify(payload.document_scope) !== JSON.stringify(scope.length ? scope : null) ||
-      JSON.stringify(scope) !== JSON.stringify(
-        grounded ? Array.from(state.selectedKnowledgeIds).sort() : []
-      )) {
+      scopeVersion !== state.knowledgeScopeVersion ||
+      JSON.stringify(scope) !== JSON.stringify(selectedGroundingScope(grounded))) {
       throw new Error('The local context preview is stale or its model identity changed.');
     }
     const report = get('context-report');
@@ -933,7 +943,8 @@ JAVASCRIPT = r"""'use strict';
     } else {
       const message = get('prompt').value.trim();
       const grounded = get('grounded').checked;
-      const document_ids = grounded ? Array.from(state.selectedKnowledgeIds).sort() : [];
+      const document_ids = selectedGroundingScope(grounded);
+      const scopeVersion = state.knowledgeScopeVersion;
       const require_full_history = get('context-preserve').checked;
       const max_output_tokens = Number(get('budget').value);
       if (!message || bytes(message) > (grounded ? 1024 : 4096)) throw new Error(grounded ? 'Evidence questions must be 1–1024 UTF-8 bytes.' : 'Messages must be 1–4096 UTF-8 bytes.');
@@ -944,9 +955,9 @@ JAVASCRIPT = r"""'use strict';
         if (preview.may_submit_under_policy !== true)
           throw new Error('Full transcript exceeds the local model window. No inference was submitted.');
       }
-      if (JSON.stringify(document_ids) !== JSON.stringify(
-        grounded ? Array.from(state.selectedKnowledgeIds).sort() : []
-      )) throw new Error('Grounding selection changed during preflight. Preview again.');
+      if (scopeVersion !== state.knowledgeScopeVersion ||
+          JSON.stringify(document_ids) !== JSON.stringify(selectedGroundingScope(grounded)))
+        throw new Error('Grounding selection changed during preflight. Preview again.');
       request = {session_id: state.session, message, grounded, max_output_tokens,
         require_full_history,
         ...(document_ids.length ? {document_ids} : {}),
@@ -976,21 +987,60 @@ JAVASCRIPT = r"""'use strict';
       throw error;
     } finally {if (epoch === state.epoch) updateControls();}
   }
+  // Selected-only mode must remain selected even when the last source is
+  // removed or withdrawn; an empty selection is a blocking state.
+  function selectedGroundingScope(grounded) {
+    if (!grounded || state.knowledgeScopeMode === 'all') return [];
+    const scope = [...state.selectedKnowledgeIds].sort();
+    if (!scope.length) throw new Error(
+      'No local references selected. Choose sources or explicitly use all.');
+    if (scope.length > 8 || scope.some(id => !state.availableKnowledgeIds.has(id)))
+      throw new Error(
+        'Previously selected source is unavailable. Re-select sources or explicitly use all.');
+    return scope;
+  }
   function knowledgeScopeStatus() {
     const count = state.selectedKnowledgeIds.size;
-    get('knowledge-scope-status').textContent = count ?
-      'Grounding restricted to exactly ' + count +
-        ' approved local document(s) (max 8). Selection changes force new inference identity.' :
-      'Grounding scope: all saved references. Select 1–8 for explicit source filtering.';
+    const missing = [...state.selectedKnowledgeIds].filter(id =>
+      !state.availableKnowledgeIds.has(id)).length;
+    const blocked = state.knowledgeScopeMode === 'selected' && (!count || !!missing);
+    const label = get('knowledge-scope-status');
+    label.classList.toggle('warning', blocked);
+    label.textContent = state.knowledgeScopeMode === 'all' ?
+      'Grounding scope: all local references (operator-selected unrestricted mode).' :
+      missing ? 'SOURCE SCOPE BLOCKED: ' + missing +
+        ' selected source(s) unavailable; no fallback to all documents.' :
+      count === 0 ? 'SOURCE SCOPE BLOCKED: select a source, or explicitly use all.' :
+      'Grounding restricted to ' + count + ' selected local document(s) (max 8).';
   }
+  function knowledgeScopeChanged() {
+    state.knowledgeScopeVersion++;
+    knowledgeScopeStatus();
+    invalidateContextPreview();
+    updateControls();
+  }
+  get('knowledge-scope-reset').addEventListener('click', () => {
+    if (!state.connected || state.busy || unresolved()) return;
+    state.knowledgeScopeMode = 'all';
+    state.selectedKnowledgeIds.clear();
+    document.querySelectorAll('.knowledge-scope-picker').forEach(el => {el.checked = false;});
+    knowledgeScopeChanged();
+    status('Grounding explicitly widened to all private local references.');
+  });
   async function loadDocuments() {
+    const epoch = state.epoch, request = ++state.knowledgeListRequest;
     const payload = await api('GET', '/v1/knowledge/documents');
+    if (epoch !== state.epoch || request !== state.knowledgeListRequest || !state.connected) return;
+    if (!payload || !Array.isArray(payload.documents))
+      throw new Error('The local reference inventory is invalid.');
     const known = new Set(payload.documents.map(doc => doc.document_id));
-    for (const id of state.selectedKnowledgeIds) {
-      if (!known.has(id)) {
-        state.selectedKnowledgeIds.delete(id);
-        invalidateContextPreview();
-      }
+    const prior = state.availableKnowledgeIds;
+    state.availableKnowledgeIds = known;
+    // Do not erase a selected ID just because it vanished: this would
+    // silently broaden the next grounded question to other references.
+    if (prior.size !== known.size || [...known].some(id => !prior.has(id))) {
+      state.knowledgeScopeVersion++;
+      invalidateContextPreview();
     }
     knowledgeScopeStatus();
     const view = get('knowledge-documents'); view.replaceChildren();
@@ -1027,7 +1077,8 @@ JAVASCRIPT = r"""'use strict';
         } else {
           state.selectedKnowledgeIds.delete(doc.document_id);
         }
-        knowledgeScopeStatus(); invalidateContextPreview();
+        state.knowledgeScopeMode = 'selected';
+        knowledgeScopeChanged();
       });
       const remove = document.createElement('button'); remove.className = 'danger'; remove.textContent = 'Remove';
       remove.addEventListener('click', () => run(async () => {
@@ -1037,6 +1088,7 @@ JAVASCRIPT = r"""'use strict';
       }));
       row.append(scopeLabel, open, remove); view.append(row);
     });
+    updateControls();
   }
   get('sidebar-toggle').addEventListener('click', () => sidebar(!get('shell').classList.contains('library-open')));
   get('sidebar-close').addEventListener('click', () => sidebar(false, true));
@@ -1473,7 +1525,7 @@ JAVASCRIPT = r"""'use strict';
 
   get('knowledge-search').addEventListener('click', () => run(async () => {
     const query = get('knowledge-query').value.trim(); if (!query) throw new Error('Enter a reference search query.');
-    const document_ids = Array.from(state.selectedKnowledgeIds).sort();
+    const document_ids = selectedGroundingScope(true);
     const result = await api('POST', '/v1/knowledge/search', {
       query, limit: 6, ...(document_ids.length ? {document_ids} : {}),
     });

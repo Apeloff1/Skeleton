@@ -230,9 +230,91 @@ def test_scope_controls_are_wired_to_local_browser_without_persistent_account_st
         "document_scope",
         "document_ids",
         "JSON.stringify(original.document_ids || [])",
-        "const scope = grounded ? Array.from(state.selectedKnowledgeIds).sort()",
+        "const scope = selectedGroundingScope(grounded)",
         "row.append(scopeLabel, open, remove)",
     ):
         assert snippet in JAVASCRIPT
     assert "localStorage" not in JAVASCRIPT
     assert "sessionStorage" not in JAVASCRIPT
+
+
+def test_missing_source_browser_scope_is_tombstoned_instead_of_implicitly_widening():
+    """The actual UI source owner keeps vanished selections until explicit reset."""
+    from skeleton.app.offline_web import HTML, JAVASCRIPT
+    assert 'id="knowledge-scope-reset"' in HTML
+    assert 'id="knowledge-scope-status"' in HTML
+    assert "knowledgeScopeMode: 'all'" in JAVASCRIPT
+    assert "state.knowledgeScopeMode = 'selected';" in JAVASCRIPT
+    assert "state.knowledgeScopeMode = 'all';" in JAVASCRIPT
+    assert "state.availableKnowledgeIds = known;" in JAVASCRIPT
+    assert "SOURCE SCOPE BLOCKED" in JAVASCRIPT
+    assert "no fallback to all documents" in JAVASCRIPT
+    assert "selectedGroundingScope(grounded)" in JAVASCRIPT
+    assert "selectedGroundingScope(true)" in JAVASCRIPT
+    assert "scopeVersion !== state.knowledgeScopeVersion" in JAVASCRIPT
+    assert "state.knowledgeListRequest" in JAVASCRIPT
+    assert "request !== state.knowledgeListRequest" in JAVASCRIPT
+    assert "scopeSelectionChanged" not in JAVASCRIPT
+    assert "knowledgeScopeChanged()" in JAVASCRIPT
+    # Source inventory updates must never silently delete selected IDs.
+    start = JAVASCRIPT.index("  async function loadDocuments() {")
+    stop = JAVASCRIPT.index("  get('sidebar-toggle').addEventListener", start)
+    loader = JAVASCRIPT[start:stop]
+    assert "state.selectedKnowledgeIds.delete(id)" not in loader
+    assert "state.availableKnowledgeIds = known;" in loader
+    assert "state.knowledgeScopeMode = 'selected';" in loader
+    assert "knowledgeScopeChanged();" in loader
+    assert "state.selectedKnowledgeIds.clear()" not in loader
+    # A *separate user-triggered control* is the only widening path.
+    reset = JAVASCRIPT[JAVASCRIPT.index("get('knowledge-scope-reset').addEventListener"):
+                       JAVASCRIPT.index("  async function loadDocuments()")]
+    assert "state.knowledgeScopeMode = 'all';" in reset
+    assert "state.selectedKnowledgeIds.clear();" in reset
+
+
+def test_session_switch_cannot_invalidate_explicit_scoped_source_consent():
+    from skeleton.app.offline_web import JAVASCRIPT
+    start = JAVASCRIPT.index("  async function selectSession(id) {")
+    stop = JAVASCRIPT.index("  function schedulePoll(", start)
+    switching = JAVASCRIPT[start:stop]
+    assert "state.selectedKnowledgeIds.clear()" not in switching
+    assert "state.knowledgeScopeMode = 'all'" not in switching
+    assert "knowledgeScopeStatus();" in switching
+    # Lock intentionally wipes both source IDs and authorizations.
+    start = JAVASCRIPT.index("  function lock() {")
+    stop = JAVASCRIPT.index("  async function", start)
+    locked = JAVASCRIPT[start:stop]
+    assert "state.selectedKnowledgeIds.clear();" in locked
+    assert "state.knowledgeScopeMode = 'all';" in locked
+
+
+def test_missing_selected_document_never_falls_back_to_other_docs_or_changes_receipts(tmp_path):
+    app = make_app(tmp_path)
+    try:
+        selected, other = add_sources(app)
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        endpoint = "/v1/sessions/" + sid
+        question = "How does rasterizer edge coverage work?"
+        # A source was selected at the time of review but disappeared before
+        # source preflight. Even though another answer-bearing document exists,
+        # no input selection may be silently expanded.
+        app.dispatch("DELETE", "/v1/knowledge/documents/" + selected)
+        assert app.knowledge.search(question, document_ids=[other])
+        for route, fields in [
+            ("/context-preview", {"message": question,
+                                  "grounded": True, "document_ids": [selected]}),
+            ("/turn", {"message": question, "grounded": True,
+                       "request_id": "vanished-source-2026",
+                       "max_output_tokens": 2,
+                       "document_ids": [selected],
+                       "require_full_history": True}),
+        ]:
+            with pytest.raises(OfflineHTTPError) as err:
+                app.dispatch("POST", endpoint + route, fields)
+            assert err.value.status == 422
+        _, saved = app.dispatch("GET", endpoint)
+        assert saved["revision"] == 0
+        assert saved["evidence"] == []
+    finally:
+        app.close()
