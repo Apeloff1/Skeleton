@@ -247,7 +247,8 @@ def _qualify_actual_local_http(
             # not a mocked HTTP adapter. An absent/invalid bearer credential
             # must never disclose model or conversation state.
             status, denied = _request(
-                instance.port, "wrong-" + token, "GET", "/v1/status",
+                instance.port, ("A" if token[0] != "A" else "B") + token[1:],
+                "GET", "/v1/status",
                 allowed_error_status=401,
             )
             if status != 401 or not isinstance(denied.get("error"), str):
