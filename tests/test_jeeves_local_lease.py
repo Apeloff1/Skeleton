@@ -208,3 +208,102 @@ def test_unprotected_shared_lock_directory_fails_closed(tmp_path: Path):
 def test_memory_database_cannot_claim_crash_safe_multi_process_exclusion():
     with pytest.raises(LocalInferenceLeaseUnavailable):
         LocalInferenceLease(":memory:")
+
+
+def test_identical_peer_request_committed_during_lease_admission_replays_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    """Adversarial timing: the peer commits AFTER the first replay lookup."""
+    from contextlib import contextmanager
+
+    model = native_model()
+    database = tmp_path / "racing.sqlite3"
+    winner = OfflineHTTPApplication(model, database, token="w" * 64)
+    loser = OfflineHTTPApplication(model, database, token="l" * 64)
+    request = {
+        "message": "Exactly one local committed model response across two owners",
+        "request_id": "same-identity-race-2026",
+        "max_output_tokens": 2,
+    }
+    try:
+        status, created = winner.dispatch("POST", "/v1/sessions", {})
+        assert status == 201
+        sid = created["session_id"]
+        path = "/v1/sessions/" + sid + "/turn"
+        actual_lease = loser._inference_lease.hold
+        committed = []
+
+        @contextmanager
+        def concurrent_peer_holds_generation():
+            # This hook runs after the losing process looked up an absent
+            # receipt, but BEFORE it acquires the cross-process lease.
+            if not committed:
+                status, answer = winner.dispatch("POST", path, request)
+                assert status == 200
+                assert answer["replayed"] is False
+                committed.append(answer)
+            with actual_lease():
+                yield
+
+        monkeypatch.setattr(loser._inference_lease, "hold", concurrent_peer_holds_generation)
+        status, recovered = loser.dispatch("POST", path, request)
+        assert status == 200 and recovered["replayed"] is True
+        assert recovered["output_digest"] == committed[0]["output_digest"]
+        assert recovered["local_execution_receipt"] == committed[0]["local_execution_receipt"]
+        assert loser._session(sid).revision == winner._session(sid).revision == 1
+        # The peer-winning genuine native generation must not change model
+        # circuit health in the losing service (no duplicate execution).
+        assert loser._inference_circuit.status()["recent_runtime_failures"] == 0
+    finally:
+        loser.close()
+        winner.close()
+
+
+def test_async_peer_lease_conflict_retries_same_request_after_release(tmp_path: Path):
+    """The accepted async ticket fails terminally, then retries idempotently."""
+    model = native_model()
+    database = tmp_path / "async-peer.sqlite3"
+    app = OfflineHTTPApplication(model, database, token="t" * 64)
+    request = {
+        "message": "A real native generation after private GPU lease contention",
+        "request_id": "lease-async-retry-2026",
+        "max_output_tokens": 2,
+    }
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        with LocalInferenceLease(database).hold():
+            status, accepted = app.submit_turn(sid, request)
+            assert status == 202 and accepted["request_id"] == request["request_id"]
+            deadline = time.monotonic() + 8
+            while True:
+                result = app.turn_status(sid, request["request_id"])
+                if result["terminal"] and result["finished_at"] is not None:
+                    break
+                assert time.monotonic() < deadline, "lease failure left async ticket active"
+                time.sleep(0.01)
+            assert result["state"] == "failed"
+            assert result["error"] == "another local service owns the inference execution slot"
+            assert result["result"] is None
+            assert app._session(sid).revision == 0
+
+        # An explicit same-content retry only, never silent automatic replay.
+        status, accepted = app.submit_turn(sid, {**request, "retry": True})
+        assert status == 202
+        deadline = time.monotonic() + 30
+        while True:
+            result = app.turn_status(sid, request["request_id"])
+            if result["terminal"] and result["finished_at"] is not None:
+                break
+            assert time.monotonic() < deadline, "recovered native execution did not finish"
+            time.sleep(0.01)
+        assert result["state"] == "complete", result["error"]
+        assert result["result"]["replayed"] is False
+        assert result["result"]["local_execution_receipt"]["model_digest"] == model.model_digest
+        assert app._session(sid).revision == 1
+        replay_status, replay = app.submit_turn(sid, request)
+        assert replay_status == 200
+        assert replay["state"] == "complete"
+        assert replay["result"]["replayed"] is True or replay["result"]["output_digest"] == result["result"]["output_digest"]
+    finally:
+        app.close()
