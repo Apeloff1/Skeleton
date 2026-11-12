@@ -82,9 +82,24 @@ SQLite reopen between them. It verifies the original response by an
 independent GET-only recovery, verifies the continued conversation, checks
 identity-bound output digests, and reports measured output token throughput.
 No fake model, remote provider, streaming estimate, or network host beyond
-127.0.0.1 is used for model inference. Model quality and protected production
-bootstrap are **not** certified by this test. Completion is bounded and never
-reported successful when either turn fails.
+127.0.0.1 is used for model inference. The qualification additionally
+sends a **negative authentication probe** (missing authority must fail with
+HTTP 401) and a **committed request-ID rewrite probe** (changing the prompt
+under a used ID must fail with HTTP 409). After both denials, the originally
+committed conversation must remain unchanged in SQLite. Results include
+`unauthenticated_local_query_denied` and
+`committed_request_rewrite_denied`. These are actual service checks, not
+claims of independently attested runtime security.
+
+Model quality and protected production bootstrap are **not** certified by
+this test. Completion is bounded and never reported successful when either
+turn fails.
+
+In the standalone local async API, an abnormal native worker exit must reach
+a terminal failed ticket, release the single-device generation slot and
+permit a new genuine local attempt. Failed tickets expose only stable public
+failure categories; internal model paths, runtime stderr and other exception
+details must not cross the HTTP boundary.
 
 The first-install script can run the same advanced test before configuring
 or starting the app:
