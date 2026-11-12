@@ -582,3 +582,67 @@ Limitations: client source-inventory reads are not an atomic transaction
 with generation, so the actual native turn always independently checks
 the selected sources. The system cannot revoke already-exported Dragon
 source text or infer publisher rights from source presence.
+
+
+## 16. Real locally verified media advisory ingress (implemented)
+
+The installed browser now has a **Review local image, audio or video for
+Jeeves** interface. It accepts a user-selected **PNG, JPEG, WebP, WAV,
+FLAC or MP4** file of no more than **4 MiB**, optionally previews that
+file using a page-owned `blob:` object URL, and computes the exact file
+SHA-256 with browser Web Crypto. The user supplies their own explicitly
+reviewed textual caption, transcript, or frame annotation, which remains
+**untrusted grounding data** rather than new privileged instructions.
+
+The **real authenticated loopback** `POST /v1/advisory/ingest` uses the
+existing `skeleton.jeeves.advisory.v1` contract with optional
+`media_type` and `media_base64` fields. A finite 6 MiB HTTP body budget
+enforces the size boundary before JSON parsing; the dedicated decoder enforces
+canonical Base64, a 4 MiB binary limit, recognized MIME/modality pairing,
+and basic container signature consistency. The server independently
+calculates SHA-256 of the exact decoded bytes and compares it to the
+submitted source digest before any SQLite writes. One incorrect digest,
+unreviewed observation, mismatched media type, malformed container header,
+noncanonical encoding, oversized upload or unknown field refuses the
+**entire advisory**. The client independently confirms the returned source
+digest, MIME, byte count, owner-review contract and **no inference** status.
+
+**Privacy and content guarantees:**
+- Raw media bytes are never placed in SQLite reference text, model prompts,
+  conversation history, auxiliary model state, or the local execution receipt.
+  Only the human-reviewed observation, content digest, media-type metadata,
+  source-byte count and explicit *container-header-only* qualification are
+  stored under the existing private model-scoped content-addressed library.
+- The server does not perform OCR, speech-to-text, video decoding, semantic
+  analysis, caption generation, or outbound provider calls. The browser can
+  display local media for the *human* with native browser viewers, but
+  these are never interpreted as an AI decoder or a second primary model.
+  A recognizable container header does not certify the rest of the file.
+- Source provenance is upgraded from
+  `caller-declared-not-media-verified` to
+  `server-verified-transient-source-bytes` **only** when the original
+  raw media bytes were actually inspected. Legacy text-only advisories and
+  separately approved Dragon excerpts retain their previous honest
+  caller-asserted source authority.
+- Media preview object URLs are actively revoked when the selected file
+  changes, the account locks, or the page closes; no token, raw file, or
+  observation is persisted to browser storage. Strict CSP allows
+  `img-src 'self' blob:` and `media-src 'self' blob:` for local user files
+  while retaining `default-src 'none'`, same-origin fetch/script policies,
+  no remote media endpoints, and frame embedding refusal.
+- A successfully admitted observation **does not generate a model reply**.
+  The operator must separately select it as a local reference, review
+  selected grounding citations, and initiate a model turn. Only the
+  installed **Jeeves primary local model** may generate that answer, with
+  source-scope, strict-context and SQLite replay controls enforced anew.
+
+**Qualification:** `tests/test_jeeves_media_advisory.py` checks six
+supported headers, source-digest substitution, invalid Base64, malformed
+media, MIME/modality mismatches, oversized input, explicit approval,
+authenticated HTTP denial, real SQLite document storage and duplicate
+reuse, the legacy crawler/text authority boundary, and real localhost
+Content Security Policy. The exact-head Jeeves workflow compiles the new
+module and runs these tests alongside native transformer and backend E2E.
+An independently supplied production GGUF, media codecs/decoding quality,
+Windows 11/WSL2, Apple Metal and physical devices remain separate
+non-waived release qualification requirements.
