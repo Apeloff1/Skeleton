@@ -283,6 +283,14 @@ class OfflineChatStore:
                     "WHERE e.session_id=offline_turns.session_id "
                     "AND e.request_id=offline_turns.request_id)"
                 )
+            if "runtime_receipt_required" not in columns:
+                # Old or imported turns remain explicitly unverified. New
+                # local generations cannot erase their receipt sidecar and
+                # masquerade as historical work.
+                self._db.execute(
+                    "ALTER TABLE offline_turns ADD COLUMN runtime_receipt_required "
+                    "INTEGER NOT NULL DEFAULT 0 CHECK (runtime_receipt_required IN (0,1))"
+                )
 
             if self._db.execute("PRAGMA foreign_keys").fetchone() != (1,):
                 raise RuntimeContractError("SQLite foreign-key enforcement unavailable")
@@ -892,15 +900,22 @@ class OfflineChatStore:
             row = self._db.execute(
                 "SELECT e.revision, e.model_digest, e.tokenizer_digest, "
                 "e.output_sha256, e.execution_receipt_digest, "
-                "t.revision, t.output_digest, t.text "
+                "t.revision, t.output_digest, t.text, t.runtime_receipt_required "
                 "FROM offline_turns t LEFT JOIN offline_turn_execution_receipts e "
                 "ON e.session_id=t.session_id AND e.request_id=t.request_id "
                 "WHERE t.session_id=? AND t.request_id=?",
                 (sid, rid),
             ).fetchone()
-            if row is None or row[0] is None:
+            if row is None:
                 return None
-            revision, saved_model, saved_tokenizer, output, receipt, committed_revision, committed_output, text = row
+            required = row[8]
+            if row[0] is None:
+                if required != 0:
+                    raise RuntimeContractError("required local execution receipt is missing")
+                return None
+            if required != 1:
+                raise RuntimeContractError("an unverified historical turn cannot acquire a runtime receipt")
+            revision, saved_model, saved_tokenizer, output, receipt, committed_revision, committed_output, text, _ = row
             if (type(revision) is not int or revision != committed_revision
                     or saved_model != model_digest or saved_tokenizer != tokenizer_digest
                     or type(text) is not str
@@ -993,11 +1008,11 @@ class OfflineChatStore:
             self._db.execute(
                 "INSERT INTO offline_turns "
                 "(session_id, request_id, request_digest, revision, text, "
-                "output_digest, prompt_tokens, generated_tokens, grounded) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "output_digest, prompt_tokens, generated_tokens, grounded, runtime_receipt_required) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (session.session_id, rid, request_digest, session.revision + 1,
                  text, output_digest, prompt_tokens, generated_tokens,
-                 int(stored_evidence is not None)),
+                 int(stored_evidence is not None), int(execution_receipt_digest is not None)),
             )
             if stored_evidence is not None:
                 self._db.execute(
