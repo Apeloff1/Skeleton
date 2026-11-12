@@ -1,113 +1,167 @@
-# Installed Jeeves AI chat — connected prototype and live acceptance
+# Jeeves — local-only model, real offline inference, advisory multimodal
 
-This is a real app integration, not a fake offline chatbot. The governed conversation UI is at /ai-chat; /jeeves-chat is the legacy compatibility route. Both rely on the canonical authenticated backend and engine. A green HTTP health response is not proof that a model can answer.
+**Jeeves is the ONLY primary chat model.** OpenAI and other hosted providers
+cannot answer as Jeeves or become fallback models. The application uses one
+genuine, operator-owned, digest-pinned local GGUF model with the *deployment
+identity* **jeeves**. This identity does not imply the underlying weights
+were trained from scratch by Skeleton. Retain their real source and license.
 
-## 1. Make the installed app reach the backend
+Multimodal capabilities (images, audio, video, crawler knowledge) are
+**advisory evidence**. They cannot replace the primary local text generator,
+authorize tools, turn into system instructions, or trigger a hosted-model
+failover. The actual model and executable, not a mock or a header alone,
+must generate a verified answer before inference can be called working.
 
-On Android/iOS, localhost points to the phone, NOT your laptop or container. Native APK production/preview builds require an explicit HTTPS origin for the real backend API, for example from the frontend/ directory:
+## 1. Prepare a genuine local model
 
-    EXPO_PUBLIC_BACKEND_URL=https://api.your-domain.example npx eas build --profile apk --platform android
+Acquire a licensed GGUF and a compatible llama.cpp CLI executable and verify
+their source. Neither a licensed user model nor hardware is bundled with
+this change. The optional provisioner can obtain publicly pinned Qwen
+weights only with an explicit --download option:
 
-EXPO_PUBLIC_BACKEND_URL is a public network location, NEVER an AI provider secret. Set DNS/TLS and a reverse proxy to the existing backend /api routes. The default Docker Compose host backend listener is loopback-bound, so changing the URL to a private IP is not enough. Do not publicly expose MongoDB, engine privileged routes, or provider credentials.
+    python scripts/provision_local_ai.py --help
 
-Native release build preflight rejects missing, loopback, HTTP, credential-bearing, query/fragment-bearing and path-suffixed origins. Runtime endpoint validation also refuses unsafe native backend URLs; browser local development remains supported. The /setup screen shows the actual application API origin and a warning when the installed application was not connected.
+Use approved files already on disk to stay fully offline. Create an immutable
+Jeeves deployment manifest in a directory that already exists:
 
-## 2. Make real chat ready
+    python scripts/build_jeeves_local_manifest.py \
+      --model /absolute/path/to/owned-model.gguf \
+      --executable /absolute/path/to/llama-cli \
+      --output /absolute/path/to/jeeves.json \
+      --profile qwen3-completion-chat --context 4096 --threads 2
 
-All four capabilities must work: (1) signed-in account and correct tenant; (2) durable conversation store with engine admission; (3) authorized engine; (4) a selectable activated text model. The chat screen now reports distinct storage, engine, provider credentials, missing model and protected local guard failures.
+Choose a prompt profile compatible with the actual model; raw and
+llama-completion-chat are alternatives. The builder reads and hashes the
+GGUF and native executable, validates the model header and runtime pins,
+and creates the manifest only if absent. No external provider is contacted.
 
-For a hosted provider, after the canonical installer has created the private .env, the owner can opt in through the new secret-safe activation command:
+## 2. Prove real local generation
 
-    python scripts/configure_ai_chat_hosted.py --model gpt-4.1-mini --prompt-key --apply
+On a host that can execute the pinned native runtime:
 
-This validates the chosen model, accepts the server-side key through a hidden prompt, holds the setup lock, updates only AI_PROVIDER, AI_MODEL and OPENAI_API_KEY atomically in owner-private .env, and does not overwrite an existing key or configured local deployment without explicit rotation/switch flags. The command reports real_inference_verified=false and requires engine recreation. The provider receives chat content, so use this only when approved for your data policy. Keep provider credentials out of Expo EXPO_PUBLIC variables. The model must genuinely exist under your provider account, and the installer, owner/bootstrap, storage and engine scope requirements still apply. Refer to FIRST_INSTALL_AI_AND_CRAWLER.md.
+    python scripts/install_ai_chat.py \
+      --deployment /absolute/path/to/jeeves.json \
+      --live-local
 
-For local GGUF: the default Compose setup is documented as missing the trusted guard and source authorities. Downloading weights alone DOES NOT make the protected local path work. A compliant trusted app bootstrap requires native tokenizer/sampler attestations, reviewer, task-scoped canonical source authority, shared writer epoch and majority-durable Mongo. Never disable the guard, use an unsafe developer bypass, or substitute fake model output in a release.
+This invokes the actual bounded offline llama.cpp process, validates a
+nonempty completion, exact model and runtime identities, and outputs a
+local execution receipt digest. It never prints the answer or a key.
 
-From the Skeleton repository root:
+**This proves host-side local inference, not yet the protected application
+backend or a phone.** The exact executable must be compatible with the
+host; Linux container builds may not execute directly on macOS/Windows.
+There is no automatic fallback to OpenAI.
 
-    python scripts/install_app.py --production --start
-    python -m skeleton app doctor --live --json
-    python -m skeleton app status --live
+## 3. Configure and start Jeeves's private application stack
 
-## 3. One-command hosted chat deployment
+Create the private env and Compose model binding:
 
-Run the complete owner-controlled deployment on the server, not on the handset:
+    python scripts/install_ai_chat.py \
+      --deployment /absolute/path/to/jeeves.json --apply
 
-    python scripts/install_ai_chat.py --model gpt-5.5 --prompt-key --apply --start
+If replacing an existing environment, explicitly add --force to preserve
+the existing valid persistent database and signing identities. Optionally
+supply --admin-email and --admin-password-file to bootstrap an approved
+administrator with a private password file.
 
-The command sets up the real private environment, activates the approved hosted
-provider (without overriding a configured required local guard), invokes the
-canonical production installer, and waits for its normal service and route
-checks. It fails closed if any required installer step fails. It reports
-`inference_verified=false` until a real turn is executed. The model name is an
-example: use a model actually authorized by your provider account.
+Start the installed stack:
 
-To provision an owner at the same time, add:
+    python scripts/install_ai_chat.py \
+      --deployment /absolute/path/to/jeeves.json \
+      --apply --force --start
 
-    --admin-email owner@example.com --admin-password-file /absolute/private/owner-password.txt
+This selects AI_PROVIDER=local, JEEVES_LOCAL_ONLY=1,
+JEEVES_PRIMARY_MODEL_ID=jeeves, AI_LOCAL_GUARD_REQUIRED=1, and pins one
+read-only local deployment. The primary engine receives no hosted provider
+key, verifier or secondary model. Docker builds may need internet access
+for image/dependency acquisition, but model *inference* remains local.
 
-To also make the run a real model-turn acceptance, add:
+A successful Compose start is only service orchestration. It does not
+prove a model answer or grant authority to disable the local guard.
 
-    --exercise --base-url https://api.your-domain.example --login-email owner@example.com
+### Trusted protected-local admission is mandatory
 
-The private account password is prompted without echo. This explicitly opts
-into sending one bounded confidential test message to the hosted model. The
-installer will not claim `inference_verified=true` without a provider receipt
-and saved, independently replayed answer. A release still additionally requires
-actual installed-device testing and exact-head security gates.
+A generic Compose stack cannot invent the genuine model tokenizer/sampler
+attestations, independent adversarial reviewer, task-scoped canonical
+snapshot reader, majority-durable Mongo writer epoch or reviewed native
+bootstrap. The application composition root must bind these before the
+engine is ready. Without them, report local_guard_unavailable. Never set
+AI_LOCAL_GUARD_REQUIRED=0 or use the unsafe development acknowledgement
+to claim a production model works. Local CLI generation is not a substitute
+for the guarded product chat route.
 
-## 4. Verify an actual model-generated chat answer
+## 4. Prove an authenticated Jeeves chat turn
 
-The new stdlib-only smoke command uses the same API that the installed app uses. It does not load a model or invent an answer. A private interactive password prompt avoids secrets in process arguments:
+Read-only account/engine/storage/model readiness:
 
-    python scripts/ai_chat_installed_smoke.py --base-url https://api.your-domain.example --login-email owner@example.com
+    python scripts/ai_chat_installed_smoke.py \
+      --base-url https://YOUR_BACKEND_HOST \
+      --login-email owner@example.com
 
-This read-only mode authenticates the account and validates the versioned readiness contract and independent storage/engine/model checks. It does not create a conversation.
+One real inference and durable canonical replay:
 
-Submit exactly one test turn only when explicitly requested:
+    python scripts/ai_chat_installed_smoke.py \
+      --base-url https://YOUR_BACKEND_HOST \
+      --login-email owner@example.com \
+      --exercise --timeout 180
 
-    python scripts/ai_chat_installed_smoke.py --base-url https://api.your-domain.example --login-email owner@example.com --exercise --timeout 180
+The exact model must have provider_id=local and model_id=jeeves. The request
+explicitly pins both, even if automatic routing is nominally available.
+Provider receipts must start with provider:local:. Hosted/advisory receipts,
+incomplete model outputs, lost canonical assistant rows and replays that
+change the answer all fail acceptance. No second POST occurs after an
+uncertain network outcome.
 
-The command creates a confidential canonical conversation, prints a nonsecret thread/request ID for recovery, admits one idempotency-keyed deferred message, polls the exact same turn, verifies terminal assistant output and real engine provider receipts, then reads the saved assistant from canonical history and checks the completed turn independently. It reports answer character count and receipt count, not message text or account tokens. If a transport times out after admission, do not resubmit: use the recorded IDs to recover the existing turn.
+Recover the original nonsecret IDs with GET-only requests:
 
-For a preexisting bearer token you may use --token-file /absolute/private/chat-token instead of --login-email. On POSIX it must be mode 0600 and never a symlink. Insecure HTTP is allowed only to actual loopback when you explicitly specify --allow-loopback-http; public hosts require HTTPS.
+    python scripts/ai_chat_installed_smoke.py \
+      --base-url https://YOUR_BACKEND_HOST \
+      --login-email owner@example.com \
+      --recover-thread THREAD_ID --recover-request REQUEST_ID
 
-### Recover a saved turn after a network interruption
+For headless environments use --token-file with a private mode-0600 file,
+never a password in command arguments. Interactive passwords require a
+real terminal and are never echoed.
 
-If a POST may have been accepted, do not send the test prompt again. Use the
-nonsecret `thread_id` and `request_id` printed before admission:
+## 5. Android/iOS connectivity is not on-device inference
 
-    python scripts/ai_chat_installed_smoke.py --base-url https://api.your-domain.example --login-email owner@example.com --recover-thread THREAD_ID --recover-request REQUEST_ID
+The mobile app connects to **your own authenticated backend**, not an
+external AI API. To build an installed client:
 
-Recovery only performs authenticated GETs, including provider-receipt and
-canonical transcript verification. It works even if the provider has gone
-offline after the original answer was committed. It never sends another chat
-turn or silently changes the selected model. After restarting the server,
-repeat recovery to qualify persisted continuation.
+    cd frontend
+    EXPO_PUBLIC_BACKEND_URL=https://YOUR_BACKEND_HOST \
+      npx eas build --profile apk --platform android
 
-## 5. Qualification and limitations
+The local GGUF runs on the operator-owned computer/server. **The phone
+is a client of that local host; it is NOT yet an independent on-device
+offline model.** A disconnected phone would require a distinct native
+Android/iOS inference module and real device memory/thermal qualification.
+Do not equate a connected phone with locally resident phone weights.
 
-Focused tests:
+## 6. Tests and release blockers
 
-    python -m pytest -q tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py
+Focused source tests and native inference acceptance:
+
+    python -m pytest -q --noconftest \
+      tests/test_jeeves_local_policy.py \
+      tests/test_install_ai_chat.py \
+      tests/test_ai_chat_installed_smoke.py \
+      tests/test_configure_ai_chat_hosted.py
+    python -m pytest -q tests/test_app_offline_chat_cli.py
     cd frontend && node --test scripts/test-installed-chat-endpoint.cjs
-    cd frontend && npm run typecheck
-    cd frontend && npm run test:app-foundation
+    cd frontend && yarn typecheck
 
-Full consumer release still requires a fresh installed APK and device validation, HTTPS ingress, engine grants, a genuinely configured provider or protected local GGUF runtime, service-restart conversation recovery, cancellation/pressure/security tests and exact-head CI. None of those independent physical qualifications is established by code-only changes. This PR remains review-only until tested.
+Real production deployment still needs an operator-owned model, actual
+GGUF completion, protected engine bootstrap, canonical live chat test on
+the installed app, restart recovery, hardware pressure checks, secure TLS
+ingress and exact-head security/installer qualifications. This PR stays
+review-only until these are proven.
 
-First-install failure lookup:
-
-| Signal | Remedy |
+| Failure | Safe response |
 | --- | --- |
-| Native URL missing, localhost or HTTP | Rebuild with the real HTTPS backend origin |
-| Network/TLS error | Repair ingress, DNS, certificate or host firewall |
-| 401/403 | Authenticate and verify tenant and engine authorization |
-| Conversation storage blocked | Repair Mongo, canonical writer epoch and storage admission |
-| Engine unavailable | Repair internal service endpoint and grants |
-| local_model_not_configured | Activate a real approved model, or hosted provider |
-| local_guard_unavailable | Complete trusted protected-local bootstrap; weights do not fix it |
-| local_guard_configuration_invalid | Repair the guard configuration; do not disable it |
-| provider_credentials_missing | Configure provider credentials privately on the host |
-| No provider receipt / saved reply | Treat the turn as failed, not as successful chat |
+| No local model | Pin real licensed GGUF + llama.cpp as model_id=jeeves |
+| Wrong provider or extra model | Reject; remove hosted and alternate inference routes |
+| local_guard_unavailable | Install trusted snapshot/reviewer/tokenizer authorities |
+| GGUF/runtime hash mismatch | Restore exact approved files and requalify |
+| No local provider receipt | Reject as unverified, never substitute hosted output |
+| Phone cannot reach backend | Configure own TLS ingress; never expose Mongo/engine |
