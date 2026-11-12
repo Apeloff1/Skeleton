@@ -123,13 +123,15 @@ def _expect_model(port: int, token: str, digest: str) -> dict[str, Any]:
 
 
 def _send_turn(port: int, token: str, session_id: str, *,
-               request_id: str, text: str, max_tokens: int, timeout: int) -> dict[str, Any]:
+               request_id: str, text: str, max_tokens: int, timeout: int,
+               require_full_history: bool = False) -> dict[str, Any]:
     path = "/v1/sessions/" + session_id + "/turns"
     started = time.monotonic()
     status, accepted = _request(port, token, "POST", path, {
         "request_id": request_id,
         "message": text,
         "max_output_tokens": max_tokens,
+        "require_full_history": require_full_history,
     })
     if status not in (200, 202) or accepted.get("request_id") != request_id:
         raise LiveJeevesFailure("a real local model turn was not admitted")
@@ -226,6 +228,8 @@ def _qualify_actual_local_http(
     token = secrets.token_urlsafe(40)
     first_request_id = "jeeves-qual-" + secrets.token_hex(12)
     second_request_id = "jeeves-qual-" + secrets.token_hex(12)
+    third_request_id = "jeeves-qual-" + secrets.token_hex(12)
+    third_prompt = "Check the earlier local conversation and respond briefly."
     second_prompt = (
         "Continue the local Jeeves conversation in one sentence without any cloud model."
     )
@@ -367,6 +371,73 @@ def _qualify_actual_local_http(
                 restarted.port, token, session_id,
                 replies=[first["result"], second["result"]],
             )
+
+            # The third turn exercises the 2026 strict-history contract with
+            # actual model output, not a UI ping or a self-reported context
+            # flag. Two previously committed turns MUST remain in the
+            # renderer. A fail-closed GGUF tokenizer rejection means the
+            # operator deployment did not qualify and may require a larger
+            # context window, never a silent truncation fallback.
+            preview_status, preview = _request(
+                restarted.port, token, "POST",
+                "/v1/sessions/" + session_id + "/context-preview",
+                {
+                    "message": third_prompt,
+                    "max_output_tokens": output_tokens,
+                    "grounded": False,
+                    "require_full_history": True,
+                },
+            )
+            if (preview_status != 200
+                    or preview.get("generation_performed") is not False
+                    or preview.get("read_only") is not True
+                    or preview.get("model_digest") != digest
+                    or preview.get("session_revision") != 2
+                    or preview.get("full_history_messages") != 4
+                    or preview.get("retained_history_messages") != 4
+                    or preview.get("omitted_history_messages") != 0
+                    or preview.get("fits_full_history") is not True
+                    or preview.get("may_submit_under_policy") is not True
+                    or preview.get("preview_is_admission_proof") is not False):
+                raise LiveJeevesFailure(
+                    "the full local transcript cannot be admitted under the strict context window"
+                )
+            third = _send_turn(
+                restarted.port, token, session_id,
+                request_id=third_request_id, text=third_prompt,
+                max_tokens=output_tokens, timeout=timeout_seconds,
+                require_full_history=True,
+            )
+            if (third["result"].get("model_digest") != digest
+                    or third["result"].get("revision") != 3):
+                raise LiveJeevesFailure(
+                    "the strict local model turn failed runtime identity or durable version checks"
+                )
+            _assert_transcript(
+                restarted.port, token, session_id,
+                replies=[first["result"], second["result"], third["result"]],
+            )
+            # Changing a committed strict request to legacy bounded mode
+            # MUST be an identity conflict, not a new generation or replay.
+            denied_status, denied = _request(
+                restarted.port, token, "POST",
+                "/v1/sessions/" + session_id + "/turns",
+                {
+                    "request_id": third_request_id,
+                    "message": third_prompt,
+                    "max_output_tokens": output_tokens,
+                    "require_full_history": False,
+                },
+                allowed_error_status=409,
+            )
+            if denied_status != 409 or not isinstance(denied.get("error"), str):
+                raise LiveJeevesFailure(
+                    "a committed model execution could be replayed under a different context policy"
+                )
+            _assert_transcript(
+                restarted.port, token, session_id,
+                replies=[first["result"], second["result"], third["result"]],
+            )
             # Historical GET proves the persisted result without issuing a
             # second model generation or reusing the POST idempotency key.
             _, same = _request(
@@ -383,25 +454,30 @@ def _qualify_actual_local_http(
         "local_only": True, "hosted_provider_used": False,
         "transport": "authenticated-loopback-http",
         "storage": "local-sqlite-reopened",
-        "actual_model_turns": 2,
+        "actual_model_turns": 3,
         "durable_recovery_verified": True, "read_only_replay_verified": True,
         "context_continuation_verified": True,
         "context_preflight_history_retained": True,
         "context_preflight_is_generation_proof": False,
         "run_1_output_sha256": first["output_sha256"],
         "run_2_output_sha256": second["output_sha256"],
+        "run_3_output_sha256": third["output_sha256"],
         "run_1_execution_receipt_sha256": first["local_execution_receipt_sha256"],
         "run_2_execution_receipt_sha256": second["local_execution_receipt_sha256"],
+        "run_3_execution_receipt_sha256": third["local_execution_receipt_sha256"],
         "runtime_receipts_survived_restart": True,
         "unauthenticated_local_query_denied": True,
         "committed_request_rewrite_denied": True,
         "competing_local_service_inference_denied": True,
         "denied_peer_request_committed_after_restart": True,
+        "strict_full_history_preview_verified": True,
+        "strict_full_history_real_generation_verified": True,
+        "strict_context_policy_idempotency_fence_verified": True,
         "turn_metrics": [
             {"elapsed_seconds": t["elapsed_seconds"],
              "observed_output_tokens_per_second": t["output_tokens_per_second_observed"],
              "actual_output_tokens": t["result"]["output_tokens"]}
-            for t in (first, second)
+            for t in (first, second, third)
         ],
         "adaptive_metal_launch": observed.get("adaptive_metal_launch"),
         "protected_backend_verified": False,
