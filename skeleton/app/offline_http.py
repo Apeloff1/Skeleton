@@ -1171,7 +1171,8 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         if web:
             self.send_header("Content-Security-Policy",
                              "default-src 'none'; script-src 'self'; style-src 'self'; "
-                             "connect-src 'self'; base-uri 'none'; form-action 'none'; "
+                             "connect-src 'self'; img-src 'self' blob:; media-src 'self' blob:; "
+                             "base-uri 'none'; form-action 'none'; "
                              "frame-ancestors 'none'")
         else:
             self.send_header("Content-Security-Policy", "default-src 'none'")
