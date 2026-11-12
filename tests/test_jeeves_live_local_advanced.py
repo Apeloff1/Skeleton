@@ -40,6 +40,8 @@ def test_real_offline_model_generates_across_loopback_http_then_recovers_sqlite(
     assert report["durable_recovery_verified"] is True
     assert report["read_only_replay_verified"] is True
     assert report["context_continuation_verified"] is True
+    assert report["unauthenticated_local_query_denied"] is True
+    assert report["committed_request_rewrite_denied"] is True
     assert report["protected_backend_verified"] is False
     assert report["mobile_device_verified"] is False
     assert report["underlying_model_quality_certified"] is False
