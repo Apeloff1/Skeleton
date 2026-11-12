@@ -195,3 +195,94 @@ def test_advanced_qualification_reports_context_preflight_not_cryptographic_gene
     assert result["context_preflight_history_retained"] is True
     assert result["context_preflight_is_generation_proof"] is False
     assert result["actual_model_turns"] == 2
+
+
+
+def test_local_runtime_execution_receipt_survives_full_sqlite_reopen_and_detects_missing_sidecar(
+    tmp_path,
+):
+    """A real native generation must atomically commit both text and runtime proof."""
+    from skeleton.app.offline_http import OfflineHTTPApplication
+    from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+
+    model = native_model()
+    database = tmp_path / "receipt.sqlite3"
+    token = "t" * 64
+    rid = "native-receipt-atomicity"
+    app = OfflineHTTPApplication(model, database, token=token)
+    try:
+        status, created = app.dispatch("POST", "/v1/sessions", {})
+        assert status == 201
+        sid = created["session_id"]
+        status, completed = app.dispatch(
+            "POST", "/v1/sessions/" + sid + "/turn",
+            {"message": "Generate a local response with native receipt",
+             "request_id": rid, "max_output_tokens": 2},
+        )
+        assert status == 200 and completed["revision"] == 1
+        local = completed["local_execution_receipt"]
+        assert local["schema"] == "skeleton.ai.local-runtime-receipt.v1"
+        assert local["model_digest"] == model.model_digest
+        assert local["output_sha256"] == completed["output_digest"]
+        assert local["authority"] == "local-runtime-custody-not-independent-attestation"
+        assert len(local["execution_receipt_digest"]) == 64
+    finally:
+        app.close()
+
+    reopened = OfflineHTTPApplication(model, database, token=token)
+    try:
+        status, historic = reopened.dispatch(
+            "GET", "/v1/sessions/" + sid + "/turns/" + rid,
+        )
+        assert status == 200
+        assert historic["recovered_from_store"] is True
+        assert historic["result"]["local_execution_receipt"] == local
+        assert historic["result"]["text"] == completed["text"]
+        # A committed new native turn's marker is required: deleting its
+        # execution receipt must produce a hard integrity failure, not
+        # silently downgrade the turn into an allegedly old unverified one.
+        with reopened._store._transaction():
+            deleted = reopened._store._db.execute(
+                "DELETE FROM offline_turn_execution_receipts WHERE session_id=? AND request_id=?",
+                (sid, rid),
+            )
+            assert deleted.rowcount == 1
+        with pytest.raises(RuntimeContractError, match="required local execution receipt is missing"):
+            reopened.dispatch("GET", "/v1/sessions/" + sid + "/turns/" + rid)
+    finally:
+        reopened.close()
+
+
+def test_local_receipt_identity_tamper_is_detected_during_read_only_replay(tmp_path):
+    from skeleton.app.offline_http import OfflineHTTPApplication
+    from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+    model = native_model()
+    app = OfflineHTTPApplication(model, tmp_path / "tamper.sqlite3", token="t" * 64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        rid = "receipt-bind-model-and-output"
+        _, committed = app.dispatch(
+            "POST", "/v1/sessions/" + sid + "/turn",
+            {"message": "Local native model binding test",
+             "request_id": rid, "max_output_tokens": 2},
+        )
+        assert committed["local_execution_receipt"]
+        with app._store._transaction():
+            app._store._db.execute(
+                "UPDATE offline_turn_execution_receipts SET model_digest=? "
+                "WHERE session_id=? AND request_id=?",
+                ("f" * 64, sid, rid),
+            )
+        with pytest.raises(RuntimeContractError, match="not bound to committed model output"):
+            app.dispatch("GET", "/v1/sessions/" + sid + "/turns/" + rid)
+    finally:
+        app.close()
+
+
+def test_advanced_genuine_execution_exposes_distinct_receipts_for_two_actual_turns():
+    report = _qualify_actual_local_http(native_model(), timeout_seconds=45, output_tokens=2)
+    assert report["runtime_receipts_survived_restart"] is True
+    assert len(report["run_1_execution_receipt_sha256"]) == 64
+    assert len(report["run_2_execution_receipt_sha256"]) == 64
+    assert report["run_1_execution_receipt_sha256"] != report["run_2_execution_receipt_sha256"]
