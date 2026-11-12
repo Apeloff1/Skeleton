@@ -48,6 +48,29 @@ HTML = r"""<!doctype html>
       <div id="knowledge-documents" class="knowledge-documents" aria-label="Imported references"></div>
       <p id="knowledge-scope-status" class="hint" role="status">Grounding scope: all saved references. Select up to 8 for an explicit local source restriction.</p>
       <button id="knowledge-scope-reset" class="small secondary" type="button">Explicitly use all references</button>
+      <details id="media-advisory-panel">
+        <summary>Review local image, audio or video for Jeeves (advisory only)</summary>
+        <p class="hint">Only a locally selected file and your own human-reviewed observation are sent to the authenticated loopback service. The server checks the exact bytes and stores only the observation plus a SHA-256 provenance fingerprint. No OCR, transcription, video inference, remote provider, or raw media storage.</p>
+        <label for="media-advisory-file">Local media source (max 4 MiB)</label>
+        <input id="media-advisory-file" type="file" accept=".png,.jpg,.jpeg,.webp,.wav,.flac,.mp4">
+        <pre id="media-advisory-fingerprint" aria-live="polite">No local media selected.</pre>
+        <button id="media-advisory-preview" type="button" class="small" disabled>Preview locally (optional)</button>
+        <div id="media-advisory-visual" hidden>
+          <img id="media-advisory-image" alt="Selected local image preview" hidden>
+          <audio id="media-advisory-audio" controls preload="none" hidden></audio>
+          <video id="media-advisory-video" controls preload="none" hidden></video>
+        </div>
+        <label for="media-advisory-title">Reviewed local source title</label>
+        <input id="media-advisory-title" type="text" maxlength="96" value="Local reviewed media" autocomplete="off">
+        <label for="media-advisory-observation">Your own caption, transcript or frame annotation (no automatic analysis)</label>
+        <textarea id="media-advisory-observation" rows="4" maxlength="12288" placeholder="Enter only what you personally reviewed. Treat media and annotations as untrusted data."></textarea>
+        <label for="media-advisory-review" class="hint">
+          <input id="media-advisory-review" type="checkbox">
+          I reviewed this exact media and observation and approve importing the text only.
+        </label>
+        <button id="media-advisory-admit" type="button" class="secondary" disabled>Admit verified local media observation</button>
+        <pre id="media-advisory-receipt" aria-live="polite">No media observation imported.</pre>
+      </details>
       <details id="dragon-bundle-panel">
         <summary>Import approved Dragon evidence (local only)</summary>
         <p class="hint">Select a previously exported Dragon authorized-source bundle. Its source bodies are untrusted, and past capture rights do not prove present rights. No network crawl, hosted model or publication is performed here.</p>
@@ -212,6 +235,7 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 .context-report{font-size:12px;background:#18243a;border-top:1px solid #34415d;color:#c6ddf7;padding:8px 24px;overflow-wrap:anywhere}.context-report.warning{color:#ffd6a0;background:#302622}
 .knowledge-section #knowledge-scope-status.warning{color:#ffd6a0;background:#302622;border-radius:6px;padding:7px}
 .grounding-preview{margin:7px auto;padding:11px;max-width:860px;width:calc(100% - 48px);background:#14243a;border:1px solid #415572;border-radius:9px}.grounding-preview summary{cursor:pointer;font-size:13px;font-weight:650}.grounding-preview .grounding-passage{padding:11px;background:#0e1829;border-radius:7px;border:1px solid #31445e;margin-top:10px;overflow-wrap:anywhere}.grounding-preview .grounding-passage pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:240px;overflow:auto}.grounding-preview .grounding-passage code{font-size:11px;overflow-wrap:anywhere}
+#media-advisory-visual img,#media-advisory-visual video{max-width:100%;max-height:300px;object-fit:contain}#media-advisory-visual audio{width:100%}#media-advisory-visual{max-height:340px;overflow:auto}#media-advisory-fingerprint,#media-advisory-receipt{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}
 .selftest-panel{margin:9px auto 4px;width:calc(100% - 50px);max-width:870px;padding:12px 15px;border:1px solid #344a68;border-radius:10px;background:#17253a;color:#d9e6fc;font-size:12px}.selftest-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;color:#c8e8d6;font-size:12px}.selftest-panel button{width:auto}
 .shell{height:100vh;height:100dvh;overflow:hidden}.sidebar{min-height:0;height:100%;overflow-y:auto}.main{height:100%;min-height:0}.messages{overscroll-behavior:contain}.intro{flex-shrink:1;overflow:auto}.mobile-only,.sidebar-scrim{display:none}.bottom input[type=checkbox]{width:auto}.turn-progress #turn-elapsed{font-variant-numeric:tabular-nums}.knowledge-record .reference-name{min-width:0;flex-shrink:1;flex:1}.brand #sidebar-close{margin-left:auto}
 @media(max-width:720px){.shell{display:block;min-height:0}.sidebar{display:none}.main{height:100%}.topbar{flex-wrap:wrap;gap:8px}.topbar>div:first-of-type{flex:1;min-width:150px}.topbar h1{font-size:15px}.topbar p{overflow-wrap:anywhere}.mobile-only{display:inline-block}.library-open .sidebar{display:flex;position:fixed;top:0;bottom:0;left:0;width:min(350px,90vw);z-index:20;min-height:0;max-height:100dvh;overflow-y:auto;box-shadow:10px 0 40px #0007}.library-open .sidebar-scrim{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:19;background:#0009;border:0;border-radius:0}.sidebar .sessions{flex:none;max-height:25vh}.sidebar .knowledge-section{flex:none;max-height:48vh}.sidebar .sidebar-footer{display:grid}.composer{flex-shrink:0;margin:0 auto;padding:10px}.composer textarea{min-height:50px;max-height:24vh}.composer .bottom{gap:6px}.turn-progress{padding:8px 12px}.status{padding:9px 12px}.messages{padding:12px;gap:10px}.message{max-width:97%}.intro h2{font-size:23px}.intro .glow{font-size:30px}.intro .minor{font-size:11px}.intro{padding:12px}.transcript-tools{margin:5px}}
@@ -230,6 +254,8 @@ JAVASCRIPT = r"""'use strict';
     pending: null, turn: null, timer: null, polling: false,
     writePending: null, writeRequest: '',
     selfTest: null, selfTestReport: null,
+    mediaAdvisoryFile: null, mediaAdvisoryDigest: '', mediaAdvisoryType: '',
+    mediaAdvisoryUrl: '',
     dragonBundle: [], dragonBundleSession: '', dragonExcerpt: null,
     selectedKnowledgeIds: new Set(), availableKnowledgeIds: new Set(),
     knowledgeScopeMode: 'all', knowledgeScopeVersion: 0, knowledgeListRequest: 0,
@@ -356,6 +382,14 @@ JAVASCRIPT = r"""'use strict';
     get('health-refresh').disabled = locked || state.busy;
     get('selftest-start').disabled = locked || working || foreignLease || state.health?.ready !== true;
     get('selftest-export').disabled = locked || !state.selfTestReport;
+    for (const id of ['media-advisory-file', 'media-advisory-title',
+                      'media-advisory-observation', 'media-advisory-review']) {
+      get(id).disabled = locked || state.busy;
+    }
+    get('media-advisory-preview').disabled = locked || state.busy || !state.mediaAdvisoryFile;
+    get('media-advisory-admit').disabled = locked || state.busy ||
+      !state.mediaAdvisoryFile || !state.mediaAdvisoryDigest ||
+      !get('media-advisory-review').checked;
     get('dragon-bundle-source').disabled = locked || state.busy || !state.dragonBundle.length;
     get('dragon-excerpt-start').disabled = locked || state.busy || !state.dragonBundle.length;
     get('dragon-excerpt-length').disabled = locked || state.busy || !state.dragonBundle.length;
@@ -409,6 +443,7 @@ JAVASCRIPT = r"""'use strict';
     get('longform-work-status').textContent = 'No active work cursor.';
     get('longform-work-id').value = '';
     state.selfTest = null; state.selfTestReport = null;
+    clearMediaAdvisory(true);
     state.dragonBundle = []; state.dragonBundleSession = ''; state.dragonExcerpt = null;
     get('dragon-bundle-file').value = '';
     get('dragon-bundle-source').replaceChildren();
@@ -1348,6 +1383,156 @@ JAVASCRIPT = r"""'use strict';
     status(imported + ' reference(s) imported or reused.' + (failures.length ? ' Unchanged files: ' + failures.join('; ') : ''));
   }));
 
+  function clearMediaAdvisory(full = false) {
+    if (state.mediaAdvisoryUrl) {
+      for (const id of ['media-advisory-image', 'media-advisory-audio', 'media-advisory-video']) {
+        const media = get(id);
+        if ('pause' in media) media.pause();
+        media.removeAttribute('src');
+        media.hidden = true;
+      }
+      URL.revokeObjectURL(state.mediaAdvisoryUrl);
+    }
+    state.mediaAdvisoryUrl = '';
+    state.mediaAdvisoryFile = null;
+    state.mediaAdvisoryDigest = '';
+    state.mediaAdvisoryType = '';
+    get('media-advisory-visual').hidden = true;
+    get('media-advisory-review').checked = false;
+    get('media-advisory-preview').disabled = true;
+    get('media-advisory-fingerprint').textContent = 'No local media selected.';
+    if (full) {
+      get('media-advisory-file').value = '';
+      get('media-advisory-title').value = 'Local reviewed media';
+      get('media-advisory-observation').value = '';
+      get('media-advisory-receipt').textContent = 'No media observation imported.';
+    }
+  }
+  const allowedLocalMedia = {
+    'image/png': 'image-caption', 'image/jpeg': 'image-caption',
+    'image/webp': 'image-caption', 'audio/wav': 'audio-transcript',
+    'audio/flac': 'audio-transcript', 'video/mp4': 'video-frames',
+  };
+  function localMediaType(file) {
+    const extensions = {
+      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      webp: 'image/webp', wav: 'audio/wav', flac: 'audio/flac',
+      mp4: 'video/mp4',
+    };
+    const extension = file.name.split('.').pop().toLowerCase();
+    const chosen = extensions[extension];
+    if (!chosen || (file.type && file.type !== chosen &&
+        !(chosen === 'audio/wav' && file.type === 'audio/x-wav')))
+      throw new Error('Select a local PNG, JPEG, WebP, WAV, FLAC or MP4 file.');
+    return chosen;
+  }
+  async function localMediaSha256(bytes) {
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest),
+      byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+  function localMediaBase64(bytes) {
+    const rows = [];
+    for (let i = 0; i < bytes.length; i += 16384)
+      rows.push(String.fromCharCode(...bytes.subarray(i, i + 16384)));
+    return btoa(rows.join(''));
+  }
+  get('media-advisory-file').addEventListener('change', () => run(async () => {
+    clearMediaAdvisory();
+    get('media-advisory-receipt').textContent =
+      'Selection changed; verify the new file and approve its exact text before importing.';
+    const file = get('media-advisory-file').files?.[0];
+    if (!file) return;
+    if (!Number.isSafeInteger(file.size) || file.size < 1 ||
+        file.size > 4 * 1024 * 1024)
+      throw new Error('Local media must be between 1 byte and 4 MiB.');
+    const mediaType = localMediaType(file);
+    const epoch = state.epoch;
+    const hash = await localMediaSha256(await file.arrayBuffer());
+    if (epoch !== state.epoch || !state.connected ||
+        get('media-advisory-file').files?.[0] !== file)
+      throw new Error('Selected media changed during local checksum validation.');
+    state.mediaAdvisoryFile = file;
+    state.mediaAdvisoryDigest = hash;
+    state.mediaAdvisoryType = mediaType;
+    get('media-advisory-fingerprint').textContent =
+      file.name + ' · ' + file.size + ' local bytes · ' + mediaType +
+      '\nBrowser SHA-256: ' + hash +
+      '\nHeader and SHA will be independently checked by Jeeves localhost before text admission.';
+    updateControls();
+  }));
+  get('media-advisory-review').addEventListener('change', updateControls);
+  get('media-advisory-preview').addEventListener('click', () => {
+    const file = state.mediaAdvisoryFile;
+    if (!state.connected || !file) return;
+    if (state.mediaAdvisoryUrl) URL.revokeObjectURL(state.mediaAdvisoryUrl);
+    const url = URL.createObjectURL(file);
+    state.mediaAdvisoryUrl = url;
+    const id = state.mediaAdvisoryType.startsWith('image/') ? 'media-advisory-image' :
+      state.mediaAdvisoryType.startsWith('audio/') ? 'media-advisory-audio' :
+      'media-advisory-video';
+    for (const key of ['media-advisory-image', 'media-advisory-audio', 'media-advisory-video']) {
+      const node = get(key);
+      node.hidden = key !== id;
+      if (key === id) node.src = url;
+      else {node.removeAttribute('src'); if ('pause' in node) node.pause();}
+    }
+    get('media-advisory-visual').hidden = false;
+  });
+  get('media-advisory-admit').addEventListener('click', () => run(async () => {
+    const file = state.mediaAdvisoryFile;
+    const mediaType = state.mediaAdvisoryType;
+    const expected = state.mediaAdvisoryDigest;
+    const observation = get('media-advisory-observation').value;
+    const title = get('media-advisory-title').value.trim();
+    if (!file || !get('media-advisory-review').checked ||
+        get('media-advisory-file').files?.[0] !== file)
+      throw new Error('Explicitly review and approve the current selected media.');
+    if (!observation.trim() || bytes(observation) > 12288 ||
+        !/^[A-Za-z0-9][A-Za-z0-9 _.:-]{0,95}$/.test(title))
+      throw new Error('Use a bounded reviewed observation and a printable source title.');
+    const epoch = state.epoch;
+    const binary = new Uint8Array(await file.arrayBuffer());
+    const digest = await localMediaSha256(binary);
+    if (epoch !== state.epoch || !state.connected ||
+        get('media-advisory-file').files?.[0] !== file ||
+        !get('media-advisory-review').checked || expected !== digest ||
+        state.mediaAdvisoryFile !== file ||
+        state.mediaAdvisoryType !== mediaType ||
+        title !== get('media-advisory-title').value.trim() ||
+        observation !== get('media-advisory-observation').value)
+      throw new Error('Media or review changed; fingerprint the selected file again.');
+    const response = await api('POST', '/v1/advisory/ingest', {
+      schema_version: 'skeleton.jeeves.advisory.v1',
+      modality: allowedLocalMedia[mediaType],
+      title, observation, observation_sha256: await exactLocalSha256(observation),
+      source_sha256: digest, media_type: mediaType,
+      media_base64: localMediaBase64(binary), reviewed: true,
+    });
+    if (epoch !== state.epoch || !state.connected ||
+        state.mediaAdvisoryFile !== file ||
+        state.mediaAdvisoryDigest !== digest)
+      throw new Error('Workspace or media changed during local admission.');
+    if (response.source_sha256 !== digest ||
+        response.observation_sha256 !== await exactLocalSha256(observation) ||
+        response.source_digest_authority !== 'server-verified-transient-source-bytes' ||
+        response.media_attestation?.media_size_bytes !== file.size ||
+        response.media_attestation?.media_type !== mediaType ||
+        response.media_attestation?.media_bytes_persisted !== false ||
+        response.primary_model_unchanged !== true ||
+        response.generation_performed !== false ||
+        response.remote_provider_called !== false ||
+        response.grounding_requires_explicit_turn !== true)
+      throw new Error('The local media admission receipt failed custody checks.');
+    get('media-advisory-receipt').textContent =
+      'Saved reviewed text in private SQLite document ' + response.document_id +
+      '. Actual media SHA-256 verified by localhost: ' + digest +
+      '. Raw media bytes not persisted; no inference or remote provider was used.';
+    clearMediaAdvisory();
+    await loadDocuments();
+    status('Locally verified reviewed media annotation admitted as untrusted reference text.');
+  }));
+
   async function exactLocalSha256(text) {
     const bytes = new TextEncoder().encode(text);
     const hashed = await crypto.subtle.digest('SHA-256', bytes);
@@ -1662,7 +1847,10 @@ JAVASCRIPT = r"""'use strict';
     if (!event.isComposing && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {event.preventDefault(); get('send').click();}
   });
   window.addEventListener('pageshow', event => {if (event.persisted) lock();});
-  window.addEventListener('pagehide', () => {stopPolling(); state.network.abort(); state.token = '';});
+  window.addEventListener('pagehide', () => {
+    stopPolling(); state.network.abort(); state.token = '';
+    clearMediaAdvisory(true);
+  });
   updateControls();
 })();
 """
