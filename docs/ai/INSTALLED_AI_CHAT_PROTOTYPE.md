@@ -235,6 +235,7 @@ Focused source tests and native inference acceptance:
       tests/test_jeeves_local_policy.py \
       tests/test_jeeves_live_local_advanced.py \
       tests/test_jeeves_inference_circuit.py \
+      tests/test_jeeves_durable_integrity.py \
       tests/test_jeeves_advisory.py \
       tests/test_install_ai_chat.py \
       tests/test_ai_chat_installed_smoke.py \
@@ -295,3 +296,29 @@ cooldown, real native/SQLite replay during an open circuit, actual
 backend-error injection and cancellation non-escalation. These tests
 validate execution-plumbing behavior, **not** model-language quality,
 operator GGUF speed, independent protected-backend quorum or handset AI.
+
+## 8. Whole-history SQLite and portable-backup custody
+
+Every authoritative conversation read now checks that **each saved assistant
+turn's output SHA-256 matches its archived text**. For native/GGUF turns
+committed with a mandatory execution receipt, the entire history must also
+contain a correctly bound sidecar with the matching revision, model digest,
+tokenizer digest, output hash, and bounded lower-case receipt digest.
+
+A missing, mismatched or retroactively attached receipt fails the *entire*
+conversation load rather than only failing a GET for the individual damaged
+turn. Jeeves must not use unverified earlier replies as context for another
+model generation. Its SQLite integrity checks are self-consistency and
+tamper-detection controls, **not** remotely signed attestation.
+
+Forked and portable imported turns retain transcript/receipt consistency
+but do **not** magically acquire a native execution identity for the new
+session: their runtime receipt remains explicitly absent until a new native
+generation occurs. An unverified historical row must never be relabeled as
+having run through the trusted native backend.
+
+A bundle checksum is unkeyed. It cannot authorize a model, supply protected
+backend proof, or excuse a nested `output_digest` inconsistent with its
+assistant text. The `tests/test_jeeves_durable_integrity.py` suite actively
+mutates earlier SQLite records and resigned portable envelopes, checking that
+invalid histories fail closed while valid fork/import history remains usable.
