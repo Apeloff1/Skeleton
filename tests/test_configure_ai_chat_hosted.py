@@ -26,7 +26,7 @@ def setup_root(root, text="AI_PROVIDER=local\nMONGO_INITDB_ROOT_PASSWORD=private
     return path
 
 
-@pytest.mark.parametrize("model", ["", "../escape", "hello world", "model\nAI_PROVIDER=local", "a" * 129])
+@pytest.mark.parametrize("model", ["", "../escape", "hello world", "model\nAI_PROVIDER=local", "a" * 129, "YOUR_APPROVED_MODEL", "YOUR_MODEL", "MODEL_ID", "EXAMPLE"])
 def test_model_selection_is_bounded_and_noninjectable(model):
     with pytest.raises(ActivationError):
         checked_model(model)
