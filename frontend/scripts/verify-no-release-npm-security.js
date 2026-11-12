@@ -115,7 +115,21 @@ function verifyNodeForgeNestedDigestAlgorithmGuard() {
 
   const rsaPath = require.resolve('node-forge/lib/rsa');
   const rsaSource = fs.readFileSync(rsaPath, 'utf8');
-  if (!rsaSource.includes('obj.value[0].value.length !==')) {
+  const packagePath = require.resolve('node-forge/package.json');
+  const version = JSON.parse(fs.readFileSync(packagePath, 'utf8')).version;
+  if (version === '1.4.3') {
+    // The newer published verifier rejects forged DigestInfo by re-encoding
+    // canonical DER rather than the older nested-sequence arity guard.
+    // The malicious signature fixture above MUST fail independently. This
+    // structure qualification MUST also pass, avoiding version-only trust.
+    const { qualifiesCanonicalRsaVerifier } = require('./security/node-forge-rsa-verifier.cjs');
+    if (!qualifiesCanonicalRsaVerifier(rsaSource)) {
+      throw new Error('node-forge canonical RSA verifier is unqualified');
+    }
+  } else if (!['1.4.0', '1.4.2'].includes(version)
+      || !rsaSource.includes('obj.value[0].value.length !==')) {
+    // The legacy versions require the locally reviewed explicit patch.
+    // Any other version stays fail-closed pending a fresh source review.
     throw new Error('node-forge nested DigestAlgorithm source guard is missing');
   }
 }
