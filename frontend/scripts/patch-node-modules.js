@@ -347,10 +347,12 @@ function patchNodeForgeNestedDigestAlgorithm() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  // Reviewed exact published versions. The 1.4.2 RSA parser still validates
-  // the outer DigestInfo count without validating nested DigestAlgorithm arity.
-  // Never silently trust a version bump as proof of this security fix.
-  if (!new Set(['1.4.0', '1.4.2']).has(version)) {
+  // Reviewed exact published versions: upstream 1.4.2 and 1.4.3 have the
+  // same lib/rsa.js (checked against digitalbazaar/forge v1.4.2...v1.4.3).
+  // Both still require our nested DigestAlgorithm arity check; the upstream
+  // canonical-DER verification alone does not replace this source guard.
+  // Keep the allowlist exact and fail closed on future/unreviewed versions.
+  if (!new Set(['1.4.0', '1.4.2', '1.4.3']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
   }
 
