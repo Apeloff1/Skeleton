@@ -16,7 +16,11 @@ Native release build preflight rejects missing, loopback, HTTP, credential-beari
 
 All four capabilities must work: (1) signed-in account and correct tenant; (2) durable conversation store with engine admission; (3) authorized engine; (4) a selectable activated text model. The chat screen now reports distinct storage, engine, provider credentials, missing model and protected local guard failures.
 
-For a hosted provider, configure the backend/engine private .env with AI_PROVIDER=openai and an approved OPENAI_API_KEY (and compatible model selection). Keep that secret out of Expo EXPO_PUBLIC variables. Restart/recreate the engine after setup. Use the existing installer and owner bootstrap steps described in FIRST_INSTALL_AI_AND_CRAWLER.md.
+For a hosted provider, after the canonical installer has created the private .env, the owner can opt in through the new secret-safe activation command:
+
+    python scripts/configure_ai_chat_hosted.py --model YOUR_APPROVED_MODEL --prompt-key --apply
+
+This validates the chosen model, accepts the server-side key through a hidden prompt, holds the setup lock, updates only AI_PROVIDER, AI_MODEL and OPENAI_API_KEY atomically in owner-private .env, and does not overwrite an existing key or configured local deployment without explicit rotation/switch flags. The command reports real_inference_verified=false and requires engine recreation. The provider receives chat content, so use this only when approved for your data policy. Keep provider credentials out of Expo EXPO_PUBLIC variables. The model must genuinely exist under your provider account, and the installer, owner/bootstrap, storage and engine scope requirements still apply. Refer to FIRST_INSTALL_AI_AND_CRAWLER.md.
 
 For local GGUF: the default Compose setup is documented as missing the trusted guard and source authorities. Downloading weights alone DOES NOT make the protected local path work. A compliant trusted app bootstrap requires native tokenizer/sampler attestations, reviewer, task-scoped canonical source authority, shared writer epoch and majority-durable Mongo. Never disable the guard, use an unsafe developer bypass, or substitute fake model output in a release.
 
@@ -46,7 +50,7 @@ For a preexisting bearer token you may use --token-file /absolute/private/chat-t
 
 Focused tests:
 
-    python -m pytest -q tests/test_ai_chat_installed_smoke.py
+    python -m pytest -q tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py
     cd frontend && node --test scripts/test-installed-chat-endpoint.cjs
     cd frontend && npm run typecheck
     cd frontend && npm run test:app-foundation
