@@ -265,7 +265,12 @@ class OfflineHTTPApplication:
         with self._store.read_snapshot():
             self._session(session_id)
             # Reject an already-owned ID with changed inputs before admission.
-            self._store.replay(session_id, rid, digest)
+            committed = self._store.replay(session_id, rid, digest)
+        if committed is not None:
+            # An exact committed retry is read-only. A process restart or a
+            # missing model must never turn durable replay into new inference.
+            observed = self.turn_status(session_id, rid)
+            return (200 if observed["state"] == "complete" else 202), observed
         key = (session_id, rid)
         with self._turn_lock:
             if self._closing:
@@ -317,10 +322,16 @@ class OfflineHTTPApplication:
         except asyncio.CancelledError:
             with self._turn_lock:
                 turn.state = "cancelled"
-        except (OfflineHTTPError, OfflineAIError, RuntimeContractError) as exc:
+        except OfflineHTTPError as exc:
             with self._turn_lock:
                 turn.state = "failed"
                 turn.error = str(exc)[:400]
+        except (OfflineAIError, RuntimeContractError):
+            # Backends may include absolute model paths, CLI output or private
+            # runtime details in exceptions. Tickets are client-visible.
+            with self._turn_lock:
+                turn.state = "failed"
+                turn.error = "local model or durable conversation operation failed"
         except Exception:
             with self._turn_lock:
                 turn.state = "failed"
@@ -1020,13 +1031,17 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         except OfflineHTTPError as exc:
             self._failed(exc)
         except RuntimeContractError as exc:
+            # Classify known contract failures without serializing private
+            # storage/model diagnostics to the authenticated HTTP caller.
             label = str(exc)
-            status = (404 if "unknown offline conversation" in label else
-                      409 if ("revision conflict" in label
-                              or "request id reused" in label) else 400)
-            self._json(status, {"error": label})
-        except (OfflineAIError, ValueError) as exc:
-            self._json(400, {"error": str(exc)})
+            if "unknown offline conversation" in label:
+                self._json(404, {"error": "unknown offline conversation"})
+            elif "revision conflict" in label or "request id reused" in label:
+                self._json(409, {"error": "local conversation conflict"})
+            else:
+                self._json(400, {"error": "invalid local conversation request"})
+        except (OfflineAIError, ValueError):
+            self._json(400, {"error": "local model request rejected"})
         except (OSError, sqlite3.Error):
             self._json(503, {"error": "local inference or storage is unavailable"})
         except Exception:
