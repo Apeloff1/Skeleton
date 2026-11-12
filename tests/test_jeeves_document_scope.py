@@ -230,7 +230,7 @@ def test_scope_controls_are_wired_to_local_browser_without_persistent_account_st
         "document_scope",
         "document_ids",
         "JSON.stringify(original.document_ids || [])",
-        "const selected = grounded ? Array.from(state.selectedKnowledgeIds).sort()",
+        "const scope = grounded ? Array.from(state.selectedKnowledgeIds).sort()",
         "row.append(scopeLabel, open, remove)",
     ):
         assert snippet in JAVASCRIPT
