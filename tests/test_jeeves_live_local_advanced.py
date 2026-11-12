@@ -585,7 +585,7 @@ def test_installed_local_browser_exposes_executable_sha_verified_inference_accep
     assert "operator_gguf_quality_certified: false" in JAVASCRIPT
     assert "independent_device_release_certified: false" in JAVASCRIPT
     assert "Download nonsecret qualification receipt" in HTML
-    assert "localhost" in HTML
+    assert "Local access token" in HTML
     # CSP intentionally allows no remote script, origin or exfiltration sink.
     assert "script-src 'self'; style-src 'self';" in JAVASCRIPT or "script-src" not in JAVASCRIPT
     assert "fetch('https://" not in JAVASCRIPT
