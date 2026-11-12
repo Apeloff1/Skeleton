@@ -112,6 +112,12 @@ def activate_hosted_ai(
         if _is_placeholder(existing_key):
             existing_key = ""
         local_model_present = any(values.get(name, "").strip() for name in _LOCAL_CONFIG)
+        if values.get("AI_LOCAL_GUARD_REQUIRED", "").strip().lower() in {"1", "true"}:
+            raise ActivationError(
+                "The protected-local guard is explicitly required for this host. "
+                "Hosted inference needs a separately approved deployment policy; "
+                "this command will not disable or silently bypass the guard."
+            )
         if active and active not in {"local", "openai"}:
             raise ActivationError("Existing nonlocal provider selection must be migrated explicitly.")
         if (active == "local" and local_model_present) and not allow_switch_from_local:
