@@ -75,6 +75,15 @@ def test_never_silently_overrides_a_configured_local_model():
         assert "AI_LOCAL_DEPLOYMENT_PATH=/app/local-ai/verified.json" in path.read_text()
 
 
+def test_hosted_mode_cannot_silently_disable_required_local_guard():
+    with TemporaryDirectory() as d:
+        path = setup_root(Path(d), "AI_PROVIDER=local\nAI_LOCAL_GUARD_REQUIRED=1\n")
+        before = path.read_bytes()
+        with pytest.raises(ActivationError, match="will not disable or silently bypass"):
+            activate_hosted_ai(Path(d), model="gpt-4.1-mini", key=EXAMPLE_KEY)
+        assert path.read_bytes() == before
+
+
 def test_existing_hosted_key_is_preserved_without_explicit_rotation():
     with TemporaryDirectory() as d:
         path = setup_root(Path(d), "AI_PROVIDER=openai\nOPENAI_API_KEY=" + EXAMPLE_KEY + "\n")
