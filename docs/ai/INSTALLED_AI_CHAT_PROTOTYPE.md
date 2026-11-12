@@ -365,7 +365,9 @@ the authorized-source-body mode and requires:
    flags explicitly **false**.
 2. Per-source SHA-256 of the exact historical export bytes, matching
    exported source/capture digests, valid policy version, bounded UTF-8
-   source text (up to 12 KiB), and historical source-use/freshness fields.
+   source text (up to 225 kB), and historical source-use/freshness fields.
+   The user chooses a Unicode-code-point start and 1–3000-character excerpt;
+   the reviewed excerpt is capped at 12 KiB and must match the preview.
 3. A full on-screen untrusted-text preview and a **fresh, manually checked**
    owner approval checkbox for the exact selected excerpt. Switching
    excerpts removes that checkbox grant.
