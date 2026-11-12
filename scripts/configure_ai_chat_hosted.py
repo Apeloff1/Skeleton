@@ -80,6 +80,8 @@ def checked_key(value: str) -> str:
 
 
 def checked_model(value: str) -> str:
+    if not _MODEL.fullmatch(value) or value.upper() in {"YOUR_APPROVED_MODEL", "YOUR_MODEL", "MODEL_ID", "EXAMPLE"}:
+        raise ActivationError("A real approved model ID is required; examples and placeholders cannot activate chat.")
     if not _MODEL.fullmatch(value):
         raise ActivationError("The model ID is invalid; use a supported provider model name.")
     return value
