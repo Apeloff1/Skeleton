@@ -115,7 +115,20 @@ function verifyNodeForgeNestedDigestAlgorithmGuard() {
 
   const rsaPath = require.resolve('node-forge/lib/rsa');
   const rsaSource = fs.readFileSync(rsaPath, 'utf8');
-  if (!rsaSource.includes('obj.value[0].value.length !==')) {
+  // In 1.4.3 upstream replaced the nested-count patch with stricter
+  // canonical DER DigestInfo round-trip validation. The installer attests the
+  // reviewed exact RSA source bytes; this verifier independently checks both
+  // that identity AND the hostile low-exponent signature rejection above.
+  const version = require('node-forge/package.json').version;
+  if (version === '1.4.3') {
+    const crypto = require('crypto');
+    const observed = crypto.createHash('sha256').update(rsaSource).digest('hex');
+    if (observed !== '6632e195295ce76f6bb9131ee770dcd6cc1ee4ffac7906302208b00faf95a87f' ||
+        !rsaSource.includes('var withParameters = _encodeDigestInfo(oid, capture.digest, true);') ||
+        !rsaSource.includes('d.substring(0, withoutParameters.length) !== withoutParameters')) {
+      throw new Error('node-forge 1.4.3 canonical DER verification custody failed');
+    }
+  } else if (!rsaSource.includes('obj.value[0].value.length !==')) {
     throw new Error('node-forge nested DigestAlgorithm source guard is missing');
   }
 }
