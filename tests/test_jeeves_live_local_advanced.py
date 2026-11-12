@@ -173,3 +173,25 @@ def test_closing_and_wrong_jeeves_identity_never_admit_new_generation(tmp_path, 
     _, state = app.dispatch("GET", "/v1/status")
     assert state["ready"] is False
     assert state["model_readiness_code"] == "local_service_shutting_down"
+
+
+
+def test_continuation_preflight_refuses_a_reopened_session_that_discards_history(monkeypatch):
+    """A second answer is not context continuity if the model forgets turn one."""
+    from skeleton.app.local_ai import DurableOfflineAISession
+    original = DurableOfflineAISession._request
+    def forget_first_turn(self, prompt, max_output_tokens):
+        prepared, kept = original(self, prompt, max_output_tokens)
+        if prompt.startswith("Continue the local Jeeves conversation"):
+            return prepared, ()
+        return prepared, kept
+    monkeypatch.setattr(DurableOfflineAISession, "_request", forget_first_turn)
+    with pytest.raises(LiveJeevesFailure, match="discard the prior conversation context"):
+        _qualify_actual_local_http(native_model(), timeout_seconds=45, output_tokens=2)
+
+
+def test_advanced_qualification_reports_context_preflight_not_cryptographic_generation_proof():
+    result = _qualify_actual_local_http(native_model(), timeout_seconds=45, output_tokens=2)
+    assert result["context_preflight_history_retained"] is True
+    assert result["context_preflight_is_generation_proof"] is False
+    assert result["actual_model_turns"] == 2
