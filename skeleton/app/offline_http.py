@@ -879,6 +879,15 @@ class OfflineHTTPApplication:
                     self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
                 return 200, {"deleted_session_id": sid}
         if tail == "turn" and method == "POST":
+            # A historical exact POST retry is a SQLite read, not an
+            # inference job. Recover it even while another turn owns the
+            # single local model, or when circuit admission is closed.
+            rid, digest = self._turn_identity(body, self.default_output_tokens)
+            with self._store.read_snapshot():
+                self._session(sid)
+                committed = self._store.replay(sid, rid, digest)
+            if committed is not None:
+                return 200, self._perform_turn(sid, body)
             with self._turn_lock:
                 if self._closing or self._active_session is not None:
                     raise OfflineHTTPError(409, "another local generation is still running")
