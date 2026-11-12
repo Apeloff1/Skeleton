@@ -5,8 +5,10 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "scripts/ai_chat_installed_smoke.py"
+      - "scripts/install_ai_chat.py"
       - "scripts/configure_ai_chat_hosted.py"
       - "tests/test_ai_chat_installed_smoke.py"
+      - "tests/test_install_ai_chat.py"
       - "tests/test_configure_ai_chat_hosted.py"
       - "frontend/**"
       - ".github/workflows/installed-ai-chat-prototype.yml"
@@ -43,12 +45,12 @@ jobs:
       - name: Install source test dependencies
         run: python -m pip install --disable-pip-version-check --no-input -e . "pytest>=8,<9"
       - name: Compile first-install operator entrypoints
-        run: python -m compileall -q scripts/ai_chat_installed_smoke.py scripts/configure_ai_chat_hosted.py
+        run: python -m compileall -q scripts/ai_chat_installed_smoke.py scripts/configure_ai_chat_hosted.py scripts/install_ai_chat.py
       - name: Verify chat real-receipt, persistence, credential and hosted activation contracts
         env:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py
+        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py
       - name: Set up Node 24
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
