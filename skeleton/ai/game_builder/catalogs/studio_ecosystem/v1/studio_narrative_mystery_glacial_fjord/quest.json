@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_narrative_mystery_glacial_fjord",
+  "genre": "narrative_mystery",
+  "biome": "glacial_fjord",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_narrative_mystery_glacial_fjord:restore",
+  "objective": "reconstruct an erased civic record",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "blue tidal shelves",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near ice-locked archive",
+        "Seek a witness of fracturing ice"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "ice-locked archive",
+      "entry": "survey_complete",
+      "actions": [
+        "investigate",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to thermal vents",
+        "Establish an independent path around a record-forging council"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "ice-locked archive",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of ice-locked archive",
+        "Construct a low-resource alternative using thermal vents"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden fracturing ice interrupts transfer",
+    "The a record-forging council suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "thermal vents",
+    "unlimited_rewards": false
+  }
+}

@@ -102,6 +102,8 @@ jobs:
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_cli_timeout_and_redaction.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_cli_publication.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_batch_cli_source_custody.py' -v
+          # Real SQLite batch CLI with synthetic-only model and protected source identity.
+          python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_batch.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_acceptance_cli*.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_source_fence*.py' -v
           python -m unittest discover -s skeleton/testing -p 'test_jeeves_native_session_source_fence.py' -v

@@ -1,67 +1,14 @@
 name: Dragon campaign source qualification
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/ai/webcrawler/dragon_campaign_stack/**"
-      - "skeleton/ai/webcrawler/operations.py"
-      - "skeleton/ai/webcrawler/core.py"
-      - "skeleton/ai/webcrawler/document_formats.py"
-      - "skeleton/ai/webcrawler/frontier_scheduler.py"
-      - "skeleton/ai/webcrawler/link_header_discovery.py"
-      - "skeleton/ai/webcrawler/structured_discovery.py"
-      - "tests/test_ai_webcrawler_dragon_text_sitemaps.py"
-      - "tests/test_ai_webcrawler_dragon_redirect_semantics.py"
-      - "tests/test_ai_webcrawler_dragon_opml_catalog.py"
-      - "skeleton/ai/webcrawler/bound_http.py"
-      - "skeleton/ai/webcrawler/content_coding.py"
-      - "skeleton/ai/webcrawler/archive_documents.py"
-      - "skeleton/ai/webcrawler/host_backpressure.py"
-      - "skeleton/ai/webcrawler/xml_documents.py"
-      - "skeleton/ai/webcrawler/capture_rights.py"
-      - "skeleton/ai/webcrawler/html_semantics.py"
-      - "skeleton/ai/webcrawler/media_probe.py"
-      - "skeleton/ai/webcrawler/pdf_documents.py"
-      - "skeleton/ai/webcrawler/pdf_worker.py"
-      - "skeleton/ai/webcrawler/office_suites.py"
-      - "skeleton/ai/webcrawler/robots_rate.py"
-      - "tests/test_ai_webcrawler_dragon_robots_rate.py"
-      - "tests/test_ai_webcrawler_dragon_office_suites.py"
-      - "tests/test_ai_webcrawler_dragon_pdf_documents.py"
-      - "tests/test_ai_webcrawler_dragon_media_probe.py"
-      - "tests/test_ai_webcrawler_dragon_html_semantics.py"
-      - "tests/test_ai_webcrawler_dragon_capture_rights.py"
-      - "tests/test_ai_webcrawler_dragon_xml_documents.py"
-      - "tests/test_ai_webcrawler_dragon_host_backpressure.py"
-      - "tests/test_ai_webcrawler_dragon_archive_documents.py"
-      - "tests/test_ai_webcrawler_dragon_http_coding.py"
-      - "tests/test_ai_webcrawler_dragon_feed_pagination.py"
-      - "tests/test_ai_webcrawler_dragon_gain7.py"
-      - "tests/test_ai_webcrawler_dragon_campaign_stack.py"
-      - "tests/test_ai_webcrawler_dragon_campaign_depth.py"
-      - "tests/test_ai_webcrawler_dragon_atlas.py"
-      - "tests/test_ai_webcrawler_dragon_invalidation.py"
-      - "tests/test_ai_webcrawler_dragon_review_ops.py"
-      - "tests/test_ai_webcrawler_dragon_retrieval_intel.py"
-      - "tests/test_ai_webcrawler_dragon_frontier_ops.py"
-      - "tests/test_ai_webcrawler_dragon_retrieval_robustness.py"
-      - "tests/test_ai_webcrawler_dragon_source_similarity.py"
-      - "tests/test_ai_webcrawler_dragon_family_stress.py"
-      - "tests/test_ai_webcrawler_dragon_forensics.py"
-      - "tests/test_ai_webcrawler_dragon_deep_forensics.py"
-      - "tests/test_ai_webcrawler_dragon_custody_wave3.py"
-      - "tests/test_ai_webcrawler_dragon_research_ops_wave4.py"
-      - "tests/test_ai_webcrawler_dragon_wave5.py"
-      - "backend/core/dragon_crawler.py"
-      - "backend/routes/dragon_academy.py"
-      - ".github/workflows/dragon-campaign-source-tests.yml"
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: dragon-campaign-source-${{ github.event.pull_request.number }}
+  group: dragon-campaign-source-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -74,10 +21,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify exact source-head checkout identity
         env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - name: Use supported Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -289,7 +236,6 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_activitystreams.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_catalogs.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_memento.py' -v
-          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_catalogs.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_scene_topology.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_extended_scene_graphs.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_openapi_graph.py' -v

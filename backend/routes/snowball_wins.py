@@ -124,7 +124,7 @@ async def pitch(pid: str):
                     version="1",
                     instructions="You are a punchy game-marketing copywriter.",
                 ),
-            ).with_model("openai", "gpt-4o-mini")
+            )
             import asyncio
             resp = await asyncio.wait_for(chat.send_message(UserMessage(
                 text=f"Write ONE vivid 2-sentence store pitch for '{title}' ({genre}). Premise: {brief}")), timeout=30)

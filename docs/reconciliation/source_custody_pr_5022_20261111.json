@@ -1,0 +1,243 @@
+{
+  "schema": 1,
+  "source_pr": 5022,
+  "source_head": "af94dcf6c458868a42c1b55248b04f65c6337c06",
+  "merge_base": "e00bfb0809b34573c2df313ea16e17fd10bead38",
+  "target_main": "42c9908bee87bacde621b99e6015250cb41d64da",
+  "source_custody": true,
+  "approval": "DO NOT MERGE",
+  "tree_reconciliation": "file-identity three-way. Auto-adopt only where main is unchanged since merge base",
+  "covered_root_until": {
+    "base": "skeleton/eval/scatter10240/caps/c0286.py",
+    "main": "skeleton/cue/gb46/caps/c1462_replay_022.py",
+    "head": "skeleton/cue/gb46/caps/c2397_export_157.py"
+  },
+  "covered_skeleton_until": {
+    "base": "testing/test_offline_cognition_overflow_hold_context.py",
+    "main": "testing/test_combat_design.py",
+    "head": "testing/test_game_pareto_train.py"
+  },
+  "adopted": [
+    {
+      "path": "skeleton/ai/game_builder/dragon_source_review.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4b54b5e93f5a1bb4d9eec5a747f1e732b02a3af8"
+    },
+    {
+      "path": "skeleton/ai/game_builder/reviewed_knowledge.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9ff1525bdae8d83173d1d3c37d42433e8b0b5ec1"
+    },
+    {
+      "path": "skeleton/ai/runtime/intelligence/execution_runtime.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c2c0e1b4cf2d520219e3e4172f80fe80e58b877b"
+    },
+    {
+      "path": "skeleton/ai/runtime/intelligence/verification_runtime.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c8b96ba4754ef846c659e70de78871eadc702e5b"
+    },
+    {
+      "path": "skeleton/ai/runtime/learning_foundation/content_retrieval.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "527974c5e15daecc3d7151f0e6173bfbfea29748"
+    },
+    {
+      "path": "skeleton/ai/runtime/learning_foundation/temporal.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0ec95be2c944d8136c935958ab85aa0241682da5"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/laptop_runtime/desktop_source_qualification.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1a538cd873149b552ab0f10448c8219ed7e70012"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/orchestration/execution_spine/database.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "476435061ee876964dd62a8d665f7a7905591ea8"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/transport/flight/event_stream/query.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "816c7a7202fb7a2f4a9ccf73818a55b3a112d2a8"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/cli.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ab651e8f4e712843d13e8f2ae09794b371d196bb"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/control.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "12710d15aba995498db855a3e685f9608779d02d"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/data.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7a6143974a1854f981b4043f1816df49fe20d512"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/distributed_trainer.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fdab5f1bc2e94a9a8b5b663f5567110572fb7b6c"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/neural_trainer.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f72ef57364abe62c98d5b3da4807ef5aeee425b1"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/observability.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f4b658822e09d2112852616f75158f69b3689762"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/post_training.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9465ecc6c81e559ca3a565b4e5abc65f1939a55f"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/preference_trainer.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c77e753ff346c57504cf334d685de45e81381271"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/state_cli.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6f3d894891c74cb0940059da372d9754b66ad1a9"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/trainer.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e4f385bd593dad2d98d385d31defc6afb21eb7e2"
+    },
+    {
+      "path": "skeleton/intelligence/execution_runtime.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c2c0e1b4cf2d520219e3e4172f80fe80e58b877b"
+    },
+    {
+      "path": "skeleton/intelligence/verification_runtime.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c8b96ba4754ef846c659e70de78871eadc702e5b"
+    },
+    {
+      "path": ".github/workflows/quarantine-flight-preflight-regression.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "568e8b964f0bc61f47e90344b6d0265e80df4913"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/offline_cognition/first_laptop_preflight_sota.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8350fcf85b747f9ed06c1dd529535206758f61a8"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/transport/flight/event_stream/service_sota.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9cc1d7eb87ea4bf4536ee77ce18bc56dc6d4a4e7"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/transport/flight/http_sota.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "73f2c63a8148803905be2ba26cf5aea3c3444f7e"
+    }
+  ],
+  "already_in_main_count": 1650,
+  "deferred": [
+    {
+      "path": "machine/ai_file_tree.json",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "76b1a388ed32cd296a2b384198759568c72fe79b",
+      "source_sha": "fa5e9979b3b20c7b0061865aef9a90187db5bdf3",
+      "main_sha": "1fc4f79bf6ab796da1cf96d709eb22d0c89ac54c"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/reliability_fabric/flows/evidence_bundle.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "9148156d656e9191966a569c506cf351bb507983",
+      "source_sha": "688233ba3193a517610725a855dcc9a6f6b58431",
+      "main_sha": "8401d526bda9eda30611ad08dc266e5d90a14b67"
+    },
+    {
+      "path": "skeleton/testing/test_ai_flight_context_admission.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "67159a84796db12b46b5c9efed0ce1105b2ac618",
+      "source_sha": "1eed20322baf4b49d67d1b744f8f2bd6259b8fd3",
+      "main_sha": "028952dc7da7173d331c8f6024e7f2dc78862d2f"
+    },
+    {
+      "path": "skeleton/testing/test_ai_git_knowledge.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "4cfd3e5e848fa6f3ee3f03ca369fb165f2cc702f",
+      "source_sha": "7caa09ef75da153c76fcc22f9bbc59eb37f48356",
+      "main_sha": "78bb41ec6b3cb86602015d6ef67a2e05ee909183"
+    },
+    {
+      "path": "skeleton/testing/test_ai_native_endurance.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "3ecff1f18f081d77e3d36b51afb05ed090c51652",
+      "source_sha": "ea0167ead5a22523405f49255e49e48d2ff782e0",
+      "main_sha": "286ab7681f184524e4209f4aefd6cdad98d9dc43"
+    },
+    {
+      "path": "skeleton/testing/test_ai_next_model.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "bb8048a61cafcce34cef1e8e92f7eae38f71d387",
+      "source_sha": "9930fc5ea401deb4b17c3a3d18468ee84ea962fb",
+      "main_sha": "63501c9d13dba88524d65c95754a025949bdf278"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/session.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": null,
+      "source_sha": "a7bf719bff8cde2765cbddd8a3574390fbacb8bd",
+      "main_sha": "9043d01d87c74926e5f6f626ac20ad5b0c1855ab"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/world_canon.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": null,
+      "source_sha": "05fde3634c305aca9502a5e839bb93dfa939b760",
+      "main_sha": "5bcc9de45c7c4d187019dfbb9c434323d269f5d8"
+    },
+    {
+      "path": "skeleton/testing/test_first_laptop_preflight_quarantine.py",
+      "reason": "main-tree-unindexed",
+      "source_sha": "aad8884b7872b457e1d9202610ce055bce5e810a"
+    },
+    {
+      "path": "skeleton/testing/test_flight_sota_quarantine.py",
+      "reason": "main-tree-unindexed",
+      "source_sha": "36d41a3b556e748ce5b0988af901f843e876eb03"
+    }
+  ],
+  "unknown_tree_paths": 1821,
+  "notes": "Source commit remains first parent; excluded conflicts are still available by immutable Git object identity. No unstated CI qualification or merge authorization."
+}

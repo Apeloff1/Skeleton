@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_misty_breakwater",
+  "title": "Misty Breakwater: City Stewardship",
+  "subtitle": "An original city stewardship brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610303533,
+  "width": 19,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 7,
+  "theme": "ocean",
+  "starting_health": 4
+}

@@ -65,9 +65,21 @@ RUN --mount=type=secret,id=proxy_ca \
 # that installer-only code out of the production runtime entirely. The
 # development stage below can restore pip from Python's bundled ensurepip when
 # developer-only tools are explicitly requested.
-RUN rm -rf /usr/local/lib/python3.14/site-packages/pip \
-           /usr/local/lib/python3.14/site-packages/pip-*.dist-info \
-           /usr/local/bin/pip*
+RUN python - <<'PY'
+import pathlib
+import shutil
+import sysconfig
+
+site = pathlib.Path(sysconfig.get_path("purelib"))
+if not site.is_dir() or not site.is_relative_to(pathlib.Path("/usr/local/lib")):
+    raise SystemExit("unexpected Python site-packages path; refusing runtime pip cleanup")
+shutil.rmtree(site / "pip", ignore_errors=True)
+for dist in site.glob("pip-*.dist-info"):
+    shutil.rmtree(dist)
+for pip_bin in pathlib.Path("/usr/local/bin").glob("pip*"):
+    if pip_bin.is_file() or pip_bin.is_symlink():
+        pip_bin.unlink()
+PY
 
 # Explicitly identify the application host as production so exec_guard can
 # never be re-enabled by ALLOW_UNSAFE_CODE_EXECUTION inside this image. CORS

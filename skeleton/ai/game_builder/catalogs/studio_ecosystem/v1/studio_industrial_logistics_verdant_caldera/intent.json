@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_verdant_caldera",
+  "title": "Verdant Caldera: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Verdant Caldera; prototype maps are not full genre implementations.",
+  "seed": 202610302458,
+  "width": 21,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 7,
+  "theme": "forest",
+  "starting_health": 5
+}

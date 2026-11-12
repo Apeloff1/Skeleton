@@ -23,12 +23,13 @@ import httpx
 import pytest
 from starlette.testclient import TestClient
 
-# Import the FastAPI app.
+# Make backend modules importable without constructing the application during
+# collection. Provider-neutral engine suites intentionally do not install every
+# backend integration dependency.
 _BACKEND_ROOT = Path(__file__).resolve().parents[1]
 for _candidate in (str(_BACKEND_ROOT), "/app/backend"):
     if _candidate not in sys.path and Path(_candidate).is_dir():
         sys.path.insert(0, _candidate)
-from server import app
 
 
 _LIVE_ENV_KEYS = ("EXPO_PUBLIC_BACKEND_URL", "EXPO_BACKEND_URL")
@@ -78,6 +79,8 @@ def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool 
 @pytest.fixture(scope="session")
 def client() -> Generator[TestClient, None, None]:
     """Create a synchronous test client with session scope."""
+    from server import app
+
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
 

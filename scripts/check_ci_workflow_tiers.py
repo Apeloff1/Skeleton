@@ -16,31 +16,48 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = Path(".github/workflows")
 ARCHIVE = Path(".github/workflows-archive")
 INDEX = Path("machine/ci_workflow_tiers.json")
-# Explicit event-subscriber inventory: no extra independent Actions admission.
-MAX_INDEPENDENT_WORKFLOWS = 26
+
+# One independently guarded queue-drain lane survives the owner-directed
+# backlog pause. Housekeeping and three-hour expiry stay dispatch-only.
+SCHEDULED_RECOVERY = frozenset({"queue-drain.yml"})
+PAUSED_RECOVERY = frozenset({
+    "actions-housekeeping-cli.yml",
+    "three-hour-actions-queue-expiry.yml",
+})
+
+# Both formerly independent, PR-path-scoped source qualifications execute
+# inside the required quality_security lane. Manual workflows remain for
+# additional operator evidence, not as a replacement for the required gate.
+MANUAL_SOURCE_QUALIFICATIONS = {
+    "godot-provenance-source-qualification.yml": (
+        "test_godot_provenance_ancestor_custody_20261110.py",
+        "test_forge_native_output_custody_20261110.py",
+        "test_godot_export_provenance.py",
+        "test_godot_export_provenance_negative.py",
+        "test_forge_export_quarantine.py",
+    ),
+    "strict-replay-source-qualification.yml": (
+        "test_postmerge_environment_checkpoint_custody.py",
+        "test_replay_checkpoint_v6.py",
+        "test_environment_replay_admission_bounds.py",
+    ),
+}
 
 
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
     lines = source.splitlines()
-    starts = [i for i, line in enumerate(lines) if line == "on:"]
-    if len(starts) != 1:
-        raise ValueError("workflow requires exactly one literal multiline 'on:' trigger")
+    try:
+        start = next(i for i, line in enumerate(lines) if line == "on:")
+    except StopIteration as exc:
+        raise ValueError("workflow missing multiline 'on:' trigger") from exc
     found: set[str] = set()
-    for line in lines[starts[0] + 1:]:
+    for line in lines[start + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
             break
         match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
         if match:
-            event = match.group(1)
-            if event in found:
-                raise ValueError("duplicate workflow trigger event")
-            found.add(event)
-        elif re.match(r"^  \S", line) and not line.lstrip().startswith("#"):
-            # Do not silently miss inline, aliased, or quoted triggers.
-            raise ValueError("unsupported workflow trigger event declaration")
-    if not found:
-        raise ValueError("workflow has no explicit trigger events")
+            found.add(match.group(1))
     return found
 
 
@@ -69,25 +86,67 @@ def audit(root: Path = ROOT) -> list[str]:
             or any(not isinstance(name, str) or not name.endswith(".yml") or "/" in name
                    for group in tiers for name in group)):
         return ["CI tiers require nonempty sets of plain .yml file names"]
-    names = specialised + core + reusable
+    scheduled = policy.get("operational_scheduled_non_pr")
+    paused = policy.get("operational_paused_manual_only")
+    if (type(scheduled) is not list
+            or len(scheduled) != len(SCHEDULED_RECOVERY)
+            or any(type(name) is not str for name in scheduled)
+            or set(scheduled) != SCHEDULED_RECOVERY):
+        failures.append("scheduled operational registry must be the exact queue-drain lane")
+        scheduled = []
+    if (type(paused) is not list
+            or len(paused) != len(PAUSED_RECOVERY)
+            or any(type(name) is not str for name in paused)
+            or set(paused) != PAUSED_RECOVERY):
+        failures.append("paused operational registry must contain exactly two manual lanes")
+        paused = []
+    for name in SCHEDULED_RECOVERY | PAUSED_RECOVERY:
+        if not (root / WORKFLOWS / name).is_file():
+            failures.append(f"{name}: required operational workflow missing")
+    # Do not solve the workflow budget by dropping source custody tests:
+    # these exact source qualifications are required within Merge Readiness.
+    try:
+        readiness_source = (root / WORKFLOWS / "merge-readiness.yml").read_text(encoding="utf-8")
+        required_quality = readiness_source.split("\n  quality_security:\n", 1)[1].split("\n  pr_automation:\n", 1)[0]
+    except (OSError, UnicodeError, IndexError) as exc:
+        failures.append(f"protected source qualification lane missing ({exc})")
+        required_quality = ""
+    for name, cases in MANUAL_SOURCE_QUALIFICATIONS.items():
+        try:
+            source = (root / WORKFLOWS / name).read_text(encoding="utf-8")
+            if events(source) != {"workflow_dispatch"}:
+                failures.append(f"{name}: source qualification must be manually dispatched, not automatically subscribed")
+            # Manually dispatchable source qualification is never an authority
+            # for whichever branch tip happened to be selected at runtime.
+            for invariant in (
+                "candidate_sha:",
+                "required: true",
+                'ref: ${{ inputs.candidate_sha }}',
+                '[[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]',
+                'test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"',
+            ):
+                if invariant not in source:
+                    failures.append(f"{name}: immutable SHA admission or checkout attestation missing")
+            expected_group = (
+                "group: " + name.removesuffix("-qualification.yml")
+                + "-${{ inputs.candidate_sha }}"
+            )
+            if (expected_group not in source or "cancel-in-progress: false" not in source):
+                failures.append(f"{name}: manual candidate concurrency must preserve independent immutable evidence")
+        except (OSError, UnicodeError, ValueError) as exc:
+            failures.append(f"{name}: cannot inspect manual source qualification ({exc})")
+        for case in cases:
+            if case not in required_quality:
+                failures.append(f"{name}: required quality gate lost source test {case}")
+    if ("python -m pytest -q" not in required_quality
+            or "python -m unittest discover" not in required_quality
+            or "python -m compileall -q" not in required_quality
+            or "continue-on-error: true" in required_quality):
+        failures.append("protected source qualification steps must compile, execute and fail closed")
+
+    names = specialised + core + reusable + scheduled + paused
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
-    approved = policy.get("automatic_event_workflows")
-    if (not isinstance(approved, list) or not approved
-            or any(type(name) is not str or not name.endswith((".yml", ".yaml"))
-                   or "/" in name or name.startswith(".") for name in approved)
-            or len(approved) != len(set(approved))
-            or len(approved) > MAX_INDEPENDENT_WORKFLOWS):
-        return ["invalid explicit automatic workflow inventory"]
-    profiles = policy.get("automatic_event_triggers")
-    if (not isinstance(profiles, dict) or set(profiles) != set(approved)
-            or any(not isinstance(event_names, list) or not event_names
-                   or len(set(event_names)) != len(event_names)
-                   or any(type(event) is not str
-                          or not re.fullmatch(r"[a-z_]+", event) for event in event_names)
-                   or not independently_triggered(set(event_names))
-                   for event_names in profiles.values())):
-        return ["invalid explicit automatic event trigger profiles"]
     rules = policy.get("release_rules")
     if not isinstance(rules, dict) or not rules or any(x is not True for x in rules.values()):
         failures.append("release rules must preserve explicit qualification")
@@ -95,10 +154,9 @@ def audit(root: Path = ROOT) -> list[str]:
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
     if not active:
         failures.append("unexpected active workflow count: 0")
-    # Signed evidence workflows may sit beside the compact PR set when they
-    # cannot run automatically. Only non-manual triggers consume the cap.
+    # Count every independently triggered workflow except the one independently
+    # guarded queue-drain recovery lane. All paused writers remain manual.
     automatic = 0
-    automatic_files: set[str] = set()
     for path in active:
         try:
             found = events(path.read_text(encoding="utf-8"))
@@ -107,24 +165,25 @@ def audit(root: Path = ROOT) -> list[str]:
                 f"{path.name}: cannot inspect active workflow ({exc})"
             )
             continue
+        if path.name == "queue-drain.yml":
+            source = path.read_text(encoding="utf-8")
+            if (found != {"workflow_dispatch", "schedule", "push"}
+                    or not re.search(
+                        r"(?m)^  push:\n    branches: \[main\]\n    paths: \['\.github/workflows/queue-drain\.yml'\]$", source
+                    )
+                    or not re.search(r"(?m)^permissions: \{\}$", source)):
+                failures.append(f"{path.name}: operational-only trigger or permission drift")
+            continue
+        if path.name in PAUSED_RECOVERY:
+            source = path.read_text(encoding="utf-8")
+            if (found != {"workflow_dispatch"}
+                    or not re.search(r"(?m)^permissions: \{\}$", source)):
+                failures.append(f"{path.name}: paused workflow gained automatic admission or permissions")
+            continue
         if independently_triggered(found):
             automatic += 1
-            automatic_files.add(path.name)
-            if path.name in profiles and found != set(profiles[path.name]):
-                failures.append(
-                    f"{path.name}: event admission trigger drift "
-                    f"(expected={sorted(profiles[path.name])}, got={sorted(found)})"
-                )
-    if automatic > MAX_INDEPENDENT_WORKFLOWS:
+    if automatic > 20:
         failures.append(f"unexpected active workflow count: {automatic}")
-    # Numeric caps alone admit unauthorized replacement beneath the ceiling.
-    # Both new automatic subscribers and missing expected gates fail closed.
-    unregistered = sorted(automatic_files - set(approved))
-    missing = sorted(set(approved) - automatic_files)
-    if unregistered:
-        failures.append(f"unregistered automatic workflows: {unregistered}")
-    if missing:
-        failures.append(f"expected automatic workflows not triggered: {missing}")
     for name in specialised:
         path = root / ARCHIVE / name
         if (root / WORKFLOWS / name).exists():

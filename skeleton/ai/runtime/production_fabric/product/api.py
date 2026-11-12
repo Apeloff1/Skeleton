@@ -1,9 +1,11 @@
-"""Compatibility export of the canonical, local-only production dispatcher.
+"""Compatibility exports for the single, pure offline production dispatcher.
 
-No additional command authority, model, provider, or network adapter is created.
+The authoritative LocalAPI class lives in dispatcher.py. Re-export that exact
+class rather than defining a second implementation with divergent identity.
+Keep legacy module attributes available for existing integrations.
 """
-from __future__ import annotations
-
-from .dispatcher import LocalAPI
-
-__all__ = ["LocalAPI"]
+from ..contracts.canonical import dumps as dumps, loads as loads
+from ..contracts.errors import ContractError as ContractError, FabricError as FabricError
+from ..contracts.identity import identifier as identifier
+from ..planning.engine import ProductionEngine as ProductionEngine
+from .dispatcher import LocalAPI as LocalAPI

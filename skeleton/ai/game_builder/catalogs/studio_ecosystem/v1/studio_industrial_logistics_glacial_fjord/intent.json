@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_glacial_fjord",
+  "title": "Glacial Fjord: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610302322,
+  "width": 21,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "ocean",
+  "starting_health": 5
+}

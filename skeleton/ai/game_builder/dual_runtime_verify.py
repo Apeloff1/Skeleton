@@ -22,6 +22,8 @@ from .playable_world import (
 SCHEMA = "skeleton.game_builder.dual_runtime_verification.v1"
 _MAX_FILES = 128
 _MAX_BYTES = 2_100_000
+# Studio source has a separate finite producer budget; base games stay at 2.1 MB.
+_MAX_STUDIO_BYTES = 16_100_000
 _MAX_MANIFEST = 65_536
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
 _COMPONENT = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\Z")
@@ -29,6 +31,18 @@ _REQUIRED = frozenset({
     "index.html", "godot/world.json", "godot/proof.json",
     "proof/verified_solution.json", "godot/project.godot",
     "godot/scripts/main.gd", "release.json",
+})
+
+
+_STUDIO_REQUIRED = frozenset({
+    "studio/pipeline.json",
+    "studio/jeeves_dragon_tools.json",
+    "studio/executed_tool_receipts.json",
+    "studio/mirror_room.json",
+    "studio/consumer_gate.json",
+    "studio/companion_mirror_room.json",
+    "studio/companion_almanac.json",
+    "studio/companion_practice.json",
 })
 
 
@@ -259,6 +273,10 @@ def _world(native: dict[str, object], manifest: dict[str, object]) -> PlayableWo
                 markers["H"], solve_safe_path(rows),
             ))
         world = PlayableWorld(intent, tuple(levels), manifest["world_algorithm"])
+    except DualRuntimeVerificationError:
+        # Preserve explicit bounded-input rejection categories. They are
+        # canonical fixed messages, never an echo of hostile world content.
+        raise
     except (KeyError, IndexError, TypeError, ValueError) as exc:
         raise DualRuntimeVerificationError("invalid canonical world geometry") from exc
     if (world.digest != manifest.get("world_digest")
@@ -266,6 +284,28 @@ def _world(native: dict[str, object], manifest: dict[str, object]) -> PlayableWo
             or intent.project_id != manifest.get("project_id")):
         raise DualRuntimeVerificationError("world identity does not match release")
     return world
+
+
+def verify_studio_release_evidence(files: dict[str, bytes]) -> None:
+    """Require the independently pinned, hashed studio release-denial receipt.
+
+    Used only after all source entries have been admitted and hashed by the
+    original package verifier or the source-only archive inspector. A studio
+    package never grants commercial rights or native device qualification.
+    """
+    if "studio/consumer_gate.json" not in files:
+        raise DualRuntimeVerificationError("studio consumer evidence missing")
+    consumer = _json(files["studio/consumer_gate.json"], _MAX_MANIFEST)
+    evidence = consumer.get("evidence")
+    if (consumer.get("schema") != "skeleton.game_builder.consumer_review.v1"
+            or consumer.get("status") != "release-blocked"
+            or consumer.get("not_a_legal_opinion") is not True
+            or type(evidence) is not dict
+            or any(evidence.get(key) is not False for key in (
+                "approved_for_publication", "rights_reviewed",
+                "human_playtested", "platform_hardware_tested",
+            ))):
+        raise DualRuntimeVerificationError("studio consumer release fence invalid")
 
 
 def _assert_original_root(root: str | Path | int, descriptor: int) -> None:
@@ -313,8 +353,17 @@ def verify_exported_package(
         manifest = _json(release, _MAX_MANIFEST)
         if release != _canonical_bytes(manifest):
             raise DualRuntimeVerificationError("noncanonical release JSON")
-        if manifest.get("schema") != "skeleton.game_builder.dual_runtime_package.v1":
+        schema = manifest.get("schema")
+        if schema not in {
+            "skeleton.game_builder.dual_runtime_package.v1",
+            "skeleton.game_builder.studio_package.v1",
+        }:
             raise DualRuntimeVerificationError("unsupported release schema")
+        # Studio export is a separately named, metadata-augmented canonical
+        # source package. Do not accept an empty label upgrade that omits the
+        # original independent mirror/consumer evidence.
+        studio = schema == "skeleton.game_builder.studio_package.v1"
+        byte_budget = _MAX_STUDIO_BYTES if studio else _MAX_BYTES
         digest = manifest.get("manifest_digest")
         body = {key: value for key, value in manifest.items()
                 if key != "manifest_digest"}
@@ -330,6 +379,10 @@ def verify_exported_package(
         expected = set(declared) | {"release.json"}
         if not _REQUIRED <= expected or "release.json" in declared:
             raise DualRuntimeVerificationError("missing required game source")
+        if studio and not _STUDIO_REQUIRED <= expected:
+            raise DualRuntimeVerificationError("studio package lacks canonical evidence")
+        if not studio and any(path.startswith("studio/") for path in declared):
+            raise DualRuntimeVerificationError("studio evidence requires studio package schema")
         for path, digest in declared.items():
             _parts(path)
             if type(digest) is not str or not _HEX.fullmatch(digest):
@@ -339,13 +392,25 @@ def verify_exported_package(
         files: dict[str, bytes] = {}
         total = len(release)
         for path, expected_digest in sorted(declared.items()):
-            payload = _read(fd, path, _MAX_BYTES - total)
+            if total >= byte_budget:
+                raise DualRuntimeVerificationError("package source byte budget exceeded")
+            payload = _read(fd, path, byte_budget - total)
             total += len(payload)
             if sha256(payload).hexdigest() != expected_digest:
                 raise DualRuntimeVerificationError("package file digest mismatch")
             files[path] = payload
         if _inventory(fd) != expected:
             raise DualRuntimeVerificationError("package changed during verification")
+        if studio:
+            verify_studio_release_evidence(files)
+            # A studio label is insufficient: bind the canonical authored source
+            # and publication-denial claims to this exact project identity.
+            pipeline = _json(files["studio/pipeline.json"], _MAX_MANIFEST)
+            if (pipeline.get("schema") != "skeleton.game_builder.studio_pipeline.v1"
+                    or pipeline.get("not_automatically_published") is not True
+                    or pipeline.get("original_game_claim") != "generated-or-user-authored-geometry"
+                    or pipeline.get("project_id") != manifest.get("project_id")):
+                raise DualRuntimeVerificationError("invalid studio source custody")
         if files["godot/proof.json"] != files["proof/verified_solution.json"]:
             raise DualRuntimeVerificationError("browser and Godot proofs differ")
         native = _json(files["godot/world.json"], _MAX_BYTES)
@@ -369,9 +434,9 @@ def verify_exported_package(
             raise DualRuntimeVerificationError("winning replay does not reproduce")
         # The replay must not attest a package whose non-manifest files were
         # replaced after the first digest pass. This is a bounded second
-        # read of at most _MAX_BYTES across the same pinned directory tree.
+        # read bounded to the declared schema budget across the same pinned tree.
         for path, expected_digest in sorted(declared.items()):
-            if sha256(_read(fd, path, _MAX_BYTES)).hexdigest() != expected_digest:
+            if sha256(_read(fd, path, byte_budget)).hexdigest() != expected_digest:
                 raise DualRuntimeVerificationError("package source changed during replay")
         if _inventory(fd) != expected:
             raise DualRuntimeVerificationError("package entries changed during replay")
