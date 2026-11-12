@@ -31,6 +31,22 @@ from skeleton.app.local_ai_transcript import load_transcript, save_transcript
 
 MAX_USER_CHARS = 4096
 MAX_HISTORY_MESSAGES = 16
+_CONTEXT_SCHEMA = "skeleton.jeeves.local-context-preview.v1"
+
+
+def _strict_context_digest(digest: str, require_full_history: bool) -> str:
+    """Version a strict-context request without changing legacy request IDs.
+
+    A historical turn with the same request ID must never be replayed under
+    different conversation-retention semantics. Grounding is bound first.
+    """
+    if type(require_full_history) is not bool:
+        raise OfflineAIError("full-history policy must be a boolean")
+    if not require_full_history:
+        return digest
+    if not isinstance(digest, str) or len(digest) != 64:
+        raise OfflineAIError("invalid local turn request identity")
+    return sha256(("skeleton.jeeves.require-full-history.v1:" + digest).encode("ascii")).hexdigest()
 
 
 class OfflineAIError(ValueError):
@@ -209,7 +225,10 @@ class OfflineAISession:
         self.history = restored
         return len(restored) // 2
 
-    def _request(self, prompt: str, max_output_tokens: int) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
+    def _request(self, prompt: str, max_output_tokens: int, *,
+                 require_full_history: bool = False) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
+        if type(require_full_history) is not bool:
+            raise OfflineAIError("full-history policy must be a boolean")
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
             raise OfflineAIError("message must contain 1-4096 characters")
         runtime = self.backend.runtime if isinstance(
@@ -248,10 +267,55 @@ class OfflineAISession:
                 return request, history
             if not history:
                 raise OfflineAIError("message exceeds the selected model context; shorten it or reduce the output budget")
+            if require_full_history:
+                raise OfflineAIError("full conversation exceeds model context; reduce output tokens, shorten the message or explicitly allow older-turn trimming")
             history = history[2:]
 
+    def preview_context(self, prompt: str, max_output_tokens: int, *,
+                        grounding_context: str | None = None) -> dict[str, Any]:
+        """Read-only deterministic model-window estimate, never generation.
+
+        Native tokenizer accounting is exact for this request construction.
+        GGUF byte estimation is deliberately conservative; the pinned native
+        runtime still owns final tokenizer/llama.cpp admission. This method
+        never truncates the durable SQLite transcript.
+        """
+        if grounding_context is not None:
+            if (not isinstance(grounding_context, str)
+                    or not grounding_context.strip()
+                    or len(grounding_context.encode("utf-8")) > 4_096):
+                raise OfflineAIError("invalid bounded source context")
+            rendered_prompt = prompt.strip() + "\\n\\n" + grounding_context
+        else:
+            rendered_prompt = prompt
+        request, retained = self._request(rendered_prompt, max_output_tokens)
+        is_native = isinstance(self.backend, NativeRuntimeLocalModel)
+        limit = (self.backend.runtime.limits.max_context if is_native
+                 else self.backend.config.context_size or 4096)
+        estimated = (len(self.backend.runtime.tokenizer.encode_ids(request.rendered_input))
+                     if is_native else len(request.rendered_input.encode("utf-8")) + 16)
+        full = len(self.history)
+        return {
+            "schema": _CONTEXT_SCHEMA,
+            "read_only": True,
+            "generation_performed": False,
+            "model_digest": self.model_digest,
+            "context_tokens": limit,
+            "reserved_output_tokens": max_output_tokens,
+            "estimated_input_tokens": estimated,
+            "estimated_total_tokens": estimated + max_output_tokens,
+            "accounting": "exact-native-tokenizer" if is_native else "conservative-gguf-byte-estimate",
+            "full_history_messages": full,
+            "retained_history_messages": len(retained),
+            "omitted_history_messages": full - len(retained),
+            "fits_full_history": len(retained) == full,
+            "gguf_final_tokenizer_admission_required": not is_native,
+            "older_messages_were_deleted": False,
+        }
+
     async def ask(self, prompt: str, *, max_output_tokens: int = 32,
-                  grounding_context: str | None = None) -> OfflineAnswer:
+                  grounding_context: str | None = None,
+                  require_full_history: bool = False) -> OfflineAnswer:
         # The evidence goes only into the untrusted *user* prompt passed to
         # the local model, never instructions/system authority or durable user
         # message. The archived transcript retains the actual user question.
@@ -264,7 +328,8 @@ class OfflineAISession:
         else:
             inference_prompt = prompt
         request, retained_history = self._request(
-            inference_prompt, max_output_tokens
+            inference_prompt, max_output_tokens,
+            require_full_history=require_full_history,
         )
         result: LocalInferenceResult = await self.engine.generate(request)
         if (
@@ -425,7 +490,8 @@ class DurableOfflineAISession(OfflineAISession):
 
     async def ask(self, prompt: str, *, max_output_tokens: int = 32,
                   request_id: str | None = None,
-                  evidence_manifest: dict[str, Any] | None = None) -> OfflineAnswer:
+                  evidence_manifest: dict[str, Any] | None = None,
+                  require_full_history: bool = False) -> OfflineAnswer:
         rid = (_identifier("request id", request_id)
                if request_id is not None else secrets.token_urlsafe(18))
         with self._busy_lock:
@@ -462,12 +528,14 @@ class DurableOfflineAISession(OfflineAISession):
                     self.backend.model_digest, self.tokenizer_digest,
                 )
                 grounding_context = evidence_manifest["context"]
+            request_digest = _strict_context_digest(request_digest, require_full_history)
             # super().ask() deliberately shrinks inference context. The
             # persisted transcript MUST instead extend the complete prior
             # SQLite history, not the model's shortened context window.
             answer = await super().ask(
                 prompt, max_output_tokens=max_output_tokens,
                 grounding_context=grounding_context,
+                require_full_history=require_full_history,
             )
             transcript = saved.transcript.append("user", prompt.strip()).append(
                 "assistant", answer.text

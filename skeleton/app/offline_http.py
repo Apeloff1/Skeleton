@@ -32,7 +32,7 @@ from skeleton.ai.model_runtime.offline_chat import (
 from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
 from skeleton.app.local_ai import (
     DurableOfflineAISession, LocalDesktopModel, OfflineAIError,
-    _model_tokenizer_digest, load_gguf_deployment, load_native_checkpoint,
+    _model_tokenizer_digest, _strict_context_digest, load_gguf_deployment, load_native_checkpoint,
     private_desktop_database,
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
@@ -158,8 +158,7 @@ class OfflineHTTPApplication:
         self._lock = threading.RLock()
         self._turn_lock = threading.RLock()
         self._inference_circuit = LocalInferenceCircuit()
-        # Coordinate native/GGUF execution across independent local services
-        # sharing one private SQLite workspace. This is not an attestation.
+        # One physical native executor per private SQLite workspace.
         self._inference_lease = LocalInferenceLease(self.database)
         self._turns: dict[tuple[str, str], _LocalTurn] = {}
         self._active_session: str | None = None
@@ -253,7 +252,8 @@ class OfflineHTTPApplication:
 
     @staticmethod
     def _turn_identity(request: dict[str, Any], default_budget: int) -> tuple[str, str]:
-        _fields(request, {"message", "request_id", "max_output_tokens", "grounded"},
+        _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
+                          "require_full_history"},
                 {"message", "request_id"})
         message = request["message"]
         if (not isinstance(message, str) or not message.strip()
@@ -262,13 +262,18 @@ class OfflineHTTPApplication:
         grounded = request.get("grounded", False)
         if type(grounded) is not bool:
             raise OfflineHTTPError(400, "grounded must be a boolean")
+        strict = request.get("require_full_history", False)
+        if type(strict) is not bool:
+            raise OfflineHTTPError(400, "require_full_history must be a boolean")
         if grounded and len(message.strip().encode("utf-8")) > 1024:
             raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
         rid = _identifier("request id", request["request_id"])
         digest = _digest_request(message.strip(), GenerationConfig(
             max_new_tokens=_budget(request, default_budget),
         ))
-        return rid, grounded_request_digest(digest) if grounded else digest
+        if grounded:
+            digest = grounded_request_digest(digest)
+        return rid, _strict_context_digest(digest, strict)
 
     def submit_turn(self, session_id: str, body: dict[str, Any]) -> tuple[int, Any]:
         request = dict(body)
@@ -456,6 +461,15 @@ class OfflineHTTPApplication:
             # Preserve the original execution's replayed=False marker after
             # confirming the SQLite receipt. A read-after-restart is replayed.
             return observed
+        if observed is not None and observed["state"] not in TERMINAL_TURN_STATES:
+            # SQLite may commit a result a few microseconds before the native
+            # worker's finally block publishes its terminal in-memory state.
+            # Do not mark the same live process's turn as a replayed terminal
+            # completion until its execution task actually settles. A fresh
+            # process without the ticket will still recover from the exact
+            # durable SQLite receipt above. This also avoids prematurely
+            # releasing the UI's cancel/pressure ownership signal.
+            return observed
         if committed is not None:
             return committed
         if observed is not None:
@@ -496,11 +510,15 @@ class OfflineHTTPApplication:
 
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
-        _fields(request, {"message", "request_id", "max_output_tokens", "grounded"},
+        _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
+                          "require_full_history"},
                 {"message", "request_id"})
         grounded = request.get("grounded", False)
+        strict = request.get("require_full_history", False)
         if type(grounded) is not bool:
             raise OfflineHTTPError(400, "grounded must be a boolean")
+        if type(strict) is not bool:
+            raise OfflineHTTPError(400, "require_full_history must be a boolean")
         text = request["message"]
         if (not isinstance(text, str) or not text.strip()
                 or len(text.encode("utf-8", errors="strict")) > 4096):
@@ -509,8 +527,12 @@ class OfflineHTTPApplication:
         rid = _identifier("request id", request["request_id"])
         budget = _budget(request, self.default_output_tokens)
         digest = _digest_request(text, GenerationConfig(max_new_tokens=budget))
+        # Evidence manifest identity is deliberately independent of the
+        # stricter SQLite turn-policy identity.
+        grounding_digest = grounded_request_digest(digest) if grounded else None
         if grounded:
-            digest = grounded_request_digest(digest)
+            digest = grounding_digest
+        digest = _strict_context_digest(digest, strict)
         with self._lock:
             self._session(session_id)
             replay = self._store.replay(session_id, rid, digest)
@@ -529,7 +551,8 @@ class OfflineHTTPApplication:
                         422, "no local reference passages match this question"
                     )
                 manifest = prepare_evidence(
-                    text, digest, hits, self.model_digest, self.tokenizer_digest,
+                    text, grounding_digest, hits,
+                    self.model_digest, self.tokenizer_digest,
                 )
             try:
                 # Acquire only for NEW generation. Already committed historical
@@ -558,6 +581,7 @@ class OfflineHTTPApplication:
                             return await chat.ask(
                                 text, max_output_tokens=budget, request_id=rid,
                                 evidence_manifest=manifest,
+                                require_full_history=strict,
                             )
                         try:
                             generated_answer = asyncio.run(generate())
@@ -742,8 +766,6 @@ class OfflineHTTPApplication:
                 "model_readiness_code": code,
                 "readiness_is_live_inference_proof": False,
                 "inference_circuit": self._inference_circuit.status(),
-                # A local OS lock observation is not an execution receipt.
-                # It cannot authorize a model or override the readiness guard.
                 "inference_lease": self._inference_lease.inspect(),
                 "runtime_kind": ("native" if hasattr(self.backend, "runtime")
                                  else "llama.cpp"),
@@ -944,6 +966,62 @@ class OfflineHTTPApplication:
                                        self.tokenizer_digest)
                     self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
                 return 200, {"deleted_session_id": sid}
+        if tail == "context-preview" and method == "POST":
+            # Local-only read-only estimate; the actual new turn still
+            # validates full-history retention and GGUF native admission.
+            _fields(body, {"message", "max_output_tokens", "grounded",
+                           "require_full_history"}, {"message"})
+            message = body["message"]
+            if (not isinstance(message, str) or not message.strip()
+                    or len(message.encode("utf-8")) > 4096):
+                raise OfflineHTTPError(400, "context preview requires 1–4096 UTF-8 message bytes")
+            grounded = body.get("grounded", False)
+            strict = body.get("require_full_history", True)
+            if type(grounded) is not bool or type(strict) is not bool:
+                raise OfflineHTTPError(400, "context policy must be boolean")
+            if grounded and len(message.strip().encode("utf-8")) > 1024:
+                raise OfflineHTTPError(400, "grounded preview exceeds 1024 bytes")
+            budget = _budget(body, self.default_output_tokens)
+            with self._lock:
+                self._session(sid)
+                context = None
+                if grounded:
+                    query = message.strip()
+                    hits = self.knowledge.search(query, limit=2)
+                    if not hits:
+                        raise OfflineHTTPError(
+                            422, "no local reference passages match this question"
+                        )
+                    digest = grounded_request_digest(_digest_request(
+                        query, GenerationConfig(max_new_tokens=budget)
+                    ))
+                    manifest = prepare_evidence(
+                        query, digest, hits, self.model_digest, self.tokenizer_digest
+                    )
+                    context = manifest["context"]
+                session = DurableOfflineAISession(
+                    self.backend, database=self.database, session_id=sid
+                )
+                try:
+                    report = session.preview_context(
+                        message.strip(), budget, grounding_context=context
+                    )
+                    saved = session.store.load(
+                        sid, self.model_digest, self.tokenizer_digest
+                    )
+                    report["session_id"] = sid
+                    report["session_revision"] = saved.revision
+                    report["grounded"] = grounded
+                    report["require_full_history"] = strict
+                    report["may_submit_under_policy"] = (
+                        report["fits_full_history"] or not strict
+                    )
+                    report["preview_is_admission_proof"] = False
+                except OfflineAIError as exc:
+                    raise OfflineHTTPError(422, str(exc)) from None
+                finally:
+                    session.close()
+                return 200, report
         if tail == "turn" and method == "POST":
             # A historical exact POST retry is a SQLite read, not an
             # inference job. Recover it even while another turn owns the

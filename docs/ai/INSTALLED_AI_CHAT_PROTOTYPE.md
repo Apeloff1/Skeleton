@@ -395,6 +395,60 @@ checks the actual local model + SQLite receipt semantics, the browser
 self-check and its Dragon UI wiring, and an actual reviewed crawler
 observation into SQLite without another generation.
 
+## 11. Full-conversation context fidelity and local preflight (implemented)
+
+The Jeeves browser now defaults to **Require entire conversation context**.
+This is a real execution policy, not a cosmetic indicator. The previous
+`OfflineAISession._request` behavior conservatively trims oldest
+user/assistant *pairs* until the model context budget can fit the request.
+The complete canonical SQLite transcript remains intact, but an earlier turn
+might not have been supplied to the model. That behavior remains supported
+**only through explicit bounded-recent opt-in** in the browser.
+
+An authenticated read-only `POST /v1/sessions/<id>/context-preview`
+accepts `message`, `max_output_tokens`, `grounded` and
+`require_full_history`. It uses the actual history-to-prompt renderer and
+current model's admitted context and output budgets. The result reports
+full/retained/omitted message counts, total input/output estimates, real model
+digest, SQLite revision, strict-policy admissibility and whether the accounting
+is **exact native-tokenizer** or **conservative GGUF UTF-8 bytes**. Grounded
+previews use the same bounded local reference retrieval and manifest
+construction as an actual grounded model turn; absent matching evidence
+refuses the preview. No model invocation, remote provider, SQLite write,
+privileged approval or automatic summary is done by this endpoint.
+
+When strict history is required, both asynchronous and synchronous native
+generation use the `require_full_history: true` request bit. The execution
+adapter now **refuses before inference** if even one older pair would need
+trimming; returning a superficially successful partial-context answer is
+forbidden. When the user consciously unchecks the box, bounded-recent
+generation may continue with the previous deterministic pair trimming,
+without ever deleting historical SQLite conversation rows. In either case,
+restarting/replaying a committed request returns the exact historical receipt.
+The policy bit is domain-separated into the idempotent request digest, so
+reusing an ID while switching between strict and bounded modes is a
+deterministic conflict, not a hidden changed-policy replay.
+
+A **Preview context** button displays the current counts and shows a
+warning if an older pair would be omitted. A strict send performs a fresh
+read-only preflight before scheduling the actual turn. The generated turn
+**also independently revalidates** the strict policy; the browser preview
+is not an admission token and cannot bypass a concurrent conversation
+revision or model change. Older API clients continue to use the legacy
+bounded mode until they explicitly send `require_full_history: true`.
+The operator may adjust the output budget, shorten an input, start a fork
+or explicitly allow trimming; no automatic model substitution occurs.
+
+**Limitations:** this is an exact token count for the source-native tokenizer,
+but GGUF `llama.cpp` may perform a different final tokenizer/context check
+and refuse after the preview. Full history fitting says nothing about
+reasoning correctness, language quality, publisher rights or actual
+hardware acceptance. No automatic lossy conversation summary is represented
+as having preserved the whole context. The standalone `OfflineAISession`
+still has an ephemeral 16-message display cache; the durable HTTP
+`DurableOfflineAISession` re-opens the entire integrity-verified SQLite
+history before calculating each new model request.
+
 ## 2026 local execution custody: independent service-process safety
 
 The standalone authenticated Jeeves HTTP service now uses an additional

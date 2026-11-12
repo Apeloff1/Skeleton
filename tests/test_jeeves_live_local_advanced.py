@@ -184,8 +184,11 @@ def test_continuation_preflight_refuses_a_reopened_session_that_discards_history
     """A second answer is not context continuity if the model forgets turn one."""
     from skeleton.app.local_ai import DurableOfflineAISession
     original = DurableOfflineAISession._request
-    def forget_first_turn(self, prompt, max_output_tokens):
-        prepared, kept = original(self, prompt, max_output_tokens)
+    def forget_first_turn(self, prompt, max_output_tokens, *, require_full_history=False):
+        prepared, kept = original(
+            self, prompt, max_output_tokens,
+            require_full_history=require_full_history,
+        )
         if prompt.startswith("Continue the local Jeeves conversation"):
             return prepared, ()
         return prepared, kept
