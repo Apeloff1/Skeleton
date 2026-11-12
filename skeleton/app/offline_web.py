@@ -1345,8 +1345,8 @@ JAVASCRIPT = r"""'use strict';
       '… (declared span ' + receipt.source_span.start + '–' +
       receipt.source_span.end + ' Unicode code points). Saved into the private ' +
       'reference library. The source span is caller-declared, not independently ' +
-      'source-reverified; source rights still require revalidation. Grounding ' +
-      'is not enabled until you explicitly select it for a new turn.';
+      'source-reverified; source rights still require revalidation. ' +
+      'Grounding is not enabled until you explicitly select it for a new turn.';
     await loadDocuments();
     status('Reviewed Dragon excerpt admitted locally as untrusted text, not as a second model or approved fact.');
   }));
