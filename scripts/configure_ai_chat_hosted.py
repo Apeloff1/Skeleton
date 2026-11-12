@@ -79,6 +79,17 @@ def checked_key(value: str) -> str:
     return value
 
 
+def prompted_provider_key() -> str:
+    """Never allow getpass to fall back to an echoing headless input stream."""
+    if not sys.stdin.isatty():
+        raise ActivationError("Private interactive key entry requires a terminal; use --key-file with mode 0600.")
+    try:
+        value = getpass("Server-side OpenAI API key (hidden): ")
+    except (EOFError, KeyboardInterrupt):
+        raise ActivationError("Private key entry was cancelled; no credentials were stored.") from None
+    return checked_key(value)
+
+
 def checked_model(value: str) -> str:
     if not _MODEL.fullmatch(value) or value.upper() in {"YOUR_APPROVED_MODEL", "YOUR_MODEL", "MODEL_ID", "EXAMPLE"}:
         raise ActivationError("A real approved model ID is required; examples and placeholders cannot activate chat.")
@@ -173,7 +184,7 @@ def main(argv: list[str] | None = None) -> int:
             }))
             return 0
         key = private_provider_key(args.key_file) if args.key_file else (
-            checked_key(getpass("Server-side OpenAI API key (hidden): ")) if args.prompt_key else None
+            prompted_provider_key() if args.prompt_key else None
         )
         report = activate_hosted_ai(
             args.root or find_repo_root(), model=model, key=key,
