@@ -208,8 +208,20 @@ def readiness(api: ChatApi) -> dict:
         and type(entry.get("max_output_tokens")) is int
         and 0 < entry["max_output_tokens"] <= 1000000
     ]
+    # Inference MUST be local Jeeves. A green health probe on a hosted model
+    # cannot certify an offline installation, even when auto-routing is on.
+    foreign = [
+        model for model in catalog
+        if isinstance(model, dict)
+        and (model.get("provider_id") != "local" or model.get("model_id") != "jeeves")
+    ]
+    if foreign:
+        raise ProbeFailure("Jeeves local-only inventory contains a foreign or advisory model.")
+    if len(selectable) > 1:
+        raise ProbeFailure("Jeeves local-only chat cannot have multiple selectable primary models.")
     return {
-        "ready": reply.get("available") is True and all(entry["ready"] for entry in verdict.values()) and bool(selectable),
+        "ready": reply.get("available") is True and all(entry["ready"] for entry in verdict.values())
+                 and len(selectable) == 1,
         "checks": verdict,
         "model_count": len(selectable),
         "automatic_available": models.get("automatic_available") is True,
@@ -253,9 +265,12 @@ def exercise(api: ChatApi, snapshot: dict, *, seconds: int, prompt: str) -> dict
     }
     if type(body["max_output_tokens"]) is not int or body["max_output_tokens"] < 1:
         raise ProbeFailure("The selected model did not provide a valid output budget.")
-    if not snapshot["automatic_available"]:
-        body["provider_id"] = selected["provider_id"]
-        body["model_id"] = selected["model_id"]
+    # Never rely on an automatic engine that might silently fail over.
+    # The fixed local model identity is submitted with the original key.
+    if selected["provider_id"] != "local" or selected["model_id"] != "jeeves":
+        raise ProbeFailure("Refusing to submit a non-Jeeves or hosted primary chat model.")
+    body["provider_id"] = "local"
+    body["model_id"] = "jeeves"
     # The identity is published before admission so an uncertain outcome can be
     # recovered using GET rather than dangerously submitting another turn.
     print(json.dumps({"phase": "created", "thread_id": thread_id, "request_id": key}))
@@ -297,7 +312,7 @@ def observe_and_verify(api: ChatApi, thread_id: str, key: str, *, seconds: int) 
             or assistant.get("content") != answer
             or assistant.get("causal_user_message_id") != user.get("message_id")
             or not isinstance(receipts, list) or not receipts
-            or any(not isinstance(ref, str) or not ref.startswith("provider:") for ref in receipts)):
+            or any(not isinstance(ref, str) or not ref.startswith("provider:local:") for ref in receipts)):
         raise ProbeFailure("The terminal result lacks an attested canonical model response and provider receipts.")
     persisted = api.request("GET", "/api/v1/conversations/" + thread_id + "/messages?active_only=true&limit=500&after_sequence=0")
     rows = persisted.get("messages")
