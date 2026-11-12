@@ -323,16 +323,33 @@ class OfflineHTTPApplication:
             with self._turn_lock:
                 turn.state = "cancelled"
         except OfflineHTTPError as exc:
+            # OfflineHTTPError is an internal exception too: future callers
+            # may construct it with CLI stderr, a model path or prompt text.
+            # Async tickets are public to the authenticated client and must
+            # NEVER serialize exception strings, even when the status code is
+            # expected. Keep only a bounded, stable operator-facing category.
+            message = {
+                400: "local request validation failed",
+                403: "local model operation denied",
+                404: "local conversation unavailable",
+                409: "local conversation conflict",
+                422: "local grounding unavailable",
+                503: "local model or durable storage unavailable",
+            }.get(exc.status, "local generation failed")
             with self._turn_lock:
                 turn.state = "failed"
-                turn.error = str(exc)[:400]
+                turn.error = message
         except (OfflineAIError, RuntimeContractError):
             # Backends may include absolute model paths, CLI output or private
             # runtime details in exceptions. Tickets are client-visible.
             with self._turn_lock:
                 turn.state = "failed"
                 turn.error = "local model or durable conversation operation failed"
-        except Exception:
+        except BaseException:
+            # This is a dedicated worker thread. An unusual native binding can
+            # raise BaseException (e.g. SystemExit) instead of Exception. Never
+            # strand a user-visible ticket in "running" after the worker dies.
+            # The finally block still releases the single-model admission slot.
             with self._turn_lock:
                 turn.state = "failed"
                 turn.error = "local generation failed; inspect the model and retry"
