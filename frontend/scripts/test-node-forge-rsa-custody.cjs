@@ -47,3 +47,13 @@ test('patched, changed, truncated, mixed or unrecognized RSA source fails closed
   }
   assert.throws(() => verifyReviewedForgeRsa(EXPECTED_VERSION, null), /unreviewed/);
 });
+
+test('production Docker dependency stage includes the pinned RSA custody helper', () => {
+  const dockerfile = fs.readFileSync(path.resolve(__dirname, '../Dockerfile'), 'utf8');
+  const expected = 'COPY scripts/node-forge-rsa-custody.cjs ./scripts/node-forge-rsa-custody.cjs';
+  const copyAt = dockerfile.indexOf(expected);
+  const hookAt = dockerfile.indexOf('node ./scripts/patch-node-modules.js');
+  assert.notEqual(copyAt, -1, 'source-pinned RSA verifier absent from container dependencies');
+  assert.ok(hookAt > copyAt, 'security helper must precede install patch execution');
+  assert.equal(dockerfile.split(expected).length, 2, 'Dockerfile must have exactly one RSA helper copy');
+});
