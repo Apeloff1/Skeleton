@@ -35,7 +35,9 @@ class RepositoryInventoryFiniteBudget(TestCase):
                     rows, was_truncated = model._iter_files()
                 self.assertEqual(len(rows), length)
                 self.assertEqual(was_truncated, truncated)
-                self.assertEqual([file.name for file in rows], names[:length])
+                # Production scanner sorts paths before enforcing the cap.
+                # Assert deterministic canonical order, not os.walk order.
+                self.assertEqual([file.name for file in rows], sorted(names)[:length])
 
     def test_live_config_maxima_are_finite_and_prohibit_oversize_files(self):
         config = load_machine_config(ROOT)
