@@ -317,3 +317,23 @@ browser evidence. Run the full App Foundation E2E stack in an approved
 isolated environment at the exact final head, then independently qualify
 device installs, source-rights behavior, recovery and provenance. Any missing
 browser execution leaves that release dimension **unqualified**.
+
+## Independent malware and artifact gates during review-only qualification
+
+PR #5281 is the only draft admitted to the existing read-only Malware Gate and
+Artifact Policy workflow jobs. The exception is tied to the PR number,
+same-repository head identity, exact source branch, and open PR action.
+Forks and unrelated drafts continue to skip these resource-intensive scans.
+Both security jobs checkout the exact `pull_request.head.sha` with full
+repository history and verify that SHA before invoking their original scanners.
+Their package-lifecycle, malware IOC, malicious active-content, artifact
+placement, immutable-reference and test-regression checks are unchanged.
+A new hermetic admission contract protects against future accidental widening
+of this draft exception.
+
+The exception is **evidence collection only**, not a release or automation
+permission. Merge Readiness retains its original draft barrier and its protected
+dependency aggregation. CodeQL security alert closure, independent device
+installation, system recovery, source-rights review, signing and rollback remain
+unqualified until their own executed current-head evidence exists. No skipped
+gate is counted as success.
