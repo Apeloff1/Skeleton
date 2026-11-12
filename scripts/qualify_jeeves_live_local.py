@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from skeleton.app.local_ai import LocalDesktopModel, load_gguf_deployment
+from skeleton.app.local_ai import DurableOfflineAISession, LocalDesktopModel, load_gguf_deployment
 from skeleton.app.offline_http import LocalOnlyHTTPServer, OfflineHTTPApplication
 from skeleton.ai.runtime.inference.deployment import LocalModelDeployment
 from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
@@ -246,10 +246,41 @@ def _qualify_actual_local_http(
                     or historical.get("output_digest") != first["output_sha256"]
                     or historical.get("text") != first["result"]["text"]):
                 raise LiveJeevesFailure("saved local turn could not be recovered after process restart")
+            second_prompt = (
+                "Continue the local Jeeves conversation in one sentence without any cloud model."
+            )
+            # A second completed response alone proves no context continuity:
+            # a truncated or reset session could have generated it. Independently
+            # re-open the canonical SQLite authority and verify the deterministic
+            # model request will retain the complete previous user+assistant turn
+            # within the current admitted tokenizer/context budget.
+            expected_history = (
+                ("user", "Jeeves local inference test: say one short sentence about offline computing."),
+                ("assistant", first["result"]["text"]),
+            )
+            preflight = DurableOfflineAISession(
+                model, database=database, session_id=session_id,
+            )
+            try:
+                if preflight.history != expected_history:
+                    raise LiveJeevesFailure(
+                        "the restarted conversation does not retain its exact model-bound turn"
+                    )
+                prepared, retained_history = preflight._request(
+                    second_prompt, output_tokens,
+                )
+                if (retained_history != expected_history
+                        or prepared.history != expected_history
+                        or prepared.prompt != second_prompt):
+                    raise LiveJeevesFailure(
+                        "the continued model request would discard the prior conversation context"
+                    )
+            finally:
+                preflight.close()
             second = _send_turn(
                 restarted.port, token, session_id,
                 request_id=second_request_id,
-                text="Continue the local Jeeves conversation in one sentence without any cloud model.",
+                text=second_prompt,
                 max_tokens=output_tokens, timeout=timeout_seconds,
             )
             if second["result"].get("model_digest") != digest:
@@ -275,6 +306,8 @@ def _qualify_actual_local_http(
         "actual_model_turns": 2,
         "durable_recovery_verified": True, "read_only_replay_verified": True,
         "context_continuation_verified": True,
+        "context_preflight_history_retained": True,
+        "context_preflight_is_generation_proof": False,
         "run_1_output_sha256": first["output_sha256"],
         "run_2_output_sha256": second["output_sha256"],
         "turn_metrics": [
