@@ -188,3 +188,23 @@ def test_local_http_denies_peer_generation_and_recovers_genuine_native_turn(tmp_
     finally:
         second.close()
         first.close()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX directory mode policy")
+def test_unprotected_shared_lock_directory_fails_closed(tmp_path: Path):
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    shared.chmod(0o777)
+    try:
+        lease = LocalInferenceLease(shared / "victim.sqlite3")
+        with pytest.raises(LocalInferenceLeaseUnavailable):
+            with lease.hold():
+                pytest.fail("unprotected shared directory admitted cross-process exclusion")
+        assert not lease.path.exists()
+    finally:
+        shared.chmod(0o700)
+
+
+def test_memory_database_cannot_claim_crash_safe_multi_process_exclusion():
+    with pytest.raises(LocalInferenceLeaseUnavailable):
+        LocalInferenceLease(":memory:")
