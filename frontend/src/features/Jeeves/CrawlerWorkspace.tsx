@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Platform, SafeAreaView, ScrollView, Share, Switch, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Platform, SafeAreaView, ScrollView, Switch, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import StudioLoginGate, { useStudioAuth } from '../../auth/StudioLoginGate';
 import { getAuthToken } from '../../auth/gameforgeAuth';
-import { createCrawl, controlCrawl, crawlRequestKey, eraseCrawl, getCrawlEvents, exportCrawlSource, getCrawl, getCrawlerReadiness, listCrawls, listCrawlSources, runCrawl, type CapturedSource, type CrawlCreate, type CrawlEvent, type CrawlerReadiness, type CrawlSession, type SourceExport } from '../../product/crawlerClient';
+import { createCrawl, controlCrawl, crawlRequestKey, eraseCrawl, getCrawlEvents, exportCrawlSource, getCrawl, getCrawlerReadiness, listCrawls, listCrawlSources, runCrawl, type CapturedSource, type CrawlCreate, type CrawlEvent, type CrawlerReadiness, type CrawlSession, } from '../../product/crawlerClient';
 import { ChatClientError } from '../../product/chatErrors';
 import { type WorkflowTemplate } from '../../product/aiWorkflowClient';
 import WorkflowTemplatePicker from './WorkflowTemplatePicker';
@@ -17,21 +15,11 @@ import DragonKnowledgePanel from './DragonKnowledgePanel';
 import DragonCompanion from './companion/DragonCompanion';
 import { companionFromCapture, INITIAL_DRAGON_STATE } from './companion/dragonCompanionState';
 import { useReducedMotion } from './companion/useDragonMotion';
+import { saveCrawlerExport } from '../../product/crawlerExport';
 import { usePowerAwareness } from '../../hooks/usePowerAwareness';
 
 function bytes(value: number): string { return value < 1024 ? `${value} B` : value < 1048576 ? `${(value / 1024).toFixed(1)} KB` : `${(value / 1048576).toFixed(1)} MB`; }
 function label(value: string): string { return value.replaceAll('_', ' '); }
-async function saveExport(file: SourceExport): Promise<void> {
-  const filename = file.filename.replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 160) || 'captured-source.json';
-  if (Platform.OS === 'web') {
-    const url = URL.createObjectURL(new Blob([file.content], { type: file.media_type })); const a = document.createElement('a');
-    try { a.href = url; a.download = filename; document.body.appendChild(a); a.click(); } finally { a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000); } return;
-  }
-  if (!FileSystem.cacheDirectory || !await Sharing.isAvailableAsync()) { await Share.share({ title: filename, message: file.content }); return; }
-  const uri = FileSystem.cacheDirectory + Date.now() + '-' + filename;
-  try { await FileSystem.writeAsStringAsync(uri, file.content, { encoding: FileSystem.EncodingType.UTF8 }); await Sharing.shareAsync(uri, { mimeType: file.media_type }); }
-  finally { await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {}); }
-}
 function Button({ title, onPress, disabled = false }: { title: string; onPress: () => void; disabled?: boolean }) {
   return <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[s.button, disabled && s.disabled]}><Text style={s.buttonText}>{title}</Text></TouchableOpacity>;
 }
@@ -211,7 +199,7 @@ function CrawlerContent() {
   };
   const refreshActive = () => { if (!active) { if (requestedSession) { void perform(async signal => { const value = await getCrawl(requestedSession, signal); if (!signal.aborted) open(value, true); }); } else void refresh(); return; } const id = active.session_id; void perform(async signal => { const [value, page] = await Promise.all([getCrawl(id, signal), listCrawlSources(id, undefined, signal)]); if (!signal.aborted && activeRef.current?.session_id === id) { accept(value); setSources(page.sources); setSourceCursor(page.next_cursor); } }); };
   return <SafeAreaView style={s.safe}><ScrollView ref={scroll} contentContainerStyle={[s.page, { maxWidth: 1480 }]} keyboardShouldPersistTaps="handled">
-    <View style={s.row}><View style={[s.grow, width < 600 && { flexBasis: '100%', flexGrow: 0, flexShrink: 0 }]}><Text style={s.eyebrow}>DRAGON · WEB KNOWLEDGE</Text><Text style={s.title}>Capture with a clear scope</Text></View><Button title="Setup" onPress={() => router.push('/setup' as never)} /><Button title="AI chat" onPress={() => router.push('/jeeves-chat' as never)} /><Button title="Home" onPress={() => router.push('/product' as never)} /></View>
+    <View style={s.row}><View style={[s.grow, width < 600 && { flexBasis: '100%', flexGrow: 0, flexShrink: 0 }]}><Text style={s.eyebrow}>DRAGON · WEB KNOWLEDGE</Text><Text style={s.title}>Capture with a clear scope</Text></View><Button title="Guided research pilot" onPress={() => router.push('/dragon-crawler-pilot' as never)} /><Button title="Setup" onPress={() => router.push('/setup' as never)} /><Button title="AI chat" onPress={() => router.push('/jeeves-chat' as never)} /><Button title="Home" onPress={() => router.push('/product' as never)} /></View>
     <Text style={s.subtitle}>Choose public URLs, authorize a bounded crawl and inspect what was actually captured. Capture does not review a source or train a model.</Text>
     <View style={s.card}><View style={s.row}><Text style={[s.heading, s.grow]}>{readiness ? readiness.available ? 'Capture service ready' : 'Capture needs setup' : 'Readiness not observed'}</Text><Button title="Refresh" onPress={() => { setError(''); void refresh(); refreshActive(); }} /></View><Text style={s.message}>{readiness?.message || 'Check the application and your account to inspect crawler readiness.'}</Text>{!readiness?.available && readiness?.action && <Text style={s.small}>{readiness.action}</Text>}<Text style={s.small}>Live reachability is checked when a request runs. Public host policy, robots rules, limits and consent are enforced by the crawler.</Text>{!canWrite && <Text style={s.error}>Your account can inspect sources and use owner stop controls when admitted. Creating, resuming or authorizing capture requires an editor or administrator.</Text>}</View>
     {!!error && <View style={s.card} accessibilityRole="alert"><Text style={s.error}>{error}</Text><View style={s.row}>{retry && <Button title="Retry the same request" disabled={!!busy || running} onPress={() => void retry()} />}<Button title="Refresh current state" onPress={refreshActive} /><Button title="Dismiss" onPress={() => setError('')} /></View></View>}
@@ -254,7 +242,7 @@ function CrawlerContent() {
         refresh={refreshActive}
         loadMore={() => { if (sourceCursor) void perform(async signal => { const page = await listCrawlSources(active.session_id, sourceCursor, signal); if (!signal.aborted && activeRef.current?.session_id === active.session_id) { setSources(rows => [...rows, ...page.sources.filter(row => !rows.some(old => old.source_id === row.source_id))].slice(0, 64)); setSourceCursor(page.next_cursor); } }); }}
         onReview={passage => { setReviewDraft(passage); choosePane('review'); }}
-        exportSource={(item, format) => { void perform(async signal => { const file = await exportCrawlSource(active.session_id, item.source_id, format, signal); if (!signal.aborted) await saveExport(file); }); }} />
+        exportSource={(item, format) => { void perform(async signal => { const file = await exportCrawlSource(active.session_id, item.source_id, format, signal); if (!signal.aborted) await saveCrawlerExport(file); }); }} />
       </>}
     </View></View>
     </View>

@@ -57,7 +57,7 @@ function Metric({ title, value, caption }: { title: string; value: number; capti
     {!!caption && <Text style={s.small}>{caption}</Text>}</View>;
 }
 
-export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlSession }) {
+export default function CrawlerResearchAtlasPanel({ session, onReport }: { session: CrawlSession; onReport?: (report: CrawlAtlasReport | null) => void }) {
   const [question, setQuestion] = useState('');
   const [dimension, setDimension] = useState<Dimension>('method');
   const [stage, setStage] = useState<Stage>('verification');
@@ -70,6 +70,8 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
   const [blockedTerms, setBlockedTerms] = useState(NEW_ATLAS_DRAFT.blockedTerms);
   const [queuedGoals, setQueuedGoals] = useState<CrawlAtlasObjective[]>([]);
   const [report, setReport] = useState<CrawlAtlasReport | null>(null);
+  const reportCallback = useRef(onReport);
+  reportCallback.current = onReport;
   const [currentGoals, setCurrentGoals] = useState<CrawlAtlasObjective[] | null>(null);
   const [minutesPerTask, setMinutesPerTask] = useState('12');
   const [budget, setBudget] = useState('120');
@@ -89,7 +91,7 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
     request.current?.abort();
     request.current = null;
     busy.current = false;
-    setWorking(false); setReport(null); setCurrentGoals(null); setError(''); setNotice('');
+    setWorking(false); setReport(null); reportCallback.current?.(null); setCurrentGoals(null); setError(''); setNotice('');
   }, []);
   useEffect(() => {
     clear();
@@ -174,6 +176,7 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
       if (controller.signal.aborted || submittedAt !== epoch.current ||
           sessionRevision !== revisionRef.current || auth !== getAuthToken()) return;
       setReport(data);
+      reportCallback.current?.(data);
       setCurrentGoals(goals);
       setNotice(allocate
         ? 'A bounded review plan was calculated, but no human was assigned and nothing was approved.'
@@ -181,7 +184,7 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
     } catch (exc) {
       if (controller.signal.aborted || submittedAt !== epoch.current ||
           sessionRevision !== revisionRef.current || auth !== getAuthToken()) return;
-      setReport(null); setCurrentGoals(null);
+      setReport(null); reportCallback.current?.(null); setCurrentGoals(null);
       setError(exc instanceof Error ? exc.message : 'The Atlas inspection could not be verified.');
     } finally {
       if (submittedAt === epoch.current) {

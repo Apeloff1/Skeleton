@@ -3,6 +3,7 @@ import { API_BASE } from '../utils/apiBase';
 import api, { type ApiResult } from '../utils/apiClient';
 import { authHeaders, getAuthToken } from '../auth/gameforgeAuth';
 import { ChatClientError, chatApiError } from './chatErrors';
+import { canonicalPilotReceipt, pilotReceiptBody } from './crawlerPilotReceipt';
 
 export type CrawlerReadiness = { available: boolean; configured: boolean; code: string; message: string; action?: string | null; network_reachability_verified?: boolean; limits: Record<string, number>; capabilities: Record<string, boolean> };
 export type CrawlUsage = { requests: number; bytes: number; documents: number; failures: number; reserved_bytes?: number };
@@ -922,5 +923,22 @@ export async function getCrawlAtlas(
   if (signal?.aborted || previousToken !== getAuthToken()) {
     throw new ChatClientError('The research inspection was detached or your account changed.', { kind: 'authorization', retryable: false });
   }
-  return checkedAtlasReport(payload.report, id, request.retrieval_mode);
+  const report = checkedAtlasReport(payload.report, id, request.retrieval_mode);
+  if (report.pilot_qualification) {
+    // Both the status envelope and this exact-byte digest are source-only:
+    // neither is a substitute for the backend's authenticated Mongo re-read.
+    const receipt = report.pilot_qualification;
+    let canonical: string;
+    try { canonical = canonicalPilotReceipt(pilotReceiptBody(receipt)); }
+    catch { invalid('Pilot receipt has an invalid canonical payload.'); }
+    const observed = await digestStringAsync(CryptoDigestAlgorithm.SHA256, canonical);
+    if (signal?.aborted || previousToken !== getAuthToken()) {
+      throw new ChatClientError('The pilot receipt was detached from your session.',
+        { kind: 'authorization', retryable: false });
+    }
+    if (observed !== receipt.qualification_digest) {
+      invalid('The exact Dragon pilot qualification receipt did not verify.');
+    }
+  }
+  return report;
 }

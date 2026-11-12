@@ -29,6 +29,7 @@
     "test:private-media": "node --test scripts/test-private-image.cjs scripts/test-private-image-browser.cjs scripts/test-private-atlas-export.cjs",
     "test:creator-identity": "node --test scripts/test-creator-account-identity.cjs scripts/test-creator-dashboard-identity.cjs",
     "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs && node scripts/test-dragon-journal-chain.cjs",
+    "test:dragon-pilot": "node --experimental-strip-types --test scripts/test-crawler-pilot-journey.mjs",
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
     "test:app-foundation": "node --test scripts/test-app-foundation-flows.mjs scripts/test-app-health-readiness.cjs scripts/test-setup-local-guard.cjs",
