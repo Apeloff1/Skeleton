@@ -543,6 +543,46 @@ search, SHA-bound preview, real inference and SQLite commit/replay, removal
 during use, invalid arrays, async tickets, and the browser contract.
 Actual operator-owned GGUF quality, device and release checks remain separate.
 
+
+## 15. Fail-closed local document scope after deletion and account changes
+
+The local Jeeves browser now makes a critical distinction between **explicit
+selected-only grounding** and **explicit all-references grounding**. Selecting
+even one local reference switches into selected-only mode. Deselecting the
+last reference leaves the mode empty and **blocks** grounded preview and
+generation; it never implicitly widens the question to the whole library.
+
+A deleted, withdrawn or inaccessible selected local document remains as a
+tombstoned selection in the current authenticated tab. The source-inventory
+refresh only updates the currently accessible IDs; it no longer clears
+unavailable selections. A prominent warning explains that the next grounded
+turn is blocked and offers an explicit operator action to reselect an
+available source or return to the complete private library. No source
+content is copied into another model or third-party service.
+
+A dedicated **Explicitly use all references** control is the only interaction
+that widens selected-only grounding to unrestricted local retrieval. Switching
+conversations preserves the existing restriction. Locking the workspace
+clears both the restriction and its source IDs as an intentional
+authentication boundary; reauthentication never silently grants an older
+source approval. Source-list responses are fenced by the active connection
+epoch and inventory request sequence, so a late refresh cannot reset a
+newer selection or another account's view.
+
+Both context preview and actual inference compare their captured
+source-selection version after asynchronous work. The backend independently
+requires every selected ID to be present in the model-scoped, SHA-verified
+SQLite source collection and maintains source-selection idempotency
+separation for the real native model receipt. The source picker can never
+bypass this server-side gate. The genuine native tests exercise a deleted
+selected document with another otherwise usable document still present:
+no model generation, answer or SQLite history mutation may result.
+
+Limitations: client source-inventory reads are not an atomic transaction
+with generation, so the actual native turn always independently checks
+the selected sources. The system cannot revoke already-exported Dragon
+source text or infer publisher rights from source presence.
+
 ## 2026 local execution custody: independent service-process safety
 
 The standalone authenticated Jeeves HTTP service now uses an additional
