@@ -1789,3 +1789,55 @@ async def test_cancelled_deferred_turn_closes_lineage_and_does_not_poison_next_h
     conversations.close()
     execution_repository.close()
     submissions.close()
+
+
+
+@pytest.mark.asyncio
+async def test_jeeves_local_only_rejects_hosted_chat_before_any_storage_write(monkeypatch):
+    """The mobile chat endpoint may never admit hosted/advisory primary models."""
+    route = _consumer_load_backend_ai_route(monkeypatch)
+    monkeypatch.setenv("JEEVES_LOCAL_ONLY", "1")
+    monkeypatch.setenv("JEEVES_PRIMARY_MODEL_ID", "jeeves")
+    monkeypatch.setenv("AI_PROVIDER", "local")
+    class UnusedAuthority:
+        async def active_transcript(self, *_args, **_kwargs):
+            raise AssertionError("local-only rejection must precede canonical storage reads")
+    monkeypatch.setattr(route, "conversation_authority", UnusedAuthority())
+    for provider, model in (
+        ("openai", "gpt-5.5"),
+        ("local", "qwen3-0.6b"),
+        ("secondary", "jeeves"),
+    ):
+        request = route.AIChatRequest(
+            message="Do not transfer private chat text to a hosted model.",
+            thread_id="thread-1", idempotency_key="deny-remote-" + provider,
+            expected_thread_version=1, provider_id=provider, model_id=model,
+        )
+        with pytest.raises(HTTPException) as blocked:
+            await route.ai_chat(
+                request,
+                user={"email": OWNER, "tenant_id": TENANT},
+            )
+        assert blocked.value.status_code == 403
+        assert "local jeeves" in str(blocked.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_jeeves_local_only_never_discloses_foreign_model_inventory(monkeypatch):
+    """Fail closed if the backend and engine disagree about local-only mode."""
+    route = _consumer_load_backend_ai_route(monkeypatch)
+    monkeypatch.setenv("JEEVES_LOCAL_ONLY", "1")
+    monkeypatch.setenv("JEEVES_PRIMARY_MODEL_ID", "jeeves")
+    monkeypatch.setattr(route.EngineClient, "from_env", classmethod(lambda cls, **kwargs: None))
+    async def injected_catalog(*_args, **_kwargs):
+        return {
+            "schema_version": "skeleton.ai.model-catalog.v1",
+            "available": True, "automatic_available": True,
+            "models": [{"provider_id": "openai", "model_id": "hosted-primary"}],
+            "readiness": {"code": "ready"},
+        }
+    monkeypatch.setattr(route, "model_catalog", injected_catalog)
+    catalog = await route.get_ai_models(user={"email": OWNER, "tenant_id": TENANT})
+    assert catalog["available"] is False
+    assert not catalog["models"]
+    assert catalog["readiness"]["code"] == "local_configuration_invalid"
