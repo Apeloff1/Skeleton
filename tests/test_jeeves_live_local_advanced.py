@@ -412,3 +412,74 @@ def test_authenticated_http_exception_boundary_does_not_echo_private_details(
     assert private.encode() not in raw
     assert b"API-SECRET" not in raw
     assert json.loads(raw) == {"error": public_message}
+
+
+@pytest.mark.parametrize("failure_kind,expected_public_error", [
+    ("http", "local model or durable storage unavailable"),
+    ("system-exit", "local generation failed; inspect the model and retry"),
+    ("keyboard-interrupt", "local generation failed; inspect the model and retry"),
+])
+def test_async_unexpected_worker_exit_never_leaks_or_strands_local_chat(
+    failure_kind, expected_public_error, monkeypatch, tmp_path,
+):
+    """A worker crash must not leak paths, strand a ticket or block later inference."""
+    import time
+    from skeleton.app.offline_http import OfflineHTTPApplication, OfflineHTTPError
+
+    model = native_model()
+    app = OfflineHTTPApplication(
+        model, tmp_path / ("worker-" + failure_kind + ".sqlite3"), token="t" * 64,
+    )
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        original = app._perform_turn
+        secret = "/private/local/weights.gguf?secret=CANARY-PRIVATE"
+        errors = {
+            "http": OfflineHTTPError(503, secret),
+            "system-exit": SystemExit(secret),
+            "keyboard-interrupt": KeyboardInterrupt(secret),
+        }
+        def explode(*_args, **_kwargs):
+            raise errors[failure_kind]
+        monkeypatch.setattr(app, "_perform_turn", explode)
+        status, ticket = app.submit_turn(sid, {
+            "message": "This worker should fail closed",
+            "request_id": "abnormal-native-worker-1",
+            "max_output_tokens": 2,
+        })
+        assert status == 202 and ticket["request_id"] == "abnormal-native-worker-1"
+        deadline = time.monotonic() + 8
+        while True:
+            observed = app.turn_status(sid, "abnormal-native-worker-1")
+            if observed["terminal"] and observed["finished_at"] is not None:
+                break
+            assert time.monotonic() < deadline, "failed worker stranded its turn ticket"
+            time.sleep(0.01)
+        assert observed["state"] == "failed"
+        assert observed["error"] == expected_public_error
+        assert "CANARY-PRIVATE" not in str(observed)
+        assert "/private/local/" not in str(observed)
+
+        # One failed thread must free the single-device worker slot, and a
+        # subsequent genuine native execution must commit to SQLite normally.
+        monkeypatch.setattr(app, "_perform_turn", original)
+        status, next_ticket = app.submit_turn(sid, {
+            "message": "Real local recovery after a failed worker",
+            "request_id": "native-worker-recovered-2",
+            "max_output_tokens": 2,
+        })
+        assert status == 202 and next_ticket["request_id"] == "native-worker-recovered-2"
+        deadline = time.monotonic() + 30
+        while True:
+            recovered = app.turn_status(sid, "native-worker-recovered-2")
+            if recovered["terminal"] and recovered["finished_at"] is not None:
+                break
+            assert time.monotonic() < deadline, "recovered worker did not finish"
+            time.sleep(0.02)
+        assert recovered["state"] == "complete", recovered["error"]
+        assert recovered["result"]["replayed"] is False
+        assert recovered["result"]["local_execution_receipt"]["model_digest"] == model.model_digest
+        assert app._session(sid).revision == 1
+    finally:
+        app.close()
