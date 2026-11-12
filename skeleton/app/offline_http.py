@@ -367,6 +367,9 @@ class OfflineHTTPApplication:
                     "input_tokens": receipt.prompt_tokens,
                     "output_tokens": receipt.generated_tokens,
                     "replayed": True, "model_digest": self.model_digest,
+                    "local_execution_receipt": self._store.local_execution_receipt(
+                        session_id, rid, self.model_digest, self.tokenizer_digest,
+                    ),
                     "evidence": evidence,
                     **_audit_pair(receipt.text, evidence),
                 },
@@ -427,6 +430,9 @@ class OfflineHTTPApplication:
                     "input_tokens": replay.prompt_tokens,
                     "output_tokens": replay.generated_tokens,
                     "replayed": True, "model_digest": self.model_digest,
+                    "local_execution_receipt": self._store.local_execution_receipt(
+                        session_id, rid, self.model_digest, self.tokenizer_digest,
+                    ),
                     "evidence": previous[replay.revision - 1],
                     **_audit_pair(replay.text, previous[replay.revision - 1]),
                 }
@@ -462,12 +468,22 @@ class OfflineHTTPApplication:
                         text, max_output_tokens=budget, request_id=rid,
                         evidence_manifest=manifest,
                     )
-                asyncio.run(generate())
+                generated_answer = asyncio.run(generate())
             finally:
                 chat.close()
             receipt = self._store.replay(session_id, rid, digest)
             if receipt is None:
                 raise RuntimeContractError("local generation receipt was not committed")
+            execution_receipt = self._store.local_execution_receipt(
+                session_id, rid, self.model_digest, self.tokenizer_digest,
+            )
+            if (execution_receipt is None
+                    or execution_receipt["execution_receipt_digest"]
+                    != generated_answer.execution_receipt_digest
+                    or execution_receipt["output_sha256"] != receipt.output_digest):
+                raise RuntimeContractError(
+                    "local native generation receipt differs from its committed SQLite response"
+                )
             committed_evidence = self._store.turn_evidence(
                 session_id, self.model_digest, self.tokenizer_digest,
             )[receipt.revision - 1]
@@ -478,6 +494,7 @@ class OfflineHTTPApplication:
                 "input_tokens": receipt.prompt_tokens,
                 "output_tokens": receipt.generated_tokens,
                 "replayed": False, "model_digest": self.model_digest,
+                "local_execution_receipt": execution_receipt,
                 "evidence": committed_evidence,
                 **_audit_pair(receipt.text, committed_evidence),
             }
