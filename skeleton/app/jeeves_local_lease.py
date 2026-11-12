@@ -135,6 +135,34 @@ class LocalInferenceLease:
 
             fcntl.flock(fd, fcntl.LOCK_UN)
 
+    def inspect(self) -> dict[str, object]:
+        """Read-only, privacy-safe local process ownership observation.
+
+        An uninitialized marker is NOT an idle or verified model. The
+        observation never creates a file, opens model weights, runs inference,
+        authenticates a tenant, or exposes paths/PIDs. Availability is a
+        transient race-prone observation; only hold() authorizes execution.
+        """
+        result = {
+            "schema": "skeleton.jeeves.local-inference-lease-status.v1",
+            "state": "uninitialized",
+            "single_host_only": True,
+            "ownership_is_generation_proof": False,
+        }
+        try:
+            self.path.lstat()
+        except FileNotFoundError:
+            return result
+        except OSError:
+            return {**result, "state": "unavailable"}
+        try:
+            with self.hold():
+                return {**result, "state": "idle"}
+        except LocalInferenceLeaseBusy:
+            return {**result, "state": "busy"}
+        except (LocalInferenceLeaseUnavailable, OSError):
+            return {**result, "state": "unavailable"}
+
     @contextmanager
     def hold(self) -> Iterator[None]:
         """Hold OS exclusion through local inference *and* SQLite commit.
