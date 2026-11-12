@@ -67,6 +67,65 @@ backend or a phone.** The exact executable must be compatible with the
 host; Linux container builds may not execute directly on macOS/Windows.
 There is no automatic fallback to OpenAI.
 
+## Advanced live local qualification: two turns, restart, hardware measurements
+
+The single-process model test above is a prerequisite, not the complete
+local runtime acceptance. To exercise a real `jeeves` GGUF from end to end
+through an **authenticated loopback HTTP server** and **real SQLite**:
+
+    python scripts/qualify_jeeves_live_local.py \
+      --manifest /absolute/path/to/jeeves.json \
+      --timeout 180 --output-tokens 16
+
+This performs two genuine local model generations with a complete server and
+SQLite reopen between them. It verifies the original response by an
+independent GET-only recovery, verifies the continued conversation, checks
+identity-bound output digests, and reports measured output token throughput.
+No fake model, remote provider, streaming estimate, or network host beyond
+127.0.0.1 is used for model inference. Model quality and protected production
+bootstrap are **not** certified by this test. Completion is bounded and never
+reported successful when either turn fails.
+
+The first-install script can run the same advanced test before configuring
+or starting the app:
+
+    python scripts/install_ai_chat.py \
+      --deployment /absolute/path/to/jeeves.json --live-local-suite
+
+For an operator applying the private configuration in the same run, add
+`--apply`; for service startup add `--start`. The advanced test separately
+reports `application_chat_verified=false` until the protected backend's
+authenticated product chat acceptance passes.
+
+## Advisory-only multimodal sources: no second language model
+
+The **localhost offline Jeeves service** exposes authenticated
+`GET /v1/advisory/status` and `POST /v1/advisory/ingest` to import only
+an explicitly reviewed local **textual observation** derived from images,
+audio, video, crawler results or documents. These APIs do not decode media,
+call external providers, run inference or change Jeeves's primary model.
+
+An advisory request is a JSON object with `schema_version` set to
+`skeleton.jeeves.advisory.v1`, `modality` set to one of
+`image-caption`, `audio-transcript`, `video-frames`,
+`crawler-excerpt`, `text-reference`; a bounded `title`, the
+`observation` text (up to 12 KiB), its exact `observation_sha256`,
+a `source_sha256`, and `reviewed: true`.
+
+The server verifies the **observation** hash; the original media artifact
+digest is explicitly treated as a **caller-declared claim** because the raw
+media was not ingested or independently hashed by this endpoint. Approved
+advisories are stored in the model-scoped offline knowledge authority with
+source/chunk checksums and deduplication. Nothing is automatically injected
+into a conversation. The user must make a separate `grounded: true` chat
+request; the model sees any matched passages as untrusted user-context
+references, not privileged instructions or a second answer source.
+
+These endpoints belong to the separate localhost offline UI and are not
+automatically reachable through the protected mobile/backend API. That
+cross-plane integration and real device media decoding remain independent
+qualification requirements.
+
 ## 3. Configure and start Jeeves's private application stack
 
 Create the private env and Compose model binding:
@@ -159,6 +218,8 @@ Focused source tests and native inference acceptance:
 
     python -m pytest -q --noconftest \
       tests/test_jeeves_local_policy.py \
+      tests/test_jeeves_live_local_advanced.py \
+      tests/test_jeeves_advisory.py \
       tests/test_install_ai_chat.py \
       tests/test_ai_chat_installed_smoke.py \
       tests/test_configure_ai_chat_hosted.py
