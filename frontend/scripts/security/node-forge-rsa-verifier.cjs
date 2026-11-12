@@ -25,6 +25,6 @@ function qualifiesCanonicalRsaVerifier(source) {
   const order = check.map(match => match.index);
   return order[0] < order[1] && order[1] < order[2] &&
     order[2] < order[3] && order[3] < order[4] && order[4] < order[5] &&
-    source.indexOf('return digest === capture.digest;', order[5]) > order[5];
+    source.indexOf('return digest === capture.digest;', order[2]) > order[5];
 }
 module.exports = { qualifiesCanonicalRsaVerifier };
