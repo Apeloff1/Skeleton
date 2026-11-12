@@ -449,6 +449,30 @@ still has an ephemeral 16-message display cache; the durable HTTP
 `DurableOfflineAISession` re-opens the entire integrity-verified SQLite
 history before calculating each new model request.
 
+
+### Exact Unicode passage custody in Dragon imports
+
+A reviewed Dragon excerpt now includes the optional, strictly validated
+`source_span: {start, end, unit: "unicode_code_points"}` in the
+`skeleton.jeeves.advisory.v1` ingestion request. The client extracts a
+bounded passage using Unicode code points (not UTF-16 JS code units) and
+requires a fresh explicit checkbox grant after each source/offset/length
+change. The local backend refuses wrong types, negative/inverted/too-large
+bounds, a mismatched `end-start` versus actual Unicode passage length,
+non-crawler modalities, unexpected keys and empty observations.
+
+The canonical SQLite advisory document now includes the source claim,
+the exact **caller-declared** offset range and the independently verified
+SHA-256 of observation bytes. This is provenance/context, **not** a claim
+that the local model independently re-fetched or verified the historical
+Dragon source. The structured return labels the authority precisely:
+`source_span_authority: caller-declared-not-source-reverified`. The browser
+checks the echoed range and authority before showing success. Replaying
+the identical reviewed advisory reuses its content-addressed record; a
+different range changes its canonical content digest. This never
+creates a model turn, grants publication rights or revalidates old
+external capture consent.
+
 ## 2026 local execution custody: independent service-process safety
 
 The standalone authenticated Jeeves HTTP service now uses an additional

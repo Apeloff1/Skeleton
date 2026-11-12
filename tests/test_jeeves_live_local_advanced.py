@@ -673,6 +673,9 @@ def test_local_browser_dragon_bridge_is_explicitly_reviewed_source_bound_and_nev
     assert "get('dragon-bundle-review').checked" in JAVASCRIPT
     assert "'/v1/advisory/ingest'" in JAVASCRIPT
     assert "modality: 'crawler-excerpt'" in JAVASCRIPT
+    assert "source_span: {start: excerpt.start" in JAVASCRIPT
+    assert "receipt.source_span_authority !== 'caller-declared-not-source-reverified'" in JAVASCRIPT
+    assert "receipt.source_span?.end !== excerpt.start + excerpt.length" in JAVASCRIPT
     assert "generation_performed !== false" in JAVASCRIPT
     assert "remote_provider_called !== false" in JAVASCRIPT
     assert "Grounding is not enabled until you explicitly select it" in JAVASCRIPT
@@ -695,6 +698,8 @@ def test_genuine_local_advisory_dragon_excerpt_persists_without_generating_secon
         "observation": text,
         "observation_sha256": sha256(text.encode("utf-8")).hexdigest(),
         "source_sha256": "f" * 64,
+        "source_span": {"start": 17, "end": 17 + len(text),
+                        "unit": "unicode_code_points"},
         "reviewed": True,
     }
     try:
@@ -712,6 +717,8 @@ def test_genuine_local_advisory_dragon_excerpt_persists_without_generating_secon
         assert accepted["source_digest_authority"] == "caller-declared-not-media-verified"
         assert accepted["observation_digest_authority"] == "server-verified-exact-text"
         assert accepted["observation_sha256"] == request["observation_sha256"]
+        assert accepted["source_span"] == request["source_span"]
+        assert accepted["source_span_authority"] == "caller-declared-not-source-reverified"
         status, replay = app.dispatch("POST", "/v1/advisory/ingest", request)
         assert status == 200 and replay["reused"] is True
         assert replay["document_id"] == accepted["document_id"]
@@ -720,6 +727,7 @@ def test_genuine_local_advisory_dragon_excerpt_persists_without_generating_secon
         assert "UNTRUSTED JEEVES ADVISORY" in doc["text"]
         assert text in doc["text"]
         assert "Caller-declared source SHA-256" in doc["text"]
+        assert "Caller-declared passage span (unverified)" in doc["text"]
         # Admission never silently starts a chat session, a model job or a
         # privileged operation; grounding needs a separate explicit turn.
         status, sessions = app.dispatch("GET", "/v1/sessions")

@@ -180,3 +180,66 @@ def test_explicit_grounded_turn_keeps_reviewed_multimodal_observation_out_of_sys
     assert session["revision"] == 1
     assert session["messages"][0]["content"] == "How does rasterizer integer edge coverage work?"
     assert session["evidence"][0] == answer["evidence"]
+
+
+def test_crawler_unicode_span_is_preserved_as_caller_declared_untrusted_provenance(localhost):
+    """Actual local SQLite import binds the exact 3-codepoint Unicode passage."""
+    observation = "A😀é"
+    payload = advisory(
+        modality="crawler-excerpt",
+        observation=observation,
+        observation_sha256=sha256(observation.encode("utf-8")).hexdigest(),
+        source_span={"start": 300, "end": 303, "unit": "unicode_code_points"},
+    )
+    prepared = prepare_advisory(payload)
+    assert prepared["source_span"] == payload["source_span"]
+    assert prepared["advisory_sha256"] == sha256(prepared["text"].encode()).hexdigest()
+    assert "Caller-declared passage span (unverified): 300-303 Unicode code points" in prepared["text"]
+    assert "Reviewed observation text:\nA😀é" in prepared["text"]
+    status, accepted = localhost("POST", "/v1/advisory/ingest", payload)
+    assert status == 201
+    assert accepted["source_span"] == payload["source_span"]
+    assert accepted["source_span_authority"] == "caller-declared-not-source-reverified"
+    assert accepted["source_digest_authority"] == "caller-declared-not-media-verified"
+    assert accepted["observation_digest_authority"] == "server-verified-exact-text"
+    assert accepted["generation_performed"] is False
+    assert accepted["remote_provider_called"] is False
+    status, item = localhost("GET", "/v1/knowledge/documents/" + accepted["document_id"])
+    assert status == 200
+    assert item["text"] == prepared["text"]
+    status, replay = localhost("POST", "/v1/advisory/ingest", payload)
+    assert status == 200 and replay["reused"] is True
+    assert replay["document_id"] == accepted["document_id"]
+
+
+@pytest.mark.parametrize("span", [
+    {"start": 4, "end": 4, "unit": "unicode_code_points"},
+    {"start": 4, "end": 5, "unit": "unicode_code_points"},
+    {"start": 0, "end": 3001, "unit": "unicode_code_points"},
+    {"start": -1, "end": 2, "unit": "unicode_code_points"},
+    {"start": True, "end": 3, "unit": "unicode_code_points"},
+    {"start": 0, "end": False, "unit": "unicode_code_points"},
+    {"start": 0, "end": 3, "unit": "bytes"},
+    {"start": 0, "end": 3, "unit": "unicode_code_points", "approved": True},
+    {"start": 0, "unit": "unicode_code_points"},
+    ["start", 0, "end", 3],
+    None,
+])
+def test_crawler_excerpt_span_rejects_invalid_shapes_bounds_and_authority(span):
+    observation = "A😀é"
+    payload = advisory(
+        modality="crawler-excerpt", observation=observation,
+        observation_sha256=sha256(observation.encode()).hexdigest(),
+        source_span=span,
+    )
+    with pytest.raises(AdvisoryRejected, match="source span"):
+        prepare_advisory(payload)
+
+
+def test_non_crawler_advisory_cannot_smuggle_source_span():
+    payload = advisory(source_span={
+        "start": 0, "end": len(advisory()["observation"]),
+        "unit": "unicode_code_points",
+    })
+    with pytest.raises(AdvisoryRejected, match="source span"):
+        prepare_advisory(payload)
