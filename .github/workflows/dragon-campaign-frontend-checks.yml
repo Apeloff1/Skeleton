@@ -39,9 +39,13 @@ jobs:
         run: yarn install --ignore-scripts --frozen-lockfile --non-interactive
       - name: Apply approved local node_modules patches
         run: node ./scripts/patch-node-modules.js
+      - name: Verify pinned node-forge RSA canonical DER custody and hostile source
+        run: yarn test:node-forge-custody
+      - name: Exercise Dragon user journey and release receipt protocol
+        run: yarn test:dragon-pilot
       - name: Run source-bound client contract tests
         run: node --test scripts/test-dragon-atlas-contract.cjs
       - name: Compile full frontend TypeScript
         run: yarn typecheck
       - name: Lint Atlas client and mounted Jeeves UI
-        run: yarn eslint src/product/crawlerClient.ts src/features/Jeeves/atlasCampaignPlan.ts src/features/Jeeves/CrawlerResearchAtlasPanel.tsx src/features/Jeeves/CrawlerWorkspace.tsx --max-warnings=0
+        run: yarn eslint src/product/crawlerClient.ts src/product/crawlerPilotReceipt.ts src/product/crawlerExport.ts src/features/Jeeves/atlasCampaignPlan.ts src/features/Jeeves/crawlerPilotFlow.ts src/features/Jeeves/CrawlerResearchAtlasPanel.tsx src/features/Jeeves/CrawlerReleasePrototype.tsx src/features/Jeeves/CrawlerWorkspace.tsx --max-warnings=0
