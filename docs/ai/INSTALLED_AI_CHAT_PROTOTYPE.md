@@ -349,6 +349,18 @@ This is separate from the in-process admission counter and failure circuit.
   so it cannot leave a dead-process PID lease indefinitely blocking chat.
   Do not delete the lock marker during normal operations: another process
   could still hold the old inode, defeating exclusivity.
+- **POSIX native-child ownership:** when llama.cpp runs under the local
+  HTTP workspace lease, the already-held, nonsecret lock descriptor is
+  deliberately passed to its verified native child through `Popen(pass_fds)`,
+  while every other child descriptor remains closed. If the Python supervisor
+  is abruptly killed, the native child retains that *same* kernel `flock`
+  until it exits; a restarted Jeeves service therefore cannot start a second
+  GGUF executor against the still-running orphan. Native execution uses
+  `asyncio.to_thread`, so this custody follows the task context explicitly.
+  The regression suite starts a real child, kills its supervisor, checks
+  contention during the orphan's lifetime and verifies eventual recovery.
+  This is local POSIX protection, not a guarantee of child termination.
+  **Windows kill-on-close Job Object containment is still unqualified.**
 - Lockfiles must be owned private regular files with one hard link and an
   exact one-byte, nonsensitive marker. Symbolic/hard links, unsafe POSIX
   permissions, replacement of an inode while acquiring it, or unprotected
