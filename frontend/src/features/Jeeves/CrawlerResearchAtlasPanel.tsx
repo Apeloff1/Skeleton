@@ -10,6 +10,7 @@ import {
   type CrawlAtlasEffort, type CrawlAtlasReport, type CrawlSession,
 } from '../../product/crawlerClient';
 import s, { colors as C } from './CrawlerWorkspace.styles';
+import DragonResearchDecisionCockpit from './DragonResearchDecisionCockpit';
 import {
   NEW_ATLAS_DRAFT, MAX_ATLAS_OBJECTIVES,
   compileAtlasCampaign, enqueueAtlasObjective, removeAtlasObjective,
@@ -57,7 +58,7 @@ function Metric({ title, value, caption }: { title: string; value: number; capti
     {!!caption && <Text style={s.small}>{caption}</Text>}</View>;
 }
 
-export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlSession }) {
+export default function CrawlerResearchAtlasPanel({ session, onReport }: { session: CrawlSession; onReport?: (report: CrawlAtlasReport | null, requestedVersion: number) => void }) {
   const [question, setQuestion] = useState('');
   const [dimension, setDimension] = useState<Dimension>('method');
   const [stage, setStage] = useState<Stage>('verification');
@@ -70,6 +71,8 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
   const [blockedTerms, setBlockedTerms] = useState(NEW_ATLAS_DRAFT.blockedTerms);
   const [queuedGoals, setQueuedGoals] = useState<CrawlAtlasObjective[]>([]);
   const [report, setReport] = useState<CrawlAtlasReport | null>(null);
+  const reportCallback = useRef(onReport);
+  reportCallback.current = onReport;
   const [currentGoals, setCurrentGoals] = useState<CrawlAtlasObjective[] | null>(null);
   const [minutesPerTask, setMinutesPerTask] = useState('12');
   const [budget, setBudget] = useState('120');
@@ -89,7 +92,7 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
     request.current?.abort();
     request.current = null;
     busy.current = false;
-    setWorking(false); setReport(null); setCurrentGoals(null); setError(''); setNotice('');
+    setWorking(false); setReport(null); reportCallback.current?.(null, -1); setCurrentGoals(null); setError(''); setNotice('');
   }, []);
   useEffect(() => {
     clear();
@@ -174,6 +177,7 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
       if (controller.signal.aborted || submittedAt !== epoch.current ||
           sessionRevision !== revisionRef.current || auth !== getAuthToken()) return;
       setReport(data);
+      reportCallback.current?.(data, session.version);
       setCurrentGoals(goals);
       setNotice(allocate
         ? 'A bounded review plan was calculated, but no human was assigned and nothing was approved.'
@@ -181,14 +185,14 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
     } catch (exc) {
       if (controller.signal.aborted || submittedAt !== epoch.current ||
           sessionRevision !== revisionRef.current || auth !== getAuthToken()) return;
-      setReport(null); setCurrentGoals(null);
+      setReport(null); reportCallback.current?.(null, -1); setCurrentGoals(null);
       setError(exc instanceof Error ? exc.message : 'The Atlas inspection could not be verified.');
     } finally {
       if (submittedAt === epoch.current) {
         request.current = null; busy.current = false; setWorking(false);
       }
     }
-  }, [session.session_id, session.consent_current, question, dimension,
+  }, [session.session_id, session.version, session.consent_current, question, dimension,
     stage, mode, priority, requiredTerms, blockedTerms, passageTarget,
     independenceTarget, maxAgeMinutes, queuedGoals,
     currentGoals, report, minutesPerTask, budget]);
@@ -320,6 +324,20 @@ export default function CrawlerResearchAtlasPanel({ session }: { session: CrawlS
     {!!error && <Text style={s.error} accessibilityRole="alert">{error}</Text>}
     {!!notice && <Text style={s.small} accessibilityLiveRegion="polite">{notice}</Text>}
     {!authChanged && report && <>
+      <DragonResearchDecisionCockpit
+        key={session.session_id + ':' + session.version + ':' + report.dashboard_digest}
+        session={session} report={report} campaign={currentGoals ?? []} />
+      <Section title="Research pilot qualification · release held">
+        <Text style={s.small}>This pilot is source-only and never authorizes capture, publishing, model training or product release.</Text>
+        {report.pilot_qualification ? <>
+          <Text style={s.label}>Pilot: {readable(report.pilot_qualification.pilot_status)}</Text>
+          <Text style={s.small}>Receipt {report.pilot_qualification.qualification_digest.slice(0, 16)} · {report.pilot_qualification.checks.filter(item => item.status === 'qualified').length}/{report.pilot_qualification.pilot_check_count} source-only checks qualified</Text>
+          {report.pilot_qualification.checks.filter(item => item.status === 'held').map(item =>
+            <Text style={s.error} key={item.code}>{readable(item.code)} · {readable(item.next_action || 'human_review_required')}</Text>)}
+          <Text style={s.small}>External release checks: {report.pilot_qualification.external_release_checks.length} unqualified. Complete exact-head CI, independent device/recovery testing and human source review before any release claim.</Text>
+          <Text style={s.small}>The result expires on source, consent, policy, identity or head changes; re-run Atlas before relying on it.</Text>
+        </> : <Text style={s.error}>Pilot qualification receipt unavailable. Release remains held.</Text>}
+      </Section>
       <Text style={s.heading}>Evidence inspection</Text>
       <Text style={s.small}>Snapshot {report.snapshot_digest.slice(0, 16)} · {report.stages.length} audit stages · sequence {report.run_sequence} · {report.objectives.length} operator objectives</Text>
       <View style={styles.section}>

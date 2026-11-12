@@ -146,6 +146,17 @@ class AtlasOwnerBridgeTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(report["training_permission"])
         self.assertFalse(report["network_executed"])
         self.assertFalse(report["dispatch_recovery"]["mongo_commit_confirmed"])
+        pilot = report["pilot_qualification"]
+        self.assertEqual(pilot["atlas_digest"], report["atlas_digest"])
+        self.assertEqual(pilot["snapshot_digest"], report["snapshot_digest"])
+        self.assertEqual(pilot["source_policy_digest"], report["source_policy"]["digest"])
+        self.assertEqual(pilot["pilot_check_count"], 10)
+        self.assertEqual(len(pilot["external_release_checks"]), 10)
+        self.assertTrue(all(item["status"] == "not_qualified"
+                            for item in pilot["external_release_checks"]))
+        self.assertFalse(pilot["release_authorized"])
+        self.assertFalse(pilot["publication_authorized"])
+        self.assertTrue(pilot["recheck_mongo_authority_before_any_followup"])
         self.assertEqual(len(report["dashboard_digest"]), 64)
         self.assertNotIn("Archive capture methodology", repr(report))
 
@@ -261,6 +272,10 @@ class AtlasOwnerBridgeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report["retrieval"]["retained_hits"], 0)
         self.assertEqual(report["jeeves_handoff"]["citation_count"], 0)
         self.assertTrue(report["review_required"])
+        self.assertIn("current_policy",
+                      report["pilot_qualification"]["blocked_checks"])
+        self.assertEqual(report["pilot_qualification"]["pilot_status"],
+                         "held_for_repair")
 
     async def test_backend_rejects_changed_snapshot_after_composition(self):
         self.next_row = deepcopy(self.original)

@@ -115,22 +115,28 @@ function verifyNodeForgeNestedDigestAlgorithmGuard() {
 
   const rsaPath = require.resolve('node-forge/lib/rsa');
   const rsaSource = fs.readFileSync(rsaPath, 'utf8');
-  const packagePath = require.resolve('node-forge/package.json');
-  const version = JSON.parse(fs.readFileSync(packagePath, 'utf8')).version;
+  const version = require('node-forge/package.json').version;
   if (version === '1.4.3') {
-    // The newer published verifier rejects forged DigestInfo by re-encoding
-    // canonical DER rather than the older nested-sequence arity guard.
-    // The malicious signature fixture above MUST fail independently. This
-    // structure qualification MUST also pass, avoiding version-only trust.
+    // 1.4.3 rejects non-canonical DER DigestInfo encodings, superseding the
+    // old nested-length local patch. Require exact reviewed upstream bytes;
+    // do not waive or skip the malicious RSA signature test above.
+    const { verifyReviewedForgeRsa } = require('./node-forge-rsa-custody.cjs');
+    const receipt = verifyReviewedForgeRsa(version, rsaSource);
     const { qualifiesCanonicalRsaVerifier } = require('./security/node-forge-rsa-verifier.cjs');
     if (!qualifiesCanonicalRsaVerifier(rsaSource)) {
       throw new Error('node-forge canonical RSA verifier is unqualified');
     }
-  } else if (!['1.4.0', '1.4.2'].includes(version)
-      || !rsaSource.includes('obj.value[0].value.length !==')) {
-    // The legacy versions require the locally reviewed explicit patch.
-    // Any other version stays fail-closed pending a fresh source review.
-    throw new Error('node-forge nested DigestAlgorithm source guard is missing');
+    if (receipt.patchRequired || receipt.locallyPatched ||
+        receipt.securityDecision !== 'reviewed_upstream_canonical_der') {
+      throw new Error('node-forge 1.4.3 canonical-DER source custody is not verified');
+    }
+  } else if (version === '1.4.0' || version === '1.4.2') {
+    // Legacy formats retain their reviewed nested-element patch.
+    if (!rsaSource.includes('obj.value[0].value.length !==')) {
+      throw new Error('node-forge nested DigestAlgorithm source guard is missing');
+    }
+  } else {
+    throw new Error(`node-forge ${version} requires a new security qualification`);
   }
 }
 
