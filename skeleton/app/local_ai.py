@@ -523,12 +523,16 @@ class DurableOfflineAISession(OfflineAISession):
                     grounded_request_digest, validate_evidence,
                 )
                 request_digest = grounded_request_digest(request_digest)
+            # The full-history policy must be part of BOTH SQLite identity
+            # and the citation manifest. Store.commit validates the latter
+            # against exactly the same final request digest.
+            request_digest = _strict_context_digest(request_digest, require_full_history)
+            if evidence_manifest is not None:
                 validate_evidence(
                     evidence_manifest, prompt.strip(), request_digest,
                     self.backend.model_digest, self.tokenizer_digest,
                 )
                 grounding_context = evidence_manifest["context"]
-            request_digest = _strict_context_digest(request_digest, require_full_history)
             # super().ask() deliberately shrinks inference context. The
             # persisted transcript MUST instead extend the complete prior
             # SQLite history, not the model's shortened context window.
