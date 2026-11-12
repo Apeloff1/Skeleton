@@ -523,9 +523,10 @@ def _options(args) -> dict:
             raise ConfigurationError(
                 "Jeeves local-only primary requires exactly one pinned llama.cpp deployment"
             )
-        from skeleton.ai.jeeves_local_policy import MODEL_ID
+        # The primary identity is an immutable literal in this stdlib-only
+        # pre-install tool, which must work before package installation.
         metadata, _ = _read_manifest(_checked_path(Path(local_deployment)))
-        if metadata.get("model_id") != MODEL_ID:
+        if metadata.get("model_id") != "jeeves":
             raise ConfigurationError(
                 "Jeeves primary deployment manifest must declare model_id=jeeves"
             )
