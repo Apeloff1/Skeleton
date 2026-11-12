@@ -12,6 +12,21 @@ authorize tools, turn into system instructions, or trigger a hosted-model
 failover. The actual model and executable, not a mock or a header alone,
 must generate a verified answer before inference can be called working.
 
+## Desktop-first: use the existing offline Jeeves workbench
+
+On an installed desktop with an already-approved GGUF, you can use the
+native Jeeves workbench immediately, without Docker or a remote LLM provider:
+
+    python scripts/launch_jeeves_desktop.py
+
+Select the actual model and a private local state directory through the
+window. This launches the existing real llama.cpp + private SQLite
+ExecutionSpine desktop, with local memory/pressure controls. The model
+must genuinely be installed; no answer is fabricated when it is missing.
+This is an independent desktop local chat mode: it is **not a substitute**
+for the protected backend guard required by the connected mobile/web
+application.
+
 ## 1. Prepare a genuine local model
 
 Acquire a licensed GGUF and a compatible llama.cpp CLI executable and verify
