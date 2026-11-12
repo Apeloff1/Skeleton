@@ -185,12 +185,28 @@ def qualify_jeeves_live_local(
     timeout_seconds: int = 180,
     output_tokens: int = 16,
 ) -> dict[str, Any]:
-    """Two REAL local generations separated by a real server/SQLite restart."""
+    """Production entrypoint: no alias, no alternate model and no fake GGUF."""
+    if getattr(model, "model_id", None) != "jeeves":
+        raise LiveJeevesFailure("Jeeves must be the real loaded local model identity")
+    return _qualify_actual_local_http(
+        model, timeout_seconds=timeout_seconds, output_tokens=output_tokens,
+    )
+
+
+def _qualify_actual_local_http(
+    model: LocalDesktopModel,
+    *,
+    timeout_seconds: int = 180,
+    output_tokens: int = 16,
+) -> dict[str, Any]:
+    """Real native generation + SQLite recovery. Also exercises tiny native in CI.
+
+    This internal acceptance helper never changes a model identity. The
+    production entrypoint above requires the exact admitted jeeves identity.
+    """
     if (type(timeout_seconds) is not int or not 10 <= timeout_seconds <= 600
             or type(output_tokens) is not int or not 1 <= output_tokens <= 64):
         raise LiveJeevesFailure("qualification time/token budgets are invalid")
-    if getattr(model, "model_id", None) != "jeeves":
-        raise LiveJeevesFailure("Jeeves must be the real loaded local model identity")
     digest = getattr(model, "model_digest", None)
     if not isinstance(digest, str) or len(digest) != 64:
         raise LiveJeevesFailure("Jeeves has no stable admitted model digest")
@@ -252,7 +268,7 @@ def qualify_jeeves_live_local(
                 raise LiveJeevesFailure("read-only historical replay no longer matches")
     return {
         "schema_version": _SCHEMA, "qualified": True,
-        "model_id": "jeeves", "model_digest": digest,
+        "model_id": model.model_id, "model_digest": digest,
         "local_only": True, "hosted_provider_used": False,
         "transport": "authenticated-loopback-http",
         "storage": "local-sqlite-reopened",
