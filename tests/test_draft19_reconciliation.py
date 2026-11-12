@@ -87,5 +87,63 @@ class Draft19AdmissionTests(unittest.TestCase):
                 validate(candidate)
 
 
+
+class WorkflowSourceCustodyTests(unittest.TestCase):
+    """Fail closed when a focused CI command names non-existent or shadowed tests."""
+
+    @staticmethod
+    def _step(workflow: str, name: str) -> str:
+        marker = "      - name: " + name
+        if workflow.count(marker) != 1:
+            raise AssertionError("CI step missing or duplicated: " + name)
+        return workflow.split(marker, 1)[1].split("      - name:", 1)[0]
+
+    def test_quest_dialogue_focused_paths_are_real_and_have_distinct_modules(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github/workflows/draft19-gguf-source-qualification.yml").read_text(
+            encoding="utf-8"
+        )
+        step = self._step(workflow, "Qualify collided quest/dialogue pytest module identities")
+        selected = [line.strip() for line in step.splitlines()
+                    if line.strip().startswith("skeleton/testing/")]
+        expected = [
+            "skeleton/testing/dialogue_sessions_v1/test_companions_rescue.py",
+            "skeleton/testing/questflows_v1/test_questflows_companions_rescue.py",
+        ]
+        self.assertEqual(selected, expected)
+        self.assertEqual(len({Path(path).name for path in selected}), len(selected))
+        for path in selected:
+            with self.subTest(path=path):
+                self.assertTrue((root / path).is_file(), path)
+                self.assertFalse((root / path).is_symlink(), path)
+
+    def test_backend_and_root_codeql_test_packages_are_isolated_and_both_required(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github/workflows/merge-readiness.yml").read_text(
+            encoding="utf-8"
+        )
+        backend = self._step(
+            workflow, "Verify tenant-bound binary custody, vault streaming and bounded SSRF"
+        )
+        source = self._step(
+            workflow, "Qualify complete CodeQL alert lineage and cross-package inventory"
+        )
+        self.assertIn("working-directory: backend", backend)
+        self.assertIn("python -m pytest --noconftest -q", backend)
+        self.assertIn("python -m pytest --noconftest -q", source)
+        self.assertIn("tests/test_codeql_exception_boundary_20261111.py", backend)
+        for name in (
+            "test_full_security_alert_inventory_20261111.py",
+            "test_codeql_lineage_contract_20261111.py",
+            "test_codeql_all_151_source_contracts_20261111.py",
+            "test_codeql_stack_trace_custody_20261111.py",
+        ):
+            with self.subTest(name=name):
+                path = "tests/" + name
+                self.assertTrue((root / path).is_file())
+                self.assertEqual(source.count(path), 1)
+                self.assertNotIn("../" + path, backend)
+
+
 if __name__ == "__main__":
     unittest.main()

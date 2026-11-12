@@ -102,7 +102,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/dialogue_sessions_v1/test_companions_rescue.py
-          skeleton/testing/questflows_v1/test_companions_rescue.py
+          skeleton/testing/questflows_v1/test_questflows_companions_rescue.py
       - name: Qualify signed and unsigned first-playable continuity
         env:
           PYTHONPATH: ".:backend:tests"
