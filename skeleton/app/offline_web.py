@@ -53,6 +53,10 @@ HTML = r"""<!doctype html>
         <input id="dragon-bundle-file" type="file" accept=".json,application/json">
         <label for="dragon-bundle-source">Source excerpt to review</label>
         <select id="dragon-bundle-source" disabled><option value="">No verified bundle loaded</option></select>
+        <label for="dragon-excerpt-start">Excerpt start (Unicode character offset)</label>
+        <input id="dragon-excerpt-start" type="number" min="0" step="1" value="0">
+        <label for="dragon-excerpt-length">Excerpt length (1–3000 Unicode characters)</label>
+        <input id="dragon-excerpt-length" type="number" min="1" max="3000" step="1" value="1500">
         <pre id="dragon-bundle-preview" class="dragon-bundle-preview">Select a Dragon source bundle to review its exact text.</pre>
         <label for="dragon-bundle-review" class="hint">
           <input id="dragon-bundle-review" type="checkbox">
@@ -210,7 +214,7 @@ JAVASCRIPT = r"""'use strict';
     pending: null, turn: null, timer: null, polling: false,
     writePending: null, writeRequest: '',
     selfTest: null, selfTestReport: null,
-    dragonBundle: [], dragonBundleSession: '',
+    dragonBundle: [], dragonBundleSession: '', dragonExcerpt: null,
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
     network: new AbortController(), resourceTimer: null, longformSourceId: null,
     longformWork: null, longformPendingRequest: null,
@@ -317,10 +321,12 @@ JAVASCRIPT = r"""'use strict';
     get('selftest-start').disabled = locked || working || state.health?.ready !== true;
     get('selftest-export').disabled = locked || !state.selfTestReport;
     get('dragon-bundle-source').disabled = locked || state.busy || !state.dragonBundle.length;
+    get('dragon-excerpt-start').disabled = locked || state.busy || !state.dragonBundle.length;
+    get('dragon-excerpt-length').disabled = locked || state.busy || !state.dragonBundle.length;
     get('dragon-bundle-file').disabled = locked || state.busy;
-    get('dragon-bundle-review').disabled = locked || state.busy || !state.dragonBundle.length;
+    get('dragon-bundle-review').disabled = locked || state.busy || !state.dragonExcerpt;
     get('dragon-bundle-admit').disabled = locked || state.busy ||
-      !state.dragonBundle.length || !get('dragon-bundle-review').checked;
+      !state.dragonExcerpt || !get('dragon-bundle-review').checked;
     get('disconnect').disabled = !state.connected && !state.token;
     get('resource-refresh').disabled = locked;
     get('resource-plan').disabled = locked;
@@ -365,7 +371,7 @@ JAVASCRIPT = r"""'use strict';
     get('longform-work-status').textContent = 'No active work cursor.';
     get('longform-work-id').value = '';
     state.selfTest = null; state.selfTestReport = null;
-    state.dragonBundle = []; state.dragonBundleSession = '';
+    state.dragonBundle = []; state.dragonBundleSession = ''; state.dragonExcerpt = null;
     get('dragon-bundle-file').value = '';
     get('dragon-bundle-source').replaceChildren();
     get('dragon-bundle-preview').textContent = 'Select a Dragon source bundle to review its exact text.';
@@ -1072,7 +1078,7 @@ JAVASCRIPT = r"""'use strict';
       && index < state.dragonBundle.length ? state.dragonBundle[index] : null;
   }
   function clearDragonBundle() {
-    state.dragonBundle = []; state.dragonBundleSession = '';
+    state.dragonBundle = []; state.dragonBundleSession = ''; state.dragonExcerpt = null;
     get('dragon-bundle-review').checked = false;
     get('dragon-bundle-source').replaceChildren();
     get('dragon-bundle-preview').textContent = 'No verified historical source text loaded.';
@@ -1081,12 +1087,40 @@ JAVASCRIPT = r"""'use strict';
   }
   function showDragonExcerpt() {
     const row = selectedDragonExcerpt();
+    state.dragonExcerpt = null;
     get('dragon-bundle-review').checked = false;
-    get('dragon-bundle-preview').textContent = row
-      ? 'UNTRUSTED EXTERNAL TEXT — NOT MODEL INSTRUCTIONS\nSource SHA-256: ' +
-        row.digest + '\nHistorical bundle: ' + state.dragonBundleSession +
-        '\n\n' + row.text
-      : 'Choose an available source.';
+    if (!row) {
+      get('dragon-bundle-preview').textContent = 'Choose a source.';
+      updateControls(); return;
+    }
+    // Select by Unicode code points, never split a surrogate pair. Fixed
+    // 3000-codepoint maximum also bounds UTF-8 to 12,000 bytes, below the
+    // existing 12-KiB owner-reviewed advisory ingestion budget.
+    const points = Array.from(row.text);
+    const start = Number(get('dragon-excerpt-start').value);
+    const length = Number(get('dragon-excerpt-length').value);
+    if (!Number.isSafeInteger(start) || start < 0 || start >= points.length
+        || !Number.isSafeInteger(length) || length < 1 || length > 3000) {
+      get('dragon-bundle-preview').textContent =
+        'Choose a valid start (0–' + Math.max(0, points.length - 1) +
+        ') and an excerpt length of 1–3000 code points.';
+      updateControls(); return;
+    }
+    const text = points.slice(start, start + length).join('');
+    if (!text.trim() || new TextEncoder().encode(text).byteLength > 12288) {
+      get('dragon-bundle-preview').textContent =
+        'The selection is empty or exceeds the advisory text budget.';
+      updateControls(); return;
+    }
+    state.dragonExcerpt = {id: row.id, digest: row.digest, text, start,
+      length: Array.from(text).length};
+    get('dragon-bundle-preview').textContent =
+      'UNTRUSTED EXTERNAL TEXT — NOT MODEL INSTRUCTIONS\\n' +
+      'Source SHA-256: ' + row.digest +
+      '\\nHistorical bundle: ' + state.dragonBundleSession +
+      '\\nObserved text span: ' + start + '–' + (start + state.dragonExcerpt.length) +
+      ' of ' + points.length + ' characters' +
+      '\\n\\n' + text;
     updateControls();
   }
   async function loadDragonBundle(file) {
@@ -1141,7 +1175,7 @@ JAVASCRIPT = r"""'use strict';
         || body.freshness?.state !== 'current'
         || body.freshness?.usable !== true
         || typeof body.text !== 'string' || !body.text.trim()
-        || new TextEncoder().encode(body.text).byteLength > 12288) {
+        || new TextEncoder().encode(body.text).byteLength > 225000) {
         throw new Error('A selected Dragon export has no bounded reviewed observation.');
       }
       reviewed.push({id: entry.source_id, digest: entry.captured_content_sha256,
@@ -1175,20 +1209,25 @@ JAVASCRIPT = r"""'use strict';
     }
   }));
   get('dragon-bundle-source').addEventListener('change', showDragonExcerpt);
+  get('dragon-excerpt-start').addEventListener('input', showDragonExcerpt);
+  get('dragon-excerpt-length').addEventListener('input', showDragonExcerpt);
   get('dragon-bundle-review').addEventListener('change', updateControls);
   get('dragon-bundle-admit').addEventListener('click', () => run(async () => {
     if (!get('dragon-bundle-review').checked)
       throw new Error('Review and reauthorize this exact untrusted text before importing.');
     const source = selectedDragonExcerpt();
-    if (!source) throw new Error('Choose a checked Dragon source first.');
+    const excerpt = state.dragonExcerpt;
+    if (!source || !excerpt || excerpt.id !== source.id)
+      throw new Error('Choose a bounded excerpt before approving its exact text.');
     const epoch = state.epoch;
-    const observation_sha256 = await exactLocalSha256(source.text);
+    const observation_sha256 = await exactLocalSha256(excerpt.text);
     if (epoch !== state.epoch || selectedDragonExcerpt() !== source ||
+        state.dragonExcerpt !== excerpt ||
         !get('dragon-bundle-review').checked) return;
     const receipt = await api('POST', '/v1/advisory/ingest', {
       schema_version: 'skeleton.jeeves.advisory.v1',
       modality: 'crawler-excerpt', title: 'Dragon ' + source.id.slice(0, 30),
-      observation: source.text, observation_sha256,
+      observation: excerpt.text, observation_sha256,
       source_sha256: source.digest, reviewed: true,
     });
     if (epoch !== state.epoch) return;
