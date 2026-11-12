@@ -206,3 +206,47 @@ def test_live_browser_exposes_context_preflight_and_strict_dispatch_contract():
     assert "original.require_full_history === require_full_history" in JAVASCRIPT
     assert "require_full_history: true" in JAVASCRIPT
     assert "OL DER" not in JAVASCRIPT
+
+
+def test_real_grounded_strict_context_reuses_evidence_identity_but_fences_turn_policy(tmp_path):
+    """Native model genuinely generates with reviewed local evidence and full-history safety."""
+    app = OfflineHTTPApplication(
+        native_model(), tmp_path / "jeeves-context-grounded.sqlite3",
+        token="t" * 64,
+    )
+    try:
+        status, _ = app.dispatch("POST", "/v1/knowledge/documents", {
+            "title": "Local rasterizer reference",
+            "text": "The local rasterizer uses integer edge equations for coverage.",
+        })
+        assert status in (200, 201)
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        message = "How does rasterizer integer edge coverage work?"
+        preview_code, preview = app.dispatch(
+            "POST", f"/v1/sessions/{sid}/context-preview", {
+                "message": message, "max_output_tokens": 2,
+                "grounded": True, "require_full_history": True,
+            },
+        )
+        assert preview_code == 200 and preview["grounded"] is True
+        assert preview["fits_full_history"] is True
+        assert preview["may_submit_under_policy"] is True
+        status, answer = app.dispatch("POST", f"/v1/sessions/{sid}/turn", {
+            "message": message,
+            "request_id": "grounded-strict-context-2026",
+            "max_output_tokens": 2,
+            "grounded": True,
+            "require_full_history": True,
+        })
+        assert status == 200
+        assert answer["replayed"] is False
+        assert answer["text"].strip()
+        assert answer["evidence"]["claim"] == "source_passages_supplied_not_answer_verification"
+        assert answer["local_execution_receipt"]["output_sha256"] == answer["output_digest"]
+        assert len(answer["evidence"]["citations"]) >= 1
+        _, saved = app.dispatch("GET", f"/v1/sessions/{sid}")
+        assert saved["revision"] == 1
+        assert saved["messages"][0]["content"] == message
+    finally:
+        app.close()
