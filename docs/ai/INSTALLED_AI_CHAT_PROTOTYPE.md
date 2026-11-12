@@ -360,6 +360,17 @@ This is separate from the in-process admission counter and failure circuit.
   A different database may have a different local inference workload; this
   mechanism is not a global GPU scheduler or substitute for hardware
   resource admission.
+- The operator's real GGUF HTTP qualification now also starts a
+  **second independently authenticated localhost listener** on the same
+  database. While one listener holds the kernel lease, a new synchronous
+  turn through the other must fail HTTP 423 without changing any SQLite
+  history. It then restarts the original listener and submits the **same
+  previously denied request ID**; only this later admitted call may execute
+  the second genuine native turn. The JSON report explicitly distinguishes
+  `competing_local_service_inference_denied` and
+  `denied_peer_request_committed_after_restart`. Both listeners run in
+  one operator process; the separate subprocess-kill scenario remains
+  covered by the adversarial unit suite, not by this GGUF operator test.
 - The `tests/test_jeeves_local_lease.py` suite exercises independent
   in-process owners, a **real child process** holding the kernel lock,
   immediate recovery after killing that process, unsafe lockfile attacks,
