@@ -2,6 +2,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { qualifiesCanonicalRsaVerifier } = require('./security/node-forge-rsa-verifier.cjs');
+const { readFileSync } = require('node:fs');
+const { join } = require('node:path');
 
 // Bounded fingerprint of the actual published v1.4.3 RSA verifier, without
 // executing third-party crypto code or trusting a version-string assertion.
@@ -50,4 +52,12 @@ test('missing or altered security checks cannot enter the frontend image', () =>
     assert.equal(qualifiesCanonicalRsaVerifier(input), false,
       'unreviewed RSA verifier must block the Docker dependency patch stage');
   }
+});
+
+test('frontend Docker dependency layer copies the exact security helper before running patcher', () => {
+  const docker = readFileSync(join(__dirname, '..', 'Dockerfile'), 'utf8');
+  const patch = readFileSync(join(__dirname, 'patch-node-modules.js'), 'utf8');
+  assert.match(docker, /COPY scripts\/security\/node-forge-rsa-verifier\.cjs \.\/scripts\/security\/node-forge-rsa-verifier\.cjs/);
+  assert.match(patch, /require\('\.\/security\/node-forge-rsa-verifier\.cjs'\)/);
+  assert.match(patch, /node-forge 1\.4\.3 canonical DER verifier changed; security review required/);
 });
