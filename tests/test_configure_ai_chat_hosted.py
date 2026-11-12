@@ -163,3 +163,26 @@ def test_interactive_provider_prompt_cancellation_is_safe(monkeypatch):
     with pytest.raises(ActivationError, match="was cancelled") as result:
         config.prompted_provider_key()
     assert "sensitive-transport-path" not in str(result.value)
+
+
+
+@pytest.mark.parametrize("allow_switch,replace_key", [
+    (False, False), (True, False), (True, True),
+])
+def test_jeeves_local_only_cannot_be_promoted_to_hosted_even_with_legacy_switch_flags(
+    tmp_path, allow_switch, replace_key
+):
+    path = setup_root(
+        tmp_path,
+        "JEEVES_LOCAL_ONLY=1\nJEEVES_PRIMARY_MODEL_ID=jeeves\n"
+        "AI_PROVIDER=local\nAI_LOCAL_DEPLOYMENT_PATH=/app/model.json\n"
+        "AI_LOCAL_GUARD_REQUIRED=1\n",
+    )
+    before = path.read_bytes()
+    with pytest.raises(ActivationError, match="local-only primary model"):
+        activate_hosted_ai(
+            tmp_path, model="gpt-5.5", key=EXAMPLE_KEY,
+            allow_switch_from_local=allow_switch,
+            replace_existing_key=replace_key,
+        )
+    assert path.read_bytes() == before
