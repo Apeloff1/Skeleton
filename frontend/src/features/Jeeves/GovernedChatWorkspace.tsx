@@ -236,6 +236,25 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const attached = accountDraftsReady ? files[threadId] || [] : [];
   const busy = ['submitting', 'streaming', 'reconnecting', 'cancelling'].includes(state.status);
   const loading = state.status === 'loading';
+  // Readiness is observed independently of the controller's model catalog.
+  // When an operator activates a provider after installation, update the
+  // selectable inventory without silently changing a saved model preference.
+  // Never change the selected model for an admitted/pending canonical turn.
+  const currentCatalogKey = state.models.map(model =>
+    [model.id, model.available, model.selectable].join(':')).sort().join('|');
+  const observedCatalogKey = readiness?.available === true
+    ? readiness.models.models.map(model =>
+      [model.id, model.available, model.selectable].join(':')).sort().join('|')
+    : '';
+  const catalogSyncAttempt = useRef<{ controller: typeof controller; key: string } | null>(null);
+  useEffect(() => {
+    if (!observedCatalogKey || !state.ready || state.pending || busy || loading
+      || observedCatalogKey === currentCatalogKey) return;
+    if (catalogSyncAttempt.current?.controller === controller
+      && catalogSyncAttempt.current.key === observedCatalogKey) return;
+    catalogSyncAttempt.current = { controller, key: observedCatalogKey };
+    void controller.refreshModels();
+  }, [controller, currentCatalogKey, observedCatalogKey, busy, loading, state.pending, state.ready]);
   const selectedModel = state.models.find(model => model.id === state.selectedModelId);
   const observedModel = readiness?.models.models.find(model => model.id === selectedModel?.id);
   const modelReady = readiness?.available === true && !!selectedModel?.available && selectedModel.selectable
@@ -689,7 +708,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
           {state.activeThread?.state === 'archived' ? <View style={s.alert}><Text style={s.alertText}>Restore this conversation to continue chatting.</Text>
             <Button icon="arrow-undo-outline" label="Restore conversation" onPress={() => run(() => controller.archive(false))} /></View> : <>
             {!busy && !loading && !pending && !modelReady && <View style={s.alert}>
-              <Text accessibilityLiveRegion="polite" style={s.alertText}>{readinessError?.message || (readiness && !readiness.available ? chatReadinessMessage(readiness) : readiness?.models.readiness?.message || observedModel?.readiness.message) || 'A ready model and conversation storage are required. Your draft is preserved while you finish setup.'}</Text>
+              <Text accessibilityLiveRegion="polite" style={s.alertText}>{readinessError?.message || (readiness && !readiness.available ? chatReadinessMessage(readiness) : readiness?.available && !modelReady && state.models.some(model => model.available && model.selectable) ? 'The AI engine is ready, but the selected model is unavailable or belongs to a previous configuration. Choose a ready model explicitly; your draft and any saved turn are preserved.' : readiness?.models.readiness?.message || observedModel?.readiness.message) || 'A ready model and conversation storage are required. Your draft is preserved while you finish setup.'}</Text>
               <View style={s.row}><MiniButton icon="refresh-outline" label="Check readiness & models" onPress={() => run(async () => { await Promise.all([refreshReadiness(), controller.refreshModels()]); })} /><MiniButton icon="settings-outline" label="Finish AI setup" onPress={() => router.push('/setup' as never)} /><MiniButton icon="hardware-chip-outline" label="Choose model" onPress={() => setModelsOpen(true)} /></View>
             </View>}
             {!!uploadError && <View style={s.row}><Text style={[s.errorText, { flex: 1 }]} accessibilityRole="alert">{uploadError}</Text><IconButton icon="close-outline" label="Dismiss file error" onPress={() => setUploadError(null)} /></View>}
