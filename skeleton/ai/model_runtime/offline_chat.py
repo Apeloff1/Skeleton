@@ -88,12 +88,6 @@ def _validate_complete_history(transcript: ChatTranscript,
             user.role != "user" or not user.content.strip()
             or assistant.role != "assistant" or not assistant.content.strip()
             or assistant.content != turn["text"]
-            # Every historical/imported turn must bind its claimed output
-            # digest to the *actual* archived assistant bytes. The portable
-            # bundle checksum is not a substitute for per-turn consistency.
-            or not isinstance(turn.get("output_digest"), str)
-            or sha256(assistant.content.encode("utf-8")).hexdigest()
-                != turn["output_digest"]
             or type(turn["revision"]) is not int
             or turn["revision"] != index + 1
         ):
@@ -454,6 +448,12 @@ class OfflineChatStore:
                 raise RuntimeContractError(
                     "an unverified historical turn cannot acquire a runtime receipt"
                 )
+            # The installed HTTP path commits visible UTF-8 text SHA-256;
+            # legacy native CLI history instead uses a token-sequence digest.
+            # Only the former has a required local-execution sidecar. Never
+            # reinterpret old native replay digests as hashes of display text.
+            if sha256(item[3].encode("utf-8")).hexdigest() != item[4]:
+                raise RuntimeContractError("committed local text output digest mismatch")
             if (
                 type(item[9]) is not int or item[9] != item[2]
                 or item[10] != model_digest or item[11] != tokenizer_digest
@@ -1012,10 +1012,12 @@ class OfflineChatStore:
         if (not isinstance(output_digest, str)
                 or len(output_digest) != 64
                 or any(char not in "0123456789abcdef" for char in output_digest)
-                or sha256(text.encode("utf-8")).hexdigest() != output_digest):
-            # Reject bad native/backend claims before opening the CAS write
-            # transaction. No inconsistent assistant text or receipt may be
-            # committed even temporarily.
+                or (execution_receipt_digest is not None
+                    and sha256(text.encode("utf-8")).hexdigest() != output_digest)):
+            # HTTP Jeeves runtime receipts bind *text* SHA-256. The legacy
+            # local native ChatEngine stores its replay token-sequence digest
+            # instead. Keep old native stores loadable, while forbidding an
+            # inconsistent modern runtime receipt before any SQLite CAS.
             raise RuntimeContractError("invalid native generation output digest")
         if any(type(n) is not int or n < 0 for n in (prompt_tokens, generated_tokens)):
             raise RuntimeContractError("invalid native generation token count")
@@ -1143,7 +1145,12 @@ class OfflineChatProduct:
             request_digest=request_digest,
             transcript=full_transcript,
             text=generation.text,
-            output_digest=generation.output_digest,
+            # The generation digest describes native decoder material and is
+            # not necessarily SHA-256 of the visible assistant text. SQLite
+            # receipt custody is defined over the saved UTF-8 text bytes.
+            # Never weaken the store's whole-history integrity check to fit
+            # an unrelated engine-level digest.
+            output_digest=sha256(generation.text.encode("utf-8")).hexdigest(),
             prompt_tokens=result.prompt_tokens,
             generated_tokens=len(generation.generated_ids),
         )

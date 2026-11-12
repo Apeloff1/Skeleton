@@ -46,7 +46,7 @@ def committed_two_turns(tmp_path):
 
 
 @pytest.mark.parametrize("mutation,error", [
-    ("historical_output_digest", "conversation turn history/receipt mismatch"),
+    ("historical_output_digest", "committed local text output digest mismatch"),
     ("historical_receipt_removed", "required local execution receipt is missing"),
     ("historical_receipt_model", "local execution receipt is not bound to committed"),
     ("historical_receipt_revision", "local execution receipt is not bound to committed"),
@@ -150,7 +150,7 @@ def test_forked_and_imported_history_is_explicitly_unverified_not_reexecuted(tmp
         app.close()
 
 
-def test_portable_bundle_refuses_forged_nested_output_digest_even_when_resigned(
+def test_portable_bundle_refuses_inconsistent_nested_turn_text_even_when_resigned(
     tmp_path,
 ):
     """A recomputed bundle checksum cannot excuse an inconsistent turn digest."""
@@ -161,9 +161,9 @@ def test_portable_bundle_refuses_forged_nested_output_digest_even_when_resigned(
         )
         bundle = json.loads(raw)
         assert bundle["body"]["turns"]
-        bundle["body"]["turns"][0]["output_digest"] = "a" * 64
-        # Attacker can recompute this unkeyed envelope hash, but cannot make
-        # the recorded digest consistent with the archived assistant bytes.
+        bundle["body"]["turns"][0]["text"] = "forged but not in transcript"
+        # Attacker can recompute this unkeyed envelope hash. An inconsistent
+        # turn row still cannot be imported as the archived transcript.
         body = bundle["body"]
         bundle["sha256"] = sha256(json.dumps(
             body, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
@@ -257,5 +257,45 @@ def test_commit_rejects_inconsistent_output_hash_before_any_cas_write(
             (sid,),
         ).fetchone()[0]
         assert count == 0
+    finally:
+        app.close()
+
+
+def test_legacy_native_token_sequence_digest_remains_loadable_without_new_attestation(
+    tmp_path,
+):
+    """Existing local native ChatEngine hashes tokens, not displayed UTF-8."""
+    app = OfflineHTTPApplication(
+        native_model(), tmp_path / "legacy-native.sqlite3", token="a" * 64
+    )
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        saved = app._store.load(sid, app.model_digest, app.tokenizer_digest)
+        answer = "a legacy native visible reply"
+        legacy_digest = "e" * 64
+        assert legacy_digest != sha256(answer.encode("utf-8")).hexdigest()
+        committed = app._store.commit(
+            session=saved,
+            request_id="native-token-replay",
+            request_digest="b" * 64,
+            transcript=saved.transcript.append("user", "hello").append(
+                "assistant", answer,
+            ),
+            text=answer,
+            output_digest=legacy_digest,
+            prompt_tokens=8,
+            generated_tokens=4,
+            execution_receipt_digest=None,
+        )
+        assert committed.revision == 1
+        reloaded = app._store.load(sid, app.model_digest, app.tokenizer_digest)
+        assert reloaded.revision == 1
+        assert reloaded.transcript.messages[-1].content == answer
+        receipt = app._store.replay(sid, "native-token-replay", "b" * 64)
+        assert receipt is not None and receipt.output_digest == legacy_digest
+        assert app._store.local_execution_receipt(
+            sid, "native-token-replay", app.model_digest, app.tokenizer_digest,
+        ) is None
     finally:
         app.close()

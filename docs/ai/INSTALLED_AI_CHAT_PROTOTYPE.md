@@ -299,11 +299,17 @@ operator GGUF speed, independent protected-backend quorum or handset AI.
 
 ## 8. Whole-history SQLite and portable-backup custody
 
-Every authoritative conversation read now checks that **each saved assistant
-turn's output SHA-256 matches its archived text**. For native/GGUF turns
-committed with a mandatory execution receipt, the entire history must also
-contain a correctly bound sidecar with the matching revision, model digest,
-tokenizer digest, output hash, and bounded lower-case receipt digest.
+Every authoritative conversation read validates full transcript/receipt
+order and all required modern native/GGUF execution receipts against their
+saved revisions, model/tokenizer identities and output hashes. New Jeeves
+HTTP outputs with mandatory runtime receipts are bound to **SHA-256 of visible
+UTF-8 answer text**; any mismatch anywhere in that history is rejected.
+
+Compatibility note: older standalone native ChatEngine generations use a
+**token-sequence replay digest**, not SHA-256 of displayed text. Their rows
+have no mandatory HTTP runtime-execution receipt and remain explicitly
+unverified by the new text-digest rule. Do not retrofit invented native
+attestations or break those historical conversations.
 
 A missing, mismatched or retroactively attached receipt fails the *entire*
 conversation load rather than only failing a GET for the individual damaged
@@ -320,8 +326,9 @@ having run through the trusted native backend.
 A bundle checksum is unkeyed. It cannot authorize a model, supply protected
 backend proof, or excuse a nested `output_digest` inconsistent with its
 assistant text. The `tests/test_jeeves_durable_integrity.py` suite actively
-mutates earlier SQLite records and resigned portable envelopes, checking that
-invalid histories fail closed while valid fork/import history remains usable.
+mutates earlier SQLite runtime receipts and rechecksums portable envelopes,
+checking that invalid histories fail closed while valid legacy, forked and
+imported history remains usable.
 
 ## 2026 local execution custody: independent service-process safety
 
