@@ -158,9 +158,8 @@ class OfflineHTTPApplication:
         self._lock = threading.RLock()
         self._turn_lock = threading.RLock()
         self._inference_circuit = LocalInferenceCircuit()
-        # One physical SQLite workspace must not run two GGUF/native executors
-        # from independent processes. The OS automatically releases the lock
-        # after an abnormal process exit; it is never a model quality proof.
+        # Coordinate native/GGUF execution across independent local services
+        # sharing one private SQLite workspace. This is not an attestation.
         self._inference_lease = LocalInferenceLease(self.database)
         self._turns: dict[tuple[str, str], _LocalTurn] = {}
         self._active_session: str | None = None
@@ -282,10 +281,14 @@ class OfflineHTTPApplication:
             # Reject an already-owned ID with changed inputs before admission.
             committed = self._store.replay(session_id, rid, digest)
         if committed is not None:
-            # An exact committed retry is read-only. A process restart or a
-            # missing model must never turn durable replay into new inference.
-            observed = self.turn_status(session_id, rid)
-            return (200 if observed["state"] == "complete" else 202), observed
+            # A process restart, another active worker, or a missing model
+            # must never turn a committed retry into new inference.
+            observed = self._read_committed_turn(
+                session_id, rid, expected_request_digest=digest,
+            )
+            if observed is None:
+                raise OfflineHTTPError(409, "committed local turn changed during recovery")
+            return 200, observed
         key = (session_id, rid)
         with self._turn_lock:
             if self._closing:
@@ -376,6 +379,47 @@ class OfflineHTTPApplication:
                 turn.loop = None
                 self._active_session = None
 
+    def _read_committed_turn(
+        self, session_id: str, request_id: str, *,
+        expected_request_digest: str | None = None,
+        observed: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Read SQLite truth independently of a running model's execution lock.
+
+        The transcript, evidence and execution receipt are one read snapshot.
+        This is deliberately not a retry of local inference and cannot invent
+        a receipt for an in-flight, cancelled or uncommitted generation.
+        """
+        with self._store.read_snapshot():
+            committed = self._store.committed_turn(
+                session_id, request_id, self.model_digest, self.tokenizer_digest,
+                expected_request_digest=expected_request_digest,
+            )
+            if committed is None:
+                return None
+            receipt, evidence = committed
+            execution = self._store.local_execution_receipt(
+                session_id, request_id, self.model_digest, self.tokenizer_digest,
+            )
+        return {
+            "session_id": session_id, "request_id": request_id,
+            "state": "complete", "terminal": True, "cancel_requested": False,
+            "created_at": observed["created_at"] if observed else None,
+            "finished_at": observed["finished_at"] if observed else None,
+            "recovered_from_store": True, "error": None,
+            "result": {
+                "session_id": session_id, "request_id": request_id,
+                "revision": receipt.revision, "text": receipt.text,
+                "output_digest": receipt.output_digest,
+                "input_tokens": receipt.prompt_tokens,
+                "output_tokens": receipt.generated_tokens,
+                "replayed": True, "model_digest": self.model_digest,
+                "local_execution_receipt": execution,
+                "evidence": evidence,
+                **_audit_pair(receipt.text, evidence),
+            },
+        }
+
     def turn_status(self, session_id: str, request_id: str, *, cancel: bool = False) -> dict[str, Any]:
         self._session(session_id)
         rid = _identifier("request id", request_id)
@@ -385,42 +429,40 @@ class OfflineHTTPApplication:
                 if cancel:
                     self._request_cancel(turn)
                 observed = turn.public()
-                if turn.state not in {"failed", "cancelled"}:
-                    return observed
             else:
                 observed = None
-        # A process restart/eviction cannot erase a committed turn's status.
-        # This also recovers a peer process winning the same request ID while
-        # our own execution was settling. Uncommitted work is never invented.
-        committed = self._store.committed_turn(
-            session_id, rid, self.model_digest, self.tokenizer_digest,
-            expected_request_digest=turn.request_digest if turn is not None else None,
+        # A peer may commit the turn before our worker has finalized its
+        # in-memory ticket. Even a completed *local* ticket must revalidate
+        # its durable text and native execution sidecar before being claimed
+        # as committed, rather than trusting a stale in-memory snapshot.
+        committed = self._read_committed_turn(
+            session_id, rid,
+            expected_request_digest=turn.request_digest if turn else None,
+            observed=observed,
         )
+        if observed is not None and observed["state"] == "complete":
+            if committed is None or not isinstance(observed["result"], dict):
+                raise RuntimeContractError("completed local turn is missing its durable receipt")
+            original = observed["result"]
+            verified = committed["result"]
+            if (
+                original.get("revision") != verified["revision"]
+                or original.get("text") != verified["text"]
+                or original.get("output_digest") != verified["output_digest"]
+                or original.get("local_execution_receipt")
+                    != verified["local_execution_receipt"]
+            ):
+                raise RuntimeContractError("local ticket does not match committed runtime custody")
+            # Preserve the original execution's replayed=False marker after
+            # confirming the SQLite receipt. A read-after-restart is replayed.
+            return observed
         if committed is not None:
-            receipt, evidence = committed
-            return {
-                "session_id": session_id, "request_id": rid,
-                "state": "complete", "terminal": True, "cancel_requested": False,
-                "created_at": observed["created_at"] if observed else None,
-                "finished_at": observed["finished_at"] if observed else None,
-                "recovered_from_store": True, "error": None,
-                "result": {
-                    "session_id": session_id, "request_id": rid,
-                    "revision": receipt.revision, "text": receipt.text,
-                    "output_digest": receipt.output_digest,
-                    "input_tokens": receipt.prompt_tokens,
-                    "output_tokens": receipt.generated_tokens,
-                    "replayed": True, "model_digest": self.model_digest,
-                    "local_execution_receipt": self._store.local_execution_receipt(
-                        session_id, rid, self.model_digest, self.tokenizer_digest,
-                    ),
-                    "evidence": evidence,
-                    **_audit_pair(receipt.text, evidence),
-                },
-            }
+            return committed
         if observed is not None:
             return observed
-        raise OfflineHTTPError(404, "uncommitted turn ticket unavailable; resubmit the exact original request to recover")
+        raise OfflineHTTPError(
+            404, "uncommitted turn ticket unavailable; resubmit the exact original request to recover"
+        )
 
     def authenticate(self, authorization: str | None) -> bool:
         if not isinstance(authorization, str) or not authorization.startswith("Bearer "):
@@ -443,25 +485,14 @@ class OfflineHTTPApplication:
             return min(32, limits.max_new_tokens, max(1, limits.max_context // 4))
         return min(512, max(1, (self.backend.config.context_size or 4096) // 4))
 
-    def _replayed_result(self, session_id: str, rid: str, replay: Any) -> dict[str, Any]:
-        """Serve a validated committed reply without acquiring a generation lease."""
-        previous = self._store.turn_evidence(
-            session_id, self.model_digest, self.tokenizer_digest,
+    def _replayed_result(self, session_id: str, rid: str, digest: str) -> dict[str, Any]:
+        """Replay only a full SQLite-validated, model-scoped committed receipt."""
+        committed = self._read_committed_turn(
+            session_id, rid, expected_request_digest=digest,
         )
-        evidence = previous[replay.revision - 1]
-        return {
-            "session_id": session_id, "request_id": rid,
-            "revision": replay.revision, "text": replay.text,
-            "output_digest": replay.output_digest,
-            "input_tokens": replay.prompt_tokens,
-            "output_tokens": replay.generated_tokens,
-            "replayed": True, "model_digest": self.model_digest,
-            "local_execution_receipt": self._store.local_execution_receipt(
-                session_id, rid, self.model_digest, self.tokenizer_digest,
-            ),
-            "evidence": evidence,
-            **_audit_pair(replay.text, evidence),
-        }
+        if committed is None or not isinstance(committed.get("result"), dict):
+            raise OfflineHTTPError(409, "committed local turn changed during recovery")
+        return committed["result"]
 
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
@@ -484,7 +515,7 @@ class OfflineHTTPApplication:
             self._session(session_id)
             replay = self._store.replay(session_id, rid, digest)
             if replay is not None:
-                return self._replayed_result(session_id, rid, replay)
+                return self._replayed_result(session_id, rid, digest)
             # Historical replies are read-only; newly generated turns must
             # prove the active local model still matches its admitted identity.
             self._admit_local_generation()
@@ -509,7 +540,7 @@ class OfflineHTTPApplication:
                     # Recover its durable result instead of generating twice.
                     peer_replay = self._store.replay(session_id, rid, digest)
                     if peer_replay is not None:
-                        return self._replayed_result(session_id, rid, peer_replay)
+                        return self._replayed_result(session_id, rid, digest)
                     self._session(session_id)
                     chat = DurableOfflineAISession(
                         self.backend, database=self.database, session_id=session_id
@@ -919,7 +950,12 @@ class OfflineHTTPApplication:
                 self._session(sid)
                 committed = self._store.replay(sid, rid, digest)
             if committed is not None:
-                return 200, self._perform_turn(sid, body)
+                observed = self._read_committed_turn(
+                    sid, rid, expected_request_digest=digest,
+                )
+                if observed is None:
+                    raise OfflineHTTPError(409, "committed local turn changed during recovery")
+                return 200, observed["result"]
             with self._turn_lock:
                 if self._closing or self._active_session is not None:
                     raise OfflineHTTPError(409, "another local generation is still running")

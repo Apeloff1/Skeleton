@@ -14,9 +14,11 @@ on:
       - "skeleton/app/offline_http.py"
       - "skeleton/app/jeeves_local_lease.py"
       - "tests/test_jeeves_local_lease.py"
+      - "skeleton/ai/model_runtime/offline_chat.py"
       - "tests/test_jeeves_advisory.py"
       - "tests/test_jeeves_live_local_advanced.py"
       - "tests/test_jeeves_inference_circuit.py"
+      - "tests/test_jeeves_durable_integrity.py"
       - "skeleton/app/jeeves_inference_circuit.py"
       - "skeleton/ai/jeeves_local_policy.py"
       - "skeleton/provider_runtime.py"
@@ -72,7 +74,7 @@ jobs:
         env:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py tests/test_jeeves_advisory.py tests/test_jeeves_live_local_advanced.py tests/test_jeeves_inference_circuit.py tests/test_jeeves_local_lease.py
+        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py tests/test_jeeves_advisory.py tests/test_jeeves_live_local_advanced.py tests/test_jeeves_inference_circuit.py tests/test_jeeves_durable_integrity.py tests/test_jeeves_local_lease.py
       - name: Verify authenticated backend-to-engine HTTP chat with durable local fixture
         env:
           PYTHONPATH: ".:backend"
