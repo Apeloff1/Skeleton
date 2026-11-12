@@ -172,6 +172,42 @@ class OfflineHTTPApplication:
             self._store.close()
             raise
 
+    def _model_readiness(self) -> tuple[bool, str]:
+        """Observed local backend admission; a network/HTTP ping is not inference.
+
+        The model may be replaced, permissions revoked, or its native device
+        detached after the loopback server started. A successful startup can
+        therefore never be a perpetual ready=true claim. Keep all backend
+        exception text, paths and model prompt bytes out of the HTTP surface.
+        Full SHA-256 rehash and active tokenizer validation still happen at
+        the actual inference boundary, not from this cheap metadata probe.
+        """
+        if self._closing:
+            return False, "local_service_shutting_down"
+        try:
+            from skeleton.ai.jeeves_local_policy import is_local_only, primary_model_id
+            if is_local_only() and getattr(self.backend, "model_id", None) != primary_model_id():
+                return False, "local_primary_identity_changed"
+            if self.backend.model_digest != self.model_digest:
+                return False, "local_model_identity_changed"
+            if _model_tokenizer_digest(self.backend) != self.tokenizer_digest:
+                return False, "local_tokenizer_identity_changed"
+            checker = getattr(self.backend, "check_readiness", None)
+            if not callable(checker):
+                # A new model backend may not inherit a permissive default.
+                return False, "local_model_readiness_unavailable"
+            checker()
+        except Exception:
+            return False, "local_model_identity_unavailable"
+        return True, "ready"
+
+    def _admit_local_generation(self) -> None:
+        ready, code = self._model_readiness()
+        if not ready:
+            raise OfflineHTTPError(
+                503, "local inference unavailable: " + code,
+            )
+
     def close(self) -> None:
         with self._turn_lock:
             self._closing = True
@@ -240,6 +276,10 @@ class OfflineHTTPApplication:
                     raise OfflineHTTPError(409, "request ID belongs to different turn content")
                 if not retry or existing.state not in {"failed", "cancelled"}:
                     return (200 if existing.state in TERMINAL_TURN_STATES else 202), existing.public()
+            # Recheck before allocating a worker so a replaced/unreadable
+            # GGUF cannot be offered as a healthy new request. A completed
+            # idempotent turn remains readable even when the model is gone.
+            self._admit_local_generation()
             if self._active_session is not None:
                 raise OfflineHTTPError(409, "another local generation is still running")
             if existing is not None:
@@ -390,6 +430,9 @@ class OfflineHTTPApplication:
                     "evidence": previous[replay.revision - 1],
                     **_audit_pair(replay.text, previous[replay.revision - 1]),
                 }
+            # Historical replies are read-only; newly generated turns must
+            # prove the active local model still matches its admitted identity.
+            self._admit_local_generation()
             manifest = None
             if grounded:
                 if len(text.encode("utf-8")) > 1024:
@@ -568,8 +611,11 @@ class OfflineHTTPApplication:
                               else self.backend.config.context_size or 4096)
             output_tokens = (self.backend.runtime.limits.max_new_tokens
                              if hasattr(self.backend, "runtime") else 8192)
+            ready, code = self._model_readiness()
             return 200, {
-                "local_only": True, "ready": True,
+                "local_only": True, "ready": ready,
+                "model_readiness_code": code,
+                "readiness_is_live_inference_proof": False,
                 "runtime_kind": ("native" if hasattr(self.backend, "runtime")
                                  else "llama.cpp"),
                 "adaptive_metal_launch": getattr(
