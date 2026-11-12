@@ -39,6 +39,7 @@ from scripts.configure_ai_chat_hosted import (
     checked_key,
     checked_model,
     private_provider_key,
+    prompted_provider_key,
 )
 
 
@@ -97,7 +98,7 @@ def _hosted_key(args: argparse.Namespace) -> str | None:
     if args.key_file is not None:
         return private_provider_key(args.key_file)
     if args.prompt_key:
-        return checked_key(getpass("Server-side provider key (not echoed): "))
+        return prompted_provider_key()
     return None  # Existing approved server-side key may be reused.
 
 
