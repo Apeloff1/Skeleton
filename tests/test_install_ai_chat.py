@@ -230,3 +230,17 @@ def test_injected_acceptance_contract_reports_proof_only_after_authority(capsys)
     assert '"inference_verified":true' in output
     assert '"provider_receipts":1' in output
     assert '"model_receipts"' not in output
+
+
+
+def test_installer_private_key_prompt_uses_hosted_config_guard(monkeypatch):
+    calls = []
+    secret = "sk-" + "Q" * 50
+
+    def prompt():
+        calls.append("private-terminal")
+        return secret
+
+    monkeypatch.setattr(install_ai_chat, "prompted_provider_key", prompt)
+    assert install_ai_chat._hosted_key(options(prompt_key=True)) == secret
+    assert calls == ["private-terminal"]
