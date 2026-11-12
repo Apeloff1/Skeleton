@@ -394,3 +394,116 @@ in a permitted external environment, a multi-user tenant-isolation
 penetration test, a source-rights approval, or independent native hardware
 installation. The isolated proof is about correct authorization, persistence
 and zero unrequested network activity.
+
+## Advanced research decision cockpit — operator-facing vertical slice
+
+This release-prototype extension upgrades the six-stage research experience
+from a passive list of dozens of independent Atlas diagnostic sections into a
+bounded, interactive **research decision cockpit** under the existing Research
+Atlas stage. The underlying data belongs entirely to the current
+authenticated Mongo owner, the source-use policy engine, the 26-stage
+assurance/forensic chains and the existing Atlas response. This extension
+creates no new crawler engine, persistent review status, agent, LLM provider,
+network call or alternate source-authority database.
+
+### Contract and workflow
+
+The cockpit is shown only after an owner-scoped Atlas response has completed
+the client protocol verifier and still matches its initiating session
+revision. It requires the real, source-only pilot receipt and the existing
+source-only release, training, publication, network and review guard flags.
+
+It has three interactive perspectives, each operating strictly on the same
+verified response:
+
+**1. Objective decision matrix.** Up to eight real operator objectives are
+ordered by a deterministic, lexicographic risk/severity rule. Each row shows
+selected passages; observed source records, hosts and exact captured-content
+families; optional minimum passage target from the operator's actual campaign;
+hypothetical passage shortfall; and machine-readable reasons for triage:
+missing selected evidence, source-host concentration, suspected copy overlap,
+family shortfall, query-support concern, policy exclusions or privacy/security
+holds. The UI does not present a scored model-confidence number: such a number
+would falsely imply factual authority. Every objective shows **zero verified
+independent groups**, even if many URLs, hosts or exact-content families were
+observed. A source-reuse cluster is a lead for human review, not proof of
+authorship, collusion, plagiarism or corroboration.
+
+**2. Single-host fault simulation.** Users can select one observed host from
+the canonical Atlas host-ablation receipt, or compare against the no-failure
+baseline. An objective that would lose all selected evidence is marked
+critical. An objective left with a single observed host is escalated. The
+simulation never deletes text, schedules more crawling, touches source
+permissions, recomputes retrieval weights, or claims that unavailable hosts
+are actually offline. The operator sees recorded host-loss consequences and
+uncertain physical-dispatch bytes alongside existing robots/preflight holds.
+Unknown or fabricated host selectors are rejected before rendering.
+
+**3. Human review workload planning.** The operator enters a total
+finite human time budget of 15–480 minutes and a task estimate of 5–120
+minutes. The cockpit ranks the existing bounded `recommended_queue` by the
+forensic risk grade, canonical priority and deterministic task identity. It
+budgets only tasks declared ready by the canonical review receipt AND having
+no outstanding predecessors. Other tasks are explicitly shown as held for
+dependency satisfaction, with no implied completion; ready tasks beyond
+budget are also shown. Up to 48 review leads can be inspected without
+modifying task assignments or their server statuses. The count of review
+tasks omitted from the server's bounded queue remains visible rather than
+being silently discarded. An estimated plan is not a human decision.
+
+### Historical research brief
+
+The cockpit offers a metadata-only brief through the platform share sheet.
+That operation first re-reads the current authenticated crawl session and
+checks the exact captured revision, consent and source/Atlas/pilot digests
+against an immutable local receipt witness. Sharing is refused on owner
+switches, changed research inputs, changed session revisions, revoked
+consent, outdated pilot proof or transport errors. The text contains only
+bounded counts, objective IDs, risk codes, review-task IDs and SHA-256 digest
+prefixes; no captured text, URLs, operator questions, passwords, bearer
+tokens, selected passages or hostnames. The share interface only exports a
+**historical human-review advisory**, never grants publication, training,
+downstream model use, or release. Once exported, a local share copy cannot be
+remotely revoked, so users must still recheck authorization for any source
+use.
+
+### Authority, privacy and adversarial handling
+
+- The canonical backend alone decides tenant/owner scope, consent, fetch
+  eligibility, robots, DNS/SSRF rules, source policy, storage admission,
+  finite budgets, recovery and physical dispatch. The decision engine
+  consumes the response *after* the second authenticated policy read; it
+  cannot alter the report, source library, or Mongo.
+- Every decision row and review task has bounded identifiers, counts and
+  arrays. Duplicate objectives, malformed task IDs, invalid priorities,
+  unknown hosts, forged release flags or report/pilot digest mismatches fail
+  closed. Only canonical Atlas data can provide source observations;
+  neither the UI nor a local synthetic witness can establish truth.
+- A share request aborts on account, receipt, session-revision, removed-host
+  scenario, budget or per-task estimate changes. The share payload is
+  generated after the successful revalidation step. Source text is never
+  copied into the cockpit state or serialized into its report.
+- The source library and old Atlas receipts are invalidated on uncertain
+  ownership/consent rechecks, and the app never reports incomplete E2E or
+  skipped security checks as successful.
+
+### Qualification matrix
+
+Hermetic source-only Node 24 regression coverage must verify objective
+ordering, observed/attested distinction, target deficits, source-family
+leads, valid/unknown host-loss scenarios, deterministic repeated rendering,
+finite budgeting, dependencies, budget starvation, malformed identifiers,
+duplicate tasks/objectives, manipulated authority flags, consent withdrawal,
+digest mismatch, size bounds, source-text non-disclosure, and authenticated
+sharing order. The existing Backend Quality frontend lane must compile all
+TypeScript, lint the two new advanced files and run this regression suite.
+The independent pilot qualification workflow also runs it without requiring
+a real crawler or model. Production Docker/Chromium must additionally build
+the new screen and keep the existing anonymous and editor-first-user flows
+green at the exact final head.
+
+This is an **advanced reviewable product prototype**. Production release
+is still separately gated on actual Merge Readiness, independent device
+installation, native-model capability, host/DNS/robots integration, recovery
+under pressure, CodeQL/security, signed provenance and human rights review.
+No amount of local scorecard success can override those requirements.

@@ -16,6 +16,9 @@ on:
       - "tests/test_dragon_e2e_editor_admission.py"
       - "scripts/qualify_e2e_dragon_editor.py"
       - "tests/e2e/app-foundation/dragon-crawler-pilot.spec.mjs"
+      - "frontend/src/features/Jeeves/dragonResearchDecisionEngine.ts"
+      - "frontend/src/features/Jeeves/DragonResearchDecisionCockpit.tsx"
+      - "frontend/scripts/test-dragon-advanced-decision.mjs"
   workflow_dispatch:
 
 permissions:
@@ -70,3 +73,4 @@ jobs:
       - name: Exercise user journey preflight and pilot receipt encoding
         run: |
           node --experimental-strip-types --test frontend/scripts/test-crawler-pilot-journey.mjs
+          node --experimental-strip-types --test frontend/scripts/test-dragon-advanced-decision.mjs

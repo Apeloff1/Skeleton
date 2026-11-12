@@ -10,6 +10,7 @@ import {
   type CrawlAtlasEffort, type CrawlAtlasReport, type CrawlSession,
 } from '../../product/crawlerClient';
 import s, { colors as C } from './CrawlerWorkspace.styles';
+import DragonResearchDecisionCockpit from './DragonResearchDecisionCockpit';
 import {
   NEW_ATLAS_DRAFT, MAX_ATLAS_OBJECTIVES,
   compileAtlasCampaign, enqueueAtlasObjective, removeAtlasObjective,
@@ -323,6 +324,9 @@ export default function CrawlerResearchAtlasPanel({ session, onReport }: { sessi
     {!!error && <Text style={s.error} accessibilityRole="alert">{error}</Text>}
     {!!notice && <Text style={s.small} accessibilityLiveRegion="polite">{notice}</Text>}
     {!authChanged && report && <>
+      <DragonResearchDecisionCockpit
+        key={session.session_id + ':' + session.version + ':' + report.dashboard_digest}
+        session={session} report={report} campaign={currentGoals ?? []} />
       <Section title="Research pilot qualification · release held">
         <Text style={s.small}>This pilot is source-only and never authorizes capture, publishing, model training or product release.</Text>
         {report.pilot_qualification ? <>
