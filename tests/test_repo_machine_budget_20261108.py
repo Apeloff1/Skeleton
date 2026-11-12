@@ -46,7 +46,7 @@ class RepositoryBudgetTests(TestCase):
                         listed, incomplete = scanner._iter_files()
                     self.assertEqual(len(listed), count)
                     self.assertEqual(incomplete, truncated)
-                    self.assertEqual([item.name for item in listed], names[:count])
+                    self.assertEqual([item.name for item in listed], sorted(names)[:count])
 
     def test_oversized_file_limit_does_not_expand_permitted_model_bytes(self):
         config = load_machine_config(REPOSITORY)
