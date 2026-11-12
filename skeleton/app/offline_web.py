@@ -117,6 +117,7 @@ HTML = r"""<!doctype html>
       <button id="sidebar-toggle" class="small mobile-only" aria-controls="sidebar" aria-expanded="true">Library &amp; connection</button>
       <div><h1>Local model conversation</h1><p id="model">Not connected</p></div>
       <div id="indicator" class="indicator">LOCKED</div>
+      <button id="health-refresh" class="small" disabled>Check model</button>
     </header>
     <div id="turn-progress" class="turn-progress" role="status" hidden>
       <span id="turn-label">Ready</span><span id="turn-elapsed"></span>
@@ -222,6 +223,44 @@ JAVASCRIPT = r"""'use strict';
   const terminal = turn => !!turn && ['complete', 'failed', 'cancelled'].includes(turn.state);
   const unresolved = () => !!state.turn && !terminal(state.turn);
   const status = value => { get('status').textContent = value; };
+  async function refreshHealth() {
+    if (!state.connected || !state.token) return;
+    const epoch = state.epoch;
+    const previous = state.health;
+    try {
+      const observed = await api('GET', '/v1/status');
+      if (epoch !== state.epoch || !state.connected) return;
+      state.health = observed;
+      get('budget').max = String(observed.max_output_tokens);
+      if (Number(get('budget').value) > observed.max_output_tokens) {
+        get('budget').value = String(observed.default_output_tokens);
+      }
+      if (previous?.ready !== observed.ready ||
+          previous?.model_readiness_code !== observed.model_readiness_code) {
+        if (observed.ready === true) {
+          status('Jeeves local runtime is admitting new inference. Readiness is not an executed completion.');
+        } else if (observed.model_readiness_code === 'local_execution_circuit_open') {
+          const retry = observed.inference_circuit?.retry_after_seconds;
+          status('Local runtime failures paused new inference' +
+            (Number.isInteger(retry) ? ' for approximately ' + retry + ' seconds.' : '.') +
+            ' Saved conversations and exact retries remain accessible.');
+        } else {
+          status('Local model unavailable (' +
+            (observed.model_readiness_code || 'unknown') +
+            '). Check the local artifacts and host; no hosted fallback will be used.');
+        }
+      }
+    } catch (error) {
+      if (epoch !== state.epoch || !state.connected) return;
+      state.health = {...(previous || {}), ready: false,
+        model_readiness_code: 'local_status_unreachable'};
+      if (previous?.model_readiness_code !== 'local_status_unreachable') {
+        status('Local model health could not be checked. New inference is disabled; history remains available when the host returns.');
+      }
+    } finally {
+      if (epoch === state.epoch) updateControls();
+    }
+  }
   function sidebar(open, restoreFocus = false) {
     get('shell').classList.toggle('library-open', open);
     get('sidebar-toggle').setAttribute('aria-expanded', String(open));
@@ -246,8 +285,9 @@ JAVASCRIPT = r"""'use strict';
       get(id).disabled = locked || state.busy || !state.session;
     });
     ['prompt', 'budget', 'grounded'].forEach(id => {get(id).disabled = locked || working;});
-    get('send').disabled = locked || working || !state.session;
+    get('send').disabled = locked || working || !state.session || state.health?.ready !== true;
     get('connect').disabled = state.busy || state.connected;
+    get('health-refresh').disabled = locked || state.busy;
     get('disconnect').disabled = !state.connected && !state.token;
     get('resource-refresh').disabled = locked;
     get('resource-plan').disabled = locked;
@@ -276,7 +316,8 @@ JAVASCRIPT = r"""'use strict';
       };
       get('turn-label').textContent = labels[state.turn.state] || state.turn.state;
     }
-    get('indicator').textContent = locked ? 'LOCKED' : unresolved() ? 'LOCAL • RUNNING' : 'OFFLINE • CONNECTED';
+    get('indicator').textContent = locked ? 'LOCKED' : unresolved() ? 'LOCAL • RUNNING' :
+      state.health?.ready === true ? 'LOCAL • READY' : 'LOCAL • DEGRADED';
   }
   function stopPolling() {
     if (state.timer !== null) clearTimeout(state.timer);
@@ -632,15 +673,23 @@ JAVASCRIPT = r"""'use strict';
     await loadSessions(); await loadDocuments();
     await refreshResources();
     if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
-    state.resourceTimer = setInterval(refreshResources, 10000);
+    state.resourceTimer = setInterval(() => {
+      void refreshResources();
+      void refreshHealth();
+    }, 10000);
     if (state.health.active_turn) {
       const activeTurn = state.health.active_turn;
       await selectSession(activeTurn.session_id);
       state.turn = activeTurn; state.pollStarted = performance.now(); schedulePoll(100);
       status('Reconnected to a local generation already in progress.');
+    } else if (state.health.ready !== true) {
+      status('Connected to the local host, but model inference is unavailable (' +
+        (state.health.model_readiness_code || 'unknown') +
+        '). Saved conversations remain accessible; no hosted fallback.');
     } else status('Connected locally. Choose a conversation or create a new one.');
   }));
   get('disconnect').addEventListener('click', lock);
+  get('health-refresh').addEventListener('click', () => void refreshHealth());
   get('resource-refresh').addEventListener('click', refreshResources);
   get('resource-plan').addEventListener('click', () => run(async () => {
     const source_bytes = Number(get('resource-bytes').value);
