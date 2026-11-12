@@ -103,6 +103,7 @@ def test_real_authenticated_http_preflight_has_no_storage_or_inference_side_effe
         assert report["preview_is_admission_proof"] is False
         assert report["model_digest"] == app.model_digest
         assert report["generation_performed"] is False
+        assert report["grounding_preview"] is None
         assert report["older_messages_were_deleted"] is False
         _, saved = app.dispatch("GET", f"/v1/sessions/{sid}")
         assert saved["revision"] == 0 and saved["messages"] == []
@@ -205,6 +206,13 @@ def test_live_browser_exposes_context_preflight_and_strict_dispatch_contract():
     assert "request = {session_id: state.session, message, grounded, max_output_tokens," in JAVASCRIPT
     assert "original.require_full_history === require_full_history" in JAVASCRIPT
     assert "require_full_history: true" in JAVASCRIPT
+    assert 'id="context-grounding-preview"' in HTML
+    assert 'id="context-grounding-citations"' in HTML
+    assert "local-grounding-preview.v1" in JAVASCRIPT
+    assert "await exactLocalSha256(row.passage)" in JAVASCRIPT
+    assert "passage.textContent = row.passage" in JAVASCRIPT
+    assert "clearGroundingPreview()" in JAVASCRIPT
+    assert "grounding.future_source_snapshot_guaranteed !== false" in JAVASCRIPT
     assert "OL DER" not in JAVASCRIPT
 
 
@@ -232,6 +240,23 @@ def test_real_grounded_strict_context_reuses_evidence_identity_but_fences_turn_p
         assert preview_code == 200 and preview["grounded"] is True
         assert preview["fits_full_history"] is True
         assert preview["may_submit_under_policy"] is True
+        manifest = preview["grounding_preview"]
+        assert manifest["schema"] == "skeleton.jeeves.local-grounding-preview.v1"
+        assert manifest["source_authority"] == "untrusted-local-passages-only"
+        assert manifest["generation_performed"] is False
+        assert manifest["is_committed_inference_evidence"] is False
+        assert manifest["future_source_snapshot_guaranteed"] is False
+        assert len(manifest["context_sha256"]) == 64
+        assert manifest["source_count"] == len(manifest["citations"]) >= 1
+        for citation in manifest["citations"]:
+            assert citation["passage_sha256"] == sha256(citation["passage"].encode("utf-8")).hexdigest()
+            _, document = app.dispatch(
+                "GET", "/v1/knowledge/documents/" + citation["document_id"],
+            )
+            assert document["sha256"] == citation["document_sha256"]
+            assert document["text"][citation["char_start"]:citation["char_end"]] == citation["passage"]
+        _, before_generation = app.dispatch("GET", f"/v1/sessions/{sid}")
+        assert before_generation["revision"] == 0
         status, answer = app.dispatch("POST", f"/v1/sessions/{sid}/turn", {
             "message": message,
             "request_id": "grounded-strict-context-2026",
@@ -243,6 +268,8 @@ def test_real_grounded_strict_context_reuses_evidence_identity_but_fences_turn_p
         assert answer["replayed"] is False
         assert answer["text"].strip()
         assert answer["evidence"]["claim"] == "source_passages_supplied_not_answer_verification"
+        assert answer["evidence"]["context_sha256"] == manifest["context_sha256"]
+        assert answer["evidence"]["citations"] == manifest["citations"]
         assert answer["local_execution_receipt"]["output_sha256"] == answer["output_digest"]
         assert len(answer["evidence"]["citations"]) >= 1
         _, saved = app.dispatch("GET", f"/v1/sessions/{sid}")

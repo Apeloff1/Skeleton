@@ -158,7 +158,6 @@ class OfflineHTTPApplication:
         self._lock = threading.RLock()
         self._turn_lock = threading.RLock()
         self._inference_circuit = LocalInferenceCircuit()
-        # One physical native executor per private SQLite workspace.
         self._inference_lease = LocalInferenceLease(self.database)
         self._turns: dict[tuple[str, str], _LocalTurn] = {}
         self._active_session: str | None = None
@@ -982,6 +981,7 @@ class OfflineHTTPApplication:
             with self._lock:
                 self._session(sid)
                 context = None
+                manifest = None
                 if grounded:
                     query = message.strip()
                     hits = self.knowledge.search(query, limit=2)
@@ -1016,6 +1016,19 @@ class OfflineHTTPApplication:
                         report["fits_full_history"] or not strict
                     )
                     report["preview_is_admission_proof"] = False
+                    report["grounding_preview"] = (
+                        None if manifest is None else {
+                            "schema": "skeleton.jeeves.local-grounding-preview.v1",
+                            "context_sha256": manifest["context_sha256"],
+                            "question_sha256": manifest["question_sha256"],
+                            "source_count": len(manifest["citations"]),
+                            "citations": manifest["citations"],
+                            "source_authority": "untrusted-local-passages-only",
+                            "generation_performed": False,
+                            "is_committed_inference_evidence": False,
+                            "future_source_snapshot_guaranteed": False,
+                        }
+                    )
                 except OfflineAIError as exc:
                     raise OfflineHTTPError(422, str(exc)) from None
                 finally:

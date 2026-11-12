@@ -473,6 +473,37 @@ different range changes its canonical content digest. This never
 creates a model turn, grants publication rights or revalidates old
 external capture consent.
 
+
+## 13. Inspect the exact local citations before grounded model inference
+
+The Jeeves authenticated `POST /v1/sessions/<session>/context-preview`
+endpoint now returns a bounded `grounding_preview` object when
+`grounded: true`. It includes a model-bound source-context SHA-256, exact
+question SHA-256 and up to two independently validated local citations:
+model-scoped document ID, content SHA-256, chunk ID, exact Unicode character
+coordinates, finite selected passage and passage SHA-256. It is **read-only**
+and makes no model request, storage mutation or network-provider call.
+Non-grounded previews return `grounding_preview: null`.
+
+The browser exposes a collapsible **Local grounding passages selected by
+preview** panel. It validates the schema and coordinates, independently
+checks each passage SHA-256 with browser Web Crypto, and renders every untrusted
+passage with DOM `textContent` rather than interpreting it as HTML.
+Account disconnection, session change, prompt edit, grounding toggle and
+context-budget change clear prior source previews so stale text is not shown
+as fresh source evidence. The operator can inspect the exact citations
+before submitting a real local-model question.
+
+This remains a **preflight snapshot**, not an execution receipt or a promise
+that documents cannot change before generation. The actual local model turn
+constructs a fresh evidence manifest, and the canonical SQLite transcript
+stores the citations that were *really supplied* with the generated answer.
+No preview automatically authorizes reproduction, publishing, training or
+external-site access; Dragon historical sources remain untrusted until
+separately reviewed. The test suite compares inspected source offsets with
+their saved SHA-bound documents and confirms the subsequent real native
+inference receipt retains the same citations when nothing changes.
+
 ## 2026 local execution custody: independent service-process safety
 
 The standalone authenticated Jeeves HTTP service now uses an additional

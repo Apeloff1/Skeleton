@@ -173,6 +173,12 @@ HTML = r"""<!doctype html>
       </div>
     </div>
     <div id="context-report" class="context-report" role="status" aria-live="polite">Context budget not checked. Full-history mode refuses generation rather than silently dropping older turns.</div>
+    <details id="context-grounding-preview" class="grounding-preview" hidden>
+      <summary>Local grounding passages selected by preview — untrusted text</summary>
+      <p id="context-grounding-identity" class="hint"></p>
+      <div id="context-grounding-citations" aria-live="polite"></div>
+      <p class="hint">Preview only. Actual inference rechecks local sources and separately persists the committed citation receipt. This is not source-rights or factual verification.</p>
+    </details>
     <div id="status" class="status" role="status">Paste the local access token to connect.</div>
     <dialog id="reference-dialog" aria-labelledby="reference-title">
       <h2 id="reference-title">Local reference</h2><p id="reference-digest" class="hint"></p>
@@ -201,6 +207,7 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 [hidden]{display:none!important}.turn-progress{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#1c2943;border-bottom:1px solid #35466b;padding:12px 24px;font-size:12px}.turn-progress #turn-label{flex:1}.transcript-tools{display:flex;gap:8px;justify-content:center;margin:8px}.message-actions{display:flex;gap:7px;margin-top:12px;white-space:normal}.instructions{margin:12px 0;color:#b8c9e9;font-size:12px}.instructions textarea{width:100%;margin-top:9px;color:#eff2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:8px}.sidebar input[type=search]{min-width:0;flex:1;width:100%;color:#eef2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:9px}.reference-name{text-align:left;padding:4px;border:0;background:transparent;font-size:11px;overflow-wrap:anywhere}.session small:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}dialog{width:min(850px,94vw);max-height:86vh;overflow:auto;background:#131d2d;color:#ebf1ff;border:1px solid #526a95;border-radius:14px;padding:22px}dialog::backdrop{background:#000a}dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;background:#0b1321;padding:15px;border-radius:9px}dialog .hint{overflow-wrap:anywhere}:focus-visible{outline:2px solid #a1c1ff;outline-offset:3px}
 
 .context-report{font-size:12px;background:#18243a;border-top:1px solid #34415d;color:#c6ddf7;padding:8px 24px;overflow-wrap:anywhere}.context-report.warning{color:#ffd6a0;background:#302622}
+.grounding-preview{margin:7px auto;padding:11px;max-width:860px;width:calc(100% - 48px);background:#14243a;border:1px solid #415572;border-radius:9px}.grounding-preview summary{cursor:pointer;font-size:13px;font-weight:650}.grounding-preview .grounding-passage{padding:11px;background:#0e1829;border-radius:7px;border:1px solid #31445e;margin-top:10px;overflow-wrap:anywhere}.grounding-preview .grounding-passage pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:240px;overflow:auto}.grounding-preview .grounding-passage code{font-size:11px;overflow-wrap:anywhere}
 .selftest-panel{margin:9px auto 4px;width:calc(100% - 50px);max-width:870px;padding:12px 15px;border:1px solid #344a68;border-radius:10px;background:#17253a;color:#d9e6fc;font-size:12px}.selftest-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;color:#c8e8d6;font-size:12px}.selftest-panel button{width:auto}
 .shell{height:100vh;height:100dvh;overflow:hidden}.sidebar{min-height:0;height:100%;overflow-y:auto}.main{height:100%;min-height:0}.messages{overscroll-behavior:contain}.intro{flex-shrink:1;overflow:auto}.mobile-only,.sidebar-scrim{display:none}.bottom input[type=checkbox]{width:auto}.turn-progress #turn-elapsed{font-variant-numeric:tabular-nums}.knowledge-record .reference-name{min-width:0;flex-shrink:1;flex:1}.brand #sidebar-close{margin-left:auto}
 @media(max-width:720px){.shell{display:block;min-height:0}.sidebar{display:none}.main{height:100%}.topbar{flex-wrap:wrap;gap:8px}.topbar>div:first-of-type{flex:1;min-width:150px}.topbar h1{font-size:15px}.topbar p{overflow-wrap:anywhere}.mobile-only{display:inline-block}.library-open .sidebar{display:flex;position:fixed;top:0;bottom:0;left:0;width:min(350px,90vw);z-index:20;min-height:0;max-height:100dvh;overflow-y:auto;box-shadow:10px 0 40px #0007}.library-open .sidebar-scrim{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:19;background:#0009;border:0;border-radius:0}.sidebar .sessions{flex:none;max-height:25vh}.sidebar .knowledge-section{flex:none;max-height:48vh}.sidebar .sidebar-footer{display:grid}.composer{flex-shrink:0;margin:0 auto;padding:10px}.composer textarea{min-height:50px;max-height:24vh}.composer .bottom{gap:6px}.turn-progress{padding:8px 12px}.status{padding:9px 12px}.messages{padding:12px;gap:10px}.message{max-width:97%}.intro h2{font-size:23px}.intro .glow{font-size:30px}.intro .minor{font-size:11px}.intro{padding:12px}.transcript-tools{margin:5px}}
@@ -398,6 +405,7 @@ JAVASCRIPT = r"""'use strict';
     get('selftest-result').textContent = 'No live qualification performed.';
     get('context-report').classList.remove('warning');
     get('context-report').textContent = 'Context not checked. Full-history mode refuses any silent trimming.';
+    clearGroundingPreview();
     get('context-preserve').checked = true;
     state.longformSourceId = null;
     state.longformWork = null;
@@ -608,6 +616,7 @@ JAVASCRIPT = r"""'use strict';
     get('revision').textContent = result.revision + ' saved turns';
     get('context-report').classList.remove('warning');
     get('context-report').textContent = 'Conversation changed. Check the full local model context budget before the next turn.';
+    clearGroundingPreview();
     showMessages(); await loadSessions(); updateControls();
   }
   function schedulePoll(delay = 1200) {
@@ -785,7 +794,14 @@ JAVASCRIPT = r"""'use strict';
       if (epoch === state.epoch) updateControls();
     }
   }
+  function clearGroundingPreview() {
+    get('context-grounding-citations').replaceChildren();
+    get('context-grounding-identity').textContent = '';
+    get('context-grounding-preview').hidden = true;
+    get('context-grounding-preview').open = false;
+  }
   function invalidateContextPreview() {
+    clearGroundingPreview();
     const display = get('context-report');
     display.classList.remove('warning');
     display.textContent = 'Question, evidence, output budget or policy changed. Preview again; strict retention is enforced independently at generation.';
@@ -816,6 +832,61 @@ JAVASCRIPT = r"""'use strict';
         !Number.isSafeInteger(payload.reserved_output_tokens) ||
         payload.estimated_total_tokens > payload.context_tokens) {
       throw new Error('The local context accounting response was invalid.');
+    }
+    const grounding = payload.grounding_preview;
+    clearGroundingPreview();
+    if (grounded) {
+      const sha = /^[0-9a-f]{64}$/;
+      if (!grounding || grounding.schema !== 'skeleton.jeeves.local-grounding-preview.v1' ||
+        grounding.source_authority !== 'untrusted-local-passages-only' ||
+        grounding.generation_performed !== false ||
+        grounding.is_committed_inference_evidence !== false ||
+        grounding.future_source_snapshot_guaranteed !== false ||
+        !sha.test(grounding.context_sha256) || !sha.test(grounding.question_sha256) ||
+        !Array.isArray(grounding.citations) ||
+        grounding.source_count !== grounding.citations.length ||
+        grounding.source_count < 1 || grounding.source_count > 3) {
+        throw new Error('The preview did not provide a bounded, untrusted local-source manifest.');
+      }
+      const cards = [];
+      for (const row of grounding.citations) {
+        if (!row || typeof row.title !== 'string' || row.title.length > 200 ||
+          !/^[A-Za-z0-9_-]{1,128}$/.test(row.document_id) ||
+          !sha.test(row.document_sha256) || !sha.test(row.passage_sha256) ||
+          !Number.isSafeInteger(row.char_start) || !Number.isSafeInteger(row.char_end) ||
+          row.char_start < 0 || row.char_end <= row.char_start ||
+          typeof row.passage !== 'string' || Array.from(row.passage).length !== row.char_end - row.char_start ||
+          Array.from(row.passage).length > 220 ||
+          typeof row.citation !== 'string' ||
+          !row.citation.startsWith('local:' + row.document_id + ':')) {
+          throw new Error('A local evidence citation has invalid source coordinates.');
+        }
+        if (await exactLocalSha256(row.passage) !== row.passage_sha256)
+          throw new Error('The displayed source passage differs from its SHA-256.');
+        cards.push(row);
+      }
+      if (epoch !== state.epoch || state.revision !== revision || !state.connected)
+        throw new Error('The local preview became stale during passage verification.');
+      const panel = get('context-grounding-citations');
+      for (const row of cards) {
+        const article = document.createElement('article');
+        article.className = 'grounding-passage';
+        const title = document.createElement('strong');
+        title.textContent = row.title;
+        const identity = document.createElement('code');
+        identity.textContent = row.citation + ' · chars ' + row.char_start + '–' + row.char_end +
+          ' · passage sha256 ' + row.passage_sha256;
+        const passage = document.createElement('pre');
+        passage.textContent = row.passage;
+        article.append(title, identity, passage);
+        panel.append(article);
+      }
+      get('context-grounding-identity').textContent =
+        'Read-only ' + cards.length + ' passage(s) · local context sha256 ' +
+        grounding.context_sha256 + '. Untrusted, not a native inference receipt.';
+      get('context-grounding-preview').hidden = false;
+    } else if (grounding !== null) {
+      throw new Error('An ungrounded local preview incorrectly included source passages.');
     }
     const allowed = payload.may_submit_under_policy === true;
     report.classList.toggle('warning', omitted > 0 || !allowed);
