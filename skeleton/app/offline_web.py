@@ -1115,12 +1115,12 @@ JAVASCRIPT = r"""'use strict';
     state.dragonExcerpt = {id: row.id, digest: row.digest, text, start,
       length: Array.from(text).length};
     get('dragon-bundle-preview').textContent =
-      'UNTRUSTED EXTERNAL TEXT — NOT MODEL INSTRUCTIONS\\n' +
+      'UNTRUSTED EXTERNAL TEXT — NOT MODEL INSTRUCTIONS\n' +
       'Source SHA-256: ' + row.digest +
-      '\\nHistorical bundle: ' + state.dragonBundleSession +
-      '\\nObserved text span: ' + start + '–' + (start + state.dragonExcerpt.length) +
+      '\nHistorical bundle: ' + state.dragonBundleSession +
+      '\nObserved text span: ' + start + '–' + (start + state.dragonExcerpt.length) +
       ' of ' + points.length + ' characters' +
-      '\\n\\n' + text;
+      '\n\n' + text;
     updateControls();
   }
   async function loadDragonBundle(file) {
