@@ -526,3 +526,80 @@ def test_strict_full_history_preview_stays_readonly_during_peer_lease_and_replay
     finally:
         peer.close()
         first.close()
+
+
+def test_scoped_grounding_honors_live_peer_lease_and_sqlite_source_custody(tmp_path: Path):
+    """Two real local apps must not bypass either the source or OS lease fence."""
+    from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+    model = native_model()
+    db = tmp_path / "scoped-native-service.sqlite3"
+    first = OfflineHTTPApplication(model, db, token="a" * 64)
+    peer = OfflineHTTPApplication(model, db, token="b" * 64)
+    try:
+        _, selected = first.dispatch("POST", "/v1/knowledge/documents", {
+            "title": "Operator-reviewed rasterizer A",
+            "text": "The local rasterizer uses integer edge equations for coverage.",
+        })
+        _, excluded = first.dispatch("POST", "/v1/knowledge/documents", {
+            "title": "Operator-reviewed rasterizer B",
+            "text": "The alternate rasterizer uses local fixed-point edge coverage.",
+        })
+        _, created = first.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        endpoint = "/v1/sessions/" + sid
+        chosen = selected["document_id"]
+        rejected = excluded["document_id"]
+        request = {
+            "message": "How does rasterizer edge coverage work?",
+            "request_id": "scoped-lease-local-model",
+            "grounded": True, "require_full_history": True,
+            "max_output_tokens": 2, "document_ids": [chosen],
+        }
+        with first._inference_lease.hold():
+            _, preview = peer.dispatch("POST", endpoint + "/context-preview", {
+                "message": request["message"],
+                "grounded": True, "require_full_history": True,
+                "max_output_tokens": 2, "document_ids": [chosen],
+            })
+            assert preview["document_scope"] == [chosen]
+            assert preview["grounding_preview"]["citations"]
+            assert all(c["document_id"] == chosen
+                       for c in preview["grounding_preview"]["citations"])
+            assert preview["generation_performed"] is False
+            with pytest.raises(OfflineHTTPError) as busy:
+                peer.dispatch("POST", endpoint + "/turn", request)
+            assert busy.value.status == 423
+            assert peer._session(sid).revision == 0
+
+        # A previously lease-rejected request ID remains available for real
+        # local model execution and an exact SQLite model-bound receipt.
+        status, generated = peer.dispatch("POST", endpoint + "/turn", request)
+        assert status == 200
+        assert generated["replayed"] is False
+        assert generated["local_execution_receipt"]["output_sha256"] == generated["output_digest"]
+        assert generated["evidence"]["citations"]
+        assert all(c["document_id"] == chosen for c in generated["evidence"]["citations"])
+
+        status, replay = first.dispatch("POST", endpoint + "/turn", request)
+        assert status == 200
+        assert replay["replayed"] is True
+        assert replay["text"] == generated["text"]
+        with pytest.raises((RuntimeContractError, OfflineHTTPError)):
+            first.dispatch("POST", endpoint + "/turn", {
+                **request, "document_ids": [rejected],
+            })
+        _, before_revocation = first.dispatch("GET", endpoint)
+        assert before_revocation["revision"] == 1
+        first.dispatch("DELETE", "/v1/knowledge/documents/" + chosen)
+        with pytest.raises(OfflineHTTPError) as revoked:
+            peer.dispatch("POST", endpoint + "/turn", {
+                **request, "request_id": "scoped-lease-revoked",
+            })
+        assert revoked.value.status == 422
+        _, final = peer.dispatch("GET", endpoint)
+        assert final["revision"] == 1
+        # No source deletion may retroactively destroy the committed receipt.
+        assert final["evidence"][0] == generated["evidence"]
+    finally:
+        peer.close()
+        first.close()
