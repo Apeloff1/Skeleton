@@ -9,15 +9,17 @@ import {
   Text, TextInput, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
 import StudioLoginGate, { useStudioAuth } from '../../auth/StudioLoginGate';
 import { getAuthToken } from '../../auth/gameforgeAuth';
 import {
   createCrawl, crawlRequestKey, controlCrawl, exportCrawlSource,
-  getCrawl, getCrawlerReadiness, listCrawls, listCrawlSources,
+  getCrawl, getCrawlSource, getCrawlerReadiness, listCrawls, listCrawlSources,
   runCrawl, type CapturedSource, type CrawlAtlasReport, type CrawlCommand,
   type CrawlCreate, type CrawlerReadiness, type CrawlSession,
 } from '../../product/crawlerClient';
 import { saveCrawlerExport } from '../../product/crawlerExport';
+import { buildCrawlerEvidenceBundle } from '../../product/crawlerEvidenceBundle';
 import { portablePilotReceipt } from '../../product/crawlerPilotReceipt';
 import {
   bindPilotSnapshot, requireCurrentPilotSnapshot, type PilotSnapshotWitness,
@@ -98,6 +100,7 @@ function PilotContent() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [bundling, setBundling] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [scopePreview, setScopePreview] = useState(false);
@@ -111,6 +114,8 @@ function PilotContent() {
   const lock = useRef(false);
   const preflightLock = useRef(false);
   const exportLock = useRef(false);
+  const bundleLock = useRef(false);
+  const bundleAbort = useRef<AbortController | null>(null);
   const shareLock = useRef(false);
   const shareAbort = useRef<AbortController | null>(null);
   const epoch = useRef(0);
@@ -132,7 +137,7 @@ function PilotContent() {
       before.status !== value.status)) {
       // Revoked consent, revision and owner/session changes invalidate any
       // share already waiting on a server re-read. No stale receipt leaves.
-      shareAbort.current?.abort();
+      shareAbort.current?.abort(); bundleAbort.current?.abort();
       setSourceViewEpoch(value => value + 1);
       setAtlas(null);
       setAtlasWitness(null);
@@ -147,7 +152,7 @@ function PilotContent() {
     // Unverified evidence is not retained while source authorization is
     // checked. Session titles/counters are separately preserved only after a
     // successful authenticated session read.
-    shareAbort.current?.abort();
+    shareAbort.current?.abort(); bundleAbort.current?.abort();
     setSourceViewEpoch(value => value + 1);
     setAtlas(null); setAtlasWitness(null); setReviewDraft(null);
     setSources([]); setSourceCursor(null);
@@ -235,12 +240,12 @@ function PilotContent() {
       account.current = current;
       epoch.current++;
       reads.current?.abort(); catalogueRead.current?.abort();
-      mutationAbort.current?.abort(); shareAbort.current?.abort(); pending.current = null;
-      preflightLock.current = false; exportLock.current = false; shareLock.current = false;
+      mutationAbort.current?.abort(); shareAbort.current?.abort(); bundleAbort.current?.abort(); pending.current = null;
+      preflightLock.current = false; exportLock.current = false; bundleLock.current = false; shareLock.current = false;
       sessionRef.current = null;
       setSession(null); setSources([]); setSessions([]); setNextCursor(null);
       setSourceCursor(null); setReviewDraft(null); setAtlas(null); setAtlasWitness(null);
-      setSharing(false);
+      setSharing(false); setBundling(false);
       setReadiness(null); setStage('scope'); setBusy(''); setLoaded(false);
       setForm({ ...EMPTY_PILOT_FORM }); setScopePreview(false);
       setError('Your sign-in changed. Refresh the pilot to load the new account scope.');
@@ -250,7 +255,7 @@ function PilotContent() {
       clearInterval(timer);
       epoch.current++;
       reads.current?.abort(); catalogueRead.current?.abort();
-      mutationAbort.current?.abort(); shareAbort.current?.abort();
+      mutationAbort.current?.abort(); shareAbort.current?.abort(); bundleAbort.current?.abort();
     };
     // Start once per signed-in screen lifetime; refresh is explicit thereafter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -259,7 +264,7 @@ function PilotContent() {
   const select = (row: CrawlSession) => {
     if (lock.current || preflightLock.current || busy || pending.current || shareLock.current) return;
     reads.current?.abort();
-    shareAbort.current?.abort();
+    shareAbort.current?.abort(); bundleAbort.current?.abort();
     setSourceViewEpoch(value => value + 1);
     sessionRef.current = row;
     setSession(row); setSources([]); setSourceCursor(null);
@@ -379,6 +384,47 @@ function PilotContent() {
     } finally {
       exportLock.current = false;
       if (fresh(undefined, token)) setExporting(false);
+    }
+  };
+
+
+  const exportEvidenceBundle = async (includeBodies: boolean) => {
+    const current = sessionRef.current;
+    if (!current || !current.consent_current || !fresh() || !sources.length
+      || bundleLock.current || exportLock.current || shareLock.current
+      || lock.current || preflightLock.current || pending.current) return;
+    bundleLock.current = true;
+    const abort = new AbortController(); bundleAbort.current = abort;
+    const token = account.current, sourceEpoch = epoch.current;
+    const identity = current.session_id, originalVersion = current.version;
+    setBundling(true); setError(''); setNotice('');
+    try {
+      const packet = await buildCrawlerEvidenceBundle({
+        session: current, sourceIds: sources.slice(0, 8).map(row => row.source_id),
+        includeBodies, signal: abort.signal,
+        checkScope: () => fresh(abort.signal, token) && epoch.current === sourceEpoch
+          && sessionRef.current?.session_id === identity
+          && sessionRef.current?.version === originalVersion
+          && sessionRef.current?.consent_current === true,
+        getSession: getCrawl, getSource: getCrawlSource,
+        exportSource: exportCrawlSource,
+        sha256: text => digestStringAsync(CryptoDigestAlgorithm.SHA256, text),
+      });
+      if (!fresh(abort.signal, token) || epoch.current !== sourceEpoch) return;
+      await saveCrawlerExport(packet);
+      if (fresh(undefined, token) && epoch.current === sourceEpoch) {
+        setNotice(includeBodies
+          ? 'Authorized source bodies were exported after current rights checks (up to 8 sources). Revalidate rights and freshness before downstream use.'
+          : 'Metadata-only provenance bundle exported without source bodies, URLs or search queries.');
+      }
+    } catch {
+      if (fresh(undefined, token) && epoch.current === sourceEpoch) {
+        setError('Evidence bundle was refused or interrupted. No partial bundle was shared. Recheck current consent, source-use policy, revision and export size.');
+      }
+    } finally {
+      if (bundleAbort.current === abort) bundleAbort.current = null;
+      bundleLock.current = false;
+      if (fresh(undefined, token) && epoch.current === sourceEpoch) setBundling(false);
     }
   };
 
@@ -633,6 +679,19 @@ function PilotContent() {
               <Button title="Refresh current source policy" onPress={() => void reload(session.session_id)} />
             </View>}
         </View>
+        {session && <View style={s.card}>
+          <Heading title="Audited multi-source evidence bundle" help="Export up to 8 owned sources. Every source and the session are re-read, and content mode requires the server's per-source rights-checked export. A revision or consent change refuses the entire bundle." />
+          <Text style={s.small}>Sources loaded: {sources.length}. The first 8 authorized sources will be included. This is not permission to publish, train, or claim remote freshness.</Text>
+          <View style={s.row}>
+            <Button testID="dragon-export-metadata-bundle" title={bundling ? 'Verifying sources…' : 'Export provenance only'}
+              disabled={bundling || exporting || !session.consent_current || sources.length === 0 || !!busy}
+              onPress={() => { void exportEvidenceBundle(false); }} />
+            <Button testID="dragon-export-authorized-bundle" title={bundling ? 'Verifying rights…' : 'Export authorized source copies'}
+              disabled={bundling || exporting || !session.consent_current || sources.length === 0 || !!busy}
+              onPress={() => { void exportEvidenceBundle(true); }} />
+          </View>
+          {bundling && <ActivityIndicator color={C.accent} />}
+        </View>}
         {session && <CrawlerSourceLibrary key={session.session_id + ':' + sourceViewEpoch} session={session}
           sources={sources} more={!!sourceCursor} busy={!!busy || exporting}
           canWrite={canWrite} loadMore={() => void moreSources()}
@@ -644,7 +703,7 @@ function PilotContent() {
             if (value.session.version < sessionRef.current.version) {
               void reload(value.session.session_id); return;
             }
-            shareAbort.current?.abort();
+            shareAbort.current?.abort(); bundleAbort.current?.abort();
             setSourceViewEpoch(epoch => epoch + 1);
             update(value.session); setAtlas(null); setAtlasWitness(null); setReviewDraft(null);
             setSources(rows => rows.map(row =>
