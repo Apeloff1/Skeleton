@@ -307,3 +307,112 @@ def test_async_peer_lease_conflict_retries_same_request_after_release(tmp_path: 
         assert replay["result"]["replayed"] is True or replay["result"]["output_digest"] == result["result"]["output_digest"]
     finally:
         app.close()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="only POSIX flock descriptors support this inheritance")
+def test_native_worker_context_propagates_kernel_lease_across_asyncio_to_thread(tmp_path: Path):
+    """Native inference uses asyncio.to_thread: the kernel FD must follow it."""
+    import asyncio
+
+    from skeleton.ai.runtime.inference.lease_custody import gguf_child_pass_fds
+
+    lease = LocalInferenceLease(tmp_path / "native-task.sqlite3")
+    assert gguf_child_pass_fds() == ()
+    with lease.hold():
+        inherited = gguf_child_pass_fds()
+        assert len(inherited) == 1
+        assert os.fstat(inherited[0]).st_ino == lease.path.stat().st_ino
+
+        async def check_async_native_worker():
+            # The engine creates an asyncio.Task that delegates to_thread.
+            # Verify that both contexts see exactly the same locked FD.
+            async def delegated():
+                return await asyncio.to_thread(gguf_child_pass_fds)
+            return await asyncio.create_task(delegated())
+
+        assert asyncio.run(check_async_native_worker()) == inherited
+    assert gguf_child_pass_fds() == ()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="only POSIX flock descriptors support this inheritance")
+def test_abrupt_supervisor_death_keeps_lease_held_until_orphan_native_child_exits(tmp_path: Path):
+    """Kill the lease-owning parent but not its admitted child subprocess.
+
+    A new server must not spawn a second GGUF while a real first child lives.
+    No mock and no external provider: the worker is a real separate OS process.
+    """
+    database = tmp_path / "orphan-native.sqlite3"
+    parent_started = tmp_path / "parent-started"
+    child_started = tmp_path / "child-started"
+    child_finished = tmp_path / "child-finished"
+    root = str(Path(__file__).resolve().parents[1])
+    child_script = "\n".join([
+        "from pathlib import Path",
+        "import sys, time",
+        "started, finished = map(Path, sys.argv[1:3])",
+        "started.write_text('executing', encoding='ascii')",
+        "time.sleep(2.5)",
+        "finished.write_text('completed', encoding='ascii')",
+    ])
+    # The admitted GGUF runtime passes the same FD with Popen(close_fds=True).
+    # This parent reproduces that exact kernel-level process boundary.
+    parent_script = "\n".join([
+        "from pathlib import Path",
+        "import subprocess, sys, time",
+        "from skeleton.app.jeeves_local_lease import LocalInferenceLease",
+        "from skeleton.ai.runtime.inference.lease_custody import gguf_child_pass_fds",
+        "db, parent_ready, child_ready, child_done = map(Path, sys.argv[1:5])",
+        "child_source = sys.argv[5]",
+        "with LocalInferenceLease(db).hold():",
+        "    subprocess.Popen([sys.executable, '-c', child_source, str(child_ready), str(child_done)],",
+        "        pass_fds=gguf_child_pass_fds(), close_fds=True,",
+        "        start_new_session=True, stdin=subprocess.DEVNULL,",
+        "        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)",
+        "    parent_ready.write_text('spawned', encoding='ascii')",
+        "    time.sleep(30)",
+    ])
+    env = dict(os.environ)
+    env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
+    parent = subprocess.Popen(
+        [sys.executable, "-c", parent_script, str(database), str(parent_started),
+         str(child_started), str(child_finished), child_script],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE, env=env,
+    )
+    try:
+        deadline = time.monotonic() + 8
+        while (not child_started.exists() and parent.poll() is None
+               and time.monotonic() < deadline):
+            time.sleep(0.02)
+        assert parent_started.read_text(encoding="ascii") == "spawned"
+        assert child_started.read_text(encoding="ascii") == "executing"
+        assert not child_finished.exists()
+
+        # Simulate a forced kill in which Python cannot unlock its flock.
+        # The orphaned native child must retain the inherited open file
+        # description and block replacement inference during its lifetime.
+        parent.kill()
+        parent.communicate(timeout=8)
+        with pytest.raises(LocalInferenceLeaseBusy):
+            with LocalInferenceLease(database).hold():
+                pytest.fail("second model admitted while orphan native child still owns the lease")
+
+        deadline = time.monotonic() + 8
+        while not child_finished.exists() and time.monotonic() < deadline:
+            time.sleep(0.025)
+        assert child_finished.read_text(encoding="ascii") == "completed"
+
+        # The child closes its inherited FD at exit. The OS then releases
+        # the lock even though the original Python supervisor never returned.
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                with LocalInferenceLease(database).hold():
+                    break
+            except LocalInferenceLeaseBusy:
+                assert time.monotonic() < deadline, "orphan failed to release kernel lease"
+                time.sleep(0.025)
+    finally:
+        if parent.poll() is None:
+            parent.kill()
+        parent.communicate(timeout=8)
