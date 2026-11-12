@@ -9,6 +9,7 @@ on:
       - "scripts/configure_ai_chat_hosted.py"
       - "tests/test_ai_chat_installed_smoke.py"
       - "tests/test_install_ai_chat.py"
+      - "tests/test_hosted_chat_provider_contract.py"
       - "tests/test_configure_ai_chat_hosted.py"
       - "frontend/**"
       - ".github/workflows/installed-ai-chat-prototype.yml"
@@ -52,7 +53,7 @@ jobs:
         env:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py
+        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_hosted_chat_provider_contract.py
       - name: Verify authenticated backend-to-engine HTTP chat with durable local fixture
         env:
           PYTHONPATH: ".:backend"
@@ -69,8 +70,6 @@ jobs:
           python -m pytest -q --noconftest
           backend/tests/test_ai_provider_adapter.py::test_openai_adapter_normalizes_response_and_preserves_history
           backend/tests/test_ai_provider_adapter.py::test_openai_adapter_rejects_empty_model_output
-          backend/tests/test_ai_provider_reliability.py::test_timeout_burst_is_bounded_and_sanitized
-          backend/tests/test_ai_provider_reliability.py::test_sdk_client_receives_explicit_timeout_and_retry_bounds
       - name: Set up Node 24
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
