@@ -1,0 +1,10 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+config/name="SkeletonBetaGame"
+run/main_scene="res://world.tscn"
+config/features=PackedStringArray("4.3")
+
+[rendering]
+renderer/rendering_method="forward_plus"
