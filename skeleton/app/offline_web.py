@@ -163,12 +163,15 @@ HTML = r"""<!doctype html>
       <textarea id="prompt" rows="3" placeholder="Enter a message..." maxlength="4096"></textarea>
       <div class="inline bottom">
         <label for="grounded"><input id="grounded" type="checkbox"> Include local evidence</label>
+        <label for="context-preserve"><input id="context-preserve" type="checkbox" checked> Require entire conversation context</label>
+        <button id="context-preview" class="small" disabled>Preview context</button>
         <label for="budget">Output tokens <input id="budget" type="number" min="1" max="8192" value="32"></label>
         <span id="revision">No conversation selected</span>
         <button id="send" class="primary">Generate locally ↗</button>
         <button id="retry-turn" class="secondary" hidden>Retry original turn</button>
       </div>
     </div>
+    <div id="context-report" class="context-report" role="status" aria-live="polite">Context budget not checked. Full-history mode refuses generation rather than silently dropping older turns.</div>
     <div id="status" class="status" role="status">Paste the local access token to connect.</div>
     <dialog id="reference-dialog" aria-labelledby="reference-title">
       <h2 id="reference-title">Local reference</h2><p id="reference-digest" class="hint"></p>
@@ -196,6 +199,7 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 .source-custody-item{white-space:pre-wrap;font-size:11px;margin-top:7px;color:#d0d9ed;background:#1e2d42;border:1px solid #344a68;border-radius:7px;padding:9px;max-height:180px;overflow:auto}
 [hidden]{display:none!important}.turn-progress{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#1c2943;border-bottom:1px solid #35466b;padding:12px 24px;font-size:12px}.turn-progress #turn-label{flex:1}.transcript-tools{display:flex;gap:8px;justify-content:center;margin:8px}.message-actions{display:flex;gap:7px;margin-top:12px;white-space:normal}.instructions{margin:12px 0;color:#b8c9e9;font-size:12px}.instructions textarea{width:100%;margin-top:9px;color:#eff2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:8px}.sidebar input[type=search]{min-width:0;flex:1;width:100%;color:#eef2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:9px}.reference-name{text-align:left;padding:4px;border:0;background:transparent;font-size:11px;overflow-wrap:anywhere}.session small:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}dialog{width:min(850px,94vw);max-height:86vh;overflow:auto;background:#131d2d;color:#ebf1ff;border:1px solid #526a95;border-radius:14px;padding:22px}dialog::backdrop{background:#000a}dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;background:#0b1321;padding:15px;border-radius:9px}dialog .hint{overflow-wrap:anywhere}:focus-visible{outline:2px solid #a1c1ff;outline-offset:3px}
 
+.context-report{font-size:12px;background:#18243a;border-top:1px solid #34415d;color:#c6ddf7;padding:8px 24px;overflow-wrap:anywhere}.context-report.warning{color:#ffd6a0;background:#302622}
 .selftest-panel{margin:9px auto 4px;width:calc(100% - 50px);max-width:870px;padding:12px 15px;border:1px solid #344a68;border-radius:10px;background:#17253a;color:#d9e6fc;font-size:12px}.selftest-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;color:#c8e8d6;font-size:12px}.selftest-panel button{width:auto}
 .shell{height:100vh;height:100dvh;overflow:hidden}.sidebar{min-height:0;height:100%;overflow-y:auto}.main{height:100%;min-height:0}.messages{overscroll-behavior:contain}.intro{flex-shrink:1;overflow:auto}.mobile-only,.sidebar-scrim{display:none}.bottom input[type=checkbox]{width:auto}.turn-progress #turn-elapsed{font-variant-numeric:tabular-nums}.knowledge-record .reference-name{min-width:0;flex-shrink:1;flex:1}.brand #sidebar-close{margin-left:auto}
 @media(max-width:720px){.shell{display:block;min-height:0}.sidebar{display:none}.main{height:100%}.topbar{flex-wrap:wrap;gap:8px}.topbar>div:first-of-type{flex:1;min-width:150px}.topbar h1{font-size:15px}.topbar p{overflow-wrap:anywhere}.mobile-only{display:inline-block}.library-open .sidebar{display:flex;position:fixed;top:0;bottom:0;left:0;width:min(350px,90vw);z-index:20;min-height:0;max-height:100dvh;overflow-y:auto;box-shadow:10px 0 40px #0007}.library-open .sidebar-scrim{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:19;background:#0009;border:0;border-radius:0}.sidebar .sessions{flex:none;max-height:25vh}.sidebar .knowledge-section{flex:none;max-height:48vh}.sidebar .sidebar-footer{display:grid}.composer{flex-shrink:0;margin:0 auto;padding:10px}.composer textarea{min-height:50px;max-height:24vh}.composer .bottom{gap:6px}.turn-progress{padding:8px 12px}.status{padding:9px 12px}.messages{padding:12px;gap:10px}.message{max-width:97%}.intro h2{font-size:23px}.intro .glow{font-size:30px}.intro .minor{font-size:11px}.intro{padding:12px}.transcript-tools{margin:5px}}
@@ -316,6 +320,8 @@ JAVASCRIPT = r"""'use strict';
     });
     ['prompt', 'budget', 'grounded'].forEach(id => {get(id).disabled = locked || working;});
     get('send').disabled = locked || working || !state.session || state.health?.ready !== true;
+    get('context-preview').disabled = locked || working || !state.session;
+    get('context-preserve').disabled = locked || working;
     get('connect').disabled = state.busy || state.connected;
     get('health-refresh').disabled = locked || state.busy;
     get('selftest-start').disabled = locked || working || state.health?.ready !== true;
@@ -379,6 +385,9 @@ JAVASCRIPT = r"""'use strict';
     get('dragon-bundle-review').checked = false;
     get('selftest-panel').hidden = true;
     get('selftest-result').textContent = 'No live qualification performed.';
+    get('context-report').classList.remove('warning');
+    get('context-report').textContent = 'Context not checked. Full-history mode refuses any silent trimming.';
+    get('context-preserve').checked = true;
     state.longformSourceId = null;
     state.longformWork = null;
     state.longformPendingRequest = null;
@@ -586,6 +595,8 @@ JAVASCRIPT = r"""'use strict';
     state.faithfulness = result.faithfulness_audits || [];
     if (current !== id) get('prompt').value = state.drafts.get(id) || '';
     get('revision').textContent = result.revision + ' saved turns';
+    get('context-report').classList.remove('warning');
+    get('context-report').textContent = 'Conversation changed. Check the full local model context budget before the next turn.';
     showMessages(); await loadSessions(); updateControls();
   }
   function schedulePoll(delay = 1200) {
@@ -734,7 +745,7 @@ JAVASCRIPT = r"""'use strict';
       session_id: created.session_id, request_id,
       message: 'Local inference acceptance: respond with one brief sentence about offline computing.',
       max_output_tokens: Math.max(1, Math.min(16, observed.max_output_tokens)),
-      grounded: false,
+      grounded: false, require_full_history: true,
     };
     const started_at = performance.now();
     state.selfTest = { session_id: created.session_id, request_id,
@@ -763,6 +774,62 @@ JAVASCRIPT = r"""'use strict';
       if (epoch === state.epoch) updateControls();
     }
   }
+  function invalidateContextPreview() {
+    const display = get('context-report');
+    display.classList.remove('warning');
+    display.textContent = 'Question, evidence, output budget or policy changed. Preview again; strict retention is enforced independently at generation.';
+  }
+  async function previewLocalContext(message, max_output_tokens, grounded, require_full_history) {
+    if (!state.session) throw new Error('Select a conversation first.');
+    const epoch = state.epoch;
+    const revision = state.revision;
+    const payload = await api('POST', '/v1/sessions/' + state.session + '/context-preview', {
+      message, max_output_tokens, grounded, require_full_history,
+    });
+    if (state.epoch !== epoch || !state.connected) throw new Error('Workspace disconnected.');
+    if (payload.session_id !== state.session || payload.session_revision !== revision ||
+      payload.read_only !== true || payload.generation_performed !== false ||
+      payload.model_digest !== state.health?.model_digest ||
+      payload.preview_is_admission_proof !== false ||
+      payload.require_full_history !== require_full_history ||
+      payload.grounded !== grounded) {
+      throw new Error('The local context preview is stale or its model identity changed.');
+    }
+    const report = get('context-report');
+    const omitted = payload.omitted_history_messages;
+    if (!Number.isSafeInteger(omitted) || omitted < 0 ||
+        payload.fits_full_history !== (omitted === 0) ||
+        !Number.isSafeInteger(payload.estimated_input_tokens) ||
+        payload.estimated_input_tokens < 1 ||
+        !Number.isSafeInteger(payload.context_tokens) ||
+        !Number.isSafeInteger(payload.reserved_output_tokens) ||
+        payload.estimated_total_tokens > payload.context_tokens) {
+      throw new Error('The local context accounting response was invalid.');
+    }
+    const allowed = payload.may_submit_under_policy === true;
+    report.classList.toggle('warning', omitted > 0 || !allowed);
+    report.textContent = 'Local window ' + payload.estimated_input_tokens + ' input units + ' +
+      payload.reserved_output_tokens + ' output / ' + payload.context_tokens +
+      ' context · history ' + payload.retained_history_messages + '/' +
+      payload.full_history_messages + ' messages retained' +
+      (omitted ? ' · ' + omitted + ' OLDER MESSAGES OMITTED IN BOUNDED MODE' : ' · full history fits') +
+      ' · ' + payload.accounting +
+      (payload.gguf_final_tokenizer_admission_required ? ' (GGUF tokenizer rechecks at native spawn)' : '') +
+      (allowed ? ' · admissible by requested retention policy' :
+        ' · NOT ADMISSIBLE: uncheck full-history requirement only if you explicitly accept trimming.');
+    return payload;
+  }
+  get('context-preview').addEventListener('click', () => run(async () => {
+    const message = get('prompt').value.trim();
+    const grounded = get('grounded').checked;
+    const max_output_tokens = Number(get('budget').value);
+    if (!message || !Number.isSafeInteger(max_output_tokens))
+      throw new Error('Enter a real message and bounded output-token count to preview.');
+    await previewLocalContext(message, max_output_tokens,
+      grounded, get('context-preserve').checked);
+  }));
+  ['grounded', 'context-preserve', 'budget'].forEach(id =>
+    get(id).addEventListener('change', invalidateContextPreview));
   async function submit(retry = false) {
     const epoch = state.epoch;
     if (!state.session) throw new Error('Create or select a conversation first.');
@@ -774,14 +841,23 @@ JAVASCRIPT = r"""'use strict';
     } else {
       const message = get('prompt').value.trim();
       const grounded = get('grounded').checked;
+      const require_full_history = get('context-preserve').checked;
       const max_output_tokens = Number(get('budget').value);
       if (!message || bytes(message) > (grounded ? 1024 : 4096)) throw new Error(grounded ? 'Evidence questions must be 1–1024 UTF-8 bytes.' : 'Messages must be 1–4096 UTF-8 bytes.');
       if (!Number.isInteger(max_output_tokens) || max_output_tokens < 1 || max_output_tokens > state.health.max_output_tokens) throw new Error('Output budget exceeds the selected model limit.');
+      if (require_full_history) {
+        const preview = await previewLocalContext(
+          message, max_output_tokens, grounded, require_full_history);
+        if (preview.may_submit_under_policy !== true)
+          throw new Error('Full transcript exceeds the local model window. No inference was submitted.');
+      }
       request = {session_id: state.session, message, grounded, max_output_tokens,
+        require_full_history,
         request_id: crypto.randomUUID().replace(/-/g, '')};
       const original = state.pending;
       if (original && original.session_id === request.session_id && original.message === message
-          && original.grounded === grounded && original.max_output_tokens === max_output_tokens) {
+          && original.grounded === grounded && original.max_output_tokens === max_output_tokens
+          && original.require_full_history === require_full_history) {
         request = original; retry = true;
       }
       state.pending = request;
@@ -1360,7 +1436,10 @@ JAVASCRIPT = r"""'use strict';
   get('reference-save').addEventListener('click', () => {
     if (state.reference) download(state.reference.text, state.reference.title, 'text/plain;charset=utf-8');
   });
-  get('prompt').addEventListener('input', () => {if (state.session) state.drafts.set(state.session, get('prompt').value);});
+  get('prompt').addEventListener('input', () => {
+    if (state.session) state.drafts.set(state.session, get('prompt').value);
+    invalidateContextPreview();
+  });
   get('prompt').addEventListener('keydown', event => {
     if (!event.isComposing && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {event.preventDefault(); get('send').click();}
   });
