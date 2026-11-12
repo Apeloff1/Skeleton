@@ -43,15 +43,14 @@ def prepare_advisory(body: dict[str, Any]) -> dict[str, str]:
         raise AdvisoryRejected("advisory metadata has unexpected or missing fields")
     if body["schema_version"] != SCHEMA:
         raise AdvisoryRejected("unsupported advisory schema")
-    if body["modality"] not in _MODALITIES:
+    if type(body["modality"]) is not str or body["modality"] not in _MODALITIES:
         raise AdvisoryRejected("advisory modality is unsupported")
     if (not isinstance(body["title"], str)
             or _TITLE.fullmatch(body["title"]) is None):
         raise AdvisoryRejected("advisory title must be bounded printable text")
     text = body["observation"]
     if (type(text) is not str or not text.strip() or "\x00" in text
-            or any(ord(char) in range(1, 9) or ord(char) in (11, 12, 14, 15, 16, 17, 18, 19)
-                   for char in text)):
+            or any(ord(char) < 32 and char not in "\n\r\t" for char in text)):
         raise AdvisoryRejected("advisory observation must be nonempty text only")
     try:
         size = len(text.encode("utf-8"))
