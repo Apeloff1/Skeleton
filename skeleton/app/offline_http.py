@@ -71,6 +71,7 @@ def _audit_pair(text: str, evidence: dict[str, Any] | None) -> dict[str, Any]:
 
 MAX_JSON_BYTES = 16 * 1024 * 1024
 MAX_CHAT_REQUEST_BYTES = 64 * 1024
+MAX_MEDIA_ADVISORY_REQUEST_BYTES = 6 * 1024 * 1024
 MAX_CONNECTIONS = 16
 MAX_TURN_TICKETS = 32
 TERMINAL_TURN_STATES = frozenset({"complete", "failed", "cancelled"})
@@ -795,6 +796,9 @@ class OfflineHTTPApplication:
                 "network_provider_dispatch": False,
                 "advisory_never_primary_model": True,
                 "explicit_grounded_turn_required": True,
+                "transient_media_bytes_verified_locally": True,
+                "raw_media_persisted": False,
+                "media_decoder_or_ocr_called": False,
             }
         if path == "/v1/advisory/ingest" and method == "POST":
             from skeleton.app.jeeves_advisory import (
@@ -1210,6 +1214,7 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         limit = (
             MAX_JSON_BYTES if path == "/v1/sessions/import"
             else MAX_JSON_BYTES if path == "/v1/knowledge/documents"
+            else MAX_MEDIA_ADVISORY_REQUEST_BYTES if path == "/v1/advisory/ingest"
             else MAX_CHAT_REQUEST_BYTES
         )
         length = int(declared)
