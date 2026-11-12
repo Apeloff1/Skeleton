@@ -298,3 +298,22 @@ Duplicate sharing is blocked until the first share request finishes. Account-cha
 **Additional acceptance cases:** version unchanged/share permitted; revision increment/share refused; mismatched account/session, stale source-policy digest or report digest/share refused; withdrawn consent/share refused; cancelled session/share refused; source-list failure with good session refresh/counters displayed but evidence cleared; account transition during receipt refresh/no share; Atlas response from old version/no receipt; repeated share tap/one in-flight read.
 
 **Limit of this hardening:** `getCrawl` does not reproduce the Atlas engine's full owner-scoped source-policy digest read. A metadata share only checks for a changed session revision and explicit consent. Any new *source usage* or factual review must still re-enter the canonical source/Atlas APIs for current per-source policy and freshness authorization. The receipt remains advisory even when every source-only gate is qualified.
+
+## Browser-level first-user acceptance
+
+The existing `tests/e2e/playwright.config.mjs` discovers
+`tests/e2e/app-foundation/dragon-crawler-pilot.spec.mjs` when the full
+production frontend/backend/docker stack is running. This test deliberately
+uses a newly registered isolated user and **does not launch a crawler**.
+It confirms that the exported route resolves, anonymous users see the login
+gate, valid sign-in reveals six stages, source capture remains disabled without
+explicit grants, loopback URL preflight fails without network dispatch, the
+receipt explicitly denies release/publication/training, and responsive mobile
+stage controls do not disappear.
+
+The production-stack browser job is skipped while the PR remains draft.
+Its workflow-level green status from unrelated retry-contract jobs is not
+browser evidence. Run the full App Foundation E2E stack in an approved
+isolated environment at the exact final head, then independently qualify
+device installs, source-rights behavior, recovery and provenance. Any missing
+browser execution leaves that release dimension **unqualified**.

@@ -281,3 +281,14 @@ test('user sharing is guarded by a canonical current-revision read, not stale UI
   assert.ok(screen.indexOf('requireCurrentPilotSnapshot(witness, sessionRef.current, latest, report);') <
     screen.indexOf("await Share.share({ title: 'Dragon source-only pilot receipt'"));
 });
+
+test('real Playwright first-install smoke never mistakes sign-in for crawler authority', () => {
+  const source = read('../tests/e2e/app-foundation/dragon-crawler-pilot.spec.mjs');
+  assert.match(source, /page.goto\('\/dragon-crawler-pilot'\)/);
+  assert.match(source, /gate-email/);
+  assert.match(source, /pilot-create/);
+  assert.match(source, /toBeDisabled\(\)/);
+  assert.match(source, /http:\/\/127\.0\.0\.1\/private/);
+  assert.match(source, /crawlerWrites/);
+  assert.match(source, /Release authorized: NO/);
+});
