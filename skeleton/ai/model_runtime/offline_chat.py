@@ -1009,7 +1009,13 @@ class OfflineChatStore:
         encoded = transcript.to_json()
         if len(encoded.encode("utf-8")) > MAX_TRANSCRIPT_BYTES:
             raise RuntimeContractError("completed conversation exceeds persisted budget")
-        if not isinstance(output_digest, str) or len(output_digest) != 64:
+        if (not isinstance(output_digest, str)
+                or len(output_digest) != 64
+                or any(char not in "0123456789abcdef" for char in output_digest)
+                or sha256(text.encode("utf-8")).hexdigest() != output_digest):
+            # Reject bad native/backend claims before opening the CAS write
+            # transaction. No inconsistent assistant text or receipt may be
+            # committed even temporarily.
             raise RuntimeContractError("invalid native generation output digest")
         if any(type(n) is not int or n < 0 for n in (prompt_tokens, generated_tokens)):
             raise RuntimeContractError("invalid native generation token count")
