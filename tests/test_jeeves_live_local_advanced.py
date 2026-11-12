@@ -556,3 +556,79 @@ def test_browser_self_test_is_user_triggered_private_and_never_fake_ready():
     assert "if (!state.connected || unresolved() || state.health?.ready !== true)" in JAVASCRIPT
     # A successful HTTP health GET alone must never certify model generation.
     assert JAVASCRIPT.index("const saved = await api('GET', '/v1/sessions/' + claim.session_id)") > JAVASCRIPT.index("async function completeSelfTest(")
+
+
+def test_installed_local_browser_exposes_executable_sha_verified_inference_acceptance():
+    """Browser control must use genuine async local HTTP and committed SQLite.
+
+    This source contract is not a substitute for a real operator GGUF/UI run;
+    it catches disconnected mock buttons and false green read-only pings.
+    """
+    from skeleton.app.offline_web import HTML, JAVASCRIPT, CSS
+
+    for control in ("selftest-start", "selftest-panel",
+                    "selftest-result", "selftest-export"):
+        assert f'id="{control}"' in HTML
+    assert "selftest-panel" in CSS
+    assert "get('selftest-start').addEventListener('click', () => run(startSelfTest))" in JAVASCRIPT
+    assert "async function startSelfTest()" in JAVASCRIPT
+    assert "async function completeSelfTest(ticket, epoch)" in JAVASCRIPT
+    assert "observed.local_only !== true" in JAVASCRIPT
+    assert "state.health?.ready !== true" in JAVASCRIPT
+    assert "'/v1/sessions/' + session_id + '/turns'" in JAVASCRIPT
+    assert "'/v1/sessions/' + claim.session_id" in JAVASCRIPT
+    assert "crypto.subtle.digest('SHA-256', binary)" in JAVASCRIPT
+    assert "receipt?.output_sha256 !== result.output_digest" in JAVASCRIPT
+    assert "receipt?.model_digest !== claim.model_digest" in JAVASCRIPT
+    assert "result.replayed !== false" in JAVASCRIPT
+    assert "state.selfTestReport = null;" in JAVASCRIPT
+    assert "operator_gguf_quality_certified: false" in JAVASCRIPT
+    assert "independent_device_release_certified: false" in JAVASCRIPT
+    assert "Download nonsecret qualification receipt" in HTML
+    assert "localhost" in HTML
+    # CSP intentionally allows no remote script, origin or exfiltration sink.
+    assert "script-src 'self'; style-src 'self';" in JAVASCRIPT or "script-src" not in JAVASCRIPT
+    assert "fetch('https://" not in JAVASCRIPT
+
+
+def test_real_model_reference_receipt_matches_selftest_browser_integrity_contract():
+    """The actual native/SQLite contract has the fields used in browser verification."""
+    import hashlib
+    from skeleton.app.offline_http import OfflineHTTPApplication
+
+    model = native_model()
+    from tempfile import TemporaryDirectory
+    from pathlib import Path
+
+    with TemporaryDirectory() as directory:
+        app = OfflineHTTPApplication(
+            model, Path(directory) / "local-browser-selftest.sqlite3",
+            token="s" * 64,
+        )
+        try:
+            _, created = app.dispatch("POST", "/v1/sessions", {})
+            sid = created["session_id"]
+            status, turn = app.dispatch("POST", "/v1/sessions/" + sid + "/turn", {
+                "message": "Local inference acceptance: respond with one brief sentence about offline computing.",
+                "request_id": "browser-live-acceptance-2026",
+                "max_output_tokens": 2,
+                "grounded": False,
+            })
+            assert status == 200
+            assert turn["text"].strip()
+            assert turn["replayed"] is False
+            assert turn["output_tokens"] >= 1
+            assert turn["output_digest"] == hashlib.sha256(
+                turn["text"].encode("utf-8"),
+            ).hexdigest()
+            receipt = turn["local_execution_receipt"]
+            assert receipt["model_digest"] == turn["model_digest"]
+            assert receipt["output_sha256"] == turn["output_digest"]
+            assert receipt["revision"] == turn["revision"]
+            assert len(receipt["execution_receipt_digest"]) == 64
+            status, stored = app.dispatch("GET", "/v1/sessions/" + sid)
+            assert status == 200
+            assert stored["revision"] == turn["revision"]
+            assert [m["content"] for m in stored["messages"] if m["role"] == "assistant"][-1] == turn["text"]
+        finally:
+            app.close()
