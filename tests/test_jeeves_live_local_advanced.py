@@ -653,7 +653,13 @@ def test_local_browser_dragon_bridge_is_explicitly_reviewed_source_bound_and_nev
     assert "body.source_id !== entry.source_id" in JAVASCRIPT
     assert "body.content_digest !== entry.captured_content_sha256" in JAVASCRIPT
     assert "body.use_policy?.enabled !== true" in JAVASCRIPT
-    assert "new TextEncoder().encode(body.text).byteLength > 12288" in JAVASCRIPT
+    assert "new TextEncoder().encode(body.text).byteLength > 225000" in JAVASCRIPT
+    assert "new TextEncoder().encode(text).byteLength > 12288" in JAVASCRIPT
+    assert "const points = Array.from(row.text)" in JAVASCRIPT
+    assert "length > 3000" in JAVASCRIPT
+    assert "get('dragon-excerpt-start').addEventListener('input', showDragonExcerpt)" in JAVASCRIPT
+    assert "get('dragon-excerpt-length').addEventListener('input', showDragonExcerpt)" in JAVASCRIPT
+    assert "state.dragonExcerpt !== excerpt" in JAVASCRIPT
     assert "get('dragon-bundle-review').checked" in JAVASCRIPT
     assert "'/v1/advisory/ingest'" in JAVASCRIPT
     assert "modality: 'crawler-excerpt'" in JAVASCRIPT
