@@ -61,14 +61,38 @@ def backend_origin(value: str, *, allow_loopback_http: bool = False) -> str:
 
 
 def private_bearer_token(path: Path) -> str:
-    if path.is_symlink() or not path.is_file():
+    """Pin a single-link regular token file to its opened inode before reading."""
+    if path.is_symlink():
         raise ProbeFailure("The token file must be a private regular file, not a symlink.")
-    info = path.stat()
-    if not stat.S_ISREG(info.st_mode) or info.st_size > 8192:
-        raise ProbeFailure("The token file is not a bounded regular file.")
-    if os.name == "posix" and info.st_mode & 0o077:
-        raise ProbeFailure("The token file must not be readable by group or others (chmod 600).")
-    token = path.read_text(encoding="utf-8").strip()
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError:
+        raise ProbeFailure("The private account token file could not be opened.") from None
+    with os.fdopen(descriptor, "rb") as handle:
+        opened = os.fstat(handle.fileno())
+        try:
+            named = os.lstat(path)
+        except OSError:
+            raise ProbeFailure("The account token file disappeared.") from None
+        if (
+            not stat.S_ISREG(opened.st_mode) or not stat.S_ISREG(named.st_mode)
+            or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+            or opened.st_size > 8192 or (os.name != "nt" and (
+                opened.st_nlink != 1 or bool(opened.st_mode & 0o077)
+            ))
+        ):
+            raise ProbeFailure("The token file must be a bounded, unaliased private file (chmod 600).")
+        raw = handle.read(8193)
+        current = os.lstat(path)
+        if not stat.S_ISREG(current.st_mode) or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino):
+            raise ProbeFailure("The private token file changed during admission.")
+    if len(raw) > 8192:
+        raise ProbeFailure("The account token exceeds the private input bound.")
+    try:
+        token = raw.decode("utf-8").strip()
+    except UnicodeError:
+        raise ProbeFailure("The account token must be UTF-8.") from None
     if not 16 <= len(token) <= 8192 or any(ord(ch) < 33 or ord(ch) > 126 for ch in token):
         raise ProbeFailure("The token file does not contain a valid bearer token.")
     return token
