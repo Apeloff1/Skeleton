@@ -13,7 +13,11 @@
     "tests/test_pr_merge_hold_gate.py"
   ],
   "provisional": true,
-  "pending_conflict_resolution": [
+  "pending_conflict_resolution": [],
+  "merge_approval": false,
+  "security_review_required": true,
+  "notes": "Historical source custody retained. This 2-parent current-main reconciliation eliminates the enumerated source overlaps; CI, security approval, branch protection and live/device qualification remain unverified and held.",
+  "resolved_source_overlap": [
     {
       "path": ".github/workflows/merge-readiness.yml",
       "head_blob": "a99ef7c79fcac8e0df34c4696b62a14ee15385ab",
@@ -45,7 +49,6 @@
       "change": "added"
     }
   ],
-  "merge_approval": false,
-  "security_review_required": true,
-  "notes": "Non-overlapping source blobs carried onto current main. All six overlapping current-main source paths retain main's blob; their source versions remain recoverable from the first parent. This only removes Git graph divergence; it does not resolve the deferred semantic conflicts."
+  "current_main_integration_parent": "df96a92eafbb4730ff8207dca19c3e7596bec67f",
+  "resolution": "exact Git-tree main reconciliation retaining latest main telemetry privacy tests and merging bounded API egress client-side telemetry controls"
 }

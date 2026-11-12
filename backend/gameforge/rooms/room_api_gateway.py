@@ -43,10 +43,16 @@ _MAX_EXTERNAL_TARGETS_PER_CALL = 32
 _MAX_MCP_QUERIES_PER_CALL = 32
 _MAX_TOTAL_CONCURRENT_JOBS = 48
 _MAX_INFLIGHT_PER_CALL = 8
+# Stable public contract aliases used by mainline admission tests and callers.
+_MAX_RESPONSE_BYTES = _MAX_EXTERNAL_RESPONSE_BYTES
+_MAX_API_TARGETS = _MAX_EXTERNAL_TARGETS_PER_CALL
+_MAX_MCP_QUERIES = _MAX_MCP_QUERIES_PER_CALL
+_MAX_SOURCES = 16
+_MAX_CONCURRENT_QUERIES = _MAX_INFLIGHT_PER_CALL
 _FORBIDDEN_FORWARD_HEADERS = frozenset({
     "host", "authorization", "cookie", "set-cookie",
     "proxy-authorization", "proxy-connection", "proxy-authenticate",
-    "connection", "transfer-encoding", "te", "upgrade",
+    "connection", "content-length", "transfer-encoding", "te", "upgrade",
     "forwarded", "x-forwarded-for", "x-forwarded-host", "x-real-ip",
     "x-api-key", "x-auth-token",
 })
@@ -74,8 +80,6 @@ def _resolve_public_host(hostname: str) -> str:
         raise ValueError("external API host resolved to no addresses")
     if len(addresses) > _MAX_DNS_ANSWERS:
         raise ValueError("external API host returned too many DNS answers")
-    if len(addresses) > 32:
-        raise ValueError("external API host has too many DNS addresses")
     approved: set[str] = set()
     for address in addresses:
         try:
@@ -255,6 +259,19 @@ def _bounded_request_data(value: Any, *, kind: str) -> Any:
     return value
 
 
+def _bounded_json(value: Any) -> Any:
+    """Compatibility entrypoint: same pre-serialization 16 KiB request budget."""
+    return _bounded_request_data(value, kind="json")
+
+
+def _safe_params(value: Any) -> dict[str, str] | None:
+    """Validate primitive-only query mapping without caller conversion hooks."""
+    checked = _bounded_request_data(value, kind="params")
+    if checked is None:
+        return None
+    return {key: str(item) for key, item in checked.items()}
+
+
 async def _bounded_external_body(response: Any) -> str:
     """Stream with a hard memory budget, never use unbounded response.text."""
     declared = response.headers.get("content-length")
@@ -271,6 +288,11 @@ async def _bounded_external_body(response: Any) -> str:
             raise ValueError("external API response exceeds the byte budget")
         body.extend(chunk)
     return body.decode("utf-8", errors="replace")[:2000]
+
+async def _bounded_http_body(response: Any) -> str:
+    """Mainline compatibility entrypoint for the same bounded stream reader."""
+    return await _bounded_external_body(response)
+
 
 def _get_mcp():
     global _mcp
@@ -293,13 +315,13 @@ async def _mcp_query(query: str, sources: list[str] | None) -> dict:
 async def _api_query(target: dict) -> dict:
     """Call only approved public endpoints with bounded DNS, body and response."""
     if type(target) is not dict:
-        return {"channel": "api", "target": "external-api",
+        return {"channel": "api", "target": "external_api",
                 "ok": False, "error": "invalid_api_target"}
     name = target.get("name")
     if type(name) is not str or not 1 <= len(name) <= 64 or not all(
         ch.isascii() and (ch.isalnum() or ch in "-_") for ch in name
     ):
-        name = "external-api"
+        name = "external_api"
     if not _EXTERNAL_ENABLED:
         return {"channel": "api", "target": name, "ok": True, "disabled": True,
                 "note": "external APIs disabled by default"}
@@ -313,8 +335,8 @@ async def _api_query(target: dict) -> dict:
         method = _safe_method(target.get("method", "GET"))
         timeout = _safe_timeout(target.get("timeout", 8))
         headers = _safe_headers(target.get("headers")) or {}
-        params = _bounded_request_data(target.get("params"), kind="params")
-        payload = _bounded_request_data(target.get("json"), kind="json")
+        params = _safe_params(target.get("params"))
+        payload = _bounded_json(target.get("json"))
         hostname = urlsplit(base_url).hostname
         if hostname is None:
             raise ValueError("external API host is missing")
@@ -369,12 +391,12 @@ async def query_concurrent(room_id: str, mcp_queries: list[str] | None = None,
         or (
             sources is not None
             and (
-                type(sources) is not list or len(sources) > 16
+                type(sources) is not list or len(sources) > _MAX_SOURCES
                 or any(type(s) is not str or not 1 <= len(s) <= 100 for s in sources)
             )
         )
     ):
-        raise ValueError("room query exceeds admission bounds")
+        raise ValueError("room API admission budget exceeded")
 
     t0 = time.perf_counter()
     capacity = asyncio.Semaphore(_MAX_INFLIGHT_PER_CALL)

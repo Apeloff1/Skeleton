@@ -113,7 +113,7 @@ def test_crash_report_is_bounded_before_detail_redaction():
         })
 
 
-def test_server_side_redaction_still_applies_to_untrusted_client_detail():
+def test_server_side_minimum_necessary_telemetry_drops_private_detail():
     event = TelemetryEvent.model_validate(_item(
         detail={
             "authorization": "Bearer private-secret",
@@ -122,5 +122,6 @@ def test_server_side_redaction_still_applies_to_untrusted_client_detail():
     ))
     result = _norm(event)
     assert "private-secret" not in json.dumps(result)
-    assert result["detail"]["authorization"] == "[REDACTED]"
-    assert result["detail"]["safe"]["password"] == "[REDACTED]"
+    # Sensitive keys and nested objects are dropped rather than stored as
+    # redacted-looking placeholders; raw text must never reach persistence.
+    assert result["detail"] is None

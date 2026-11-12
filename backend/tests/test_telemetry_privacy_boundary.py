@@ -68,6 +68,12 @@ def test_untrusted_identifiers_cannot_become_url_or_credential_records():
     assert row["event"] == "other"
     assert row["severity"] == "info"
     assert row["detail"] == {"ok": True}
+    # The admission model must reject unknown severities before persistence.
+    with pytest.raises(ValidationError):
+        TelemetryEvent(
+            modal_id="ToolsArena", session_id="s_opaque",
+            event="open", severity="rotating_secret",
+        )
 
 
 @pytest.mark.parametrize("value", [
@@ -92,7 +98,8 @@ def test_bounded_detail_does_not_walk_nesting_or_sensitive_keys():
         "score": math.inf,
     }
     assert safe_detail(raw) == {
-        "safe": True, "mode": "offline", "state": "running", "error_type": "TypeError",
+        "safe": True, "mode": "offline",
+        "state": "running", "error_type": "TypeError",
     }
     assert safe_detail([raw]) is None
     assert safe_detail("password=secret") is None
@@ -122,7 +129,7 @@ def test_crash_diagnostics_never_persist_stack_message_or_info_text():
 def test_too_large_batch_and_oversized_fields_are_rejected_early():
     event = _event()
     with pytest.raises(ValidationError):
-        TelemetryBatch(events=[event] * 501)
+        TelemetryBatch(events=[event] * 101)
     with pytest.raises(ValidationError):
         TelemetryEvent(modal_id="x" * 81, session_id="s", event="open")
     with pytest.raises(ValidationError):

@@ -23,7 +23,12 @@ from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.telemetry_privacy import (
-    crash_metadata, safe_detail, safe_event, safe_label, safe_number, safe_session,
+    crash_metadata,
+    safe_detail,
+    safe_event,
+    safe_label,
+    safe_number,
+    safe_session,
 )
 from middleware.security import AuditMiddleware, RateLimitMiddleware
 from routes.gameforge_auth import require_role
@@ -149,9 +154,8 @@ def _norm(event: TelemetryEvent) -> dict:
         "modal_id": safe_label(event.modal_id),
         "session_id": safe_session(event.session_id),
         "event": safe_event(event.event),
-        "severity": event.severity if event.severity in {
-            "info", "warn", "error", "fatal"
-        } else "info",
+        # Schema already permits only the public severity enum.
+        "severity": event.severity,
         "ts_client": safe_number(event.ts_client, maximum=10_000_000_000),
         "duration_ms": safe_number(event.duration_ms, maximum=86_400_000),
         "detail": safe_detail(event.detail),
@@ -189,7 +193,7 @@ async def post_batch(batch: TelemetryBatch):
 
 
 def crash_row(report: CrashReport) -> dict:
-    """Collect diagnostic presence and bounded safe scalars, never raw text."""
+    """Build a minimum-necessary crash record without private exception text."""
     return {
         "ts": time.time(),
         "modal_id": "__app__",

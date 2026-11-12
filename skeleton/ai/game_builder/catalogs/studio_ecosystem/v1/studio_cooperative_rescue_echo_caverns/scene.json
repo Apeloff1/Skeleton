@@ -1,0 +1,61 @@
+{
+  "project_id": "studio_cooperative_rescue_echo_caverns",
+  "genre": "cooperative_rescue",
+  "biome": "echo_caverns",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.scene.v1",
+  "world": "Echo Caverns",
+  "episode_plan": [
+    {
+      "id": "arrival",
+      "location": "ringing stone halls",
+      "quest": "arrival",
+      "trigger": "unstable resonance",
+      "objects": [
+        "hazard_monitor",
+        "navigation_marker",
+        "witness_letter"
+      ]
+    },
+    {
+      "id": "dispute",
+      "location": "underground listening post",
+      "quest": "dispute",
+      "trigger": "Access dispute over acoustic reflectors",
+      "objects": [
+        "public_ledger",
+        "interview_station",
+        "faction_delegate"
+      ]
+    },
+    {
+      "id": "repair",
+      "location": "boundary of ringing stone halls",
+      "quest": "repair",
+      "trigger": "Repair budget becomes binding",
+      "objects": [
+        "repair_terminal",
+        "community_board",
+        "verification_station"
+      ]
+    }
+  ],
+  "continuity": {
+    "state_keys": [
+      "route_discovered",
+      "claims_reviewed",
+      "repair_verification"
+    ],
+    "carry_forward": true
+  },
+  "engine": {
+    "design_target": "cooperative_rescue",
+    "preview_actual": "existing_det_grid_maze",
+    "preview_includes_full_genre": false,
+    "interaction_binding": "requires_further_editor_implementation"
+  },
+  "navigation_design": {
+    "alternate_exits": 2,
+    "weather_consequence": "unstable resonance"
+  }
+}

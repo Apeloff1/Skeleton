@@ -4,11 +4,10 @@ canonical governed product-control seam.
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database
+from routes.playable_access import _GuardedPrivateProjectRoute, project_router, scoped_database
 from routes import gameforge_auth as auth
 
 from dataclasses import asdict
-import hmac
 import os
 from datetime import datetime, timezone
 
@@ -37,6 +36,7 @@ router = project_router(
     prefix="/api/admin/ops",
     tags=["ops"],
     dependencies=[Depends(auth.require_role("admin"))],
+    route_class=_GuardedPrivateProjectRoute,
 )
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
 _db = scoped_database(_db)
@@ -58,10 +58,13 @@ def _ops_credential(
     x_ops_token: str = Header(default="", alias="X-Ops-Token", max_length=512),
     legacy_token: str = Query(default="", alias="token", max_length=512, deprecated=True),
 ) -> str:
-    """Prefer a header so operator credentials do not enter URLs or access logs."""
-    if x_ops_token and legacy_token and not hmac.compare_digest(x_ops_token, legacy_token):
-        raise HTTPException(status_code=400, detail="conflicting ops credentials")
-    return x_ops_token or legacy_token
+    """Reject URL credentials: request lines, proxies and analytics retain them."""
+    if legacy_token:
+        raise HTTPException(
+            status_code=400,
+            detail="operator credentials must use the X-Ops-Token header",
+        )
+    return x_ops_token
 
 
 class RuleInput(BaseModel):
