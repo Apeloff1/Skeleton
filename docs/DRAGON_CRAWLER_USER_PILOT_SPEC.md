@@ -282,3 +282,19 @@ python scripts/check_provider_bootstrap.py
 A release workflow must produce a signed exact-head and environment-bound receipt identifying: commit, artifact digest, builder, dependency manifest, security-policy version, source-contract version, test suite and attempt, OS/device/hardware, model/runtime versions, rollback procedure and independent verifier. It must never treat `pilot_status=ready_for_human_review` as approval for production release.
 
 The pilot's delivery is complete as an **implementation exercise** when code and docs are committed, tests actually run and the PR documents exact-head status. It is complete as a **user product release** only after the full production checklist is independently validated and deployed, not because the assistant wrote a checklist.
+
+## Addendum — stale-session containment and safe receipt sharing (Nov 12, 2026)
+
+The guided screen keeps an ephemeral, immutable **Atlas snapshot witness** that binds the existing verified Atlas report to the current authenticated session ID, exact session version, report digest, source snapshot digest, source-policy digest, run sequence and pilot qualification digest. This witness is a local stale-data detector only; it is neither a capability token nor a source-use permission.
+
+Before the user intentionally shares a source-only receipt, the UI must re-read the current owned session with `getCrawl` through the existing authenticated transport and compare its version, identity and consent to that witness. A mismatch, withdrawn consent, cancelled session, report-digest change, current read failure or account switch must prevent sharing and require a new Atlas inspection. The prior receipt is invalidated in local state. The user-facing copy must clearly state that even a successfully shared receipt is **historical snapshot metadata**, never proof that source rights remain valid now.
+
+An in-flight Atlas response must additionally match the exact session version observed at request submission, not merely the session ID observed when the response arrives. The Atlas panel already fences its request against account/revision changes; the guided page independently checks the submitted revision before retaining the report.
+
+Read failures are handled independently: a failed source-library fetch must not suppress a successful authoritative session refresh that records expired consent or changed counters. In that case clear cached source rows, selected review spans and Atlas evidence; display the authoritative session and explain that source rights could not be verified. A readiness/catalogue failure must clear any stale positive readiness indication and disable new acquisition.
+
+Duplicate sharing is blocked until the first share request finishes. Account-change and component-unmount fences abort outstanding authenticated receipt-refresh operations. Once a copy has left the app via the device share sheet, no revocation of that exported copy can be promised.
+
+**Additional acceptance cases:** version unchanged/share permitted; revision increment/share refused; mismatched account/session, stale source-policy digest or report digest/share refused; withdrawn consent/share refused; cancelled session/share refused; source-list failure with good session refresh/counters displayed but evidence cleared; account transition during receipt refresh/no share; Atlas response from old version/no receipt; repeated share tap/one in-flight read.
+
+**Limit of this hardening:** `getCrawl` does not reproduce the Atlas engine's full owner-scoped source-policy digest read. A metadata share only checks for a changed session revision and explicit consent. Any new *source usage* or factual review must still re-enter the canonical source/Atlas APIs for current per-source policy and freshness authorization. The receipt remains advisory even when every source-only gate is qualified.

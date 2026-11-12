@@ -9,6 +9,8 @@ import {
 } from '../src/features/Jeeves/crawlerPilotFlow.ts';
 import { canonicalPilotReceipt, pilotReceiptBody, portablePilotReceipt }
   from '../src/product/crawlerPilotReceipt.ts';
+import { bindPilotSnapshot, requireCurrentPilotSnapshot }
+  from '../src/features/Jeeves/crawlerPilotContinuity.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const read = path => readFileSync(resolve(HERE, '..', path), 'utf8');
@@ -171,6 +173,109 @@ test('real Expo route and client are wired to existing authoritative APIs', () =
   assert.ok(!screen.includes('new WebSocket'), 'do not invent a network owner');
   assert.match(client, /canonicalPilotReceipt/);
   assert.match(client, /digestStringAsync\(CryptoDigestAlgorithm.SHA256, canonical\)/);
-  assert.match(panel, /reportCallback.current\?\.\(data\)/);
+  assert.match(panel, /reportCallback.current\?\.\(data, session.version\)/);
   assert.match(workspace, /Guided research pilot/);
+});
+
+const DIGEST = n => n.repeat(64);
+const liveSession = () => ({
+  session_id: 'owned-session', version: 9, status: 'completed',
+  consent_current: true, counters: { requests: 4, documents: 3, bytes: 300 },
+});
+const liveReport = () => ({
+  session_id: 'owned-session', atlas_digest: DIGEST('a'),
+  snapshot_digest: DIGEST('b'), run_sequence: 4,
+  source_policy: { digest: DIGEST('c') },
+  pilot_qualification: {
+    source_only: true, read_only: true,
+    recheck_mongo_authority_before_any_followup: true,
+    atlas_digest: DIGEST('a'), snapshot_digest: DIGEST('b'),
+    source_policy_digest: DIGEST('c'),
+    qualification_digest: DIGEST('d'), run_sequence: 4,
+    release_authorized: false, training_authorized: false,
+    publication_authorized: false,
+  },
+});
+
+test('metadata-only research witness binds a real owned consented revision', () => {
+  const current = liveSession();
+  const report = liveReport();
+  const witness = bindPilotSnapshot(current, report);
+  assert.deepEqual(witness, {
+    sessionId: current.session_id, sessionVersion: 9,
+    atlasDigest: DIGEST('a'), snapshotDigest: DIGEST('b'),
+    sourcePolicyDigest: DIGEST('c'), runSequence: 4,
+    qualificationDigest: DIGEST('d'),
+  });
+  assert.ok(Object.isFrozen(witness));
+  assert.doesNotThrow(() => requireCurrentPilotSnapshot(
+    witness, current, { ...current }, report,
+  ));
+});
+
+test('late response never upgrades stale, foreign or revoked source metadata', () => {
+  const current = liveSession();
+  const report = liveReport();
+  const wrong = [
+    [ { ...current, consent_current: false }, report ],
+    [ { ...current, status: 'cancelled' }, report ],
+    [ { ...current, version: 10 }, report ],
+    [ { ...current, session_id: 'another-owner' }, report ],
+    [ current, { ...report, session_id: 'another-owner' } ],
+    [ current, { ...report, snapshot_digest: DIGEST('e') } ],
+    [ current, { ...report, source_policy: { digest: DIGEST('e') } } ],
+    [ current, { ...report, run_sequence: 5 } ],
+    [ current, { ...report, pilot_qualification: {
+      ...report.pilot_qualification, release_authorized: true,
+    } } ],
+    [ current, { ...report, pilot_qualification: {
+      ...report.pilot_qualification, qualification_digest: 'not-a-hash',
+    } } ],
+  ];
+  for (const [session, response] of wrong) {
+    assert.throws(() => bindPilotSnapshot(session, response),
+      'A stale or fabricated source snapshot was bound as current');
+  }
+});
+
+test('share preflight rejects server-side revision, account and consent changes', () => {
+  const captured = liveSession(), report = liveReport();
+  const witness = bindPilotSnapshot(captured, report);
+  for (const live of [
+    { ...captured, version: 10 },
+    { ...captured, consent_current: false },
+    { ...captured, status: 'cancelled' },
+    { ...captured, session_id: 'foreign' },
+  ]) assert.throws(() => requireCurrentPilotSnapshot(
+    witness, captured, live, report,
+  ));
+  assert.throws(() => requireCurrentPilotSnapshot(
+    witness, { ...captured, version: 8 }, captured, report,
+  ));
+  for (const changed of [
+    { ...report, run_sequence: 2 },
+    { ...report, atlas_digest: DIGEST('e') },
+    { ...report, snapshot_digest: DIGEST('e') },
+    { ...report, source_policy: { digest: DIGEST('e') } },
+    { ...report, pilot_qualification: {
+      ...report.pilot_qualification, qualification_digest: DIGEST('e'),
+    } },
+  ]) assert.throws(() => requireCurrentPilotSnapshot(
+    witness, captured, captured, changed,
+  ));
+  assert.throws(() => requireCurrentPilotSnapshot(null, captured, captured, report));
+  assert.throws(() => requireCurrentPilotSnapshot(witness, null, captured, report));
+  assert.throws(() => requireCurrentPilotSnapshot(witness, captured, captured, null));
+});
+
+test('user sharing is guarded by a canonical current-revision read, not stale UI state', () => {
+  const screen = read('src/features/Jeeves/CrawlerReleasePrototype.tsx');
+  assert.match(screen, /const latest = await getCrawl\(current\.session_id, abort\.signal\);/);
+  assert.match(screen, /requireCurrentPilotSnapshot\(witness, sessionRef\.current, latest, report\)/);
+  assert.match(screen, /shareAbort\.current\?\.abort\(\)/);
+  assert.match(screen, /setAtlasWitness\(null\)/);
+  assert.match(screen, /current.version !== requestedVersion/);
+  assert.match(screen, /await submitPending\(\)/);
+  assert.ok(screen.indexOf('requireCurrentPilotSnapshot(witness, sessionRef.current, latest, report);') <
+    screen.indexOf("await Share.share({ title: 'Dragon source-only pilot receipt'"));
 });

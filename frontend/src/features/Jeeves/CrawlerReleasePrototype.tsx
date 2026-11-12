@@ -19,6 +19,9 @@ import {
 } from '../../product/crawlerClient';
 import { saveCrawlerExport } from '../../product/crawlerExport';
 import { portablePilotReceipt } from '../../product/crawlerPilotReceipt';
+import {
+  bindPilotSnapshot, requireCurrentPilotSnapshot, type PilotSnapshotWitness,
+} from './crawlerPilotContinuity';
 import CrawlerResearchAtlasPanel from './CrawlerResearchAtlasPanel';
 import CrawlerSourceLibrary, { type CrawlPassageSelection } from './CrawlerSourceLibrary';
 import DragonKnowledgePanel from './DragonKnowledgePanel';
@@ -86,10 +89,12 @@ function PilotContent() {
   const [sourceCursor, setSourceCursor] = useState<string | null>(null);
   const [reviewDraft, setReviewDraft] = useState<CrawlPassageSelection | null>(null);
   const [atlas, setAtlas] = useState<CrawlAtlasReport | null>(null);
+  const [atlasWitness, setAtlasWitness] = useState<PilotSnapshotWitness | null>(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [scopePreview, setScopePreview] = useState(false);
   const account = useRef(getAuthToken());
@@ -102,6 +107,8 @@ function PilotContent() {
   const lock = useRef(false);
   const preflightLock = useRef(false);
   const exportLock = useRef(false);
+  const shareLock = useRef(false);
+  const shareAbort = useRef<AbortController | null>(null);
   const epoch = useRef(0);
 
   const fresh = (signal?: AbortSignal, original = account.current) =>
@@ -115,8 +122,12 @@ function PilotContent() {
       value,
       ...rows.filter(row => row.session_id !== value.session_id),
     ].slice(0, 128));
-    if (before && (before.session_id !== value.session_id || before.version !== value.version)) {
+    if (before && (before.session_id !== value.session_id ||
+      before.version !== value.version ||
+      before.consent_current !== value.consent_current ||
+      before.status !== value.status)) {
       setAtlas(null);
+      setAtlasWitness(null);
     }
   }, []);
 
@@ -125,17 +136,27 @@ function PilotContent() {
     const abort = new AbortController(); reads.current = abort;
     const token = account.current;
     try {
-      const [current, page] = await Promise.all([
-        getCrawl(id, abort.signal),
-        listCrawlSources(id, undefined, abort.signal),
-      ]);
-      if (!fresh(abort.signal, token)) return;
-      if (sessionRef.current?.session_id !== id) return;
+      // A denied or unavailable source-library request must not hide the
+      // authoritative session revision, counters or revoked consent. First
+      // reconcile the session, then independently attempt source inventory.
+      const current = await getCrawl(id, abort.signal);
+      if (!fresh(abort.signal, token) || sessionRef.current?.session_id !== id) return;
       update(current);
-      setSources(page.sources);
-      setSourceCursor(page.next_cursor);
+      setSources([]); setSourceCursor(null);
       if (!keepStage) setStage('capture');
-      setError(''); setNotice('Source inventory reconciled with the canonical session.');
+      try {
+        const page = await listCrawlSources(id, undefined, abort.signal);
+        if (!fresh(abort.signal, token) || sessionRef.current?.session_id !== id) return;
+        setSources(page.sources);
+        setSourceCursor(page.next_cursor);
+        setError('');
+        setNotice('Session revision and current source inventory were reconciled.');
+      } catch {
+        if (fresh(abort.signal, token)) {
+          setAtlas(null); setAtlasWitness(null); setReviewDraft(null);
+          setError('The session is current, but retained source rights or inventory could not be verified. Evidence was cleared; retry after checking authorization.');
+        }
+      }
     } catch {
       if (fresh(abort.signal, token)) {
         setError('The canonical session could not be refreshed. Last displayed state may be stale; do not retry a new command until it is reconciled.');
@@ -170,6 +191,7 @@ function PilotContent() {
       setError('');
     } catch {
       if (fresh(abort.signal, token)) {
+        setReadiness(null);
         setError('Crawler readiness or session catalogue could not be verified. Check setup and your sign-in.');
       }
     } finally {
@@ -187,11 +209,12 @@ function PilotContent() {
       account.current = current;
       epoch.current++;
       reads.current?.abort(); catalogueRead.current?.abort();
-      mutationAbort.current?.abort(); pending.current = null;
-      preflightLock.current = false; exportLock.current = false;
+      mutationAbort.current?.abort(); shareAbort.current?.abort(); pending.current = null;
+      preflightLock.current = false; exportLock.current = false; shareLock.current = false;
       sessionRef.current = null;
       setSession(null); setSources([]); setSessions([]); setNextCursor(null);
-      setSourceCursor(null); setReviewDraft(null); setAtlas(null);
+      setSourceCursor(null); setReviewDraft(null); setAtlas(null); setAtlasWitness(null);
+      setSharing(false);
       setReadiness(null); setStage('scope'); setBusy(''); setLoaded(false);
       setForm({ ...EMPTY_PILOT_FORM }); setScopePreview(false);
       setError('Your sign-in changed. Refresh the pilot to load the new account scope.');
@@ -200,7 +223,8 @@ function PilotContent() {
       alive.current = false;
       clearInterval(timer);
       epoch.current++;
-      reads.current?.abort(); catalogueRead.current?.abort(); mutationAbort.current?.abort();
+      reads.current?.abort(); catalogueRead.current?.abort();
+      mutationAbort.current?.abort(); shareAbort.current?.abort();
     };
     // Start once per signed-in screen lifetime; refresh is explicit thereafter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -211,7 +235,8 @@ function PilotContent() {
     reads.current?.abort();
     sessionRef.current = row;
     setSession(row); setSources([]); setSourceCursor(null);
-    setAtlas(null); setReviewDraft(null); setError(''); setNotice('');
+    setAtlas(null); setAtlasWitness(null);
+    setReviewDraft(null); setError(''); setNotice('');
     setStage('capture');
     void reload(row.session_id);
   };
@@ -231,7 +256,7 @@ function PilotContent() {
       if (!fresh(abort.signal, token) || rev !== epoch.current) return;
       if (command.kind === 'create') {
         update(result); setSources([]); setSourceCursor(null);
-        setReviewDraft(null); setAtlas(null); setStage('capture');
+        setReviewDraft(null); setAtlas(null); setAtlasWitness(null); setStage('capture');
         setForm(old => ({ ...old, consent: false, rights: false }));
       } else if (sessionRef.current?.session_id === result.session_id) update(result);
       pending.current = null;
@@ -301,7 +326,7 @@ function PilotContent() {
         }};
       }
       setBusy('');
-      void submitPending();
+      await submitPending();
     } catch {
       if (fresh()) setError('Could not read the latest canonical revision. No new crawler command was submitted.');
     } finally {
@@ -349,13 +374,39 @@ function PilotContent() {
   };
 
   const sharePilotReceipt = async () => {
-    if (!atlas?.pilot_qualification || !fresh()) return;
+    const current = sessionRef.current;
+    const report = atlas;
+    const witness = atlasWitness;
+    if (!current || !report?.pilot_qualification || !witness || !fresh()
+      || shareLock.current || lock.current || preflightLock.current || pending.current) return;
+    shareLock.current = true;
+    const abort = new AbortController();
+    shareAbort.current = abort;
+    const token = account.current;
+    const startingEpoch = epoch.current;
+    setSharing(true); setError('');
     try {
-      const message = portablePilotReceipt(atlas);
+      // This is an authenticated, read-only CAS witness. It does NOT
+      // authorize new source use, remote freshness, publication or training.
+      const latest = await getCrawl(current.session_id, abort.signal);
+      if (!fresh(abort.signal, token) || epoch.current !== startingEpoch ||
+        sessionRef.current?.session_id !== current.session_id) return;
+      requireCurrentPilotSnapshot(witness, sessionRef.current, latest, report);
+      const message = portablePilotReceipt(report);
+      if (!fresh(abort.signal, token) || epoch.current !== startingEpoch) return;
       await Share.share({ title: 'Dragon source-only pilot receipt', message });
-      setNotice('The local share flow was invoked. This is not a publication or release approval.');
+      if (fresh(undefined, token) && epoch.current === startingEpoch) {
+        setNotice('The historical, metadata-only snapshot was handed to the share interface. No current source-use or product release permission was granted.');
+      }
     } catch {
-      setError('The bounded pilot receipt could not be shared.');
+      if (fresh(undefined, token) && epoch.current === startingEpoch) {
+        setAtlas(null); setAtlasWitness(null);
+        setError('The receipt was not shared. The current owned session or its revision could not be reverified. Reopen Research Atlas and inspect a fresh policy-bound snapshot.');
+      }
+    } finally {
+      shareLock.current = false;
+      if (shareAbort.current === abort) shareAbort.current = null;
+      if (fresh(undefined, token) && epoch.current === startingEpoch) setSharing(false);
     }
   };
 
@@ -565,7 +616,7 @@ function PilotContent() {
             if (value.session.version < sessionRef.current.version) {
               void reload(value.session.session_id); return;
             }
-            update(value.session); setAtlas(null); setReviewDraft(null);
+            update(value.session); setAtlas(null); setAtlasWitness(null); setReviewDraft(null);
             setSources(rows => rows.map(row =>
               row.source_id === value.source.source_id ? value.source : row));
           }} />}
@@ -578,8 +629,19 @@ function PilotContent() {
           {session && !session.consent_current && <Text style={s.error}>Consent has expired. Atlas cannot be run until the canonical authority permits source use.</Text>}
         </View>
         {session && <CrawlerResearchAtlasPanel key={session.session_id}
-          session={session} onReport={value => {
-            if (sessionRef.current?.session_id === session.session_id && fresh()) setAtlas(value);
+          session={session} onReport={(value, requestedVersion) => {
+            const current = sessionRef.current;
+            if (!fresh() || current?.session_id !== session.session_id ||
+              (value !== null && current.version !== requestedVersion)) return;
+            if (!value) { setAtlas(null); setAtlasWitness(null); return; }
+            try {
+              const witness = bindPilotSnapshot(current, value);
+              setAtlasWitness(witness);
+              setAtlas(value);
+            } catch {
+              setAtlas(null); setAtlasWitness(null);
+              setError('Research receipt has no current bound owner/session revision; reinspect the authorized evidence.');
+            }
           }} />}
       </View>}
 
@@ -623,7 +685,9 @@ function PilotContent() {
             ? pilot.operator_actions.map(code => <Text key={code} style={s.error}>{label(code)}</Text>)
             : <Text style={s.small}>Source-only checks have no outstanding blockers; independent human and release verification remain required.</Text>}
           <Text style={s.small}>All {pilot.external_release_checks.length} external release gates are unqualified by this source-only receipt. Skips, pending runs and historical checks cannot count as green.</Text>
-          <Button title="Share source-only pilot receipt" onPress={() => void sharePilotReceipt()} />
+          <Button title={sharing ? "Verifying receipt revision…" : "Share source-only pilot receipt"}
+            disabled={sharing || !!busy || !!pending.current || !atlasWitness}
+            onPress={() => void sharePilotReceipt()} />
         </View>}
         <View style={s.row}>
           <Button title="Reinspect current Atlas" onPress={() => setStage('research')} />

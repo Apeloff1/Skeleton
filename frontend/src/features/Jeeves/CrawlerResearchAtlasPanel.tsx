@@ -57,7 +57,7 @@ function Metric({ title, value, caption }: { title: string; value: number; capti
     {!!caption && <Text style={s.small}>{caption}</Text>}</View>;
 }
 
-export default function CrawlerResearchAtlasPanel({ session, onReport }: { session: CrawlSession; onReport?: (report: CrawlAtlasReport | null) => void }) {
+export default function CrawlerResearchAtlasPanel({ session, onReport }: { session: CrawlSession; onReport?: (report: CrawlAtlasReport | null, requestedVersion: number) => void }) {
   const [question, setQuestion] = useState('');
   const [dimension, setDimension] = useState<Dimension>('method');
   const [stage, setStage] = useState<Stage>('verification');
@@ -91,7 +91,7 @@ export default function CrawlerResearchAtlasPanel({ session, onReport }: { sessi
     request.current?.abort();
     request.current = null;
     busy.current = false;
-    setWorking(false); setReport(null); reportCallback.current?.(null); setCurrentGoals(null); setError(''); setNotice('');
+    setWorking(false); setReport(null); reportCallback.current?.(null, -1); setCurrentGoals(null); setError(''); setNotice('');
   }, []);
   useEffect(() => {
     clear();
@@ -176,7 +176,7 @@ export default function CrawlerResearchAtlasPanel({ session, onReport }: { sessi
       if (controller.signal.aborted || submittedAt !== epoch.current ||
           sessionRevision !== revisionRef.current || auth !== getAuthToken()) return;
       setReport(data);
-      reportCallback.current?.(data);
+      reportCallback.current?.(data, session.version);
       setCurrentGoals(goals);
       setNotice(allocate
         ? 'A bounded review plan was calculated, but no human was assigned and nothing was approved.'
@@ -184,14 +184,14 @@ export default function CrawlerResearchAtlasPanel({ session, onReport }: { sessi
     } catch (exc) {
       if (controller.signal.aborted || submittedAt !== epoch.current ||
           sessionRevision !== revisionRef.current || auth !== getAuthToken()) return;
-      setReport(null); reportCallback.current?.(null); setCurrentGoals(null);
+      setReport(null); reportCallback.current?.(null, -1); setCurrentGoals(null);
       setError(exc instanceof Error ? exc.message : 'The Atlas inspection could not be verified.');
     } finally {
       if (submittedAt === epoch.current) {
         request.current = null; busy.current = false; setWorking(false);
       }
     }
-  }, [session.session_id, session.consent_current, question, dimension,
+  }, [session.session_id, session.version, session.consent_current, question, dimension,
     stage, mode, priority, requiredTerms, blockedTerms, passageTarget,
     independenceTarget, maxAgeMinutes, queuedGoals,
     currentGoals, report, minutesPerTask, budget]);
