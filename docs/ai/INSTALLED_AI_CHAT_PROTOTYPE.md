@@ -234,6 +234,7 @@ Focused source tests and native inference acceptance:
     python -m pytest -q --noconftest \
       tests/test_jeeves_local_policy.py \
       tests/test_jeeves_live_local_advanced.py \
+      tests/test_jeeves_inference_circuit.py \
       tests/test_jeeves_advisory.py \
       tests/test_install_ai_chat.py \
       tests/test_ai_chat_installed_smoke.py \
@@ -256,3 +257,41 @@ review-only until these are proven.
 | GGUF/runtime hash mismatch | Restore exact approved files and requalify |
 | No local provider receipt | Reject as unverified, never substitute hosted output |
 | Phone cannot reach backend | Configure own TLS ingress; never expose Mongo/engine |
+
+
+## 7. November 2026 fail-closed inference reliability
+
+Jeeves uses a process-local runtime failure circuit on the standalone
+authenticated loopback service. The circuit is **not an alternate model**,
+a cloud failover, a health-check completion, or a durable source of truth.
+
+- Three genuine native/GGUF runtime failures within 60 seconds open the
+  circuit for 10 seconds. Further failed recovery attempts double the
+  cooldown up to 120 seconds. A completed successful native execution
+  resets it. Rejected prompts, explicit cancellation, and SQLite replay
+  do not increment the failure counter.
+- `GET /v1/status` returns `inference_circuit.state` as `closed`,
+  `open`, or `probe_ready`, with a bounded retry interval and no
+  model path, prompt, exception string, API key, or token. During an
+  open interval `ready=false`, with
+  `model_readiness_code=local_execution_circuit_open`.
+- New synchronous and asynchronous generation both fail closed while
+  the circuit is open. Existing committed history, GET-only recovery,
+  and exact idempotent retries are still readable without loading the
+  model or spending another generation. A failed ticket is **not**
+  advertised as a completed model result.
+- This counter is intentionally memory-only. Restarting the process
+  resets its local failure counter, **not** the SHA-bound model identity,
+  SQLite receipts, canonical conversation, protected engine policy or
+  operator deployment requirements. A device supervisor must enforce
+  its own restart budget and crash-loop control.
+- CPU/GPU pressure admission remains owned by the existing local
+  resource fabric and llama.cpp execution guards. Circuit status
+  is not a substitute for measured production GGUF and device proof.
+
+The `tests/test_jeeves_inference_circuit.py` regression suite includes
+a deterministic monotonic clock, sliding-window expiry, exponential
+cooldown, real native/SQLite replay during an open circuit, actual
+backend-error injection and cancellation non-escalation. These tests
+validate execution-plumbing behavior, **not** model-language quality,
+operator GGUF speed, independent protected-backend quorum or handset AI.
