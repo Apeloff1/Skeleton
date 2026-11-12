@@ -330,6 +330,71 @@ mutates earlier SQLite runtime receipts and rechecksums portable envelopes,
 checking that invalid histories fail closed while valid legacy, forked and
 imported history remains usable.
 
+
+## 9. Executable localhost Jeeves self-check (real model, not a status ping)
+
+The authenticated same-origin desktop browser exposes **Run genuine local inference
+self-test**. The control is unavailable until local model admission reports
+ready. When clicked, it creates a **real new SQLite conversation**, submits one
+bounded asynchronous local-model request and waits for its durable terminal
+receipt. The check then uses WebCrypto SHA-256 to hash the exact assistant UTF-8
+text, compares the stored execution digest and active model identity, and
+re-reads the saved SQLite conversation. Only a genuinely committed answer
+with matching text, revision and native execution sidecar can show a qualified
+local inference check. A nonsecret JSON report can be downloaded.
+
+An unavailable model, timeout, cancellation, bad digest, missing receipt,
+changed token or lost history produces **NOT QUALIFIED**, not a fabricated
+response. If delivery is uncertain, the original request ID is retained for
+the existing Check status / Retry original turn workflow; the browser never
+creates an unrelated replacement request silently. The live check does not
+certify model reasoning quality, independently protected app bootstrap,
+operator-owned GGUF weights on another host, physical handset operation or
+release readiness.
+
+## 10. Dragon-to-Jeeves local evidence bridge (actual user workflow)
+
+Dragon's guided capture pilot exports a bounded JSON `skeleton.dragon.
+owner_evidence_bundle.v1` with either provenance-only metadata or historical
+per-source authorized JSON copies. The local Jeeves browser now has an
+**Import approved Dragon evidence (local only)** panel. It supports **only**
+the authorized-source-body mode and requires:
+
+1. A 1-byte to 2-MiB explicitly selected JSON file, source count 1–8,
+   stable session identity and revision, and all publication/training/release
+   flags explicitly **false**.
+2. Per-source SHA-256 of the exact historical export bytes, matching
+   exported source/capture digests, valid policy version, bounded UTF-8
+   source text (up to 225 kB), and historical source-use/freshness fields.
+   The user chooses a Unicode-code-point start and 1–3000-character excerpt;
+   the reviewed excerpt is capped at 12 KiB and must match the preview.
+3. A full on-screen untrusted-text preview and a **fresh, manually checked**
+   owner approval checkbox for the exact selected excerpt. Switching
+   excerpts removes that checkbox grant.
+4. Explicit `POST /v1/advisory/ingest` through the **existing authenticated
+   localhost service** with text and source digests. The server separately
+   verifies the exact observation SHA-256 before storing the text under the
+   active model's private SQLite knowledge authority. An exact duplicate
+   returns the existing document instead of silently creating another.
+5. An explicit separate **Include local evidence** option on a subsequent
+   conversation turn. Import never auto-invokes inference or promotes
+   captured source instructions to a system/developer/tool role.
+
+**Security limitations:** Dragon bundle checksums authenticate equality of
+bytes, not the source publisher or user's current rights. A saved bundle is
+a historical snapshot and could be manipulated by its holder: local Jeeves
+cannot remotely revalidate Dragon's live tenant authority, robots, legal
+license, takedown state or freshness. The user must independently recheck
+permission before approving each excerpt. The text remains explicitly
+untrusted in the model context, and the primary model stays local Jeeves.
+No raw media decoding, remote service, automatic training, publication,
+unsandboxed tool action or developer-level prompt elevation occurs.
+
+The `tests/test_jeeves_live_local_advanced.py` acceptance suite now
+checks the actual local model + SQLite receipt semantics, the browser
+self-check and its Dragon UI wiring, and an actual reviewed crawler
+observation into SQLite without another generation.
+
 ## 2026 local execution custody: independent service-process safety
 
 The standalone authenticated Jeeves HTTP service now uses an additional

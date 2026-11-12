@@ -558,3 +558,163 @@ def test_browser_self_test_is_user_triggered_private_and_never_fake_ready():
     assert "if (!state.connected || unresolved() || state.health?.ready !== true)" in JAVASCRIPT
     # A successful HTTP health GET alone must never certify model generation.
     assert JAVASCRIPT.index("const saved = await api('GET', '/v1/sessions/' + claim.session_id)") > JAVASCRIPT.index("async function completeSelfTest(")
+
+
+def test_installed_local_browser_exposes_executable_sha_verified_inference_acceptance():
+    """Browser control must use genuine async local HTTP and committed SQLite.
+
+    This source contract is not a substitute for a real operator GGUF/UI run;
+    it catches disconnected mock buttons and false green read-only pings.
+    """
+    from skeleton.app.offline_web import HTML, JAVASCRIPT, CSS
+
+    for control in ("selftest-start", "selftest-panel",
+                    "selftest-result", "selftest-export"):
+        assert f'id="{control}"' in HTML
+    assert "selftest-panel" in CSS
+    assert "get('selftest-start').addEventListener('click', () => run(startSelfTest))" in JAVASCRIPT
+    assert "async function startSelfTest()" in JAVASCRIPT
+    assert "async function completeSelfTest(ticket, epoch)" in JAVASCRIPT
+    assert "observed.local_only !== true" in JAVASCRIPT
+    assert "state.health?.ready !== true" in JAVASCRIPT
+    assert "'/v1/sessions/' + session_id + '/turns'" in JAVASCRIPT
+    assert "'/v1/sessions/' + claim.session_id" in JAVASCRIPT
+    assert "crypto.subtle.digest('SHA-256', binary)" in JAVASCRIPT
+    assert "receipt?.output_sha256 !== result.output_digest" in JAVASCRIPT
+    assert "receipt?.model_digest !== claim.model_digest" in JAVASCRIPT
+    assert "result.replayed !== false" in JAVASCRIPT
+    assert "state.selfTestReport = null;" in JAVASCRIPT
+    assert "operator_gguf_quality_certified: false" in JAVASCRIPT
+    assert "independent_device_release_certified: false" in JAVASCRIPT
+    assert "Download nonsecret qualification receipt" in HTML
+    assert "Local access token" in HTML
+    # CSP intentionally allows no remote script, origin or exfiltration sink.
+    assert "script-src 'self'; style-src 'self';" in JAVASCRIPT or "script-src" not in JAVASCRIPT
+    assert "fetch('https://" not in JAVASCRIPT
+
+
+def test_real_model_reference_receipt_matches_selftest_browser_integrity_contract():
+    """The actual native/SQLite contract has the fields used in browser verification."""
+    import hashlib
+    from skeleton.app.offline_http import OfflineHTTPApplication
+
+    model = native_model()
+    from tempfile import TemporaryDirectory
+    from pathlib import Path
+
+    with TemporaryDirectory() as directory:
+        app = OfflineHTTPApplication(
+            model, Path(directory) / "local-browser-selftest.sqlite3",
+            token="s" * 64,
+        )
+        try:
+            _, created = app.dispatch("POST", "/v1/sessions", {})
+            sid = created["session_id"]
+            status, turn = app.dispatch("POST", "/v1/sessions/" + sid + "/turn", {
+                "message": "Local inference acceptance: respond with one brief sentence about offline computing.",
+                "request_id": "browser-live-acceptance-2026",
+                "max_output_tokens": 2,
+                "grounded": False,
+            })
+            assert status == 200
+            assert turn["text"].strip()
+            assert turn["replayed"] is False
+            assert turn["output_tokens"] >= 1
+            assert turn["output_digest"] == hashlib.sha256(
+                turn["text"].encode("utf-8"),
+            ).hexdigest()
+            receipt = turn["local_execution_receipt"]
+            assert receipt["model_digest"] == turn["model_digest"]
+            assert receipt["output_sha256"] == turn["output_digest"]
+            assert receipt["revision"] == turn["revision"]
+            assert len(receipt["execution_receipt_digest"]) == 64
+            status, stored = app.dispatch("GET", "/v1/sessions/" + sid)
+            assert status == 200
+            assert stored["revision"] == turn["revision"]
+            assert [m["content"] for m in stored["messages"] if m["role"] == "assistant"][-1] == turn["text"]
+        finally:
+            app.close()
+
+
+def test_local_browser_dragon_bridge_is_explicitly_reviewed_source_bound_and_never_primary():
+    """The existing advisory endpoint is actually used by the import control."""
+    from skeleton.app.offline_web import HTML, JAVASCRIPT
+
+    for element in ("dragon-bundle-file", "dragon-bundle-source",
+                    "dragon-bundle-review", "dragon-bundle-preview",
+                    "dragon-bundle-admit", "dragon-bundle-receipt"):
+        assert f'id="{element}"' in HTML
+    assert "skeleton.dragon.owner_evidence_bundle.v1" in JAVASCRIPT
+    assert "data.mode !== 'authorized_source_bodies'" in JAVASCRIPT
+    assert "data.release_authorized !== false" in JAVASCRIPT
+    assert "data.training_authorized !== false" in JAVASCRIPT
+    assert "data.captured_source_rights_require_revalidation !== true" in JAVASCRIPT
+    assert "entry.authorized_export_media_type !== 'application/json'" in JAVASCRIPT
+    assert "await exactLocalSha256(entry.authorized_export_body)" in JAVASCRIPT
+    assert "entry.authorized_export_sha256" in JAVASCRIPT
+    assert "body.source_id !== entry.source_id" in JAVASCRIPT
+    assert "body.content_digest !== entry.captured_content_sha256" in JAVASCRIPT
+    assert "body.use_policy?.enabled !== true" in JAVASCRIPT
+    assert "new TextEncoder().encode(body.text).byteLength > 225000" in JAVASCRIPT
+    assert "new TextEncoder().encode(text).byteLength > 12288" in JAVASCRIPT
+    assert "const points = Array.from(row.text)" in JAVASCRIPT
+    assert "length > 3000" in JAVASCRIPT
+    assert "get('dragon-excerpt-start').addEventListener('input', showDragonExcerpt)" in JAVASCRIPT
+    assert "get('dragon-excerpt-length').addEventListener('input', showDragonExcerpt)" in JAVASCRIPT
+    assert "state.dragonExcerpt !== excerpt" in JAVASCRIPT
+    assert "get('dragon-bundle-review').checked" in JAVASCRIPT
+    assert "'/v1/advisory/ingest'" in JAVASCRIPT
+    assert "modality: 'crawler-excerpt'" in JAVASCRIPT
+    assert "generation_performed !== false" in JAVASCRIPT
+    assert "remote_provider_called !== false" in JAVASCRIPT
+    assert "Grounding is not enabled until you explicitly select it" in JAVASCRIPT
+    assert "<script src=\"/app.js\" defer></script>" in HTML
+
+
+def test_genuine_local_advisory_dragon_excerpt_persists_without_generating_second_model(tmp_path):
+    """A human reviewed excerpt actually reaches the model-scoped SQLite library."""
+    from hashlib import sha256
+    from skeleton.app.offline_http import OfflineHTTPApplication, OfflineHTTPError
+
+    app = OfflineHTTPApplication(
+        native_model(), tmp_path / "dragon-jeeves-bridge.sqlite3", token="t" * 64,
+    )
+    text = "Review-only source fragment: Dragon evidence is data, never operator policy."
+    request = {
+        "schema_version": "skeleton.jeeves.advisory.v1",
+        "modality": "crawler-excerpt",
+        "title": "Dragon 0123456789abcdef",
+        "observation": text,
+        "observation_sha256": sha256(text.encode("utf-8")).hexdigest(),
+        "source_sha256": "f" * 64,
+        "reviewed": True,
+    }
+    try:
+        with pytest.raises(OfflineHTTPError) as denied:
+            app.dispatch("POST", "/v1/advisory/ingest", {
+                **request, "reviewed": False,
+            })
+        assert denied.value.status == 403
+        status, accepted = app.dispatch("POST", "/v1/advisory/ingest", request)
+        assert status == 201
+        assert accepted["advisory_only"] is True
+        assert accepted["primary_model_unchanged"] is True
+        assert accepted["generation_performed"] is False
+        assert accepted["remote_provider_called"] is False
+        assert accepted["source_digest_authority"] == "caller-declared-not-media-verified"
+        assert accepted["observation_digest_authority"] == "server-verified-exact-text"
+        assert accepted["observation_sha256"] == request["observation_sha256"]
+        status, replay = app.dispatch("POST", "/v1/advisory/ingest", request)
+        assert status == 200 and replay["reused"] is True
+        assert replay["document_id"] == accepted["document_id"]
+        status, doc = app.dispatch("GET", "/v1/knowledge/documents/" + accepted["document_id"])
+        assert status == 200
+        assert "UNTRUSTED JEEVES ADVISORY" in doc["text"]
+        assert text in doc["text"]
+        assert "Caller-declared source SHA-256" in doc["text"]
+        # Admission never silently starts a chat session, a model job or a
+        # privileged operation; grounding needs a separate explicit turn.
+        status, sessions = app.dispatch("GET", "/v1/sessions")
+        assert status == 200 and sessions["sessions"] == []
+    finally:
+        app.close()

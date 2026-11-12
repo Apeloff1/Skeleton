@@ -350,8 +350,18 @@ function patchNodeForgeNestedDigestAlgorithm() {
   // Reviewed exact published versions. The 1.4.2 RSA parser still validates
   // the outer DigestInfo count without validating nested DigestAlgorithm arity.
   // Never silently trust a version bump as proof of this security fix.
-  if (!new Set(['1.4.0', '1.4.2']).has(version)) {
+  if (!new Set(['1.4.0', '1.4.2', '1.4.3']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
+  }
+  if (version === '1.4.3') {
+    const { qualifiesCanonicalRsaVerifier } = require('./security/node-forge-rsa-verifier.cjs');
+    const source = fs.readFileSync(
+      path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
+    if (!qualifiesCanonicalRsaVerifier(source)) {
+      throw new Error('[patch-node-modules] node-forge 1.4.3 canonical DER verifier changed; security review required');
+    }
+    console.log('[patch-node-modules] ✓ node-forge 1.4.3 upstream canonical DER RSA verifier qualified');
+    return;
   }
 
   // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: preserve the exact reviewed
