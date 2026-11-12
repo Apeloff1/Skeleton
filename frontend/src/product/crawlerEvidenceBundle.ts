@@ -144,6 +144,7 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
     const current = await options.getSource(session.session_id, sourceId, signal);
     gate(options);
     if (!original || !current || current.source_id !== sourceId
+      || original.use_policy?.enabled !== true
       || current.content_digest !== original.content_digest
       || !SHA.test(current.content_digest)
       || current.use_policy?.enabled !== true

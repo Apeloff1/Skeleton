@@ -42,7 +42,7 @@ from skeleton.app.jeeves_local_lease import (
 )
 from skeleton.ai.runtime.inference.llama_cpp import LlamaCppRuntimeError
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeBackendError
-from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
+from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_QUERY_BYTES
 from skeleton.app.offline_resource_fabric import AdaptiveResourceFabric
 from skeleton.app.offline_longform_virtual import (
     LongformVirtualMemory, LongformMemoryError,
@@ -759,6 +759,10 @@ class OfflineHTTPApplication:
                     _fields(body, {"source_id"}, {"source_id"})
                     return 200, self.longform.verify(body["source_id"])
                 raise OfflineHTTPError(404, "unknown longform operation")
+            except OfflineHTTPError:
+                # Typed HTTP admission failures are already safe and must
+                # retain their status. They also inherit from ValueError.
+                raise
             except (LongformMemoryError, LocalResourcePressure,
                     sqlite3.Error, OSError, ValueError, UnicodeError) as exc:
                 raise OfflineHTTPError(
@@ -897,10 +901,20 @@ class OfflineHTTPApplication:
                 raise OfflineHTTPError(400, str(exc)) from exc
         if path == "/v1/knowledge/search" and method == "POST":
             _fields(body, {"query", "limit", "document_ids"}, {"query"})
+            query, limit = body["query"], body.get("limit", 6)
+            if not isinstance(query, str) or not query.strip():
+                raise OfflineHTTPError(400, "invalid local reference query")
+            try:
+                if len(query.encode("utf-8", errors="strict")) > MAX_QUERY_BYTES:
+                    raise OfflineHTTPError(400, "invalid local reference query")
+            except UnicodeError:
+                raise OfflineHTTPError(400, "invalid local reference query") from None
+            if type(limit) is not int or not 1 <= limit <= 12:
+                raise OfflineHTTPError(400, "invalid reference search limit")
             scope = _document_scope(body, True)
             try:
                 hits = self.knowledge.search(
-                    body["query"], limit=body.get("limit", 6),
+                    query, limit=limit,
                     document_ids=scope,
                 )
             except RuntimeContractError:
@@ -914,11 +928,12 @@ class OfflineHTTPApplication:
             self.knowledge.delete(document_id)
             return 200, {"deleted_document_id": document_id}
         if path == "/v1/sessions/search" and method == "POST":
-            _fields(body, {"query", "cursor", "limit"}, set())
+            _fields(body, {"query", "cursor", "limit", "archived"}, set())
             return 200, self._store.session_summaries(
                 self.model_digest, self.tokenizer_digest,
                 query=body.get("query", ""), cursor=body.get("cursor"),
                 limit=body.get("limit", 30),
+                archived=body.get("archived", False),
             )
         if path == "/v1/sessions":
             if method == "GET":
@@ -968,6 +983,9 @@ class OfflineHTTPApplication:
                     evidence = self._store.turn_evidence(
                         sid, self.model_digest, self.tokenizer_digest,
                     )
+                    metadata = self._store.session_metadata(
+                        sid, self.model_digest, self.tokenizer_digest,
+                    )
                 answers = [
                     message.content for message in stored.transcript.messages
                     if message.role == "assistant"
@@ -979,6 +997,7 @@ class OfflineHTTPApplication:
                     for answer, item in zip(answers, evidence)
                 ]
                 return 200, {
+                    **metadata,
                     "session_id": sid, "revision": stored.revision,
                     "messages": stored.transcript.to_list(),
                     "evidence": evidence,
@@ -993,6 +1012,18 @@ class OfflineHTTPApplication:
                                        self.tokenizer_digest)
                     self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
                 return 200, {"deleted_session_id": sid}
+        if tail == "metadata" and method == "POST":
+            _fields(body, {"title", "pinned", "archived", "expected_metadata_revision"}, set())
+            if "expected_metadata_revision" in body and (
+                    type(body["expected_metadata_revision"]) is not int
+                    or body["expected_metadata_revision"] < 0):
+                raise OfflineHTTPError(400, "invalid conversation metadata revision")
+            return 200, self._store.update_metadata(
+                sid, self.model_digest, self.tokenizer_digest,
+                {key: value for key, value in body.items()
+                 if key != "expected_metadata_revision"},
+                expected_metadata_revision=body.get("expected_metadata_revision"),
+            )
         if tail == "context-preview" and method == "POST":
             # Local-only read-only estimate; the actual new turn still
             # validates full-history retention and GGUF native admission.

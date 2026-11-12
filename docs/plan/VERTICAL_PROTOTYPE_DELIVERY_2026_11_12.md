@@ -114,10 +114,15 @@ requirements retain their separate qualification status.
 | #5283 | `07fc463373a2105860e7b2d957a6363b1afbc759` | Jeeves baseline; preserves single-host inference custody. |
 | #5282 | `478698a7d452272798af3ecd2154dbd803c5442e` | Already an ancestor of #5283; no duplicate cherry-pick. |
 | #5281 | `87b01112d5a26c9f6f820fdf44466bddfc2075a1` | Merged into the isolated draft with semantic conflict reconciliation. |
-| #5280 | `cd7d907eee754b714d51e8fd51d02f2f6b3e219d` | Audit the remaining advisory-inventory changes; overlapping RSA hardening is reconciled with newer exact-source guards. |
-| #5070 | `edd849dde47f57f8bd531f625d151f10ed7d176c` | Audit unique fixes by file; retain overlapping historical integration rather than merging it indiscriminately. |
+| #5280 | `cd7d907eee754b714d51e8fd51d02f2f6b3e219d` | Integrated the exact-version advisory inventory and mixed-version/actual-lock tests; overlapping RSA hardening uses the newer exact-source guards. |
+| #5070 | `edd849dde47f57f8bd531f625d151f10ed7d176c` | Integrated loopback assembly validation and Docker heredoc parsing, then hardened delimiter/multiple-heredoc handling. Other runtime, source-pin, and telemetry changes remain separately held for bounded review. |
 
 The Dragon reconciliation preserves both exact upstream RSA source checks and
 canonical-DER guards, both dependency-stage helper files, and the distinct GGUF
 custody and held-source regression suites. Local checks do not substitute for
 the final combined commit's CI, hardware, language-quality, or release evidence.
+
+The resulting workspace is described in the [user and recovery guide](../ai/JEEVES_WORKSPACE_PROTOTYPE.md).
+The [competitive acceptance protocol](JEEVES_DRAGON_COMPETITIVE_ACCEPTANCE_2026_11_12.md)
+records equivalent tasks and missing comparator evidence. Neither document is
+a substitute for observed qualification.
