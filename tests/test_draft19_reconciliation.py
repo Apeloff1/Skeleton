@@ -132,6 +132,7 @@ class WorkflowSourceCustodyTests(unittest.TestCase):
         self.assertIn("python -m pytest --noconftest -q", backend)
         self.assertIn("python -m pytest --noconftest -q", source)
         self.assertIn("tests/test_codeql_exception_boundary_20261111.py", backend)
+        self.assertFalse(backend.rstrip().endswith("\\"), "backend pytest command must terminate")
         for name in (
             "test_full_security_alert_inventory_20261111.py",
             "test_codeql_lineage_contract_20261111.py",

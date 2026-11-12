@@ -277,7 +277,7 @@ jobs:
             tests/test_scim_tenant_custody_20261111.py \
             tests/test_scim_webhook_principal_20261111.py \
             tests/test_codeql_godot_quorum_errors_20261111.py \
-            tests/test_codeql_exception_boundary_20261111.py \
+            tests/test_codeql_exception_boundary_20261111.py
       - name: Qualify complete CodeQL alert lineage and cross-package inventory
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
