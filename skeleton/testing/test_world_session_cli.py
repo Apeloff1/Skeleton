@@ -79,7 +79,7 @@ class SessionCliTests(unittest.TestCase):
                    input_stream=io.BytesIO(b"[]"), output_stream=out, error_stream=err)
         self.assertEqual(code, 2)
         self.assertEqual(out.getvalue(), b"")
-        self.assertIn("not_found", err)
+        self.assertIn("not_found", err.getvalue())
 
     def test_rejects_invalid_trace_and_duplicate_keys(self):
         for raw in (b'{"trace":[]}', b'["no_such_choice"]', b'["pursue_goal","pursue_goal"]'):
