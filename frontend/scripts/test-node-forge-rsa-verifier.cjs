@@ -61,3 +61,15 @@ test('frontend Docker dependency layer copies the exact security helper before r
   assert.match(patch, /require\('\.\/security\/node-forge-rsa-verifier\.cjs'\)/);
   assert.match(patch, /node-forge 1\.4\.3 canonical DER verifier changed; security review required/);
 });
+
+
+test('release security smoke demands both forged RSA rejection and strict upstream canonical DER source', () => {
+  const script = readFileSync(join(__dirname, 'verify-no-release-npm-security.js'), 'utf8');
+  assert.match(script, /node-forge accepted nested DigestAlgorithm garbage/);
+  assert.match(script, /_parseAllDigestBytes: true/);
+  assert.match(script, /_skipPaddingChecks: true/);
+  assert.match(script, /version === '1\.4\.3'/);
+  assert.match(script, /qualifiesCanonicalRsaVerifier\(rsaSource\)/);
+  assert.match(script, /node-forge canonical RSA verifier is unqualified/);
+  assert.match(script, /node-forge nested DigestAlgorithm source guard is missing/);
+});
