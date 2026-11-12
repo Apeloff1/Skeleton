@@ -59,7 +59,7 @@ def test_untrusted_identifiers_cannot_become_url_or_credential_records():
         modal_id="https://token@private.invalid/foo",
         session_id="Authorization: Bearer secret",
         event="action:hello?token=secret",
-        severity="rotating_secret",
+        severity="info",
         detail={"status": "private_secret", "ok": True},
     )
     row = _norm(event)
@@ -92,7 +92,7 @@ def test_bounded_detail_does_not_walk_nesting_or_sensitive_keys():
         "score": math.inf,
     }
     assert safe_detail(raw) == {
-        "safe": True, "state": "running", "error_type": "TypeError",
+        "safe": True, "mode": "offline", "state": "running", "error_type": "TypeError",
     }
     assert safe_detail([raw]) is None
     assert safe_detail("password=secret") is None
