@@ -515,6 +515,20 @@ def _existing_private_environment(env_file: Path) -> dict[str, str]:
 def _options(args) -> dict:
     local_deployment = getattr(args, "local_deployment", None)
     local_catalog = getattr(args, "local_catalog", None)
+    jeeves_primary = bool(getattr(args, "jeeves_primary", False))
+    if jeeves_primary:
+        # Pinned production Jeeves identity only. An arbitrary local catalog,
+        # multi-model verifier or hosted provider cannot become the primary.
+        if args.provider != "local" or local_deployment is None:
+            raise ConfigurationError(
+                "Jeeves local-only primary requires exactly one pinned llama.cpp deployment"
+            )
+        from skeleton.ai.jeeves_local_policy import MODEL_ID
+        metadata, _ = _read_manifest(_checked_path(Path(local_deployment)))
+        if metadata.get("model_id") != MODEL_ID:
+            raise ConfigurationError(
+                "Jeeves primary deployment manifest must declare model_id=jeeves"
+            )
     admin = None
     if getattr(args, "admin_email", None) is not None or getattr(args, "admin_password_file", None) is not None:
         if str(ROOT) not in sys.path:
@@ -606,6 +620,7 @@ def _options(args) -> dict:
         "provider": args.provider,
         "admin": admin,
         "prior_environment": prior,
+        "jeeves_primary": jeeves_primary,
     }
     _prepared_local_sources(options, force=args.force, dry_run=args.dry_run)
     inputs = {path for path in (
@@ -765,6 +780,9 @@ def _configuration(options: dict) -> tuple[dict[str, str], dict]:
         "SKL_ENGINE_ALLOWED_TENANTS_CSV": ",".join(options["tenants"]),
         "SKL_ENGINE_ALLOWED_CAPABILITIES_CSV": "assistant.chat,assistant.compat,assistant.runtime.control",
         "SKL_JEEVES_CANONICAL_CONVERSATIONS": "1",
+        "JEEVES_LOCAL_ONLY": "1" if options["jeeves_primary"] else "0",
+        "JEEVES_PRIMARY_MODEL_ID": "jeeves",
+        "AI_LOCAL_GUARD_REQUIRED": "1" if options["jeeves_primary"] else "",
         "EXPO_PUBLIC_BACKEND_URL": f"http://{options['host']}:{options['backend_port']}",
         "EXPO_PUBLIC_SKELETON_URL": f"http://{options['host']}:{options['skeleton_port']}",
         "AI_PROVIDER": options["provider"],
@@ -788,7 +806,9 @@ def _configuration(options: dict) -> tuple[dict[str, str], dict]:
                 "environment": {
                     "GAMEFORGE_AUTH_ENFORCE": "1",
                     "GAMEFORGE_JWT_SECRET": "${GAMEFORGE_JWT_SECRET:?private chat signing secret is required}",
-                    "DB_NAME": values["MONGO_INITDB_DATABASE"].replace("$", "$$"),
+                    "DB_NAME": values["MONGO_INITDB_DATABASE"].replace("$", "$"),
+                    "JEEVES_LOCAL_ONLY": values["JEEVES_LOCAL_ONLY"],
+                    "JEEVES_PRIMARY_MODEL_ID": values["JEEVES_PRIMARY_MODEL_ID"],
                 }
             }
         }
@@ -799,6 +819,7 @@ def _configuration(options: dict) -> tuple[dict[str, str], dict]:
         "AI_PROVIDER", "AI_MODEL", "AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH",
         "AI_LOCAL_MODEL_CATALOG_PATH", "AI_SECONDARY_API_KEY", "AI_SECONDARY_BASE_URL",
         "AI_SECONDARY_MODEL", "AI_VERIFICATION_MODEL", "EMERGENT_LLM_KEY",
+        "JEEVES_LOCAL_ONLY", "JEEVES_PRIMARY_MODEL_ID", "AI_LOCAL_GUARD_REQUIRED",
     }}
     if options["provider"] == "local":
         engine_environment["OPENAI_API_KEY"] = ""
@@ -920,6 +941,8 @@ def _summary(options: dict, *, written: bool) -> dict:
         "admin_bootstrap_requested": options.get("admin") is not None,
         "local_artifact_present": options["artifact"] is not None,
         "local_deployment_present": options["deployment"] is not None,
+        "jeeves_local_only": options["jeeves_primary"],
+        "primary_model_id": "jeeves" if options["jeeves_primary"] else None,
         "local_catalog_present": options["catalog"] is not None,
         "portable_manifests": [str(path) for path, _raw in options["local_manifests"]],
         "local_container_platform": options["local_platform"],
@@ -942,6 +965,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-file", required=True, help="explicit new private environment file")
     parser.add_argument("--provider", required=True, choices=("openai", "local"))
+    parser.add_argument(
+        "--jeeves-primary", action="store_true",
+        help="require one local deployment with model_id=jeeves, protected inference and no remote fallback",
+    )
     parser.add_argument(
         "--openai-key-env", help="name of an existing environment variable containing a real hosted key"
     )
