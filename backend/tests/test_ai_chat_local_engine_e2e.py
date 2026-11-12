@@ -255,6 +255,7 @@ def _load_backend_ai_route(monkeypatch):
     if "core.conversations" not in sys.modules:
         conversations = ModuleType("core.conversations")
         conversations.ConversationStorageUnavailable = ConversationStorageUnavailable
+        conversations.ConversationConflict = ConversationConflict
         conversations.conversation_authority = object()
         monkeypatch.setitem(sys.modules, "core.conversations", conversations)
 
@@ -1366,6 +1367,7 @@ def _consumer_load_backend_ai_route(monkeypatch):
     if 'core.conversations' not in sys.modules:
         conversations = ModuleType('core.conversations')
         conversations.ConversationStorageUnavailable = ConversationStorageUnavailable
+        conversations.ConversationConflict = ConversationConflict
         conversations.conversation_authority = object()
         monkeypatch.setitem(sys.modules, 'core.conversations', conversations)
     if 'routes.gameforge_auth' not in sys.modules:
