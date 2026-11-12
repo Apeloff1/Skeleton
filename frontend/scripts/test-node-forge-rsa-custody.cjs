@@ -57,3 +57,17 @@ test('production Docker dependency stage includes the pinned RSA custody helper'
   assert.ok(hookAt > copyAt, 'security helper must precede install patch execution');
   assert.equal(dockerfile.split(expected).length, 2, 'Dockerfile must have exactly one RSA helper copy');
 });
+
+test('release npm guard invokes exact RSA custody and retains the hostile signature probe', () => {
+  const security = fs.readFileSync(
+    path.resolve(__dirname, 'verify-no-release-npm-security.js'), 'utf8',
+  );
+  assert.match(security, /verifyReviewedForgeRsa\(version, rsaSource\)/);
+  assert.match(security, /version === '1\.4\.3'/);
+  assert.match(security, /node-forge accepted nested DigestAlgorithm garbage/);
+  assert.match(security, /_skipPaddingChecks: true/);
+  assert.match(security, /receipt\.locallyPatched/);
+  // Obsolete marker remains legal only inside a separately version-pinned
+  // branch for the two older RSA implementations.
+  assert.match(security, /version === '1\.4\.0' \|\| version === '1\.4\.2'/);
+});
