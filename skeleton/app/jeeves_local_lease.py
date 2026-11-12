@@ -20,6 +20,10 @@ import stat
 import threading
 from typing import Iterator
 
+from skeleton.ai.runtime.inference.lease_custody import (
+    enter_local_lease, leave_local_lease,
+)
+
 
 class LocalInferenceLeaseBusy(RuntimeError):
     """A peer with the same local database owns the generation slot."""
@@ -142,6 +146,7 @@ class LocalInferenceLease:
             raise LocalInferenceLeaseBusy("local inference is already running in this service")
         fd: int | None = None
         locked = False
+        context_token = None
         try:
             fd = self._verified_descriptor()
             self._lock_fd(fd)
@@ -154,15 +159,25 @@ class LocalInferenceLease:
                     or (observed.st_dev, observed.st_ino)
                     != (owned.st_dev, owned.st_ino)):
                 raise LocalInferenceLeaseUnavailable("local inference lock path changed after acquisition")
+            # Propagate this particular locked file description through
+            # asyncio.to_thread into a pinned llama.cpp child on POSIX. If
+            # Python dies, the child retains exclusion until it exits.
+            context_token = enter_local_lease(fd)
             yield
         finally:
-            if fd is not None:
+            try:
+                if context_token is not None:
+                    leave_local_lease(context_token)
+            finally:
                 try:
-                    if locked:
-                        self._unlock_fd(fd)
+                    if fd is not None:
+                        try:
+                            if locked:
+                                self._unlock_fd(fd)
+                        finally:
+                            os.close(fd)
                 finally:
-                    os.close(fd)
-            self._thread_gate.release()
+                    self._thread_gate.release()
 
 
 __all__ = [
