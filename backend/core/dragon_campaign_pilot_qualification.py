@@ -157,10 +157,18 @@ def qualify_dragon_pilot(report: Mapping[str, object]) -> dict[str, object]:
     grounding_deficit = _count(forensics, "grounding_deficit_objectives", ceiling=8)
     query_unsupported = _count(forensics, "query_unsupported_objectives", ceiling=8)
     context_overrun = _boolean(forensics, "context_budget_exceeded")
-    if type(operations.get("capacity_holds")) is not list or len(operations["capacity_holds"]) > 256:
+    # Canonical engine receipts use frozen tuples; JSON projections and
+    # transport clients use lists. Both shapes are valid *only* after an
+    # exact bounded element check. Never reinterpret tuples as approval.
+    holds = operations.get("capacity_holds")
+    if (not isinstance(holds, (list, tuple)) or len(holds) > 256
+            or any(type(code) is not str or not 1 <= len(code) <= 96
+                   for code in holds)):
         raise ValueError("Dragon pilot resource observations are unbounded")
     flagged = robustness.get("flagged_objectives")
-    if not isinstance(flagged, list) or len(flagged) > 8:
+    if (not isinstance(flagged, (list, tuple)) or len(flagged) > 8
+            or any(type(code) is not str or not 1 <= len(code) <= 64
+                   for code in flagged)):
         raise ValueError("Dragon pilot objective robustness is unbounded")
 
     gates = (

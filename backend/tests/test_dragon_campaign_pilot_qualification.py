@@ -133,6 +133,33 @@ class DragonPilotQualificationTests(unittest.TestCase):
         self.assertIn("reconcile_canonical_worker_and_mongo_checkpoint",
                       receipt["operator_actions"])
 
+    def test_native_frozen_capacity_holds_remain_advisory(self):
+        metadata = _report()
+        metadata["operations"]["capacity_holds"] = (
+            "physical_resource_pressure_unobserved",
+        )
+        metadata["retrieval_robustness"]["flagged_objectives"] = (
+            "source_diversity_review",
+        )
+        receipt = qualify_dragon_pilot(metadata)
+        self.assertIn("measured_capacity", receipt["blocked_checks"])
+        self.assertIn("source_robustness", receipt["blocked_checks"])
+        self.assertFalse(receipt["release_authorized"])
+
+    def test_resource_hold_type_guard_rejects_unbounded_or_forged_rows(self):
+        for bad in (None, "not-list", (False,), ("x" * 100,), tuple("x" for _ in range(257))):
+            with self.subTest(bad=type(bad).__name__):
+                metadata = _report()
+                metadata["operations"]["capacity_holds"] = bad
+                with self.assertRaises(ValueError):
+                    qualify_dragon_pilot(metadata)
+        for bad in (None, ["x" * 100], (True,), tuple("x" for _ in range(9))):
+            with self.subTest(bad=type(bad).__name__):
+                metadata = _report()
+                metadata["retrieval_robustness"]["flagged_objectives"] = bad
+                with self.assertRaises(ValueError):
+                    qualify_dragon_pilot(metadata)
+
     def test_forensic_and_review_holds_fail_closed(self):
         metadata = _report()
         metadata["forensics"]["privacy_held_sources"] = 1

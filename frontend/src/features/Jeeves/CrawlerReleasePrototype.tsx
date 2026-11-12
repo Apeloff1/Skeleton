@@ -100,6 +100,8 @@ function PilotContent() {
   const mutationAbort = useRef<AbortController | null>(null);
   const pending = useRef<Pending | null>(null);
   const lock = useRef(false);
+  const preflightLock = useRef(false);
+  const exportLock = useRef(false);
   const epoch = useRef(0);
 
   const fresh = (signal?: AbortSignal, original = account.current) =>
@@ -186,6 +188,7 @@ function PilotContent() {
       epoch.current++;
       reads.current?.abort(); catalogueRead.current?.abort();
       mutationAbort.current?.abort(); pending.current = null;
+      preflightLock.current = false; exportLock.current = false;
       sessionRef.current = null;
       setSession(null); setSources([]); setSessions([]); setNextCursor(null);
       setSourceCursor(null); setReviewDraft(null); setAtlas(null);
@@ -204,7 +207,7 @@ function PilotContent() {
   }, []);
 
   const select = (row: CrawlSession) => {
-    if (lock.current || busy || pending.current) return;
+    if (lock.current || preflightLock.current || busy || pending.current) return;
     reads.current?.abort();
     sessionRef.current = row;
     setSession(row); setSources([]); setSourceCursor(null);
@@ -250,7 +253,7 @@ function PilotContent() {
   };
 
   const create = () => {
-    if (!canWrite || readiness?.available !== true || pending.current || lock.current) {
+    if (!canWrite || readiness?.available !== true || pending.current || lock.current || preflightLock.current) {
       setError('An editor account, configured crawler and fully resolved previous command are required.');
       return;
     }
@@ -266,10 +269,11 @@ function PilotContent() {
   const execute = async (kind: 'run' | 'pause' | 'resume') => {
     const current = sessionRef.current;
     if (!current || !current.consent_current || !canWrite
-      || readiness?.available !== true || pending.current || lock.current) {
+      || readiness?.available !== true || pending.current || lock.current || preflightLock.current) {
       setError('Resolve consent, admission, account authority or the previous command before continuing.');
       return;
     }
+    preflightLock.current = true;
     setBusy('checking current revision');
     try {
       const latest = await getCrawl(current.session_id);
@@ -301,13 +305,15 @@ function PilotContent() {
     } catch {
       if (fresh()) setError('Could not read the latest canonical revision. No new crawler command was submitted.');
     } finally {
+      preflightLock.current = false;
       if (fresh()) setBusy('');
     }
   };
 
   const exportSelected = async (item: CapturedSource, format: 'json' | 'markdown') => {
     const current = sessionRef.current;
-    if (!current || exporting || !fresh()) return;
+    if (!current || exporting || exportLock.current || !fresh()) return;
+    exportLock.current = true;
     const token = account.current; setExporting(true); setError('');
     const abort = new AbortController();
     try {
@@ -318,6 +324,7 @@ function PilotContent() {
     } catch {
       if (fresh(undefined, token)) setError('The authorized source export could not be completed. Refresh source policy and try again.');
     } finally {
+      exportLock.current = false;
       if (fresh(undefined, token)) setExporting(false);
     }
   };
