@@ -36,6 +36,9 @@ from skeleton.app.local_ai import (
     private_desktop_database,
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
+from skeleton.app.jeeves_inference_circuit import LocalInferenceCircuit
+from skeleton.ai.runtime.inference.llama_cpp import LlamaCppRuntimeError
+from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeBackendError
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
 from skeleton.app.offline_resource_fabric import AdaptiveResourceFabric
 from skeleton.app.offline_longform_virtual import (
@@ -151,6 +154,7 @@ class OfflineHTTPApplication:
         self.tokenizer_digest = _model_tokenizer_digest(backend)
         self._lock = threading.RLock()
         self._turn_lock = threading.RLock()
+        self._inference_circuit = LocalInferenceCircuit()
         self._turns: dict[tuple[str, str], _LocalTurn] = {}
         self._active_session: str | None = None
         self._closing = False
@@ -184,6 +188,10 @@ class OfflineHTTPApplication:
         """
         if self._closing:
             return False, "local_service_shutting_down"
+        # Sustained native/GGUF execution failures must not spin an infinite
+        # costly restart/retry loop. Historical SQLite replay is unaffected.
+        if not self._inference_circuit.status()["admit_new_inference"]:
+            return False, "local_execution_circuit_open"
         try:
             from skeleton.ai.jeeves_local_policy import is_local_only, primary_model_id
             if is_local_only() and getattr(self.backend, "model_id", None) != primary_model_id():
@@ -496,7 +504,16 @@ class OfflineHTTPApplication:
                         text, max_output_tokens=budget, request_id=rid,
                         evidence_manifest=manifest,
                     )
-                generated_answer = asyncio.run(generate())
+                try:
+                    generated_answer = asyncio.run(generate())
+                except (LlamaCppRuntimeError, NativeRuntimeBackendError,
+                        TimeoutError, OSError):
+                    # Count genuine local runtime failures, not invalid user
+                    # prompts, explicit cancellations or SQLite replay.
+                    self._inference_circuit.record_failure()
+                    raise
+                else:
+                    self._inference_circuit.record_success()
             finally:
                 chat.close()
             receipt = self._store.replay(session_id, rid, digest)
@@ -661,6 +678,7 @@ class OfflineHTTPApplication:
                 "local_only": True, "ready": ready,
                 "model_readiness_code": code,
                 "readiness_is_live_inference_proof": False,
+                "inference_circuit": self._inference_circuit.status(),
                 "runtime_kind": ("native" if hasattr(self.backend, "runtime")
                                  else "llama.cpp"),
                 "adaptive_metal_launch": getattr(
