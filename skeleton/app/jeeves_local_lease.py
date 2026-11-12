@@ -74,7 +74,7 @@ class LocalInferenceLease:
             # Windows locks an exact byte range; establish its byte without
             # truncation. No user information or host secrets enter this file.
             if metadata.st_size == 0:
-                os.write(fd, b"\\0")
+                os.write(fd, bytes((0,)))
                 os.fsync(fd)
             elif metadata.st_size != 1:
                 raise LocalInferenceLeaseUnavailable("inference lease marker format is invalid")
