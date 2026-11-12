@@ -247,16 +247,19 @@ def test_sync_exact_replay_remains_available_while_different_turn_runs(
             "max_output_tokens": 2,
         }
         _, first = app.dispatch("POST", f"/v1/sessions/{sid}/turn", original)
-        real_perform = app._perform_turn
+        real_ask = DurableOfflineAISession.ask
 
-        def blocked_perform(session_id, body, *, turn=None):
-            if body["request_id"] == "competing-live-turn":
+        async def blocked_native_ask(session, prompt, *args, **kwargs):
+            if prompt == "world":
+                # Pause INSIDE the actual generation-wide _perform_turn lock.
+                # A replay that calls _perform_turn will deadlock here until
+                # release, proving the old implementation was insufficient.
                 begin.set()
-                if not release.wait(timeout=10):
+                if not await asyncio.to_thread(release.wait, 10):
                     raise RuntimeError("test fixture release not signalled")
-            return real_perform(session_id, body, turn=turn)
+            return await real_ask(session, prompt, *args, **kwargs)
 
-        monkeypatch.setattr(app, "_perform_turn", blocked_perform)
+        monkeypatch.setattr(DurableOfflineAISession, "ask", blocked_native_ask)
 
         def run_new_turn():
             try:
