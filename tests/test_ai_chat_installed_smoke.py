@@ -133,3 +133,67 @@ def test_real_turn_fails_closed_without_proof(kwargs, expected):
     api = FakeApi(**kwargs)
     with pytest.raises(smoke.ProbeFailure, match=expected):
         smoke.exercise(api, smoke.readiness(api), seconds=10, prompt="Hello")
+
+
+def test_recovery_only_reads_existing_turn_and_never_resubmits(capsys):
+    api = FakeApi()
+    api.key = "installed-ai-smoke-original-receipt"
+    result = smoke.observe_and_verify(
+        api, "thread-1", api.key, seconds=10,
+    )
+    assert result["persisted"] is True
+    assert result["replay_verified"] is True
+    assert result["model_receipts"] == 1
+    assert sum(method == "POST" for method, _path, _body in api.calls) == 0
+    assert sum(path.startswith("/api/ai/chat/turns/") for _, path, _ in api.calls) == 2
+    assert sum(path.startswith("/api/v1/conversations/") for _, path, _ in api.calls) == 1
+
+
+@pytest.mark.parametrize("identity", ["", "../other", "has spaces", "x" * 161, "t?key=evil"])
+def test_recovery_rejects_invalid_saved_identity_before_network(identity):
+    api = FakeApi()
+    with pytest.raises(smoke.ProbeFailure, match="invalid conversation identity"):
+        smoke.observe_and_verify(api, identity, "known-1", seconds=10)
+    assert api.calls == []
+
+
+def test_recovery_cannot_validate_missing_provider_or_fake_transcript():
+    for invalid in ({"receipts": False}, {"durable": False}, {"replay": False}):
+        api = FakeApi(**invalid)
+        api.key = "installed-ai-smoke-recovery"
+        with pytest.raises(smoke.ProbeFailure):
+            smoke.observe_and_verify(api, "thread-1", api.key, seconds=10)
+        assert all(method == "GET" for method, _path, _body in api.calls)
+
+
+@pytest.mark.parametrize("malformed", [None, {}, "yes", ["ready"] * 17])
+def test_incompatible_catalog_does_not_crash_or_claim_ai_readiness(malformed):
+    class BadCatalog(FakeApi):
+        def request(self, method, path, body=None):
+            reply = super().request(method, path, body)
+            if path == "/api/ai/chat/readiness":
+                reply["models"]["models"] = malformed
+            return reply
+    with pytest.raises(smoke.ProbeFailure, match="bounded valid model list"):
+        smoke.readiness(BadCatalog())
+
+
+def test_incompatible_model_capacity_is_not_selected():
+    class BadCapacity(FakeApi):
+        def request(self, method, path, body=None):
+            reply = super().request(method, path, body)
+            if path == "/api/ai/chat/readiness":
+                reply["models"]["models"][0]["max_output_tokens"] = True
+            return reply
+    assert smoke.readiness(BadCapacity())["ready"] is False
+
+
+def test_recovery_arguments_are_both_required_before_secret_is_read(monkeypatch):
+    calls = []
+    monkeypatch.setattr(smoke, "private_bearer_token", lambda _path: calls.append("token") or "x" * 64)
+    assert smoke.main([
+        "--base-url", "https://api.example.org",
+        "--token-file", "/private/unused",
+        "--recover-thread", "thread-1",
+    ]) == 2
+    assert calls == []
