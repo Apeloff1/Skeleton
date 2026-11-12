@@ -247,6 +247,17 @@ def exercise(api: ChatApi, snapshot: dict, *, seconds: int, prompt: str) -> dict
         # A timeout may follow a committed admission: never repeat this POST.
         print(json.dumps({"phase": "admission_unconfirmed", "thread_id": thread_id, "request_id": key}))
         raise
+    return observe_and_verify(api, thread_id, key, seconds=seconds)
+
+
+def observe_and_verify(api: ChatApi, thread_id: str, key: str, *, seconds: int) -> dict:
+    """Read only one known canonical turn; never create or re-admit a request.
+
+    Safe for recovering an unknown POST outcome, even if the model is now
+    offline. A completed turn is proven from provider and persisted receipts.
+    """
+    thread_id = _identity(thread_id)
+    key = _identity(key)
     deadline = time.monotonic() + seconds
     query = urlencode({"idempotency_key": key})
     turn_path = "/api/ai/chat/turns/" + thread_id + "?" + query
@@ -293,6 +304,8 @@ def main(argv: list[str] | None = None) -> int:
     credentials.add_argument("--login-email", help="prompt privately for the account password (no token file needed)")
     parser.add_argument("--allow-loopback-http", action="store_true", help="allow unencrypted local tests ONLY to loopback")
     parser.add_argument("--exercise", action="store_true", help="submit exactly one real conversation turn and verify persistence")
+    parser.add_argument("--recover-thread", help="read the saved canonical conversation ID from an uncertain earlier admission")
+    parser.add_argument("--recover-request", help="read the original idempotency request ID; never resubmit the prompt")
     parser.add_argument("--timeout", type=int, default=180, help="overall chat completion wait, 10-600 seconds")
     parser.add_argument("--prompt", default="Reply in one short sentence identifying that this is a real AI chat reply.", help="bounded test message")
     args = parser.parse_args(argv)
@@ -303,6 +316,18 @@ def main(argv: list[str] | None = None) -> int:
         api = ChatApi(origin, "")
         token = private_bearer_token(args.token_file) if args.token_file else interactive_login(api, args.login_email)
         api.token = token
+        recovery = bool(args.recover_thread or args.recover_request)
+        if recovery:
+            if not args.recover_thread or not args.recover_request or args.exercise:
+                raise ProbeFailure("Recovery needs both --recover-thread and --recover-request, without --exercise.")
+            identity = api.request("GET", "/api/auth/me")
+            if identity.get("authenticated") is not True or not isinstance(identity.get("user"), dict):
+                raise ProbeFailure("Account authentication is required to recover a saved turn.")
+            proof = observe_and_verify(
+                api, args.recover_thread, args.recover_request, seconds=args.timeout,
+            )
+            print(json.dumps({"phase": "recovered", **{key: value for key, value in proof.items() if key != "phase"}}, sort_keys=True))
+            return 0
         state = readiness(api)
         print(json.dumps({"phase": "readiness", **{k: v for k, v in state.items() if k != "selected"}}, sort_keys=True))
         if not args.exercise:
