@@ -286,3 +286,129 @@ def test_advanced_genuine_execution_exposes_distinct_receipts_for_two_actual_tur
     assert len(report["run_1_execution_receipt_sha256"]) == 64
     assert len(report["run_2_execution_receipt_sha256"]) == 64
     assert report["run_1_execution_receipt_sha256"] != report["run_2_execution_receipt_sha256"]
+
+
+def test_async_committed_retry_recovers_after_restart_without_model(monkeypatch, tmp_path):
+    """Idempotent async POST must read durable truth before model admission."""
+    from skeleton.app.offline_http import OfflineHTTPApplication
+    from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+
+    model = native_model()
+    database = tmp_path / "async-restart.sqlite3"
+    payload = {
+        "message": "Keep this native answer after offline restart",
+        "request_id": "durable-async-replay-1",
+        "max_output_tokens": 2,
+    }
+    initial = OfflineHTTPApplication(model, database, token="t" * 64)
+    try:
+        _, created = initial.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        status, completed = initial.dispatch("POST", f"/v1/sessions/{sid}/turn", payload)
+        assert status == 200 and completed["revision"] == 1
+    finally:
+        initial.close()
+
+    restarted = OfflineHTTPApplication(model, database, token="t" * 64)
+    try:
+        monkeypatch.setattr(
+            model, "check_readiness",
+            lambda: (_ for _ in ()).throw(RuntimeError("/private/gguf/model.gguf API-SECRET")),
+        )
+        status, readiness = restarted.dispatch("GET", "/v1/status")
+        assert status == 200 and readiness["ready"] is False
+        status, replay = restarted.dispatch(
+            "POST", f"/v1/sessions/{sid}/turns", payload,
+        )
+        assert status == 200 and replay["state"] == "complete"
+        assert replay["recovered_from_store"] is True
+        assert replay["result"]["replayed"] is True
+        assert replay["result"]["output_digest"] == completed["output_digest"]
+        assert replay["result"]["local_execution_receipt"] == completed["local_execution_receipt"]
+        with pytest.raises(RuntimeContractError, match="request id reused"):
+            restarted.submit_turn(sid, {**payload, "message": "Changed request must conflict"})
+        with pytest.raises(Exception, match="local inference unavailable"):
+            restarted.submit_turn(sid, {**payload, "request_id": "new-work-model-unavailable"})
+    finally:
+        restarted.close()
+
+
+def test_async_model_failure_does_not_expose_private_exception(monkeypatch, tmp_path):
+    """Polling failed work must not surface a model executable path or token."""
+    import time
+    from skeleton.app.offline_http import OfflineHTTPApplication
+    from skeleton.app.local_ai import OfflineAIError
+
+    model = native_model()
+    app = OfflineHTTPApplication(model, tmp_path / "ticket-privacy.sqlite3", token="t" * 64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        secret = "/private/weights/API-SECRET.gguf"
+        def fail_inference(*args, **kwargs):
+            raise OfflineAIError(secret)
+        monkeypatch.setattr(app, "_perform_turn", fail_inference)
+        status, accepted = app.submit_turn(sid, {
+            "request_id": "redact-failed-ticket",
+            "message": "No private error text",
+            "max_output_tokens": 2,
+        })
+        assert status == 202
+        deadline = time.monotonic() + 4
+        while True:
+            observed = app.turn_status(sid, "redact-failed-ticket")
+            if observed["terminal"] or time.monotonic() >= deadline:
+                break
+            time.sleep(0.01)
+        assert observed["terminal"] and observed["state"] == "failed"
+        assert "API-SECRET" not in str(observed)
+        assert "/private/weights/" not in str(observed)
+        assert observed["error"] == "local model or durable conversation operation failed"
+    finally:
+        app.close()
+
+
+@pytest.mark.parametrize("error,status,public_message", [
+    ("contract", 400, "invalid local conversation request"),
+    ("missing", 404, "unknown offline conversation"),
+    ("conflict", 409, "local conversation conflict"),
+    ("value", 400, "local model request rejected"),
+    ("offline", 400, "local model request rejected"),
+])
+def test_authenticated_http_exception_boundary_does_not_echo_private_details(
+    error, status, public_message, monkeypatch, tmp_path
+):
+    """Failure classification survives while backend-specific payloads do not."""
+    from http.client import HTTPConnection
+    import json
+    from scripts.qualify_jeeves_live_local import _LiveServer
+    from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+    from skeleton.app.local_ai import OfflineAIError
+
+    private = "/private/jeeves/weights.gguf?credential=API-SECRET"
+    cases = {
+        "contract": RuntimeContractError("model bootstrap failed " + private),
+        "missing": RuntimeContractError("unknown offline conversation " + private),
+        "conflict": RuntimeContractError("offline conversation revision conflict " + private),
+        "value": ValueError("tokenizer failed: " + private),
+        "offline": OfflineAIError("model invocation failed: " + private),
+    }
+    token = "t" * 64
+    with _LiveServer(native_model(), tmp_path / "http-redaction.sqlite3", token) as server:
+        def raise_internal(*args, **kwargs):
+            raise cases[error]
+        monkeypatch.setattr(server.app, "dispatch", raise_internal)
+        connection = HTTPConnection("127.0.0.1", server.port, timeout=5)
+        try:
+            connection.request(
+                "GET", "/v1/status", headers={"Authorization": "Bearer " + token},
+            )
+            response = connection.getresponse()
+            actual_status = response.status
+            raw = response.read()
+        finally:
+            connection.close()
+    assert actual_status == status
+    assert private.encode() not in raw
+    assert b"API-SECRET" not in raw
+    assert json.loads(raw) == {"error": public_message}
