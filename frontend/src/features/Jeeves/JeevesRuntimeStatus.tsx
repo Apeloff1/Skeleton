@@ -35,7 +35,7 @@ export default function JeevesRuntimeStatus({ readiness, refresh, readinessError
   return <View style={s.container}><View style={s.row}>
     <TouchableOpacity style={s.summary} accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setExpanded(value => !value)}>
       <Ionicons name={jeevesReady ? 'checkmark-circle-outline' : 'information-circle-outline'} size={17} color={jeevesReady ? '#86efac' : '#c4b5fd'} />
-      <Text style={s.title}>{busy ? 'Checking AI readiness…'  : jeevesReady ? 'Jeeves local inference connected · one local model' : current ? 'Jeeves local model needs setup' : 'AI readiness not observed'}</Text>
+      <Text style={s.title}>{busy ? 'Checking AI readiness…' : jeevesReady ? 'Jeeves local model reports ready' : current ? 'Jeeves local model needs setup' : 'AI readiness not observed'}</Text>
       <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color="#94a3b8" />
     </TouchableOpacity>
     <TouchableOpacity style={s.button} disabled={busy} accessibilityRole="button" accessibilityLabel="Refresh AI readiness" accessibilityState={{ disabled: busy }} onPress={() => { void check().catch(() => {}); }}>
@@ -47,6 +47,7 @@ export default function JeevesRuntimeStatus({ readiness, refresh, readinessError
     {current && Object.entries(current.checks).map(([key, value]) => <Text key={key} style={s.text}>{checks[key as keyof typeof checks] || key.replaceAll('_', ' ')}: {value.available ? 'ready' : value.code.replaceAll('_', ' ')}</Text>)}
     {current && !current.checks.models.available && current.models.readiness?.message && <Text style={s.error}>{current.models.readiness.message}</Text>}
     {current && !current.checks.models.available && current.models.readiness?.action && <Text style={s.text}>{current.models.readiness.action}</Text>}
+    {current && <Text style={s.text}>Model readiness is a metadata and service check, not proof that the local GGUF generated a response. Verify a real two-turn answer and durable replay before first-install sign-off.</Text>}
     {current && <Text style={s.text}>{current.capabilities.token_deltas ? 'Live response text is available; the saved answer remains authoritative.' : 'Actual execution states are shown while the final answer is prepared.'} {current.capabilities.resume ? 'Saved turns can be resumed without starting duplicate work.' : 'Turn recovery is unavailable on this connection.'}</Text>}
     {lastObservedAt && <Text style={s.text}>Observed {new Date(lastObservedAt).toLocaleTimeString()}. Readiness is checked again when you return.</Text>}
     <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/setup' as never)} style={s.settings}><Text style={s.link}>Setup & readiness →</Text></TouchableOpacity>
