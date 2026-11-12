@@ -455,6 +455,15 @@ class OfflineHTTPApplication:
             # Preserve the original execution's replayed=False marker after
             # confirming the SQLite receipt. A read-after-restart is replayed.
             return observed
+        if observed is not None and observed["state"] not in TERMINAL_TURN_STATES:
+            # SQLite may commit a result a few microseconds before the native
+            # worker's finally block publishes its terminal in-memory state.
+            # Do not mark the same live process's turn as a replayed terminal
+            # completion until its execution task actually settles. A fresh
+            # process without the ticket will still recover from the exact
+            # durable SQLite receipt above. This also avoids prematurely
+            # releasing the UI's cancel/pressure ownership signal.
+            return observed
         if committed is not None:
             return committed
         if observed is not None:
