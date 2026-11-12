@@ -23,11 +23,12 @@ const DIGEST = /^[a-f0-9]{64}$/;
 
 /** Capture a digest-only witness from a *verified* response and local revision. */
 export function bindPilotSnapshot(
-  session: CrawlSession, report: CrawlAtlasReport,
+  session: CrawlSession, report: CrawlAtlasReport, requestedVersion: number,
 ): PilotSnapshotWitness {
   const pilot = report?.pilot_qualification;
   if (!session || !report || !pilot || session.consent_current !== true ||
     !Number.isSafeInteger(session.version) || session.version < 1 ||
+    !Number.isSafeInteger(requestedVersion) || requestedVersion !== session.version ||
     session.status === 'cancelled' || report.session_id !== session.session_id ||
     pilot.atlas_digest !== report.atlas_digest ||
     pilot.snapshot_digest !== report.snapshot_digest ||

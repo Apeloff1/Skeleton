@@ -635,7 +635,7 @@ function PilotContent() {
               (value !== null && current.version !== requestedVersion)) return;
             if (!value) { setAtlas(null); setAtlasWitness(null); return; }
             try {
-              const witness = bindPilotSnapshot(current, value);
+              const witness = bindPilotSnapshot(current, value, requestedVersion);
               setAtlasWitness(witness);
               setAtlas(value);
             } catch {

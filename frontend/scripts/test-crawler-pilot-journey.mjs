@@ -200,7 +200,7 @@ const liveReport = () => ({
 test('metadata-only research witness binds a real owned consented revision', () => {
   const current = liveSession();
   const report = liveReport();
-  const witness = bindPilotSnapshot(current, report);
+  const witness = bindPilotSnapshot(current, report, 9);
   assert.deepEqual(witness, {
     sessionId: current.session_id, sessionVersion: 9,
     atlasDigest: DIGEST('a'), snapshotDigest: DIGEST('b'),
@@ -208,6 +208,8 @@ test('metadata-only research witness binds a real owned consented revision', () 
     qualificationDigest: DIGEST('d'),
   });
   assert.ok(Object.isFrozen(witness));
+  assert.throws(() => bindPilotSnapshot(current, report, 8));
+  assert.throws(() => bindPilotSnapshot(current, report, NaN));
   assert.doesNotThrow(() => requireCurrentPilotSnapshot(
     witness, current, { ...current }, report,
   ));
@@ -233,14 +235,14 @@ test('late response never upgrades stale, foreign or revoked source metadata', (
     } } ],
   ];
   for (const [session, response] of wrong) {
-    assert.throws(() => bindPilotSnapshot(session, response),
+    assert.throws(() => bindPilotSnapshot(session, response, 9),
       'A stale or fabricated source snapshot was bound as current');
   }
 });
 
 test('share preflight rejects server-side revision, account and consent changes', () => {
   const captured = liveSession(), report = liveReport();
-  const witness = bindPilotSnapshot(captured, report);
+  const witness = bindPilotSnapshot(captured, report, 9);
   for (const live of [
     { ...captured, version: 10 },
     { ...captured, consent_current: false },
