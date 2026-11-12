@@ -92,7 +92,8 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_app_offline_delivery_archive.py::test_deterministic_game_archive_and_independent_read_only_inspection
-          skeleton/testing/test_app_offline_delivery_archive.py::test_studio_archive_rejects_missing_or_forged_custody_source
+          skeleton/testing/test_app_offline_delivery_archive.py::test_archive_inspection_fails_closed_on_invalid_custody
+          skeleton/testing/test_app_offline_delivery_archive.py::test_archive_rejects_source_tamper_without_publishing
           skeleton/testing/test_app_offline_install_preflight.py::test_preflight_does_not_reserve_and_installer_rechecks
       - name: Qualify repository scanner finite-budget semantics
         run: python -m unittest discover -s tests -p 'test_repo_machine_budget_20261108.py' -v
