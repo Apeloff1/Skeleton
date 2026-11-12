@@ -468,3 +468,61 @@ def test_local_desktop_prototype_exposes_real_kernel_lock_and_fail_closed_send()
     assert "get('lease-indicator').textContent = 'Execution lock unknown'" in JAVASCRIPT
     assert "LOCAL • ANOTHER EXECUTOR IS ACTIVE" in JAVASCRIPT
     assert "LOCAL • EXECUTION LOCK UNSAFE" in JAVASCRIPT
+
+
+def test_strict_full_history_preview_stays_readonly_during_peer_lease_and_replays_exactly(tmp_path: Path):
+    """Combined prototype: context budgets are readable while a peer owns the GGUF slot.
+
+    A live kernel lock denies new strict model execution, not permissioned
+    history/context inspection; release permits one genuine native generation
+    with precisely the original policy-bound request ID and SQLite receipt.
+    """
+    model = native_model()
+    database = tmp_path / "strict-cross-process.sqlite3"
+    first = OfflineHTTPApplication(model, database, token="a" * 64)
+    peer = OfflineHTTPApplication(model, database, token="b" * 64)
+    request = {
+        "message": "hello",
+        "request_id": "strict-cross-process-2026",
+        "max_output_tokens": 2,
+        "require_full_history": True,
+    }
+    try:
+        _, created = first.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        turn_path = f"/v1/sessions/{sid}/turn"
+        preview_path = f"/v1/sessions/{sid}/context-preview"
+        with first._inference_lease.hold():
+            status, preview = peer.dispatch("POST", preview_path, {
+                "message": "hello", "max_output_tokens": 2,
+                "require_full_history": True,
+            })
+            assert status == 200
+            assert preview["read_only"] is True
+            assert preview["generation_performed"] is False
+            assert preview["fits_full_history"] is True
+            assert preview["session_revision"] == 0
+            with pytest.raises(OfflineHTTPError) as blocked:
+                peer.dispatch("POST", turn_path, request)
+            assert blocked.value.status == 423
+            assert peer._session(sid).revision == 0
+        status, generated = peer.dispatch("POST", turn_path, request)
+        assert status == 200 and generated["replayed"] is False
+        assert generated["text"].strip()
+        assert generated["local_execution_receipt"]["output_sha256"] == generated["output_digest"]
+        status, replay = first.dispatch("POST", turn_path, request)
+        assert status == 200 and replay["replayed"] is True
+        assert replay["text"] == generated["text"]
+        _, checked = first.dispatch("GET", f"/v1/sessions/{sid}")
+        assert checked["revision"] == 1
+        assert len(checked["messages"]) == 2
+        status, post = first.dispatch("POST", preview_path, {
+            "message": "world", "max_output_tokens": 2,
+            "require_full_history": True,
+        })
+        assert status == 200 and post["session_revision"] == 1
+        assert post["full_history_messages"] == 2
+        assert post["fits_full_history"] is True
+    finally:
+        peer.close()
+        first.close()
