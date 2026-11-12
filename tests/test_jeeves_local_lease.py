@@ -456,3 +456,15 @@ def test_authenticated_status_reports_live_lease_without_claiming_generation(tmp
         assert idle["ready"] is True
     finally:
         app.close()
+
+
+def test_local_desktop_prototype_exposes_real_kernel_lock_and_fail_closed_send():
+    from skeleton.app.offline_web import HTML, JAVASCRIPT
+    assert 'id="lease-indicator"' in HTML
+    assert "observed.inference_lease?.state" in JAVASCRIPT
+    assert "const foreignLease = ['busy', 'unavailable'].includes" in JAVASCRIPT
+    assert "get('send').disabled = locked || working || foreignLease" in JAVASCRIPT
+    assert "get('selftest-start').disabled = locked || working || foreignLease" in JAVASCRIPT
+    assert "get('lease-indicator').textContent = 'Execution lock unknown'" in JAVASCRIPT
+    assert "LOCAL • ANOTHER EXECUTOR IS ACTIVE" in JAVASCRIPT
+    assert "LOCAL • EXECUTION LOCK UNSAFE" in JAVASCRIPT
