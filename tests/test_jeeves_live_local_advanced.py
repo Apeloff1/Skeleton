@@ -62,3 +62,114 @@ def test_resource_budgets_fail_before_live_generation(timeout, tokens):
         _qualify_actual_local_http(
             native_model(), timeout_seconds=timeout, output_tokens=tokens,
         )
+
+
+
+def test_live_loopback_status_refuses_mutated_native_weights_without_exposing_data(tmp_path, monkeypatch):
+    """A process that booted successfully is not perpetually ready.
+
+    Source digest/device changes make new work unavailable, while old
+    SQLite history can still be read without executing another model.
+    """
+    from skeleton.app.offline_http import OfflineHTTPApplication, OfflineHTTPError
+    model = native_model()
+    app = OfflineHTTPApplication(model, tmp_path / "jeeves.sqlite3", token="t" * 64)
+    try:
+        status, observed = app.dispatch("GET", "/v1/status")
+        assert status == 200 and observed["ready"] is True
+        assert observed["model_readiness_code"] == "ready"
+        assert observed["readiness_is_live_inference_proof"] is False
+        _, session = app.dispatch("POST", "/v1/sessions", {})
+        monkeypatch.setattr(model, "check_readiness",
+                            lambda: (_ for _ in ()).throw(
+                                RuntimeError("private-device-path-and-credentials")))
+        status, observed = app.dispatch("GET", "/v1/status")
+        assert status == 200 and observed["ready"] is False
+        assert observed["model_readiness_code"] == "local_model_identity_unavailable"
+        assert "private-device-path" not in repr(observed)
+        with pytest.raises(OfflineHTTPError, match="local inference unavailable") as blocked:
+            app.submit_turn(session["session_id"], {
+                "message": "Prevent a model-drift launch",
+                "request_id": "stale-model-1",
+                "max_output_tokens": 2,
+            })
+        assert blocked.value.status == 503
+        assert "private-device-path" not in str(blocked.value)
+        _, transcript = app.dispatch("GET", "/v1/sessions/" + session["session_id"])
+        assert transcript["revision"] == 0 and transcript["messages"] == []
+    finally:
+        app.close()
+
+
+def test_readonly_history_survives_native_model_unavailability_after_real_generation(
+    tmp_path, monkeypatch
+):
+    """No re-generation of committed text during a model outage."""
+    from skeleton.app.offline_http import OfflineHTTPApplication, OfflineHTTPError
+    model = native_model()
+    app = OfflineHTTPApplication(model, tmp_path / "persistent.sqlite3", token="t" * 64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        payload = {
+            "message": "A real offline answer",
+            "request_id": "persist-then-unavailable",
+            "max_output_tokens": 2,
+        }
+        status, committed = app.dispatch(
+            "POST", "/v1/sessions/" + sid + "/turn", payload,
+        )
+        assert status == 200 and committed["revision"] == 1
+        monkeypatch.setattr(
+            model, "check_readiness",
+            lambda: (_ for _ in ()).throw(RuntimeError("private-weight-error")),
+        )
+        _, observed = app.dispatch("GET", "/v1/status")
+        assert observed["ready"] is False
+        _, replayed = app.dispatch(
+            "GET", "/v1/sessions/" + sid + "/turns/" + payload["request_id"],
+        )
+        assert replayed["state"] == "complete"
+        assert replayed["result"]["output_digest"] == committed["output_digest"]
+        _, historical = app.dispatch("GET", "/v1/sessions/" + sid)
+        assert historical["revision"] == 1
+        assert historical["messages"][-1]["content"] == committed["text"]
+        with pytest.raises(OfflineHTTPError) as blocked:
+            app.dispatch("POST", "/v1/sessions/" + sid + "/turn", {
+                "message": "new input cannot run untrusted backend",
+                "request_id": "next-must-block",
+                "max_output_tokens": 2,
+            })
+        assert blocked.value.status == 503
+        # Historical exactly-once retries must not need the lost model.
+        status, duplicate = app.dispatch(
+            "POST", "/v1/sessions/" + sid + "/turn", payload,
+        )
+        assert status == 200 and duplicate["replayed"] is True
+        assert duplicate["output_digest"] == committed["output_digest"]
+    finally:
+        app.close()
+
+
+def test_closing_and_wrong_jeeves_identity_never_admit_new_generation(tmp_path, monkeypatch):
+    from skeleton.app.offline_http import OfflineHTTPApplication, OfflineHTTPError
+    model = native_model()
+    app = OfflineHTTPApplication(model, tmp_path / "closing.sqlite3", token="t" * 64)
+    try:
+        status, created = app.dispatch("POST", "/v1/sessions", {})
+        assert status == 201
+        monkeypatch.setenv("JEEVES_LOCAL_ONLY", "1")
+        monkeypatch.setenv("JEEVES_PRIMARY_MODEL_ID", "jeeves")
+        _, status = app.dispatch("GET", "/v1/status")
+        assert status["ready"] is False
+        assert status["model_readiness_code"] == "local_primary_identity_changed"
+        with pytest.raises(OfflineHTTPError, match="local_primary_identity_changed"):
+            app.submit_turn(created["session_id"], {
+                "message": "reject non-Jeeves primary at dispatch",
+                "request_id": "deny-other-model", "max_output_tokens": 2,
+            })
+    finally:
+        app.close()
+    _, state = app.dispatch("GET", "/v1/status")
+    assert state["ready"] is False
+    assert state["model_readiness_code"] == "local_service_shutting_down"
