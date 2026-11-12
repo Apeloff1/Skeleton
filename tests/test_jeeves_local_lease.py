@@ -416,3 +416,43 @@ def test_abrupt_supervisor_death_keeps_lease_held_until_orphan_native_child_exit
         if parent.poll() is None:
             parent.kill()
         parent.communicate(timeout=8)
+
+
+def test_lease_inspection_is_read_only_private_and_distinguishes_busy_idle_invalid(tmp_path: Path):
+    database = tmp_path / "inspected.sqlite3"
+    current = LocalInferenceLease(database)
+    observed = current.inspect()
+    assert observed == {
+        "schema": "skeleton.jeeves.local-inference-lease-status.v1",
+        "state": "uninitialized",
+        "single_host_only": True,
+        "ownership_is_generation_proof": False,
+    }
+    assert not current.path.exists(), "status GET must not create a lease sidecar"
+    with current.hold():
+        busy = LocalInferenceLease(database).inspect()
+        assert busy["state"] == "busy" and busy["ownership_is_generation_proof"] is False
+        assert "pid" not in busy and "path" not in busy and "token" not in busy
+    after = LocalInferenceLease(database).inspect()
+    assert after["state"] == "idle"
+    current.path.write_bytes(b"unsafe-marker")
+    assert current.inspect()["state"] == "unavailable"
+
+
+def test_authenticated_status_reports_live_lease_without_claiming_generation(tmp_path: Path):
+    model = native_model()
+    db = tmp_path / "actual-status.sqlite3"
+    app = OfflineHTTPApplication(model, db, token="t" * 64)
+    try:
+        status, before = app.dispatch("GET", "/v1/status")
+        assert status == 200 and before["inference_lease"]["state"] == "uninitialized"
+        assert before["inference_lease"]["ownership_is_generation_proof"] is False
+        with LocalInferenceLease(db).hold():
+            status, busy = app.dispatch("GET", "/v1/status")
+            assert status == 200 and busy["inference_lease"]["state"] == "busy"
+            assert busy["readiness_is_live_inference_proof"] is False
+        status, idle = app.dispatch("GET", "/v1/status")
+        assert status == 200 and idle["inference_lease"]["state"] == "idle"
+        assert idle["ready"] is True
+    finally:
+        app.close()
