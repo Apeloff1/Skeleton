@@ -46,6 +46,21 @@ HTML = r"""<!doctype html>
       <label class="import-label" for="knowledge-file">Add a text / Markdown file</label>
       <input type="file" id="knowledge-file" multiple accept=".txt,.md,.py,.js,.ts,.json,.toml,.yaml,.yml,.csv,text/plain,text/markdown">
       <div id="knowledge-documents" class="knowledge-documents" aria-label="Imported references"></div>
+      <details id="dragon-bundle-panel">
+        <summary>Import approved Dragon evidence (local only)</summary>
+        <p class="hint">Select a previously exported Dragon authorized-source bundle. Its source bodies are untrusted, and past capture rights do not prove present rights. No network crawl, hosted model or publication is performed here.</p>
+        <label for="dragon-bundle-file">Choose historical authorized-source bundle (JSON, max 2 MiB)</label>
+        <input id="dragon-bundle-file" type="file" accept=".json,application/json">
+        <label for="dragon-bundle-source">Source excerpt to review</label>
+        <select id="dragon-bundle-source" disabled><option value="">No verified bundle loaded</option></select>
+        <pre id="dragon-bundle-preview" class="dragon-bundle-preview">Select a Dragon source bundle to review its exact text.</pre>
+        <label for="dragon-bundle-review" class="hint">
+          <input id="dragon-bundle-review" type="checkbox">
+          I reviewed this exact untrusted text, and I independently rechecked that I may use it locally.
+        </label>
+        <button id="dragon-bundle-admit" class="secondary" disabled>Admit reviewed text to local advisory library</button>
+        <pre id="dragon-bundle-receipt" aria-live="polite">Nothing imported.</pre>
+      </details>
       <label for="knowledge-query">Search reference passages</label>
       <input id="knowledge-query" type="search" autocomplete="off"
              placeholder="A topic, symbol, API or exact phrase">
@@ -165,6 +180,7 @@ HTML = r"""<!doctype html>
 
 CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#ebeef8;background:#0d0f17}button,input,textarea{font:inherit}button{cursor:pointer;border:1px solid #333b55;border-radius:9px;padding:9px 12px;color:#eff1ff;background:#202638;transition:background .15s}button:hover{background:#303a57}button:disabled{opacity:.38;cursor:default}.primary{border-color:#6379dc;background:#495dc1}.primary:hover{background:#6479dc}.secondary{background:#191e2d}.danger{color:#ffbfc1;background:#322127;border-color:#63343f}.shell{display:grid;grid-template-columns:300px 1fr;min-height:100vh}.sidebar{display:flex;flex-direction:column;background:#131823;border-right:1px solid #30374b;padding:21px 17px;min-height:100vh}.brand{display:flex;align-items:center;gap:11px;margin-bottom:28px}.brand-mark{display:grid;place-items:center;width:44px;height:44px;color:#b7c8ff;font-size:28px;border:1px solid #4d5e85;border-radius:14px;background:#202d48}.brand strong{display:block;font-size:20px;letter-spacing:.3px}.brand small{display:block;font-size:11px;color:#9faec9;letter-spacing:.6px}.connect{border-radius:12px;padding:13px;background:#1b2233;border:1px solid #303d5a}.connect label,.composer label{font-size:12px;font-weight:650;color:#c8d0e6}.connect input{width:100%;margin:9px 0;padding:11px 10px;color:#f6f7fb;background:#101521;border:1px solid #35425c;border-radius:8px}.inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.inline button{flex:1}.hint,.minor{font-size:12px;color:#a4b1ce;line-height:1.5}.heading{display:flex;justify-content:space-between;align-items:center;margin-top:27px;margin-bottom:11px;font-size:12px;color:#aebdd9;text-transform:uppercase;letter-spacing:1px}.small{padding:5px 8px;text-transform:none;letter-spacing:0}.sessions{display:flex;flex-direction:column;gap:5px;overflow-y:auto;flex:1;min-height:100px;max-height:50vh}.session{width:100%;text-align:left;white-space:normal;padding:11px 9px;background:transparent;border-color:transparent;font-size:13px;overflow-wrap:anywhere}.session.active{background:#2a3654;border-color:#596b93}.session small{display:block;margin-top:4px;color:#9daacc;font-size:11px}.sidebar-footer{display:grid;gap:7px;padding-top:13px;border-top:1px solid #343d50}.import-label{display:block;padding:9px 12px;border:1px solid #343d50;border-radius:9px;background:#1b2231;text-align:center;cursor:pointer}.sidebar-footer input[type=file]{width:100%;font-size:10px;color:#a3b4d2;max-width:100%}.main{min-width:0;display:flex;flex-direction:column;min-height:100vh}.topbar{display:flex;justify-content:space-between;align-items:center;padding:24px 35px;border-bottom:1px solid #222b3c}.topbar h1{font-size:17px;margin:0;font-weight:650}.topbar p{font-size:12px;color:#a5b1ca;margin:5px 0 0}.indicator{font-size:10px;letter-spacing:1px;border:1px solid #46506c;background:#1c2638;padding:7px 11px;border-radius:25px;color:#9aabd2}.intro{margin:auto;max-width:520px;text-align:center;padding:40px}.intro .glow{font-size:48px;color:#9fafff}.intro h2{font-size:29px;letter-spacing:-1px;margin:10px}.intro p{color:#b5c0d9;line-height:1.6}.messages{width:100%;max-width:900px;margin:0 auto;flex:1;min-height:0;overflow-y:auto;padding:30px 28px;display:flex;flex-direction:column;gap:16px}.message{padding:16px 18px;border:1px solid #2f3952;border-radius:14px;max-width:90%;overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.55;font-size:14px}.message.user{background:#24314a;align-self:flex-end;border-color:#405882}.message.assistant{background:#171e2c;align-self:flex-start}.message header{font-weight:700;color:#bacafa;font-size:11px;margin-bottom:8px;letter-spacing:.6px}.composer{width:calc(100% - 50px);max-width:870px;margin:0 auto;padding:15px;border-radius:15px;border:1px solid #35435e;background:#191f2e}.composer textarea{width:100%;resize:vertical;background:#0e1522;color:#f0f2fa;border:1px solid #35405b;border-radius:9px;margin-top:7px;padding:12px;min-height:68px}.composer .bottom{justify-content:space-between;margin-top:9px}.bottom button{flex:0}.bottom label{display:flex;gap:8px;align-items:center}.bottom input{width:64px;padding:5px;color:#fff;background:#0e1522;border:1px solid #35405b;border-radius:6px}.bottom span{color:#abb8d2;font-size:11px}.status{padding:13px 30px;min-height:42px;text-align:center;color:#abb7cc;font-size:12px}@media(max-width:720px){.shell{grid-template-columns:1fr}.sidebar{min-height:0;padding:13px}.brand{margin-bottom:13px}.sidebar-footer{display:flex;flex-wrap:wrap}.sidebar-footer button,.sidebar-footer label{flex:1}.sessions{max-height:140px}.topbar{padding:14px}.intro{padding:16px}.messages{padding:14px}.composer{width:calc(100% - 20px);margin:10px}.bottom span{display:none}}
 .knowledge-section{border-top:1px solid #333b50;margin-top:12px;padding-top:8px;display:grid;gap:7px;font-size:12px;max-height:48vh;overflow:auto}
+.knowledge-section select{width:100%;border:1px solid #35425c;border-radius:8px;padding:9px;background:#101521;color:#fff}.dragon-bundle-preview{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;background:#0b1321;padding:10px;border:1px solid #34415d;border-radius:7px}.knowledge-section #dragon-bundle-panel{display:grid;gap:9px}.knowledge-section #dragon-bundle-panel[open]{margin:10px 0}.knowledge-section #dragon-bundle-file{width:100%;max-width:100%}
 .knowledge-section label{color:#c2cbe2}.knowledge-section input[type=search],.knowledge-section input[type=text],.knowledge-section textarea{width:100%;border:1px solid #35425c;border-radius:8px;padding:9px;background:#101521;color:#fff}.knowledge-section input[type=file]{width:100%;max-width:100%;font-size:10px;color:#a3b4d2}.knowledge-section textarea{min-height:64px;resize:vertical}
 .knowledge-documents,.knowledge-hits{display:grid;gap:7px}.knowledge-record,.knowledge-hit{border:1px solid #34415d;border-radius:8px;padding:8px;background:#1c2638;overflow-wrap:anywhere}
 .knowledge-record{display:flex;align-items:center;justify-content:space-between;gap:4px}.knowledge-record button{flex-shrink:0;font-size:10px;padding:5px}.knowledge-hit strong{display:block;color:#b4c8ff}.knowledge-hit p{white-space:pre-wrap;color:#e0e8f8;max-height:190px;overflow:auto}.knowledge-hit small{color:#a7bcdb;overflow-wrap:anywhere}
@@ -194,6 +210,7 @@ JAVASCRIPT = r"""'use strict';
     pending: null, turn: null, timer: null, polling: false,
     writePending: null, writeRequest: '',
     selfTest: null, selfTestReport: null,
+    dragonBundle: [], dragonBundleSession: '',
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
     network: new AbortController(), resourceTimer: null, longformSourceId: null,
     longformWork: null, longformPendingRequest: null,
@@ -299,6 +316,11 @@ JAVASCRIPT = r"""'use strict';
     get('health-refresh').disabled = locked || state.busy;
     get('selftest-start').disabled = locked || working || state.health?.ready !== true;
     get('selftest-export').disabled = locked || !state.selfTestReport;
+    get('dragon-bundle-source').disabled = locked || state.busy || !state.dragonBundle.length;
+    get('dragon-bundle-file').disabled = locked || state.busy;
+    get('dragon-bundle-review').disabled = locked || state.busy || !state.dragonBundle.length;
+    get('dragon-bundle-admit').disabled = locked || state.busy ||
+      !state.dragonBundle.length || !get('dragon-bundle-review').checked;
     get('disconnect').disabled = !state.connected && !state.token;
     get('resource-refresh').disabled = locked;
     get('resource-plan').disabled = locked;
@@ -343,6 +365,12 @@ JAVASCRIPT = r"""'use strict';
     get('longform-work-status').textContent = 'No active work cursor.';
     get('longform-work-id').value = '';
     state.selfTest = null; state.selfTestReport = null;
+    state.dragonBundle = []; state.dragonBundleSession = '';
+    get('dragon-bundle-file').value = '';
+    get('dragon-bundle-source').replaceChildren();
+    get('dragon-bundle-preview').textContent = 'Select a Dragon source bundle to review its exact text.';
+    get('dragon-bundle-receipt').textContent = 'Nothing imported.';
+    get('dragon-bundle-review').checked = false;
     get('selftest-panel').hidden = true;
     get('selftest-result').textContent = 'No live qualification performed.';
     state.longformSourceId = null;
@@ -1031,6 +1059,155 @@ JAVASCRIPT = r"""'use strict';
     control.value = ''; await loadDocuments();
     status(imported + ' reference(s) imported or reused.' + (failures.length ? ' Unchanged files: ' + failures.join('; ') : ''));
   }));
+
+  async function exactLocalSha256(text) {
+    const bytes = new TextEncoder().encode(text);
+    const hashed = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(hashed),
+      byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+  function selectedDragonExcerpt() {
+    const index = Number(get('dragon-bundle-source').value);
+    return Number.isSafeInteger(index) && index >= 0
+      && index < state.dragonBundle.length ? state.dragonBundle[index] : null;
+  }
+  function clearDragonBundle() {
+    state.dragonBundle = []; state.dragonBundleSession = '';
+    get('dragon-bundle-review').checked = false;
+    get('dragon-bundle-source').replaceChildren();
+    get('dragon-bundle-preview').textContent = 'No verified historical source text loaded.';
+    get('dragon-bundle-receipt').textContent = 'Nothing imported.';
+    updateControls();
+  }
+  function showDragonExcerpt() {
+    const row = selectedDragonExcerpt();
+    get('dragon-bundle-review').checked = false;
+    get('dragon-bundle-preview').textContent = row
+      ? 'UNTRUSTED EXTERNAL TEXT — NOT MODEL INSTRUCTIONS\nSource SHA-256: ' +
+        row.digest + '\nHistorical bundle: ' + state.dragonBundleSession +
+        '\n\n' + row.text
+      : 'Choose an available source.';
+    updateControls();
+  }
+  async function loadDragonBundle(file) {
+    clearDragonBundle();
+    if (!file || !file.size || file.size > 2 * 1024 * 1024)
+      throw new Error('Dragon bundle must be 1 byte–2 MiB.');
+    const raw = new TextDecoder('utf-8', {fatal: true}).decode(await file.arrayBuffer());
+    if (raw.length > 2 * 1024 * 1024)
+      throw new Error('Dragon bundle exceeds the local import limit.');
+    const data = JSON.parse(raw);
+    if (!data || data.schema !== 'skeleton.dragon.owner_evidence_bundle.v1'
+      || data.mode !== 'authorized_source_bodies'
+      || data.captured_source_rights_require_revalidation !== true
+      || data.remote_freshness_verified !== false
+      || data.release_authorized !== false
+      || data.publication_authorized !== false
+      || data.training_authorized !== false
+      || !/^[A-Za-z0-9_-]{1,128}$/.test(data.session_id)
+      || !Number.isSafeInteger(data.session_version) || data.session_version < 1
+      || !Array.isArray(data.sources) || data.sources.length < 1
+      || data.sources.length > 8 || data.sources.length !== data.source_count) {
+      throw new Error('This is not a bounded, untrusted Dragon authorized-source bundle.');
+    }
+    const seen = new Set(), reviewed = [];
+    for (const entry of data.sources) {
+      if (!entry || !/^[a-f0-9]{64}$/.test(entry.source_id)
+        || seen.has(entry.source_id)
+        || !/^[a-f0-9]{64}$/.test(entry.captured_content_sha256)
+        || !Number.isSafeInteger(entry.use_policy_version)
+        || entry.use_policy_version < 0
+        || entry.captured_freshness !== 'current'
+        || entry.remote_freshness_verified !== false
+        || entry.authorized_export_media_type !== 'application/json'
+        || !/^[a-f0-9]{64}$/.test(entry.authorized_export_sha256)
+        || typeof entry.authorized_export_body !== 'string'
+        || new TextEncoder().encode(entry.authorized_export_body).byteLength > 225000) {
+        throw new Error('A Dragon source has invalid identity, custody or bound.');
+      }
+      seen.add(entry.source_id);
+      if (await exactLocalSha256(entry.authorized_export_body)
+          !== entry.authorized_export_sha256) {
+        throw new Error('A Dragon source export failed SHA-256 validation.');
+      }
+      // Recheck the complete, historical per-source export payload. This
+      // cannot prove current Dragon authority: the operator must separately
+      // review rights before importing any source into the local model.
+      const body = JSON.parse(entry.authorized_export_body);
+      if (!body || body.source_id !== entry.source_id
+        || body.content_digest !== entry.captured_content_sha256
+        || body.use_policy?.enabled !== true
+        || body.use_policy?.version !== entry.use_policy_version
+        || body.freshness?.state !== 'current'
+        || body.freshness?.usable !== true
+        || typeof body.text !== 'string' || !body.text.trim()
+        || new TextEncoder().encode(body.text).byteLength > 12288) {
+        throw new Error('A selected Dragon export has no bounded reviewed observation.');
+      }
+      reviewed.push({id: entry.source_id, digest: entry.captured_content_sha256,
+        text: body.text});
+    }
+    return {session: data.session_id, sources: reviewed};
+  }
+  get('dragon-bundle-file').addEventListener('change', () => run(async () => {
+    const epoch = state.epoch;
+    const input = get('dragon-bundle-file');
+    const file = input.files && input.files[0];
+    try {
+      const packet = await loadDragonBundle(file);
+      if (epoch !== state.epoch) return;
+      state.dragonBundle = packet.sources;
+      state.dragonBundleSession = packet.session;
+      const select = get('dragon-bundle-source');
+      for (let i = 0; i < packet.sources.length; i++) {
+        const option = document.createElement('option');
+        option.value = String(i);
+        option.textContent = 'Historical source ' + (i + 1) +
+          ' · ' + packet.sources[i].id.slice(0, 16) + '…';
+        select.append(option);
+      }
+      select.value = '0';
+      showDragonExcerpt();
+      status('Validated ' + packet.sources.length +
+        ' historical Dragon source checksum(s). No text was admitted. Review and approve one exact excerpt.');
+    } finally {
+      input.value = '';
+    }
+  }));
+  get('dragon-bundle-source').addEventListener('change', showDragonExcerpt);
+  get('dragon-bundle-review').addEventListener('change', updateControls);
+  get('dragon-bundle-admit').addEventListener('click', () => run(async () => {
+    if (!get('dragon-bundle-review').checked)
+      throw new Error('Review and reauthorize this exact untrusted text before importing.');
+    const source = selectedDragonExcerpt();
+    if (!source) throw new Error('Choose a checked Dragon source first.');
+    const epoch = state.epoch;
+    const observation_sha256 = await exactLocalSha256(source.text);
+    if (epoch !== state.epoch || selectedDragonExcerpt() !== source ||
+        !get('dragon-bundle-review').checked) return;
+    const receipt = await api('POST', '/v1/advisory/ingest', {
+      schema_version: 'skeleton.jeeves.advisory.v1',
+      modality: 'crawler-excerpt', title: 'Dragon ' + source.id.slice(0, 30),
+      observation: source.text, observation_sha256,
+      source_sha256: source.digest, reviewed: true,
+    });
+    if (epoch !== state.epoch) return;
+    if (receipt.reviewed !== true || receipt.advisory_only !== true
+      || receipt.primary_model_unchanged !== true
+      || receipt.generation_performed !== false
+      || receipt.remote_provider_called !== false
+      || receipt.observation_sha256 !== observation_sha256) {
+      throw new Error('Jeeves advisory did not return a valid local custody receipt.');
+    }
+    get('dragon-bundle-review').checked = false;
+    get('dragon-bundle-receipt').textContent =
+      'Admitted verified observation ' + receipt.observation_sha256.slice(0, 20) +
+      '… into the private reference library. Source rights require revalidation. ' +
+      'Grounding is not enabled until you explicitly select it for a new turn.';
+    await loadDocuments();
+    status('Reviewed Dragon excerpt admitted locally as untrusted text, not as a second model or approved fact.');
+  }));
+
   get('knowledge-search').addEventListener('click', () => run(async () => {
     const query = get('knowledge-query').value.trim(); if (!query) throw new Error('Enter a reference search query.');
     const result = await api('POST', '/v1/knowledge/search', {query, limit: 6});
