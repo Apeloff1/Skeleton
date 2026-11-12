@@ -16,7 +16,7 @@ on:
       - "skeleton/testing/test_inference_stream_event_type_fencing.py"
       - "skeleton/app/studio_readiness.py"
       - "skeleton/testing/test_app_studio_private_token_custody.py"
-      - "tests/test_consumer_loopback_compose.py"
+      - "skeleton/testing/test_app_compose_loopback_contract.py"
       - "machine/ai_file_tree.json"
       - ".github/workflows/source-bound-custody-qualification.yml"
 
@@ -73,7 +73,7 @@ jobs:
             skeleton/testing/test_local_ai_model_loader_custody.py \
             skeleton/testing/test_inference_stream_event_type_fencing.py \
             skeleton/testing/test_app_studio_private_token_custody.py \
-            tests/test_consumer_loopback_compose.py
+            skeleton/testing/test_app_compose_loopback_contract.py
       - name: Verify closed inference mirror and exact source tree custody
         run: |
           python - <<'PY'
@@ -103,7 +103,7 @@ jobs:
           python -m pytest -q --maxfail=1 --noconftest \
             scripts/windows/test_payload_zip.py \
             scripts/windows/test_installer_source_ref_preflight.py \
-            tests/test_consumer_loopback_compose.py \
+            skeleton/testing/test_app_compose_loopback_contract.py \
             skeleton/testing/test_local_ai_model_loader_custody.py \
             skeleton/testing/test_inference_stream_event_type_fencing.py \
             skeleton/testing/test_app_studio_private_token_custody.py
