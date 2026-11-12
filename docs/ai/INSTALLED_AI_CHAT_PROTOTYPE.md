@@ -504,6 +504,45 @@ separately reviewed. The test suite compares inspected source offsets with
 their saved SHA-bound documents and confirms the subsequent real native
 inference receipt retains the same citations when nothing changes.
 
+
+## 14. Select exact local reference documents for the next model turn
+
+The authenticated Jeeves browser now exposes **Use** checkboxes beside real
+local references. An operator may select 1–8 document IDs to restrict
+manual reference search, the next grounded context preflight and the actual
+native/GGUF model turn. All selected IDs are validated against the exact
+model-and-tokenizer-scoped, SHA-checked SQLite document/chunk authority.
+If a selected source disappears, is withdrawn or belongs to a different
+local model identity, the request fails **before generation** instead of
+silently broadening to other documents. No new model, provider, network
+request or external crawler is involved.
+
+The existing `/v1/knowledge/search`,
+`/v1/sessions/<id>/context-preview`, synchronous `/turn` and asynchronous
+`/turns` endpoints accept optional `document_ids` arrays, rejecting
+duplicates, malformed IDs, excess cardinality and selection on ungrounded
+turns. Without an explicit selection, legacy local reference search remains
+unchanged; the browser displays that all locally saved references are in
+scope rather than pretending a source has been chosen.
+
+Selected IDs are sorted, bounded, and domain-separated into the **grounded
+idempotency request digest** before applying strict-history policy. The
+source citation manifest and the final SQLite generation receipt use this
+same scope-bound digest. Reusing a request ID for a different document set
+or switching back to unrestricted search must never replay it under an
+unacknowledged new source policy. A source selection change invalidates
+the read-only preview. During a conversation switch or explicit lock the
+source picker is cleared; unknown/deleted IDs are pruned on owner-authenticated
+library refresh. No document IDs or private content are persisted in
+browser localStorage/sessionStorage.
+
+A selected document is still *untrusted grounding data*, not a system
+instruction, current publisher-rights certificate, factual verification
+or permission to train/publish. The genuine native tests cover source-scoped
+search, SHA-bound preview, real inference and SQLite commit/replay, removal
+during use, invalid arrays, async tickets, and the browser contract.
+Actual operator-owned GGUF quality, device and release checks remain separate.
+
 ## 2026 local execution custody: independent service-process safety
 
 The standalone authenticated Jeeves HTTP service now uses an additional

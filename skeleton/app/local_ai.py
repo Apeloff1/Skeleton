@@ -491,7 +491,8 @@ class DurableOfflineAISession(OfflineAISession):
     async def ask(self, prompt: str, *, max_output_tokens: int = 32,
                   request_id: str | None = None,
                   evidence_manifest: dict[str, Any] | None = None,
-                  require_full_history: bool = False) -> OfflineAnswer:
+                  require_full_history: bool = False,
+                  document_ids: tuple[str, ...] | None = None) -> OfflineAnswer:
         rid = (_identifier("request id", request_id)
                if request_id is not None else secrets.token_urlsafe(18))
         with self._busy_lock:
@@ -518,14 +519,20 @@ class DurableOfflineAISession(OfflineAISession):
             config = GenerationConfig(max_new_tokens=max_output_tokens)
             request_digest = _digest_request(prompt.strip(), config)
             grounding_context = None
+            from skeleton.app.offline_grounding import (
+                grounded_request_digest, normalized_document_scope,
+                scoped_grounded_request_digest, validate_evidence,
+            )
+            source_scope = normalized_document_scope(document_ids)
+            if source_scope is not None and evidence_manifest is None:
+                raise OfflineAIError("document scope requires explicit grounded inference")
             if evidence_manifest is not None:
-                from skeleton.app.offline_grounding import (
-                    grounded_request_digest, validate_evidence,
-                )
                 request_digest = grounded_request_digest(request_digest)
-            # The full-history policy must be part of BOTH SQLite identity
-            # and the citation manifest. Store.commit validates the latter
-            # against exactly the same final request digest.
+                request_digest = scoped_grounded_request_digest(
+                    request_digest, source_scope,
+                )
+            # Every selected source scope, strict context policy, citation
+            # manifest and the SQLite receipt share one request identity.
             request_digest = _strict_context_digest(request_digest, require_full_history)
             if evidence_manifest is not None:
                 validate_evidence(
