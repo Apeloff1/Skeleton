@@ -59,19 +59,16 @@ def test_lease_crash_releases_kernel_lock_to_new_process(tmp_path: Path):
     database = tmp_path / "shared.sqlite3"
     ready = tmp_path / "child-ready"
     root = str(Path(__file__).resolve().parents[1])
-    child_script = (
-        "from pathlib import Path; import sys, time; "
-        "from skeleton.app.jeeves_local_lease import LocalInferenceLease; "
-        "db,ready = map(Path,sys.argv[1:3]); "
-        "lease = LocalInferenceLease(db); "
-        "with lease.hold():\\n"
-        "    ready.write_text('locked',encoding='ascii')\\n"
-        "    time.sleep(30)\\n"
-    )
-    # Convert the inline separator to actual code lines for the child process.
-    child_script = child_script.replace("with lease.hold():\\n", "with lease.hold():\n").replace(
-        "encoding='ascii')\\n", "encoding='ascii')\n",
-    ).replace("time.sleep(30)\\n", "time.sleep(30)\n")
+    child_script = "\\n".join([
+        "from pathlib import Path",
+        "import sys",
+        "import time",
+        "from skeleton.app.jeeves_local_lease import LocalInferenceLease",
+        "db, ready = map(Path, sys.argv[1:3])",
+        "with LocalInferenceLease(db).hold():",
+        "    ready.write_text('locked', encoding='ascii')",
+        "    time.sleep(30)",
+    ])
     env = dict(os.environ)
     env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
     process = subprocess.Popen(
