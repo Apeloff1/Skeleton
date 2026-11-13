@@ -113,6 +113,9 @@ export interface RunRequest {
   operator_axes?: Record<string, number>;
   /** Validated complete Galaxy questionnaire transferred within this app session. */
   galaxy_profile?: import('./galaxyHandoff').GalaxyProfile;
+  /** Explicitly request the native Godot room-entry quest subsystem. */
+  quest_content?: boolean;
+  quest_length?: number;
   generation?: string | null;
   include_files?: boolean;
 }
@@ -172,6 +175,16 @@ export interface RunPayload {
   build_plan?: BuildPlanPayload | null;
   operator_axes?: Record<string, number>;
   galaxy_profile?: { sha256?: string; matrices?: number; source?: string; artifact?: string };
+  native_quest?: {
+    schema?: string;
+    source_world_sha256?: string;
+    quest_sha256?: string;
+    steps?: number;
+    quest?: string;
+    runtime?: string;
+    replay_verified?: boolean;
+    sealed?: boolean;
+  };
   galaxy_mechanics?: {
     schema?: string; source_sha256?: string; active_matrix_dials?: number;
     supported_inputs?: string[]; unmapped_matrix_dials?: number;
