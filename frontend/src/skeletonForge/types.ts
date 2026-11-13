@@ -81,6 +81,23 @@ export interface GenerationRow {
   [k: string]: unknown;
 }
 
+/** Read-only source-backed game-control profile, not playable-engine proof. */
+export interface GenreControlProfile {
+  schema: string;
+  genre: string;
+  family: string;
+  catalogs: string[];
+  actions: { id: string; kind: string; context?: string }[];
+  bindings: {
+    action: string;
+    control: string;
+    modifiers: string[];
+    scale: number;
+    axis: string;
+    deadzone: number;
+  }[];
+}
+
 /**
  * `BuildPlan.to_dict` from skeleton/jeeves/builder.py. Every field is
  * optional: older servers omit keys, and the plan viewer must tolerate that.

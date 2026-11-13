@@ -109,6 +109,29 @@ def run(req: RunRequest) -> Dict[str, Any]:
     return payload
 
 
+@router.get("/controls/genres")
+def gameforge_control_genres() -> Dict[str, Any]:
+    """Discover device-independent historical controls for creator genres."""
+    from skeleton.game.presentation.genre_action_profiles import GENRE_FAMILY, FAMILIES
+    return {
+        "schema": "skeleton.game.genre_action_catalog.v1",
+        "genres": sorted(GENRE_FAMILY),
+        "families": sorted(FAMILIES),
+        "count": len(GENRE_FAMILY),
+    }
+
+
+@router.get("/controls/genres/{genre}")
+def gameforge_control_genre(genre: str) -> Dict[str, Any]:
+    """Present semantic input controls; do not claim a dedicated native engine."""
+    from skeleton.game.presentation.input_actions import InputContractError
+    from skeleton.game.presentation.genre_action_profiles import genre_control_profile
+    try:
+        return genre_control_profile(genre)
+    except InputContractError as exc:
+        raise HTTPException(status_code=404, detail="unknown creator genre") from exc
+
+
 class ComposeRequest(BaseModel):
     vision: str = Field(default="", max_length=4000)
 

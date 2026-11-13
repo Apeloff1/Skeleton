@@ -12,6 +12,7 @@ import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
 import { suggestPlayableMode } from '../playableSuggestions';
 import DesignInstruments from './DesignInstruments';
+import GenreControlsPreview from './GenreControlsPreview';
 import DesignPresetPanel from './DesignPresetPanel';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
@@ -197,6 +198,7 @@ function GenrePicker({ value, onPick }: { value?: string; onPick: (v: string) =>
         ))}
       </View>
       {!shown.length ? <Text style={st.help}>No matching genre. Try a broader term or another category.</Text> : null}
+      {value ? <GenreControlsPreview genre={value} /> : null}
     </View>
   );
 }
