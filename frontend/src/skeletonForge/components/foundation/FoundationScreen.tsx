@@ -118,30 +118,30 @@ function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => vo
     if (!restored || !returned.studioProjectId || !returned.studioProjectUpdatedAt) {
       throw new Error('Returned Forge draft is not source-bound to a Studio project');
     }
-    const at = new Date().toISOString();
-    const reconciled = reconcileStudioReturn(
-      result.projects, returned.studioProjectId,
-      returned.studioProjectUpdatedAt, restored, at,
-    );
-    const originalUpdated = reconciled.status === 'applied';
-    const projects = originalUpdated ? reconciled.projects
-      : recoverStudioReturnAsCopy(result.projects, restored, at).projects;
     try {
+      const at = new Date().toISOString();
+      const reconciled = reconcileStudioReturn(
+        result.projects, returned.studioProjectId,
+        returned.studioProjectUpdatedAt, restored, at,
+      );
+      const originalUpdated = reconciled.status === 'applied';
+      const projects = originalUpdated ? reconciled.projects
+        : recoverStudioReturnAsCopy(result.projects, restored, at).projects;
       await saveFoundation(store, {
         onboarded: result.onboarded, projects, prefs: result.prefs,
         projectsCorrupt: false, holdSaves: false,
       });
+      setStudioReturnNotice(originalUpdated
+        ? 'Advanced Forge edits were saved to the original Studio project.'
+        : 'The original project changed or was deleted. Your Forge edits were preserved as a separate project copy.');
+      return { ...result, projects };
     } catch (error) {
-      // An interrupted write must not permanently consume the single-use
-      // return. Reissue within the same account scope for the next retry.
+      // Failed validation, copy allocation or storage cannot silently consume
+      // the user's returning edited questionnaire. Reissue within this scope.
       try { await storeCreatorBridge(returned); }
-      catch { /* device storage is already failed; surface the save error */ }
+      catch { /* device storage may be unavailable; retain the original failure */ }
       throw error;
     }
-    setStudioReturnNotice(originalUpdated
-      ? 'Advanced Forge edits were saved to the original Studio project.'
-      : 'The original project changed or was deleted. Your Forge edits were preserved as a separate project copy.');
-    return { ...result, projects };
   }, [store]);
   const save = React.useCallback((snap: PersistSnapshot) => saveFoundation(store, snap), [store]);
   const openAdvancedCockpit = React.useCallback((project?: StudioProject) => {
