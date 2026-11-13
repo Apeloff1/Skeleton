@@ -111,6 +111,8 @@ export interface RunRequest {
   answers: Record<string, string>;
   /** Sparse, explicitly overridden design tensor axes (0..1). */
   operator_axes?: Record<string, number>;
+  /** Validated complete Galaxy questionnaire transferred within this app session. */
+  galaxy_profile?: import('./galaxyHandoff').GalaxyProfile;
   generation?: string | null;
   include_files?: boolean;
 }
@@ -169,6 +171,13 @@ export interface RunPayload {
   sim?: { passed?: boolean; primary_dps?: number } | null;
   build_plan?: BuildPlanPayload | null;
   operator_axes?: Record<string, number>;
+  galaxy_profile?: { sha256?: string; matrices?: number; source?: string; artifact?: string };
+  galaxy_mechanics?: {
+    schema?: string; source_sha256?: string; active_matrix_dials?: number;
+    supported_inputs?: string[]; unmapped_matrix_dials?: number;
+    room_votes?: Record<string, number>;
+    applied?: { target: string; value: boolean | string; changed: boolean; source: string[] }[];
+  };
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];
   [k: string]: unknown;

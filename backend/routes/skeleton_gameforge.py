@@ -26,6 +26,8 @@ class RunRequest(BaseModel):
     answers: Dict[str, str] = Field(default_factory=dict)
     # Sparse, explicit design-instrument edits. Raw values are validated by GameForge.
     operator_axes: Optional[Dict[str, Any]] = None
+    # Inert and bounded source profile for exact creator-to-build provenance.
+    galaxy_profile: Optional[Dict[str, Any]] = None
     blend: Optional[list] = None
     t: float = 0.5
     generation: Optional[str] = None
@@ -67,6 +69,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             overwrite=req.overwrite,
             answers=req.answers or None,
             **({"operator_axes": req.operator_axes} if req.operator_axes is not None else {}),
+            **({"galaxy_profile": req.galaxy_profile} if req.galaxy_profile is not None else {}),
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
         )
