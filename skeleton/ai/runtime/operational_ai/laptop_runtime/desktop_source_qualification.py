@@ -18,7 +18,7 @@ from hashlib import sha256
 import json
 from pathlib import PurePosixPath
 import time
-import tomli as tomllib
+import tomllib
 
 from .desktop_patch_bundle import PatchEntry, PortablePatchPlan
 
