@@ -264,7 +264,7 @@ jobs:
             git cat-file -e "$CANDIDATE_SHA^{commit}"
             git cat-file -e "$BASE_SHA^{commit}"
             # Download the native engine only when creator code changed.
-            if ! git diff --name-only "$BASE_SHA" "$CANDIDATE_SHA" | grep -Eq '^(skeleton/(forge/(archetype_content|playable_tuning|playable_provenance|godot_emit)\.py|ai/game_builder/|testing/test_(multi|native_godot|gameforge|galaxy|historical)|context/(pipeline|galaxy_profile)\.py)|frontend/src/skeletonForge/|frontend/scripts/skeleton-forge/|backend/routes/skeleton_gameforge\.py|\.github/workflows/merge-readiness\.yml)'; then
+            if ! git diff --name-only "$BASE_SHA" "$CANDIDATE_SHA" | grep -Eq '^(skeleton/(forge/(archetype_content|playable_tuning|playable_provenance|godot_emit)\.py|ai/game_builder/|testing/test_(multi|native_quest|native_godot|gameforge|galaxy|historical)|context/(pipeline|galaxy_profile)\.py)|frontend/src/skeletonForge/|frontend/scripts/skeleton-forge/|backend/routes/skeleton_gameforge\.py|\.github/workflows/merge-readiness\.yml)'; then
               echo "No changed creator contracts; generic quality gates still apply"
               exit 0
             fi
@@ -285,7 +285,8 @@ jobs:
           # A missing native engine is a failure, not a pytest skip.
           GODOT_BINARY="$GODOT_BINARY" PYTHONPATH=".:backend" \
             PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
-              skeleton/testing/test_multigenre_native_godot.py
+              skeleton/testing/test_multigenre_native_godot.py \
+              skeleton/testing/test_native_quest_godot_acceptance.py
       - name: Verify filesystem and encrypted compliance CodeQL regressions
         working-directory: backend
         env:
