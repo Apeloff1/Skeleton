@@ -38,18 +38,18 @@ def _safe_export_path(name: str) -> bool:
 
 
 class RunRequest(BaseModel):
-    vision: str = ""
+    vision: str = Field(default="", max_length=4000)
     era: Optional[str] = None
     archetype: str = "extraction"
     target: str = "godot"
     project_root: Optional[str] = None
     overwrite: bool = False
     include_files: bool = False
-    answers: Dict[str, str] = Field(default_factory=dict)
+    answers: Dict[str, str] = Field(default_factory=dict, max_length=64)
     # Sparse, explicit design-instrument edits. Raw values are validated by GameForge.
     operator_axes: Optional[Dict[str, Any]] = None
-    blend: Optional[list] = None
-    t: float = 0.5
+    blend: Optional[list] = Field(default=None, max_length=3)
+    t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
     generation: Optional[str] = None
     playable_content: bool = False
     playtest: Optional[Literal["off", "auto", "require"]] = None
