@@ -33,6 +33,11 @@ export interface GalaxyBridgeSelection {
 const availableGenres = new Set(GENRE_CHOICES);
 const galaxyIds = new Set(GALAXY_CHOICES.map((x) => x.id));
 const axes = new Set<string>(DESIGN_AXES.map((x) => x.id));
+const allowedBrief = new Set(['genre', 'theme', 'perspective', 'combat', 'progression']);
+const allowedBeats = new Set([
+  'pace', 'death', 'combat', 'info', 'loot', 'heat', 'author', 'social',
+  'space', 'fail_state', 'ai', 'era_explicit',
+]);
 const validKey = /^[a-z][a-z0-9_-]{0,47}$/;
 const validId = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$/;
 
@@ -41,13 +46,17 @@ const record = (value: unknown): Record<string, unknown> | null =>
 const cleanText = (value: unknown, length: number): string =>
   typeof value === 'string' ? value.slice(0, length) : '';
 
-function cleanChoices(value: unknown, max: number): Record<string, string> {
+function cleanChoices(value: unknown, max: number, allowed: ReadonlySet<string>): Record<string, string> {
   const out: Record<string, string> = {};
   const source = record(value);
   if (!source) return out;
-  for (const [key, choice] of Object.entries(source).slice(0, max)) {
-    if (validKey.test(key) && typeof choice === 'string' && choice.length <= 80 && validId.test(choice)) {
+  let count = 0;
+  for (const [key, choice] of Object.entries(source)) {
+    if (count >= max) break;
+    if (allowed.has(key) && validKey.test(key) &&
+        typeof choice === 'string' && choice.length <= 80 && validId.test(choice)) {
       out[key] = choice;
+      count++;
     }
   }
   return out;
@@ -64,9 +73,9 @@ export function parseCreatorBridge(
       !Number.isFinite(now) || input.createdMs > now + 30_000 ||
       now - input.createdMs > CREATOR_BRIDGE_TTL_MS) return null;
   const vision = cleanText(input.vision, 4000);
-  const brief = cleanChoices(input.brief, 5);
+  const brief = cleanChoices(input.brief, 5, allowedBrief);
   if (brief.genre && !availableGenres.has(brief.genre)) delete brief.genre;
-  const beats = cleanChoices(input.beats, 12);
+  const beats = cleanChoices(input.beats, 12, allowedBeats);
   const instruments: Record<string, number> = {};
   const rawAxes = record(input.instruments);
   if (rawAxes) {
