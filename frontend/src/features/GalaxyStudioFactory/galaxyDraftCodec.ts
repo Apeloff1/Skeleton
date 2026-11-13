@@ -44,6 +44,10 @@ export interface GalaxyDraftSnapshot {
   ageTarget: string;
   selectedEraId: string;
   ageEraYear: number;
+  /** Authored build target and scale settings remain Galaxy-owned. */
+  targetFiles: number;
+  scaleCommand: string;
+  showDescriptions: boolean;
   classic: Record<string, number>;
   styleChoices: Record<string, string | boolean>;
   styleParams: Record<string, string>;
@@ -160,6 +164,9 @@ export function normalizeGalaxyDraft(raw: unknown, now: number = Date.now()): Ga
     ageTarget: clip(v.ageTarget, 32) || 'ALL',
     selectedEraId: validId(v.selectedEraId) ? v.selectedEraId : 'ps5_2020',
     ageEraYear: num(v.ageEraYear, 1985, 2030, 2025),
+    targetFiles: num(v.targetFiles, 48_000, 1_000_000, 1_000_000),
+    scaleCommand: clip(v.scaleCommand, 120),
+    showDescriptions: v.showDescriptions !== false,
     classic: numericMap(v.classic, 48, 0, 10),
     styleChoices, styleParams: stringMap(v.styleParams, 32),
     extraParams: numericMap(v.extraParams, 180, 0, 1000),

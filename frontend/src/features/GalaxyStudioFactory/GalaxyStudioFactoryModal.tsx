@@ -56,7 +56,7 @@ interface Props {
   initialForgeDraft?: CreatorBridgeDraft | null;
   initialGalaxyDraft?: GalaxyDraftSnapshot | null;
   handoffError?: string | null;
-  onSendToForge?: (selection: GalaxyBridgeSelection) => void;
+  onSendToForge?: (selection: GalaxyBridgeSelection) => Promise<void>;
 }
 type Step = 'pick' | 'building' | 'done';
 
@@ -378,6 +378,7 @@ export default function GalaxyStudioFactoryModal
 ({ visible, onClose, initialForgeDraft = null, initialGalaxyDraft = null, handoffError = null, onSendToForge }: Props) {
   const [step, setStep] = useState<Step>('pick');
   const [handoffBusy, setHandoffBusy] = useState(false);
+  const handoffLock = useRef(false);
   const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
   // ★ 2026-05 SOTA UX: Quick / Advanced mode toggle.
   // Default ON (Quick) so first-time users see a focused, friendly form.
@@ -676,9 +677,9 @@ export default function GalaxyStudioFactoryModal
   // Auto-expand the AAA Design Questionnaire on first mount so the
   // FileSizeSlider + 5 description fields are discoverable without an
   // extra tap. Users who want a clean view can still collapse it.
-  const [showDescriptions, setShowDescriptions] = useState(true);
-  const [scaleCommand, setScaleCommand] = useState('');
-  const [targetFiles, setTargetFiles] = useState<number>(MAX_TARGET_FILES);
+  const [showDescriptions, setShowDescriptions] = useState(initialGalaxyDraft?.showDescriptions ?? true);
+  const [scaleCommand, setScaleCommand] = useState(initialGalaxyDraft?.scaleCommand ?? '');
+  const [targetFiles, setTargetFiles] = useState<number>(initialGalaxyDraft?.targetFiles ?? MAX_TARGET_FILES);
 
   /** Keep scaleCommand in sync with the slider so the existing backend
    *  payload (`scale: scaleCommand`) carries the user's target file count.
@@ -1618,27 +1619,51 @@ export default function GalaxyStudioFactoryModal
   }, []);
 
   // ═══ STEP 1: PICK GENRE ═══
-  const transferToForge = async () => {
-    if (!onSendToForge || handoffBusy || step !== 'pick') return;
-    setHandoffBusy(true);
-    setDraftSaveError(null);
-    try {
+  const persistGalaxyDraft = async () => {
       const snapshot: GalaxyDraftSnapshot = {
         schema: GALAXY_DRAFT_SCHEMA, savedMs: Date.now(),
         title, gameVision, systemArch, worldLaws, agentInstructions,
         genreId: selectedGenre?.id ?? null, subgenreId: selectedSubgenre,
         extraGenreIds, extraSubgenreIds, multiGenreMode, quickMode,
         complexity, ageTarget, selectedEraId, ageEraYear,
+        targetFiles, scaleCommand, showDescriptions,
         classic: { graphicsEra, npcDensity, soundEra, worldSize, physicsRealism, aiComplexity, lightingEngine, particleEffects, destructionPhysics, narrativeBranching, economyComplexity, multiplayerMax, weatherSystems, dayNightCycle, animationFluidity, postProcessing, locomotionDepth, foliageDensity, waterSimulation, uiMinimalism, lootVariety, craftingDepth, dialogDepth, stealthMechanics, vehicleSimulation, biomeDiversity, factionReputation, skillSystem, goreSystem, moddingSupport, juice },
         styleChoices: { animationStyle, storylineStyle, gamePace, difficultyCurve, perspective, combatStyle, visualStyle, gameTone, progressionType, audioMood, locomotionStyle, cameraEffects },
         styleParams, extraParams, production: productionState,
         matrices: matrixValues, narrative: narrativePhaseValues,
       };
       await saveGalaxyDraft(snapshot);
-      onSendToForge({ title, vision: gameVision, genreId: selectedGenre?.id ?? null });
+  };
+
+  const transferToForge = async () => {
+    if (!onSendToForge || handoffLock.current || handoffBusy || step !== 'pick') return;
+    handoffLock.current = true;
+    setHandoffBusy(true);
+    setDraftSaveError(null);
+    try {
+      await persistGalaxyDraft();
+      await onSendToForge({ title, vision: gameVision, genreId: selectedGenre?.id ?? null });
     } catch {
-      setDraftSaveError('Galaxy draft could not be preserved locally. No navigation occurred.');
+      setDraftSaveError('Galaxy draft could not be transferred. No build was started.');
     } finally {
+      handoffLock.current = false;
+      setHandoffBusy(false);
+    }
+  };
+
+  const persistAndClose = async () => {
+    if (handoffLock.current) return;
+    if (step !== 'pick') { onClose(); return; }
+    handoffLock.current = true;
+    setHandoffBusy(true);
+    setDraftSaveError(null);
+    try {
+      await persistGalaxyDraft();
+      onClose();
+    } catch {
+      setDraftSaveError('Your Galaxy draft could not be saved locally. Close cancelled to prevent losing changes.');
+    } finally {
+      handoffLock.current = false;
       setHandoffBusy(false);
     }
   };
@@ -3461,7 +3486,7 @@ export default function GalaxyStudioFactoryModal
   const getSub = () => step === 'pick' ? `${genres.length} genres • ${manifest?.total_agents?.toLocaleString() || '28,894'} agents` : step === 'building' ? `Batch ${buildStatus?.bg_current_batch || buildStatus?.current_batch || 0}/${buildStatus?.total_batches || 10} • ${(buildStatus?.completed_phases || 0)}/${buildStatus?.total_phases || 100} phases • ${(buildStatus?.file_count || 0).toLocaleString()} files` : `${files?.total_files?.toLocaleString() || 0} files • ${files?.total_lines?.toLocaleString() || 0} lines`;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { void persistAndClose(); }}>
       <View style={s.container} testID="galaxy-studio-modal-root">
         <View style={s.header}>
           <TouchableOpacity testID="galaxy-studio-close-button" onPress={() => {
@@ -3470,7 +3495,7 @@ export default function GalaxyStudioFactoryModal
             if (showVault) { setShowVault(false); return; }
             if (step === 'done') { setStep('pick'); return; }
             if (step === 'building') { onClose(); return; }
-            onClose();
+            void persistAndClose();
           }} style={s.headerBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name={step === 'pick' && !showCode && !showVault && !showMLConsole ? 'close-outline' : 'arrow-back-outline'} size={24} color={T.text} />
           </TouchableOpacity>

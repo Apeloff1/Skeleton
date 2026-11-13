@@ -42,13 +42,13 @@ export default function GalaxyRoute() {
     return () => { mounted = false; };
   }, []);
 
-  const continueInForge = React.useCallback((selection: GalaxyBridgeSelection) => {
+  const continueInForge = React.useCallback(async (selection: GalaxyBridgeSelection): Promise<void> => {
     try {
-      void storeCreatorBridge(handoffFromGalaxy(selection, incoming))
-        .then(() => router.replace('/skeleton-forge?tab=build' as any))
-        .catch(() => setHandoffError('Could not save the Galaxy draft. Your current settings are unchanged.'));
+      await storeCreatorBridge(handoffFromGalaxy(selection, incoming));
+      router.replace('/skeleton-forge?tab=build' as any);
     } catch {
-      setHandoffError('Invalid Galaxy draft; nothing was transferred.');
+      setHandoffError('Could not hand off the Galaxy draft to GameForge. Nothing was built.');
+      throw new Error('Galaxy to GameForge handoff failed');
     }
   }, [router, incoming]);
 

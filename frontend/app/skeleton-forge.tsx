@@ -18,6 +18,7 @@ export default function SkeletonForgeRoute() {
   const router = useRouter();
   const [incoming, setIncoming] = React.useState<CreatorBridgeDraft | null>(null);
   const [ready, setReady] = React.useState(false);
+  const handoffInFlight = React.useRef(false);
   const [handoffError, setHandoffError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -30,11 +31,15 @@ export default function SkeletonForgeRoute() {
   }, []);
 
   const openGalaxy = React.useCallback((draft: QuestionnaireState) => {
+    if (handoffInFlight.current) return;
+    handoffInFlight.current = true;
     try {
       void storeCreatorBridge(handoffFromForge(draft))
         .then(() => router.push('/galaxy' as any))
-        .catch(() => setHandoffError('Could not save the GameForge draft. Navigation cancelled to preserve your work.'));
+        .catch(() => setHandoffError('Could not save the GameForge draft. Navigation cancelled to preserve your work.'))
+        .finally(() => { handoffInFlight.current = false; });
     } catch {
+      handoffInFlight.current = false;
       setHandoffError('Invalid GameForge draft; nothing was transferred.');
     }
   }, [router]);
