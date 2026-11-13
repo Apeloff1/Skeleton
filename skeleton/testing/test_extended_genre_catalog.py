@@ -81,6 +81,22 @@ class ExtendedGenreContractTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(len(set(actual)), 158)
 
+    def test_runtime_ai_tree_mirrors_are_identical(self):
+        root = Path(__file__).resolve().parents[2]
+        pairs = (
+            ("skeleton/context/questionnaire.py",
+             "skeleton/ai/runtime/context/questionnaire.py"),
+            ("skeleton/context/genre_catalog.py",
+             "skeleton/ai/runtime/context/genre_catalog.py"),
+        )
+        for canonical, mirror in pairs:
+            with self.subTest(canonical=canonical):
+                self.assertEqual(
+                    (root / canonical).read_bytes(),
+                    (root / mirror).read_bytes(),
+                    "canonical and AI runtime source trees diverged",
+                )
+
     def test_backend_http_route_advertises_same_catalog(self):
         from backend.routes.skeleton_gameforge import genres
         self.assertEqual(genres(), genre_catalog_payload())
