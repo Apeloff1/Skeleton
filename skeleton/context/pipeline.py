@@ -251,7 +251,13 @@ class GameForgeRun:
         if axis_overrides:
             payload["operator_axes"] = axis_overrides
         if galaxy_receipt:
-            payload["galaxy_profile"] = galaxy_receipt
+            payload["galaxy_profile"] = {
+                **galaxy_receipt,
+                "emitted": bool(
+                    run.succeeded and
+                    "design/galaxy_studio_profile.json" in (run.context.get("files") or {})
+                ),
+            }
         self.bus.emit("gameforge.run.finished", {
             "succeeded": run.succeeded,
             "era": payload["era"],

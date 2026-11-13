@@ -83,7 +83,9 @@ def normalise_galaxy_profile(raw: Optional[Mapping[str, Any]]) -> Optional[dict[
             raise ValueError("too many Galaxy matrix phases")
         for values in phases.values():
             if type(values) is not dict or len(values) > 128 or any(
-                type(value) not in (int, float) or not math.isfinite(value)
+                type(value) not in (int, float)
+                or (type(value) is int and value.bit_length() > 53)
+                or (type(value) is float and not math.isfinite(value))
                 or not 0 <= value <= 1000
                 for value in values.values()
             ):

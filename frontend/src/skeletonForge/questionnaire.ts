@@ -249,7 +249,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   for (const [k, v] of Object.entries(state.brief)) answers[k] = v;
   for (const [k, v] of Object.entries(state.beats)) answers[k] = v;
   const request: RunRequest = {
-    vision: specializedVision(state.vision, state.galaxyGenre, VISION_MAX),
+    vision: state.galaxyProfile ? state.vision.trim().slice(0, VISION_MAX) : specializedVision(state.vision, state.galaxyGenre, VISION_MAX),
     era: state.options.era,
     archetype: state.options.archetype || 'auto',
     target: state.options.target || 'godot',
