@@ -325,3 +325,40 @@ test('legacy projects without newly recovered controls retain authorship and gai
   assert.equal(saved.projects[0].questionnaire.sourceExport.enabled, false);
 });
 
+
+test('explicit legacy import cannot overwrite existing account projects and is blocked without access', () => {
+  const owned = project('shared-id', {
+    title: 'My current account project',
+    questionnaire: m.freshQuestionnaire(),
+  });
+  const legacyDuplicate = project('shared-id', {
+    title: 'Older unscoped copy should not overwrite current project',
+  });
+  const legacyNew = project('old-original', {
+    title: 'Original archive recovered by consent',
+    questionnaire: {
+      step: 'brief', vision: 'A historical original game',
+      brief: { genre: 'rpg' }, beats: {},
+      options: { target: 'godot', archetype: 'auto', era: null, generation: null },
+    },
+  });
+  const before = base({ projects: [owned] });
+  const imported = m.foundationReducer(before, {
+    type: 'importLegacy', projects: [legacyDuplicate, legacyNew],
+  });
+  assert.deepEqual(imported.projects.map(x => x.id), ['old-original', 'shared-id']);
+  assert.equal(imported.projects[1].title, owned.title);
+  assert.equal(imported.projects[0].questionnaire.vision, 'A historical original game');
+  assert.equal(imported.projects[0].questionnaire.sourceExport.enabled, false);
+  assert.equal(m.foundationReducer(before, {
+    type: 'importLegacy', projects: [legacyNew, { id: null }],
+  }), before, 'one corrupt entry must not partially import legacy data');
+  assert.equal(m.foundationReducer(
+    base({ projects: [owned], auth: signedOutEnforced() }),
+    { type: 'importLegacy', projects: [legacyNew] },
+  ).projects.length, 1);
+  assert.equal(m.foundationReducer(
+    base({ projects: [owned], holdSaves: true }),
+    { type: 'importLegacy', projects: [legacyNew] },
+  ).projects.length, 1);
+});
