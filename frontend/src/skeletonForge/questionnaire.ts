@@ -8,6 +8,7 @@
  * answered (skeleton/context/questionnaire.intake), and the UI says so.
  */
 import type { Beat, RunRequest } from './types';
+import { isDesignAxis, normaliseAxisEdit, sparseInstrumentPayload } from './instruments';
 
 export const STEPS = ['vision', 'brief', 'beats', 'options', 'review'] as const;
 export type Step = typeof STEPS[number];
@@ -71,6 +72,8 @@ export interface QuestionnaireState {
   vision: string;
   brief: Record<string, string>;
   beats: Record<string, string>;
+  /** Explicit overrides only; an absent axis remains driven by the forge. */
+  instruments: Record<string, number>;
   options: ForgeOptions;
 }
 
@@ -78,6 +81,8 @@ export type QuestionnaireAction =
   | { type: 'setVision'; vision: string }
   | { type: 'setBrief'; facet: string; value: string | null }
   | { type: 'setBeat'; beat: string; value: string | null }
+  | { type: 'setAxis'; axis: string; value: number | null }
+  | { type: 'resetAxes' }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'next' }
   | { type: 'back' }
@@ -89,6 +94,7 @@ export const INITIAL_STATE: QuestionnaireState = {
   vision: '',
   brief: {},
   beats: {},
+  instruments: {},
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
 };
 
@@ -132,6 +138,19 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       return { ...state, brief: toggle(state.brief, action.facet, action.value) };
     case 'setBeat':
       return { ...state, beats: toggle(state.beats, action.beat, action.value) };
+    case 'setAxis': {
+      if (!isDesignAxis(action.axis)) return state;
+      const instruments = { ...(state.instruments || {}) };
+      if (action.value === null) delete instruments[action.axis];
+      else {
+        const value = normaliseAxisEdit(action.value);
+        if (value === null) return state;
+        instruments[action.axis] = value;
+      }
+      return { ...state, instruments };
+    }
+    case 'resetAxes':
+      return { ...state, instruments: {} };
     case 'setOption': {
       const value = action.value === '' ? null : action.value;
       if (action.key === 'archetype' || action.key === 'target') {
@@ -194,7 +213,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   // exists in both); a beat answer wins because beats are authoritative.
   for (const [k, v] of Object.entries(state.brief)) answers[k] = v;
   for (const [k, v] of Object.entries(state.beats)) answers[k] = v;
-  return {
+  const request: RunRequest = {
     vision: state.vision.trim().slice(0, VISION_MAX),
     era: state.options.era,
     archetype: state.options.archetype || 'auto',
@@ -202,6 +221,9 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
     generation: state.options.generation,
     answers,
   };
+  const instrumentAxes = sparseInstrumentPayload(state.instruments);
+  if (Object.keys(instrumentAxes).length) request.operator_axes = instrumentAxes;
+  return request;
 }
 
 /** Collisions where a beat answer shadows a brief facet of the same id. */

@@ -6,6 +6,8 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { humanize } from '../graph';
+import { DESIGN_AXES } from '../instruments';
+import DesignInstruments from './DesignInstruments';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
   blockReason, buildRunRequest, eraSource, progress, reachable, shadowedBriefFacets, stepIndex,
@@ -167,6 +169,7 @@ function BeatsStep({ state, dispatch, beats, beatsLive }: QuestionnaireFlowProps
 }
 
 function OptionsStep({ state, dispatch, eras = [], generations = [] }: QuestionnaireFlowProps) {
+  const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
   return (
     <Card>
       <View accessibilityRole="radiogroup" accessibilityLabel="Forge archetype" style={st.group}>
@@ -213,6 +216,20 @@ function OptionsStep({ state, dispatch, eras = [], generations = [] }: Questionn
           </View>
         </View>
       ) : null}
+      <View style={st.group}>
+        <Button
+          label={instrumentsOpen ? 'Hide design instruments' : 'Advanced: ten design sliders / knobs'}
+          tone="secondary" compact onPress={() => setInstrumentsOpen((v) => !v)}
+          testID="q-design-instruments-toggle"
+        />
+      </View>
+      {instrumentsOpen ? (
+        <DesignInstruments
+          axes={state.instruments || {}}
+          onAxis={(axis, value) => dispatch({ type: 'setAxis', axis, value })}
+          onReset={() => dispatch({ type: 'resetAxes' })}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -240,6 +257,7 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Beats" v={beatsTxt || '—'} />
       <Row k="Archetype" v={arch?.label ?? req.archetype} />
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
+      {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
       <Row k="Era" v={req.era ? humanize(req.era) : 'decided by the forge'} />
       {req.generation ? <Row k="Hardware" v={humanize(req.generation)} /> : null}
       <Banner tone="idle">{ERA_SOURCE_COPY[eraSource(state)]}</Banner>
