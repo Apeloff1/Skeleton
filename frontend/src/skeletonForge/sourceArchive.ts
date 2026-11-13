@@ -19,26 +19,41 @@ export interface GodotSourceArchive {
   manifestSha256: string;
 }
 
-function utf8(text: string): Uint8Array {
-  const out: number[] = [];
+function utf8(text: string, maxBytes: number = MAX_EXPORT_SOURCE_BYTES): Uint8Array {
+  // Two bounded passes use one exact-size typed array instead of a boxed
+  // number[] with high transient memory pressure on Hermes/mobile runtimes.
+  // Reject lone UTF-16 surrogates before allocating or changing source bytes.
+  let size = 0;
   for (let i = 0; i < text.length; i++) {
-    const n = text.codePointAt(i)!;
-    // Malformed UTF-16 must never be silently encoded as a different file
-    // from the source hashed by the canonical Python projector.
-    if (n >= 0xd800 && n <= 0xdfff) {
+    const scalar = text.codePointAt(i)!;
+    if (scalar >= 0xd800 && scalar <= 0xdfff) {
       throw new Error('Godot source contains an invalid UTF-16 surrogate');
     }
+    if (scalar > 0xffff) i++;
+    size += scalar < 0x80 ? 1 : scalar < 0x800 ? 2 : scalar < 0x10000 ? 3 : 4;
+    if (size > maxBytes) throw new Error('Godot export exceeds the 8 MiB source budget');
+  }
+  const encoded = new Uint8Array(size);
+  let offset = 0;
+  for (let i = 0; i < text.length; i++) {
+    const n = text.codePointAt(i)!;
     if (n > 0xffff) i++;
-    if (n < 0x80) out.push(n);
-    else if (n < 0x800) out.push(0xc0 | (n >> 6), 0x80 | (n & 63));
-    else if (n < 0x10000) {
-      out.push(0xe0 | (n >> 12), 0x80 | ((n >> 6) & 63), 0x80 | (n & 63));
+    if (n < 0x80) encoded[offset++] = n;
+    else if (n < 0x800) {
+      encoded[offset++] = 0xc0 | (n >> 6);
+      encoded[offset++] = 0x80 | (n & 63);
+    } else if (n < 0x10000) {
+      encoded[offset++] = 0xe0 | (n >> 12);
+      encoded[offset++] = 0x80 | ((n >> 6) & 63);
+      encoded[offset++] = 0x80 | (n & 63);
     } else {
-      out.push(0xf0 | (n >> 18), 0x80 | ((n >> 12) & 63),
-        0x80 | ((n >> 6) & 63), 0x80 | (n & 63));
+      encoded[offset++] = 0xf0 | (n >> 18);
+      encoded[offset++] = 0x80 | ((n >> 12) & 63);
+      encoded[offset++] = 0x80 | ((n >> 6) & 63);
+      encoded[offset++] = 0x80 | (n & 63);
     }
   }
-  return Uint8Array.from(out);
+  return encoded;
 }
 
 // Explicitly initialize a typed table; ArrayLike without indexed entries
@@ -176,7 +191,8 @@ export function buildGodotSourceArchive(payload: RunPayload): GodotSourceArchive
       throw new Error('Case-colliding Godot project paths cannot be exported');
     }
     casefoldedNames.add(foldedName);
-    const encodedName = utf8(name), encodedBody = utf8(body);
+    const encodedName = utf8(name, 240);
+    const encodedBody = utf8(body, MAX_EXPORT_SOURCE_BYTES - sourceBytes);
     sourceBytes += encodedBody.length;
     if (sourceBytes > MAX_EXPORT_SOURCE_BYTES) throw new Error('Godot export exceeds the 8 MiB source budget');
     archiveBytes += 76 + 2 * encodedName.length + encodedBody.length;
