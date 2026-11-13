@@ -118,6 +118,7 @@ export type FoundationAction =
   | { type: 'signedOut' }
   | { type: 'setPrefs'; prefs: StudioPrefs }
   | { type: 'recordRun'; projectId: string; snapshot: RunSnapshot }
+  | { type: 'importLegacy'; projects: StudioProject[] }
   | { type: 'persistError'; error: string | null };
 
 const LOADING_AUTH: AuthView = {
@@ -336,6 +337,16 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
       return { ...state, prefs: sanitizePrefs(action.prefs) };
     case 'recordRun':
       return applyRecordRun(state, action.projectId, action.snapshot);
+    case 'importLegacy': {
+      if (!canEnter(state) || state.holdSaves) return state;
+      const existing = new Set(state.projects.map((project) => project.id));
+      const admitted = sanitizeProjects(action.projects);
+      if (admitted.corrupt) return state;
+      const fresh = admitted.projects.filter((project) => !existing.has(project.id));
+      // Original unscoped data remains read-only; never overwrite a
+      // current account's project with an ambiguous old project ID.
+      return fresh.length ? { ...state, projects: [...fresh, ...state.projects] } : state;
+    }
     case 'persistError':
       return { ...state, persistError: action.error };
     default:
@@ -567,6 +578,60 @@ export function sanitizeProjects(raw: unknown): { projects: StudioProject[]; cor
   }
   return { projects, corrupt: false };
 }
+
+/** Reconcile one edited Forge questionnaire into exactly its originating
+ * Studio project. ID and source revision must match; a concurrent edit or
+ * deleted project is never overwritten just because a bridge exists. */
+export function reconcileStudioReturn(
+  projects: readonly StudioProject[], projectId: string,
+  expectedUpdatedAt: string, questionnaire: QuestionnaireState,
+  at: string,
+): { status: 'applied' | 'conflict' | 'missing' | 'invalid'; projects: StudioProject[] } {
+  const snapshot = [...projects];
+  const index = snapshot.findIndex((p) => p.id === projectId);
+  if (index < 0) return { status: 'missing', projects: snapshot };
+  if (snapshot[index].updatedAt !== expectedUpdatedAt) {
+    return { status: 'conflict', projects: snapshot };
+  }
+  const draft = {
+    ...snapshot[index],
+    title: projectTitle(questionnaire.vision),
+    questionnaire,
+    updatedAt: at,
+  };
+  const vetted = sanitizeProjects([draft]);
+  if (vetted.corrupt || vetted.projects.length !== 1) {
+    return { status: 'invalid', projects: snapshot };
+  }
+  snapshot[index] = vetted.projects[0];
+  return { status: 'applied', projects: snapshot };
+}
+
+/** User-approved return from Forge: preserve edits as a new project if the
+ * original was changed/deleted while the cockpit was open. */
+export function recoverStudioReturnAsCopy(
+  projects: readonly StudioProject[], questionnaire: QuestionnaireState, at: string,
+): { project: StudioProject; projects: StudioProject[] } {
+  const occupied = new Set(projects.map((p) => p.id));
+  const stamp = Date.parse(at);
+  if (!Number.isFinite(stamp)) throw new Error('Invalid Studio return timestamp');
+  let id = '';
+  for (let index = 0; index < 128; index++) {
+    const proposed = 'p_return_' + Math.floor(stamp).toString(36) + '_' + index.toString(36);
+    if (!occupied.has(proposed)) { id = proposed; break; }
+  }
+  if (!id) throw new Error('No available Studio project ID for returned Forge edits');
+  const candidate: StudioProject = {
+    id, title: projectTitle(questionnaire.vision) + ' (Forge copy)',
+    createdAt: at, updatedAt: at, questionnaire, lastRun: null,
+  };
+  const checked = sanitizeProjects([candidate]);
+  if (checked.corrupt || checked.projects.length !== 1) {
+    throw new Error('Returned Forge questionnaire was invalid');
+  }
+  return { project: checked.projects[0], projects: [checked.projects[0], ...projects] };
+}
+
 
 export interface AuthClient {
   checkMe: () => Promise<AuthObservation>;

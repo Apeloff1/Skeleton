@@ -13,6 +13,11 @@ const ALLOWED_PREFIXES = new Set([
   '@skeleton_creator_bridge_v1',
   '@skeleton_galaxy_editor_draft_v1',
   '@skeleton_galaxy_profile_snapshot_v1',
+  // First-install Studio project records use the same owner-fenced storage
+  // as Forge, without attributing old unscoped drafts to a new account.
+  'skeleton.studio.onboarded.v1',
+  'skeleton.studio.projects.v1',
+  'skeleton.studio.prefs.v1',
 ]);
 
 export interface CreatorStorageScope {
