@@ -20,12 +20,32 @@ SELECTED_SCOPE = "code_debugging"
 SELECTED_CATEGORIES = ("gdscript", "debugging")
 
 
+def _record_text(value: object) -> str:
+    if type(value) is not str or not value.strip():
+        raise ValueError("reference records require nonempty string fields")
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeError:
+        raise ValueError("reference records require valid UTF-8 text") from None
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class ReferenceFact:
     fact_id: str
     kind: str
     statement: str
     source_urls: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        for value in (self.fact_id, self.kind, self.statement):
+            _record_text(value)
+        if self.kind not in {"api", "derived_pattern"}:
+            raise ValueError("unsupported reference fact kind")
+        if not isinstance(self.source_urls, (tuple, list)) or not self.source_urls:
+            raise ValueError("reference facts require a finite source URL sequence")
+        # Own the sequence rather than retaining a caller's mutable list.
+        object.__setattr__(self, "source_urls", tuple(_record_text(url) for url in self.source_urls))
 
 
 _DOCS = "https://docs.godotengine.org/en/4.6/"
@@ -94,6 +114,12 @@ class ReferencePack:
     """Immutable source snapshot; selection uses category, never task identity."""
 
     facts: tuple[ReferenceFact, ...] = _FACTS
+
+    def __post_init__(self) -> None:
+        if (not isinstance(self.facts, (tuple, list)) or not self.facts
+                or any(type(fact) is not ReferenceFact for fact in self.facts)):
+            raise ValueError("reference packs require a finite sequence of ReferenceFact records")
+        object.__setattr__(self, "facts", tuple(self.facts))
 
     @property
     def context_text(self) -> str:

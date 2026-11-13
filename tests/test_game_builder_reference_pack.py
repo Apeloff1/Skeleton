@@ -114,6 +114,51 @@ def test_frozen_records_and_returned_metadata_do_not_create_mutable_authority():
     assert pack.to_wire()["categories"] == ["gdscript", "debugging"]
 
 
+def test_fact_constructor_copies_caller_source_url_list():
+    original = references.load_reference_pack("godot46")
+    urls = list(original.facts[0].source_urls)
+    fact = replace(original.facts[0], source_urls=urls)
+    urls[0] = "https://example.invalid/replaced"
+    urls.append("https://example.invalid/extra")
+    assert type(fact.source_urls) is tuple
+    assert fact.source_urls == original.facts[0].source_urls
+
+
+def test_pack_constructor_copies_caller_fact_list_without_changing_default_identity():
+    original = references.load_reference_pack("godot46")
+    facts = list(original.facts)
+    pack = references.ReferencePack(facts)
+    context, identity = pack.context_text, pack.digest
+    facts[0] = replace(facts[0], statement="Changed outside the pack")
+    facts.clear()
+    assert type(pack.facts) is tuple
+    assert pack.context_text == context == original.context_text
+    assert pack.digest == identity == original.digest
+    assert identity == "cd88d2c65b1413157cf4c9fb78bd83e61f8c9d77600f2aa03ac00a763306bf72"
+    assert len(context.encode("utf-8")) == 1309
+
+
+@pytest.mark.parametrize("urls", [None, "https://example.invalid", {}, [], [None], [3], [""], ["\ud800"]])
+def test_constructor_rejects_invalid_source_url_records(urls):
+    with pytest.raises(ValueError):
+        replace(references.load_reference_pack("godot46").facts[0], source_urls=urls)
+
+
+@pytest.mark.parametrize("changes", [
+    {"fact_id": None}, {"fact_id": ""}, {"kind": "unknown"},
+    {"statement": []}, {"statement": " "}, {"statement": "\ud800"},
+])
+def test_constructor_rejects_invalid_fact_string_fields(changes):
+    with pytest.raises(ValueError):
+        replace(references.load_reference_pack("godot46").facts[0], **changes)
+
+
+@pytest.mark.parametrize("facts", [None, "not facts", {}, [], [None], [{}], [True]])
+def test_constructor_rejects_non_fact_pack_entries(facts):
+    with pytest.raises(ValueError):
+        references.ReferencePack(facts)
+
+
 def test_reference_data_has_no_taskbank_scorer_answer_keys_or_external_runtime_imports():
     source = inspect.getsource(references)
     tree = ast.parse(source)

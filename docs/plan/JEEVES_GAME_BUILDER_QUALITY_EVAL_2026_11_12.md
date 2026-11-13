@@ -564,3 +564,9 @@ there is no automatic promotion or general model ranking. The paired regression,
 known scorer limitations, and all adverse outputs remain in the record. Further
 grounding or product changes require separately recorded development experiments
 and independent task/code/gameplay acceptance before claiming broader quality.
+
+After measurement, constructor hardening copied caller-supplied fact/source-URL
+lists into owned tuples and validated their record types. The default context
+remains exactly 1309 bytes with the same canonical pack digest. Original measured
+source snapshots remain intact; the new constructor behavior was tested without
+another model campaign and is not represented as newly measured model quality.
