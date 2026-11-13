@@ -67,8 +67,19 @@ test('complete historical backend genre vote vocabulary is available in the crea
     'fighting', 'puzzle', 'deckbuilder', 'card', 'battle-royale', 'mmo',
     'mmorpg', 'visual-novel', 'narrative', 'cozy', 'arcade', 'bullet-heaven',
   ];
-  assert.deepEqual(new Set(genres), new Set(expected));
-  assert.equal(new Set(genres).size, expected.length);
+  const catalog = load('src/skeletonForge/genreCatalog.ts');
+  assert.equal(expected.length, 36);
+  assert.equal(genres.length, 158);
+  assert.equal(new Set(genres).size, 158);
+  assert.ok(expected.every((genre) => genres.includes(genre)), 'all 36 historical genres remain selectable');
+  assert.deepEqual(genres, catalog.GENRE_CHOICES);
+  assert.equal(catalog.GENRE_GROUPS.length, 11);
+  assert.deepEqual(new Set(catalog.POPULAR_GENRES), new Set(expected));
+  assert.deepEqual(catalog.filterGenreChoices('colony'), ['colony-sim']);
+  assert.deepEqual(catalog.filterGenreChoices('racing').sort(), ['arcade-racing', 'kart-racing', 'racing', 'sim-racing'].sort());
+  assert.ok(catalog.filterGenreChoices('', 'horror-suspense').includes('survival-horror'));
+  assert.deepEqual(catalog.filterGenreChoices('', 'does-not-exist'), []);
+  assert.equal(catalog.filterGenreChoices('  ' ,'popular').length, 36);
 });
 
 
@@ -81,4 +92,17 @@ test('the legacy full Galaxy matrix questionnaire is reachable from Forge option
   assert.match(text(html), /14 production matrices/);
   assert.match(text(html), /100 extended sliders/);
   assert.match(html, /data-testid="q-open-galaxy-studio"/);
+});
+
+test('expanded 158-genre creator brief exposes categorized search without losing prior selection', () => {
+  const state = { ...Q.INITIAL_STATE, step: 'brief', vision: 'a strategy and racing game', brief: { genre: 'city-builder' } };
+  const html = render(h(Flow, { state, dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {} }));
+  assert.match(text(html), /158 selectable game genres and subgenres/);
+  assert.match(html, /data-testid="q-genre-search"/);
+  assert.match(html, /data-testid="q-genre-family-racing-sports"/);
+  assert.match(html, /data-testid="q-brief-genre-city-builder"/);
+  assert.match(text(html), /not a promise of a dedicated playable engine/);
+  const built = Q.buildRunRequest(state);
+  assert.equal(built.answers.genre, 'city-builder');
+  assert.equal(Q.buildRunRequest({ ...state, brief: { genre: 'colony-sim' } }).answers.genre, 'colony-sim');
 });

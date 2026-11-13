@@ -83,3 +83,13 @@ run types. This is discovery/workflow continuity, NOT a claim that all 14
 matrices have become canonical GameForge runtime inputs.** That schema mapping
 requires project-scoped handoff with explicit ownership, versioned validation,
 provenance and gameplay/export acceptance rather than blind JSON pass-through.
+
+
+## Follow-up: 158-genre creator taxonomy (stacked review)
+
+The 36 genres above were the complete *legacy brief-vote vocabulary*, not the
+full range of game genres requested by the owner. A stacked, review-only
+follow-up introduces 158 searchable categories and subgenres (preserving all
+36 legacy era votes), with parity tests and a read-only `/api/skeleton/genres`
+endpoint. See `docs/creation/EXPANDED_GAME_GENRE_CATALOG_20261113.md`.
+This is intake classification, not 158 verified distinct gameplay runtimes.
