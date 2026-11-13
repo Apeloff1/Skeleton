@@ -128,7 +128,7 @@ function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => vo
         result.projects, returned.studioProjectId,
         returned.studioProjectUpdatedAt, restored, at,
       );
-      const originalUpdated = reconciled.status === 'applied';
+      const originalUpdated = reconciled.status === 'applied' || reconciled.status === 'already-applied';
       const projects = originalUpdated ? reconciled.projects
         : recoverStudioReturnAsCopy(result.projects, restored, at).projects;
       await saveFoundation(store, {

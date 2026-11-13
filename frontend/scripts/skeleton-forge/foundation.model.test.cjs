@@ -444,7 +444,11 @@ test('returning cockpit edits respects the exact Studio project revision', () =>
   assert.equal(applied.projects[0].id, original.id);
   assert.equal(applied.projects[0].questionnaire.vision, 'A new authored game world');
   assert.equal(applied.projects[0].updatedAt, nextDate);
-  const conflict = m.reconcileStudioReturn(applied.projects, 'p_origin', AT, newState, nextDate);
+  const retried = m.reconcileStudioReturn(applied.projects, 'p_origin', AT, newState, nextDate);
+  assert.equal(retried.status, 'already-applied');
+  assert.equal(retried.projects[0].updatedAt, nextDate);
+  const different = Q.questionnaireReducer(newState, { type: 'setAxis', axis: 'risk', value: 0.6 });
+  const conflict = m.reconcileStudioReturn(applied.projects, 'p_origin', AT, different, nextDate);
   assert.equal(conflict.status, 'conflict');
   assert.equal(conflict.projects[0].updatedAt, nextDate);
   assert.equal(m.reconcileStudioReturn([original], 'nonexistent', AT, newState, nextDate).status, 'missing');
@@ -627,5 +631,33 @@ test('same-millisecond Studio edits advance revision and protect advanced-cockpi
   assert.ok(Date.parse(finished.projects[0].updatedAt) > Date.parse(two));
   assert.equal(m.nextStudioRevision(one, AT), two);
   assert.throws(() => m.nextStudioRevision('not-a-date', AT), /Invalid Studio source revision/);
+});
+
+
+test('a committed Studio return can be acknowledged after a failed handoff delete', () => {
+  const original = project('p_durable', {
+    questionnaire: Q.questionnaireReducer(m.freshQuestionnaire(), {
+      type: 'setVision', vision: 'My original prototype',
+    }),
+  });
+  const edited = Q.questionnaireReducer(original.questionnaire, {
+    type: 'setAxis', axis: 'tempo', value: 0.4,
+  });
+  const committed = m.reconcileStudioReturn(
+    [original], original.id, original.updatedAt, edited, '2026-11-13T23:15:00.000Z',
+  );
+  assert.equal(committed.status, 'applied');
+  const retried = m.reconcileStudioReturn(
+    committed.projects, original.id, original.updatedAt, edited, '2026-11-13T23:15:01.000Z',
+  );
+  assert.equal(retried.status, 'already-applied');
+  assert.deepEqual(retried.projects, committed.projects);
+  const conflicting = Q.questionnaireReducer(edited, {
+    type: 'setAxis', axis: 'tempo', value: 0.9,
+  });
+  assert.equal(m.reconcileStudioReturn(
+    committed.projects, original.id, original.updatedAt, conflicting,
+    '2026-11-13T23:15:01.000Z',
+  ).status, 'conflict');
 });
 
