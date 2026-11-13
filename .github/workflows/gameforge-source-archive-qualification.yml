@@ -1,0 +1,73 @@
+name: Bounded GameForge exact-run source archive qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "backend/routes/skeleton_gameforge.py"
+      - "skeleton/testing/test_gameforge_source_archive.py"
+      - "frontend/src/skeletonForge/sourceArchive.ts"
+      - "frontend/src/skeletonForge/shareSourceArchive.ts"
+      - "frontend/src/skeletonForge/hooks.ts"
+      - "frontend/src/skeletonForge/components/**"
+      - "frontend/scripts/skeleton-forge/source-archive.test.cjs"
+      - "frontend/scripts/skeleton-forge/run-session-isolation.test.cjs"
+      - ".github/workflows/gameforge-source-archive-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-source-archive-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  python_source:
+    name: Exact-run source export API and custody contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout final PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install bounded test prerequisites
+        run: python -m pip install --disable-pip-version-check "pytest==8.4.2" "fastapi>=0.115,<0.165" "pydantic>=2.10,<3"
+      - name: Source export contracts (no real native executable)
+        env:
+          PYTHONPATH: ".:backend"
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest skeleton/testing/test_gameforge_source_archive.py backend/tests/test_native_eight_scene_api.py
+
+  frontend_source:
+    name: Offline Godot ZIP and account-bound privacy contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout final PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Activate pinned package manager
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+      - name: Install from frozen manifest
+        working-directory: frontend
+        run: yarn install --frozen-lockfile --ignore-scripts --non-interactive
+      - name: Archive, privacy and eight-scene frontend tests
+        working-directory: frontend
+        run: node --test scripts/skeleton-forge/source-archive.test.cjs scripts/skeleton-forge/run-session-isolation.test.cjs scripts/skeleton-forge/native-scene-qualification.test.cjs
+      - name: Typecheck full frontend
+        working-directory: frontend
+        run: yarn typecheck

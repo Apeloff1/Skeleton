@@ -241,6 +241,17 @@ export interface RunPayload {
   };
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];
+  /** Actual source bodies are returned only for an explicit bounded export. */
+  files?: Record<string, string>;
+  source_manifest?: {
+    schema?: string; file_count?: number; sha256?: string;
+    files?: Record<string, string>;
+  } | null;
+  source_export?: {
+    status?: 'ready' | 'unavailable';
+    bytes?: number; file_count?: number;
+    manifest_sha256?: string; reason?: string;
+  } | null;
   [k: string]: unknown;
 }
 

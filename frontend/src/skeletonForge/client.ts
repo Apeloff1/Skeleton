@@ -81,7 +81,9 @@ export function runForge(req: RunRequest, signal?: AbortSignal): Promise<ApiResu
   // separate authored playable scene. The ordinary request keeps its original
   // 3-minute bound; native proof has an independently bounded 8-minute cap.
   const nativeProof = req.playtest === 'auto' || req.playtest === 'require';
-  return api.post(`${SKELETON_API}/run`, { ...req, include_files: false }, {
+  return api.post(`${SKELETON_API}/run`, {
+    ...req, include_files: req.include_files === true,
+  }, {
     signal, timeoutMs: nativeProof ? 480000 : 180000, retries: 0,
   });
 }
