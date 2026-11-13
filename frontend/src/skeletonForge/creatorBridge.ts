@@ -17,8 +17,8 @@ export interface CreatorBridgeDraft {
   target: CreatorBridgeTarget;
   createdMs: number;
   /** Optional first-install Studio project origin, never a URL or account ID. */
-  studioProjectId: string | null;
-  studioProjectUpdatedAt: string | null;
+  studioProjectId?: string | null;
+  studioProjectUpdatedAt?: string | null;
   /** Retain the user's current place in the questionnaire. */
   step: QuestionnaireState['step'];
   vision: string;
@@ -132,10 +132,13 @@ export function handoffFromForge(
   state: QuestionnaireState, now: number = Date.now(),
   origin: CreatorBridgeDraft | null = null,
 ): CreatorBridgeDraft {
+  // Accept session metadata only from a previously verified Forge handoff.
+  // Older v1 drafts without optional Studio fields continue to parse.
+  const admittedOrigin = origin ? parseCreatorBridge(origin, 'forge', origin.createdMs) : null;
   const raw = {
     schema: CREATOR_BRIDGE_SCHEMA, target: 'galaxy', createdMs: now,
-    studioProjectId: origin?.studioProjectId ?? null,
-    studioProjectUpdatedAt: origin?.studioProjectUpdatedAt ?? null,
+    studioProjectId: admittedOrigin?.studioProjectId ?? null,
+    studioProjectUpdatedAt: admittedOrigin?.studioProjectUpdatedAt ?? null,
     step: state.step, vision: state.vision, brief: state.brief, beats: state.beats,
     instruments: state.instruments, galaxyGenre: state.galaxyGenre,
     options: state.options, quest: state.quest,
