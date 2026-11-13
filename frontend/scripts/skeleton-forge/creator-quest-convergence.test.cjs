@@ -64,6 +64,18 @@ test('JSON target suppresses only native quest, keeping genre and authored desig
   assert.match(text(screen({ ...state, step: 'review' })), /Native room quests are disabled/);
 });
 
+test('native scene opt-in explains rendered goals and touch controls, without overclaiming 158 engines', () => {
+  const state = reduce(
+    { type: 'setVision', vision: 'A tactile original action game' },
+    { type: 'setPlayableEnabled', value: true },
+  );
+  const ui = text(screen({ ...state, step: 'options' }));
+  assert.match(ui, /draw visible objectives, live progress indicators/);
+  assert.match(ui, /touch\/keyboard directional controller/);
+  assert.match(ui, /three independent playable scenes/);
+  assert.match(ui, /not a claim of 158 gameplay engines/);
+});
+
 test('native playable sidecar and room quest compose in the same Godot source request', () => {
   const state = reduce(
     { type: 'setVision', vision: 'An original planetary supply-chain escape game' },

@@ -43,6 +43,14 @@ def test_each_gameplay_archetype_produces_actual_godot_loop_scripts(archetype: s
     assert COMPLETE_MARKER in generated[f"scripts/archetypes/{archetype}/core_loop.gd"]
     assert FAILED_MARKER in generated[f"scripts/archetypes/{archetype}/core_loop.gd"]
     assert "func _physics_process" in generated[f"scripts/archetypes/{archetype}/player_controller.gd"]
+    loop = generated[f"scripts/archetypes/{archetype}/core_loop.gd"]
+    assert "ForgeGameplayHUD" in loop and "TouchControls" in loop
+    assert "func _draw_objectives() -> void:" in loop
+    assert "func _hud_status() -> String:" in loop
+    assert "draw_circle(player.global_position" in loop
+    assert 'Input.action_press(action)' in loop
+    assert 'Input.action_release(action)' in loop
+    assert 'DisplayServer.get_name() == "headless"' in loop
     assert "CharacterBody2D" in generated[f"scenes/archetypes/{archetype}/main.tscn"]
     ok, problems = check_ok(generated)
     assert ok, problems

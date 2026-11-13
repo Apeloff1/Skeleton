@@ -261,7 +261,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
       <View style={st.group} testID="q-playable-content-controls" accessibilityRole="radiogroup" accessibilityLabel="Playable Godot prototype scene">
         <Text style={st.q}>Playable Godot prototype scene</Text>
-        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Extraction, Combat Loop and Pipeline have dedicated prototypes. Compose from vision uses Extraction as its fallback playable scene. The generated main world now includes an in-game button to launch this prototype and return again. It is an independently playable scene, not a claim of 158 gameplay engines.</Text>
+        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Extraction, Combat Loop and Pipeline have dedicated prototypes. Compose from vision uses Extraction as its fallback playable scene. The generated main world now includes an in-game button to launch this prototype and return again. All three prototypes draw visible objectives, live progress indicators and a touch/keyboard directional controller; headless Godot tests still run separately. This remains three independent playable scenes, not a claim of 158 gameplay engines.</Text>
         <View style={st.chips}>
           <Chip label="Blueprint only" selected={!state.playable?.enabled}
             onPress={() => dispatch({ type: 'setPlayableEnabled', value: false })}

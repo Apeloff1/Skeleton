@@ -51,6 +51,20 @@ def test_archetype_files_are_complete(name):
     assert 'Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")' in controller
     assert "func _tick(" in loop and COMPLETE_MARKER in loop and FAILED_MARKER in loop
     assert "{{" not in loop and "}}" not in loop
+    # Actual non-headless gameplay must show objectives, controls and player
+    # movement, not an invisible script declaring a completed win marker.
+    assert "func _draw() -> void:" in loop
+    assert "func _draw_objectives() -> void:" in loop
+    assert "func _hud_status() -> String:" in loop
+    assert "draw_circle(player.global_position" in loop
+    assert "queue_redraw()" in loop
+    assert "ForgeGameplayHUD" in loop and "TouchControls" in loop
+    assert "Control.PRESET_BOTTOM_LEFT" in loop
+    assert "Input.action_press(action)" in loop
+    assert "Input.action_release(action)" in loop
+    assert 'DisplayServer.get_name() == "headless"' in loop
+    assert "Completed:" not in loop  # explicit outcome is uppercase
+    assert "COMPLETED: " in loop and "FAILED: " in loop
 
 
 @pytest.mark.parametrize("name", content_archetypes())
