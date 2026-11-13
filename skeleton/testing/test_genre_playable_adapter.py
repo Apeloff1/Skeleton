@@ -105,3 +105,13 @@ def test_unknown_genres_and_conflicting_binding_overrides_fail_closed():
             "move": [{"control": "keyboard:key.e", "modifiers": [], "scale": 1.0,
                       "axis": "x", "deadzone": 0.0}]
         })
+
+
+def test_noncanonical_override_payload_rejected_even_with_recomputed_digest():
+    from skeleton.game.gameplay.flgb_gameplay_runtime import dig
+    good = play_genre_campaign(game(), "rpg", [event(0, "keyboard", "key.d")])
+    forged = deepcopy(good)
+    forged["overrides"] = {"move": []}
+    forged["digest"] = dig({k: v for k, v in forged.items() if k != "digest"})
+    with pytest.raises(GameplayContractError):
+        verify_genre_campaign(game(), forged)

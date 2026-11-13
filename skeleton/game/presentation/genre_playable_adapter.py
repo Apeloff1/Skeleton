@@ -19,7 +19,7 @@ from skeleton.game.gameplay.flgb_gameplay_runtime import dig, GameplayContractEr
 from skeleton.game.gameplay.offline_grid_campaign import Campaign
 from skeleton.game.presentation.input_actions import Binding, InputContractError
 from skeleton.game.presentation.genre_action_profiles import genre_action_map
-from skeleton.game.presentation.input_router import InputProfile, InputEvent
+from skeleton.game.presentation.input_router import InputProfile
 from skeleton.game.presentation.input_gameplay_bridge import play_inputs, verify_input_gameplay
 from skeleton.game.presentation.flgb_presentation_runtime import PresentationContractError
 
@@ -110,29 +110,19 @@ def play_genre_campaign(
     body = {
         "schema": SCHEMA,
         "genre": genre,
-        "overrides": scheme_overrides(overrides),
+        "overrides": scheme_overrides(genre, overrides),
         "profile": profile.manifest(),
         "gameplay": report,
     }
     return {**body, "digest": dig(body)}
 
 
-def scheme_overrides(overrides: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Canonicalize user remaps and drop aliasing into the report source."""
-    if overrides is None:
-        return {}
-    # B024 validates every key, chord, scale and conflict before we serialize.
-    # The exported normalized form becomes the replay authority.
-    from skeleton.game.presentation.genre_action_profiles import genre_action_map
-    # This helper is deliberately not a second authority for validation;
-    # profile import is verified against the particular genre by the caller.
-    if not isinstance(overrides, Mapping):
-        raise InputContractError("overrides must be a mapping")
-    import json
-    try:
-        return json.loads(json.dumps(dict(overrides), sort_keys=True, allow_nan=False))
-    except (ValueError, TypeError) as exc:
-        raise InputContractError("invalid remap serialization") from exc
+def scheme_overrides(genre: str, overrides: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Export the exact validated, replayable B024 remap, never raw input."""
+    scheme = genre_action_map(genre)
+    if overrides is not None:
+        scheme.import_overrides(overrides)
+    return scheme.export_overrides()
 
 
 def verify_genre_campaign(campaign: Campaign, value: Any) -> dict[str, Any]:
@@ -143,8 +133,14 @@ def verify_genre_campaign(campaign: Campaign, value: Any) -> dict[str, Any]:
     if type(value["genre"]) is not str or type(value["overrides"]) is not dict:
         raise GameplayContractError("invalid genre-playable report source")
     body = {k: val for k, val in value.items() if k != "digest"}
-    if value["digest"] != dig(body):
-        raise GameplayContractError("genre-playable source checksum mismatch")
+    try:
+        if value["digest"] != dig(body):
+            raise GameplayContractError("genre-playable source checksum mismatch")
+        canonical = scheme_overrides(value["genre"], value["overrides"])
+        if value["overrides"] != canonical:
+            raise GameplayContractError("genre-playable remap is not canonical")
+    except (InputContractError, TypeError, ValueError, OverflowError) as exc:
+        raise GameplayContractError("invalid genre-playable source") from exc
     try:
         profile = playable_input_profile(value["genre"], value["overrides"])
     except (InputContractError, PresentationContractError) as exc:
