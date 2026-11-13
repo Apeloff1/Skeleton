@@ -10,6 +10,7 @@ module consumes them through small typed seams (``RouteChoice`` and
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 from typing import Callable, Mapping, Sequence
 
 from skeleton.frontier.runtime.model_router_contract import (
@@ -25,6 +26,13 @@ class BudgetExceeded(RuntimeError):
     """Raised when an attempted step would breach a hard budget."""
 
 
+def _finite_nonnegative(name: str, value: object) -> float:
+    if (isinstance(value, bool) or not isinstance(value, (float, int))
+            or not math.isfinite(value) or value < 0):
+        raise ValueError(f"{name} must be a finite non-negative number")
+    return float(value)
+
+
 @dataclass(frozen=True)
 class Budget:
     max_mutations: int
@@ -32,8 +40,10 @@ class Budget:
     max_cost: float
 
     def __post_init__(self) -> None:
-        if self.max_mutations < 0 or self.max_seconds < 0 or self.max_cost < 0:
-            raise ValueError("budgets must be non-negative")
+        if type(self.max_mutations) is not int or self.max_mutations < 0:
+            raise ValueError("max_mutations must be a non-negative integer")
+        _finite_nonnegative("max_seconds", self.max_seconds)
+        _finite_nonnegative("max_cost", self.max_cost)
 
 
 @dataclass(frozen=True)
@@ -47,6 +57,11 @@ class EvalFailure:
 class EvalResult:
     score: float
     failures: tuple[EvalFailure, ...] = ()
+
+    def __post_init__(self) -> None:
+        if (isinstance(self.score, bool) or not isinstance(self.score, (int, float))
+                or not math.isfinite(self.score)):
+            raise ValueError("evaluation score must be finite")
 
     @property
     def passed(self) -> bool:
@@ -93,6 +108,9 @@ class Mutation:
     cost: float
     rationale: str = ""
 
+    def __post_init__(self) -> None:
+        _finite_nonnegative("mutation cost", self.cost)
+
 
 @dataclass(frozen=True)
 class RouteChoice:
@@ -104,6 +122,9 @@ class RouteChoice:
     provider: str
     unit_cost: float = 0.0
     receipt: RoutingReceipt | None = None
+
+    def __post_init__(self) -> None:
+        _finite_nonnegative("route unit cost", self.unit_cost)
 
     @classmethod
     def from_receipt(cls, receipt: RoutingReceipt, model: str | None = None,
@@ -166,6 +187,9 @@ class RepairLoop:
 
     def run(self, artifact: Mapping[str, object]) -> RepairOutcome:
         start = self.clock()
+        if (isinstance(start, bool) or not isinstance(start, (int, float))
+                or not math.isfinite(start)):
+            raise ValueError("repair clock must provide finite timestamps")
         current = dict(artifact)
         result = self.evaluator(current)
         out = RepairOutcome("already_passing", current, result.score, 0, 0.0, 0.0)
@@ -175,6 +199,8 @@ class RepairLoop:
         stale = 0
         while True:
             elapsed = self.clock() - start
+            if not math.isfinite(elapsed) or elapsed < 0:
+                raise ValueError("repair clock must advance monotonically")
             out.seconds_spent = elapsed
             if out.steps >= self.budget.max_mutations:
                 return self._stop(out, "exhausted", "mutation budget")
@@ -201,7 +227,10 @@ class RepairLoop:
                 current, result, stale = candidate, new, 0
                 out.artifact, out.best_score = current, result.score
                 if result.passed:
-                    out.seconds_spent = self.clock() - start
+                    elapsed = self.clock() - start
+                    if not math.isfinite(elapsed) or elapsed < 0:
+                        raise ValueError("repair clock must advance monotonically")
+                    out.seconds_spent = elapsed
                     return self._stop(out, "repaired", "evals pass")
             else:
                 stale += 1
