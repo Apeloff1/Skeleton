@@ -60,16 +60,23 @@ export async function shareGodotSourceArchive(
   if (!stillCurrent()) throw new Error('Godot source export cancelled because the account changed');
   const { File, Paths } = await import('expo-file-system');
   const file = new File(Paths.cache, archive.filename);
-  if (file.exists) file.delete();
-  file.create();
-  file.write(archive.bytes);
-  if (!stillCurrent()) {
-    file.delete();
-    throw new Error('Godot source export cancelled because the account changed');
+  // Never retain another authenticated user's authored project in the
+  // shared device cache. A share sheet can fail or be cancelled, so cleanup
+  // must run for both success and failure, not just auth rotation.
+  try {
+    if (file.exists) file.delete();
+    file.create();
+    file.write(archive.bytes);
+    if (!stillCurrent()) {
+      throw new Error('Godot source export cancelled because the account changed');
+    }
+    await Sharing.shareAsync(file.uri, {
+      mimeType: 'application/zip',
+      dialogTitle: 'Save or share your Godot project source',
+      UTI: 'public.zip-archive',
+    });
+  } finally {
+    try { if (file.exists) file.delete(); }
+    catch { /* Sharing result/error must not be disguised by cache cleanup. */ }
   }
-  await Sharing.shareAsync(file.uri, {
-    mimeType: 'application/zip',
-    dialogTitle: 'Save or share your Godot project source',
-    UTI: 'public.zip-archive',
-  });
 }
