@@ -68,7 +68,7 @@ export default function SkeletonForgeRoute() {
   return (
     <SafeAreaView style={st.root}>
       {handoffError ? <Text accessibilityRole="alert" style={{ color: C.amber }}>{handoffError}</Text> : null}
-      {savedGalaxy ? (
+      {ready && loadedAuthEpoch === authEpoch && savedGalaxy ? (
         <Text style={{ color: C.green, fontSize: 12, paddingHorizontal: 12, paddingVertical: 5 }}
           testID="forge-saved-galaxy-instruments">
           Galaxy draft preserved on this device: {Object.keys(savedGalaxy.matrices).length} advanced matrix families and {Object.keys(savedGalaxy.extraParams).length} extra sliders. Reopen Galaxy Studio to edit them.
