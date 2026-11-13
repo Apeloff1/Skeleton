@@ -258,6 +258,7 @@ class GameForgeRun:
                 "playable_archetype": run.context.get("playable_archetype"),
                 "playable_scene": run.context.get("playable_scene"),
                 "playable_launch_scene": run.context.get("playable_launch_scene"),
+                "playable_launcher": run.context.get("playable_launcher"),
             },
             "jeeves": run.context.get("jeeves_advice"),
             "cortex": run.context.get("cortex"),
@@ -541,6 +542,16 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
                 existing, f'run/main_scene="{playable_scene}"',
             )
             ctx["playable_launch_scene"] = playable_scene
+        else:
+            # A source-only extra scene is unusable for normal players.
+            # Install a real in-game toggle without changing the main world.
+            from skeleton.forge.archetype_content import (
+                attach_playable_launcher, PLAYABLE_LAUNCHER_PATH,
+            )
+            files = attach_playable_launcher(files, selected)
+            ctx["files"] = files
+            ctx["file_count"] = len(files)
+            ctx["playable_launcher"] = PLAYABLE_LAUNCHER_PATH
     if ctx.get("galaxy_profile") is not None:
         files = attach_galaxy_profile(files, ctx["galaxy_profile"])
         ctx["files"] = files

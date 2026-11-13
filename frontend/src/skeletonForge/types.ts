@@ -175,6 +175,7 @@ export interface RunPayload {
     playable_archetype?: string | null;
     playable_scene?: string | null;
     playable_launch_scene?: string | null;
+    playable_launcher?: string | null;
   };
   jeeves?: { next?: { text?: string; action?: string; priority?: number } | null; briefing?: string } | null;
   sim?: { passed?: boolean; primary_dps?: number } | null;

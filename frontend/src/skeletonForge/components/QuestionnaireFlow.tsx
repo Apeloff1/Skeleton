@@ -232,7 +232,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
               ))}
             </View>
             <View style={st.chips}>
-              <Chip label="Keep current Godot launch scene" selected={!state.playable?.launch}
+              <Chip label="Keep main world; add in-game switch button" selected={!state.playable?.launch}
                 onPress={() => dispatch({ type: 'setPlayableMainScene', value: false })}
                 testID="q-playable-extra-only" />
               <Chip label="Launch this mini-game as main" selected={!!state.playable?.launch}

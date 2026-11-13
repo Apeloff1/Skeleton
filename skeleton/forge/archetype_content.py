@@ -574,3 +574,72 @@ def attach_archetype_content(files: Mapping[str, str], name: str) -> Dict[str, s
             raise ValueError("playable archetype output collides with existing source: " + path)
         out[path] = body
     return out
+
+
+PLAYABLE_LAUNCHER_PATH = "scripts/autoloads/playable_hub.gd"
+_LAUNCHER_SCRIPT = '''extends CanvasLayer
+## Opt-in in-game launcher for an actual additional 2D playable genre.
+## Switching scenes restarts the active room world, not quest custody.
+
+const ORIGINAL_WORLD := "res://scenes/levels/run_level.tscn"
+const BONUS_SCENE := "res://scenes/archetypes/__MODE__/main.tscn"
+var _button: Button
+
+
+func _ready() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	layer = 7
+	_button = Button.new()
+	_button.text = "World / __MODE__ mini-game"
+	_button.tooltip_text = "Switching scenes restarts the world, but saved quest snapshots remain stored in the QuestRuntime autoload"
+	_button.custom_minimum_size = Vector2(188, 40)
+	add_child(_button)
+	_button.pressed.connect(_switch_scene)
+	get_viewport().size_changed.connect(_layout_button)
+	_layout_button()
+
+
+func _layout_button() -> void:
+	if not is_instance_valid(_button):
+		return
+	var width := get_viewport().get_visible_rect().size.x
+	_button.position = Vector2(maxf(14.0, width - 220.0), 14.0)
+
+
+func _switch_scene() -> void:
+	var current := get_tree().current_scene
+	if current == null:
+		return
+	var target := ORIGINAL_WORLD if current.scene_file_path == BONUS_SCENE else BONUS_SCENE
+	var result := get_tree().change_scene_to_file(target)
+	if result != OK:
+		push_warning("Playable scene is unavailable")
+'''
+
+
+def attach_playable_launcher(files: Mapping[str, str], name: str) -> Dict[str, str]:
+    """Make an opt-in bonus Godot mini-game reachable without overwriting main.
+
+    All scene names come from the fixed authored prototype registry. The menu
+    is source-bound and never follows a game-file or user-supplied path.
+    """
+    if type(name) is not str or name not in _SPECS or not isinstance(files, Mapping):
+        raise ValueError("unregistered playable launcher mode or project")
+    project = files.get("project.godot")
+    source = f"scenes/archetypes/{name}/main.tscn"
+    if type(project) is not str or project.count("[autoload]\n") != 1:
+        raise ValueError("canonical Godot autoload block is missing")
+    if source not in files or PLAYABLE_LAUNCHER_PATH in files:
+        raise ValueError("bonus game scene is missing or launcher path collides")
+    if "PlayableHub=" in project:
+        raise ValueError("PlayableHub autoload is already registered")
+    launcher = _LAUNCHER_SCRIPT.replace("__MODE__", name)
+    out = dict(files)
+    out[PLAYABLE_LAUNCHER_PATH] = launcher
+    out["project.godot"] = project.replace(
+        "[autoload]\n",
+        '[autoload]\nPlayableHub="*res://scripts/autoloads/playable_hub.gd"\n',
+        1,
+    )
+    return out
