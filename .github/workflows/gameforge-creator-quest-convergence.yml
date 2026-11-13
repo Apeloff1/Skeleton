@@ -5,6 +5,11 @@ on:
     paths:
       - 'frontend/src/skeletonForge/**'
       - 'frontend/scripts/skeleton-forge/**'
+      - 'frontend/app/galaxy.tsx'
+      - 'frontend/app/skeleton-forge.tsx'
+      - 'frontend/src/features/GalaxyStudioFactory/draftCustody.ts'
+      - 'frontend/src/features/GalaxyStudioFactory/galaxyDraftCodec.ts'
+      - 'frontend/src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'
       - 'backend/routes/skeleton_gameforge.py'
       - 'skeleton/context/**'
       - 'skeleton/ai/game_builder/godot_quest_bridge.py'
@@ -62,6 +67,7 @@ jobs:
           node --test \
             scripts/skeleton-forge/creator-quest-convergence.test.cjs \
             scripts/skeleton-forge/creator-bridge.test.cjs \
+            scripts/skeleton-forge/galaxy-draft-custody.test.cjs \
             scripts/skeleton-forge/instruments.test.cjs \
             scripts/skeleton-forge/native-quest.test.cjs
       - name: Typecheck complete frontend

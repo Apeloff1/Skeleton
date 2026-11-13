@@ -25,3 +25,9 @@ Review only, do not merge or release. Exact-head focused Python and Node regress
 - Transfer is local-only AsyncStorage with a 20-minute validity window and a maximum 16 KiB serialized envelope. Invalid, stale, wrong-direction, and unsupported fields are rejected/filtered.
 - **Limit**: Galaxy's 14+ production matrices and extended slider values are *not* naively mapped to the ten-axis Forge tensor. They remain in Galaxy Studio; this bridge does not claim fully shared cross-editor editing or complete world playability.
 - Node regression: `frontend/scripts/skeleton-forge/creator-bridge.test.cjs`, with exact-head focused qualification in `.github/workflows/gameforge-creator-quest-convergence.yml`.
+
+## Advanced Galaxy editor continuity
+
+The cross-editor transfer now preserves Galaxy's **fourteen actual matrix families**, narrative-phase values, primary and fused genre selections, all additional slider maps, classic controls, production options, style choices and authored text in a separate, bounded, on-device editor draft. The full local snapshot is versioned, checked for numeric ranges, bounded to 320 KiB, and expires after 30 days. The pure codec has an independent focused regression suite at `frontend/scripts/skeleton-forge/galaxy-draft-custody.test.cjs`. Reloading Galaxy restores these values unless the user explicitly changes them. GameForge receives only compatible vision/genre choices while its own ten-axis/beat/quest settings are restored; **the two editors retain different control semantics**, rather than falsely mapping fourteen families to ten axes.
+
+All of this is source-level work pending exact-head frontend typechecking and on-device navigation checks; it is not yet certified as release-ready.
