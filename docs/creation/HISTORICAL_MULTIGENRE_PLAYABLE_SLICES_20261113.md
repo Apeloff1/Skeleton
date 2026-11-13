@@ -62,3 +62,39 @@ real Godot 4.3 headless mode, check the ARCHETYPE_LOOP_COMPLETE marker
 and exit status, then exercise manual keyboard and controller behavior on
 real hardware. Windows 11 installer, source mirror, security/malware,
 dependency, artifact and source-provenance gates are independent.
+
+
+## Fully accessible original gameplay
+
+All eight original prototypes now expose a live text HUD showing the
+objective and current progression. The existing extraction, combat and
+logistics prototypes also render visible loot/enemies/workstations, rather
+than headless-only internal state. Player movement accepts normal Godot
+ui_* keyboard/controller inputs. On actual touchscreen-enabled systems the
+controller installs a visual D-pad and dedicated USE button, with bounded
+input pressed/released signals and viewport relayout. Manual combat and
+factory interaction now require player input, while headless autopilot
+remains an independent executable-test mode.
+
+When a bonus mini-game is attached without selecting it as main,
+the generated project includes a PlayableHub autoload with a real
+in-game World / Mode switch button. This lets players launch the additional
+mode and return to the canonical Godot world without opening the editor.
+Changing scenes restarts the current room-world scene; existing saved
+quest snapshots remain in the QuestRuntime autoload but are not
+automatically replayed into the restarted world.
+
+The additional launcher is never written for non-opt-in builds.
+No arbitrary scene path is accepted; only the eight authored registry
+values can reach the launcher template. The source manifest and static
+checks cover the additional autoload script and revised project.godot.
+
+## Separate native qualification
+
+\`skeleton/testing/test_multigenre_native_godot.py\` exercises each
+prototype in a real, installed Godot binary when available. Its witness
+must contain an exact matching ARCHETYPE_LOOP_COMPLETE marker and a
+zero-exit headless boot. Missing Godot is a **skip, never a pass**.
+Touch/keyboard/controller interaction on physical devices remains
+independently unverified until tested; static assertions alone do not
+prove real device behavior.

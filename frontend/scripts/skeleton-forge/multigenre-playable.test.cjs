@@ -103,3 +103,14 @@ test('review distinguishes actual extra playable content from the starting scene
   });
   assert.match(text(display(launched, 'review')), /Crafting Delivery.*startup scene/);
 });
+
+
+
+test('including a bonus scene exposes an accessible in-game launcher option', () => {
+  const state = reducer(
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setPlayableMode', value: 'puzzle' },
+  );
+  assert.match(text(display(state)), /Keep main world; add in-game switch button/);
+  assert.match(text(display(state, 'review')), /Spatial Puzzle.*additional scene/);
+});

@@ -56,6 +56,14 @@ def test_each_archetype_adds_real_scene_controller_and_winnable_loop(name):
     assert 'func _physics_process(' in added[f"scripts/archetypes/{name}/player_controller.gd"]
     assert 'func _draw()' in added[f"scripts/archetypes/{name}/player_controller.gd"]
     assert 'arrows: move' in added[f"scripts/archetypes/{name}/core_loop.gd"]
+    assert "func _objective_text() -> String:" in added[f"scripts/archetypes/{name}/core_loop.gd"]
+    assert "_status.text" in added[f"scripts/archetypes/{name}/core_loop.gd"]
+    controller = added[f"scripts/archetypes/{name}/player_controller.gd"]
+    assert "Input.get_vector" in controller
+    assert "Input.action_press(action)" in controller
+    assert "Input.action_release(action)" in controller
+    assert "DisplayServer.is_touchscreen_available()" in controller
+    assert "_touch_controls.append" in controller
     result = attach_archetype_content(original, name)
     assert original == before
     assert len(result) == len(original) + 3
@@ -167,3 +175,77 @@ def test_backend_plays_explicit_mode_and_main_scene_only_when_requested(monkeypa
     with pytest.raises(HTTPException) as exc:
         run(RunRequest(playable_content=False, playable_archetype="racing"))
     assert exc.value.status_code == 422
+
+
+
+@pytest.mark.parametrize("name", SUPPORTED)
+def test_bonus_mode_adds_reachable_in_game_launcher_without_rewriting_default_world(name):
+    from skeleton.forge.archetype_content import (
+        attach_playable_launcher, PLAYABLE_LAUNCHER_PATH,
+    )
+    base = godot_files()
+    scene = attach_archetype_content(base, name)
+    source = attach_playable_launcher(scene, name)
+    assert len(source) == len(base) + 4
+    assert source["data/rooms.json"] == base["data/rooms.json"]
+    assert source["project.godot"].count("PlayableHub=") == 1
+    assert 'run/main_scene="res://scenes/levels/run_level.tscn"' in source["project.godot"]
+    assert PLAYABLE_LAUNCHER_PATH in source
+    script = source[PLAYABLE_LAUNCHER_PATH]
+    assert f'res://scenes/archetypes/{name}/main.tscn' in script
+    assert "get_tree().change_scene_to_file(target)" in script
+    assert "get_tree().current_scene" in script
+    assert "ORIGINAL_WORLD" in script
+    assert source_manifest(source)["file_count"] == len(source)
+    ok, problems = check_ok(source)
+    assert ok, problems
+    assert base == godot_files(), "launcher construction mutated canonical source"
+
+
+def test_launcher_rejects_source_collisions_and_unregistered_paths():
+    from skeleton.forge.archetype_content import (
+        attach_playable_launcher, PLAYABLE_LAUNCHER_PATH,
+    )
+    base = attach_archetype_content(godot_files(), "puzzle")
+    with pytest.raises(ValueError):
+        attach_playable_launcher(base, "../../system")
+    with pytest.raises(ValueError):
+        attach_playable_launcher(godot_files(), "puzzle")
+    source = attach_playable_launcher(base, "puzzle")
+    with pytest.raises(ValueError):
+        attach_playable_launcher(source, "puzzle")
+    changed = dict(base)
+    changed[PLAYABLE_LAUNCHER_PATH] = "extends Node"
+    with pytest.raises(ValueError):
+        attach_playable_launcher(changed, "puzzle")
+    changed = dict(base)
+    changed["project.godot"] = changed["project.godot"].replace(
+        "[autoload]\n", "[autoload]\nPlayableHub=\"*res://unknown.gd\"\n"
+    )
+    with pytest.raises(ValueError):
+        attach_playable_launcher(changed, "puzzle")
+
+
+def test_pipeline_bonus_launcher_and_quest_are_composed_without_clobbering(monkeypatch):
+    from skeleton.context import pipeline
+    from skeleton.ai.game_builder.godot_quest_bridge import verify_native_quest
+    from skeleton.forge.archetype_content import PLAYABLE_LAUNCHER_PATH
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    ctx = {
+        "era": "extraction_now", "target": "godot",
+        "files": godot_files(), "project_root": None,
+        "playtest_mode": "off", "playable_content": True,
+        "playable_archetype_selection": "stealth",
+        "playable_main_scene": False,
+        "quest_content": True, "quest_length": 2,
+    }
+    pipeline._stage_emit(ctx)
+    files = ctx["files"]
+    assert PLAYABLE_LAUNCHER_PATH in files
+    assert ctx["playable_launcher"] == PLAYABLE_LAUNCHER_PATH
+    assert "PlayableHub=" in files["project.godot"]
+    assert "QuestRuntime=" in files["project.godot"]
+    assert verify_native_quest(files)
+    assert ctx["native_quest_receipt"]["steps"] == 2
+    assert files["data/rooms.json"] == godot_files()["data/rooms.json"]
+    assert source_manifest(files)["file_count"] == len(files)
