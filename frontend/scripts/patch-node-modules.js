@@ -347,9 +347,27 @@ function patchNodeForgeNestedDigestAlgorithm() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  // Reviewed exact published versions. The 1.4.2 RSA parser still validates
-  // the outer DigestInfo count without validating nested DigestAlgorithm arity.
-  // Never silently trust a version bump as proof of this security fix.
+  // node-forge 1.4.3 replaces legacy nested-arity hardening with
+  // canonical DER DigestInfo comparisons. Do not apply the obsolete patch
+  // to this newer parser. Permit only the reviewed upstream *exact bytes*.
+  if (version === '1.4.3') {
+    const { verifyReviewedForgeRsa } = require('./node-forge-rsa-custody.cjs');
+    const source = fs.readFileSync(
+      path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
+    const proof = verifyReviewedForgeRsa(version, source);
+    const { qualifiesCanonicalRsaVerifier } = require('./security/node-forge-rsa-verifier.cjs');
+    if (!qualifiesCanonicalRsaVerifier(source)) {
+      throw new Error('[patch-node-modules] node-forge 1.4.3 canonical DER verifier changed; security review required');
+    }
+    if (proof.patchRequired || proof.locallyPatched) {
+      throw new Error('[patch-node-modules] reviewed upstream unexpectedly requires a local patch');
+    }
+    console.log('[patch-node-modules] ✓ node-forge 1.4.3 pinned canonical-DER RSA verifier');
+    skipped++;
+    return;
+  }
+  // Older reviewed 1.4.0/1.4.2 formats still need the legacy, exact
+  // nested-element patch. Unrecognized versions always fail closed.
   if (!new Set(['1.4.0', '1.4.2']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
   }

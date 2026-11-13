@@ -57,5 +57,5 @@ def test_production_setup_route_cannot_be_spa_fallback_false_positive():
     assert 'X-Content-Type-Options "nosniff"' in location_body
 
     dockerfile = (root / "frontend/Dockerfile").read_text(encoding="utf-8")
-    assert "test -f /app/dist/setup.html || test -f /app/dist/setup/index.html" in dockerfile
+    assert "test -s /app/dist/setup.html || test -s /app/dist/setup/index.html" in dockerfile
     assert (root / "frontend/app/setup.tsx").is_file()

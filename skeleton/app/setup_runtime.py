@@ -610,11 +610,10 @@ def _ensure_runtime_environment_locked(
             warnings.append(f"{key} remains optional and unconfigured")
 
     if not values.get("AI_PROVIDER", "").strip():
-        # Preserve existing genuine hosted configuration on upgrades. Clean
-        # installations need neither a provider credential nor invented weights.
-        provider = (
-            "openai" if any(values.get(key) for key in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY")) else "local"
-        )
+        # First install never promotes a hosted key to the Jeeves primary AI.
+        # Such keys may belong to separate advisory integrations and must not
+        # determine where private chat content is sent.
+        provider = "local"
         text = _replace_env_value(text, "AI_PROVIDER", provider)
         values["AI_PROVIDER"] = provider
         configured.append("AI_PROVIDER")

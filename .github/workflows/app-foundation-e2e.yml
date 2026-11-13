@@ -51,7 +51,11 @@ concurrency:
 jobs:
   stack-e2e:
     name: App Foundation E2E (stack + Playwright)
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
+    # PR #5281 is the sole explicitly admitted draft for isolated, ephemeral
+    # first-user browser qualification. This does NOT clear merge/release
+    # security holds or grant production access. Other drafts remain skipped.
+    # Restrict the exception to an in-repository head, not an untrusted fork.
+    if: github.event_name != 'pull_request' || ((!github.event.pull_request.draft || (github.event.pull_request.number == 5281 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/dragon-research-pilot-qualification-20261112')) && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     # Playwright 1.56.1 does not install Chromium on ubuntu-26.04 (the
     # ubuntu-latest runner image as of 2026-10-26); use its supported LTS.
     runs-on: ubuntu-24.04
