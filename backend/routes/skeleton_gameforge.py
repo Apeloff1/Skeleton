@@ -73,6 +73,8 @@ def generations() -> Dict[str, Any]:
 @router.post("/run")
 def run(req: RunRequest) -> Dict[str, Any]:
     from skeleton.context.pipeline import GameForgeRun
+    if not req.playable_content and (req.playable_archetype is not None or req.playable_main_scene):
+        raise HTTPException(status_code=422, detail="playable mode selection requires explicit opt-in")
     try:
         payload = GameForgeRun.live().execute(
             req.vision,

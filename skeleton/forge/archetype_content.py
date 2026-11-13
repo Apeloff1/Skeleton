@@ -35,6 +35,11 @@ func _ready() -> void:
 \tautopilot = DisplayServer.get_name() == "headless" or OS.get_cmdline_user_args().has("--autoplay")
 
 
+func _draw() -> void:
+\tdraw_circle(Vector2.ZERO, 9.0, Color(0.95, 0.85, 0.35))
+\tdraw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 20, Color(0.25, 0.45, 0.95), 2.0)
+
+
 func _physics_process(_delta: float) -> void:
 \tvar direction := Vector2.ZERO
 \tif autopilot:
@@ -58,6 +63,19 @@ const MAX_FRAMES := {max_frames}
 var frames: int = 0
 var finished: bool = false
 @onready var player: CharacterBody2D = $Player
+var _status: Label
+
+
+func _ready() -> void:
+\tvar canvas := CanvasLayer.new()
+\tcanvas.layer = 5
+\tadd_child(canvas)
+\t_status = Label.new()
+\t_status.position = Vector2(14, 12)
+\t_status.add_theme_font_size_override("font_size", 15)
+\t_status.add_theme_color_override("font_color", Color(0.92, 0.95, 1.0))
+\tcanvas.add_child(_status)
+\t_status.text = ARCHETYPE.replace("_", " ").capitalize() + " | arrows: move | Enter: interact"
 
 
 func _finish(ok: bool, reason: String) -> void:

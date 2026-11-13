@@ -382,6 +382,7 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Beats" v={beatsTxt || '—'} />
       <Row k="Archetype" v={arch?.label ?? req.archetype} />
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
+      {state.playable?.enabled && !req.playable_content ? <Banner tone="warn" testID="q-playable-not-exported">Native playable mini-games require Godot output. This JSON-only export preserves your design but will not contain the mini-game scenes.</Banner> : null}
       {req.playable_content ? <Row k="Playable mini-game" v={`${PLAYABLE_SLICES.find((slice) => slice.id === req.playable_archetype)?.label ?? req.playable_archetype} · ${req.playable_main_scene ? "startup scene" : "additional scene"}`} /> : null}
       {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · source-bound HUD and save contract`} /> : null}
       {state.quest?.enabled && !req.quest_content ? <Banner tone="warn" testID="q-native-quest-not-exported">Native room quests are disabled for JSON blueprint output. Select Godot in Forge options to include one.</Banner> : null}
