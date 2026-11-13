@@ -45,6 +45,7 @@ import { shareResult } from '../../utils/shareResult';
 import { classifyBuildJob } from '../../product/buildJobLifecycle';
 
 import { FALLBACK_GENRES } from './fallbackGenres';
+import { mergeGalaxyGenreCatalog, recoveredGalaxyGenre } from './genreRegistry';
 import { GALAXY_TO_FORGE_BRIEF } from '../../skeletonForge/galaxyGenres';
 import type { CreatorBridgeDraft, GalaxyBridgeSelection } from '../../skeletonForge/creatorBridge';
 import { GALAXY_DRAFT_SCHEMA, saveGalaxyDraft, type GalaxyDraftSnapshot } from './draftCustody';
@@ -616,7 +617,7 @@ export default function GalaxyStudioFactoryModal
     setTitle(tpl.title);
     if (tpl.genre) {
       const match = genres.find(g => g.id === tpl.genre);
-      if (match) setSelectedGenre(match);
+      if (match) { pendingGenreRestore.current = null; setSelectedGenre(match); }
     }
     if (tpl.subgenre) setSelectedSubgenre(tpl.subgenre);
     setGameVision(tpl.gameVision);
@@ -642,12 +643,24 @@ export default function GalaxyStudioFactoryModal
     }
   }, [genres]);
 
-  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(() => {
-    const genreId = initialForgeDraft?.galaxyGenre ??
+  const pendingGenreRestore = useRef<string | null>(
+    initialForgeDraft?.galaxyGenre ??
       Object.entries(GALAXY_TO_FORGE_BRIEF).find(([, vote]) => vote === initialForgeDraft?.brief.genre)?.[0] ??
-      initialGalaxyDraft?.genreId;
-    return (FALLBACK_GENRES.find((genre) => genre.id === genreId) as Genre | undefined) ?? null;
-  });
+      initialGalaxyDraft?.genreId ?? null,
+  );
+  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(
+    () => recoveredGalaxyGenre(FALLBACK_GENRES, pendingGenreRestore.current),
+  );
+  // A valid backend-only selected genre is rehydrated when its live row
+  // arrives. An explicit user selection/clear always wins the race.
+  useEffect(() => {
+    const id = pendingGenreRestore.current;
+    if (!id) return;
+    const matching = recoveredGalaxyGenre(genres, id);
+    if (!matching) return;
+    setSelectedGenre(current => current ?? matching);
+    pendingGenreRestore.current = null;
+  }, [genres]);
   const [selectedSubgenre, setSelectedSubgenre] = useState<string | null>(initialGalaxyDraft?.subgenreId ?? null);
   // ═══ Multi-genre / multi-subgenre fusion support ═══
   // The primary `selectedGenre` above stays the lead; extra picks fuse in.
@@ -816,7 +829,7 @@ export default function GalaxyStudioFactoryModal
 
   const resetState = () => {
     detachArtifactObservation();
-    setStep('pick'); setTitle(''); setSelectedGenre(null); setSelectedSubgenre(null);
+    setStep('pick'); setTitle(''); pendingGenreRestore.current = null; setSelectedGenre(null); setSelectedSubgenre(null);
     setExtraGenreIds([]); setExtraSubgenreIds([]); setMultiGenreMode(false);
     setGenreSearch(''); setExpandedGenre(null); setGameVision(''); setSystemArch('');
     setWorldLaws(''); setAgentInstructions(''); setShowDescriptions(false); setScaleCommand(''); setComplexity(10); setAgeTarget('ALL'); setGraphicsEra(7); setNpcDensity(7); setSoundEra(7); setWorldSize(7); setPhysicsRealism(7); setAiComplexity(7); setLightingEngine(7); setParticleEffects(7); setDestructionPhysics(7); setNarrativeBranching(7); setEconomyComplexity(7); setMultiplayerMax(7); setWeatherSystems(7); setDayNightCycle(7); setAnimationFluidity(7); setPostProcessing(7); setFoliageDensity(7); setWaterSimulation(7); setUiMinimalism(7); setLootVariety(7); setCraftingDepth(7); setDialogDepth(7); setStealthMechanics(7); setVehicleSimulation(7); setBiomeDiversity(7); setFactionReputation(7); setSkillSystem(7); setGoreSystem(7); setModdingSupport(7); setJuice(7); setTargetFiles(MAX_TARGET_FILES);
@@ -887,7 +900,7 @@ export default function GalaxyStudioFactoryModal
         staleMaxMs: 30 * 24 * 60 * 60_000, // serve up to 30 d stale
       });
       if (data && Array.isArray(data.genres) && data.genres.length > 0) {
-        setGenres(data.genres);
+        setGenres(mergeGalaxyGenreCatalog(data));
         return;
       }
     } catch {}
@@ -1921,7 +1934,7 @@ export default function GalaxyStudioFactoryModal
               <Text style={[s.selectedName, { color: selectedGenre.color }]}>{selectedGenre.name}</Text>
               {selectedSubgenre && <Text style={s.selectedSub}>{selectedSubgenre.replace(/_/g, ' ')}</Text>}
             </View>
-            <TouchableOpacity onPress={() => { setSelectedGenre(null); setSelectedSubgenre(null); setExpandedGenre(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity onPress={() => { pendingGenreRestore.current = null; setSelectedGenre(null); setSelectedSubgenre(null); setExpandedGenre(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close-outline" size={20} color={T.textMuted} />
             </TouchableOpacity>
           </View>
@@ -2719,7 +2732,7 @@ export default function GalaxyStudioFactoryModal
                   // In fusion mode, tap on non-primary toggles extra-add
                   toggleExtraGenre(g.id);
                 } else {
-                  setSelectedGenre(g); setSelectedSubgenre(null); setExpandedGenre(g.id);
+                  pendingGenreRestore.current = null; setSelectedGenre(g); setSelectedSubgenre(null); setExpandedGenre(g.id);
                   // Reset extras on new primary
                   setExtraGenreIds([]); setExtraSubgenreIds([]);
                 }
