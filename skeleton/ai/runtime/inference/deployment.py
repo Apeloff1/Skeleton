@@ -14,6 +14,7 @@ from typing import Any
 
 from .llama_cpp import (
     COMPLETION_CHAT_FLAGS,
+    CODING_COMPLETION_CHAT_TEMPLATE,
     QWEN3_COMPLETION_CHAT_TEMPLATE,
     LlamaCppConfig,
     LlamaCppModel,
@@ -31,6 +32,10 @@ from .local import (
 
 SCHEMA = "skeleton.local_model.deployment.v1"
 QUALIFICATION_SCHEMA = "skeleton.local_model.qualification.v1"
+QWEN25_CODER_COMPLETION_PROFILE = "qwen2.5-coder-completion-chat"
+LOCAL_MODEL_RUNTIME_PROFILES = (
+    "raw", "llama-completion-chat", "qwen3-completion-chat", QWEN25_CODER_COMPLETION_PROFILE,
+)
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_MANIFEST_BYTES = 1024 * 1024
 
@@ -439,19 +444,22 @@ def create_local_model_deployment(
     Publish only after that authority validates a private candidate. Hard-link
     publication is create-only: an existing destination is never replaced.
     """
-    if not isinstance(runtime_profile, str) or runtime_profile not in {
-        "raw",
-        "llama-completion-chat",
-        "qwen3-completion-chat",
-    }:
+    if not isinstance(runtime_profile, str) or runtime_profile not in LOCAL_MODEL_RUNTIME_PROFILES:
         raise LocalModelDeploymentError("unsupported local runtime profile")
     extra_args: tuple[str, ...] = ()
-    completion_profile = runtime_profile in {"llama-completion-chat", "qwen3-completion-chat"}
+    completion_profile = runtime_profile != "raw"
     if completion_profile:
         extra_args = COMPLETION_CHAT_FLAGS
         output_framing = "llama_completion_eog"
         if runtime_profile == "qwen3-completion-chat":
             extra_args += ("--chat-template", QWEN3_COMPLETION_CHAT_TEMPLATE)
+        elif runtime_profile == QWEN25_CODER_COMPLETION_PROFILE:
+            # Preserve the actual Qwen2.5 ChatML message boundaries. The
+            # generic conversation profile wraps an already rendered request
+            # as one user message and is intentionally unchanged for legacy
+            # deployments. This explicit profile is recognized by the native
+            # runtime without adding Qwen3's closed-thinking prefix.
+            extra_args += ("--chat-template", CODING_COMPLETION_CHAT_TEMPLATE)
     target = Path(destination).expanduser().absolute()
     if not target.parent.is_dir():
         raise LocalModelDeploymentError("manifest destination directory must already exist")
@@ -679,7 +687,10 @@ def qualify_local_model_deployment_sync(
 
 
 __all__ = [
+    "CODING_COMPLETION_CHAT_TEMPLATE",
+    "LOCAL_MODEL_RUNTIME_PROFILES",
     "QUALIFICATION_SCHEMA",
+    "QWEN25_CODER_COMPLETION_PROFILE",
     "QWEN3_COMPLETION_CHAT_TEMPLATE",
     "SCHEMA",
     "LocalModelDeployment",

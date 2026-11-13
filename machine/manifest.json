@@ -830,6 +830,65 @@
       "discovery": "title and transcript search; active/archive filters; pinned-first ordering",
       "backup": "organization metadata has a versioned backup envelope; legacy v1/v2 bundles remain importable",
       "qualification": "implementation candidate; source and browser evidence recorded separately"
+    },
+    "forge_game_builder": {
+      "owner": "skeleton/forge/game_builder.py",
+      "design_owner": "skeleton/forge/game_design_spec.py",
+      "proposal_owner": "skeleton/forge/ai_builder/plan_guard.py",
+      "runtime_owner": "skeleton/forge/playable_runtime.py",
+      "operator": "python scripts/build_jeeves_game.py",
+      "proposal_policy": "policy://game.forge_design/local-data-proposal@1",
+      "model_execution": "existing local inference plane; explicit pinned Jeeves GGUF; no hosted fallback",
+      "authority": "strict bounded gameplay data only; existing compiler retains genre/engine/scope/brief and explicit gameplay labels",
+      "artifacts": "existing Forge projector; operator publication is create-only after deadline and required native input proof",
+      "verification": "Godot content-table proof, native boot and input journey are separate evidence states",
+      "rollback": "omit the optional planner/use deterministic compiler; existing projects and receipts are preserved",
+      "composition_owner": "skeleton/app/offline_game_builder.py",
+      "workspace_adapter": {
+        "http_owner": "skeleton/app/offline_http.py",
+        "ui_owner": "skeleton/app/offline_web.py",
+        "routes": [
+          "POST /v1/game-builds",
+          "GET /v1/game-builds",
+          "GET /v1/game-builds/{request_id}",
+          "GET /v1/game-builds/{request_id}/archive"
+        ],
+        "input": "request_id and at most 4000 UTF-8 bytes of explicit brief; no client filesystem/model/engine paths",
+        "model": "same admitted workspace backend and existing inference lease; complete accepted structured proposal required",
+        "jobs": "additive model/tokenizer-scoped offline_game_builds table in existing workspace SQLite file; cross-process active-slot fencing; no automatic inference retry",
+        "artifacts": "bounded immutable source-only ZIP after actual native input proof; create-only publication, exact digest checked on recovery and download",
+        "limits": {
+          "output_tokens": 256,
+          "planning_seconds": 90,
+          "deadline_seconds": 180,
+          "archive_bytes": 16777216
+        },
+        "qualification": "native source project and measured input journey; human quality, native device performance and store packaging remain separate",
+        "runbook": "docs/plan/JEEVES_NATIVE_BUILDER_WORKSPACE_2026_11_13.md"
+      }
+    },
+    "game_quality_evaluation": {
+      "owner": "skeleton/eval/game_builder_quality.py",
+      "operator": "python scripts/evaluate_jeeves_game_builder_quality.py",
+      "workload": "24 fixed public diagnostic tasks; not a hidden generalization holdout",
+      "identity": "taskset/scorer/source/test/model/runtime/config hashes plus immutable response chain",
+      "dimensions": [
+        "structure",
+        "requirements",
+        "correctness",
+        "latency"
+      ],
+      "authority": "measurement only; generated code is never executed and scores do not promote model or release quality",
+      "state": "operator-private diagnostic artifacts; not conversation or model-state authority",
+      "optional_reference_pack": {
+        "owner": "skeleton/eval/game_builder_reference_pack.py",
+        "operator_flag": "--reference-pack godot46",
+        "version": "godot46-game-building-basics@1",
+        "scope": "category-only gdscript/debugging; identical source context for eight tasks; sixteen control prompts unchanged",
+        "trust": "bounded untrusted user-context data; agent summaries of cited Godot 4.6 primary documentation",
+        "budget": "1309 UTF-8 context bytes; whole-campaign input and output admission before dispatch; no truncation",
+        "qualification": "post-diagnostic development grounding; no hidden holdout, model promotion or quality claim"
+      }
     }
   }
 }

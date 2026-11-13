@@ -5896,7 +5896,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "14793b6534829de56144579b75021973ae219eef9bb56e96e03ad2956da3d6ca",
+      "source_sha256": "8189010fea232c8be7e4608c414d1c3588df0fe7f603918c65c90e18dea6d758",
       "interaction_count": 74,
       "backend_surfaces": [
         "/api/collections",
@@ -5913,7 +5913,7 @@
         "/top",
         "/tournaments"
       ],
-      "accessibility_signal_count": 105,
+      "accessibility_signal_count": 107,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5924,7 +5924,10 @@
       },
       "validation_evidence": [
         "frontend/app/playable.tsx",
-        "scripts/check_product_surface_specification.py"
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/features/Playable/GameBuilderBriefPanel.tsx",
+        "frontend/scripts/test-game-builder-brief.cjs",
+        "frontend/scripts/test-playable-job-observation.cjs"
       ]
     },
     {
