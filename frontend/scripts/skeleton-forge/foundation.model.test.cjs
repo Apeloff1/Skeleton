@@ -362,3 +362,72 @@ test('explicit legacy import cannot overwrite existing account projects and is b
     { type: 'importLegacy', projects: [legacyNew] },
   ).projects.length, 1);
 });
+
+test('overlapping Studio saves cannot revert the newest questionnaire snapshot', async () => {
+  const memory = storage.memoryKv();
+  let releaseFirstProjectWrite;
+  let firstProjectWriteStarted;
+  const started = new Promise(resolve => { firstProjectWriteStarted = resolve; });
+  const firstSaved = project('serial', { title: 'Earlier genre' });
+  const lastSaved = project('serial', { title: 'Latest creator controls' });
+  const store = {
+    getItem: (key) => memory.getItem(key),
+    async setItem(key, value) {
+      if (key === storage.KEYS.projects && value.includes('Earlier genre')) {
+        firstProjectWriteStarted();
+        await new Promise(resolve => { releaseFirstProjectWrite = resolve; });
+      }
+      await memory.setItem(key, value);
+    },
+  };
+  const first = storage.saveFoundation(store, m.persistSnapshot(
+    base({ projects: [firstSaved] }),
+  ));
+  await started;
+  const second = storage.saveFoundation(store, m.persistSnapshot(
+    base({ projects: [lastSaved] }),
+  ));
+  // The later complete snapshot must not overtake a delayed earlier write.
+  await Promise.resolve();
+  assert.equal(memory.dump()[storage.KEYS.projects], undefined);
+  releaseFirstProjectWrite();
+  await Promise.all([first, second]);
+  assert.equal((await storage.loadFoundation(memory)).projects[0].title, 'Latest creator controls');
+});
+
+test('a failed earlier save does not poison a later repair or retry', async () => {
+  const memory = storage.memoryKv();
+  let failOnce = true;
+  const store = {
+    getItem: key => memory.getItem(key),
+    async setItem(key, value) {
+      if (key === storage.KEYS.projects && failOnce) {
+        failOnce = false;
+        throw new Error('temporary storage pressure');
+      }
+      await memory.setItem(key, value);
+    },
+  };
+  const first = storage.saveFoundation(store, m.persistSnapshot(
+    base({ projects: [project('p1')] }),
+  ));
+  const second = storage.saveFoundation(store, m.persistSnapshot(
+    base({ projects: [project('p2')] }),
+  ));
+  await assert.rejects(first, /temporary storage pressure/);
+  await second;
+  const loaded = await storage.loadFoundation(memory);
+  assert.deepEqual(loaded.projects.map(p => p.id), ['p2']);
+});
+
+test('duplicate historical project IDs are held for recovery, not silently merged', () => {
+  const same = project('collision');
+  const result = m.sanitizeProjects([same, { ...same, title: 'A second authored world' }]);
+  assert.equal(result.corrupt, true);
+  assert.deepEqual(result.projects, []);
+  const active = base({ projects: [project('existing')] });
+  assert.equal(m.foundationReducer(active, {
+    type: 'importLegacy',
+    projects: [same, { ...same, title: 'A second authored world' }],
+  }), active);
+});

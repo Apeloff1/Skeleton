@@ -585,9 +585,16 @@ export function sanitizeProjects(raw: unknown): { projects: StudioProject[]; cor
   if (raw == null) return { projects: [], corrupt: false };
   if (!Array.isArray(raw)) return { projects: [], corrupt: true };
   const projects: StudioProject[] = [];
+  const ids = new Set<string>();
   for (const item of raw) {
     const project = sanitizeProject(item);
-    if (!project) return { projects: [], corrupt: true };
+    if (!project || ids.has(project.id)) {
+      // Duplicate IDs make project navigation ambiguous and may overwrite
+      // an existing account's project during an explicit legacy import.
+      // Fail the entire batch rather than silently dropping authored data.
+      return { projects: [], corrupt: true };
+    }
+    ids.add(project.id);
     projects.push(project);
   }
   return { projects, corrupt: false };
