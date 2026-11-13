@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 import hashlib
 import json
 import os
@@ -53,6 +55,11 @@ def _deployment(tmp_path: Path) -> tuple[Path, Path, Path]:
     model.parent.mkdir()
     model.write_bytes(
         struct.pack("<4sIQQ", b"GGUF", 3, 2, 1)
+        + struct.pack("<Q", len(b"general.architecture"))
+        + b"general.architecture"
+        + struct.pack("<I", 8)
+        + struct.pack("<Q", len(b"llama"))
+        + b"llama"
         + b"operator-owned-model-v1"
     )
     manifest = tmp_path / "deployment.json"
@@ -114,6 +121,126 @@ def test_deployment_manifest_binds_relative_artifacts_and_hashes(tmp_path: Path)
     assert deployment.gguf_version == 3
     assert deployment.gguf_tensor_count == 2
     assert deployment.gguf_metadata_count == 1
+
+
+def _deployment_with_adjacent_library(tmp_path: Path) -> tuple[Path, Path, Path]:
+    manifest, runtime, _ = _deployment(tmp_path)
+    library = runtime.parent / "libllama.so.0"
+    library.write_bytes(b"pinned runtime library")
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["runtime_libraries"] = {library.name: _sha(library)}
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    return manifest, runtime, library
+
+
+@pytest.mark.skipif(not hasattr(os, "O_NOFOLLOW"), reason="Pinned runtime requires no-follow file opens")
+def test_adjacent_library_inventory_detects_content_change_before_dispatch(tmp_path: Path) -> None:
+    from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel, LlamaCppRuntimeError
+    manifest, _, library = _deployment_with_adjacent_library(tmp_path)
+    deployment = LocalModelDeployment.load(manifest)
+    backend = LlamaCppModel(deployment.llama_cpp_config())
+    assert deployment.runtime_libraries == ((library.name, _sha(library)),)
+    before = library.stat()
+    library.write_bytes(b"X" * before.st_size)
+    os.utime(library, ns=(before.st_atime_ns, before.st_mtime_ns))
+    with pytest.raises(LlamaCppRuntimeError, match="library"):
+        backend.assert_identity()
+
+
+@pytest.mark.skipif(not hasattr(os, "O_NOFOLLOW"), reason="Pinned runtime requires no-follow file opens")
+def test_resource_retuning_preserves_deployment_library_pins_and_kv_identity(tmp_path: Path) -> None:
+    from dataclasses import replace
+    from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel, LlamaCppRuntimeError
+
+    manifest, _, library = _deployment_with_adjacent_library(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["config"].update(kv_cache_location="backend", kv_cache_type_k="q8_0", kv_cache_type_v="f16")
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    deployment = LocalModelDeployment.load(manifest)
+    baseline = deployment.llama_cpp_config()
+    backend = LlamaCppModel(baseline)
+    assert baseline.runtime_libraries == ((library.name, _sha(library)),)
+    assert (baseline.kv_cache_type_k, baseline.kv_cache_type_v) == ("q8_0", "f16")
+    for pins in ((), ((library.name, "f" * 64),)):
+        with pytest.raises(LlamaCppRuntimeError, match="cannot change model, safety or context identity"):
+            backend.activate_prelaunch_resource_profile(replace(baseline, runtime_libraries=pins))
+        assert backend.config == baseline
+    with pytest.raises(LlamaCppRuntimeError, match="cannot change model, safety or context identity"):
+        backend.activate_prelaunch_resource_profile(replace(baseline, kv_cache_type_k="q4_0"))
+    backend.activate_prelaunch_resource_profile(replace(
+        baseline, threads=1, batch_size=64, kv_cache_location="host",
+    ))
+    assert backend.config.runtime_libraries == baseline.runtime_libraries
+    assert backend.config.kv_cache_location == "host"
+    backend.assert_identity()
+
+
+@pytest.mark.skipif(not hasattr(os, "O_NOFOLLOW"), reason="Pinned runtime requires no-follow file opens")
+@pytest.mark.parametrize("change", ["delete", "add", "symlink", "nested"])
+def test_adjacent_library_inventory_rejects_replacement_and_loader_search_changes(tmp_path: Path, change: str) -> None:
+    from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel, LlamaCppRuntimeError
+    manifest, runtime, library = _deployment_with_adjacent_library(tmp_path)
+    backend = LlamaCppModel(LocalModelDeployment.load(manifest).llama_cpp_config())
+    if change == "delete":
+        library.unlink()
+    elif change == "add":
+        (runtime.parent / "libunlisted.so").write_bytes(b"unexpected")
+    elif change == "nested":
+        (runtime.parent / "glibc-hwcaps").mkdir()
+    else:
+        if os.name == "nt":
+            pytest.skip("Windows symlink creation requires host privileges")
+        alternate = tmp_path / "other.so"
+        alternate.write_bytes(library.read_bytes())
+        library.unlink()
+        library.symlink_to(alternate)
+    with pytest.raises(LlamaCppRuntimeError, match="runtime"):
+        backend.assert_identity()
+
+
+@pytest.mark.parametrize("name", ["../libevil.so", "/tmp/libevil.so", "libx.so/../escape", "not-a-library"])
+def test_adjacent_library_manifest_rejects_unsafe_names(tmp_path: Path, name: str) -> None:
+    manifest, _, library = _deployment_with_adjacent_library(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["runtime_libraries"] = {name: _sha(library)}
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(LocalModelDeploymentError, match="invalid llama.cpp deployment config"):
+        LocalModelDeployment.load(manifest)
+
+
+@pytest.mark.parametrize("inventory", [None, {}])
+def test_declared_library_inventory_cannot_silently_downgrade_to_legacy(tmp_path: Path, inventory) -> None:
+    manifest, _, _ = _deployment_with_adjacent_library(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["runtime_libraries"] = inventory
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(LocalModelDeploymentError, match="non-empty"):
+        LocalModelDeployment.load(manifest)
+
+
+@pytest.mark.skipif(not hasattr(os, "O_NOFOLLOW"), reason="Pinned runtime requires no-follow file opens")
+def test_pinned_bundle_strips_ambient_loader_overrides_without_changing_legacy(tmp_path: Path, monkeypatch) -> None:
+    from skeleton.ai.runtime.inference.llama_cpp import LlamaCppConfig, LlamaCppModel
+    manifest, runtime, _ = _deployment_with_adjacent_library(tmp_path)
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/untrusted/override")
+    monkeypatch.setenv("DYLD_LIBRARY_PATH", "/untrusted/override")
+    deployment = LocalModelDeployment.load(manifest)
+    strict = LlamaCppModel(deployment.llama_cpp_config())
+    assert "LD_LIBRARY_PATH" not in strict._effective_environment()
+    assert "DYLD_LIBRARY_PATH" not in strict._effective_environment()
+    legacy = LlamaCppModel(LlamaCppConfig(executable=str(runtime), model_path=str(deployment.model_path), context_size=128))
+    assert legacy._effective_environment()["LD_LIBRARY_PATH"] == "/untrusted/override"
+    for name in ("LD_PRELOAD", "LD_AUDIT", "DYLD_INSERT_LIBRARIES", "GLIBC_TUNABLES", "GGML_BACKEND_PATH"):
+        with pytest.raises(ValueError, match="loader environment override"):
+            LlamaCppConfig(executable=str(runtime), model_path=str(deployment.model_path),
+                           runtime_libraries=deployment.runtime_libraries, environment={name: "override"})
+
+
+def test_pinned_bundle_refuses_hosts_without_no_follow_open(tmp_path: Path, monkeypatch) -> None:
+    manifest, _, _ = _deployment_with_adjacent_library(tmp_path)
+    monkeypatch.delattr(os, "O_NOFOLLOW", raising=False)
+    with pytest.raises(LocalModelDeploymentError, match="library inventory"):
+        LocalModelDeployment.load(manifest)
 
 
 @pytest.mark.asyncio
@@ -373,4 +500,3 @@ def test_qualification_rejects_truncated_response(tmp_path: Path) -> None:
             result,
             prompt="qualification",
         )
-

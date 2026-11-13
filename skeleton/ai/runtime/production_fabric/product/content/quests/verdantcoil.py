@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for verdantcoil."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('verdantcoil_arrival', (), (), ('arrival_record',)), Quest('verdantcoil_source', ('verdantcoil_arrival',), ('arrival_record',), ('source_proof',)), Quest('verdantcoil_witness', ('verdantcoil_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('verdantcoil_reconcile', ('verdantcoil_source', 'verdantcoil_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('verdantcoil_crossing', ('verdantcoil_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('verdantcoil_conclusion', ('verdantcoil_crossing',), ('crossing_pass',), ('ending_unlocked',)))

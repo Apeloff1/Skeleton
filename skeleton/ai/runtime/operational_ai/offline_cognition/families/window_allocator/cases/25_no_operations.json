@@ -1,0 +1,24 @@
+{
+  "schema": "offline-cognition-case.v1",
+  "family": "window_allocator",
+  "id": "25_no_operations",
+  "expected": "reject",
+  "payload": {
+    "name": "window_allocator",
+    "category": "context",
+    "source_role": "history",
+    "retrieval_mode": "lexical",
+    "context_limit": 5632,
+    "byte_limit": 61440,
+    "latency_ms": 65000,
+    "min_evidence": 4,
+    "priority": 7,
+    "rank_lexical": 0.65,
+    "rank_dense": 0.25,
+    "rank_freshness": 0.1,
+    "operations": []
+  },
+  "risk": "Refuse no operations",
+  "native_e2e": false,
+  "release_certified": false
+}

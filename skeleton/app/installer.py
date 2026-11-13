@@ -8,10 +8,11 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from skeleton.app.assembly import (
+    CHROMA_FULL_PROFILE_BLOCKED,
     checks_ok,
     compose_command,
     find_repo_root,
@@ -21,7 +22,7 @@ from skeleton.app.assembly import (
     runtime_manifest,
 )
 from skeleton.app.preloader import PreloadReport, inspect_host
-from skeleton.app.setup_runtime import SetupResult, ensure_runtime_environment
+from skeleton.app.setup_runtime import SetupResult, ensure_runtime_environment, runtime_source_fingerprint
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -120,6 +121,28 @@ def _setup_phase(result: SetupResult) -> InstallPhase:
     return InstallPhase("setup-runtime", True, detail)
 
 
+def _runtime_source_stable(root: Path, admitted_digest: str) -> bool:
+    """Check private .env custody without reading values into receipts.
+
+    This is an epoch fence, not a filesystem transaction: arbitrary external
+    writers may still race Docker. Any *observed* mutation denies qualification
+    and prevents follow-up admission with stale startup inputs.
+    """
+    try:
+        return runtime_source_fingerprint(root) == admitted_digest
+    except (OSError, ValueError, UnicodeError):
+        return False
+
+
+def _runtime_source_rejection() -> InstallPhase:
+    return InstallPhase(
+        "runtime-source-epoch",
+        False,
+        "private runtime configuration changed or became unsafe during installation; "
+        "services and readiness are not qualified; preserve .env and retry preflight",
+    )
+
+
 def install_application(
     root: Path | None = None,
     *,
@@ -138,6 +161,12 @@ def install_application(
 
     root = (root or find_repo_root()).resolve()
     phases: list[InstallPhase] = []
+
+    if full and start:
+        return InstallReceipt(
+            root=root,
+            phases=(InstallPhase("chroma-persistence", False, CHROMA_FULL_PROFILE_BLOCKED),),
+        )
 
     if production and hot:
         return InstallReceipt(
@@ -200,8 +229,25 @@ def install_application(
             )
         )
 
+    # Admit one process environment before runtime preflight; all later
+    # manifest, Compose and readiness decisions consume the same snapshot.
+    admitted_process_env = dict(os.environ)
+    # Observe the .env source before preflight itself can read its contents.
+    # Recheck afterward so configuration changes during validation cannot
+    # certify startup using a different source or inode.
+    admitted_digest: str | None = None
+    if start:
+        try:
+            # A fresh installed runtime must have a bounded private source.
+            # No bypass for a missing or replaced .env, including bundled EXEs.
+            admitted_digest = runtime_source_fingerprint(root)
+        except (OSError, ValueError, UnicodeError):
+            phases.append(_runtime_source_rejection())
+            return InstallReceipt(root=root, phases=tuple(phases))
     manifest = load_manifest()
-    runtime_checks = preflight(root, runtime=True, manifest=manifest)
+    runtime_checks = preflight(
+        root, runtime=True, manifest=manifest, environ=admitted_process_env,
+    )
     runtime_ok = checks_ok(runtime_checks)
     failed_codes = [check.code for check in runtime_checks if check.required and not check.ok]
     phases.append(
@@ -217,12 +263,31 @@ def install_application(
     )
     if not runtime_ok:
         return InstallReceipt(root=root, phases=tuple(phases))
-    manifest = runtime_manifest(manifest, root=root)
+    if admitted_digest is not None and not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
+    # A concurrent operator change to os.environ after preflight cannot make
+    # startup validate one port while a later probe uses another port.
+    try:
+        manifest = runtime_manifest(
+            manifest, root=root, environ=admitted_process_env,
+        )
+    except (OSError, ValueError, UnicodeError):
+        phases.append(
+            InstallPhase(
+                "runtime-manifest", False,
+                "runtime port configuration invalid, unreadable or changed after preflight",
+            )
+        )
+        return InstallReceipt(root=root, phases=tuple(phases))
+    if admitted_digest is not None and not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
 
     # Validate precisely the configuration used for startup. The production
     # frontend uses port 8080, unlike the default development Compose model.
     mode = "production" if production else "development"
-    compose_env = {**os.environ, **manifest.mode_env(mode)}
+    compose_env = {**admitted_process_env, **manifest.mode_env(mode), "COMPOSE_REMOVE_ORPHANS": "0"}
     compose_validate = _run(
         compose_command("config", manifest=manifest, full=full, hot=hot),
         root=root,
@@ -234,20 +299,34 @@ def install_application(
     phases.append(compose_validate)
     if not compose_validate.ok or not start:
         return InstallReceipt(root=root, phases=tuple(phases))
-
-    try:
-        host_urls = public_service_urls(root, manifest=manifest)
-    except ValueError as exc:
-        phases.append(InstallPhase("public-endpoints", False, str(exc)))
+    if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
         return InstallReceipt(root=root, phases=tuple(phases))
 
-    command = compose_command(
-        "up",
-        manifest=manifest,
-        full=full,
-        build=True,
-        hot=hot,
-    )
+    try:
+        host_urls = public_service_urls(
+            root, manifest=manifest, environ=admitted_process_env,
+        )
+    except (OSError, ValueError, UnicodeError):
+        phases.append(
+            InstallPhase("public-endpoints", False, "public endpoint configuration unsafe or invalid")
+        )
+        return InstallReceipt(root=root, phases=tuple(phases))
+    if not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
+
+    try:
+        command = compose_command(
+            "up",
+            manifest=manifest,
+            full=full,
+            build=True,
+            hot=hot,
+        )
+    except ValueError as exc:
+        phases.append(InstallPhase("start", False, str(exc)))
+        return InstallReceipt(root=root, phases=tuple(phases))
     try:
         completed = runner(
             list(command),
@@ -267,17 +346,100 @@ def install_application(
     except (OSError, subprocess.SubprocessError) as exc:
         phases.append(InstallPhase("start", False, f"application start failed: {type(exc).__name__}"))
 
-    if phases[-1].ok:
+    # Even an apparently successful Compose exit cannot attest a startup
+    # whose private configuration changed during process execution.
+    if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
+
+    full_start_ok = phases[-1].ok
+    if not full_start_ok:
+        # A failed protected-stack start must remain a required failure. When
+        # the canonical frontend is independently startable, attempt only its
+        # diagnostic surface; never remove backend/engine health fences or
+        # promote setup liveness into full application readiness. The same
+        # admitted private configuration epoch fences recovery and its probe.
+        frontend = manifest.service("frontend")
+        if not frontend.depends_on:
+            if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+                phases.append(_runtime_source_rejection())
+                return InstallReceipt(root=root, phases=tuple(phases))
+            diagnostic_manifest = replace(
+                manifest,
+                default_services=("frontend",),
+                full_services=("frontend",),
+            )
+            recovery = _run(
+                compose_command("up", manifest=diagnostic_manifest, hot=hot),
+                root=root,
+                runner=runner,
+                label="setup-ui-recovery",
+                timeout=900.0,
+                env=compose_env,
+            )
+            if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+                phases.append(_runtime_source_rejection())
+                return InstallReceipt(root=root, phases=tuple(phases))
+            phases.append(
+                InstallPhase(
+                    "setup-ui-recovery", recovery.ok,
+                    recovery.detail + "; protected application start remains failed",
+                    required=False,
+                )
+            )
+            if recovery.ok:
+                from skeleton.app.health import probe_local_setup
+
+                probe = probe_local_setup(
+                    replace(
+                        frontend,
+                        public_url=host_urls.get("frontend", frontend.public_url),
+                        health_path="/setup",
+                    ),
+                    timeout=2.0,
+                )
+                if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+                    phases.append(_runtime_source_rejection())
+                    return InstallReceipt(root=root, phases=tuple(phases))
+                phases.append(
+                    InstallPhase(
+                        "setup-ui-availability", probe.ok,
+                        (
+                            "local setup route answered directly; backend and AI remain unavailable"
+                            if probe.ok
+                            else "setup route unavailable; inspect frontend logs"
+                        ),
+                        required=False,
+                    )
+                )
+        else:
+            phases.append(
+                InstallPhase(
+                    "setup-ui-recovery", False,
+                    "frontend has protected startup dependencies; qualify #4682 before independent setup recovery",
+                    required=False,
+                )
+            )
+
+    if full_start_ok:
         from skeleton.app.health import probes_ok, wait_for_application
 
         results = wait_for_application(
             manifest=manifest,
             full=full,
             timeout=3.0,
-            attempts=12,
-            delay=1.0,
+            # Cold production startup is dependency ordered: Mongo must become
+            # healthy before the engine starts, and the backend waits for both.
+            # Their image health checks allow a 60-second start period, so the
+            # old twelve-second budget routinely called a healthy first install
+            # failed while containers were still inside their declared grace.
+            attempts=60,
+            delay=2.0,
             public_url_overrides=host_urls,
         )
+        if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+            phases.append(_runtime_source_rejection())
+            return InstallReceipt(root=root, phases=tuple(phases))
         healthy = probes_ok(results)
         failed = [result.service for result in results if not result.ok]
         phases.append(
@@ -294,7 +456,11 @@ def install_application(
         if healthy:
             from skeleton.app.first_install import critical_backend_route_report
 
-            route_status = critical_backend_route_report(host_urls["backend"], timeout=3.0)
+            # public_service_urls is intentionally a sparse *override* map.
+            # On a clean install with default ports it has no "backend" key;
+            # use the already resolved canonical manifest URL as the fallback.
+            backend_url = host_urls["backend"] if "backend" in host_urls else manifest.service("backend").public_url
+            route_status = critical_backend_route_report(backend_url, timeout=3.0)
             routes_ready = route_status["ready"] is True
             phases.append(
                 InstallPhase(
@@ -307,6 +473,9 @@ def install_application(
                     ),
                 )
             )
+
+    if admitted_digest is not None and not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
 
     return InstallReceipt(root=root, phases=tuple(phases))
 

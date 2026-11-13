@@ -1,0 +1,73 @@
+name: Harbor CLI and Studio Archive Source Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/game/gameplay/harbor_crafting_patrol_cli.py"
+      - "skeleton/app/offline_delivery_archive.py"
+      - "skeleton/build/delivery/packaging.py"
+      - "skeleton/ai/build/core/delivery/packaging.py"
+      - "skeleton/testing/test_harbor_crafting_patrol_guidance.py"
+      - "skeleton/testing/test_app_offline_archive_schema_parity.py"
+      - "skeleton/testing/test_delivery_packaging.py"
+      - "skeleton/testing/test_harbor_crafting_journal_transfer.py"
+      - "skeleton/testing/test_ecs_ai.py"
+      - ".github/workflows/harbor-studio-source-qualification.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harbor-studio-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  source_boundary:
+    name: Report-only CLI and resealed Studio custody
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout immutable PR head without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Assert checked-out SHA equals immutable PR head
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Use canonical Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install focused hermetic test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Compile changed source and regressions
+        run: |
+          python -m compileall -q \
+            skeleton/game/gameplay/harbor_crafting_patrol_cli.py \
+            skeleton/app/offline_delivery_archive.py \
+            skeleton/build/delivery/packaging.py \
+            skeleton/ai/build/core/delivery/packaging.py \
+            skeleton/testing/test_harbor_crafting_patrol_guidance.py \
+            skeleton/testing/test_app_offline_archive_schema_parity.py \
+            skeleton/testing/test_delivery_packaging.py \
+            skeleton/testing/test_harbor_crafting_journal_transfer.py \
+            skeleton/testing/test_ecs_ai.py
+      - name: Replay report-only CLI and Studio archive custody regressions
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_harbor_crafting_patrol_guidance.py
+          skeleton/testing/test_harbor_crafting_patrol_debrief.py
+          skeleton/testing/test_harbor_crafting_patrol_quests.py
+          skeleton/testing/test_app_offline_archive_schema_parity.py
+          skeleton/testing/test_delivery_packaging.py
+          skeleton/testing/test_harbor_crafting_journal_transfer.py
+          skeleton/testing/test_ecs_ai.py
+      - name: Verify canonical AI-tree parity
+        run: python scripts/check_ai_file_tree.py

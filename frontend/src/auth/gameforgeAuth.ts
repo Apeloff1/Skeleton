@@ -58,6 +58,34 @@ async function persist(token: string) {
   } catch {}
 }
 
+/** Scoped bearer snapshot for raw private media.
+ * A logout or account change invalidates the session before data is consumed.
+ */
+export async function prepareApiRequest(
+  _url: string,
+  extra: Record<string, string> = {},
+  upstream?: AbortSignal,
+): Promise<{ headers: Record<string, string>; signal: AbortSignal; current: () => boolean; dispose: () => void }> {
+  await initializeStoredToken();
+  const epoch = _tokenEpoch;
+  const token = _token;
+  const controller = new AbortController();
+  const invalidate = () => { controller.abort(); };
+  const unsubscribe = subscribeAuthChanges(invalidate);
+  upstream?.addEventListener('abort', invalidate, { once: true });
+  if (upstream?.aborted || epoch !== _tokenEpoch || token !== _token) invalidate();
+  return {
+    headers: { ...extra, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    signal: controller.signal,
+    current: () => !controller.signal.aborted && epoch === _tokenEpoch && token === _token,
+    dispose: () => {
+      unsubscribe();
+      upstream?.removeEventListener('abort', invalidate);
+      controller.abort();
+    },
+  };
+}
+
 async function loadStored(): Promise<string> {
   try {
     if (Platform.OS === 'web') return localStorage.getItem(KEY) || '';
@@ -68,7 +96,7 @@ async function loadStored(): Promise<string> {
 }
 
 /** Share cold storage initialization without confusing it with an account change. */
-async function initializeStoredToken(): Promise<void> {
+export async function initializeStoredToken(): Promise<void> {
   if (_tokenLoaded) return;
   if (!_tokenInitialization) {
     const epoch = _tokenEpoch;
@@ -281,6 +309,8 @@ export async function googleLogin(): Promise<{ ok: boolean; role?: string; error
 }
 
 export async function logout(): Promise<void> {
-  try { await api.post('/api/auth/logout', {}, { headers: authHeaders(), timeoutMs: 8000 }); } catch {}
+  const headers = authHeaders();
+  // Revoke local observations immediately, including a stalled server request.
   await persist('');
+  try { await api.post('/api/auth/logout', {}, { headers, timeoutMs: 8000 }); } catch {}
 }

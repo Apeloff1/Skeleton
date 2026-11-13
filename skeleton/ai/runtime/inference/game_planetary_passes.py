@@ -220,7 +220,7 @@ def train_jeeves_cognition(
     elapsed_before = 0.0
     resumed = False
     if ckpt_path.exists():
-        loaded = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        loaded = torch.load(ckpt_path, map_location="cpu", weights_only=True)
         if int(loaded.get("hidden", -1)) != hidden:
             raise ValueError("checkpoint hidden size does not match")
         model.load_state_dict(loaded["best_state"])
@@ -233,7 +233,7 @@ def train_jeeves_cognition(
         source_digest = loaded.get("source_digest")
         resumed = True
     elif source is not None:
-        loaded = torch.load(source, map_location="cpu", weights_only=False)
+        loaded = torch.load(source, map_location="cpu", weights_only=True)
         if int(loaded["hidden"]) != hidden:
             raise ValueError("source checkpoint hidden size does not match")
         model.load_state_dict(loaded["best_state"])

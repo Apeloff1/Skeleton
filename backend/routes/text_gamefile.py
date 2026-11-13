@@ -1,12 +1,14 @@
 """routes/text_gamefile.py — 10 text→gamefile systems API (gate-crosswired)."""
 from __future__ import annotations
 
+from core.public_exception_route import PublicExceptionRoute
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from core import text_gamefile as tg
 
-router = APIRouter(prefix="/api/galaxy-studio/text-gamefile", tags=["text-gamefile"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/galaxy-studio/text-gamefile", tags=["text-gamefile"])
 
 
 @router.get("/generators")
@@ -29,12 +31,13 @@ def generate(key: str, req: GenReq):
 
 
 class PruneReq(BaseModel):
-    build_id: str | None = None      # None → prune ALL forged gamefiles
+    build_id: str = Field(..., min_length=1, max_length=128)
 
 
 @router.post("/prune")
-def prune(req: PruneReq | None = None):
-    return tg.prune_gamefiles((req.build_id if req else None))
+def prune(req: PruneReq):
+    """Delete only the explicitly authorized build's forged source/history."""
+    return tg.prune_gamefiles(req.build_id)
 
 
 @router.get("/{build_id}/list")

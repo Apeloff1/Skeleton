@@ -15,7 +15,7 @@ def test_public_bootstrap_is_dependency_closed_and_sanitized():
 
     services = {item["name"]: item for item in payload["services"]}
     assert {"frontend", "backend", "skeleton", "mongo"}.issubset(services)
-    assert services["backend"]["health_path"] == "/api/health"
+    assert services["backend"]["health_path"] == "/api/health/ready"
     assert services["backend"]["ingress_prefix"] == "/api"
     assert services["skeleton"]["health_path"] == "/api/v1/health/live"
     assert services["skeleton"]["ingress_prefix"] == "/api/v1"
@@ -23,8 +23,9 @@ def test_public_bootstrap_is_dependency_closed_and_sanitized():
 
     default = payload["profiles"]["default"]
     assert set(default["services"]) == {"mongo", "backend", "skeleton", "frontend"}
-    assert default["layers"][0] == ["mongo"]
-    assert default["layers"][-1] == ["frontend"]
+    assert default["layers"][0] == ["frontend", "mongo"]
+    assert default["layers"][-1] == ["backend"]
+    assert "frontend" in default["layers"][0]
 
     serialized = repr(payload)
     for forbidden in ("required_env", "optional_env", "public_url", "container_port", "entrypoint"):
@@ -197,5 +198,26 @@ def test_product_shell_uses_single_runtime_readiness_source():
     assert "getProductReadiness" not in product
     assert "health?.product?.available" in product
     assert "product: runtime.product" in health
-    assert "public_readiness()" in runtime
+    import ast
+    tree = ast.parse(runtime)
+    observations = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Await)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Attribute)
+        and isinstance(node.value.func.value, ast.Name)
+        and node.value.func.value.id == "asyncio"
+        and node.value.func.attr == "to_thread"
+        and node.value.args
+        and isinstance(node.value.args[0], ast.Name)
+        and node.value.args[0].id == "public_readiness"
+    ]
+    assert len(observations) == 1
+    assert not any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "public_readiness"
+        for node in ast.walk(tree)
+    ), "readiness must not block the event loop with a direct call"
     assert '"product": product_readiness' in runtime

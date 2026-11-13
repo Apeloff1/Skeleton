@@ -15,6 +15,8 @@
 
 services:
   # ==========================================================================
+  # Local first-install APIs are loopback-only. Remote access requires an
+  # independently authenticated TLS ingress, never an implicit 0.0.0.0 bind.
   # Skeleton API (hexagonal v16 rewrite)
   # ==========================================================================
   skeleton:
@@ -31,7 +33,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
     ports:
-      - "${SKELETON_PORT:-8010}:8001"
+      - "127.0.0.1:${SKELETON_PORT:-8010}:8001"
     environment:
       - SKL_ENVIRONMENT=${ENVIRONMENT:-development}
       - SKL_MONGO_URI=${SKL_MONGO_URI:?SKL_MONGO_URI must be set to an authenticated MongoDB URI}
@@ -115,13 +117,17 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
     ports:
-      - "${BACKEND_PORT:-8001}:8001"
+      - "127.0.0.1:${BACKEND_PORT:-8001}:8001"
     environment:
       - MONGO_URL=${MONGO_URL:?MONGO_URL must be set to an authenticated MongoDB URI}
       - DB_NAME=${DB_NAME:-tutolage}
       - ENVIRONMENT=${ENVIRONMENT:-development}
+      # Explicit trusted browser origin; never build share links from Host headers.
+      - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost:${FRONTEND_PORT:-3000}}
       - DEBUG=${DEBUG:-false}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      # Keep browser admission aligned with the published frontend port. A
+      # tester may need a non-default port when another local app owns 3000.
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-3000},http://127.0.0.1:${FRONTEND_PORT:-3000}}
       # Runtime model-provider credentials are engine-owned after Stage-5 cutover.
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a high-entropy value}
       - GAMEFORGE_JWT_SECRET=${GAMEFORGE_JWT_SECRET:?GAMEFORGE_JWT_SECRET must be set; run app setup}
@@ -156,7 +162,7 @@ services:
       skeleton:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health', timeout=5).read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health/ready', timeout=5).read()"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -177,7 +183,7 @@ services:
     container_name: tutolage-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
     environment:
       # EXPO_PUBLIC_* values are embedded into the browser bundle, so they
       # must be host-resolvable rather than Docker-internal service names.
@@ -187,11 +193,10 @@ services:
       - EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}
       - EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:${SKELETON_PORT:-8010}}
       - NODE_ENV=${NODE_ENV:-development}
-    depends_on:
-      backend:
-        condition: service_healthy
-      skeleton:
-        condition: service_healthy
+    # First-run setup and diagnostics must start independently of backend
+    # and engine. Even service_started would transitively block this UI:
+    # backend requires a healthy engine, which requires healthy MongoDB.
+    # Keep the backend/engine health fences unchanged; failed APIs stay closed.
     networks:
       - tutolage
 
@@ -233,6 +238,11 @@ services:
     # This service has no auth boundary here, so never bind it publicly.
     ports:
       - "127.0.0.1:${CHROMA_PORT:-8000}:8000"
+    # IMPORTANT: The pinned image persists at /data. This legacy mount is
+    # deliberately retained until existing containers' /data has been exported,
+    # verified and restored to chroma_data. Never recreate an existing Chroma
+    # container to apply a mount correction without that migration.
+    # See docs/APP_ASSEMBLY.md for the data-recovery hold.
     volumes:
       - chroma_data:/chroma/chroma
     environment:

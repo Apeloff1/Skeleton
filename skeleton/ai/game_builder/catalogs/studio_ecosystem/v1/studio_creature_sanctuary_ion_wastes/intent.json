@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_ion_wastes",
+  "title": "Ion Wastes: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010313719,
+  "width": 19,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "space",
+  "starting_health": 3
+}

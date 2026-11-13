@@ -261,11 +261,15 @@ def test_build_stream_preserves_service_bearer_and_attester_with_scoped_job():
         ),
         1,
     )
-    assert len(seen) == 1
-    assert seen[0].headers["authorization"] == "Bearer test-only-token"
-    assert seen[0].headers["x-zaibatsu-attester"] == "test-attester"
-    assert seen[0].url.params["actor_id"] == "actor-1"
-    assert seen[0].url.params["tenant_id"] == "tenant-2"
+    # The bounded event pump may reconnect before its generator is closed.
+    # All emitted requests still need valid principal scope and job custody.
+    assert seen
+    for req in seen:
+        assert req.headers["authorization"] == "Bearer test-only-token"
+        assert req.headers["x-zaibatsu-attester"] == "test-attester"
+        assert req.url.params["actor_id"] == "actor-1"
+        assert req.url.params["tenant_id"] == "tenant-2"
+        assert req.url.params["job_id"] == "e1"
 
 
 def test_direct_job_stream_fails_closed_without_actor_and_tenant_scope():

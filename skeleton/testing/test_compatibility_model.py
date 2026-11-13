@@ -30,7 +30,7 @@ def test_compatibility_matrix_covers_exact_schema_registry() -> None:
     }
 
     assert set(matrix) == set(expected)
-    assert len(matrix) == 40
+    assert len(matrix) == len(expected)
     for schema_id, schema in expected.items():
         row = matrix[schema_id]
         assert row["current_version"] == schema["version"]

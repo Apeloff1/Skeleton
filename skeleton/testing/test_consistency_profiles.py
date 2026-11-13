@@ -40,7 +40,7 @@ def test_machine_registry_covers_every_state_domain() -> None:
     topology = json.loads((ROOT / "machine/state_topology.json").read_text(encoding="utf-8"))
     registry = json.loads((ROOT / "machine/consistency_profiles.json").read_text(encoding="utf-8"))
 
-    assert registry["profile_count"] == len(topology["state_domains"]) == 21
+    assert registry["profile_count"] == len(registry["profiles"]) == len(topology["state_domains"])
     assert [row["domain_id"] for row in registry["profiles"]] == [
         row["id"] for row in topology["state_domains"]
     ]

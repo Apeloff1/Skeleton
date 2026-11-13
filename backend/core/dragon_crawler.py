@@ -441,7 +441,9 @@ class DragonCrawlerApplication:
                 if key not in {"principal_email", "scope", "consent_id", "request_digest"}
             }
             if grant
-            else {"enabled": False, "state": "not_authorized", "slices_started": 0}
+            else {"enabled": False, "state": "not_authorized", "epoch": 0,
+                  "slices_started": 0, "max_slices": 0, "expires_at": None,
+                  "next_run_at": None, "stop_reason": None}
         )
         current = status["consent_current"]
         status["capabilities"] = {
@@ -511,6 +513,858 @@ class DragonCrawlerApplication:
     async def get(self, scope: dict[str, str], identifier: str) -> dict:
         return self._projection(await self._reconcile(scope, await self._owned(scope, identifier)))
 
+
+    @staticmethod
+    def _campaign_mandate(scope: dict[str, str], row: dict):
+        """Advisory research boundary tied to an existing authenticated capture."""
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            CampaignMandate, CampaignScope,
+        )
+        request_type, _ = _core()
+        request = request_type.from_dict(_plain(row["request"]))
+        consent = _plain(row["consent"])
+        return CampaignMandate(
+            scope=CampaignScope(
+                tenant_id=scope["tenant_id"],
+                owner_id=scope["owner_id"],
+                consent_id=consent["consent_id"],
+                expires_at=consent["expires_at"],
+                allowed_hosts=tuple(request.allowed_hosts),
+                purpose="authenticated_existing_capture_research",
+            ),
+            request=request,
+            query=request.query,
+            created_at=_utc(row["created_at"]).timestamp(),
+        )
+
+    def _campaign_authority(self, row: dict) -> tuple[dict, tuple[str, ...]]:
+        """Return only the bound snapshot and source-policy-disallowed IDs."""
+        self._source_use(row)
+        snapshot = _plain(row["snapshot"])
+        _, run_type = _core()
+        runtime = run_type.from_snapshot(snapshot)
+        revoked = tuple(sorted(
+            source["source_id"]
+            for source in runtime.sources()
+            if self._capture_freshness(row, source)["state"] != "current"
+        ))
+        return snapshot, revoked
+
+    async def campaign_inspection(
+        self, scope: dict[str, str], identifier: str,
+    ) -> dict[str, Any]:
+        """Read-only, owner-fenced research diagnostics from current Mongo data.
+
+        No raw page text, pending worker control, autonomous scheduling,
+        pre-IO budget reservation or knowledge promotion is returned.
+        """
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            analyze_frontier_topology, compile_crawl_risks,
+            inspect_crawl_campaign, decide_campaign_stop,
+        )
+        row = await self._owned(scope, identifier)
+        snapshot, revoked = self._campaign_authority(row)
+        mandate = self._campaign_mandate(scope, row)
+        at = _now().timestamp()
+        report = inspect_crawl_campaign(
+            snapshot, mandate, now=at, authorized=True,
+            revoked_source_ids=revoked,
+        )
+        topology = analyze_frontier_topology(
+            snapshot, mandate, now=at, authorized=True,
+        )
+        risk = compile_crawl_risks(
+            snapshot, mandate, now=at, authorized=True,
+        )
+        stop = decide_campaign_stop(
+            mandate, report.budget, report.evidence,
+            novelty_scores=(), now=at, authorized=True,
+        )
+        source_summary = [
+            {
+                "source_id": src.source_id,
+                "canonical_url": src.canonical_url,
+                "captured_at": src.fetched_at,
+                "truncated": src.text_truncated,
+                "instruction_risk_count": src.risk_count,
+                "review_required": True,
+                "source_hash": src.full_content_hash,
+            }
+            for src in report.evidence.sources
+        ]
+        response = {
+            "schema_version": "skeleton.dragon.campaign_dashboard.v1",
+            "session_id": identifier,
+            "run_id": report.run_id,
+            "run_sequence": report.run_sequence,
+            "snapshot_digest": report.snapshot_digest,
+            "mandate_digest": mandate.fingerprint,
+            "inspection_digest": report.inspection_digest,
+            "budget": asdict(report.budget),
+            "dispatch_proposal_count": len(report.plan.dispatches),
+            "dispatch_hints_authoritative": False,
+            "frontier": {
+                "count": topology.frontier_count,
+                "by_depth": topology.pending_by_depth,
+                "hosts": [asdict(host) for host in topology.hosts],
+                "digest": topology.topology_digest,
+            },
+            "sources": source_summary,
+            "source_policy_held_count": len(revoked),
+            "rejected_source_count": len(report.evidence.rejected_sources),
+            "risk": {
+                "events_retained": risk.events_retained,
+                "event_history_truncated": risk.events_truncated,
+                "findings": [asdict(item) for item in risk.risks],
+                "digest": risk.risk_digest,
+            },
+            "stop": asdict(stop),
+            "knowledge_verified": False,
+            "training_permission": False,
+            "read_only": True,
+        }
+        response["dashboard_digest"] = _digest(response)
+        return {"ok": True, "report": response}
+
+    async def campaign_index_search(
+        self, scope: dict[str, str], identifier: str,
+        query: str, *, mode: str = "all", limit: int = 8,
+    ) -> dict[str, Any]:
+        """Freshly rebuilt lexical research search under current source policy."""
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            build_ephemeral_index, search_ephemeral_index,
+        )
+        row = await self._owned(scope, identifier)
+        snapshot, revoked = self._campaign_authority(row)
+        mandate = self._campaign_mandate(scope, row)
+        at = _now().timestamp()
+        index = build_ephemeral_index(
+            mandate, snapshot, now=at, authorized=True,
+            revoked_source_ids=revoked,
+        )
+        result = search_ephemeral_index(
+            mandate, snapshot, index, query,
+            now=at, authorized=True, revoked_source_ids=revoked,
+            mode=mode, limit=limit,
+        )
+        payload = {
+            "schema_version": "skeleton.dragon.campaign_index_search.v1",
+            "session_id": identifier,
+            "source_snapshot_digest": result.source_snapshot_digest,
+            "index_digest": index.index_digest,
+            "query": query,
+            "mode": mode,
+            "hits": [asdict(hit) for hit in result.hits],
+            "result_digest": result.result_digest,
+            "source_policy_held_count": len(revoked),
+            "review_state": "unreviewed_external_evidence_only",
+            "training_permission": False,
+            "publication_granted": False,
+        }
+        return {"ok": True, "result": payload}
+
+
+    async def campaign_atlas(
+        self, scope: dict[str, str], identifier: str,
+        objectives: tuple[dict[str, Any], ...],
+        review_effort: tuple[dict[str, Any], ...] = (),
+        review_budget_minutes: int = 240,
+        retrieval_mode: str = "fusion",
+    ) -> dict[str, Any]:
+        """Run the policy-first read-only research Atlas for an owned crawl.
+
+        The authenticated Mongo session and its current source-use policy are
+        the only authority. The caller provides research questions, never
+        source-policy decisions, retained text, an authorization boolean,
+        network rights, credentials, or a dispatch grant.
+        """
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            ResearchObjective, SourcePolicyDecision, ReviewEffort,
+            compose_dragon_atlas, verify_dragon_atlas_trace,
+        )
+        from skeleton.ai.webcrawler.dragon_campaign_stack.forensics import (
+            compose_atlas_forensics, verify_atlas_forensics,
+        )
+
+        row = await self._owned(scope, identifier)
+        snapshot, _ = self._campaign_authority(row)
+        mandate = self._campaign_mandate(scope, row)
+        now = _now().timestamp()
+        if not isinstance(objectives, tuple) or not 1 <= len(objectives) <= 8:
+            raise ValueError("bounded operator research objectives required")
+        goals = tuple(ResearchObjective(
+            **{
+                **value,
+                "required_terms": tuple(value.get("required_terms", ())),
+                "blocked_terms": tuple(value.get("blocked_terms", ())),
+            },
+        ) for value in objectives)
+        if not isinstance(review_effort, tuple) or len(review_effort) > 7:
+            raise ValueError("bounded explicit review effort estimates required")
+        review_costs = tuple(ReviewEffort(**value) for value in review_effort)
+        _, run_type = _core()
+        runtime = run_type.from_snapshot(snapshot)
+        authoritative = []
+        for source in runtime.sources():
+            capture = self._capture_freshness(row, source)
+            source_policy = self._capture_policy(row, source)
+            retained_until = _utc(datetime.fromisoformat(
+                capture["valid_until"]
+            )).timestamp()
+            authoritative.append(SourcePolicyDecision(
+                source_id=source["source_id"],
+                source_hash=source["content_hash"],
+                consent_id=mandate.scope.consent_id,
+                policy_revision=source_policy["version"],
+                effective_at=source["fetched_at"],
+                expires_at=retained_until,
+                status=(
+                    "review_scoped" if capture["state"] == "current" else
+                    "withdrawn" if capture["state"] == "withdrawn" else
+                    "embargoed"
+                ),
+                authority_reference="authenticated_owned_mongo_source_use",
+                purpose=mandate.scope.purpose,
+            ))
+        atlas = compose_dragon_atlas(
+            mandate, snapshot, objectives=goals,
+            source_policies=tuple(authoritative),
+            policy_snapshot_authenticated=True,
+            now=now, authorized=True,
+            max_retrieved_passages=16, max_context_chars=8000,
+            review_effort=review_costs,
+            review_budget_minutes=review_budget_minutes,
+            retrieval_mode=retrieval_mode,
+        )
+        verify_dragon_atlas_trace(
+            mandate, snapshot, atlas, now=_now().timestamp(), authorized=True,
+        )
+        # Forensic analysis consumes only the authenticated exact-source Atlas
+        # and emits metadata-only, review-held receipts. Never include Frame text.
+        # Use one immutable inspection clock for deterministic replay.
+        # Current wall-time and Mongo authorization are checked separately
+        # again before the response crosses the authenticated boundary.
+        forensic_issued_at = _now().timestamp()
+        forensic = compose_atlas_forensics(
+            mandate, snapshot, atlas, now=forensic_issued_at, authorized=True,
+        )
+        verify_atlas_forensics(
+            mandate, snapshot, atlas, forensic,
+            now=forensic_issued_at, authorized=True,
+        )
+        from skeleton.ai.webcrawler.dragon_campaign_stack import (
+            compose_operational_assurance, verify_operational_assurance,
+        )
+        operations = compose_operational_assurance(
+            mandate, snapshot, now=forensic_issued_at, authorized=True,
+        )
+        verify_operational_assurance(
+            mandate, snapshot, operations,
+            now=forensic_issued_at, authorized=True,
+        )
+        # A second authenticated Mongo read fences revision/policy races.
+        # Consumers still MUST recheck both sources and consent before use.
+        latest = await self._owned(scope, identifier)
+        latest_snapshot, _ = self._campaign_authority(latest)
+        if (
+            latest_snapshot.get("snapshot_digest") != snapshot.get("snapshot_digest")
+            or latest.get("version") != row.get("version")
+            or _plain(latest.get("source_use_policies", {}))
+               != _plain(row.get("source_use_policies", {}))
+        ):
+            raise CrawlerError(
+                "crawler_research_revision_changed",
+                "The capture or source-use policy changed during Atlas inspection.",
+                409,
+            )
+        now_again = _now().timestamp()
+        mandate.admit(now=now_again, authorized=True)
+        for source in runtime.sources():
+            if source["source_id"] in atlas.policies.allowed_source_ids and (
+                self._capture_freshness(latest, source)["state"] != "current"
+            ):
+                raise CrawlerError(
+                    "crawler_research_source_changed",
+                    "Source access changed during Atlas inspection.",
+                    409,
+                )
+        # Expose audit metadata, NEVER the JSON envelope or raw external
+        # passages: source text remains on the separate checked source API.
+        metadata = {
+            "schema_version": "skeleton.dragon.campaign_atlas_dashboard.v1",
+            "session_id": identifier,
+            "run_id": atlas.run_id,
+            "run_sequence": atlas.source_sequence,
+            "snapshot_digest": atlas.source_snapshot_digest,
+            "mandate_digest": atlas.mandate_digest,
+            "atlas_digest": atlas.atlas_digest,
+            "issued_at": atlas.issued_at,
+            "stages": [
+                {
+                    "ordinal": stage.ordinal,
+                    "name": stage.name,
+                    "receipt_digest": stage.receipt_digest,
+                    "chain_digest": stage.chain_digest,
+                }
+                for stage in atlas.stages
+            ],
+            "source_policy": {
+                "digest": atlas.policies.policy_digest,
+                "sources_seen": atlas.policies.source_count,
+                "included_source_count": len(atlas.policies.allowed_source_ids),
+                "excluded_source_count": len(atlas.policies.excluded_source_ids),
+                "complete_current_policy_required": True,
+            },
+            "objectives": [
+                {
+                    "objective_id": goal.objective_id,
+                    "dimension": goal.dimension,
+                    "stage": goal.stage,
+                    "priority": goal.priority,
+                }
+                for goal in atlas.workbench.objectives.objectives
+            ],
+            "query_lattice": {
+                "digest": atlas.lattice.lattice_digest,
+                "queries": len(atlas.lattice.queries),
+                "source_authority": "operator_objectives_only",
+            },
+            "retrieval": {
+                "digest": atlas.retrieval.fusion_digest,
+                "mode": atlas.retrieval_mode,
+                "candidate_passages": atlas.retrieval.matched_passages,
+                "retained_hits": len(atlas.retrieval.results),
+                "distinct_hosts": atlas.retrieval.host_count,
+                "evidence": [
+                    {
+                        "source_id": hit.source_id,
+                        "canonical_url": hit.canonical_url,
+                        "passage_hash": hit.passage_hash,
+                        "start": hit.start,
+                        "end": hit.end,
+                        "score": hit.score,
+                        "objective_ids": hit.matched_objective_ids,
+                        "review_required": True,
+                    }
+                    for hit in atlas.retrieval.results
+                ],
+            },
+            "context": {
+                "digest": atlas.context.envelope_digest,
+                "source_references": atlas.context.reference_count,
+                "serialized_bytes": atlas.context.serialized_bytes,
+                "raw_source_text_redacted": True,
+                "fresh_policy_recheck_required": True,
+            },
+            "independence": (
+                {
+                    "digest": atlas.independence.audit_digest,
+                    "ambiguous_groups": atlas.independence.ambiguous_group_count,
+                    "tainted_sources": atlas.independence.tainted_source_count,
+                    "operator_fact_review_required": True,
+                } if atlas.independence else None
+            ),
+            "lexical_ranking": (
+                {
+                    "ranking_digest": atlas.lexical_ranking.ranking_digest,
+                    "indexed_passages": atlas.lexical_ranking.document_count,
+                    "scored_passages": atlas.lexical_ranking.scored_passages,
+                    "scored_query_receipts": len(atlas.lexical_ranking.scored_receipts),
+                    "indexed_terms": atlas.lexical_ranking.indexed_term_count,
+                    "ai_embedding_used": False,
+                    "model_confidence_certified": False,
+                } if atlas.lexical_ranking else None
+            ),
+            "numeric_signals": {
+                "report_digest": atlas.numeric_signals.report_digest,
+                "observed_quantities": len(atlas.numeric_signals.mentions),
+                "cross_source_review_candidates": len(atlas.numeric_signals.candidates),
+                "unit_families": atlas.numeric_signals.detected_unit_families,
+                "candidates": [
+                    {
+                        "objective_id": item.objective_id,
+                        "left_source_id": item.left_source_id,
+                        "right_source_id": item.right_source_id,
+                        "left_span_start": item.left_mention_start,
+                        "right_span_start": item.right_mention_start,
+                        "unit_family": item.normalized_unit,
+                        "normalized_left": item.left_value,
+                        "normalized_right": item.right_value,
+                        "relative_gap": item.relative_gap,
+                        "human_review_required": True,
+                        "factual_contradiction_established": False,
+                    }
+                    for item in atlas.numeric_signals.candidates[:16]
+                ],
+                "facts_verified": False,
+            },
+            "temporal_signals": {
+                "report_digest": atlas.temporal_signals.signal_digest,
+                "date_mentions": len(atlas.temporal_signals.mentions),
+                "date_groups": len(atlas.temporal_signals.date_groups),
+                "groups": [
+                    {
+                        "objective_id": item.objective_id,
+                        "date": item.iso_date,
+                        "source_count": len(item.source_ids),
+                        "date_not_verified_as_remote_update": True,
+                    }
+                    for item in atlas.temporal_signals.date_groups[:16]
+                ],
+                "remote_freshness_verified": False,
+            },
+            "reviewed_query_feedback": (
+                {
+                    "digest": atlas.feedback.feedback_digest,
+                    "operator_labeled_passages": atlas.feedback.label_count,
+                    "candidate_term_count": sum(len(x.candidates)
+                                                for x in atlas.feedback.objectives),
+                    "query_mutation_approved": False,
+                } if atlas.feedback else None
+            ),
+            "evidence_graph": {
+                "graph_digest": atlas.graph.graph_digest,
+                "vertices": atlas.graph.integrity.vertex_count,
+                "arcs": atlas.graph.integrity.edge_count,
+                "retained_passages": atlas.graph.integrity.passage_count,
+                "sources": atlas.graph.integrity.source_count,
+                "held_sources": atlas.graph.integrity.held_source_count,
+                "objective_neighborhoods": [
+                    {
+                        "objective_id": item.objective_id,
+                        "source_count": len(item.distinct_source_ids),
+                        "passage_count": item.exact_passage_count,
+                        "host_count": len(item.distinct_hosts),
+                        "claim_count": len(item.associated_claim_ids),
+                        "independence_attested": False,
+                    }
+                    for item in atlas.graph.objectives
+                ],
+                "graph_is_factual_proof": False,
+            },
+            "review_operations": {
+                "agenda_digest": atlas.agenda.agenda_digest,
+                "replay_digest": atlas.review_replay.replay_digest,
+                "tasks_total": len(atlas.agenda.tasks),
+                "pending_tasks": len(atlas.review_replay.pending_task_ids),
+                "blocked_tasks": len(atlas.review_replay.blocked_task_ids),
+                "ready_task_ids": atlas.agenda.ready_task_ids[:32],
+                "task_types": dict(atlas.agenda.counts_by_type),
+                "recommended_queue": [
+                    {
+                        "task_id": task.task_id,
+                        "type": task.task_type,
+                        "objective_id": task.objective_id,
+                        "source_id": task.source_id,
+                        "priority": task.priority,
+                        "predecessors": task.predecessors,
+                        "current_status": "pending_human_review",
+                        "automatically_approvable": False,
+                    }
+                    for task in atlas.agenda.tasks[:32]
+                ],
+                "human_review_recorded": False,
+                "durable_review_mutations": False,
+            },
+            "review_portfolio": (
+                {
+                    "portfolio_digest": atlas.portfolio.portfolio_digest,
+                    "estimated_minutes": atlas.portfolio.consumed_minutes_estimated,
+                    "budget_minutes": atlas.portfolio.time_budget_minutes,
+                    "selected_count": len(atlas.portfolio.tasks_selected),
+                    "task_ids": [
+                        item.task_id for item in atlas.portfolio.tasks_selected
+                    ],
+                    "persistence_performed": False,
+                    "effort_is_observed": False,
+                } if atlas.portfolio is not None else None
+            ),
+            "jeeves_handoff": {
+                "manifest_digest": atlas.handoff.handoff_digest,
+                "citation_count": len(atlas.handoff.citations),
+                "task_count": len(atlas.handoff.tasks),
+                "body_excluded": True,
+                "network_called": False,
+                "dispatch_granted": False,
+                "requires_fresh_source_policy": True,
+            },
+            "citation_manifest": {
+                "manifest_digest": atlas.citations.manifest_digest,
+                "exact_anchored_references": len(atlas.citations.citations),
+                "body_redacted": True,
+                "publication_permission": False,
+            },
+            "evidence_family_stress": {
+                "stress_digest": atlas.family_stress.stress_digest,
+                "policy_digest": atlas.family_stress.policy_digest,
+                "retrieval_digest": atlas.family_stress.retrieval_digest,
+                "robustness_digest": atlas.family_stress.robustness_digest,
+                "similarity_digest": atlas.family_stress.similarity_digest,
+                "selected_source_records": (
+                    atlas.family_stress.source_records_observed
+                ),
+                "exact_content_families": (
+                    atlas.family_stress.exact_content_families_observed
+                ),
+                "possible_near_duplicate_clusters": (
+                    atlas.family_stress.possible_near_duplicate_clusters
+                ),
+                "flagged_objectives": (
+                    atlas.family_stress.objectives_with_potential_dependence
+                ),
+                "objectives_with_similarity_holds": (
+                    atlas.family_stress.objectives_with_similarity_holds
+                ),
+                "objectives": [
+                    {
+                        "objective_id": item.objective_id,
+                        "target_attested_groups": item.desired_attested_source_groups,
+                        "selected_passages": item.observed_selected_passages,
+                        "selected_source_records": item.source_record_count,
+                        "exact_content_families": item.exact_content_family_count,
+                        "possible_near_duplicate_clusters": (
+                            item.possible_near_duplicate_cluster_count
+                        ),
+                        "possible_mirror_collapse": (
+                            item.possible_collapse_from_exact_families
+                        ),
+                        "unscored_sources": item.unscored_similarity_source_count,
+                        "worst_host_loss_clusters": (
+                            item.worst_observed_host_removal_cluster_count
+                        ),
+                        "hypothetical_target_shortfall": (
+                            item.hypothetical_target_shortfall
+                        ),
+                        "observed_hosts": item.observed_host_count,
+                        "concern": item.concern,
+                        "independent_evidence_attested": False,
+                    } for item in atlas.family_stress.objectives
+                ],
+                "limitations": atlas.family_stress.limitations,
+                "claim_correctness_verified": False,
+                "source_text_exported": False,
+                "model_or_network_invoked": False,
+                "human_review_required": True,
+            },
+            "source_similarity": {
+                "audit_digest": atlas.similarity.audit_digest,
+                "retrieval_digest": atlas.similarity.retrieval_digest,
+                "policy_digest": atlas.similarity.source_policy_digest,
+                "selected_sources": len(atlas.similarity.considered_source_ids),
+                "compared_sources": len(atlas.similarity.compared_source_ids),
+                "held_sources": len(atlas.similarity.held_source_ids),
+                "eligible_pairs": atlas.similarity.eligible_pair_count,
+                "candidate_pairs": atlas.similarity.scored_pair_count,
+                "cross_host_candidates": atlas.similarity.cross_host_candidate_count,
+                "skipped_oversize": atlas.similarity.skipped_oversize_sources,
+                "skipped_short": atlas.similarity.skipped_short_sources,
+                "jaccard_threshold": atlas.similarity.threshold_jaccard,
+                "containment_threshold": atlas.similarity.threshold_containment,
+                "candidate_leads": [
+                    {
+                        "left_host": item.left_host,
+                        "right_host": item.right_host,
+                        "jaccard": item.jaccard,
+                        "smaller_set_containment": item.smaller_set_containment,
+                        "length_ratio": item.length_ratio,
+                        "relation": item.relation,
+                        "cross_host": item.cross_host,
+                        "human_lineage_review_required": True,
+                        "shared_origin_established": False,
+                    } for item in atlas.similarity.similar_pairs[:16]
+                ],
+                "clusters": [
+                    {
+                        "observed_hosts": item.observed_hosts,
+                        "source_count": len(item.source_ids),
+                        "direct_candidate_edges": item.direct_candidate_edges,
+                        "all_pairs_verified": False,
+                        "independent_origin_verified": False,
+                    } for item in atlas.similarity.components[:16]
+                ],
+                "source_bodies_redacted": True,
+                "network_used": False,
+                "training_or_publication_granted": False,
+                "lineage_verified": False,
+            },
+            "retrieval_robustness": {
+                "audit_digest": atlas.robustness.audit_digest,
+                "retrieval_digest": atlas.robustness.retrieval_digest,
+                "selected_passages": atlas.robustness.selected_passages,
+                "selected_sources": atlas.robustness.selected_sources,
+                "selected_hosts": atlas.robustness.selected_hosts,
+                "distinct_content_families": (
+                    atlas.robustness.distinct_content_families
+                ),
+                "cross_host_exact_copy_groups": (
+                    atlas.robustness.cross_host_exact_clone_groups
+                ),
+                "exact_copy_families": [
+                    {
+                        "content_sha256": family.content_sha256,
+                        "source_count": len(family.selected_source_ids),
+                        "host_count": len(family.observed_hosts),
+                        "hosts": family.observed_hosts,
+                        "selected_passages": family.selected_passages,
+                        "independence_verified": False,
+                    } for family in atlas.robustness.exact_content_reuse
+                ],
+                "flagged_objectives": atlas.robustness.flagged_objectives,
+                "objectives": [
+                    {
+                        "objective_id": item.objective_id,
+                        "selected_passages": item.selected_passages,
+                        "distinct_selected_sources": item.distinct_selected_sources,
+                        "distinct_selected_hosts": item.distinct_selected_hosts,
+                        "distinct_content_families": item.distinct_content_families,
+                        "cross_host_exact_content_reuse": item.cross_host_exact_content_reuse,
+                        "dominant_host": item.dominant_host,
+                        "dominant_host_fraction": item.dominant_host_fraction,
+                        "remaining_passages_after_host_loss": (
+                            item.smallest_remaining_passages_after_host_removal
+                        ),
+                        "remaining_sources_after_host_loss": (
+                            item.smallest_remaining_sources_after_host_removal
+                        ),
+                        "risk": item.host_ablation_risk,
+                        "independence_confirmed": False,
+                    } for item in atlas.robustness.analyses
+                ],
+                "host_ablation": [
+                    {
+                        "removed_host": item.removed_host,
+                        "removed_selected_passages": item.removed_selected_passages,
+                        "surviving_selected_passages": item.surviving_selected_passages,
+                        "surviving_unique_sources": item.surviving_unique_sources,
+                        "surviving_distinct_content_families": (
+                            item.surviving_distinct_content_families
+                        ),
+                        "objectives_without_evidence": (
+                            item.objectives_without_any_selected_passages
+                        ),
+                        "objectives_left_with_one_host": (
+                            item.objectives_left_with_one_host
+                        ),
+                        "reranking_executed": False,
+                    } for item in atlas.robustness.leave_one_host_out
+                ],
+                "objective_reuse": [
+                    {
+                        "left_objective_id": item.left_objective_id,
+                        "right_objective_id": item.right_objective_id,
+                        "shared_source_count": len(item.overlapping_source_ids),
+                        "shared_host_count": len(item.overlapping_hosts),
+                        "shared_content_family_count": len(
+                            item.overlapping_content_hashes
+                        ),
+                        "source_jaccard": item.source_jaccard,
+                        "independence_proven": False,
+                    } for item in atlas.robustness.objective_reuse
+                ],
+                "limitations": atlas.robustness.limitations,
+                "source_bodies_excluded": True,
+                "verified_independence": False,
+                "network_or_reranking_executed": False,
+            },
+            "canonical_routes": {
+                "route_digest": atlas.routes.route_digest,
+                "node_count": len(atlas.routes.nodes),
+                "committed_parent_arcs": len(atlas.routes.edges),
+                "components": len(atlas.routes.strongly_connected_components),
+                "unreachable_pending": len(atlas.routes.unreachable_pending_urls),
+                "unknown_parent_urls": len(atlas.routes.unknown_parent_urls),
+                "host_load": [
+                    {
+                        "host": host.host,
+                        "discovered_nodes": host.discovered_nodes,
+                        "pending_urls": host.pending_urls,
+                        "ready_urls": host.ready_urls,
+                        "robots_status": host.robots_status,
+                        "observed_fairness_share": host.pending_fairness_share,
+                    } for host in atlas.routes.host_load
+                ],
+                "network_authority": False,
+            },
+            "slice_simulation": {
+                "simulation_digest": atlas.simulation.simulation_digest,
+                "projected_request_slots": atlas.simulation.projected_request_slots,
+                "projected_byte_reserve": atlas.simulation.projected_byte_reserve,
+                "remaining_requests": atlas.simulation.request_budget_remaining_after,
+                "remaining_bytes": atlas.simulation.byte_budget_remaining_after,
+                "steps": [
+                    {
+                        "url": step.url,
+                        "action": step.action,
+                        "host": step.host,
+                        "ready_at": step.projected_ready_at,
+                        "conservative_byte_cap": step.conservative_reserve_bytes,
+                        "robots_preflight_required": step.requires_live_robots_authority,
+                    } for step in atlas.simulation.steps
+                ],
+                "held_urls": atlas.simulation.held_urls[:16],
+                "blockers": atlas.simulation.terminal_blockers,
+                "physical_worker_authorized": False,
+                "network_committed": False,
+                "real_robots_admission_executed": False,
+            },
+            "dispatch_recovery": {
+                "ledger_digest": atlas.faults.ledger_digest,
+                "retained_event_count": atlas.faults.events_retained,
+                "event_history_incomplete": atlas.faults.history_incomplete,
+                "pending_dispatch": atlas.faults.current_pending_dispatch,
+                "uncertain_bytes": atlas.faults.retained_uncertain_bytes,
+                "hosts": [
+                    {
+                        "host": entry.host,
+                        "fault_grade": entry.fault_grade,
+                        "dispatch_intents": entry.dispatch_intents,
+                        "retries": entry.retries,
+                        "transport_failures": entry.transport_failures,
+                        "interrupted": entry.interrupted,
+                    } for entry in atlas.faults.hosts
+                ],
+                "recovery_queue": [
+                    {
+                        "code": item.code,
+                        "severity": item.severity,
+                        "supporting_sequences": item.supporting_event_sequences,
+                        "requires_operator_resolution": item.blocked_until_operator_resolution,
+                        "auto_execute": False,
+                    } for item in atlas.faults.recovery_queue
+                ],
+                "physical_worker_join_confirmed": False,
+                "mongo_commit_confirmed": False,
+                "uncertain_bytes_refunded": False,
+            },
+            "frontier": {
+                "advisory_digest": atlas.allocation.advice_digest,
+                "proposed_slots": atlas.allocation.request_slots,
+                "actual_dispatches": 0,
+                "resource_sample_required": atlas.pressure is None,
+                "externally_authorized": False,
+            },
+            "operations": {
+                "report_digest": operations.report_digest,
+                "source_snapshot_digest": operations.source_snapshot_digest,
+                "run_sequence": operations.run_sequence,
+                "stages": [
+                    {
+                        "ordinal": stage.ordinal,
+                        "name": stage.name,
+                        "receipt_digest": stage.source_receipt_digest,
+                        "chain_digest": stage.chain_digest,
+                    } for stage in operations.stages
+                ],
+                "retained_event_count": len(operations.timeline.events),
+                "historical_events_incomplete": operations.timeline.retained_history_incomplete,
+                "event_clock_integrity_review": (
+                    operations.timeline.interior_sequence_gap
+                    or operations.timeline.clock_regression_detected
+                    or bool(operations.timeline.future_clock_receipts)
+                ),
+                "pending_dispatch": operations.timeline.pending_dispatch_unresolved,
+                "uncertain_bytes": operations.timeline.uncertain_bytes,
+                "inspected_origins": len(operations.hosts.origins),
+                "unresolved_robots_origins": operations.hosts.cold_robots_origins,
+                "stale_robots_origins": operations.hosts.stale_robots_origins,
+                "observed_resource_samples": operations.capacity.samples_observed,
+                "hypothetical_work_candidates": operations.dispatch.feasible_hypothetical_requests,
+                "capacity_holds": operations.capacity.holds,
+                "critical_operator_steps": operations.runbook.critical_step_count,
+                "operator_runbook": [
+                    {
+                        "code": item.code,
+                        "priority": item.priority,
+                        "requires_backend_authority": True,
+                        "automatically_executed": False,
+                    } for item in operations.runbook.steps[:16]
+                ],
+                "physical_worker_fenced": False,
+                "mongo_checkpoint_confirmed": False,
+                "live_robots_permission_granted": False,
+                "network_executed": False,
+                "source_text_redacted": True,
+                "read_only": True,
+                "automatic_recovery_authorized": False,
+            },
+            "forensics": {
+                "report_digest": forensic.report_digest,
+                "frame_set_digest": forensic.frame_set_digest,
+                "atlas_digest": forensic.atlas_digest,
+                "source_policy_digest": forensic.source_policy_digest,
+                "retrieval_digest": forensic.retrieval_digest,
+                "stages": [
+                    {
+                        "ordinal": entry.number,
+                        "name": entry.name,
+                        "receipt_digest": entry.receipt_digest,
+                        "chain_digest": entry.chain_digest,
+                    } for entry in forensic.stages
+                ],
+                "selected_passages": forensic.selected_anchor_count,
+                "selected_sources": forensic.selected_source_count,
+                "security_held_passages": forensic.security.held_passages,
+                "security_held_sources": len(forensic.security.held_sources),
+                "active_content_held_sources": len(forensic.active_content.held_source_ids),
+                "privacy_held_sources": len(forensic.privacy.held_source_ids),
+                "cross_host_sentence_echoes": forensic.echoes.cross_host_echo_count,
+                "source_reuse_components": len(forensic.reuse.components),
+                "possible_polarity_collisions": len(forensic.polarity.leads),
+                "low_information_passages": forensic.boilerplate.possible_padding_passage_count,
+                "capture_age_held_sources": len(forensic.freshness.held_source_ids),
+                "overlap_excess_characters": forensic.geometry.total_overlap_excess_characters,
+                "concentrated_objectives": forensic.exposure.concentration_review_objectives,
+                "provenance_held_sources": len(forensic.provenance.held_source_ids),
+                "grounding_deficit_objectives": len(forensic.grounding.missing_or_weak_objectives),
+                "reference_reused_sources": forensic.reference_concentration.cross_objective_reused_source_count,
+                "consent_renewal_review_due": forensic.consent.warning == "renewal_review_due",
+                "urgent_research_gaps": len(forensic.gaps.urgent_objectives),
+                "context_selected_utf8_bytes": forensic.context_budget.total_selected_utf8_bytes,
+                "extraction_held_sources": len(forensic.extraction.held_source_ids),
+                "query_unsupported_objectives": len(forensic.query_support.missing_evidence_objectives),
+                "origin_review_sources": len(forensic.origins.review_source_ids),
+                "selection_source_dominance_objectives": len(forensic.selection_fairness.source_dominance_objectives),
+                "risk_ablated_objectives": len(forensic.risk_ablation.objectives_emptied_in_scenario),
+                "script_coverage_review_objectives": len(forensic.script_coverage.review_objectives),
+                "context_budget_exceeded": (
+                    forensic.context_budget.over_campaign_evidence_char_limit
+                    or forensic.context_budget.over_explicit_context_byte_limit
+                ),
+                "review_tasks": len(forensic.reviews.tasks),
+                "critical_review_tasks": forensic.reviews.severe_count,
+                "review_queue": [
+                    {
+                        "task_id": item.task_id,
+                        "risk": item.risk,
+                        "reason": item.reason,
+                        "source_ids": item.source_ids,
+                        "objective_ids": item.objective_ids,
+                        "model_may_decide": False,
+                    }
+                    for item in forensic.reviews.tasks[:24]
+                ],
+                "source_bodies_redacted": True,
+                "human_review_required": True,
+                "publication_granted": False,
+                "training_permission": False,
+                "network_or_model_invoked": False,
+            },
+            "scorecard": {
+                "digest": atlas.scorecard.scorecard_digest,
+                "dimensions": [asdict(x) for x in atlas.scorecard.dimensions],
+                "alerts": atlas.scorecard.alerts,
+                "advisory_priority": atlas.scorecard.advisory_priority_score,
+                "decision": atlas.scorecard.decision,
+            },
+            "read_only": True,
+            "network_executed": False,
+            "publication_granted": False,
+            "training_permission": False,
+            "review_required": True,
+        }
+        metadata["dashboard_digest"] = _digest(metadata)
+        return {"ok": True, "report": metadata}
+
     async def list(self, scope: dict[str, str], *, cursor: str | None = None, limit: int = 16) -> dict:
         query = {**scope, "status": {"$ne": "deleted"}}
         if cursor:
@@ -565,6 +1419,8 @@ class DragonCrawlerApplication:
             max_response_bytes=524288,
             max_total_bytes=body.get("max_bytes", 8 * 1024 * 1024),
             min_host_delay_seconds=1.0,
+            discover_sitemaps=body.get("discover_sitemaps", False),
+            frontier_strategy=body.get("frontier_strategy", "fifo"),
         )
         now = _now()
         expiry = now + timedelta(hours=24)

@@ -97,6 +97,66 @@ class ArchitectureOwnershipTests(unittest.TestCase):
         ):
             MODULE.validate(root)
 
+    def test_gap_bindings_match_canonical_record(self) -> None:
+        root = self._fixture()
+        graph_path = root / "machine/architecture_ownership.json"
+        master_path = root / "machine/ai_master_plan.json"
+        graph = json.loads(graph_path.read_text(encoding="utf-8"))
+        master = json.loads(master_path.read_text(encoding="utf-8"))
+        binding = next(item for item in graph["masterplan_bindings"] if item["volume_ref"] == "VOL-002")
+        volume = next(item for item in master["volumes"] if item["key"] == "VOL-002")
+
+        # An empty record is only an exact match, not proof of consumer readiness.
+        self.assertEqual(binding["required_gap_texts"], [])
+        self.assertEqual(volume["gaps"], [])
+        MODULE.validate(root)
+
+        binding["required_gap_texts"] = ["recorded gap"]
+        volume["gaps"] = ["recorded gap"]
+        graph_path.write_text(json.dumps(graph), encoding="utf-8")
+        master_path.write_text(json.dumps(master), encoding="utf-8")
+        MODULE.validate(root)
+
+        for binding_gaps, canonical_gaps in [([], ["recorded gap"]), (["recorded gap"], []),
+                                              (["other gap"], ["recorded gap"])]:
+            with self.subTest(binding=binding_gaps, canonical=canonical_gaps):
+                binding["required_gap_texts"] = binding_gaps
+                volume["gaps"] = canonical_gaps
+                graph_path.write_text(json.dumps(graph), encoding="utf-8")
+                master_path.write_text(json.dumps(master), encoding="utf-8")
+                with self.assertRaisesRegex(MODULE.ArchitectureOwnershipError, "masterplan gap drift"):
+                    MODULE.validate(root)
+
+    def test_rejects_malformed_gap_records(self) -> None:
+        root = self._fixture()
+        graph_path = root / "machine/architecture_ownership.json"
+        master_path = root / "machine/ai_master_plan.json"
+        graph = json.loads(graph_path.read_text(encoding="utf-8"))
+        master = json.loads(master_path.read_text(encoding="utf-8"))
+        binding = next(item for item in graph["masterplan_bindings"] if item["volume_ref"] == "VOL-002")
+        volume = next(item for item in master["volumes"] if item["key"] == "VOL-002")
+
+        for target, key in [(binding, "required_gap_texts"), (volume, "gaps")]:
+            for value, error in [(None, "gaps must be arrays"), ("gap", "gaps must be arrays"),
+                                 ([""], "gaps must be non-empty strings"),
+                                 (["  "], "gaps must be non-empty strings"),
+                                 ([1], "gaps must be non-empty strings"),
+                                 (["gap", "gap"], "gaps must be unique")]:
+                with self.subTest(field=key, value=value):
+                    target[key] = value
+                    graph_path.write_text(json.dumps(graph), encoding="utf-8")
+                    master_path.write_text(json.dumps(master), encoding="utf-8")
+                    with self.assertRaisesRegex(MODULE.ArchitectureOwnershipError, error):
+                        MODULE.validate(root)
+                    target[key] = []
+            with self.subTest(field=key, value="missing"):
+                del target[key]
+                graph_path.write_text(json.dumps(graph), encoding="utf-8")
+                master_path.write_text(json.dumps(master), encoding="utf-8")
+                with self.assertRaisesRegex(MODULE.ArchitectureOwnershipError, "gaps must be arrays"):
+                    MODULE.validate(root)
+                target[key] = []
+
 
 if __name__ == "__main__":
     unittest.main()

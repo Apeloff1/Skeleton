@@ -1,5 +1,6 @@
 from core.databases import client as _SHARED_MONGO_CLIENT
 """Code Playground — Execute code in sandboxed environment. Supports 6 languages."""
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 from pydantic import BaseModel
 import subprocess, os, tempfile
@@ -8,7 +9,7 @@ from dotenv import load_dotenv
 from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 load_dotenv()
-router = APIRouter(prefix="/api/playground", tags=["playground"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/playground", tags=["playground"])
 
 class CodeRequest(BaseModel):
     language: str

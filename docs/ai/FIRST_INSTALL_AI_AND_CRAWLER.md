@@ -8,6 +8,19 @@ and Mongo services. This guide covers installation, optional local weights,
 durable chat and bounded web capture. It does not certify production deployment,
 every-console compatibility, studio mastery or automatic improvement in quality.
 
+**Local chat is currently blocked:** default Compose startup does not supply the
+trusted components required by the local inference guard. Preparing a model does
+not resolve that missing bootstrap. A consumer installation has not been qualified
+on the target Windows laptop.
+
+Setup and `app doctor` distinguish `local_guard_unavailable` (trusted guard
+components are absent) from `local_guard_configuration_invalid` (the configured
+guard cannot activate). These are application-composition failures, not a reason
+to redownload weights or expose internal provider errors. Retain the installation
+and inspect the [guard readiness requirements](../qa/GUARDED_LOCAL_READINESS_2026-10-28.md)
+before retrying. The shared Mongo source fence requires primary-bound linearizable
+reads; the default standalone Mongo deployment does not provide that authority.
+
 ## Start the application
 
 From the repository root, with Python and Docker Compose installed and the
@@ -29,8 +42,21 @@ The existing `DB_NAME` selects the backend Mongo database. Curiosity state uses
 the existing backend data volume at `/app/data/curiosity`; the read-only container
 root is not a writable state location.
 
-Open `http://localhost:3000/setup` with the default ports. The setup page remains
-readable before login and when the API is unavailable. It observes capabilities
+The optional `--full` Chroma service has an unresolved persistence mismatch:
+the pinned image writes to `/data`, while its named volume is mounted at
+`/chroma/chroma`. Data in the container's `/data` can be lost on removal or
+recreation. App-owned full-profile startup is blocked until safe migration is
+qualified. App-owned `app down` stops containers without removing them; direct
+Compose teardown and older app versions can still remove writable data. Before
+operating on an existing Chroma installation, follow the
+[Chroma persistence and recovery warning](../APP_ASSEMBLY.md#application-surfaces).
+The default profile does not require Chroma for bounded lexical retrieval.
+
+Open `http://localhost:3000/setup` with the default ports. Once the frontend has
+started, the setup page remains readable before login and when the API is
+unavailable. Compose currently waits for healthy backend and engine services
+before starting that frontend; if startup never reaches it, use installer output
+and service logs. The page observes capabilities
 separately and provides commands to copy into the host terminal. Create an
 account through the existing login screen. A healthy application can have an
 unconfigured AI model; the page reports that condition explicitly.
@@ -61,6 +87,60 @@ in the engine attester configuration; do not reassign its stored captures. The
 configuration helper supports repeated `--tenant` flags; include `default` too
 when retaining access for new default-tenant accounts. Reconfiguration still
 requires the helper's original model input and credential-preservation rules.
+
+## Windows x64 and WSL 2
+
+For an Intel or AMD Windows laptop, the recommended path for the pinned Linux
+model is Ubuntu on WSL 2 with Docker Desktop's WSL 2 backend and integration for
+that distribution enabled. Install and start Docker Desktop separately. From
+PowerShell, run `wsl --install -d Ubuntu` if Ubuntu is not installed, restart if
+prompted, and complete Ubuntu's first-run setup. Open the Ubuntu shell and check
+that `docker compose version` works there and `uname -m` reports `x86_64`.
+
+Keep the repository, `.venv`, model and private configuration in the Ubuntu
+Linux filesystem, such as `~/Skeleton`; do not use an `/mnt/c` checkout for this
+recipe. The [Windows first-install commands](../../README.md#windows-with-wsl-2)
+run the installer from a fresh default-branch checkout inside Ubuntu. Open the published
+`http://localhost:3000/setup` address from a Windows browser.
+
+Create a private UTF-8 password file **outside** the repository. For example,
+in the Ubuntu shell, run the first two commands below, type the password in the
+editor and save it, then run the remaining commands. Choose at least 16 characters
+and at most 72 UTF-8 bytes; replace the email with your own. Do not put the
+password in the command line or shell history:
+
+```bash
+umask 077
+nano "$HOME/.skeleton-owner-password"
+chmod 600 "$HOME/.skeleton-owner-password"
+python -m skeleton app setup --admin-email owner@example.com --admin-password-file "$HOME/.skeleton-owner-password"
+python -m skeleton app up --production --no-build
+```
+
+After installing the Python environment, prepare the default model **inside the
+same Ubuntu checkout**, retaining the existing Compose mount path:
+
+```bash
+python scripts/provision_local_ai.py --target linux-x86_64-glibc --download --context-size 12288 --output ./data/local-ai
+```
+
+Open the existing private `.env` with `nano .env`, set only the selectors shown
+below, and run the listed restart and doctor commands from that same shell. A fresh owner-controlled directory is
+required if the default directory is incomplete or contains another deployment.
+For the optional coding profile, choose a separate directory and follow the
+[coding profile guide](LOCAL_CODING_PROFILE.md).
+
+Direct native Windows acquisition is refused before transfer: Windows directory
+ownership, readonly hard-link cleanup and container mount semantics still require
+real Windows validation. The existing verification path for complete pinned
+deployments remains available without downloading, subject to host filesystem
+support. The native Linux x86-64 WSL shell
+does not need `--prepare-for-container`; that explicit flag is required when
+preparing on another host and does not establish successful Windows-host preparation.
+WSL preparation targets
+the Linux engine container; it does not establish native Windows model execution.
+The Windows Setup executable, cross-platform console support and laptop GPU
+acceleration have not been qualified by the Linux verification VM.
 
 The first-install continuation has been exercised with fresh Mongo, engine,
 production backend and Nginx containers, including actual local-model inference,
@@ -112,11 +192,13 @@ database. A preserved hosted key is reused unless a new key source is supplied.
 
 Portable GGUF executables must be Linux ELF64 for amd64 or arm64. The override
 selects the matching container platform, which Docker must support. Adjacent
-`lib*.so*` runtime dependencies are bounded to 128 files and 128 MiB per runtime;
-the helper does not discover arbitrary system dependencies or establish an
-independent shared-library execution pin. Mixed executable architectures in one
-catalog are rejected. The engine still performs model activation and resource
-admission at startup.
+`lib*.so*` runtime dependencies are bounded to 128 files and 128 MiB per runtime.
+When a deployment declares an adjacent-library inventory, the helper verifies
+its exact names and digests before preparing the read-only file bindings. Legacy
+manifests without an inventory keep their previous behavior; they do not gain
+library pins automatically. Mixed executable architectures in one catalog are
+rejected. The engine still performs model activation and resource admission at
+startup.
 
 ## Activate the reproducible local CPU model
 
@@ -124,8 +206,9 @@ The optional acquisition recipe uses Qwen3-0.6B-Q8_0, an Apache-2.0 model, and
 llama.cpp b11429, an MIT runtime. Both artifacts have fixed URLs, exact byte
 counts and SHA256 values in `scripts/provision_local_ai.py`. The runtime recipe
 targets Linux x86_64 with glibc, including the canonical engine container. This
-small model provides a usable integration path; useful complex planning still
-depends on model capability and measured results.
+small model is intended for local integration; the default Compose local guard
+bootstrap is incomplete, so preparing these files alone does not enable chat.
+Useful complex planning depends on model capability and measured results.
 
 Explicitly download and prepare approximately 657 MB of artifacts:
 
@@ -158,6 +241,7 @@ Set the following values in private `.env` for the read-only Compose model mount
 ```dotenv
 AI_PROVIDER=local
 AI_LOCAL_MODEL_PATH=
+AI_LOCAL_MODEL_CATALOG_PATH=
 AI_LOCAL_DEPLOYMENT_PATH=/app/local-ai/deployment.json
 SKELETON_LOCAL_MODEL_DIR=./data/local-ai
 ```
@@ -177,10 +261,18 @@ activation/capacity checks still apply. Existing installations must match the
 requested context and are never rewritten; use a fresh destination when changing it.
 The deployment uses two CPU threads, no GPU,
 finite execution deadlines and the explicit completion-chat profile. The model
-and executable are rehashed by the canonical activation/inference owner. The
-provisioning receipt additionally records acquired library digests. The current
-runtime independently pins the executable and model; it does not establish a
-separate immutable shared-library execution closure.
+and executable are rehashed by the canonical activation/inference owner. Newly
+provisioned manifests also record digests for every extracted adjacent runtime
+library. The runtime checks that flat inventory at activation and around process
+execution, and strips loader search-path overrides in this mode. Existing
+manifests without that field remain unpinned and are not rewritten. The pinned
+inventory requires no-follow file opens, available on the intended Linux/WSL2
+path; it is not qualified for native Windows.
+
+These checks do not prove which objects the operating-system loader actually
+mapped, pin system libraries, or eliminate file changes between a check and
+process loading. They do not attest GGUF tokenizer behavior or make the guarded
+local provider operational.
 
 For another compatible installed GGUF/runtime, use the existing
 `python -m skeleton app prepare-local-model --help`. Modern `llama-completion`

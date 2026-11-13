@@ -8,16 +8,18 @@ runtime boundary for the assembled application services.
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import os
 from pathlib import Path
 import secrets
 import subprocess
 import sys
 import threading
+from urllib.parse import urlsplit
 import webbrowser
 
 from skeleton.app.assembly import checks_ok, compose_command, load_manifest, preflight, public_service_urls
-from skeleton.app.health import probe_application, probes_ok
+from skeleton.app.health import probe_application, probe_local_setup, probes_ok
 from skeleton.app.installer import InstallReceipt, install_application
 from skeleton.app.preloader import PreloadReport, inspect_host
 
@@ -149,6 +151,7 @@ def stop_runtime(root: Path | None = None) -> tuple[bool, str]:
             capture_output=True,
             text=True,
             timeout=90,
+            env={**os.environ, "COMPOSE_REMOVE_ORPHANS": "0"},
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return False, f"Unable to stop services: {type(exc).__name__}; check Docker Desktop"
@@ -180,20 +183,59 @@ def runtime_status(root: Path | None = None) -> tuple[bool, str]:
 
 
 def open_running_application(root: Path | None = None) -> tuple[bool, str]:
-    """Probe off the GUI thread and open the browser only after readiness."""
-    online, detail = runtime_status(root)
-    if not online:
-        return False, "Application not ready:\n" + detail
+    """Open the local setup UI without granting backend or guarded-AI readiness.
+
+    First-install diagnostics must remain reachable while a protected service
+    fails closed. Only the frontend's own nonredirecting health probe can admit
+    browser launch; runtime_status remains the separate whole-app diagnostic.
+    """
     try:
-        app_url = public_service_urls(
-            (root or installation_root()).resolve(),
-        ).get("frontend", APP_URL)
-        opened = webbrowser.open(app_url)
+        root = (root or installation_root()).resolve()
+        manifest = load_manifest()
+        frontend = manifest.service("frontend")
+        app_url = public_service_urls(root, manifest=manifest).get(
+            "frontend", frontend.public_url
+        )
+        parsed = urlsplit(app_url)
+        if (
+            parsed.scheme != "http"
+            or parsed.hostname not in {"localhost", "127.0.0.1", "::1"}
+            or parsed.port is None
+            or not 1 <= parsed.port <= 65535
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in {"", "/"}
+            or parsed.query
+            or parsed.fragment
+        ):
+            return False, "Setup UI address must be a local HTTP endpoint"
+        # Probe the actual exported setup route, not just a generic SPA root
+        # that could return 200 while the first-run page is unavailable.
+        frontend_probe = probe_local_setup(
+            replace(frontend, public_url=app_url, health_path="/setup"),
+            timeout=2.0,
+        )
+    except (OSError, ValueError, KeyError) as exc:
+        # Never echo operator environment values or failing URL to the GUI.
+        return False, f"Setup UI probe failed: {type(exc).__name__}"
+
+    if not frontend_probe.ok:
+        status = frontend_probe.status if frontend_probe.status is not None else "-"
+        return False, (
+            f"Setup UI unavailable (HTTP {status}): {frontend_probe.detail}. "
+            "Inspect frontend container logs."
+        )
+    try:
+        opened = webbrowser.open(app_url.rstrip("/") + "/setup")
     except (OSError, ValueError, webbrowser.Error) as exc:
-        return False, f"Application is ready; browser failed: {type(exc).__name__}"
+        return False, f"Setup UI is reachable; browser failed: {type(exc).__name__}"
     if not opened:
-        return False, f"Application ready at {app_url}; no browser accepted the URL"
-    return True, f"Application opened at {app_url}\n" + detail
+        return False, "Setup UI is reachable; no browser accepted the local URL"
+    return True, (
+        f"Setup UI opened at {app_url.rstrip('/')}/setup. "
+        "Backend, storage and guarded AI readiness are NOT established. "
+        "Use System Check and runtime diagnostics before attempting gameplay."
+    )
 
 
 class WindowsLauncher:

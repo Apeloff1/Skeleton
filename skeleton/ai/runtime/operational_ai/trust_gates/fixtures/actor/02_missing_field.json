@@ -1,0 +1,16 @@
+{
+  "case": "02_missing_field",
+  "gate": "actor",
+  "expect": "reject",
+  "reason": "Unknown defaults may not grant authority",
+  "payload": {
+    "user": "operator",
+    "request_id": "r_001",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "scope": "local:operator",
+    "rights": [
+      "inference"
+    ]
+  }
+}

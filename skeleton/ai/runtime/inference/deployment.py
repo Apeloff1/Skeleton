@@ -13,9 +13,12 @@ from pathlib import Path
 from typing import Any
 
 from .llama_cpp import (
+    COMPLETION_CHAT_FLAGS,
+    QWEN3_COMPLETION_CHAT_TEMPLATE,
     LlamaCppConfig,
     LlamaCppModel,
     LlamaCppRuntimeError,
+    _runtime_library_identities,
     build_llama_cpp_adapter,
     inspect_gguf,
 )
@@ -28,13 +31,6 @@ from .local import (
 
 SCHEMA = "skeleton.local_model.deployment.v1"
 QUALIFICATION_SCHEMA = "skeleton.local_model.qualification.v1"
-QWEN3_COMPLETION_CHAT_TEMPLATE = (
-    "{% for message in messages %}"
-    "{{ '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
-    "{% endfor %}{% if add_generation_prompt %}"
-    "{{ '<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n' }}"
-    "{% endif %}"
-)
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_MANIFEST_BYTES = 1024 * 1024
 
@@ -133,6 +129,10 @@ class LocalModelDeployment:
     output_framing: str = "raw"
     runtime_scratch_bytes: int = 512 * 1024 * 1024
     kv_bytes_per_token: int | None = None
+    runtime_libraries: tuple[tuple[str, str], ...] = ()
+    kv_cache_location: str = "backend"
+    kv_cache_type_k: str | None = None
+    kv_cache_type_v: str | None = None
 
     @classmethod
     def load(
@@ -180,6 +180,7 @@ class LocalModelDeployment:
             "executable_sha256",
             "model_path",
             "model_sha256",
+            "runtime_libraries",
             "config",
         }
         unknown_top_level = set(payload) - allowed_top_level
@@ -206,6 +207,10 @@ class LocalModelDeployment:
                 raise LocalModelDeploymentError("deployment files exceed the declared catalog byte budget")
         executable_digest = _digest_field(payload.get("executable_sha256"), "executable_sha256")
         model_digest = _digest_field(payload.get("model_sha256"), "model_sha256")
+        library_map = payload.get("runtime_libraries")
+        if "runtime_libraries" in payload and (not isinstance(library_map, dict) or not library_map):
+            raise LocalModelDeploymentError("runtime_libraries must be a non-empty name-to-SHA256 object")
+        library_pins = () if library_map is None else tuple(library_map.items())
         config = payload.get("config", {})
         if not isinstance(config, dict):
             raise LocalModelDeploymentError("config must be an object")
@@ -217,6 +222,9 @@ class LocalModelDeployment:
             "threads",
             "batch_size",
             "gpu_layers",
+            "kv_cache_location",
+            "kv_cache_type_k",
+            "kv_cache_type_v",
             "temperature",
             "extra_args",
             "output_framing",
@@ -243,6 +251,9 @@ class LocalModelDeployment:
                 threads=config.get("threads"),
                 batch_size=config.get("batch_size"),
                 gpu_layers=config.get("gpu_layers"),
+                kv_cache_location=config.get("kv_cache_location", "backend"),
+                kv_cache_type_k=config.get("kv_cache_type_k"),
+                kv_cache_type_v=config.get("kv_cache_type_v"),
                 temperature=config.get("temperature", 0.0),
                 extra_args=tuple(extra_args),
                 output_framing=config.get("output_framing", "raw"),
@@ -250,9 +261,14 @@ class LocalModelDeployment:
                 kv_bytes_per_token=config.get("kv_bytes_per_token"),
                 reject_model_symlink=True,
                 rehash_artifacts_each_run=False,
+                runtime_libraries=library_pins,
             )
         except (TypeError, ValueError, OSError) as exc:
             raise LocalModelDeploymentError(f"invalid llama.cpp deployment config: {exc}") from exc
+        if validated.runtime_libraries:
+            library_paths = {executable.parent / name for name, _ in validated.runtime_libraries}
+            if library_paths.intersection({executable, model, resolved_manifest}):
+                raise LocalModelDeploymentError("runtime libraries cannot overlap deployment artifacts")
         if _sha256_file(executable) != executable_digest:
             raise LocalModelDeploymentError("runtime executable digest mismatch")
         if _sha256_file(model) != model_digest:
@@ -279,14 +295,26 @@ class LocalModelDeployment:
             threads=validated.threads,
             batch_size=validated.batch_size,
             gpu_layers=validated.gpu_layers,
+            kv_cache_location=validated.kv_cache_location,
+            kv_cache_type_k=validated.kv_cache_type_k,
+            kv_cache_type_v=validated.kv_cache_type_v,
             temperature=float(validated.temperature),
             extra_args=validated.extra_args,
             output_framing=validated.output_framing,
             runtime_scratch_bytes=validated.runtime_scratch_bytes,
             kv_bytes_per_token=validated.kv_bytes_per_token,
+            runtime_libraries=validated.runtime_libraries,
             manifest_digest=_stable_digest(payload),
         )
         deployment.verify_artifacts()
+        if max_artifact_bytes is not None and validated.runtime_libraries:
+            try:
+                libraries = _runtime_library_identities(executable.parent, validated.runtime_libraries)
+                referenced.update({Path(item.path): item.size_bytes for item in libraries})
+                if sum(referenced.values()) > max_artifact_bytes:
+                    raise LocalModelDeploymentError("deployment files exceed the declared catalog byte budget")
+            except LlamaCppRuntimeError as exc:
+                raise LocalModelDeploymentError("runtime library inventory is invalid") from exc
         if expected_sha256 is not None:
             try:
                 with resolved_manifest.open("rb") as stream:
@@ -302,6 +330,11 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError("runtime executable digest mismatch")
         if _sha256_file(self.model_path) != self.model_sha256:
             raise LocalModelDeploymentError("model artifact digest mismatch")
+        if self.runtime_libraries:
+            try:
+                _runtime_library_identities(self.executable_path.parent, self.runtime_libraries)
+            except LlamaCppRuntimeError as exc:
+                raise LocalModelDeploymentError("runtime library inventory is invalid") from exc
 
     def llama_cpp_config(
         self,
@@ -320,6 +353,9 @@ class LocalModelDeployment:
             threads=self.threads,
             batch_size=self.batch_size,
             gpu_layers=self.gpu_layers,
+            kv_cache_location=self.kv_cache_location,
+            kv_cache_type_k=self.kv_cache_type_k,
+            kv_cache_type_v=self.kv_cache_type_v,
             temperature=self.temperature,
             extra_args=self.extra_args,
             output_framing=self.output_framing,
@@ -327,6 +363,7 @@ class LocalModelDeployment:
             kv_bytes_per_token=self.kv_bytes_per_token,
             reject_model_symlink=True,
             rehash_artifacts_each_run=rehash_artifacts_each_run,
+            runtime_libraries=self.runtime_libraries,
         )
 
     def adapter(
@@ -338,6 +375,8 @@ class LocalModelDeployment:
         max_concurrency: int = 1,
         max_queue_size: int = 256,
         max_batch_size: int = 256,
+        require_guarded_inference: bool = False,
+        guarded_components: Any | None = None,
     ) -> LocalModelAdapter:
         adapter = build_llama_cpp_adapter(
             self.llama_cpp_config(rehash_artifacts_each_run=rehash_artifacts_each_run),
@@ -346,6 +385,8 @@ class LocalModelDeployment:
             max_concurrency=max_concurrency,
             max_queue_size=max_queue_size,
             max_batch_size=max_batch_size,
+            require_guarded_inference=require_guarded_inference,
+            guarded_components=guarded_components,
         )
         model = adapter.engine.model
         if not isinstance(model, LlamaCppModel):
@@ -358,6 +399,8 @@ class LocalModelDeployment:
         return LocalModelAdapter(
             adapter.engine,
             default_seed=default_seed,
+            guarded_service=adapter.guarded_service,
+            require_guarded_inference=adapter.require_guarded_inference,
             artifact_status={
                 "schema": SCHEMA,
                 "model_id": model.model_id,
@@ -381,6 +424,9 @@ def create_local_model_deployment(
     context_size: int = 4096,
     threads: int | None = None,
     gpu_layers: int = 0,
+    kv_cache_location: str = "backend",
+    kv_cache_type_k: str | None = None,
+    kv_cache_type_v: str | None = None,
     timeout_seconds: float = 120.0,
     output_framing: str = "raw",
     runtime_profile: str = "raw",
@@ -402,18 +448,7 @@ def create_local_model_deployment(
     extra_args: tuple[str, ...] = ()
     completion_profile = runtime_profile in {"llama-completion-chat", "qwen3-completion-chat"}
     if completion_profile:
-        extra_args = (
-            "--conversation",
-            "--single-turn",
-            "--simple-io",
-            "--no-perf",
-            "--no-escape",
-            "--color",
-            "off",
-            "--jinja",
-            "--reasoning",
-            "off",
-        )
+        extra_args = COMPLETION_CHAT_FLAGS
         output_framing = "llama_completion_eog"
         if runtime_profile == "qwen3-completion-chat":
             extra_args += ("--chat-template", QWEN3_COMPLETION_CHAT_TEMPLATE)
@@ -438,6 +473,9 @@ def create_local_model_deployment(
         context_size=context_size,
         threads=threads,
         gpu_layers=gpu_layers,
+        kv_cache_location=kv_cache_location,
+        kv_cache_type_k=kv_cache_type_k,
+        kv_cache_type_v=kv_cache_type_v,
         timeout_seconds=timeout_seconds,
         output_framing=output_framing,
         reject_model_symlink=True,
@@ -466,6 +504,13 @@ def create_local_model_deployment(
             "kv_bytes_per_token": validated.kv_bytes_per_token,
         },
     }
+    if validated.kv_cache_location != "backend":
+        # Preserve exact manifests for previously installed default profiles.
+        payload["config"]["kv_cache_location"] = validated.kv_cache_location
+    for key in ("kv_cache_type_k", "kv_cache_type_v"):
+        value = getattr(validated, key)
+        if value is not None:
+            payload["config"][key] = value
     if completion_profile:
         payload["config"]["batch_size"] = validated.batch_size
     candidate: Path | None = None
@@ -502,6 +547,8 @@ def load_local_model_adapter(
     max_concurrency: int = 1,
     max_queue_size: int = 256,
     max_batch_size: int = 256,
+    require_guarded_inference: bool = False,
+    guarded_components: Any | None = None,
 ) -> LocalModelAdapter:
     return LocalModelDeployment.load(manifest_path).adapter(
         cache_size=cache_size,
@@ -510,6 +557,8 @@ def load_local_model_adapter(
         max_concurrency=max_concurrency,
         max_queue_size=max_queue_size,
         max_batch_size=max_batch_size,
+        require_guarded_inference=require_guarded_inference,
+        guarded_components=guarded_components,
     )
 
 

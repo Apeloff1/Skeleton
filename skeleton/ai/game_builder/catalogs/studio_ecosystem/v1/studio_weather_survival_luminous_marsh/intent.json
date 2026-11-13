@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_luminous_marsh",
+  "title": "Luminous Marsh: Stormline",
+  "subtitle": "Original stormline design in Luminous Marsh; only the grid preview compiles today.",
+  "seed": 203010316591,
+  "width": 25,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 10,
+  "theme": "forest",
+  "starting_health": 3
+}

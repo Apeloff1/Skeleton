@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_social_diplomacy_luminous_marsh",
+  "title": "Luminous Marsh: Social Diplomacy",
+  "subtitle": "An original social diplomacy brief in Luminous Marsh; prototype maps are not full genre implementations.",
+  "seed": 202610302100,
+  "width": 25,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 7,
+  "theme": "forest",
+  "starting_health": 6
+}

@@ -124,7 +124,7 @@ async def test_pipeline_engine_failure_maps_to_stable_503(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_toolkit_engine_failure_keeps_legacy_sentinel(monkeypatch) -> None:
+async def test_toolkit_engine_failure_returns_stable_502_without_provider_detail(monkeypatch) -> None:
     async def execute(_request):
         raise EngineTextError("private-provider-detail")
 
@@ -133,9 +133,12 @@ async def test_toolkit_engine_failure_keeps_legacy_sentinel(monkeypatch) -> None
         "execute_engine_text",
         execute,
     )
-    result = await ai_toolkit_enhanced.call_ai("Prompt", "System")
+    with pytest.raises(HTTPException) as caught:
+        await ai_toolkit_enhanced.call_ai("Prompt", "System")
 
-    assert result == "llm_request_failed"
+    assert caught.value.status_code == 502
+    assert caught.value.detail == "AI toolkit request could not be completed"
+    assert "private-provider-detail" not in str(caught.value.detail)
 
 
 @pytest.mark.parametrize(

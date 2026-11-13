@@ -10,6 +10,8 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
 from skeleton.app.offline_chat_cli import _read_reference_file, main

@@ -32,9 +32,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          auth_dir="$RUNNER_TEMP/branch-clean-auth"
-          mkdir -p "$auth_dir"
-          cat > "$auth_dir/askpass.sh" <<'EOF'
+          askpass_dir="$RUNNER_TEMP/branch-clean-auth"
+          mkdir -p "$askpass_dir"
+          cat > "$askpass_dir/askpass.sh" <<'EOF'
           #!/usr/bin/env bash
           set -euo pipefail
           case "${1:-}" in
@@ -43,8 +43,8 @@ jobs:
             *) exit 1 ;;
           esac
           EOF
-          chmod 700 "$auth_dir/askpass.sh"
-          export GIT_ASKPASS="$auth_dir/askpass.sh"
+          chmod 700 "$askpass_dir/askpass.sh"
+          export GIT_ASKPASS="$askpass_dir/askpass.sh"
           export GIT_ASKPASS_REQUIRE=force
           {
             echo "GIT_ASKPASS=$GIT_ASKPASS"

@@ -214,16 +214,24 @@ class NativeProductExecutors:
     def launch_playable(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.playables.playable.launch"
         if self._already_complete(operation, executor): return True
-        seed = int(payload.get("seed", 1))
-        session = self.sessions.create(seed=seed, terrain_size=float(payload.get("terrain_size", 720.0)),
-                                       resolution=int(payload.get("resolution", 96)), thermal_count=int(payload.get("thermal_count", 8)))
+        seed = payload.get("seed", 1)
+        terrain_size = payload.get("terrain_size", 720.0)
+        resolution = payload.get("resolution", 96)
+        thermal_count = payload.get("thermal_count", 8)
+        session = self.sessions.create(owner=operation.principal, seed=seed, terrain_size=terrain_size,
+                                       resolution=resolution, thermal_count=thermal_count)
         return self._write(operation, executor, {"session_id": session.id, "created_at": session.created_at,
-            "closed": session.closed, "runtime": self.sessions.snapshot(), "seed": seed})
+            "closed": session.closed, "runtime": self.sessions.snapshot(), "seed": seed,
+            "checkpointed": self.sessions.root is not None})
 
     def runtime_sessions(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.playables.runtime.sessions"
         if self._already_complete(operation, executor): return True
-        return self._write(operation, executor, {"runtime": self.sessions.snapshot()})
+        limit = payload.get("limit", 50)
+        if isinstance(limit, bool) or not isinstance(limit, int): raise ValueError("limit must be an integer")
+        return self._write(operation, executor, {"runtime": self.sessions.snapshot(),
+            "sessions": self.sessions.inventory(owner=operation.principal, limit=limit),
+            "checkpointed": self.sessions.root is not None})
 
     def progress_inspect(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.playables.progress.inspect"

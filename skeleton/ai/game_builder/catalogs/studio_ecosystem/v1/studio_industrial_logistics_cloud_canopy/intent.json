@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_cloud_canopy",
+  "title": "Cloud Canopy: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610302373,
+  "width": 19,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "forest",
+  "starting_health": 4
+}

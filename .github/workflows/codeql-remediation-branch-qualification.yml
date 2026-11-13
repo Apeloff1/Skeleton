@@ -1,0 +1,116 @@
+name: CodeQL Remediation Branch Qualification
+
+# Review-only qualification: draft PRs skip normal merge readiness.
+# No CodeQL alert dismissal, release or deployment action is permitted here.
+on:
+  push:
+    branches:
+      - 'security/codeql-*'
+
+concurrency:
+  group: codeql-remediation-source-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python-source:
+    if: github.repository == 'Apeloff1/Skeleton'
+    name: Draft CodeQL Python source qualification (review only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+    steps:
+      - name: Check out exact security-branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+      - name: Install focused runtime dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          'pytest>=8,<9' 'pytest-asyncio>=0.24,<2' 'fastapi==0.161.1'
+          'httpx>=0.28.1,<1' 'pydantic-settings>=2.15.0,<3'
+          'pymongo>=4,<5' 'motor>=3,<4' 'bcrypt>=4,<5'
+          'PyJWT>=2,<3' 'email-validator>=2,<3'
+          'python-dotenv>=1,<2' 'cryptography>=50.0.2'
+      - name: Compile all inventory Python sources and shared boundaries
+        run: |
+          python - <<'PY'
+          import json
+          import py_compile
+          from pathlib import Path
+          root = Path.cwd()
+          inventory = json.loads(
+              (root / 'docs/security/codeql-open-151-lineage-2026-11-11.json').read_text()
+          )
+          paths = sorted({
+              finding['path'] for finding in inventory['findings']
+              if finding['path'].endswith('.py')
+          })
+          assert len(inventory['findings']) == 151
+          assert len(paths) >= 40
+          for relative in paths + [
+              'backend/core/http_errors.py',
+              'backend/core/public_exception_route.py',
+              'backend/routes/playable_access.py',
+              'backend/routes/share.py',
+          ]:
+              py_compile.compile(str(root / relative), doraise=True)
+          print(f'Compiled {len(paths)} alerted Python files and four boundaries')
+          PY
+      - name: Exercise CodeQL source, exception, SSRF, XSS and vault regressions
+        run: |
+          python -m pytest --noconftest --import-mode=importlib --rootdir=. -q \
+            backend/tests/test_codeql_exception_boundary_20261111.py \
+            backend/tests/test_public_exception_route_security.py \
+            backend/tests/test_http_error_redaction.py \
+            backend/tests/test_http_error_redaction_bounds_20261111.py \
+            backend/tests/test_share_page_security.py \
+            backend/tests/test_codeql_origin_guards_20261111.py \
+            backend/tests/test_codeql_tts_linear_20261111.py \
+            backend/tests/test_codeql_free_api_selector_20261111.py \
+            backend/tests/test_free_api_network_security.py \
+            backend/tests/test_room_api_egress_admission_20261111.py \
+            backend/tests/test_compressed_vault_secure_io.py \
+            backend/tests/test_compressed_vault_lazy_startup.py \
+            backend/tests/test_codeql_storage_security_20261111.py \
+            backend/tests/test_binary_tenant_boundary_20261111.py \
+            backend/tests/test_apk_atomic_publication_20261111.py \
+            tests/test_codeql_lineage_contract_20261111.py \
+            tests/test_full_security_alert_inventory_20261111.py \
+            tests/test_codeql_all_151_source_contracts_20261111.py \
+            tests/test_ci_regression_suite_contract_20261111.py
+
+  frontend-source:
+    if: github.repository == 'Apeloff1/Skeleton'
+    name: Draft CodeQL frontend regression qualification (review only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact security-branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install frontend without dependency lifecycle scripts
+        run: yarn --cwd frontend install --frozen-lockfile --ignore-scripts --non-interactive
+      - name: Exercise crypto identifiers, prototype guard, privacy and compiler isolation
+        run: >-
+          node --test
+          frontend/scripts/test-secure-session-identifiers.cjs
+          frontend/scripts/test-quickwins-prototype-guard.cjs
+          frontend/scripts/test-telemetry-privacy.cjs
+          frontend/scripts/test-telemetry-batch-admission.cjs
+          frontend/scripts/test-wasm-origin-execution-boundary.cjs
