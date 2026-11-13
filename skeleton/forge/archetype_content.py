@@ -174,6 +174,12 @@ const HEAT_PER_SECOND := 6.0
 const PICKUP_RADIUS := 12.0
 
 
+func _draw() -> void:
+\tfor location in loot:
+\t\tdraw_circle(location, 12.0, Color(0.3, 0.8, 1.0))
+\tdraw_circle(extract_point, 20.0, Color(0.25, 0.92, 0.45))
+
+
 func _tick(delta: float) -> void:
 \theat += HEAT_PER_SECOND * delta
 \tif heat >= HEAT_LIMIT:
@@ -185,6 +191,7 @@ func _tick(delta: float) -> void:
 \t\t\tif player.autopilot or Input.is_action_just_pressed("ui_accept"):
 \t\t\t\tloot.remove_at(0)
 \t\t\t\tcarried += 1
+\t\t\t\tqueue_redraw()
 \telse:
 \t\tplayer.autopilot_target = extract_point
 \t\tif player.global_position.distance_to(extract_point) <= PICKUP_RADIUS:
@@ -204,6 +211,11 @@ var wave: int = 0
 var enemies: Array[Dictionary] = []
 var player_hp: int = 100
 var kills: int = 0
+
+
+func _draw() -> void:
+\tfor enemy in enemies:
+\t\tdraw_circle(enemy["pos"], 12.0, Color(0.96, 0.3, 0.28))
 
 
 func _spawn_wave() -> void:
@@ -235,6 +247,7 @@ func _tick(_delta: float) -> void:
 \t\tif target["hp"] <= 0:
 \t\t\tenemies.remove_at(0)
 \t\t\tkills += 1
+\tqueue_redraw()
 
 
 func _objective_text() -> String:
@@ -253,17 +266,25 @@ var shipped: int = 0
 var refine_timer: float = 0.0
 
 
+func _draw() -> void:
+\tdraw_circle(source, 15.0, Color(0.37, 0.72, 0.98))
+\tdraw_circle(refinery, 19.0, Color(0.99, 0.69, 0.30))
+\tdraw_circle(depot, 19.0, Color(0.33, 0.92, 0.45))
+
+
 func _tick(delta: float) -> void:
 \tmatch stage:
 \t\t"to_source":
 \t\t\tplayer.autopilot_target = source
 \t\t\tif player.global_position.distance_to(source) <= RADIUS:
-\t\t\t\tstage = "to_refinery"
+\t\t\t\tif player.autopilot or Input.is_action_just_pressed("ui_accept"):
+\t\t\t\t\tstage = "to_refinery"
 \t\t"to_refinery":
 \t\t\tplayer.autopilot_target = refinery
 \t\t\tif player.global_position.distance_to(refinery) <= RADIUS:
-\t\t\t\tstage = "refining"
-\t\t\t\trefine_timer = 0.25
+\t\t\t\tif player.autopilot or Input.is_action_just_pressed("ui_accept"):
+\t\t\t\t\tstage = "refining"
+\t\t\t\t\trefine_timer = 0.25
 \t\t"refining":
 \t\t\trefine_timer -= delta
 \t\t\tif refine_timer <= 0.0:
@@ -271,8 +292,9 @@ func _tick(delta: float) -> void:
 \t\t"to_depot":
 \t\t\tplayer.autopilot_target = depot
 \t\t\tif player.global_position.distance_to(depot) <= RADIUS:
-\t\t\t\tshipped += 1
-\t\t\t\tstage = "to_source"
+\t\t\t\tif player.autopilot or Input.is_action_just_pressed("ui_accept"):
+\t\t\t\t\tshipped += 1
+\t\t\t\t\tstage = "to_source"
 \tif shipped >= QUOTA:
 \t\t_finish(true, "shipped=%d" % shipped)
 
