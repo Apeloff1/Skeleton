@@ -7,6 +7,7 @@ const m = load('src/skeletonForge/foundation/model.ts');
 const storage = load('src/skeletonForge/foundation/storage.ts');
 const a11y = load('src/skeletonForge/foundation/a11y.ts');
 const Q = load('src/skeletonForge/questionnaire.ts');
+const H = load('src/skeletonForge/creatorBridge.ts');
 
 const AT = '2026-10-17T12:00:00.000Z';
 
@@ -489,4 +490,40 @@ test('a failed supporting save cannot partially publish a newer authored project
   assert.deepEqual(seen.slice(-3), [
     storage.KEYS.prefs, storage.KEYS.onboarded, storage.KEYS.projects,
   ]);
+});
+
+test('source-bound Studio-to-cockpit-to-Studio edits survive a complete device save/reload', async () => {
+  const initial = Q.questionnaireReducer(m.freshQuestionnaire(),
+    { type: 'setVision', vision: 'A small original local-game world' });
+  const original = project('p_roundtrip', { questionnaire: initial });
+  const envelope = H.handoffFromStudio(
+    initial, original.id, original.updatedAt, 1700000000000,
+  );
+  assert.equal(envelope.studioProjectUpdatedAt, AT);
+  const edited = [
+    { type: 'setAxis', axis: 'agency', value: 0.83 },
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setPlaytestMode', value: 'require' },
+    { type: 'setSourceExportEnabled', value: true },
+  ].reduce(Q.questionnaireReducer, initial);
+  const fromCockpit = H.handoffToStudio(edited, envelope, 1700000005000);
+  const accepted = H.studioStateFromHandoff(fromCockpit, 1700000005001);
+  assert.equal(accepted.playtest, 'require');
+  const applied = m.reconcileStudioReturn(
+    [original], fromCockpit.studioProjectId,
+    fromCockpit.studioProjectUpdatedAt, accepted,
+    '2026-11-13T16:00:00.000Z',
+  );
+  assert.equal(applied.status, 'applied');
+  const device = storage.memoryKv();
+  await storage.saveFoundation(device, m.persistSnapshot(base({ projects: applied.projects })));
+  const restarted = await storage.loadFoundation(device);
+  assert.equal(restarted.projectsCorrupt, false);
+  const saved = restarted.projects[0].questionnaire;
+  assert.equal(saved.vision, initial.vision);
+  assert.deepEqual(saved.instruments, { agency: 0.83 });
+  assert.equal(saved.playable.enabled, true);
+  assert.equal(saved.playtest, 'require');
+  assert.equal(saved.sourceExport.enabled, true);
+  assert.equal(Q.buildRunRequest(saved).include_files, true);
 });
