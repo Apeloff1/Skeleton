@@ -4,7 +4,7 @@
  * never automatically attributed to the currently authenticated account.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { creatorStorageScope } from '../creatorStorageScope';
+import { creatorStorageScope, type CreatorStorageScope } from '../creatorStorageScope';
 import { KEYS, type Kv } from './storage';
 
 const KEY_SET = new Set<string>(Object.values(KEYS));
@@ -13,21 +13,46 @@ function allowed(key: string): void {
   if (!KEY_SET.has(key)) throw new Error('Unexpected first-install storage key');
 }
 
+/**
+ * Bind *every* key in one Studio session to a single account snapshot.
+ * Recomputing the token fingerprint for each setItem allowed a logout in
+ * the middle of saveFoundation's three writes to publish an old user's
+ * projects under the incoming user's key.
+ *
+ * The scope promise is lazy, shared by concurrent load requests and never
+ * renegotiated after an auth epoch rotation. A new authenticated session
+ * must create a new adapter; old adapters fail closed instead of rebinding.
+ */
 export function asyncStorageKv(): Kv {
+  let owner: Promise<CreatorStorageScope> | null = null;
+  const lockedScope = () => {
+    if (!owner) owner = creatorStorageScope(KEYS.projects);
+    return owner;
+  };
+  async function scopedKey(key: string): Promise<{ key: string; scope: CreatorStorageScope }> {
+    allowed(key);
+    const scope = await lockedScope();
+    if (!scope.stillCurrent()) throw new Error('Account changed during Studio project storage');
+    const prefix = KEYS.projects + ':';
+    if (!scope.key.startsWith(prefix)) throw new Error('Invalid Studio project storage prefix');
+    const fingerprint = scope.key.slice(prefix.length);
+    if (!/^(?:anonymous|[a-f0-9]{64})$/.test(fingerprint)) {
+      throw new Error('Invalid Studio project owner fingerprint');
+    }
+    return { key: key + ':' + fingerprint, scope };
+  }
   return {
     async getItem(key) {
-      allowed(key);
-      const scope = await creatorStorageScope(key);
-      const content = await AsyncStorage.getItem(scope.key);
-      if (!scope.stillCurrent()) throw new Error('Account changed during Studio project read');
+      const selected = await scopedKey(key);
+      const content = await AsyncStorage.getItem(selected.key);
+      if (!selected.scope.stillCurrent()) throw new Error('Account changed during Studio project read');
       return content;
     },
     async setItem(key, value) {
-      allowed(key);
-      const scope = await creatorStorageScope(key);
-      if (!scope.stillCurrent()) throw new Error('Account changed before Studio project write');
-      await AsyncStorage.setItem(scope.key, value);
-      if (!scope.stillCurrent()) throw new Error('Account changed during Studio project write');
+      const selected = await scopedKey(key);
+      if (!selected.scope.stillCurrent()) throw new Error('Account changed before Studio project write');
+      await AsyncStorage.setItem(selected.key, value);
+      if (!selected.scope.stillCurrent()) throw new Error('Account changed during Studio project write');
     },
   };
 }
