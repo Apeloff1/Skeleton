@@ -100,6 +100,7 @@ test('untrusted duplicate/unsafe choice and axis keys cannot poison restored req
   const safe = H.parseCreatorBridge(raw, 'galaxy', 1700000000001);
   assert.equal(safe.brief.genre, 'colony-sim');
   assert.equal(Object.hasOwn(safe.brief, '__proto__'), false);
+  assert.equal(Object.hasOwn(safe.brief, 'constructor'), false);
   assert.deepEqual(safe.instruments, { risk: 0.7 });
   assert.deepEqual(safe.quest, { enabled: true, length: 3 });
 });
@@ -113,6 +114,8 @@ test('Galaxy and Forge routes only hand off after explicit user action', () => {
   assert.match(forgeRoute, /onOpenGalaxyStudio=\{openGalaxy\}/);
   assert.match(galaxyRoute, /storeCreatorBridge\(handoffFromGalaxy\(selection, incoming\)\)/);
   assert.match(galaxyModal, /testID="galaxy-continue-in-gameforge"/);
-  assert.match(galaxyModal, /onPress=\{\(\) => onSendToForge\(\{/);
+  assert.match(galaxyModal, /onPress=\{transferToForge\}/);
+  assert.match(galaxyModal, /await saveGalaxyDraft\(snapshot\)/);
+  assert.match(galaxyModal, /GALAXY_DRAFT_SCHEMA/);
   assert.doesNotMatch(forgeRoute, /onOpenGalaxyStudio=\{\(\) => router\.push/);
 });
