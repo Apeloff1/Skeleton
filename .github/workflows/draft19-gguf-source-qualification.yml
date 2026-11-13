@@ -18,7 +18,9 @@ on:
       - "skeleton/testing/test_app_offline_mixed_game_library_continuity.py"
       - "skeleton/testing/dialogue_sessions_v1/__init__.py"
       - "skeleton/testing/questflows_v1/__init__.py"
-      - "skeleton/testing/test_local_ai_gguf_custody.py"
+      - "skeleton/testing/test_local_ai_model_loader_custody.py"
+      - "tests/test_local_ai_gguf_custody_v6.py"
+      - "tests/test_gguf_artifact_qualification_reconciliation.py"
       - "machine/draft19_reconciliation.json"
       - "scripts/check_draft19_reconciliation.py"
       - "tests/test_draft19_reconciliation.py"
@@ -52,7 +54,8 @@ jobs:
           python-version: "3.11.16"
       - name: Compile changed sources
         run: |
-          python -m py_compile skeleton/local_ai/model_loader.py skeleton/testing/test_local_ai_gguf_custody.py
+          python -m py_compile skeleton/local_ai/model_loader.py skeleton/testing/test_local_ai_model_loader_custody.py
+          python -m py_compile tests/test_local_ai_gguf_custody_v6.py tests/test_gguf_artifact_qualification_reconciliation.py
           python -m py_compile backend/core/lazy_registry.py
           python -m py_compile skeleton/app/offline_delivery_archive.py skeleton/testing/test_app_offline_delivery_archive.py
           python -m py_compile skeleton/testing/test_app_offline_archive_schema_parity.py skeleton/testing/test_repo_machine_inventory_budget.py
@@ -72,8 +75,11 @@ jobs:
           "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3"
           "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2"
           "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
-      - name: Run GGUF custody and prior compatibility tests
-        run: python -m unittest skeleton.testing.test_local_ai_gguf_qualification skeleton.testing.test_local_ai_gguf_custody -v
+      - name: Run maintained GGUF custody and prior compatibility tests
+        run: |
+          python -m unittest skeleton.testing.test_local_ai_model_loader_custody -v
+          python -m unittest discover -s tests -p 'test_local_ai_gguf_custody_v6.py' -v
+          python -m unittest discover -s tests -p 'test_gguf_artifact_qualification_reconciliation.py' -v
       - name: Validate literal deferred-import inventory and storage diagnostics
         env:
           PYTHONPATH: ".:backend:tests"
