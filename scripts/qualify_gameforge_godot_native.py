@@ -17,6 +17,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
 import tempfile
@@ -111,10 +112,12 @@ def verify_engine_archive(
         if len(records) > 32:
             raise ValueError("Godot release archive contains too many members")
         names: set[str] = set()
+        inflated_bytes = 0
         for item in records:
             name = item.filename
             parts = PurePosixPath(name).parts
             if (not parts or name.startswith("/") or "\\" in name
+                    or PurePosixPath(name).as_posix() != name.rstrip("/")
                     or any(part in ("", ".", "..") for part in parts)
                     or name.casefold() in names):
                 raise ValueError("Godot archive has unsafe or duplicate source paths")
@@ -128,6 +131,13 @@ def verify_engine_archive(
                 continue
             if item.file_size > 400 * 1024 * 1024:
                 raise ValueError("Godot archive entry exceeds bounded binary size")
+            inflated_bytes += item.file_size
+            if inflated_bytes > 512 * 1024 * 1024:
+                raise ValueError("Godot archive total uncompressed size exceeded")
+            # A candidate's actual file length must agree with the launch
+            # binary before streaming its potentially compressed contents.
+            if item.file_size != exe.stat().st_size:
+                continue
             # Only candidate executable names are hashed; other artifacts
             # cannot masquerade as the engine under an arbitrary name.
             if not PurePosixPath(name).name.casefold().startswith("godot"):
@@ -152,6 +162,16 @@ def verify_engine_archive(
         # expected hash, not official origin or desktop/device correctness.
         "binary_matches_archive": "true",
     }
+
+
+def parse_godot_major_four(text: str) -> str:
+    """Admit a real Godot 4 CLI version string, never Godot 3 or shell noise."""
+    candidate = text.strip()
+    if len(candidate) > 400 or "\n" in candidate or "\r" in candidate:
+        raise ValueError("Godot CLI reported an invalid version string")
+    if not re.fullmatch(r"4\\.\\d+(?:\\.\\d+)?(?:\\.(?:stable|rc|beta|alpha|dev))?\\.[A-Za-z0-9.\\-]+", candidate):
+        raise ValueError("Godot 4 CLI version was not verified")
+    return candidate
 
 
 def _scenario(exe: Path, name: str, axes: dict[str, float], root: Path) -> dict[str, Any]:
@@ -230,6 +250,10 @@ def main() -> int:
     _require(exe.is_file() and os.access(exe, os.X_OK),
              "native Godot binary missing or not executable")
     custody = verify_engine_archive(exe, args.archive, args.archive_sha256)
+    probe = _launch(exe, ["--version"], exe.parent, timeout=15)
+    _require(probe["exit"] == 0 and not probe["timeout"] and not probe["errors"],
+             "Godot 4 executable version probe failed")
+    engine_version = parse_godot_major_four(probe["output"].strip())
     expected_names = ("combat_loop", "extraction", "pipeline")
     _require(content_archetypes() == expected_names,
              "native suite must be reviewed when archetype inventory changes")
@@ -252,6 +276,7 @@ def main() -> int:
         "godot_archive_sha256": custody["archive_sha256"],
         "godot_binary_sha256": custody["godot_binary_sha256"],
         "godot_archive_member": custody["archive_member"],
+        "godot_engine_version": engine_version,
         "binary_matches_pinned_archive": True,
         "expected_digest_origin_verified": False,
         "headless_godot_executed": True,

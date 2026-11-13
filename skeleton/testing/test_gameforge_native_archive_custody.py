@@ -83,3 +83,32 @@ def test_symlink_archive_entries_fail_closed(tmp_path):
     digest = hashlib.sha256(dist.read_bytes()).hexdigest()
     with pytest.raises(ValueError, match="symbolic link"):
         verify_engine_archive(exe, dist, digest)
+
+
+@pytest.mark.parametrize("invalid", [
+    "3.5.stable.official.aaaa", "4.3", "Godot 4.3", "", "4.3.stable.official.x\nSCRIPT ERROR",
+    "4.3.stable.official.x\r", "5.0.stable.official.abc",
+])
+def test_only_explicit_single_line_godot_four_versions_are_admitted(invalid):
+    from scripts.qualify_gameforge_godot_native import parse_godot_major_four
+    with pytest.raises(ValueError):
+        parse_godot_major_four(invalid)
+
+
+@pytest.mark.parametrize("valid", [
+    "4.3.stable.official.77dcf97d8",
+    "4.4.1.stable.official.aabbccdd",
+    "4.6.stable.official.aabbccdd",
+])
+def test_actual_godot_four_version_shapes(valid):
+    from scripts.qualify_gameforge_godot_native import parse_godot_major_four
+    assert parse_godot_major_four(valid) == valid
+
+
+def test_noncanonical_zip_alias_is_not_accepted_as_official_distribution(tmp_path):
+    exe = tmp_path / "godot"
+    exe.write_bytes(b"safe engine")
+    dist = tmp_path / "godot-release.zip"
+    digest = _archive(dist, {"pkg//Godot_4": exe.read_bytes()})
+    with pytest.raises(ValueError, match="unsafe or duplicate"):
+        verify_engine_archive(exe, dist, digest)
