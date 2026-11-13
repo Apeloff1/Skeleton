@@ -9,6 +9,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 import pytest
+from fastapi import HTTPException
 
 from backend.routes.skeleton_gameforge import RunRequest, run
 from skeleton.context.pipeline import GameForgeRun
@@ -81,6 +82,46 @@ def test_source_export_recomputes_full_manifest_and_rejects_unsafe_paths(monkeyp
     out = run(RunRequest(vision="An original Godot world", include_files=True))
     assert out["source_export"]["status"] == "unavailable"
     assert "files" not in out
+
+
+@pytest.mark.parametrize("path, overwrite", [
+    ("/tmp/gameforge-export", False),
+    ("../../private/server-files", True),
+    ("C:\\\\Users\\\\Public\\\\GameForge", False),
+    ("", False),
+    (None, True),
+])
+def test_remote_run_cannot_write_or_overwrite_server_files(monkeypatch, path, overwrite):
+    invoked = []
+
+    class NeverCall:
+        def execute(self, *args, **kwargs):
+            invoked.append((args, kwargs))
+            raise AssertionError("remote filesystem write path must be rejected before execution")
+
+    monkeypatch.setattr(GameForgeRun, "live", lambda: NeverCall())
+    with pytest.raises(HTTPException) as refused:
+        run(RunRequest(
+            vision="My local-only original Godot project",
+            project_root=path,
+            overwrite=overwrite,
+            include_files=True,
+        ))
+    assert refused.value.status_code == 400
+    assert "cannot write server project paths" in refused.value.detail
+    assert invoked == []
+
+
+def test_http_run_ignores_project_publication_even_if_model_defaults_change(monkeypatch):
+    calls = stub(monkeypatch, fixture())
+    out = run(RunRequest(
+        vision="An original game", project_root=None, overwrite=False,
+        include_files=True,
+    ))
+    assert out["succeeded"] is True
+    assert calls[-1]["project_root"] is None
+    assert calls[-1]["overwrite"] is False
+    assert out["source_export"]["status"] == "ready"
 
 
 def test_non_godot_export_fails_closed_without_transferring_source_bodies(monkeypatch):
