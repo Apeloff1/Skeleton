@@ -9,6 +9,7 @@ import { humanize } from '../graph';
 import { DESIGN_AXES } from '../instruments';
 import { PLAYABLE_SLICES } from '../questionnaire';
 import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
+import { suggestPlayableMode } from '../playableSuggestions';
 import DesignInstruments from './DesignInstruments';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
@@ -177,6 +178,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
   const filteredGenres = GALAXY_CHOICES.filter((g) => (g.id + ' ' + g.name + ' ' + g.desc).toLowerCase().includes(genreSearch.trim().toLowerCase()));
+  const playableHint = suggestPlayableMode(state.galaxyGenre);
   return (
     <Card>
       <View accessibilityRole="radiogroup" accessibilityLabel="Forge archetype" style={st.group}>
@@ -222,6 +224,20 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         {state.playable?.enabled && state.options.target === 'godot' ? (
           <>
             <Text style={st.help}>Select the implemented game loop:</Text>
+            {playableHint ? (
+              <View testID="q-playable-suggestion">
+                <Text style={st.help}>
+                  Historical {playableHint.genreName}: the nearest authored mini-game is
+                  {' '}{PLAYABLE_SLICES.find((slice) => slice.id === playableHint.mode)?.label ?? playableHint.mode}.
+                  This is only a small prototype, not full specialized genre gameplay.
+                </Text>
+                <Chip label="Use this prototype" role="button"
+                  selected={state.playable.mode === playableHint.mode}
+                  onPress={() => dispatch({ type: 'setPlayableMode', value: playableHint.mode })}
+                  testID="q-use-playable-suggestion" />
+              </View>
+            ) : null}
+
             <View style={st.chips}>
               {PLAYABLE_SLICES.map((slice) => (
                 <Chip key={slice.id} label={slice.label}

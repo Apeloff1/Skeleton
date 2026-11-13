@@ -98,3 +98,16 @@ zero-exit headless boot. Missing Godot is a **skip, never a pass**.
 Touch/keyboard/controller interaction on physical devices remains
 independently unverified until tested; static assertions alone do not
 prove real device behavior.
+
+
+## Honesty-first Galaxy genre suggestions
+
+The canonical 67-genre Galaxy catalog can now recommend the nearest
+one of eight **actually implemented** prototypes for a deliberately
+small set of semantically related genres, for example racing → racing,
+tycoon → production pipeline, and extraction shooter → extraction.
+The creator never automatically enables a mini-game or changes the
+selection; a user must explicitly press "Use this prototype".
+Unsupported modes such as RPG and 2D platformer show **no fake playable
+recommendation**. The original full design profile always remains
+independent of this suggested mini-game and retains its source receipt.

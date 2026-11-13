@@ -114,3 +114,36 @@ test('including a bonus scene exposes an accessible in-game launcher option', ()
   assert.match(text(display(state)), /Keep main world; add in-game switch button/);
   assert.match(text(display(state, 'review')), /Spatial Puzzle.*additional scene/);
 });
+
+
+
+test('historical genre hints are sparse, honest and never mutate intent automatically', () => {
+  const H = load('src/skeletonForge/playableSuggestions.ts');
+  assert.equal(H.suggestPlayableMode('racing').mode, 'racing');
+  assert.equal(H.suggestPlayableMode('extraction_shooter').mode, 'extraction');
+  assert.equal(H.suggestPlayableMode('tycoon').mode, 'pipeline');
+  assert.equal(H.suggestPlayableMode('puzzle').mode, 'puzzle');
+  assert.equal(H.suggestPlayableMode('rpg'), null, 'a full RPG cannot be faked as a mini-loop');
+  assert.equal(H.suggestPlayableMode('platformer_2d'), null);
+  assert.equal(H.suggestPlayableMode('__proto__'), null);
+  let state = reducer(
+    { type: 'setVision', vision: 'Original racing title' },
+    { type: 'setGalaxyGenre', genre: 'racing' },
+    { type: 'setPlayableEnabled', value: true },
+  );
+  assert.equal(Q.buildRunRequest(state).playable_archetype, 'extraction');
+  const html = display(state);
+  assert.match(html, /data-testid="q-playable-suggestion"/);
+  assert.match(html, /data-testid="q-use-playable-suggestion"/);
+  assert.match(text(html), /only a small prototype, not full specialized genre gameplay/);
+  state = Q.questionnaireReducer(state, { type: 'setPlayableMode', value: 'racing' });
+  assert.equal(Q.buildRunRequest(state).playable_archetype, 'racing');
+});
+
+test('unsupported Galaxy genres show no misleading playable recommendation', () => {
+  const state = reducer(
+    { type: 'setGalaxyGenre', genre: 'rpg' },
+    { type: 'setPlayableEnabled', value: true },
+  );
+  assert.doesNotMatch(display(state), /data-testid="q-playable-suggestion"/);
+});
