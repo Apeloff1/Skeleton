@@ -726,6 +726,11 @@ def describe(world:LivingWorld,state:LivingState,
              *,include_options:bool=True)->dict:
     validate_world(world);validate_state(world,state)
     current=terrain_for_state(world,state,state.realm,state.x,state.y)
+    # API projections must contain JSON arrays, not internal immutable tuples.
+    # Keep LivingState itself immutable for deterministic replay and hashing.
+    player=asdict(state)
+    for field in ("discoveries","endings_seen","world_changes"):
+        player[field]=list(player[field])
     return {
         "schema":SCHEMA,"world_id":world.world_id,
         "variation":world.variant,"style":world.style,
@@ -735,7 +740,7 @@ def describe(world:LivingWorld,state:LivingState,
             not state.endings_seen or world.allows_continuation),
         "has_completed_ending":bool(state.endings_seen),
         "postgame_active":bool(state.endings_seen) and world.allows_continuation,
-        "player":asdict(state),
+        "player":player,
         "tile":current,
         "environment":atmosphere(world,state),
         "options":options(world,state) if include_options else [],

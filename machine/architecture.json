@@ -25,11 +25,14 @@
     "ai_implementation_handoff": "machine/ai_implementation_handoff.json",
     "ai_closure_evidence": "machine/ai_closure_evidence.json",
     "ai_capability_registry": "machine/ai_capabilities.json",
+    "product_vertical_readiness": "machine/product_vertical_readiness.json",
     "ai_file_tree": "machine/ai_file_tree.json",
     "enterprise_system_contract": "machine/enterprise_system_architecture.json",
     "enterprise_system_manual": "docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md",
     "enterprise_system_validator": "scripts/check_enterprise_system_architecture.py",
-    "enterprise_system_independent_verifier": "scripts/verify_enterprise_system_architecture.py"
+    "enterprise_system_independent_verifier": "scripts/verify_enterprise_system_architecture.py",
+    "product_surface_specification": "machine/product_surface_specification.json",
+    "product_surface_validator": "scripts/check_product_surface_specification.py"
   },
   "objectives": [
     "one product shell",
@@ -299,10 +302,7 @@
       "path": "frontend",
       "kind": "expo",
       "canonical": true,
-      "depends_on": [
-        "backend",
-        "skeleton"
-      ]
+      "depends_on": []
     }
   ],
   "interfaces": [
@@ -311,14 +311,14 @@
       "from": "frontend",
       "to": "backend",
       "transport": "http",
-      "contract": "frontend/utils/apiBase.ts -> /api/*"
+      "contract": "frontend/src/utils/apiBase.ts -> /api/*"
     },
     {
       "id": "frontend-engine",
       "from": "frontend",
       "to": "skeleton",
       "transport": "http",
-      "contract": "frontend/utils/apiBase.ts -> /api/v1/*"
+      "contract": "frontend/src/utils/apiBase.ts -> /api/v1/*"
     },
     {
       "id": "engine-health",
@@ -531,7 +531,7 @@
   "invariants": [
     "frontend is the only canonical human-interface root",
     "backend and skeleton remain separate API processes until route and dependency ownership converge",
-    "browser clients resolve endpoints through frontend/utils/apiBase.ts",
+    "browser clients resolve endpoints through frontend/src/utils/apiBase.ts",
     "runtime service dependencies match skeleton/app/manifest.json",
     "every architecture node and interface reference resolves to a declared node",
     "zone dependency graph is acyclic",
@@ -1422,13 +1422,14 @@
       "startup_groups": [
         {
           "order": 0,
-          "id": "data-foundation",
+          "id": "diagnostics-and-data-foundation",
           "nodes": [
+            "frontend",
             "mongo",
             "chroma"
           ],
           "mode": "parallel",
-          "barrier": "started-and-health-probe-eligible"
+          "barrier": "setup-ui-starts-independently; data-health-probes-do-not-gate-setup"
         },
         {
           "order": 1,
@@ -1437,7 +1438,7 @@
             "skeleton"
           ],
           "mode": "serial",
-          "barrier": "ready-before-application-start"
+          "barrier": "engine-ready-before-dependent-application-start"
         },
         {
           "order": 2,
@@ -1446,16 +1447,7 @@
             "backend"
           ],
           "mode": "serial",
-          "barrier": "ready-before-dependent-product-start"
-        },
-        {
-          "order": 3,
-          "id": "product-shell",
-          "nodes": [
-            "frontend"
-          ],
-          "mode": "serial",
-          "barrier": "ready-after-backend-and-engine"
+          "barrier": "backend-readiness-required-for-protected-product-actions"
         }
       ],
       "readiness_rules": [
@@ -1463,7 +1455,7 @@
         "liveness proves process survival; readiness proves dependency-safe request admission",
         "degraded readiness must be explicit and cannot claim unavailable capability as healthy",
         "provider credentials do not make provider-backed capabilities ready unless architecture receipt and provider preflight succeed",
-        "product readiness requires both application and engine endpoints used by the shell"
+        "protected product actions require both application and engine endpoints used by the shell; setup diagnostics do not"
       ],
       "shutdown_groups": [
         {

@@ -1,0 +1,17 @@
+{
+  "case": "07_wrong_last_type",
+  "gate": "journal",
+  "expect": "reject",
+  "reason": "Typed values are not arbitrary objects",
+  "payload": {
+    "stream": "chat_001",
+    "sequence": 1,
+    "prev_sha": "0000000000000000000000000000000000000000000000000000000000000000",
+    "event_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "kind": "inference.completed",
+    "payload_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "epoch": {
+      "untrusted": true
+    }
+  }
+}

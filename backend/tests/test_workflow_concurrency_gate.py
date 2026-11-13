@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from unittest import mock
 
+from scripts import check_toolchain_contract as toolchain_contract
 from scripts import check_workflow_concurrency as concurrency
 
 
@@ -240,6 +241,108 @@ jobs: {}
     assert _scan(text, "ci.yml") == []
 
 
+def test_main_ci_contract_rejects_legacy_ref_wide_cancellation() -> None:
+    root = Path(__file__).resolve().parents[2]
+    current = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert toolchain_contract.ci_preserves_main_run_evidence(current)
+
+    # Regression: the archived/restored CI policy used this main-wide ref
+    # cancellation. Even if a generic ref-scoped workflow check accepts it,
+    # the reusable CI contract must reject it as evidence-destructive.
+    legacy = current.replace(
+        "github.event.pull_request.number || github.sha",
+        "github.event.pull_request.number || github.ref",
+    ).replace(
+        "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}",
+        "cancel-in-progress: true",
+    )
+    assert legacy != current
+    assert toolchain_contract.ref_scoped_cancellation(legacy)
+    assert not toolchain_contract.ci_preserves_main_run_evidence(legacy)
+
+    # Main commits can opt out of preemption completely, or cancel only
+    # their exact SHA, without losing earlier main-run receipts.
+    no_cancellation = current.replace(
+        "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}",
+        "cancel-in-progress: false",
+    )
+    assert toolchain_contract.ci_preserves_main_run_evidence(no_cancellation)
+
+
+def test_yaml_comment_cannot_spoof_sha_scoped_main_evidence() -> None:
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert toolchain_contract.ci_preserves_main_run_evidence(workflow)
+    spoof = workflow.replace(
+        "group: ci-" + chr(36) +
+        "{{ github.event_name }}-" + chr(36) +
+        "{{ github.event.pull_request.number || github.sha }}",
+        "group: ci-" + chr(36) + "{{ github.ref }} # " +
+        chr(36) + "{{ github.sha }}",
+    ).replace(
+        "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}",
+        "cancel-in-progress: true",
+    )
+    assert spoof != workflow
+    assert not toolchain_contract.ci_preserves_main_run_evidence(spoof)
+
+
+def test_nested_job_concurrency_cannot_mask_main_cancellation() -> None:
+    root = Path(__file__).resolve().parents[2]
+    current = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert toolchain_contract.ci_preserves_main_run_evidence(current)
+
+    legacy = current.replace(
+        "github.event.pull_request.number || github.sha",
+        "github.event.pull_request.number || github.ref",
+    ).replace(
+        "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}",
+        "cancel-in-progress: true",
+    )
+    # A perfectly valid job-level override must not mask the unsafe workflow
+    # default. The old whole-file regex accepted this false negative.
+    nested = legacy.replace(
+        "  changes:\n",
+        "  changes:\n"
+        "    concurrency:\n"
+        "      group: safe-" + chr(36) + "{{ github.sha }}\n"
+        "      cancel-in-progress: false\n",
+        1,
+    )
+    assert nested != legacy
+    assert toolchain_contract.cancel_false(nested)
+    assert not toolchain_contract.ci_preserves_main_run_evidence(nested)
+
+    duplicated = current.replace(
+        "concurrency:\n",
+        "concurrency:\n  cancel-in-progress: false\n",
+        1,
+    )
+    assert not toolchain_contract.ci_preserves_main_run_evidence(duplicated)
+
+
+def test_reusable_ci_keeps_pr_cancellation_but_preserves_each_main_sha() -> None:
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    # PR number is stable across pushes, so a superseding head can cancel.
+    # Main has no PR number and must retain separate immutable SHA evidence.
+    assert (
+        "group: ci-\u0024{{ github.event_name }}-\u0024{{ github.event.pull_request.number || github.sha }}"
+        in workflow
+    )
+    assert "cancel-in-progress: \u0024{{ github.event_name == 'pull_request' }}" in workflow
+    _record, findings = concurrency.violations_from_text("ci.yml", workflow)
+    assert findings == []
+    assert toolchain_contract.pr_only_ref_or_sha_scoped_cancellation(workflow)
+    # Never interpret unconditional cancellation as safe main-branch queuing.
+    unsafe = workflow.replace(
+        "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}",
+        "cancel-in-progress: true",
+    )
+    assert "cancel-in-progress: true" in unsafe
+    assert not toolchain_contract.pr_only_ref_or_sha_scoped_cancellation(unsafe)
+
+
 def test_rejects_sha_scoped_group_when_preemption_is_enabled() -> None:
     text = """name: ineffective-preemption
 on:
@@ -296,12 +399,11 @@ def test_current_repository_concurrency_groups_pass() -> None:
 
 
 def test_legacy_merge_readiness_drain_has_unique_top_level_concurrency() -> None:
-    workflow = (
-        Path(__file__).resolve().parents[2]
-        / ".github"
-        / "workflows"
-        / "merge-readiness-concurrency-drain.yml"
-    ).read_text(encoding="utf-8")
+    root = Path(__file__).resolve().parents[2] / ".github"
+    active = root / "workflows" / "merge-readiness-concurrency-drain.yml"
+    archived = root / "workflows-archive" / "merge-readiness-concurrency-drain.yml"
+    # Retiring a recovery controller does not retire its concurrency safeguards.
+    workflow = (active if active.is_file() else archived).read_text(encoding="utf-8")
 
     record, findings = concurrency.violations_from_text(
         "merge-readiness-concurrency-drain.yml",
@@ -400,7 +502,10 @@ def test_native_platform_pr_runs_preempt_only_obsolete_heads() -> None:
         "game-builder-native-coleco-cpu.yml",
     )
     for name in preemptible:
-        text = (workflows / name).read_text(encoding="utf-8")
+        active = workflows / name
+        archived = workflows.parent / "workflows-archive" / name
+        # Manual native-ROM contracts still require safe concurrency behavior.
+        text = (active if active.is_file() else archived).read_text(encoding="utf-8")
         # Native console compilation is deliberately manual-only on some
         # targets. Preserve the no-automatic-run policy when throttled.
         assert "  workflow_dispatch:" in text, name
@@ -414,5 +519,62 @@ def test_native_platform_pr_runs_preempt_only_obsolete_heads() -> None:
     # Expensive cross-target and Spectrum qualification deliberately preserve
     # the currently running source evidence and coalesce only pending requests.
     for name in ("game-builder-native-spectrum.yml", "game-builder-native-portfolio.yml"):
-        text = (workflows / name).read_text(encoding="utf-8")
+        active = workflows / name
+        archived = workflows.parent / "workflows-archive" / name
+        # Manual native-ROM contracts still require safe concurrency behavior.
+        text = (active if active.is_file() else archived).read_text(encoding="utf-8")
         assert "  cancel-in-progress: false" in text, name
+
+def test_reusable_ci_preserves_immutable_main_sha_evidence() -> None:
+    from scripts import check_toolchain_contract
+
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    expected_group = (
+        "ci-" + chr(36) + "{{ github.event_name }}-"
+        + chr(36) + "{{ github.event.pull_request.number || github.sha }}"
+    )
+    assert "group: " + expected_group in workflow
+    cancel = "cancel-in-progress: " + chr(36) + "{{ github.event_name == 'pull_request' }}"
+    assert cancel in workflow
+    assert check_toolchain_contract.ci_preserves_main_run_evidence(workflow)
+    unsafe = workflow.replace(cancel, "cancel-in-progress: true")
+    assert unsafe != workflow
+    assert not check_toolchain_contract.ci_preserves_main_run_evidence(unsafe)
+
+
+
+def test_owner_historical_cleanup_uses_dispatch_unique_outer_and_authorized_job_lock() -> None:
+    """Manual owner dispatch has a unique outer slot and shared job lock."""
+    root = Path(__file__).resolve().parents[2]
+    source = (root / ".github/workflows/owner-historical-actions-cleanup.yml").read_text(
+        encoding="utf-8"
+    )
+    record, findings = concurrency.violations_from_text(
+        "owner-historical-actions-cleanup.yml", source
+    )
+    assert findings == []
+    assert record is not None
+    assert "github.run_id" in record.template
+    assert "cancel-in-progress: false" in source
+    assert "github.actor == github.repository_owner" in source
+    assert "  workflow_dispatch:" in source
+    assert "github.event_name == 'workflow_dispatch'" in source
+    assert "  issue_comment:" not in source
+    assert "  schedule:" not in source
+    # Distinct manual requests cannot cancel one another at workflow scope.
+    assert "group: owner-historical-actions-cleanup-v5-arm-${{ github.repository }}" in source
+
+
+
+def test_owner_historical_cleanup_uses_only_owner_scoped_optional_admin_token() -> None:
+    root = Path(__file__).resolve().parents[2]
+    source = (root / ".github/workflows/owner-historical-actions-cleanup.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "secrets.OWNER_ACTIONS_CLEANUP_TOKEN || github.token" in source
+    assert "github.actor == github.repository_owner" in source
+    assert "github.event_name == 'workflow_dispatch'" in source
+    assert "  issue_comment:" not in source
+    assert "scripts/owner_historical_actions_cleanup.py" in source
+    assert "persist-credentials: false" in source

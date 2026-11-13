@@ -1,7 +1,7 @@
 import { CryptoDigestAlgorithm, digest } from 'expo-crypto';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
-import { API_BASE } from '../../utils/apiBase';
+import { API_BASE } from '../utils/apiBase';
 import { authHeaders, getAuthToken } from '../auth/gameforgeAuth';
 import { ChatClientError } from './chatErrors';
 import { type LearningProject, learningRequestKey } from './gameLearningClient';

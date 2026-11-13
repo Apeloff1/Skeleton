@@ -1,0 +1,618 @@
+[
+  {
+    "schema": "skeleton.game_adaptive_ratchet.v1",
+    "cycle": 1,
+    "bytes_trained": 208666701,
+    "budget_bytes": 208666624,
+    "official_tracks": {
+      "visual": 2.0240078380826483,
+      "narrative": 2.008711168421652,
+      "systems": 2.0100562550413024
+    },
+    "torch_best_tracks": {
+      "visual": 2.024007797241211,
+      "narrative": 2.008711099624634,
+      "systems": 2.010056495666504
+    },
+    "model_digest": "c5eec052a38f719117186fdbd8090c9fca53500d2eb5c7b869f45728e0067de0",
+    "ratchet": {
+      "accepts": 499,
+      "rejects": 8222
+    },
+    "promotion": false,
+    "note": "Short pass ids, hidden 128, AdamW peak 1e-3. Full 199 MiB budget."
+  },
+  {
+    "schema": "skeleton.game_adaptive_ratchet.v2",
+    "cycle": 2,
+    "bytes_seen": 335229564,
+    "cycle_start_bytes": 208666701,
+    "official_tracks": {
+      "visual": 1.5076881939711142,
+      "narrative": 1.4813217022344867,
+      "systems": 1.5138253624330105
+    },
+    "torch_best_tracks": {
+      "visual": 1.5076881647109985,
+      "narrative": 1.4813216924667358,
+      "systems": 1.5138254165649414
+    },
+    "model_digest": "4ae88a3d121c7376a8c21c24afeb20b4fc6ff58a59767b9d1fe7a0ab0102fa49",
+    "ratchet": {
+      "accepts": 4,
+      "rejects": 1973,
+      "scale": 1.0
+    },
+    "promotion": false,
+    "note": "Long pass ids, a million away from the reserved 13-digit measurement ids. Kept weights are the best holdout state. Further fresh Adam steps at 3e-4 raised a track, and smaller rates did too, so the rest of the 199 MiB budget was not applied."
+  },
+  {
+    "schema": "skeleton.game_adaptive_ratchet.v2",
+    "bytes_trained": 335578717,
+    "cycle_start": 335229564,
+    "cycle_bytes": 349153,
+    "goal": 343618172,
+    "official_tracks": {
+      "visual": 1.5055037017735209,
+      "narrative": 1.4767407712552283,
+      "systems": 1.51098586405026,
+      "review": 1.5594443256757207,
+      "practice": 1.5272560882968464
+    },
+    "torch_best_tracks": {
+      "visual": 1.5055036544799805,
+      "narrative": 1.4767405986785889,
+      "systems": 1.5109859704971313,
+      "review": 1.5594444274902344,
+      "practice": 1.5272561311721802
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0005,
+      "accepts": 20,
+      "rejects": 86,
+      "accept_rate": 0.0
+    },
+    "model_digest": "0e45ff72aaea58646e918e9a0442c3df30ee6912a060a663674c463531c1da75",
+    "seconds": 5.795,
+    "promotion": false,
+    "note": "Focus fine-tune. Legal and coding weighted at 3, proofreading, syntax, errors, crash, and lint at 2.5, plus tutorial, achievement, navigation, moderation, analytics, subtitles, and photo mode. AdamW peak 3e-5. All five tracks fell. The cycle stopped after 64 rejected chunks and kept this state. The separate local transformer holdout logprob moved from -5.617680 to -5.448432 over 827 steps and was kept as a candidate, not a serving model."
+  },
+  {
+    "schema": "skeleton.game_adaptive_ratchet.v2",
+    "bytes_trained": 931860,
+    "cycle_start": 0,
+    "cycle_bytes": 931860,
+    "goal": 33554432,
+    "official_tracks": {
+      "visual": 1.5024955435009084,
+      "narrative": 1.473844519777313,
+      "systems": 1.507959462084698,
+      "review": 1.5533088380243099,
+      "practice": 1.52230878820073
+    },
+    "torch_best_tracks": {
+      "visual": 1.5024956464767456,
+      "narrative": 1.4738445281982422,
+      "systems": 1.5079594850540161,
+      "review": 1.5533087253570557,
+      "practice": 1.5223087072372437
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0005,
+      "accepts": 25,
+      "rejects": 257,
+      "accept_rate": 0.0
+    },
+    "model_digest": "5949fbf8ed17c42a126d6852a94c651d8861455f58374042b13735cf931825fd",
+    "seconds": 248.565,
+    "promotion": false,
+    "enterprise": {
+      "schema": "skeleton.game_finetune_enterprise.v1",
+      "standardized": true,
+      "enterprise_qualified": false,
+      "owner": "skeleton.ai.runtime.inference",
+      "runtime_root_added": false,
+      "levels": {
+        "L00": "inference package owns the byte network and the local transformer candidate",
+        "L01": "no new runtime root; NumpyRecurrentLM and TinyTransformer stay the owners",
+        "L02": "half targets are half the measured baseline; holdout text is not a training target",
+        "L03": "promotion stays false; a serving checkpoint is not replaced",
+        "L04": "AdamW fine-tune from the saved weights, widened only by zero-filled hidden units",
+        "L05": "weights stay under the gitignored checkpoint directory",
+        "L06": "original lessons only; no personal data and no commercial game text",
+        "L07": "a rejected or non-finite step restores the weights",
+        "L08": "official track losses, digest, accepts, and rejects are on the receipt",
+        "L09": "byte budget, learning rate, hidden size, and seconds are recorded",
+        "L10": "official NumpyRecurrentLM reload is the acceptance measurement",
+        "L11": "rollback digest is the pre-finetune network; use it when the half is not met",
+        "L12": "PAUSE saves and waits; a reject plateau keeps the best weights",
+        "L13": "not an enterprise-qualified volume; the half target is explicit and unmet until measured"
+      },
+      "half_targets": {
+        "visual": 0.7527518508867604,
+        "narrative": 0.7383703856276141,
+        "systems": 0.75549293202513,
+        "review": 0.7797221628378603,
+        "practice": 0.7636280441484232
+      },
+      "half_met": {
+        "visual": false,
+        "narrative": false,
+        "systems": false,
+        "review": false,
+        "practice": false
+      },
+      "half_met_all": false,
+      "rollback_digest": "0e45ff72aaea58646e918e9a0442c3df30ee6912a060a663674c463531c1da75",
+      "rollback_trigger": "keep the rollback network when any track is above its half target",
+      "promotion": false
+    }
+  },
+  {
+    "schema": "skeleton.game_adaptive_ratchet.v2",
+    "bytes_trained": 34486389,
+    "cycle_start": 931860,
+    "cycle_bytes": 33554529,
+    "goal": 34486292,
+    "official_tracks": {
+      "visual": 1.5036612084845131,
+      "narrative": 1.4639428875821738,
+      "systems": 1.4986928607658716,
+      "review": 1.4991698946222984,
+      "practice": 1.4890600421388223
+    },
+    "torch_best_tracks": {
+      "visual": 1.5036613941192627,
+      "narrative": 1.4639427661895752,
+      "systems": 1.4986927509307861,
+      "review": 1.499169945716858,
+      "practice": 1.4890600442886353
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0005,
+      "accepts": 854,
+      "rejects": 9288,
+      "accept_rate": 0.0
+    },
+    "model_digest": "38a778daef29a186aebd3335c3f283bf5f296137986a3188ca2ac3e38519d7e1",
+    "seconds": 843.843,
+    "loss_focus": "skeleton",
+    "promotion": false,
+    "enterprise": {
+      "schema": "skeleton.game_finetune_enterprise.v1",
+      "standardized": true,
+      "enterprise_qualified": false,
+      "owner": "skeleton.ai.runtime.inference",
+      "runtime_root_added": false,
+      "levels": {
+        "L00": "inference package owns the byte network and the local transformer candidate",
+        "L01": "no new runtime root; NumpyRecurrentLM and TinyTransformer stay the owners",
+        "L02": "half targets are half the measured baseline; holdout text is not a training target",
+        "L03": "promotion stays false; a serving checkpoint is not replaced",
+        "L04": "AdamW fine-tune from the saved weights; the gradient uses shared template bytes",
+        "L05": "weights stay under the gitignored checkpoint directory",
+        "L06": "original lessons only; no personal data and no commercial game text",
+        "L07": "a rejected or non-finite step restores the weights",
+        "L08": "official track losses, digest, accepts, and rejects are on the receipt",
+        "L09": "byte budget, learning rate, hidden size, and seconds are recorded",
+        "L10": "official NumpyRecurrentLM reload is the acceptance measurement",
+        "L11": "rollback digest is the pre-finetune network; use it when the half is not met",
+        "L12": "PAUSE saves and waits; a reject plateau keeps the best weights",
+        "L13": "not an enterprise-qualified volume; the half target is explicit and unmet until measured"
+      },
+      "half_targets": {
+        "visual": 0.7527518508867604,
+        "narrative": 0.7383703856276141,
+        "systems": 0.75549293202513,
+        "review": 0.7797221628378603,
+        "practice": 0.7636280441484232
+      },
+      "half_met": {
+        "visual": false,
+        "narrative": false,
+        "systems": false,
+        "review": false,
+        "practice": false
+      },
+      "half_met_all": false,
+      "rollback_digest": "0e45ff72aaea58646e918e9a0442c3df30ee6912a060a663674c463531c1da75",
+      "rollback_trigger": "keep the rollback network when any track is above its half target",
+      "promotion": false
+    }
+  },
+  {
+    "schema": "skeleton.game_adaptive_ratchet.v2",
+    "bytes_trained": 35003063,
+    "cycle_start": 34486389,
+    "cycle_bytes": 516674,
+    "goal": 42874997,
+    "official_tracks": {
+      "visual": 1.5016526719163024,
+      "narrative": 1.4629118592428343,
+      "systems": 1.4966765903978754,
+      "review": 1.4978585346301407,
+      "practice": 1.4873938926672934
+    },
+    "torch_best_tracks": {
+      "visual": 1.501652717590332,
+      "narrative": 1.46291184425354,
+      "systems": 1.4966766834259033,
+      "review": 1.4978584051132202,
+      "practice": 1.4873939752578735
+    },
+    "ratchet": {
+      "margin": 1e-05,
+      "scale": 1.0,
+      "slack": 0.0002,
+      "accepts": 8,
+      "rejects": 23,
+      "accept_rate": 0.0
+    },
+    "model_digest": "9121fca460dd2d4e014d7a57659e932f19f0577b5672a71fa24c3d964c039a78",
+    "seconds": 21.284,
+    "loss_focus": null,
+    "selection": "maximal",
+    "promotion": false,
+    "enterprise": {
+      "schema": "skeleton.game_finetune_enterprise.v1",
+      "standardized": true,
+      "enterprise_qualified": false,
+      "owner": "skeleton.ai.runtime.inference",
+      "runtime_root_added": false,
+      "levels": {
+        "L00": "inference package owns the byte network and the local transformer candidate",
+        "L01": "no new runtime root; NumpyRecurrentLM and TinyTransformer stay the owners",
+        "L02": "half targets are half the measured baseline; holdout text is not a training target",
+        "L03": "promotion stays false; a serving checkpoint is not replaced",
+        "L04": "each round tries every legal source and keeps the prediction step that raises every track",
+        "L05": "weights stay under the gitignored checkpoint directory",
+        "L06": "original lessons only; no personal data and no commercial game text",
+        "L07": "a rejected or non-finite step restores the weights",
+        "L08": "official track losses, digest, accepts, and rejects are on the receipt",
+        "L09": "byte budget, learning rate, hidden size, and seconds are recorded",
+        "L10": "official NumpyRecurrentLM reload is the acceptance measurement",
+        "L11": "rollback digest is the pre-finetune network; use it when the half is not met",
+        "L12": "PAUSE saves and waits; a reject plateau keeps the best weights",
+        "L13": "not an enterprise-qualified volume; the half target is explicit and unmet until measured"
+      },
+      "half_targets": {
+        "visual": 0.7527518508867604,
+        "narrative": 0.7383703856276141,
+        "systems": 0.75549293202513,
+        "review": 0.7797221628378603,
+        "practice": 0.7636280441484232
+      },
+      "half_met": {
+        "visual": false,
+        "narrative": false,
+        "systems": false,
+        "review": false,
+        "practice": false
+      },
+      "half_met_all": false,
+      "rollback_digest": "0e45ff72aaea58646e918e9a0442c3df30ee6912a060a663674c463531c1da75",
+      "rollback_trigger": "keep the rollback network when any track is above its half target",
+      "promotion": false
+    }
+  },
+  {
+    "schema": "skeleton.game_coherent_english.v1",
+    "bytes_trained": 5471352,
+    "cycle_start": 0,
+    "cycle_bytes": 5471352,
+    "goal": 1000000,
+    "official_tracks": {
+      "visual": 1.5024384655516598,
+      "narrative": 1.4633808168149796,
+      "systems": 1.4968191332411533,
+      "review": 1.4973368152143198,
+      "practice": 1.4867418727860693,
+      "rights": 1.603466478101145,
+      "sound": 1.5302591436776942,
+      "stage": 1.501610734736527,
+      "craft": 1.421799442667733,
+      "play": 1.5621899496180067
+    },
+    "torch_best_tracks": {
+      "visual": 1.5024385452270508,
+      "narrative": 1.4633809328079224,
+      "systems": 1.4968193769454956,
+      "review": 1.4973368644714355,
+      "practice": 1.4867419004440308,
+      "rights": 1.603466510772705,
+      "sound": 1.5302590131759644,
+      "stage": 1.5016107559204102,
+      "craft": 1.4217994213104248,
+      "play": 1.5621898174285889
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0002,
+      "accepts": 12,
+      "rejects": 2222,
+      "accept_rate": 0.0
+    },
+    "model_digest": "aec9f79614ec2b80bf0711744632cd85bdbe07b39723cd06ddecf38b915832b5",
+    "seconds": 494.674,
+    "loss_focus": null,
+    "selection": "coherent-english",
+    "promotion": false,
+    "words_trained": 1000100,
+    "words_kept": 5374,
+    "token_count": 1000356,
+    "language": "english",
+    "passages": 8934,
+    "domains": 70,
+    "coherence_before": {
+      "ordered_nll": 1.8280563354492188,
+      "contradiction_nll": 1.8566383123397827,
+      "gap": 0.028581976890563965
+    },
+    "coherence_after": {
+      "ordered_nll": 1.8133615255355835,
+      "contradiction_nll": 1.8430490493774414,
+      "gap": 0.02968752384185791
+    },
+    "source_digest": "9121fca460dd2d4e014d7a57659e932f19f0577b5672a71fa24c3d964c039a78"
+  },
+  {
+    "schema": "skeleton.game_coherent_english.v1",
+    "bytes_trained": 313347,
+    "cycle_start": 0,
+    "cycle_bytes": 313347,
+    "goal": 1000000000000,
+    "official_tracks": {
+      "visual": 1.5024384655516598,
+      "narrative": 1.4633808168149796,
+      "systems": 1.4968191332411533,
+      "review": 1.4973368152143198,
+      "practice": 1.4867418727860693,
+      "rights": 1.603466478101145,
+      "sound": 1.5302591436776942,
+      "stage": 1.501610734736527,
+      "craft": 1.421799442667733,
+      "play": 1.5621899496180067
+    },
+    "torch_best_tracks": {
+      "visual": 1.5024385452270508,
+      "narrative": 1.4633809328079224,
+      "systems": 1.4968193769454956,
+      "review": 1.4973368644714355,
+      "practice": 1.4867419004440308,
+      "rights": 1.603466510772705,
+      "sound": 1.5302590131759644,
+      "stage": 1.5016107559204102,
+      "craft": 1.4217994213104248,
+      "play": 1.5621898174285889
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0002,
+      "accepts": 0,
+      "rejects": 32,
+      "accept_rate": 0.0
+    },
+    "model_digest": "aec9f79614ec2b80bf0711744632cd85bdbe07b39723cd06ddecf38b915832b5",
+    "seconds": 29.267,
+    "loss_focus": null,
+    "selection": "trillion-english",
+    "promotion": false,
+    "words_trained": 57308,
+    "words_kept": 0,
+    "token_count": 57322,
+    "language": "english",
+    "passages": 512,
+    "domains": 70,
+    "coherence_before": {
+      "ordered_nll": 1.8133615255355835,
+      "contradiction_nll": 1.8430490493774414,
+      "gap": 0.02968752384185791
+    },
+    "coherence_after": {
+      "ordered_nll": 1.8133615255355835,
+      "contradiction_nll": 1.8430490493774414,
+      "gap": 0.02968752384185791
+    },
+    "source_digest": "aec9f79614ec2b80bf0711744632cd85bdbe07b39723cd06ddecf38b915832b5",
+    "stop_reason": "plateau",
+    "budget_met": false,
+    "words_per_second": 1958.1098165168962,
+    "projected_seconds": 510696586.8639631
+  },
+  {
+    "schema": "skeleton.game_map_variants.v1",
+    "bytes_trained": 6531740,
+    "cycle_start": 0,
+    "cycle_bytes": 6531740,
+    "goal": 1000000000,
+    "official_tracks": {
+      "visual": 1.5121704775878497,
+      "narrative": 1.4745006681394313,
+      "systems": 1.5055118528539717,
+      "review": 1.5097609405131627,
+      "practice": 1.499099735847114,
+      "rights": 1.6163887836008148,
+      "sound": 1.5409454269471075,
+      "stage": 1.512303309665505,
+      "craft": 1.4260927835451176,
+      "play": 1.570881690620964,
+      "maps": 4.202247154463002
+    },
+    "torch_best_tracks": {
+      "visual": 1.5121705532073975,
+      "narrative": 1.4745006561279297,
+      "systems": 1.5055118799209595,
+      "review": 1.5097609758377075,
+      "practice": 1.4990999698638916,
+      "rights": 1.6163887977600098,
+      "sound": 1.5409454107284546,
+      "stage": 1.5123032331466675,
+      "craft": 1.4260927438735962,
+      "play": 1.570881724357605,
+      "maps": 4.202247142791748
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0002,
+      "accepts": 154,
+      "rejects": 180,
+      "accept_rate": 0.0
+    },
+    "model_digest": "3d6963d51e3f14085b4c916a84ec8c9c46f5d11158c675017fc5eefcd4eb8e2c",
+    "seconds": 148.651,
+    "loss_focus": null,
+    "selection": "map-billion",
+    "promotion": false,
+    "words_trained": 21376,
+    "language": "english",
+    "source_digest": "aec9f79614ec2b80bf0711744632cd85bdbe07b39723cd06ddecf38b915832b5",
+    "stop_reason": "plateau",
+    "budget_met": false,
+    "words_per_second": 143.79990716510483,
+    "projected_seconds": 6954107.410179641,
+    "maps_trained": 21376,
+    "maps_kept": 9856,
+    "maps_per_second": 143.79990716510483,
+    "max_seconds": 1800.0
+  },
+  {
+    "schema": "skeleton.game_map_variants.v1",
+    "bytes_trained": 10026670,
+    "cycle_start": 0,
+    "cycle_bytes": 10026670,
+    "goal": 3000000000,
+    "official_tracks": {
+      "visual": 1.5451525602865301,
+      "narrative": 1.5096227856594444,
+      "systems": 1.5308267033191554,
+      "review": 1.5465068927071897,
+      "practice": 1.5301908799199877,
+      "rights": 1.649555970055732,
+      "sound": 1.5687954365379038,
+      "stage": 1.5409333048671319,
+      "craft": 1.4527528332449646,
+      "play": 1.5942519000404685,
+      "maps": 3.6010719717897124,
+      "cognition": 1.901899145097854
+    },
+    "torch_best_tracks": {
+      "visual": 1.5451526641845703,
+      "narrative": 1.5096230506896973,
+      "systems": 1.5308266878128052,
+      "review": 1.5465070009231567,
+      "practice": 1.5301910638809204,
+      "rights": 1.6495559215545654,
+      "sound": 1.5687954425811768,
+      "stage": 1.5409332513809204,
+      "craft": 1.452752947807312,
+      "play": 1.5942517518997192,
+      "maps": 3.601072072982788,
+      "cognition": 1.9018992185592651
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0002,
+      "accepts": 262,
+      "rejects": 284,
+      "accept_rate": 0.0
+    },
+    "model_digest": "16fa5f6d6b9df366bbdd158769b5964edff85da90ffdbc91139819a93375237f",
+    "seconds": 203.49,
+    "loss_focus": null,
+    "selection": "tabletop-billion",
+    "promotion": false,
+    "words_trained": 34944,
+    "language": "english",
+    "source_digest": "3d6963d51e3f14085b4c916a84ec8c9c46f5d11158c675017fc5eefcd4eb8e2c",
+    "stop_reason": "plateau",
+    "budget_met": false,
+    "words_per_second": 171.72342621259028,
+    "projected_seconds": 17469951.923076924,
+    "maps_trained": 34944,
+    "maps_kept": 16768,
+    "maps_per_second": 171.72342621259028,
+    "max_seconds": 900.0,
+    "family_counts": {
+      "homebrew_map": 11648,
+      "tabletop_map": 11648,
+      "dungeon_map": 11648
+    },
+    "family_kept": {
+      "homebrew_map": 5593,
+      "tabletop_map": 5592,
+      "dungeon_map": 5583
+    },
+    "per_family_budget": 1000000000
+  },
+  {
+    "schema": "skeleton.game_planetary_passes.v1",
+    "bytes_trained": 113535,
+    "cycle_start": 0,
+    "cycle_bytes": 113535,
+    "goal": 900000,
+    "official_tracks": {
+      "visual": 1.5435657494473194,
+      "narrative": 1.5079808356780011,
+      "systems": 1.5291717907379279,
+      "review": 1.545062523587071,
+      "practice": 1.5285982166700034,
+      "rights": 1.6476558192323898,
+      "sound": 1.5672374582897552,
+      "stage": 1.5393926012010322,
+      "craft": 1.4514228211940106,
+      "play": 1.5927239190938387,
+      "maps": 3.601786246315784,
+      "cognition": 2.094213697180609
+    },
+    "torch_best_tracks": {
+      "visual": 1.5435658693313599,
+      "narrative": 1.5079807043075562,
+      "systems": 1.5291719436645508,
+      "review": 1.54506254196167,
+      "practice": 1.5285981893539429,
+      "rights": 1.6476556062698364,
+      "sound": 1.5672374963760376,
+      "stage": 1.5393927097320557,
+      "craft": 1.4514230489730835,
+      "play": 1.5927238464355469,
+      "maps": 3.6017863750457764,
+      "cognition": 2.0942137241363525
+    },
+    "ratchet": {
+      "margin": 1e-06,
+      "scale": 1.0,
+      "slack": 0.0002,
+      "accepts": 4,
+      "rejects": 34,
+      "accept_rate": 0.0
+    },
+    "model_digest": "a39eba98a5a8100a2d8053bd3ba72193d625aabfc3cd4990a54269f8e489c536",
+    "seconds": 4.675,
+    "loss_focus": null,
+    "selection": "jeeves-cognition",
+    "promotion": false,
+    "words_trained": 38,
+    "language": "english",
+    "source_digest": "16fa5f6d6b9df366bbdd158769b5964edff85da90ffdbc91139819a93375237f",
+    "stop_reason": "plateau",
+    "budget_met": false,
+    "words_per_second": 8.128342245989305,
+    "projected_seconds": 110723.6842105263,
+    "max_seconds": 900.0,
+    "steps_trained": 38,
+    "steps_kept": 4,
+    "steps_budget": 900000,
+    "cognition_gap_before": 0.03629726328825855,
+    "cognition_gap_after": 0.03627075142886582
+  }
+]

@@ -18,7 +18,7 @@ from typing import Sequence
 from .offline_workspace import DurableOfflineSession
 from .offline_library import OfflineDocumentLibrary, OfflineLibraryError, render_local_context
 from .offline_readiness import inspect_local_readiness
-from .offline_index_queue import OfflineIndexQueue
+from .offline_index_queue import MAX_RUN_BATCH, OfflineIndexQueue
 from .offline_snapshot import (
     create_snapshot, verify_snapshot, restore_snapshot,
 )
@@ -77,7 +77,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--queue-status", action="store_true", help="show durable local index jobs")
     parser.add_argument("--cancel-queue-job", help="cancel a queued indexing job by id")
     parser.add_argument("--retry-queue-job", help="retry a terminal failed indexing job by id")
-    parser.add_argument("--drain-limit", type=int, default=5, help="maximum queued indexing jobs per invocation")
+    parser.add_argument("--drain-limit", type=int, default=None,
+                        help="operator maximum; omitted selects current CPU/RAM budget")
     parser.add_argument("--snapshot-to", help="publish portable SQLite recovery folder")
     parser.add_argument("--restore-from", help="restore verified SQLite recovery folder")
     parser.add_argument("--verify-snapshot", help="verify portable local recovery folder")
@@ -476,8 +477,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             or (args.cancel_queue_job and args.retry_queue_job)
             or (args.cancel_queue_job and (args.enqueue_dir or args.run_queue))
             or (args.retry_queue_job and (args.enqueue_dir or args.run_queue))
-            or type(args.drain_limit) is not int
-            or not 1 <= args.drain_limit <= 20
+            or (args.drain_limit is not None and
+                (type(args.drain_limit) is not int or not 1 <= args.drain_limit <= MAX_RUN_BATCH))
         ):
             print("invalid offline queue arguments; select explicit local queue and index paths", file=sys.stderr)
             return 2
@@ -613,16 +614,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             durable = DurableOfflineSession(session, args.workspace, session_id=args.session_id)
         elif args.backup_in is not None:
             session.restore_history_backup(args.backup_in)
-        inference_prompt = args.prompt
+        grounding_context = None
         if args.use_library:
             with OfflineDocumentLibrary(args.library) as documents:
                 hits = documents.search(args.prompt, limit=args.context_limit)
-            inference_prompt = render_local_context(args.prompt, hits)
+            if hits:
+                grounding_context = render_local_context(args.prompt, hits)
         answer = asyncio.run(
             (durable or session).ask(
                 args.prompt,
                 max_output_tokens=args.max_output_tokens,
-                inference_prompt=inference_prompt if args.use_library else None,
+                grounding_context=grounding_context,
             )
         )
         if args.backup_out is not None:

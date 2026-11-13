@@ -5,7 +5,10 @@ from pathlib import Path
 from scripts.check_branch_flow_contract import violations_for_text
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = REPO_ROOT / ".github" / "workflows" / "branch-flow.yml"
+ACTIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "branch-flow.yml"
+ARCHIVED_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "branch-flow.yml"
+# Keep adversarial safety checks for the archived definition until it is restored.
+WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
 
 
 def _source() -> str:
@@ -156,9 +159,11 @@ def test_branch_control_plane_uses_declared_independent_runner_capacity() -> Non
         "branch-archive.yml": "ubuntu-24.04-arm",
         "branch-repair-100.yml": "ubuntu-latest",
     }.items():
-        source = (
-            REPO_ROOT / ".github" / "workflows" / workflow_name
-        ).read_text(encoding="utf-8")
+        active = REPO_ROOT / ".github" / "workflows" / workflow_name
+        archived = REPO_ROOT / ".github" / "workflows-archive" / workflow_name
+        selected = active if active.is_file() else archived
+        assert selected.is_file(), workflow_name
+        source = selected.read_text(encoding="utf-8")
         actual = [line.split("runs-on:", 1)[1].strip() for line in source.splitlines()
                   if line.lstrip().startswith("runs-on:")]
         assert actual == [runner]

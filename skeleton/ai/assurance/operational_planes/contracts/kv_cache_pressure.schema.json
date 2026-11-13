@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/kv_cache_pressure.schema.json",
+  "title": "runtime.kv_cache_pressure observation contract",
+  "description": "Guard KV memory admissions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kv_cache_utilization_pct",
+        "cache_reclaim_latency_ms"
+      ],
+      "properties": {
+        "kv_cache_utilization_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 90,
+          "description": "Upper bound for kv_cache_utilization_pct"
+        },
+        "cache_reclaim_latency_ms": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 250,
+          "description": "Upper bound for cache_reclaim_latency_ms"
+        }
+      }
+    }
+  }
+}

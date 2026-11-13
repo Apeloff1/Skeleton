@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { markBootClean } from '../utils/bootTracer';
+import { markBootClean } from '../src/utils/bootTracer';
 
 import {
   PRODUCT_CAPABILITIES,

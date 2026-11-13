@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import StudioLoginGate,{useStudioAuth} from '../src/auth/StudioLoginGate';
 import {authHeaders} from '../src/auth/gameforgeAuth';
-import {API_BASE} from '../utils/apiBase';
+import {API_BASE} from '../src/utils/apiBase';
 
 const API=(API_BASE||'').replace(/\/$/,'')+
   '/api/dragon-academy/native/production/worlds/originals';

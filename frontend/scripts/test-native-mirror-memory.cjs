@@ -1,10 +1,11 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
-const source = fs.readFileSync(path.join(__dirname, '../utils/safeStorage.ts'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '../src/utils/safeStorage.ts'), 'utf8');
 const transpiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
     esModuleInterop: true }, reportDiagnostics: true,
@@ -29,7 +30,7 @@ function fixture(overrides = {}) {
     resume() {}
   }
   const module = { exports: {} };
-  new Function('require','module','exports',transpiled.outputText)(id => {
+  compileFunction(transpiled.outputText, ['require', 'module', 'exports'])(id => {
     if (id === '@react-native-async-storage/async-storage') return store;
     if (id === './NativeMutationFence') return { NativeMutationFence: Fence };
     if (id === './storageRetentionPolicy') return { isPrunableStorageKey: () => false };

@@ -34,6 +34,7 @@
     "machine/architecture_rule_registry.json",
     "machine/contract_conformance.json",
     "machine/manifest_reference_policy.json",
+    "machine/logical_layers.json",
     "machine/python_package_layers.json",
     "machine/runtime_supervision.json",
     "scripts/check_architecture*.py"
@@ -64,9 +65,51 @@
         "machine/architecture_rule_registry.json",
         "machine/contract_conformance.json",
         "machine/manifest_reference_policy.json",
+        "machine/logical_layers.json",
         "machine/python_package_layers.json",
         "machine/runtime_supervision.json",
         "scripts/check_architecture*.py"
+      ],
+      "supersedes": [],
+      "superseded_by": null
+    },
+    {
+      "id": "ADR-0002",
+      "title": "Logical layers and HTTP route custody",
+      "status": "accepted",
+      "path": "docs/adr/ADR-0002-logical-layers-and-route-custody.md",
+      "decision_source": "architecture milestone for maintainable subsystem boundaries",
+      "masterplan_refs": [
+        "VOL-052",
+        "VOL-053",
+        "VOL-055",
+        "VOL-058"
+      ],
+      "impacted_paths": [
+        "docs/adr/**",
+        "docs/architecture/**",
+        "machine/adr_index.json",
+        "machine/architecture_rule_registry.json",
+        "machine/logical_layers.json",
+        "scripts/check_architecture*.py"
+      ],
+      "supersedes": [],
+      "superseded_by": null
+    },
+    {
+      "id": "ADR-0003",
+      "title": "Versioned subsystem contracts and the Projects resource",
+      "status": "accepted",
+      "path": "docs/adr/ADR-0003-subsystem-and-projects-contracts.md",
+      "decision_source": "Projects contract describes the #4097 router moving to /api/v1/projects",
+      "masterplan_refs": [
+        "VOL-003",
+        "VOL-058"
+      ],
+      "impacted_paths": [
+        "docs/adr/**",
+        "docs/architecture/**",
+        "machine/adr_index.json"
       ],
       "supersedes": [],
       "superseded_by": null

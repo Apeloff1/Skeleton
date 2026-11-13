@@ -4,7 +4,10 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = REPO_ROOT / ".github" / "workflows" / "autonomous-build-feedback.yml"
+ACTIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "autonomous-build-feedback.yml"
+ARCHIVED_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "autonomous-build-feedback.yml"
+# Regression assertions remain active for the archived, non-triggering definition.
+WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
 
 
 def _workflow_text() -> str:

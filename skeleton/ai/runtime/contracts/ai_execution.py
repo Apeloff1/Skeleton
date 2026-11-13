@@ -7,16 +7,20 @@ observable state only and are transport/provider neutral.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
-from enum import Enum
 import hashlib
 import json
 import re
-from typing import Any, Iterable, Mapping
-
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field, replace
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 AI_EXECUTION_SCHEMA_VERSION = 1
+# Generated answers are content, not identifiers. Match the existing provider
+# text envelope while retaining smaller bounds on references and metadata.
+AI_EXECUTION_MAX_FINAL_OUTPUT_BYTES = 4 * 1024 * 1024
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -205,20 +209,14 @@ def _text(value: object, field_name: str, *, maximum: int = 65536) -> str:
     return normalized
 
 
-def _optional_text(
-    value: object | None, field_name: str, *, maximum: int = 2048
-) -> str | None:
+def _optional_text(value: object | None, field_name: str, *, maximum: int = 2048) -> str | None:
     return None if value is None else _text(value, field_name, maximum=maximum)
 
 
 def _aware(value: object, field_name: str) -> datetime:
-    if (
-        not isinstance(value, datetime)
-        or value.tzinfo is None
-        or value.utcoffset() is None
-    ):
+    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         raise AIExecutionContractError(f"{field_name} must be timezone-aware")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _json(value: object, field_name: str, *, max_bytes: int = 512 * 1024) -> dict[str, Any]:
@@ -234,9 +232,7 @@ def _json(value: object, field_name: str, *, max_bytes: int = 512 * 1024) -> dic
             allow_nan=False,
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
-        raise AIExecutionContractError(
-            f"{field_name} must be deterministic JSON"
-        ) from exc
+        raise AIExecutionContractError(f"{field_name} must be deterministic JSON") from exc
     if len(encoded) > max_bytes:
         raise AIExecutionContractError(f"{field_name} exceeds maximum size")
     return result
@@ -293,9 +289,7 @@ class AIExecutionRequest:
         for name in ("context_policy", "tool_policy", "resource_budget", "stop_policy"):
             object.__setattr__(self, name, _json(getattr(self, name), name))
         object.__setattr__(self, "created_at", _aware(self.created_at, "created_at"))
-        object.__setattr__(
-            self, "checkpoint_ref", _optional_text(self.checkpoint_ref, "checkpoint_ref")
-        )
+        object.__setattr__(self, "checkpoint_ref", _optional_text(self.checkpoint_ref, "checkpoint_ref"))
         if self.schema_version != AI_EXECUTION_SCHEMA_VERSION:
             raise AIExecutionContractError("unsupported AI execution schema version")
 
@@ -337,7 +331,7 @@ class AIExecution:
     latest_turn_index: int = -1
     checkpoint_version: int = 0
     cancellation_requested: bool = False
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     schema_version: int = AI_EXECUTION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -376,7 +370,7 @@ class AIExecution:
         target: ExecutionState | str,
         *,
         now: datetime | None = None,
-    ) -> "AIExecution":
+    ) -> AIExecution:
         try:
             target_state = ExecutionState(target)
         except ValueError as exc:
@@ -389,7 +383,7 @@ class AIExecution:
             self,
             state=target_state,
             version=self.version + 1,
-            updated_at=_aware(now or datetime.now(timezone.utc), "now"),
+            updated_at=_aware(now or datetime.now(UTC), "now"),
         )
 
 
@@ -429,9 +423,7 @@ class AgentTurn:
             "provider_response_id",
             "verification_receipt_id",
         ):
-            object.__setattr__(
-                self, name, _optional_text(getattr(self, name), name)
-            )
+            object.__setattr__(self, name, _optional_text(getattr(self, name), name))
         if self.turn_index == 0 and self.parent_turn_id is not None:
             raise AIExecutionContractError("root turn cannot have parent_turn_id")
         if self.turn_index > 0 and self.parent_turn_id is None:
@@ -547,7 +539,18 @@ class AIExecutionResult:
             raise AIExecutionContractError("result status is invalid")
         if status == "completed" and self.final_output is None:
             raise AIExecutionContractError("completed result requires final_output")
-        for name in ("final_output", "verification", "stream_terminal_event"):
+        final_output = _optional_text(
+            self.final_output, "final_output", maximum=AI_EXECUTION_MAX_FINAL_OUTPUT_BYTES,
+        )
+        if final_output is not None:
+            try:
+                encoded = final_output.encode("utf-8")
+            except UnicodeEncodeError as exc:
+                raise AIExecutionContractError("final_output must be valid UTF-8 text") from exc
+            if len(encoded) > AI_EXECUTION_MAX_FINAL_OUTPUT_BYTES:
+                raise AIExecutionContractError("final_output exceeds maximum UTF-8 size")
+        object.__setattr__(self, "final_output", final_output)
+        for name in ("verification", "stream_terminal_event"):
             object.__setattr__(self, name, _optional_text(getattr(self, name), name))
         if self.verification_receipt is not None:
             object.__setattr__(
@@ -563,9 +566,7 @@ class AIExecutionResult:
             ("memory_refs", 1024),
             ("artifact_refs", 1024),
         ):
-            object.__setattr__(
-                self, name, _refs(getattr(self, name), name, maximum=maximum)
-            )
+            object.__setattr__(self, name, _refs(getattr(self, name), name, maximum=maximum))
         object.__setattr__(self, "usage", _json(self.usage, "usage"))
         object.__setattr__(self, "completed_at", _aware(self.completed_at, "completed_at"))
 
@@ -578,9 +579,7 @@ class AIExecutionResult:
             "final_output": self.final_output,
             "verification": self.verification,
             "verification_receipt": (
-                None
-                if self.verification_receipt is None
-                else dict(self.verification_receipt)
+                None if self.verification_receipt is None else dict(self.verification_receipt)
             ),
             "evidence_refs": list(self.evidence_refs),
             "route_receipts": list(self.route_receipts),
@@ -611,9 +610,7 @@ class ExecutionFinalizationIntent:
             or not isinstance(self.expected_execution_version, int)
             or self.expected_execution_version < 1
         ):
-            raise AIExecutionContractError(
-                "expected_execution_version must be a positive integer"
-            )
+            raise AIExecutionContractError("expected_execution_version must be a positive integer")
         object.__setattr__(self, "staged_at", _aware(self.staged_at, "staged_at"))
         if self.schema_version != AI_EXECUTION_SCHEMA_VERSION:
             raise AIExecutionContractError("unsupported AI execution schema version")
@@ -637,8 +634,31 @@ class ExecutionFinalizationIntent:
         }
 
 
+def execution_failure_code(result: Mapping[str, Any]) -> str | None:
+    """Read a bounded cause, including older immutable terminal receipts."""
+    status = result.get("status")
+    if not isinstance(status, str) or status not in {"failed", "cancelled", "degraded"}:
+        return None
+    usage = result.get("usage")
+    raw = usage.get("error_code") if isinstance(usage, Mapping) else None
+    alphabet = "abcdefghijklmnopqrstuvwxyz0123456789_"
+    if isinstance(raw, str) and 1 <= len(raw) <= 128 and all(char in alphabet for char in raw):
+        return raw
+    execution_id = result.get("execution_id")
+    terminal = result.get("stream_terminal_event")
+    if not isinstance(execution_id, str) or not execution_id or not isinstance(terminal, str):
+        return None
+    prefix = "stream-terminal:" + execution_id + ":" + status + ":"
+    if not terminal.startswith(prefix):
+        return None
+    cause = terminal[len(prefix) :]
+    return cause if 1 <= len(cause) <= 128 and all(char in alphabet for char in cause) else None
+
+
 __all__ = [
     "AI_EXECUTION_SCHEMA_VERSION",
+    "AI_EXECUTION_MAX_FINAL_OUTPUT_BYTES",
+    "TERMINAL_EXECUTION_STATES",
     "AIExecution",
     "AIExecutionContractError",
     "AIExecutionRequest",
@@ -647,6 +667,6 @@ __all__ = [
     "ExecutionCheckpoint",
     "ExecutionFinalizationIntent",
     "ExecutionState",
-    "TERMINAL_EXECUTION_STATES",
+    "execution_failure_code",
     "execution_payload_digest",
 ]

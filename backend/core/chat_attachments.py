@@ -26,6 +26,7 @@ from pymongo import ReturnDocument
 
 from skeleton.context.sources import artifact_segment
 from skeleton.contracts.context import ContextSegment
+from core.loop_local_asyncio import LoopLocalAsyncPrimitive
 
 MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 MAX_BASE64_CHARS = 4 * ((MAX_ATTACHMENT_BYTES + 2) // 3)
@@ -41,8 +42,8 @@ ATTACHMENT_PREFIX = "chat-attachment://"
 _TEXT_MIMES = frozenset({"text/plain", "text/markdown", "text/csv", "application/json"})
 _IMAGE_MIMES = frozenset({"image/png", "image/jpeg", "image/webp"})
 _ALL_MIMES = _TEXT_MIMES | _IMAGE_MIMES | {"application/pdf", "audio/wav"}
-_UPLOAD_SLOTS = asyncio.Semaphore(2)
-_INDEX_LOCK = asyncio.Lock()
+_UPLOAD_SLOTS = LoopLocalAsyncPrimitive(lambda: asyncio.Semaphore(2))
+_INDEX_LOCK = LoopLocalAsyncPrimitive(asyncio.Lock)
 _INDEX_READY = False
 
 
@@ -304,7 +305,7 @@ async def ensure_attachment_indexes() -> None:
     global _INDEX_READY
     if _INDEX_READY:
         return
-    async with _INDEX_LOCK:
+    async with _INDEX_LOCK.get():
         if _INDEX_READY:
             return
         collection = _collection()
@@ -611,8 +612,9 @@ async def upload_attachment(
         _validate_row(existing)
         return _public(existing)
     await _cleanup_owner(tenant_id, owner_id)
+    slots = _UPLOAD_SLOTS.get()
     try:
-        await asyncio.wait_for(_UPLOAD_SLOTS.acquire(), timeout=1)
+        await asyncio.wait_for(slots.acquire(), timeout=1)
     except TimeoutError as exc:
         raise ChatAttachmentError("The file extractor is busy; retry shortly", 429) from exc
     try:
@@ -628,9 +630,9 @@ async def upload_attachment(
             raise
     finally:
         if work.done():
-            _UPLOAD_SLOTS.release()
+            slots.release()
         else:
-            work.add_done_callback(lambda _completed: _UPLOAD_SLOTS.release())
+            work.add_done_callback(lambda _completed: slots.release())
     created = _now()
     expires = created + timedelta(seconds=RETENTION_SECONDS)
     context_text = f"Uploaded file: {name}\nMedia type: {mime}\n" + (

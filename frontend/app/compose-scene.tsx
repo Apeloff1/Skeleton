@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert,
@@ -9,11 +9,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   SCENE_CHAT_HANDOFF_KEY, SCENE_RECIPES,
   readSceneChatHandoff, sceneHandoffItems,
-} from '../features/Jeeves/sceneHandoff';
+} from '../src/features/Jeeves/sceneHandoff';
 import { validProjectId, projectHref } from '../src/product/worldWorkspace';
 import { acceptSceneForgeResponse } from '../src/product/sceneForgeAcceptance';
 import { Ionicons } from '@expo/vector-icons';
-import { apiFetch } from '../utils/apiController';
+import { apiFetch } from '../src/utils/apiController';
 import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
 const Construct3DView = lazyDefault(() => import('../src/components/Construct3DView'));
 
@@ -35,6 +35,8 @@ export default function ComposeScene() {
   const linkedProject = validProjectId(Array.isArray(params.build) ? params.build[0] : params.build) ||
     validProjectId(Array.isArray(params.game) ? params.game[0] : params.game);
   const [cats, setCats] = useState<any[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
   const [buildId, setBuildId] = useState(linkedProject);
   useEffect(() => { if (linkedProject) setBuildId(linkedProject); }, [linkedProject]);
   const [era, setEra] = useState('modern');
@@ -88,16 +90,27 @@ export default function ComposeScene() {
     return () => { active = false; };
   }, [chatDraftId, linkedProject]);
 
-  useEffect(() => {
-    (async () => {
+  const loadCatalog = useCallback(async () => {
+      setCatalogLoading(true); setCatalogError('');
       const [c, s] = await Promise.allSettled([
         apiFetch(`${API}/api/galaxy-studio/forge/catalog`, { timeoutMs: 20000 }),
         apiFetch(`${API}/api/galaxy-studio/forge/styles`, { timeoutMs: 15000 }),
       ]);
-      try { if (c.status === 'fulfilled') setCats((await c.value.json()).categories || []); } catch { /* ignore */ }
-      try { if (s.status === 'fulfilled') setStyleOpts(await s.value.json()); } catch { /* ignore */ }
-    })();
+      try {
+        if (c.status !== 'fulfilled' || s.status !== 'fulfilled' || !c.value.ok || !s.value.ok) throw new Error('Catalog request failed');
+        const catalog = await c.value.json();
+        const styles = await s.value.json();
+        if (!Array.isArray(catalog?.categories) || catalog.categories.length > 512 || !styles ||
+            !Array.isArray(styles.skin_styles) || !Array.isArray(styles.axes) || !Array.isArray(styles.treatments)) {
+          throw new Error('Catalog response invalid');
+        }
+        setCats(catalog.categories); setStyleOpts(styles);
+      } catch {
+        setCats([]); setStyleOpts(null);
+        setCatalogError('Scene catalogs could not be verified. Recipes remain visible, but composition is disabled until the catalog reloads.');
+      } finally { setCatalogLoading(false); }
   }, []);
+  useEffect(() => { void loadCatalog(); }, [loadCatalog]);
 
   const surprise = useCallback(() => {
     if (!styleOpts?.skin_styles?.length) return;
@@ -163,6 +176,10 @@ export default function ComposeScene() {
   };
 
   const compose = useCallback(async () => {
+    if (catalogError || catalogLoading) {
+      Alert.alert('Scene catalog unavailable', 'Reload the verified catalog before composing a scene.');
+      return;
+    }
     if (!picks.length || !validProjectId(buildId.trim())) {
       Alert.alert('Select a real build', 'Choose a project and add at least one scene item before composing.');
       return;
@@ -235,7 +252,7 @@ export default function ComposeScene() {
       Alert.alert('Scene outcome unconfirmed',
         'Check the game asset list before retrying. The server may have mounted assets even if the response was lost.');
     } finally { setBusy(false); }
-  }, [picks, buildId, era, skinStyle, makeVariants, axes, treatment]);
+  }, [picks, buildId, era, skinStyle, makeVariants, axes, treatment, catalogError, catalogLoading]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -255,6 +272,8 @@ export default function ComposeScene() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
+        {!!catalogError && <View style={styles.errorCard}><Text accessibilityRole="alert" style={styles.errorText}>{catalogError}</Text><TouchableOpacity onPress={() => { void loadCatalog(); }} style={styles.retryButton}><Text style={styles.retryText}>Retry catalogs</Text></TouchableOpacity></View>}
+        {catalogLoading && <View style={styles.catalogLoading}><ActivityIndicator color={C.accent} /><Text style={styles.catalogLoadingText}>Verifying scene catalogs…</Text></View>}
         <Text style={styles.lbl}>Build ID</Text>
         <TextInput value={buildId} onChangeText={setBuildId} style={styles.input} placeholder="Build ID (no demo default)"
           placeholderTextColor={C.muted} testID="cs-build" autoCapitalize="none" />
@@ -453,6 +472,12 @@ export default function ComposeScene() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
+  errorCard: { backgroundColor: '#34191f', borderColor: '#7f3342', borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 12 },
+  errorText: { color: '#ff9eaa', fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  retryButton: { alignSelf: 'flex-start', marginTop: 8, backgroundColor: C.card, borderColor: '#7f3342', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  retryText: { color: C.text, fontSize: 12, fontWeight: '800' },
+  catalogLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  catalogLoadingText: { color: C.muted, fontSize: 12, fontWeight: '700' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   iconBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: C.alt },
   title: { color: C.text, fontSize: 18, fontWeight: '900' },

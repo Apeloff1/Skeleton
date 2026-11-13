@@ -8,7 +8,7 @@ import sqlite3
 from typing import Any, Mapping
 
 SCHEMA = "skeleton.ai.dragon_crawl.event.v1"
-ALLOWED = frozenset(("frontier_discovered","dragon_travel","visual_probe","robots_check","fetch_started","fetch_received","policy_rejected","acquisition_accepted","burn_started","burn_chunk","burn_complete","retry_wait","crawl_complete"))
+ALLOWED = frozenset(("frontier_discovered","dragon_travel","visual_probe","robots_check","fetch_started","fetch_received","policy_rejected","acquisition_accepted","burn_started","burn_chunk","burn_complete","distill_complete","retry_wait","crawl_complete"))
 
 def _canonical(value: Mapping[str, Any]) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
@@ -26,8 +26,11 @@ class StoredDragonEvent:
     digest: str
 
     def wire(self) -> dict[str, Any]:
+        # Digest linkage is tamper-evidence for replay. It is not a signature
+        # and does not promote the payload into reviewed knowledge.
         return {"schema": SCHEMA, "sequence": self.sequence, "event_id": self.event_id,
-                "kind": self.kind, "url": self.url, "at": self.at, "payload": self.payload}
+                "kind": self.kind, "url": self.url, "at": self.at, "payload": self.payload,
+                "previous_digest": self.previous_digest, "digest": self.digest}
 
 class DragonEventJournal:
     """Transactional SQLite journal; digest chain detects accidental tampering.

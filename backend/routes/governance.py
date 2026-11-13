@@ -11,26 +11,32 @@ A safety/trust layer for the generated-game catalogue:
   GET  /api/governance/status/{pid}      — combined safety status for a game
   GET  /api/governance/audit             — immutable audit trail
 
-No auth layer yet (single-tenant dev sandbox); reporter/actor identity is a
-client-supplied visitor id. Everything here is deterministic + fast (no LLM) so
-it is trivially testable and never blocks the event loop.
+Every route is admitted through the private project boundary.  Actor identity
+comes from the authenticated principal and is never accepted from request data.
+Everything here is deterministic + fast (no LLM) so it never blocks the event
+loop on provider availability.
 """
 from __future__ import annotations
+
+from routes.playable_access import project_router, scoped_database, reauthorize_project_context
 
 import os
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Literal
 
-from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.anti_farm import allow as _allow
+from routes import gameforge_auth as auth
+from routes.playable_access import project_principal
 
-router = APIRouter(prefix="/api/governance", tags=["governance"])
+router = project_router(prefix="/api/governance", tags=["governance"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 
 # Reports threshold at which a game is auto-escalated to the review queue.
 AUTO_REVIEW_REPORTS = 3
@@ -69,6 +75,14 @@ async def _audit(action: str, target_id: str, actor: str, detail: dict | None = 
         "detail": detail or {},
         "at": _now(),
     })
+
+
+def _actor() -> str:
+    principal = project_principal()
+    value = principal.get("email") or principal.get("user_id")
+    if not isinstance(value, str) or not value.strip():
+        raise HTTPException(status_code=401, detail="Authenticated actor identity is unavailable")
+    return value.strip()[:80]
 
 
 def _tokens(text: str) -> List[str]:
@@ -124,7 +138,7 @@ async def scan(pid: str):
     g = await _db.playables.find_one(
         {"playable_id": pid}, {"_id": 0, "title": 1, "brief": 1, "html": 1})
     if not g:
-        return {"error": "not found"}
+        raise HTTPException(status_code=404, detail="Game not found")
     corpus = " ".join([g.get("title") or "", g.get("brief") or "", g.get("html") or ""])
     result = _policy_scan(corpus)
     await _db.playables.update_one(
@@ -141,7 +155,7 @@ async def plagiarism(pid: str, top: int = Query(5, le=20)):
     Surfaces near-duplicates so original creators can be credited / flagged."""
     me = await _db.playables.find_one({"playable_id": pid}, {"_id": 0, "html": 1, "title": 1})
     if not me:
-        return {"error": "not found"}
+        raise HTTPException(status_code=404, detail="Game not found")
     my_sh = _shingles(me.get("html") or "")
     others = await _db.playables.find(
         {"playable_id": {"$ne": pid}, "status": "ready"},
@@ -174,31 +188,30 @@ _REASONS = {"inappropriate", "copyright", "broken", "spam", "offensive", "other"
 
 
 class ReportBody(BaseModel):
-    playable_id: str = ""
-    reason: str = "other"
-    detail: str = ""
-    reporter_id: str = ""
+    playable_id: str = Field(min_length=1, max_length=200)
+    reason: Literal["inappropriate", "copyright", "broken", "spam", "offensive", "other"] = "other"
+    detail: str = Field(default="", max_length=1000)
+    reporter_id: str = Field(default="", max_length=80, deprecated=True)
 
 
 @router.post("/report")
 async def report(body: ReportBody, request: Request):
     pid = (body.playable_id or "").strip()
-    if not pid:
-        return {"error": "playable_id required"}
+    actor = _actor()
     # Anti-abuse: throttle reports per client IP (~1 every 10s, burst 5).
     ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
           or (request.client.host if request.client else "anon"))
     if not _allow(f"gov_report:{ip}", rate_per_sec=0.1, burst=5):
-        return {"error": "rate_limited", "detail": "Too many reports — please slow down."}
+        raise HTTPException(status_code=429, detail="Too many reports — please slow down.")
     g = await _db.playables.find_one({"playable_id": pid}, {"_id": 0, "playable_id": 1})
     if not g:
-        return {"error": "not found"}
-    reason = body.reason if body.reason in _REASONS else "other"
+        raise HTTPException(status_code=404, detail="Game not found")
+    reason = body.reason
     rid = uuid.uuid4().hex
     await _db.content_reports.insert_one({
         "report_id": rid, "playable_id": pid, "reason": reason,
         "detail": (body.detail or "")[:1000],
-        "reporter_id": (body.reporter_id or "anon")[:80],
+        "reporter_id": actor,
         "status": "open", "created_at": _now(),
     })
     # bump count + auto-escalate
@@ -211,12 +224,13 @@ async def report(body: ReportBody, request: Request):
         await _db.playables.update_one(
             {"playable_id": pid}, {"$set": {"moderation_status": "review"}})
         escalated = True
-    await _audit("report", pid, body.reporter_id, {"reason": reason, "count": count})
+    await _audit("report", pid, actor, {"reason": reason, "count": count})
     return {"report_id": rid, "playable_id": pid, "reports_count": count, "escalated": escalated}
 
 
 @router.get("/reports")
-async def reports(status: str = Query("open"), limit: int = Query(50, le=200)):
+async def reports(status: str = Query("open"), limit: int = Query(50, ge=1, le=200),
+                  _admin=Depends(auth.require_role("admin"))):
     q: dict = {} if status == "all" else {"status": status}
     rows = await _db.content_reports.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
     games = await _hydrate([r["playable_id"] for r in rows])
@@ -234,17 +248,18 @@ _ACTIONS = {"dismiss": "ok", "warn": "warned", "hide": "hidden", "restore": "ok"
 
 
 class ModerateBody(BaseModel):
-    action: str = "dismiss"
-    note: str = ""
-    actor: str = "moderator"
+    action: Literal["dismiss", "warn", "hide", "restore"] = "dismiss"
+    note: str = Field(default="", max_length=500)
+    actor: str = Field(default="", max_length=80, deprecated=True)
 
 
 @router.post("/moderate/{rid}")
-async def moderate(rid: str, body: ModerateBody):
+async def moderate(rid: str, body: ModerateBody, _admin=Depends(auth.require_role("admin"))):
+    actor = _actor()
     rep = await _db.content_reports.find_one({"report_id": rid}, {"_id": 0})
     if not rep:
-        return {"error": "not found"}
-    action = body.action if body.action in _ACTIONS else "dismiss"
+        raise HTTPException(status_code=404, detail="Report not found")
+    action = body.action
     new_mod = _ACTIONS[action]
     pid = rep["playable_id"]
     note = (body.note or "").strip()
@@ -259,17 +274,17 @@ async def moderate(rid: str, body: ModerateBody):
         {"report_id": rid},
         {"$set": {"status": "resolved" if action != "dismiss" else "dismissed",
                   "resolution": action, "note": (body.note or "")[:500],
-                  "resolved_at": _now(), "resolved_by": (body.actor or "moderator")[:80]}})
-    await _audit("moderate", pid, body.actor,
+                  "resolved_at": _now(), "resolved_by": actor}})
+    await _audit("moderate", pid, actor,
                  {"report_id": rid, "action": action, "moderation_status": new_mod})
     return {"report_id": rid, "playable_id": pid, "action": action, "moderation_status": new_mod}
 
 
 # ── Creator appeals (bidirectional trust loop) ──────────────────────────────
 class AppealBody(BaseModel):
-    playable_id: str = ""
-    reason: str = ""
-    creator_id: str = ""
+    playable_id: str = Field(min_length=1, max_length=200)
+    reason: str = Field(min_length=10, max_length=1000)
+    creator_id: str = Field(default="", max_length=80, deprecated=True)
 
 
 @router.post("/appeal")
@@ -277,28 +292,25 @@ async def appeal(body: AppealBody):
     """A creator requests re-review of a game that moderation has restricted."""
     pid = (body.playable_id or "").strip()
     reason = (body.reason or "").strip()
-    if not pid:
-        return {"error": "playable_id required"}
-    if len(reason) < 10:
-        return {"error": "please explain your appeal (min 10 chars)"}
+    actor = _actor()
     g = await _db.playables.find_one(
         {"playable_id": pid}, {"_id": 0, "moderation_status": 1, "title": 1})
     if not g:
-        return {"error": "not found"}
+        raise HTTPException(status_code=404, detail="Game not found")
     if g.get("moderation_status", "ok") not in ("hidden", "warned", "review"):
-        return {"error": "this game is not restricted — nothing to appeal"}
+        raise HTTPException(status_code=409, detail="This game is not restricted")
     # one open appeal per game
     existing = await _db.content_appeals.find_one({"playable_id": pid, "status": "open"}, {"_id": 0})
     if existing:
-        return {"error": "an appeal is already pending for this game", "appeal_id": existing["appeal_id"]}
+        raise HTTPException(status_code=409, detail="An appeal is already pending for this game")
     aid = uuid.uuid4().hex
     await _db.content_appeals.insert_one({
         "appeal_id": aid, "playable_id": pid, "reason": reason[:1000],
-        "creator_id": (body.creator_id or "anon")[:80],
+        "creator_id": actor,
         "moderation_status": g.get("moderation_status", "ok"),
         "status": "open", "created_at": _now(),
     })
-    await _audit("appeal", pid, body.creator_id, {"appeal_id": aid})
+    await _audit("appeal", pid, actor, {"appeal_id": aid})
     return {"appeal_id": aid, "playable_id": pid, "status": "open"}
 
 
@@ -306,9 +318,11 @@ APPEAL_SLA_DAYS = 7  # open appeals older than this auto-resolve as 'expired'
 
 
 @router.get("/appeals")
-async def appeals(status: str = Query("open"), limit: int = Query(50, le=200)):
+async def appeals(status: str = Query("open"), limit: int = Query(50, ge=1, le=200),
+                  _admin=Depends(auth.require_role("admin"))):
     # Lazy SLA enforcement: auto-expire stale open appeals (treated as denied;
     # the game stays restricted, but the appeal no longer blocks the queue).
+    await reauthorize_project_context(mutate=True)
     from datetime import timedelta
     cutoff = (datetime.now(timezone.utc) - timedelta(days=APPEAL_SLA_DAYS)).isoformat()
     await _db.content_appeals.update_many(
@@ -338,17 +352,18 @@ async def appeals(status: str = Query("open"), limit: int = Query(50, le=200)):
 
 
 class AppealResolveBody(BaseModel):
-    action: str = "uphold"   # uphold (deny) | restore (grant)
-    note: str = ""
-    actor: str = "moderator"
+    action: Literal["uphold", "restore"] = "uphold"
+    note: str = Field(default="", max_length=500)
+    actor: str = Field(default="", max_length=80, deprecated=True)
 
 
 @router.post("/appeal/{aid}/resolve")
-async def resolve_appeal(aid: str, body: AppealResolveBody):
+async def resolve_appeal(aid: str, body: AppealResolveBody, _admin=Depends(auth.require_role("admin"))):
+    actor = _actor()
     ap = await _db.content_appeals.find_one({"appeal_id": aid}, {"_id": 0})
     if not ap:
-        return {"error": "not found"}
-    action = body.action if body.action in ("uphold", "restore") else "uphold"
+        raise HTTPException(status_code=404, detail="Appeal not found")
+    action = body.action
     pid = ap["playable_id"]
     if action == "restore":
         await _db.playables.update_one({"playable_id": pid}, {"$set": {"moderation_status": "ok"}})
@@ -356,8 +371,8 @@ async def resolve_appeal(aid: str, body: AppealResolveBody):
         {"appeal_id": aid},
         {"$set": {"status": "granted" if action == "restore" else "denied",
                   "resolution": action, "note": (body.note or "")[:500],
-                  "resolved_at": _now(), "resolved_by": (body.actor or "moderator")[:80]}})
-    await _audit("appeal_resolve", pid, body.actor, {"appeal_id": aid, "action": action})
+                  "resolved_at": _now(), "resolved_by": actor}})
+    await _audit("appeal_resolve", pid, actor, {"appeal_id": aid, "action": action})
     return {"appeal_id": aid, "playable_id": pid, "action": action,
             "moderation_status": "ok" if action == "restore" else ap.get("moderation_status")}
 
@@ -366,6 +381,8 @@ async def resolve_appeal(aid: str, body: AppealResolveBody):
 @router.get("/notifications/{creator_id}")
 async def notifications(creator_id: str):
     """Resolved (granted/denied) appeals for a creator not yet acknowledged."""
+    if creator_id != _actor():
+        raise HTTPException(status_code=403, detail="Creator identity mismatch")
     rows = await _db.content_appeals.find(
         {"creator_id": creator_id, "status": {"$in": ["granted", "denied"]},
          "acknowledged": {"$ne": True}},
@@ -379,6 +396,8 @@ async def notifications(creator_id: str):
 
 @router.post("/notifications/{creator_id}/ack")
 async def ack_notifications(creator_id: str):
+    if creator_id != _actor():
+        raise HTTPException(status_code=403, detail="Creator identity mismatch")
     res = await _db.content_appeals.update_many(
         {"creator_id": creator_id, "status": {"$in": ["granted", "denied"]},
          "acknowledged": {"$ne": True}},
@@ -394,7 +413,7 @@ async def status(pid: str):
         {"_id": 0, "moderation_status": 1, "reports_count": 1, "policy_scan": 1, "title": 1,
          "moderation_note": 1, "moderation_reason": 1})
     if not g:
-        return {"error": "not found"}
+        raise HTTPException(status_code=404, detail="Game not found")
     open_reports = await _db.content_reports.count_documents(
         {"playable_id": pid, "status": "open"})
     return {
@@ -411,7 +430,8 @@ async def status(pid: str):
 
 # ── Audit trail ─────────────────────────────────────────────────────────────
 @router.get("/audit")
-async def audit(limit: int = Query(100, le=500), target_id: str = Query("")):
+async def audit(limit: int = Query(100, ge=1, le=500), target_id: str = Query("", max_length=200),
+                _admin=Depends(auth.require_role("admin"))):
     q = {"target_id": target_id} if target_id else {}
     rows = await _db.governance_audit.find(q, {"_id": 0}).sort("at", -1).to_list(limit)
     return {"entries": rows, "count": len(rows)}
@@ -419,7 +439,7 @@ async def audit(limit: int = Query(100, le=500), target_id: str = Query("")):
 
 # ── Platform safety overview ────────────────────────────────────────────────
 @router.get("/overview")
-async def overview():
+async def overview(_admin=Depends(auth.require_role("admin"))):
     total = await _db.playables.count_documents({"status": "ready"})
     hidden = await _db.playables.count_documents({"moderation_status": "hidden"})
     warned = await _db.playables.count_documents({"moderation_status": "warned"})

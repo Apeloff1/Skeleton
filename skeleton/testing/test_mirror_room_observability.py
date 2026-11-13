@@ -115,21 +115,21 @@ def test_observatory_file_tree_exposes_landed_extension_surface() -> None:
     assert "skeleton/learning/mirror_room" in encoded
     assert "skeleton/ai/learning/mirror_room" in encoded
     assert "test_mirror_room_observability.py" in encoded
-    assert "mirror-room-extensions.yml" in encoded
+    assert ".github/workflows/merge-readiness.yml" in encoded
 
 
 def test_observatory_file_tree_binds_landed_product_routes() -> None:
     encoded = repr(mirror_room_file_tree())
 
     assert "backend/routes/mirror_room.py" in encoded
-    assert "frontend/features/MirrorRoom" in encoded
+    assert "frontend/src/features/MirrorRoom" in encoded
     assert "frontend/app/mirror-room.tsx" in encoded
 
     screen = (
-        ROOT / "frontend/features/MirrorRoom/MirrorRoomObservatory.tsx"
+        ROOT / "frontend/src/features/MirrorRoom/MirrorRoomObservatory.tsx"
     ).read_text(encoding="utf-8")
     route = (ROOT / "frontend/app/mirror-room.tsx").read_text(encoding="utf-8")
-    types = (ROOT / "frontend/features/MirrorRoom/types.ts").read_text(
+    types = (ROOT / "frontend/src/features/MirrorRoom/types.ts").read_text(
         encoding="utf-8"
     )
     api_route = (ROOT / "backend/routes/mirror_room.py").read_text(
@@ -141,7 +141,7 @@ def test_observatory_file_tree_binds_landed_product_routes() -> None:
     assert "interface MirrorRoomObservatoryPayload" in types
     assert "production_authority: false" in types
     assert "get_default_observatory().snapshot()" in api_route
-    route_registry = (ROOT / "frontend/utils/routeRegistry.ts").read_text(
+    route_registry = (ROOT / "frontend/src/utils/routeRegistry.ts").read_text(
         encoding="utf-8"
     )
     dashboard = (ROOT / "frontend/app/dashboard.tsx").read_text(
@@ -172,14 +172,25 @@ def test_machine_product_tree_manifest_is_fail_closed() -> None:
         "backend/routes/mirror_room.py",
         "backend/core/routes_registry.py",
         "backend/core/route_policy_catalog.py",
-        "frontend/features/MirrorRoom",
+        "frontend/src/features/MirrorRoom",
         "frontend/app/mirror-room.tsx",
-        "frontend/utils/routeRegistry.ts",
+        "frontend/src/utils/routeRegistry.ts",
         "frontend/app/dashboard.tsx",
         "skeleton/testing/test_mirror_room_observability.py",
-        ".github/workflows/mirror-room-extensions.yml",
+        ".github/workflows/merge-readiness.yml",
         "docs/plan/MIRROR_ROOM_LEARNING.md",
     }
     assert required.issubset(paths)
     for surface in surfaces:
         assert (ROOT / surface["path"]).exists(), surface["path"]
+
+
+def test_observatory_ci_surface_runs_canonical_domain_regressions() -> None:
+    workflow = (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
+    # Every deterministic shard must run and the stable Unit check must
+    # depend on their collective result; a skipped or failed shard is not green.
+    assert "Canonical Domain Suite (${{ matrix.shard }})" in workflow
+    assert "shard: [0, 1, 2, 3, 4, 5, 6, 7]" in workflow
+    assert "python scripts/run_domain_suite_shard.py --index ${{ matrix.shard }} --count 8" in workflow
+    assert "needs: domain_suite" in workflow
+    assert "name: Unit" in workflow

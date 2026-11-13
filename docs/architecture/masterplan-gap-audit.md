@@ -965,7 +965,7 @@ The first pass found architectural families. The second pass attacks race window
 
 ### Second-pass closure rules
 
-- G084 is an additional P0: root-key compromise must have a tested revocation and trust-root replacement path.
+- G084 is an additional P0: root-key compromise must have a tested revocation and trust-root replacement path. The decision procedure is `skeleton/security/trust_root_recovery.py` (AI tree facade only). Landed implementation is not independent verification and does not mark the gap verified-closed.
 - Authorization/approval decisions bind the exact action digest and are revalidated at commit time.
 - Fetchers resolve/validate every redirect and final network target; DNS rebinding cannot bypass egress policy.
 - File extraction and path writes use canonicalized sandbox-relative paths and reject symlink/mount escapes.
@@ -1067,7 +1067,7 @@ This pass attacks the architecture between subsystems: policy precedence, bootst
 - Production parity must be stated per dimension; unknown parity is recorded as uncertainty.
 - Chaos tooling has its own correctness tests and blast-radius controls.
 - Region/residency policy is part of placement, logging, backup, tool and failover decisions.
-- Internal service identity is authenticated and bound into principal/capability decisions.
+- Internal service identity is authenticated and bound into principal/capability decisions. The decision procedure is `skeleton/security/zero_trust.py` with a byte-identical AI mirror: `authorize` and `revalidate` require a verifier-checked proof over the presented workload and grant. Landed implementation is not verified-closed.
 - Long-lived workflows carry a version envelope and revalidate policy/approvals on resume or deployment crossing.
 - Restore/replay reconciles external-effect receipts before re-dispatching work.
 - Activation/checkpoint protocols declare backend-specific atomicity guarantees rather than assuming POSIX semantics everywhere.

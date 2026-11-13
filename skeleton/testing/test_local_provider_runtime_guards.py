@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
+
 import threading
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -10,6 +13,7 @@ from skeleton import provider_runtime
 from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
 from skeleton.ai.runtime.inference.local import (
     LocalInferenceCancelled,
+    LocalInferenceRequest,
     ReferenceNGramModel,
 )
 from skeleton.intelligence.admission import ResourceBudget
@@ -37,6 +41,12 @@ def _registry(tmp_path, monkeypatch, *, runtime=None):
     monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(path))
     monkeypatch.setenv("AI_LOCAL_MODEL_CACHE_SIZE", "0")
     monkeypatch.setenv("AI_LOCAL_MODEL_SEED", "1")
+    # These functional tests intentionally exercise the documented, explicitly
+    # acknowledged development-only local path. Production startup must still
+    # fail closed without trusted guarded composition dependencies.
+    monkeypatch.setenv("AI_DEPLOYMENT_ENV", "development")
+    monkeypatch.setenv("AI_LOCAL_GUARD_REQUIRED", "false")
+    monkeypatch.setenv("AI_LOCAL_LEGACY_DEV_ACK", "unsafe-local-dev-only")
     for name in (
         "AI_SECONDARY_API_KEY",
         "AI_SECONDARY_BASE_URL",
@@ -45,7 +55,13 @@ def _registry(tmp_path, monkeypatch, *, runtime=None):
         "AI_TIMEOUT_SECONDS",
     ):
         monkeypatch.delenv(name, raising=False)
-    return ProviderRegistry.from_env(admission_runtime=runtime)
+    return ProviderRegistry.from_env(admission_runtime=runtime, require_guarded_local=False)
+
+
+def test_local_startup_never_infers_guard_authority_from_development_flags(tmp_path, monkeypatch):
+    _registry(tmp_path, monkeypatch)
+    with pytest.raises(ProviderUnavailableError, match="explicit development-only authorization"):
+        ProviderRegistry.from_env()
 
 
 def _durable_runtime(path):
@@ -239,7 +255,7 @@ async def test_local_timeout_signals_model_cooperative_cancellation(tmp_path, mo
                 prompt="alpha",
                 tenant_id="local-tenant",
                 operation_id="local-interrupted",
-                resource_budget=ResourceBudget(max_wall_seconds=0.05),
+                resource_budget=ResourceBudget(max_wall_seconds=0.5),
             )
         )
     assert observed_cancel.wait(1)
@@ -320,7 +336,7 @@ async def test_local_neural_activation_admits_actual_utf8_input_targets(tmp_path
         NumpyRecurrentLM(model_id="byte-local", config=NeuralLMConfig(hidden_size=4, seed=5)),
         tmp_path / "weights.json",
     )
-    registry = ProviderRegistry.from_env()
+    registry = ProviderRegistry.from_env(require_guarded_local=False)
     adapter = registry.require_active()
     original_infer = adapter.engine.model.infer
     calls = 0
@@ -331,10 +347,14 @@ async def test_local_neural_activation_admits_actual_utf8_input_targets(tmp_path
         return original_infer(*args, **kwargs)
 
     monkeypatch.setattr(adapter.engine.model, "infer", counted)
+    actual_input_tokens = adapter.engine.model.count_input_tokens(LocalInferenceRequest(prompt="café"))
+    assert actual_input_tokens == len("user: café\nassistant:".encode("utf-8")) + 1
     with pytest.raises(ProviderPolicyError, match="admission"):
         await adapter.generate(
             ProviderRequest(
-                instructions="", prompt="café", resource_budget=ResourceBudget(max_input_tokens=5)
+                instructions="",
+                prompt="café",
+                resource_budget=ResourceBudget(max_input_tokens=actual_input_tokens - 1),
             )
         )
     assert calls == 0
@@ -343,12 +363,12 @@ async def test_local_neural_activation_admits_actual_utf8_input_targets(tmp_path
             instructions="",
             prompt="café",
             max_output_tokens=2,
-            resource_budget=ResourceBudget(max_input_tokens=6),
+            resource_budget=ResourceBudget(max_input_tokens=actual_input_tokens),
         )
     )
     assert calls == 1
     assert response.model == "byte-local"
-    assert response.usage.input_tokens == 6
+    assert response.usage.input_tokens == actual_input_tokens
     assert response.usage.billed_cost == "0"
 
 
@@ -366,7 +386,7 @@ def test_invalid_local_configuration_fails_closed(tmp_path, monkeypatch, field, 
     _registry(tmp_path, monkeypatch)
     monkeypatch.setenv(field, value)
     with pytest.raises(ProviderUnavailableError, match="integer|bounds"):
-        ProviderRegistry.from_env()
+        ProviderRegistry.from_env(require_guarded_local=False)
 
 
 def test_local_activation_never_constructs_hosted_adapter_even_when_primary_credentials_exist(
@@ -379,6 +399,53 @@ def test_local_activation_never_constructs_hosted_adapter_even_when_primary_cred
         raise AssertionError("local mode must never construct a hosted adapter")
 
     monkeypatch.setattr(provider_runtime.OpenAIProviderAdapter, "__init__", forbidden)
-    registry = ProviderRegistry.from_env()
+    registry = ProviderRegistry.from_env(require_guarded_local=False)
     assert registry.require_active().provider_id == "local"
     assert len(registry.statuses()) == 1
+
+
+@pytest.mark.asyncio
+async def test_local_configured_timeout_reaches_worker_and_releases_preflight_custody(tmp_path, monkeypatch):
+    runtime = AdmissionRuntime()
+    adapter = _registry(tmp_path, monkeypatch, runtime=runtime).require_active()
+    # Leave real token preparation time before exercising native cancellation;
+    # a 30 ms total allowance can legitimately expire before dispatch under load.
+    adapter.timeout_seconds = 0.5
+    cancelled = threading.Event()
+
+    def blocking(_request, cancel):
+        assert cancel.wait(2)
+        cancelled.set()
+        raise LocalInferenceCancelled("local worker interrupted")
+
+    monkeypatch.setattr(adapter.engine.model, "infer", blocking)
+    with pytest.raises(ProviderInvocationError, match="deadline exceeded"):
+        await adapter.generate(ProviderRequest(instructions="", prompt="alpha", max_output_tokens=2))
+    assert cancelled.is_set()
+    assert adapter.engine.snapshot()["active"] == 0
+    assert runtime.snapshot()["active_operations"] == ()
+
+
+@pytest.mark.asyncio
+async def test_local_preflight_denial_releases_durable_admission_without_unknown_usage(tmp_path, monkeypatch):
+    runtime, ledger = _durable_runtime(tmp_path / "quota.sqlite3")
+    adapter = _registry(tmp_path, monkeypatch, runtime=runtime).require_active()
+    calls = []
+
+    def forbidden(*_args, **_kwargs):
+        calls.append(True)
+        raise AssertionError("input admission must precede physical inference")
+
+    monkeypatch.setattr(adapter.engine.model, "infer", forbidden)
+    with pytest.raises(ProviderPolicyError, match="admission"):
+        await adapter.generate(ProviderRequest(
+            instructions="", prompt="alpha", tenant_id="local-tenant",
+            operation_id="local-preflight-denied", max_output_tokens=2,
+            resource_budget=ResourceBudget(max_input_tokens=2),
+        ))
+    snapshot = ledger.snapshot("local-tenant")
+    assert calls == []
+    assert snapshot["active_reservations"] == 0
+    assert snapshot["unknown_usage_events"] == 0
+    assert snapshot["completions"] == 0
+    assert runtime.snapshot()["active_operations"] == ()

@@ -7,6 +7,7 @@ No Docker, remote provider, external model weights, browser, or mock HTTP stack.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from hashlib import sha256
 from http.client import HTTPConnection
 import json
 import os
@@ -14,6 +15,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import threading
 import unittest
+from uuid import uuid4
 from unittest.mock import patch
 
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
@@ -76,6 +78,156 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             conn.close()
         return status, json.loads(raw_response), headers_received
 
+    def test_mac_longform_virtual_memory_requires_approval_and_verifies_pages(self) -> None:
+        root = self.folder / "longform-books"
+        root.mkdir()
+        text = "continuity and long context " * 10000
+        (root / "manuscript.txt").write_text(text, encoding="utf-8")
+        selected = {
+            "root": str(root), "relative_path": "manuscript.txt",
+            "approved": False,
+        }
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/ingest", selected, authorized=False,
+        )
+        self.assertEqual(status, 401)
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/ingest", selected,
+        )
+        self.assertEqual(status, 403)
+        selected["approved"] = True
+        status, result, _ = self._request(
+            "POST", "/v1/resources/longform/ingest", selected,
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(result["source_bytes"], len(text.encode("utf-8")))
+        self.assertGreater(result["page_count"], 1)
+        source_id = result["source_id"]
+        status, verified, _ = self._request(
+            "POST", "/v1/resources/longform/verify",
+            {"source_id": source_id},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(verified["verified"])
+        status, hit, _ = self._request(
+            "POST", "/v1/resources/longform/search",
+            {"source_id": source_id, "query": "continuity", "limit": 2},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(hit["hits"])
+        self.assertFalse(hit["model_context_applied"])
+        status, page, _ = self._request(
+            "POST", "/v1/resources/longform/window",
+            {"source_id": source_id, "start_page": 0, "pages": 1},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(text.startswith(page["text"]))
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/window",
+            {"source_id": "../escape"},
+        )
+        self.assertEqual(status, 422)
+
+    def test_longform_work_cursor_http_cas_replay_and_resume(self) -> None:
+        import secrets
+        source = self.folder / "work"
+        source.mkdir()
+        (source / "book.txt").write_text(
+            "verified chapter and longform continuity " * 8000,
+            encoding="utf-8",
+        )
+        status, result, _ = self._request(
+            "POST", "/v1/resources/longform/ingest",
+            {"root": str(source), "relative_path": "book.txt",
+             "approved": True},
+        )
+        self.assertEqual(status, 201)
+        sid = result["source_id"]
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/work-start",
+            {"source_id": sid, "approved": False},
+        )
+        self.assertEqual(status, 403)
+        status, started, _ = self._request(
+            "POST", "/v1/resources/longform/work-start",
+            {"source_id": sid, "approved": True},
+        )
+        self.assertEqual(status, 201)
+        self.assertGreater(started["total_pages"], 1)
+        work = started["work_id"]
+        request_id = secrets.token_hex(24)
+        payload = {
+            "work_id": work, "expected_revision": 0,
+            "request_id": request_id, "pages": 1,
+        }
+        status, one, _ = self._request(
+            "POST", "/v1/resources/longform/work-next", payload,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(one["next_page"], 1)
+        self.assertTrue(one["progress_committed"])
+        status, replay, _ = self._request(
+            "POST", "/v1/resources/longform/work-next", payload,
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(replay["replayed"])
+        self.assertEqual(replay["receipt_digest"], one["receipt_digest"])
+        self.assertEqual(replay["text"], one["text"])
+        status, resumed, _ = self._request(
+            "POST", "/v1/resources/longform/work-status", {"work_id": work},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(resumed["revision"], 1)
+        payload["request_id"] = secrets.token_hex(24)
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/work-next", payload,
+        )
+        self.assertEqual(status, 422)
+        status, _, _ = self._request(
+            "POST", "/v1/resources/longform/work-status", {"work_id": work},
+            authorized=False,
+        )
+        self.assertEqual(status, 401)
+
+    def test_resource_fabric_auth_and_readonly_multisource_staging(self) -> None:
+        status, _, _ = self._request(
+            "GET", "/v1/resources", authorized=False,
+        )
+        self.assertEqual(status, 401)
+        status, monitor, _ = self._request("GET", "/v1/resources")
+        self.assertEqual(status, 200)
+        self.assertEqual(monitor["schema"], "skeleton.offline.resource-fabric.v1")
+        self.assertFalse(monitor["shared_memory_is_additive"])
+        self.assertEqual(monitor["gpu_backend_binding"], "advisory_only")
+        status, planned, _ = self._request("POST", "/v1/resources/plan", {
+            "source_bytes": 5000, "desired_streams": 2,
+        })
+        self.assertEqual(status, 200)
+        self.assertFalse(planned["backend_gpu_transfer_executed"])
+        self.assertTrue(planned["evidence_digest"])
+        source = self.folder / "selected"
+        source.mkdir()
+        (source / "first.txt").write_text("immutable selected file")
+        (source / "second.txt").write_text("another verified local file")
+        request = {
+            "root": str(source), "paths": ["first.txt", "second.txt"],
+            "desired_streams": 2, "approved": False,
+        }
+        status, _, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 403)
+        request["approved"] = True
+        status, output, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 200)
+        self.assertTrue(output["verified"])
+        self.assertFalse(output["gpu_transfer_executed"])
+        self.assertEqual(len(output["sources"]), 2)
+        self.assertTrue(all(item["readonly"] for item in output["sources"]))
+        self.assertEqual((source / "first.txt").read_text(),
+                         "immutable selected file")
+        request["paths"] = ["../http.sqlite3"]
+        status, _, _ = self._request("POST", "/v1/resources/stage", request)
+        self.assertEqual(status, 422)
+
     def test_native_local_http_roundtrip_and_exactly_once_retry(self) -> None:
         status, health, _ = self._request("GET", "/v1/status")
         self.assertEqual(status, 200)
@@ -106,6 +258,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(session["revision"], 1)
         self.assertEqual(session["evidence"], [None])
         self.assertEqual(session["citation_audits"], [None])
+        self.assertEqual(session["faithfulness_audits"], [None])
         self.assertEqual(
             [m["role"] for m in session["messages"]],
             ["system", "user", "assistant"],
@@ -263,6 +416,137 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(empty["hits"], [])
 
+    def test_governed_reference_read_requires_grant_and_replays_the_receipt(self):
+        text = "The depth buffer stores a depth value for each pixel."
+        status, created, _ = self._request(
+            "POST", "/v1/knowledge/documents",
+            {"title": "GPU notes", "text": text},
+        )
+        self.assertEqual(status, 201)
+        request_id = str(uuid4())
+        status, denied, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "depth buffer", "granted": False, "request_id": request_id},
+        )
+        self.assertEqual(status, 403)
+        self.assertIn("explicit operator grant", denied["error"])
+        status, escaped, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "../secrets", "granted": True, "request_id": str(uuid4())},
+        )
+        self.assertEqual(status, 400)
+        status, answer, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "depth buffer", "granted": True, "request_id": request_id},
+        )
+        self.assertEqual(status, 200, answer)
+        self.assertEqual(answer["status"], "succeeded")
+        self.assertFalse(answer["replayed"])
+        self.assertEqual(answer["hits"][0]["document_id"], created["document_id"])
+        self.assertEqual(
+            text[answer["hits"][0]["char_start"]:answer["hits"][0]["char_end"]],
+            answer["hits"][0]["passage"],
+        )
+        status, replay, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "depth buffer", "granted": True, "request_id": request_id},
+        )
+        self.assertEqual(status, 200, replay)
+        self.assertTrue(replay["replayed"])
+        self.assertEqual(replay["receipt_id"], answer["receipt_id"])
+        status, conflict, _ = self._request(
+            "POST", "/v1/tools/reference-read",
+            {"query": "pixel value", "granted": True, "request_id": request_id},
+        )
+        self.assertEqual(status, 409)
+
+    def test_governed_reference_write_waits_rolls_back_and_bounds_the_job(self):
+        title = "GPU notes"
+        text = "The depth buffer stores a depth value for each pixel."
+        request_id = str(uuid4())
+        status, denied, _ = self._request(
+            "POST", "/v1/tools/reference-write",
+            {"title": title, "text": text, "request_id": request_id, "approved": False},
+        )
+        self.assertEqual(status, 403)
+        self.assertIn("explicit operator approval", denied["error"])
+        status, waiting, _ = self._request(
+            "POST", "/v1/tools/reference-write",
+            {"title": title, "text": text, "request_id": request_id, "approved": True},
+        )
+        self.assertEqual(status, 200, waiting)
+        self.assertEqual(waiting["error_code"], "approval_required")
+        self.assertFalse(waiting["written"])
+        status, docs, _ = self._request("GET", "/v1/knowledge/documents")
+        self.assertEqual(docs["documents"], [])
+        status, mismatched, _ = self._request(
+            "POST", "/v1/tools/reference-write",
+            {
+                "title": title, "text": text, "request_id": request_id,
+                "approved": True, "approval_ref": "approval:" + ("0" * 64),
+            },
+        )
+        self.assertEqual(status, 200, mismatched)
+        self.assertEqual(mismatched["error_code"], "approval_binding_mismatch")
+        status, escaped, _ = self._request(
+            "POST", "/v1/tools/reference-write",
+            {
+                "title": "../secrets", "text": text, "request_id": str(uuid4()),
+                "approved": True,
+            },
+        )
+        self.assertEqual(status, 400)
+        status, written, _ = self._request(
+            "POST", "/v1/tools/reference-write",
+            {
+                "title": title, "text": text, "request_id": request_id,
+                "approved": True, "approval_ref": waiting["expected_approval_ref"],
+            },
+        )
+        self.assertEqual(status, 200, written)
+        self.assertTrue(written["written"])
+        self.assertTrue(written["created"])
+        status, found, _ = self._request(
+            "POST", "/v1/knowledge/search", {"query": "depth buffer"},
+        )
+        self.assertEqual(found["hits"][0]["document_id"], written["document_id"])
+        parent = str(uuid4())
+        status, job, _ = self._request(
+            "POST", "/v1/agents/reference-job",
+            {
+                "goal": "depth buffer", "request_id": parent, "granted": True,
+                "allow_writes": False, "title": "Extra", "text": text,
+            },
+        )
+        self.assertEqual(status, 200, job)
+        self.assertEqual(job["status"], "blocked")
+        self.assertEqual(job["steps"], 0)
+        status, read_job, _ = self._request(
+            "POST", "/v1/agents/reference-job",
+            {
+                "goal": "depth buffer", "request_id": str(uuid4()),
+                "granted": True, "allow_writes": False,
+            },
+        )
+        self.assertEqual(read_job["status"], "completed")
+        self.assertEqual(read_job["calls"], ["local.reference.read"])
+        self.assertEqual(read_job["read"]["hits"][0]["document_id"], written["document_id"])
+        status, unapproved, _ = self._request(
+            "POST", "/v1/tools/reference-write/rollback",
+            {"request_id": request_id, "approved": False},
+        )
+        self.assertEqual(status, 403)
+        status, rolled, _ = self._request(
+            "POST", "/v1/tools/reference-write/rollback",
+            {"request_id": request_id, "approved": True},
+        )
+        self.assertEqual(status, 200, rolled)
+        self.assertTrue(rolled["rolled_back"])
+        status, empty, _ = self._request(
+            "POST", "/v1/knowledge/search", {"query": "depth buffer"},
+        )
+        self.assertEqual(empty["hits"], [])
+
     def test_reference_ingestion_rejects_unauthorized_and_malformed_inputs(self):
         status, denied, _ = self._request(
             "POST", "/v1/knowledge/documents",
@@ -350,6 +634,14 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(conversation["evidence"][0], manifest)
         self.assertEqual(conversation["citation_audits"][0],
                          answer["citation_audit"])
+        self.assertEqual(answer["faithfulness"]["schema"],
+                         "skeleton.intelligence.claim-faithfulness.v1")
+        self.assertEqual(answer["faithfulness"]["model_text_sha256"],
+                         sha256(answer["text"].encode()).hexdigest())
+        self.assertIn(answer["faithfulness"]["disposition"],
+                      {"supported", "qualified", "abstain", "contested"})
+        self.assertEqual(conversation["faithfulness_audits"][0],
+                         answer["faithfulness"])
         self.assertEqual(conversation["messages"][1]["content"], answer["text"])
 
     def test_grounded_retry_after_reference_deletion_preserves_original_receipt(self):
@@ -372,6 +664,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertEqual(repeated["output_digest"], first["output_digest"])
         self.assertEqual(repeated["evidence"], first["evidence"])
         self.assertEqual(repeated["citation_audit"], first["citation_audit"])
+        self.assertEqual(repeated["faithfulness"], first["faithfulness"])
         self.assertEqual(repeated["revision"], first["revision"])
         status, conflict, _ = self._request(
             "POST", endpoint, {**payload, "grounded": False},
@@ -558,6 +851,10 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         self.assertIn("textContent", script)
         self.assertNotIn("localStorage", script)
         self.assertNotIn("innerHTML", script)
+        self.assertIn("reference-confirm", script)
+        self.assertIn("reference-job", script)
+        self.assertIn("/v1/tools/reference-write", script)
+        self.assertIn("/v1/agents/reference-job", script)
 
     def _raw_get(self, path: str):
         conn = HTTPConnection("127.0.0.1", self.port, timeout=15)

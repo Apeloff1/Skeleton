@@ -1,9 +1,12 @@
 /** Server-observed model inventory shared with Jeeves chat. No synthetic readiness. */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import StudioLoginGate from '../src/auth/StudioLoginGate';
-import { getChatReadiness, chatReadinessMessage, type ChatReadiness } from '../src/product/chatSessionClient';
+import { chatReadinessMessage } from '../src/product/chatSessionClient';
+import { useChatReadiness } from '../src/product/useChatReadiness';
+import ChatModelCapabilities from '../src/features/Jeeves/ChatModelCapabilities';
+import RuntimeOptimizationPanel from '../src/features/Jeeves/RuntimeOptimizationPanel';
 
 const WORKFLOWS = [
   { title: 'Talk to Jeeves', href: '/jeeves-chat' },
@@ -17,31 +20,8 @@ const WORKFLOWS = [
 
 function ModelInventory() {
   const router = useRouter();
-  const [readiness, setReadiness] = useState<ChatReadiness | null>(null);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(true);
-
-  const refresh = useCallback(async (signal?: AbortSignal) => {
-    setBusy(true);
-    setError('');
-    try {
-      const value = await getChatReadiness(signal);
-      if (!signal?.aborted) setReadiness(value);
-    } catch {
-      if (!signal?.aborted) {
-        setReadiness(null);
-        setError('Model readiness could not be verified. Check the authenticated runtime and setup.');
-      }
-    } finally {
-      if (!signal?.aborted) setBusy(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void refresh(controller.signal);
-    return () => controller.abort();
-  }, [refresh]);
+  const { readiness, error, busy, observedAt, refresh } = useChatReadiness();
+  const [runtimeOpen, setRuntimeOpen] = useState(false);
 
   return <SafeAreaView style={styles.safe}>
     <ScrollView contentContainerStyle={styles.page} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void refresh()} />}>
@@ -49,11 +29,15 @@ function ModelInventory() {
       <Text style={styles.title}>Jeeves · Model inventory</Text>
       <Text style={styles.muted}>Models reported by the authenticated AI chat service. A registered model is not necessarily available, selected or capable of training.</Text>
       {busy && !readiness ? <ActivityIndicator color="#B6A9FF" /> : null}
-      {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+      {error ? <Text accessibilityRole="alert" style={styles.error}>{error.message}</Text> : null}
+      {observedAt && <Text style={styles.muted}>Observed {new Date(observedAt).toLocaleTimeString()}. Refreshed when you return to this screen.</Text>}
+      <View style={styles.links}><TouchableOpacity accessibilityRole="button" style={styles.link} onPress={() => { void refresh(); }} disabled={busy}><Text style={styles.linkText}>{busy ? 'Refreshing…' : 'Refresh model readiness'}</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" style={styles.link} onPress={() => router.push('/setup' as never)}><Text style={styles.linkText}>Setup & readiness →</Text></TouchableOpacity></View>
       {readiness ? <>
         <View style={styles.card}>
           <Text style={styles.heading}>{readiness.available ? 'Conversation engine ready' : 'AI requires setup'}</Text>
           <Text style={styles.muted}>{chatReadinessMessage(readiness)}</Text>
+          {readiness.models.readiness?.message && !readiness.checks.models.available && <Text style={styles.error}>{readiness.models.readiness.message}</Text>}
+          {readiness.models.readiness?.action && !readiness.checks.models.available && <Text style={styles.muted}>{readiness.models.readiness.action}</Text>}
           {Object.entries(readiness.checks).map(([key, check]) =>
             <Text key={key} style={styles.detail}>{key.replace(/_/g, ' ')}: {check.available ? 'ready' : check.code}</Text>
           )}
@@ -63,13 +47,17 @@ function ModelInventory() {
           <Text style={styles.heading}>{model.label}</Text>
           <Text style={styles.detail}>Provider: {model.provider_id} · Model: {model.model_id}</Text>
           <Text style={[styles.detail, model.available ? styles.ready : styles.unavailable]}>
-            {model.available ? 'Available' : 'Unavailable'} · {model.active ? 'Active' : 'Inactive'} · {model.selectable ? 'Selectable' : 'Not selectable'}
+            {model.available ? 'Available' : 'Unavailable'} · {model.active ? 'Primary route' : model.fallback ? 'Declared fallback' : 'Explicit route'} · {model.selectable ? 'Selectable' : 'Not selectable'}
           </Text>
           <Text style={styles.detail}>Context {model.context_window} · Max output {model.max_output_tokens} tokens</Text>
           <Text style={styles.detail}>Credential-free: {model.credential_free ? 'yes' : 'no'} · Capabilities: {(Array.isArray(model.capabilities) ? model.capabilities.join(', ') : '') || 'not declared'}</Text>
           <Text style={styles.muted}>{model.readiness.message}</Text>
+          {model.readiness.action && <Text style={styles.muted}>{model.readiness.action}</Text>}
+          <ChatModelCapabilities capabilities={model.capabilities} modelFamily={model.model_family} activation={model.activation} tokenizer={model.tokenizer} limitsSource={model.limits_source} runtimeFacts={model} />
         </View>)}
       </> : null}
+      <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: runtimeOpen }} style={styles.link} onPress={() => setRuntimeOpen(open => !open)}><Text style={styles.linkText}>{runtimeOpen ? 'Hide runtime controls' : 'Inspect serving, learning and maintenance'}</Text></TouchableOpacity>
+      {runtimeOpen && <RuntimeOptimizationPanel />}
       <Text style={styles.section}>Related workspaces</Text>
       <View style={styles.links}>{WORKFLOWS.map(item =>
         <TouchableOpacity key={item.href} accessibilityRole="button" accessibilityLabel={item.title}

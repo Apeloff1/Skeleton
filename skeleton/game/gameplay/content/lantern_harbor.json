@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "game_id": "lantern-harbor",
+  "title": "Lantern Harbor",
+  "license": "CC0-1.0",
+  "author": "Skeleton original gameplay studio",
+  "rows": [
+    "#########",
+    "#S..#...#",
+    "#...#...#",
+    "#.......#",
+    "#....G..#",
+    "#########"
+  ],
+  "objects": [
+    {
+      "id": "lantern",
+      "kind": "item",
+      "x": 2,
+      "y": 1
+    },
+    {
+      "id": "keeper",
+      "kind": "npc",
+      "x": 3,
+      "y": 1
+    },
+    {
+      "id": "mireling",
+      "kind": "enemy",
+      "x": 6,
+      "y": 3,
+      "hp": 3,
+      "attack": 1
+    }
+  ],
+  "quests": [
+    {
+      "id": "lightkeeper",
+      "requires_items": [
+        "lantern"
+      ],
+      "requires_npcs": [
+        "keeper"
+      ],
+      "requires_quests": []
+    },
+    {
+      "id": "beaconkeeper",
+      "requires_items": [
+        "beacon"
+      ],
+      "requires_npcs": [
+        "keeper"
+      ],
+      "requires_quests": []
+    }
+  ],
+  "endings": [
+    {
+      "id": "homecoming",
+      "requires_quests": [
+        "lightkeeper"
+      ],
+      "outcome": "victory"
+    },
+    {
+      "id": "wanderer",
+      "requires_quests": [],
+      "outcome": "alternate"
+    },
+    {
+      "id": "bright-harbor",
+      "requires_quests": [
+        "beaconkeeper"
+      ],
+      "outcome": "alternate"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "signal-beacon",
+      "ingredients": [
+        "lantern"
+      ],
+      "product": "beacon"
+    }
+  ]
+}

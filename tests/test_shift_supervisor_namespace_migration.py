@@ -39,17 +39,19 @@ def test_activation_security_core_entrypoint_is_canonical_shim() -> None:
     assert legacy is canonical
 
 
-def test_shift_supervisor_control_failover_uses_canonical_state_reader() -> None:
-    workflow = (
-        Path(__file__).resolve().parents[1]
-        / ".github"
-        / "workflows"
-        / "shift-supervisor-control.yml"
-    ).read_text(encoding="utf-8")
+def test_shift_supervisor_compat_cli_uses_canonical_state_reader(tmp_path: Path) -> None:
+    # The retired shift-supervisor-control workflow is not an authority.
+    # The supported compatibility CLI delegates to the canonical runtime.
+    legacy = importlib.import_module("core.shift_supervisor.__main__")
+    canonical = importlib.import_module("skeleton.automation.shift_supervisor.__main__")
+    assert legacy.main is canonical.main
 
-    assert (
-        "from skeleton.automation.shift_supervisor.__main__ import _read_state"
-        in workflow
-    )
-    assert "from core.shift_supervisor.__main__ import _read_state" not in workflow
+    state_file = tmp_path / "shift-state.json"
+    state_file.write_text('{"version": 1, "plan_items": []}', encoding="utf-8")
+    assert canonical._read_state(state_file) == {"version": 1, "plan_items": []}
+
+    # Malformed persisted state must continue to fail closed.
+    state_file.write_text('{"version":', encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid shift-supervisor state"):
+        canonical._read_state(state_file)
 

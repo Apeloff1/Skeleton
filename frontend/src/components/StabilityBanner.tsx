@@ -12,7 +12,7 @@ import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useTunnelStatus } from '../hooks/useTunnelStatus';
 import { useReduceMotion } from '../hooks/useReduceMotion';
 import { useFeatureFlag, FLAG } from '../feature-flags';
-import { setOfflineState } from '../../utils/safeFetch';
+import { setOfflineState } from '../utils/apiClient';
 import { accessibleStatusProps } from '../accessibility/runtime';
 import { useI18n } from '../i18n';
 import type { TranslationKey } from '../i18n';

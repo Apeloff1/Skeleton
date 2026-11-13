@@ -5,12 +5,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { toast } from '../../components/Toast';
-import { actionSheet } from '../../components/ActionSheet';
+import { toast } from '../../src/components/AppToast';
+import { actionSheet } from '../../src/components/ActionSheet';
 import {
   syncAllOffline, getSyncState, getOfflineFootprint, clearOfflineCache,
   pauseSync, SyncState,
-} from '../../utils/offlineSync';
+} from '../../src/utils/offlineSync';
 
 type ItemType = 'book' | 'bible' | 'track' | 'subject';
 

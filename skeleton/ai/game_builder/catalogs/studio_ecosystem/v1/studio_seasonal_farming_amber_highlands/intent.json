@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_amber_highlands",
+  "title": "Amber Highlands: The Four Harvests",
+  "subtitle": "Original the four harvests design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010315525,
+  "width": 27,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 5,
+  "theme": "forest",
+  "starting_health": 3
+}

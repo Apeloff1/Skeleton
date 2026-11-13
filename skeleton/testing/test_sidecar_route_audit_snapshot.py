@@ -56,7 +56,7 @@ def test_sidecar_route_audit_locks_duplicate_gameforge_and_undocumented_commands
         "POST /api/v1/commands/invoke",
     ]
     assert "POST /api/v1/gameforge/intake" in payload["protected_mismatch"]
-    assert "POST /api/v1/gameforge/run" in payload["protected_mismatch"]
+    assert "POST /api/v1/gameforge/run" not in payload["protected_mismatch"]
     rows = {row["key"]: row for row in payload["routes"]}
     for row in payload["routes"]:
         assert set(row) == _ROW_KEYS
@@ -70,9 +70,9 @@ def test_sidecar_route_audit_locks_duplicate_gameforge_and_undocumented_commands
     assert intake["protected_drift"] is True
 
     run = rows["POST /api/v1/gameforge/run"]
-    assert run["seal_gated"] is True
-    assert run["charter_gated"] is False
-    assert run["protected_drift"] is True
+    assert run["seal_gated"] is False
+    assert run["charter_gated"] is True
+    assert run["protected_drift"] is False
 
     contracts = rows["GET /api/v1/commands/contracts"]
     assert contracts["source"] == "command"

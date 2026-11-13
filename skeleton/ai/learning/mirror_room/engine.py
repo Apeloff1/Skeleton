@@ -7,7 +7,7 @@ change between generations; production behavior never changes here.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol, Sequence, runtime_checkable
 
 from .contracts import (
@@ -24,6 +24,7 @@ from .contracts import (
 from .curriculum import build_curriculum
 from .evaluation import ComparisonReport, PairedEvaluator
 from .integrity import validate_split_integrity
+from .memory import TrainingLearningArchive
 from .sandbox import MirrorSandbox, SandboxExecutor, SandboxUsage
 
 
@@ -43,6 +44,53 @@ class CandidateGenerator(Protocol):
         *,
         limit: int,
     ) -> Sequence[MirrorCandidate]: ...
+
+
+def _bind_training_learner(generator: CandidateGenerator, *, spec: MirrorRoomSpec, executor_id: str, scenarios: Sequence[MirrorScenario]) -> None:
+    bind = getattr(generator, "bind_training", None)
+    if bind is not None:
+        if not callable(bind):
+            raise MirrorRoomError("candidate generator TRAIN context hook is not callable")
+        bind(spec=spec, executor_id=executor_id, scenarios=scenarios)
+
+
+def _observe_training_outcome(generator: CandidateGenerator, *, generation: int, parent: MirrorCandidate, candidate: MirrorCandidate, report: ComparisonReport) -> None:
+    if report.split is not ScenarioSplit.TRAIN:
+        raise MirrorRoomError("adaptive outcome hook cannot receive qualification evidence")
+    observe = getattr(generator, "observe_training", None)
+    if observe is not None:
+        if not callable(observe):
+            raise MirrorRoomError("candidate generator TRAIN outcome hook is not callable")
+        observe(generation=generation, parent=parent, candidate=candidate, report=report)
+
+
+def _learner_archive(generator: CandidateGenerator) -> TrainingLearningArchive:
+    archive = getattr(generator, "training_archive", None)
+    if archive is None:
+        return TrainingLearningArchive()
+    if not isinstance(archive, TrainingLearningArchive):
+        raise MirrorRoomError("candidate generator checkpoint archive is not typed TRAIN memory")
+    return archive
+
+
+def _learner_curriculum(generator: CandidateGenerator, train: Sequence[MirrorScenario], hard_examples: Sequence[HardExample]):
+    priorities = getattr(generator, "curriculum_priorities", None)
+    if priorities is not None and not callable(priorities):
+        raise MirrorRoomError("candidate generator curriculum hook is not callable")
+    return build_curriculum(train, hard_examples, learned_priorities=None if priorities is None else priorities())
+
+
+def _train_guardrails_passed(report: ComparisonReport, spec: MirrorRoomSpec) -> bool:
+    """TRAIN parent selection cannot trade away protected metric floors."""
+
+    reports = {item.metric_id: item for item in report.metric_comparisons}
+    for policy in spec.metrics:
+        if not policy.guardrail:
+            continue
+        metric = reports.get(policy.metric_id)
+        if metric is None or min(metric.oriented_delta, metric.lower_confidence_bound, metric.worst_case_delta) < -policy.max_regression:
+            return False
+    return True
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +168,7 @@ class MirrorRunReceipt:
     eligible_for_external_promotion: bool
     production_authority: bool = False
     direct_self_modify: bool = False
+    training_archive: TrainingLearningArchive = field(default_factory=TrainingLearningArchive)
 
     def __post_init__(self) -> None:
         if not isinstance(self.generator_id, str) or not self.generator_id.strip():
@@ -149,6 +198,8 @@ class MirrorRunReceipt:
             raise MirrorRoomError("Mirror Run cannot have production authority")
         if self.direct_self_modify is not False:
             raise MirrorRoomError("Mirror Run cannot directly self-modify")
+        if not isinstance(self.training_archive, TrainingLearningArchive):
+            raise MirrorRoomError("run learner checkpoint must use TRAIN-only archive")
 
         holdout = self.holdout_report
         candidate_changed = (
@@ -211,6 +262,7 @@ class MirrorRunReceipt:
                 "eligible_for_external_promotion": self.eligible_for_external_promotion,
                 "production_authority": False,
                 "direct_self_modify": False,
+                "training_archive_digest": self.training_archive.digest,
             }
         )
 
@@ -377,6 +429,7 @@ class MirrorRoom:
             )
         split_integrity = validate_split_integrity(scenarios)
         train, validation, holdout = self._partition(scenarios)
+        _bind_training_learner(generator, spec=self.spec, executor_id=executor_id, scenarios=train)
         generation_limit = (
             self.spec.budget.max_generations if generations is None else generations
         )
@@ -411,7 +464,7 @@ class MirrorRoom:
         )
 
         for generation in range(1, generation_limit + 1):
-            curriculum = build_curriculum(train, hard_examples)
+            curriculum = _learner_curriculum(generator, train, hard_examples)
             feedback = LearningFeedback(
                 generation=generation,
                 champion=learning_champion,
@@ -444,10 +497,14 @@ class MirrorRoom:
                     run_id=run_id,
                     baseline=incoming_learning,
                     candidate=candidate,
-                    scenarios=train,
+                    scenarios=curriculum.scenarios,
                     split=ScenarioSplit.TRAIN,
                     enforce_gate=False,
                 )
+                # Completed TRAIN evidence is delivered before validation is
+                # evaluated. Failed proposals teach the ranker too; no
+                # validation verdict or sealed payload reaches its optimizer.
+                _observe_training_outcome(generator, generation=generation, parent=incoming_learning, candidate=candidate, report=training_report)
                 validation_candidate_evaluations += 1
                 if (
                     validation_candidate_evaluations
@@ -473,7 +530,7 @@ class MirrorRoom:
                 seen_behavior_digests.add(candidate.behavior_digest)
 
             ranked_training = sorted(
-                raw,
+                (item for item in raw if _train_guardrails_passed(item[1], self.spec)),
                 key=lambda item: (
                     -item[1].weighted_utility_delta,
                     item[0].candidate_id,
@@ -606,6 +663,7 @@ class MirrorRoom:
             validation_candidate_evaluations=validation_candidate_evaluations,
             usage=sandbox.usage,
             eligible_for_external_promotion=eligible,
+            training_archive=_learner_archive(generator),
         )
 
 

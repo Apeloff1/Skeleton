@@ -1,6 +1,6 @@
-import {replayDragonPages} from '../features/Jeeves/companion/dragonReplay';
-import {reduceDragonJournal,EMPTY_COMPANION_JOURNAL,type WireDragonEvent} from '../features/Jeeves/companion/dragonJournal';
-import {canSuggestCrawl,DEFAULT_COMPANION_PREFERENCES} from '../features/Jeeves/companion/dragonPreferences';
+import {replayDragonPages} from '../src/features/Jeeves/companion/dragonReplay';
+import {reduceDragonJournal,EMPTY_COMPANION_JOURNAL,type WireDragonEvent} from '../src/features/Jeeves/companion/dragonJournal';
+import {canSuggestCrawl,DEFAULT_COMPANION_PREFERENCES} from '../src/features/Jeeves/companion/dragonPreferences';
 const event=(sequence:number,kind:WireDragonEvent['kind'],payload:Record<string,unknown>={}):WireDragonEvent=>({schema:'skeleton.ai.dragon_crawl.event.v1',event_id:'id-'+sequence,sequence,kind,url:'https://example.org/a',at:sequence,payload});
 describe('dragon live replay contract',()=>{
  it('rejects false memory completion',()=>{

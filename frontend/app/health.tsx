@@ -14,8 +14,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import api, { _circuitBreakerStats, _circuitBreakerReset } from '../src/utils/apiClient';
-import { _safeStorageStats, pruneExpired } from '../utils/safeStorage';
-import theme from '../theme/tokens';
+import { _safeStorageStats, pruneExpired } from '../src/utils/safeStorage';
+import theme from '../src/theme/tokens';
 
 const C = theme.colors, S = theme.spacing, R = theme.radii;
 const MONO = theme.typography.fontFamily.mono;

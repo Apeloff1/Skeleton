@@ -5,12 +5,13 @@ BuildPlan DAG, execute it (async), and re-plan from any node.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from core import autonomous_orchestrator as orch
+from routes.galaxy_studio_access import private_build_access
 
-router = APIRouter(prefix="/api/orchestrator", tags=["orchestrator"])
+router = APIRouter(prefix="/api/orchestrator", tags=["orchestrator"], dependencies=[Depends(private_build_access)])
 
 
 class PlanReq(BaseModel):
@@ -41,6 +42,11 @@ def execute_async(plan_id: str):
 @router.get("/job/{job_id}")
 def job(job_id: str):
     return orch.get_job(job_id)
+
+
+@router.post("/job/{job_id}/cancel")
+def cancel_job(job_id: str):
+    return orch.cancel_job(job_id)
 
 
 class ReplanReq(BaseModel):

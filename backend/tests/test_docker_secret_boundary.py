@@ -220,9 +220,13 @@ def test_malformed_secret_directive_fails_closed_without_payload(tmp_path: Path)
 
 
 def test_docker_secret_workflow_tracks_every_deployable_context() -> None:
-    workflow = (
-        REPO_ROOT / ".github" / "workflows" / "docker-secret-boundary.yml"
-    ).read_text(encoding="utf-8")
+    # The specialized Docker secret workflow is archived to avoid runner
+    # fanout. Keep its original context list auditable; the separate runtime
+    # scan above still enforces the boundary on the current repository.
+    active = REPO_ROOT / ".github" / "workflows" / "docker-secret-boundary.yml"
+    archive = REPO_ROOT / ".github" / "workflows-archive" / "docker-secret-boundary.yml"
+    assert not active.exists()
+    workflow = archive.read_text(encoding="utf-8")
     for path in (
         "Dockerfile",
         "backend/Dockerfile",

@@ -138,9 +138,16 @@ frame, a current digest-checked review and a current `binary_ready` desktop
 package. The simulation measures the source runtime. The desktop package is a
 compiled browser-rendered launcher; these checks do not prove that it ran on
 the target OS or certify subjective game quality. Both export preparation facts
-remain separate from a client download. The limits remain eight model calls,
-sixteen actions and four jobs; an unavailable toolchain or exhausted grant can
+remain separate from a client download. Explicit grants support up to sixteen model calls,
+sixteen actions and eight jobs; defaults remain four model calls and two jobs. An unavailable toolchain or exhausted grant can
 leave an honestly incomplete goal.
+
+For an explicitly bounded edit–simulate–review–refine loop, enable the optional
+[measured quality policy](STUDIO_MEASURED_QUALITY.md). It pins an actual reference,
+freezes the review workload, rejects measured regressions before packaging and
+can restore the exact reference through the existing world editor. Each quality
+decision replans after actual owner evidence. Acceptance remains numerical and
+source-bound, with no subjective-quality or model-weight-training claim.
 
 New checklist decisions expose the next prerequisite stage from those receipts,
 regardless of model capacity. Export progress reports source and binary

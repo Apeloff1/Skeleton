@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /rosetta — Full Rosetta Challenge Runner.
  *
@@ -11,10 +11,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
+import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
+import { apiFetch } from '../src/utils/apiController';
 
 const BACKEND = CANONICAL_API_BASE || '';
-const USER_ID = 'default_user';
 const LANGS = ['Python','JavaScript','TypeScript','Go','Rust','C','C++'];
 const DIFFICULTIES = ['easy', 'medium', 'hard', 'expert'];
 
@@ -59,10 +59,12 @@ export default function RosettaScreen() {
       const qs = new URLSearchParams({ difficulty });
       if (sourceLang) qs.set('source_lang', sourceLang);
       if (targetLang) qs.set('target_lang', targetLang);
-      const r = await fetch(`${BACKEND}/api/rosetta-challenge/generate?${qs.toString()}`);
+      const r = await apiFetch(`${BACKEND}/api/rosetta-challenge/generate?${qs.toString()}`);
       const j = await r.json();
-      if (j?.error) {
-        setErr(j.error + (j.concept ? ` (concept: ${j.concept})` : ''));
+      if (!r.ok) {
+        setErr(typeof j?.detail === 'string' ? j.detail : `Challenge generation failed (HTTP ${r.status})`);
+      } else if (typeof j?.challenge_id !== 'string' || typeof j?.source_code !== 'string' || typeof j?.target_language !== 'string') {
+        setErr('The challenge service returned an invalid challenge.');
       } else {
         setChallenge(j);
         setUserCode(j.hint || '');
@@ -78,14 +80,24 @@ export default function RosettaScreen() {
     if (!challenge) return;
     setSubmitting(true); setErr(''); setVerdict(null);
     try {
-      const qs = new URLSearchParams({
-        challenge_id: challenge.challenge_id,
-        user_id: USER_ID,
-        target_language: challenge.target_language,
-        user_code: userCode,
+      const r = await apiFetch(`${BACKEND}/api/rosetta-challenge/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          challenge_id: challenge.challenge_id,
+          target_language: challenge.target_language,
+          user_code: userCode,
+        }),
       });
-      const r = await fetch(`${BACKEND}/api/rosetta-challenge/submit?${qs.toString()}`, { method: 'POST' });
       const j = await r.json();
+      if (!r.ok) {
+        setErr(typeof j?.detail === 'string' ? j.detail : `Challenge submission failed (HTTP ${r.status})`);
+        return;
+      }
+      if (typeof j?.score !== 'number' || typeof j?.passed !== 'boolean') {
+        setErr('The challenge service returned an invalid verdict.');
+        return;
+      }
       setVerdict(j);
       if (j?.xp_awarded) setXp(v => v + j.xp_awarded);
       const passed = !!j?.passed;

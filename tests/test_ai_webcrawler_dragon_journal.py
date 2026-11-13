@@ -59,3 +59,14 @@ def test_integer_timestamp_receipt_is_stable_after_sqlite_real_roundtrip():
     db.execute("UPDATE dragon_companion_events SET url='https://evil.org' WHERE session_id='older'")
     db.commit()
     assert not journal.verify("older")
+
+
+def test_wire_exposes_digest_chain_without_signing_the_payload():
+    journal = DragonEventJournal(sqlite3.connect(":memory:"))
+    first = journal.append("session", "acquisition_accepted", "https://example.org/a", at=1.5, payload={"n": 1})
+    second = journal.append("session", "distill_complete", "https://example.org/a", at=2.5, payload={"distilled": True})
+    wired = second.wire()
+    assert wired["event_id"] == second.digest == wired["digest"]
+    assert wired["previous_digest"] == first.digest
+    assert first.wire()["previous_digest"] == "0" * 64
+    assert journal.verify("session")

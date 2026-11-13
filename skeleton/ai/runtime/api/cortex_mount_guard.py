@@ -1,42 +1,19 @@
-"""Fail-closed protection against accidental HTTP mounting of cortex secrets.
+"""Runtime re-export of the canonical cortex mount guard.
 
-The historical cortex_routes.register_routes module contains unchartered
-read/write/rotate secrets endpoints and MUST remain unmounted. The app factory
-checks the assembled route table before returning an ASGI application; this
-is a defense-in-depth guard, not a substitute for handler-level authorization.
+The implementation lives in ``skeleton.api.cortex_mount_guard``. This module
+re-exports it so the runtime tree cannot keep a second, older startup check.
 """
-from __future__ import annotations
 
-from urllib.parse import unquote
+from skeleton.api.cortex_mount_guard import (
+    CortexRouteGuardMiddleware,
+    iter_route_paths,
+    reject_cortex_secret_routes,
+    route_table_fingerprint,
+)
 
-
-def reject_cortex_secret_routes(app: object) -> None:
-    """Refuse app startup if a registered HTTP path exposes cortex secrets."""
-    routes = getattr(app, "routes", None)
-    if routes is None:
-        raise RuntimeError("HTTP route inventory unavailable; refusing startup")
-    for route in routes:
-        path = getattr(route, "path", None)
-        if not isinstance(path, str):
-            raise RuntimeError("uninspectable HTTP route; refusing startup")
-        # Starlette provides decoded ASGI paths; also inspect percent-encoded
-        # aliases so registration spelling cannot bypass the source guard.
-        decoded = path
-        for _ in range(3):
-            expanded = unquote(decoded)
-            if expanded == decoded:
-                break
-            decoded = expanded
-        # Multiple separators are normalized by some ingress stacks, so do
-        # not let an alias slip past before the request reaches Starlette.
-        normalized = "/" + "/".join(
-            segment for segment in decoded.casefold().split("/") if segment
-        )
-        if normalized == "/api/v1/secrets" or normalized.startswith("/api/v1/secrets/"):
-            raise RuntimeError(
-                "unchartered cortex secrets HTTP route is forbidden: "
-                "keep cortex_routes unmounted"
-            )
-
-
-__all__ = ["reject_cortex_secret_routes"]
+__all__ = (
+    "CortexRouteGuardMiddleware",
+    "iter_route_paths",
+    "reject_cortex_secret_routes",
+    "route_table_fingerprint",
+)

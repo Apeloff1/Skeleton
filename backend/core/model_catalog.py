@@ -10,6 +10,7 @@ import hashlib
 import asyncio
 import json
 import re
+from dataclasses import replace
 from collections.abc import Mapping
 from typing import Any
 
@@ -71,6 +72,18 @@ _READINESS = {
         "The local model artifact could not be loaded safely.",
         "Ask an administrator to replace the artifact with a valid governed model and restart the engine.",
     ),
+    "local_guard_unavailable": (
+        "Local AI is unavailable because its required safety components are not configured.",
+        "Ask an administrator to complete the trusted local AI setup and restart the engine.",
+    ),
+    "local_guard_configuration_invalid": (
+        "The local AI safety configuration is invalid.",
+        "Ask an administrator to correct the local AI safety configuration and restart the engine.",
+    ),
+    "local_artifact_identity_invalid": (
+        "The activated local model identity changed.",
+        "Ask an administrator to verify its artifact and restart the engine.",
+    ),
     "local_external_fallback_denied": (
         "Local mode contains an unsupported hosted fallback configuration.",
         "Ask an administrator to remove external fallback settings from local mode.",
@@ -83,9 +96,17 @@ _READINESS = {
         "The local model settings are invalid.",
         "Ask an administrator to review the local engine settings.",
     ),
+    "local_catalog_invalid": (
+        "The configured local model catalog could not be activated safely.",
+        "Ask an administrator to check its pinned files, route names, byte budget and available memory, then restart the engine.",
+    ),
     "local_model_unavailable": (
         "The activated local model is no longer ready.",
         "Ask an administrator to verify its artifact and restart the engine.",
+    ),
+    "local_serving_draining": (
+        "New work is paused for this local model.",
+        "Ask an administrator to resume admission for this model in Runtime optimization.",
     ),
     "no_ready_model": (
         "No configured model is ready for chat.",
@@ -110,6 +131,14 @@ _READINESS = {
     "model_temperature_unsupported": (
         "The selected model does not support temperature settings.",
         "Use its default sampling settings or choose a supported model.",
+    ),
+    "cooperation_budget_insufficient": (
+        "The selected output allowance is too small for every requested review stage.",
+        "Increase the output allowance or choose fewer drafts or review rounds.",
+    ),
+    "cooperation_context_too_small": (
+        "The selected context cannot reserve enough room for review artifacts and control policy.",
+        "Choose a larger model context or a smaller output allowance.",
     ),
 }
 
@@ -141,8 +170,8 @@ def _text(value: object, *, maximum: int, optional: bool = False) -> str | None:
     return value
 
 
-def _integer(value: object, *, maximum: int) -> int:
-    if type(value) is not int or not 1 <= value <= maximum:
+def _integer(value: object, *, maximum: int, minimum: int = 1) -> int:
+    if type(value) is not int or not minimum <= value <= maximum:
         raise EngineProtocolError("model catalog contains an invalid capacity")
     return value
 
@@ -155,13 +184,25 @@ def _activation(value: object, model_id: str | None) -> dict[str, Any] | None:
     schema = _text(value.get("schema"), maximum=128)
     if schema not in {
         "reference_ngram",
+        "skeleton.reference_ngram.v1",
         "skeleton.numpy_recurrent_lm.v1",
+        "skeleton.ai.native-llm-runtime.v2",
         "skeleton.local_model.deployment.v1",
     }:
         raise EngineProtocolError("model catalog artifact schema is unsupported")
     artifact_model = _text(value.get("model_id"), maximum=256)
     if model_id != artifact_model:
         raise EngineProtocolError("model catalog artifact/model identity mismatch")
+    catalog_binding = {}
+    catalog_keys = {"catalog_digest", "catalog_entry_digest", "catalog_source_sha256", "source_model_id"}
+    if catalog_keys.intersection(value):
+        if not catalog_keys <= set(value):
+            raise EngineProtocolError("model catalog route binding is incomplete")
+        catalog_binding["source_model_id"] = _text(value["source_model_id"], maximum=256)
+        for key in catalog_keys - {"source_model_id"}:
+            if not isinstance(value[key], str) or _DIGEST.fullmatch(value[key]) is None:
+                raise EngineProtocolError("model catalog route digest is invalid")
+            catalog_binding[key] = value[key]
     digests = {}
     for key in ("model_digest", "artifact_sha256"):
         digest = value.get(key)
@@ -186,6 +227,7 @@ def _activation(value: object, model_id: str | None) -> dict[str, Any] | None:
             "artifact_bytes": _integer(value.get("artifact_bytes"), maximum=1024**4),
             "runtime_kind": "llama.cpp-cli",
             "reference": reference,
+            **catalog_binding,
         }
     reference = "local-model-artifact:" + digests["artifact_sha256"]
     if value.get("reference", reference) != reference:
@@ -194,8 +236,12 @@ def _activation(value: object, model_id: str | None) -> dict[str, Any] | None:
         "schema": schema,
         "model_id": artifact_model,
         **digests,
-        "artifact_bytes": _integer(value.get("artifact_bytes"), maximum=128 * 1024 * 1024),
+        "artifact_bytes": _integer(
+            value.get("artifact_bytes"),
+            maximum=1024**4 if schema == "skeleton.ai.native-llm-runtime.v2" else 128 * 1024 * 1024,
+        ),
         "reference": reference,
+        **catalog_binding,
     }
 
 
@@ -204,11 +250,11 @@ def _local_handoff(*, activated: bool) -> dict[str, Any]:
         "credential_free": True,
         "activated": activated,
         "operator_required": True,
-        "configuration_keys": ["AI_PROVIDER", "AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH"],
-        "configuration_exclusive_alternatives": [["AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH"]],
+        "configuration_keys": ["AI_PROVIDER", "AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH", "AI_LOCAL_MODEL_CATALOG_PATH"],
+        "configuration_exclusive_alternatives": [["AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH", "AI_LOCAL_MODEL_CATALOG_PATH"]],
         "required_provider_value": "local",
         "restart_required": True,
-        "instruction": "An administrator can export a governed local model, configure AI_LOCAL_MODEL_PATH or an approved AI_LOCAL_DEPLOYMENT_PATH manifest exclusively, and restart the engine. No hosted AI credentials are required.",
+        "instruction": "An administrator can configure one governed AI_LOCAL_MODEL_PATH artifact, an AI_LOCAL_DEPLOYMENT_PATH manifest, or an AI_LOCAL_MODEL_CATALOG_PATH catalog of 1–8 pinned local models, and restart the engine. Catalogs declare an exact primary and optional independent verifier within an operator byte budget. No hosted AI credentials are required.",
         "production_promotion_authorized": False,
     }
 
@@ -235,16 +281,21 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
     rows = inventory.get("providers")
     if not isinstance(rows, list) or not 1 <= len(rows) <= _MAX_ROWS:
         raise EngineProtocolError("model inventory row count is invalid")
+    explicit_active = any(isinstance(row, Mapping) and "active" in row for row in rows)
     models, providers, seen = [], [], set()
     active = None
     for raw in rows:
         if not isinstance(raw, Mapping):
             raise EngineProtocolError("model inventory row is invalid")
         provider_id = _text(raw.get("id"), maximum=128)
-        if provider_id in seen:
-            raise EngineProtocolError("model inventory provider is duplicated")
-        seen.add(provider_id)
         model_id = _text(raw.get("model"), maximum=256, optional=True)
+        identity = (provider_id, model_id)
+        if identity in seen:
+            raise EngineProtocolError("model inventory provider/model identity is duplicated")
+        seen.add(identity)
+        active_row = raw.get("active", False) if explicit_active else provider_id == active_provider
+        if type(active_row) is not bool or (active_row and provider_id != active_provider):
+            raise EngineProtocolError("model inventory active route is invalid")
         if type(raw.get("available")) is not bool or type(raw.get("architecture_acknowledged")) is not bool:
             raise EngineProtocolError("model inventory readiness is invalid")
         mode = raw.get("execution_mode")
@@ -259,6 +310,18 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
         code = "ready" if available else raw.get("readiness_code", "provider_configuration_unavailable")
         if not isinstance(code, str):
             raise EngineProtocolError("model inventory readiness code is invalid")
+        serving_state = raw.get("serving_state")
+        if serving_state is not None:
+            if not local or not isinstance(serving_state, Mapping) or type(serving_state.get("draining")) is not bool:
+                raise EngineProtocolError("model inventory serving state is invalid")
+            serving_state = {
+                "draining": serving_state["draining"],
+                "active": _integer(serving_state.get("active"), minimum=0, maximum=1_000_000),
+                "queued": _integer(serving_state.get("queued"), minimum=0, maximum=1_000_000),
+                "effective_concurrency": _integer(serving_state.get("effective_concurrency"), maximum=32),
+            }
+            if available and serving_state["draining"]:
+                available, code = False, "local_serving_draining"
         activation = _activation(raw.get("artifact"), model_id)
         if local and available and activation is None:
             raise EngineProtocolError("ready local model lacks activation identity")
@@ -266,7 +329,7 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
             {
                 "provider_id": provider_id,
                 "available": available,
-                "active": provider_id == active_provider,
+                "active": active_row,
                 "fallback": raw.get("fallback") is True,
                 "credential_free": local,
                 "execution_mode": mode,
@@ -280,17 +343,25 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
                 raise EngineProtocolError("ready provider has no model identity")
             continue
         context_window = _integer(raw.get("context_window"), maximum=1_048_576)
-        max_output = _integer(raw.get("max_output_tokens"), maximum=16_384)
+        max_output = _integer(raw.get("max_output_tokens"), maximum=131_072)
         default_output = _integer(raw.get("default_output_tokens"), maximum=max_output)
-        if raw.get("limits_source") != "engine_chat_policy":
+        limits_source = raw.get("limits_source")
+        if limits_source not in {"engine_chat_policy", "activated_local_backend", "activated_native_runtime"} or (
+            not local and limits_source != "engine_chat_policy"
+        ):
             raise EngineProtocolError("model inventory context/output capacity is invalid")
         if max_output >= context_window or default_output + 3072 >= context_window:
             available, code = False, "model_context_too_small"
             providers[-1].update(available=False, readiness=readiness(code))
         tokenizer = raw.get("tokenizer")
-        if tokenizer not in {"utf8_bytes", "reference_tokens", "approximate_text"} or (
-            not local and tokenizer != "approximate_text"
-        ):
+        if tokenizer not in {
+            "utf8_bytes",
+            "reference_tokens",
+            "approximate_text",
+            "native_tokenizer",
+            "utf8_byte_tokens",
+            "utf8_bytes_upper_bound",
+        } or (not local and tokenizer != "approximate_text"):
             raise EngineProtocolError("model inventory tokenizer profile is invalid")
         capabilities = raw.get("capabilities")
         supports_temperature = raw.get("supports_temperature")
@@ -302,6 +373,8 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
             "image-variation",
             "image-editing",
             "speech-synthesis",
+            "tool-calls",
+            "structured-output",
         }
         if (
             not isinstance(capabilities, list)
@@ -322,24 +395,67 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
             "label": label,
             "available": available,
             "selectable": available and "text-generation" in capabilities,
-            "active": provider_id == active_provider,
+            "active": active_row,
+            "fallback": raw.get("fallback") is True,
             "credential_free": local,
             "execution_mode": mode,
             "context_window": context_window,
             "max_output_tokens": max_output,
             "default_output_tokens": default_output,
-            "limits_source": "engine_chat_policy",
+            "limits_source": limits_source,
             "tokenizer": tokenizer,
             "capabilities": list(capabilities),
             "supports_temperature": supports_temperature,
             "readiness": readiness(code),
             "activation": activation,
         }
+        if serving_state is not None:
+            row["serving_state"] = serving_state
+        for name in ("semantic_verifier_configured", "semantic_verifier_route"):
+            if name in raw:
+                if type(raw[name]) is not bool:
+                    raise EngineProtocolError("model inventory verifier metadata is invalid")
+                row[name] = raw[name]
+        limits = raw.get("generation_limits")
+        if limits is not None:
+            if not isinstance(limits, Mapping):
+                raise EngineProtocolError("model inventory generation limits are invalid")
+            bounded_limits = {}
+            for name in ("tokenizer_max_chars", "tokenizer_max_tokens", "max_output_utf8_bytes"):
+                if name in limits:
+                    bounded_limits[name] = _integer(limits[name], maximum=1024**3)
+            if bounded_limits:
+                row["generation_limits"] = bounded_limits
+        family = raw.get("model_family")
+        if family is not None:
+            if family not in {
+                "native_transformer",
+                "gguf_open_weight",
+                "numpy_recurrent_baseline",
+                "reference_ngram",
+                "operator_callable",
+                "unavailable",
+            }:
+                raise EngineProtocolError("model inventory family is invalid")
+            row["model_family"] = family
         models.append(row)
         if row["active"]:
             active = {"provider_id": provider_id, "model_id": model_id}
-    if active_provider not in seen:
+    if active_provider not in {provider_id for provider_id, _model_id in seen}:
         raise EngineProtocolError("model inventory active provider is missing")
+    if sum(provider["active"] for provider in providers) != 1:
+        raise EngineProtocolError("model inventory must identify one exact active model")
+    grouped_providers: dict[str, dict[str, Any]] = {}
+    for provider in providers:
+        grouped = grouped_providers.get(provider["provider_id"])
+        if grouped is None:
+            grouped_providers[provider["provider_id"]] = dict(provider)
+            continue
+        for flag in ("available", "active", "fallback", "configured"):
+            grouped[flag] = grouped[flag] or provider[flag]
+        if provider["available"] or (provider["active"] and not grouped["available"]):
+            grouped["readiness"] = provider["readiness"]
+    providers = list(grouped_providers.values())
     available = any(row["selectable"] for row in models)
     issue = (
         readiness("ready")
@@ -352,11 +468,10 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
         "available": available,
         "automatic_available": inventory["available"]
         and not any(
-            row["readiness"]["code"] == "model_context_too_small"
+            row["readiness"]["code"] in {"model_context_too_small", "local_serving_draining"}
             and (
                 row["active"]
-                or row["provider_id"]
-                in {provider["provider_id"] for provider in providers if provider["fallback"]}
+                or row["fallback"]
             )
             for row in models
         ),
@@ -417,7 +532,7 @@ def resolve_selection(
             raise ModelSelectionError("model_selection_unavailable", status_code=503)
         return {
             **selected,
-            "context_tokenizer": selected["tokenizer"],
+            "context_tokenizer": _context_tokenizer(selected["tokenizer"]),
             "selection_mode": "explicit",
             "selection_provider_id": provider_id,
             "selection_model_id": model_id,
@@ -427,14 +542,12 @@ def resolve_selection(
             raise ModelSelectionError("automatic_route_unavailable", status_code=503)
         issue = catalog.get("readiness") or {}
         raise ModelSelectionError(issue.get("code", "no_ready_model"), status_code=503)
-    providers = catalog.get("providers", [])
-    eligible = {row["provider_id"] for row in providers if row["active"] or row["fallback"]}
-    routes = [row for row in models if row["provider_id"] in eligible]
+    routes = [row for row in models if row["active"] or row.get("fallback") is True]
     ready = [row for row in routes if row["selectable"]]
     if not ready:
         raise ModelSelectionError("no_ready_model", status_code=503)
     selected = next((row for row in ready if row["active"]), ready[0])
-    profiles = {row["tokenizer"] for row in routes}
+    profiles = {_context_tokenizer(row["tokenizer"]) for row in routes}
     context_tokenizer = next(iter(profiles)) if len(profiles) == 1 else "utf8_bytes"
     # Automatic routing can use only declared fallbacks. Compile to the lowest
     # capacity among those routes while leaving dispatch selection unset.
@@ -449,6 +562,43 @@ def resolve_selection(
         "selection_provider_id": None,
         "selection_model_id": None,
     }
+
+
+def selection_may_use_llama_cpp(
+    catalog: Mapping[str, Any], selection: Mapping[str, Any], *, cooperation: Mapping[str, Any] | None = None,
+) -> bool:
+    """Identify declared llama.cpp routes, including automatic fallbacks.
+
+    Inventory does not expose a prompt-template identity, so this is only a
+    route test; callers must not infer an exact native profile from it.
+    """
+    if selection.get("selection_mode") == "explicit":
+        routes = [selection]
+    else:
+        routes = [row for row in catalog.get("models", ()) if row.get("active") or row.get("fallback")]
+    if cooperation is not None:
+        from skeleton.intelligence.cooperation import normalize_cooperation_policy
+
+        policy = normalize_cooperation_policy(cooperation)
+        assert policy is not None
+        routes.extend(
+            resolve_selection(catalog, provider_id=pair["provider_id"], model_id=pair["model_id"])
+            for pair in policy["roles"].values()
+        )
+    return any(
+        row.get("execution_mode") == "local"
+        and isinstance(row.get("activation"), Mapping)
+        and row["activation"].get("runtime_kind") == "llama.cpp-cli"
+        for row in routes
+    )
+
+
+def _context_tokenizer(profile: str) -> str:
+    """The backend never impersonates an engine-owned native tokenizer."""
+
+    if profile in {"native_tokenizer", "utf8_byte_tokens", "utf8_bytes_upper_bound"}:
+        return "utf8_bytes"
+    return profile
 
 
 def context_budget_for_selection(
@@ -472,6 +622,67 @@ def context_budget_for_selection(
         max_artifact_tokens=min(16_000, input_capacity),
         max_tool_result_tokens=min(16_000, input_capacity),
     )
+
+
+def cooperation_context_selection(
+    catalog: Mapping[str, Any],
+    selection: Mapping[str, Any],
+    cooperation: Mapping[str, Any] | None,
+    *,
+    output_tokens: int | None = None,
+) -> dict[str, Any]:
+    """Fit one immutable context to every explicitly selected cooperative role.
+
+    Role identity is resolved through the same scoped inventory as ordinary
+    chat. Output remains the primary operation's aggregate allowance; this
+    projection never multiplies it by the number of model stages.
+    """
+
+    if cooperation is None:
+        return dict(selection)
+    from skeleton.intelligence.cooperation import cooperation_stages, normalize_cooperation_policy
+
+    policy = normalize_cooperation_policy(cooperation)
+    output = selection["default_output_tokens"] if output_tokens is None else output_tokens
+    if type(output) is not int or output < 64 * len(cooperation_stages(policy)):
+        raise ModelSelectionError("cooperation_budget_insufficient")
+    rows = [selection]
+    for pair in policy["roles"].values():
+        row = resolve_selection(catalog, provider_id=pair["provider_id"], model_id=pair["model_id"])
+        # The requested stage limit is a ceiling, not a new operation budget.
+        context_budget_for_selection(
+            row,
+            output_tokens=min(policy["max_stage_output_tokens"], row["max_output_tokens"]),
+        )
+        rows.append(row)
+    profiles = {row["context_tokenizer"] for row in rows}
+    return {
+        **selection,
+        "context_window": min(row["context_window"] for row in rows),
+        "context_tokenizer": next(iter(profiles)) if len(profiles) == 1 else "utf8_bytes",
+        "supports_temperature": all(row["supports_temperature"] for row in rows),
+    }
+
+
+def cooperation_context_budget(budget: ContextBudget, cooperation: Mapping[str, Any] | None) -> ContextBudget:
+    """Reserve finite compiler slack for generated review material and framing."""
+
+    if cooperation is None:
+        return budget
+    from skeleton.intelligence.cooperation import cooperation_stages, normalize_cooperation_policy
+
+    policy = normalize_cooperation_policy(cooperation)
+    stages = len(cooperation_stages(policy))
+    stage_output = min(policy["max_stage_output_tokens"], budget.reserved_output_tokens // stages)
+    drafts = int(policy.get("draft_count", 1))
+    # Preserve legacy reservations for one draft. The first multi-draft
+    # refinement also carries every candidate, the plan and its critique.
+    artifact_slots = 2 if drafts == 1 else drafts + 2
+    headroom = min(4096, max(1024, artifact_slots * stage_output + 128 * stages))
+    reserve = budget.reserved_policy_tokens + headroom
+    if reserve + 512 >= budget.input_capacity(tools_enabled=False):
+        raise ModelSelectionError("cooperation_context_too_small")
+    return replace(budget, reserved_policy_tokens=reserve)
 
 
 def estimate_context_tokens(text: str, selection: Mapping[str, Any]) -> int:

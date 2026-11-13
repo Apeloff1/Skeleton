@@ -24,8 +24,42 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
-from scipy import stats
-from scipy.special import digamma, gammaln
+
+_stats_mod = None
+_specials: dict = {}
+
+
+def _ensure_scipy() -> None:
+    """LAFS probability math needs scipy, but importing the ledger must not."""
+    global _stats_mod
+    if _stats_mod is not None:
+        return
+    from scipy import stats as scipy_stats
+    from scipy.special import digamma as scipy_digamma, gammaln as scipy_gammaln
+
+    _stats_mod = scipy_stats
+    _specials["digamma"] = scipy_digamma
+    _specials["gammaln"] = scipy_gammaln
+
+
+class _StatsProxy:
+    def __getattr__(self, name: str):
+        _ensure_scipy()
+        return getattr(_stats_mod, name)
+
+
+class _SpecialProxy:
+    def __init__(self, name: str):
+        self._name = name
+
+    def __call__(self, *args, **kwargs):
+        _ensure_scipy()
+        return _specials[self._name](*args, **kwargs)
+
+
+stats = _StatsProxy()
+digamma = _SpecialProxy("digamma")
+gammaln = _SpecialProxy("gammaln")
 
 
 def _now() -> str:

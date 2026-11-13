@@ -611,6 +611,97 @@
         "REQ:VOL-126:001",
         "REQ:VOL-126:002"
       ]
+    },
+    {
+      "behavior_id": "BEHAV-GAME-NATIVE-DELIVERY-NORMAL",
+      "capability_id": "game.native_delivery",
+      "mode": "normal",
+      "preconditions": [
+        "authenticated tenant-bound owner",
+        "current signed Wiki and separate Hoag approvals for two independent supporting source groups",
+        "matching consented practice lesson",
+        "supported target/style emitter",
+        "shared resource scheduler and owner retained artifact budget",
+        "durable reviewed knowledge and native practice SQLite stores"
+      ],
+      "postconditions": [
+        "requested capability semantics are preserved",
+        "result status does not overstate unavailable/degraded dependencies"
+      ],
+      "forbidden_outcomes": [
+        "silent fallback to weaker capability guarantees",
+        "enabled=true treated as ready without readiness proof"
+      ],
+      "requirement_ids": [
+        "REQ:VOL-113:001",
+        "REQ:VOL-113:002",
+        "REQ:VOL-126:001",
+        "REQ:VOL-126:002"
+      ]
+    },
+    {
+      "behavior_id": "BEHAV-GAME-NATIVE-DELIVERY-DEG-KNOWLEDGE-UNAVAILABLE",
+      "capability_id": "game.native_delivery",
+      "mode": "degraded",
+      "trigger": "knowledge_unavailable",
+      "required_behavior": "browse_or_generation_unavailable",
+      "forbidden_outcomes": [
+        "claiming unavailable dependency succeeded",
+        "silent reroute into broader authority or weaker verification"
+      ],
+      "requirement_ids": [
+        "REQ:VOL-113:003",
+        "REQ:VOL-126:001",
+        "REQ:VOL-126:002"
+      ]
+    },
+    {
+      "behavior_id": "BEHAV-GAME-NATIVE-DELIVERY-DEG-UNAPPROVED-OR-STALE-SOURCES",
+      "capability_id": "game.native_delivery",
+      "mode": "degraded",
+      "trigger": "unapproved_or_stale_sources",
+      "required_behavior": "brief_blocked",
+      "forbidden_outcomes": [
+        "claiming unavailable dependency succeeded",
+        "silent reroute into broader authority or weaker verification"
+      ],
+      "requirement_ids": [
+        "REQ:VOL-113:003",
+        "REQ:VOL-126:001",
+        "REQ:VOL-126:002"
+      ]
+    },
+    {
+      "behavior_id": "BEHAV-GAME-NATIVE-DELIVERY-DEG-RESOURCE-PRESSURE",
+      "capability_id": "game.native_delivery",
+      "mode": "degraded",
+      "trigger": "resource_pressure",
+      "required_behavior": "defer_without_artifact",
+      "forbidden_outcomes": [
+        "claiming unavailable dependency succeeded",
+        "silent reroute into broader authority or weaker verification"
+      ],
+      "requirement_ids": [
+        "REQ:VOL-113:003",
+        "REQ:VOL-126:001",
+        "REQ:VOL-126:002"
+      ]
+    },
+    {
+      "behavior_id": "BEHAV-GAME-NATIVE-DELIVERY-DEG-COMPILER-MISSING",
+      "capability_id": "game.native_delivery",
+      "mode": "degraded",
+      "trigger": "compiler_missing",
+      "required_behavior": "source_only_no_binary_claim",
+      "forbidden_outcomes": [
+        "claiming unavailable dependency succeeded",
+        "silent reroute into broader authority or weaker verification"
+      ],
+      "requirement_ids": [
+        "REQ:VOL-113:003",
+        "REQ:VOL-126:001",
+        "REQ:VOL-126:002"
+      ]
     }
   ]
 }

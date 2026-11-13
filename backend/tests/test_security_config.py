@@ -61,3 +61,15 @@ def test_errors_do_not_echo_raw_invalid_values() -> None:
     with pytest.raises(SecurityConfigError) as excinfo:
         env_bool("FLAG", env={"ENVIRONMENT": "production", "FLAG": secret})
     assert secret not in str(excinfo.value)
+
+
+def test_security_augmentation_bounds_and_identifiers() -> None:
+    """Backend-owned security helpers retain the cross-boundary smoke assertions."""
+    from core.security_augmentation import bound_text, is_safe_identifier
+
+    assert bound_text("hello", 3) == "hel"
+    assert bound_text("a\x00b", 10) == "ab"
+    assert is_safe_identifier("abc-123")
+    assert not is_safe_identifier("abc/123")
+    assert not is_safe_identifier("")
+    assert not is_safe_identifier("x" * 129)

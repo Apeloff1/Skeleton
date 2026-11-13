@@ -15,10 +15,27 @@ def test_state_topology_is_valid() -> None:
     assert errors == []
     assert summary["ok"] is True
     assert summary["architecture_tag"] == "arch-map/v3.7"
-    assert summary["topology_version"] == "1.8.0"
+    assert summary["topology_version"] == "1.9.0"
     assert summary["physical_stores"] >= 7
     assert summary["state_domains"] >= 10
     assert summary["state_flows"] >= 7
+
+
+def test_dragon_conversation_micro_projection_is_derived_from_canonical_messages() -> None:
+    topology = _topology()
+    domains = {domain["id"]: domain for domain in topology["state_domains"]}
+    projection = domains["dragon-conversation-micro-projection"]
+    assert projection["authority"] == "derived"
+    assert projection["source_of_truth"] is False
+    assert projection["rebuildable"] is True
+    assert projection["derived_from"] == [
+        "conversation-thread-state",
+        "conversation-message-state",
+    ]
+    flows = {item["id"]: item for item in topology["state_flows"]}
+    flow = flows["conversation-to-dragon-micro-projection"]
+    assert flow["from"] == "conversation-message-state"
+    assert flow["to"] == "dragon-conversation-micro-projection"
 
 
 def test_closed_gap_lineage_is_retained_on_stable_authorities() -> None:
@@ -27,11 +44,24 @@ def test_closed_gap_lineage_is_retained_on_stable_authorities() -> None:
 
     operation = domains["canonical-operation-state"]
     assert operation["authority"] == "authoritative"
-    assert operation["gap"] == "gap-state-authority-convergence"
+    assert operation["status"] == "production-bound"
+    assert "gap" not in operation
 
     memory = domains["canonical-ai-memory-records"]
     assert memory["authority"] == "authoritative"
-    assert memory["gap"] == "gap-memory-durable-authority"
+    assert memory["status"] == "production-bound"
+    assert "gap" not in memory
+
+    construction = json.loads(
+        (ROOT / "machine/ai_app_construction.json").read_text(encoding="utf-8")
+    )
+    closed = {
+        item["id"]: item
+        for item in construction["gap_register"]
+        if isinstance(item, dict)
+    }
+    assert closed["gap-state-authority-convergence"]["status"] == "closed"
+    assert closed["gap-memory-durable-authority"]["status"] == "closed"
 
 
 def test_only_declared_authority_classes_are_sources_of_truth() -> None:
@@ -63,7 +93,8 @@ def test_chroma_is_not_the_target_authority_for_canonical_product_state() -> Non
     chroma_domains = [
         domain
         for domain in topology["state_domains"]
-        if domain["physical_store"] in {"backend-data-volume", "chroma-service"}
+        if domain["physical_store"] == "chroma-service"
+        or domain["id"] == "backend-rag-local-chroma"
     ]
 
     assert chroma_domains
@@ -91,7 +122,7 @@ def test_operation_state_is_production_bound_and_stream_is_non_authoritative() -
     assert operation["physical_store"] == "operation-state-sqlite"
     assert operation["status"] == "production-bound"
     assert operation["rebuildable"] is False
-    assert operation["gap"] == "gap-state-authority-convergence"
+    assert "gap" not in operation
 
     assert stream["authority"] == "durable-projection"
     assert stream["source_of_truth"] is False
@@ -197,7 +228,7 @@ def test_functional_ai_memory_authority_is_canonical_and_projections_are_derived
     assert canonical["authority"] == "authoritative"
     assert canonical["source_of_truth"] is True
     assert canonical["rebuildable"] is False
-    assert canonical["gap"] == "gap-memory-durable-authority"
+    assert "gap" not in canonical
 
     for projection_id in ("optional-vector-index", "in-process-retrieval-memory"):
         projection = domains[projection_id]

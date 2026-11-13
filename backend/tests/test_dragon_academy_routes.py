@@ -35,8 +35,28 @@ def test_registered_with_existing_auth_and_no_authority_mint_endpoints():
     assert "/api/dragon-academy/status" in paths
     assert "/api/dragon-academy/practice/run" in paths
     assert "/api/dragon-academy/practice/subscribe" in paths
-    assert not any("offer" in p or "approve" in p or "xp" in p or "review" in p
-                   for p in paths)
+    # Native Academy endpoints must not mint crawler-authoritative lessons
+    # or progress. Dedicated /knowledge/.../review operations are legitimate,
+    # but they must remain separately editor-gated and POST-only.
+    forbidden_mint_segments = {"offer", "approve", "xp"}
+    assert not any(
+        forbidden_mint_segments.intersection(path.strip("/").split("/"))
+        for path in paths
+    )
+    review_routes = {
+        r.path: r for r in route.router.routes
+        if "review" in r.path.strip("/").split("/")
+    }
+    assert set(review_routes) == {
+        "/api/dragon-academy/knowledge/candidates/{candidate_id}/review",
+        "/api/dragon-academy/knowledge/candidates/{candidate_id}/review/resume",
+    }
+    for candidate in review_routes.values():
+        assert candidate.methods == {"POST"}
+        assert any(
+            dependency.call.__name__ == "get_current_user"
+            for dependency in candidate.dependant.dependencies
+        )
     assert '/api/dragon-academy/native/generate' in paths
     assert '/api/dragon-academy/native/targets' in paths
 
@@ -751,6 +771,13 @@ def test_original_campaign_api_builds_real_multistage_forks_and_solver_diversity
     assert result["challenge"]["has_player_observations"] is False
     for index,stage in enumerate(result["stages"]):
         assert stage["stage"]==index+1
+        # Direct Python and HTTP JSON callers see the identical documented
+        # array contract; tuple-shaped internal dataclasses cannot leak here.
+        assert isinstance(stage["routes"]["routes"],list)
+        # Direct Python invocation must expose the same JSON-compatible shape
+        # as HTTP serialization. Tuple-only reports cannot be replayed by the
+        # independent verifier even when their paths are real.
+        assert isinstance(stage["routes"]["routes"], list)
         proof=verify_route_report(BASE_LEVELS[index],stage["routes"])
         assert proof["routes"]>=1
     assert "no human" in result["claim"]
@@ -790,3 +817,20 @@ def test_original_campaign_does_not_invent_branch_choices_for_two_stages():
     assert report["chapter_paths"]["ending_count"]==1
     assert report["chapter_paths"]["choice_nodes"]==0
     assert len(report["chapter_paths"]["complete_routes"])==1
+
+
+def test_standalone_original_routes_round_trip_through_independent_verifier():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_multipath import verify_route_report
+
+    board = BASE_LEVELS[0]
+    request = route.NativeRouteAnalysisRequest(
+        rows=list(board), max_routes=4, search_budget=4000,
+    )
+    report = route.native_production_multiple_routes(request, owner=identity())
+    assert report["ok"] is True
+    assert isinstance(report["routes"], list)
+    assert report["routes"]
+    verified = verify_route_report(board, report)
+    assert verified["status"] == "original_routes_replayed"
+    assert verified["routes"] == len(report["routes"])

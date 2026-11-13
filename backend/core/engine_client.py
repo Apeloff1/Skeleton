@@ -17,11 +17,16 @@ import base64
 import binascii
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+import hashlib
+import ipaddress
+import json
 import math
 import os
+import re
+from skeleton.contracts.runtime_optimization import validate_runtime_policy_patch
 from time import monotonic
 from typing import Any, Mapping, Sequence
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -30,7 +35,7 @@ from skeleton.api.engine_service import (
     EngineContextHandoff,
     EngineExecutionCommand,
 )
-from skeleton.contracts.ai_execution import AIExecutionRequest
+from skeleton.contracts.ai_execution import AIExecutionRequest, execution_failure_code
 from skeleton.contracts.context import ContextEnvelope
 from skeleton.contracts.memory_record import MemoryKind
 from skeleton.context.compiler import project_provider_context
@@ -60,6 +65,67 @@ class EngineNotFoundError(EngineProtocolError):
 
 class EngineAuthorizationError(EngineClientError):
     """The engine rejected delegated authority."""
+
+
+class EngineRequestRejectedError(EngineProtocolError):
+    """A bounded control update failed canonical engine policy validation."""
+
+
+def _bounded_engine_json(content: bytearray) -> dict[str, Any]:
+    """Decode one bounded engine envelope without ambiguous scalar identities."""
+
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if not key.isascii() and any(0xD800 <= ord(character) <= 0xDFFF for character in key):
+                raise ValueError("invalid Unicode engine envelope key")
+            if key in value:
+                raise ValueError("duplicate engine envelope key")
+            value[key] = item
+        return value
+
+    def reject_constant(_value: str) -> None:
+        raise ValueError("non-finite engine constant")
+
+    def finite_float(value: str) -> float:
+        number = float(value)
+        if not math.isfinite(number):
+            raise ValueError("non-finite engine number")
+        return number
+
+    try:
+        payload = json.loads(
+            content.decode("utf-8"),
+            object_pairs_hook=unique_object,
+            parse_constant=reject_constant,
+            parse_float=finite_float,
+        )
+    except (ValueError, UnicodeError, RecursionError, OverflowError) as exc:
+        raise EngineProtocolError("engine returned invalid finite UTF-8 JSON") from exc
+    if not isinstance(payload, dict):
+        raise EngineProtocolError("engine response must be an object")
+    pending = [(payload, 0)]
+    nodes = 0
+    while pending:
+        item, depth = pending.pop()
+        nodes += 1
+        if depth > 96 or nodes > 262_144:
+            raise EngineProtocolError("engine response exceeds its structure bound")
+        if (
+            isinstance(item, str)
+            and not item.isascii()
+            and any(0xD800 <= ord(character) <= 0xDFFF for character in item)
+        ):
+            raise EngineProtocolError("engine response contains invalid Unicode")
+        if isinstance(item, dict):
+            if nodes + len(pending) + len(item) > 262_144:
+                raise EngineProtocolError("engine response exceeds its structure bound")
+            pending.extend((child, depth + 1) for child in item.values())
+        elif isinstance(item, list):
+            if nodes + len(pending) + len(item) > 262_144:
+                raise EngineProtocolError("engine response exceeds its structure bound")
+            pending.extend((child, depth + 1) for child in item)
+    return payload
 
 
 class EngineExecutionFailed(EngineClientError):
@@ -97,11 +163,19 @@ def _positive_float(value: object, field: str, *, maximum: float) -> float:
         raise EngineProtocolError(f"{field} must be numeric")
     try:
         result = float(value)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         raise EngineProtocolError(f"{field} must be numeric") from exc
-    if result <= 0 or result > maximum or result != result:
+    if not math.isfinite(result) or result <= 0 or result > maximum:
         raise EngineProtocolError(f"{field} is outside allowed range")
     return result
+
+
+def _header_text(value: object, field: str, *, maximum: int) -> str:
+    """Accept finite printable ASCII in delegated authority request headers."""
+    text = _text(value, field, maximum=maximum)
+    if not text.isascii() or any(not 33 <= ord(ch) <= 126 for ch in text):
+        raise EngineProtocolError(f"{field} contains invalid HTTP header characters")
+    return text
 
 
 def _positive_int(value: object, field: str, *, maximum: int) -> int:
@@ -126,6 +200,61 @@ def _json_object(value: object, field: str) -> dict[str, Any]:
     return dict(value)
 
 
+def _engine_origin(raw: str) -> str:
+    """Resolve one strict authority, never a redirecting/path-bearing token sink.
+
+    This is trusted operator configuration, not general-purpose web crawling.
+    Reject userinfo, fragments, query, origin-relative escapes and ambiguous
+    host spellings before any internal service bearer token can be sent.
+    """
+    if not isinstance(raw, str) or raw != raw.strip() or len(raw) > 4096:
+        raise EngineProtocolError("engine base_url must be normalized")
+    if (
+        any(ord(ch) < 33 or ord(ch) > 126 for ch in raw)
+        or "\\" in raw or "?" in raw or "#" in raw
+    ):
+        raise EngineProtocolError("engine base_url contains forbidden URL characters")
+    try:
+        parts = urlsplit(raw)
+        scheme = parts.scheme.lower()
+        host = parts.hostname
+        port = parts.port
+    except ValueError as exc:
+        raise EngineProtocolError("engine base_url is invalid") from exc
+    if (
+        scheme not in {"http", "https"}
+        or not parts.netloc
+        or not host
+        or parts.username is not None or parts.password is not None
+        or parts.query or parts.fragment
+        or parts.path not in {"", "/"}
+        or "%" in parts.netloc
+        or "@" in parts.netloc
+    ):
+        raise EngineProtocolError("engine base_url must be an origin without credentials or paths")
+    if port is not None and not 1 <= port <= 65535:
+        raise EngineProtocolError("engine base_url port is invalid")
+    if ":" in host:
+        try:
+            address = ipaddress.IPv6Address(host)
+        except ValueError as exc:
+            raise EngineProtocolError("engine base_url IPv6 authority is invalid") from exc
+        authority = "[" + address.compressed + "]"
+    else:
+        if (
+            len(host) > 253
+            or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?", host)
+            or ".." in host
+            or any(label.startswith("-") or label.endswith("-") or len(label) > 63
+                   for label in host.split("."))
+        ):
+            raise EngineProtocolError("engine base_url host is invalid")
+        authority = host.lower()
+    if port is not None:
+        authority += ":" + str(port)
+    return scheme + "://" + authority
+
+
 @dataclass(frozen=True, slots=True)
 class EngineClientConfig:
     """Bounded application-side engine transport configuration."""
@@ -141,13 +270,17 @@ class EngineClientConfig:
     max_poll_attempts: int = 2400
 
     def __post_init__(self) -> None:
-        base = _text(self.base_url.rstrip("/"), "base_url", maximum=4096)
-        if not (base.startswith("http://") or base.startswith("https://")):
-            raise EngineProtocolError("engine base_url must use http or https")
+        base = _engine_origin(self.base_url)
         object.__setattr__(self, "base_url", base)
         token = self.service_token
         if token is not None:
-            if not isinstance(token, str) or token != token.strip() or len(token) < 32 or len(token) > 4096:
+            if (
+                not isinstance(token, str)
+                or token != token.strip()
+                or not 32 <= len(token) <= 4096
+                or not token.isascii()
+                or any(not 33 <= ord(ch) <= 126 for ch in token)
+            ):
                 raise EngineProtocolError(
                     "engine service token must be normalized and at least 32 characters"
                 )
@@ -155,7 +288,7 @@ class EngineClientConfig:
         object.__setattr__(
             self,
             "service_principal",
-            _text(self.service_principal, "service_principal", maximum=512),
+            _header_text(self.service_principal, "service_principal", maximum=512),
         )
         object.__setattr__(
             self,
@@ -222,13 +355,13 @@ class EngineClientConfig:
             raise EngineProtocolError("engine service token is required when engine URL is configured")
         try:
             return cls(
-                base_url=raw_url.strip(),
-                service_token=raw_token.strip(),
+                # Do not silently strip malformed URL/header bytes.
+                # Invalid operator settings must fail at the same authority
+                # boundary as direct EngineClientConfig construction.
+                base_url=raw_url,
+                service_token=raw_token,
                 service_principal=(
-                    os.getenv(
-                        "SKL_ENGINE_SERVICE_PRINCIPAL",
-                        "codedock-backend",
-                    ).strip()
+                    os.getenv("SKL_ENGINE_SERVICE_PRINCIPAL", "codedock-backend")
                     or "codedock-backend"
                 ),
                 request_timeout_s=float(os.getenv("SKELETON_ENGINE_REQUEST_TIMEOUT_S", "15")),
@@ -426,13 +559,17 @@ class EngineTerminalResult:
     def from_payload(cls, payload: Mapping[str, Any]) -> "EngineTerminalResult":
         body = _json_object(payload, "result")
         status = _text(body.get("status"), "result.status", maximum=64)
+        if status not in {"completed", "degraded", "failed", "cancelled"}:
+            raise EngineProtocolError("engine result status is not terminal")
+        operation_id = _text(body.get("operation_id"), "result.operation_id", maximum=192)
+        execution_id = _text(body.get("execution_id"), "result.execution_id", maximum=192)
         if status != "completed":
-            usage = _json_object(body.get("usage", {}), "result.usage")
-            failure_code = None if usage.get("error_code") is None else str(usage["error_code"])
+            _json_object(body.get("usage", {}), "result.usage")
+            failure_code = execution_failure_code(body)
             raise EngineExecutionFailed(
                 "engine execution did not complete successfully"
                 + (" (" + failure_code + ")" if failure_code else ""),
-                execution_id=str(body.get("execution_id") or ""),
+                execution_id=execution_id,
                 status=status,
                 failure_code=failure_code,
                 result=body,
@@ -456,16 +593,8 @@ class EngineTerminalResult:
             return tuple(dict.fromkeys(item.strip() for item in raw))
 
         return cls(
-            operation_id=_text(
-                body.get("operation_id"),
-                "result.operation_id",
-                maximum=192,
-            ),
-            execution_id=_text(
-                body.get("execution_id"),
-                "result.execution_id",
-                maximum=192,
-            ),
+            operation_id=operation_id,
+            execution_id=execution_id,
             status=status,
             final_output=final_output.strip(),
             usage=_json_object(body.get("usage", {}), "result.usage"),
@@ -524,11 +653,27 @@ def command_from_context(
     context_seed_refs: Sequence[str] = (),
     memory_write_intent: Mapping[str, Any] | None = None,
     structured_output_schema: Mapping[str, Any] | None = None,
+    cooperation: Mapping[str, Any] | None = None,
 ) -> EngineExecutionCommand:
     """Build a digest-bound engine command from one immutable context snapshot."""
 
     if not isinstance(context, ContextEnvelope):
         raise TypeError("context must be ContextEnvelope")
+    normalized_cooperation = None
+    if cooperation is not None:
+        from skeleton.intelligence.cooperation import cooperation_stages, normalize_cooperation_policy
+
+        try:
+            normalized_cooperation = normalize_cooperation_policy(cooperation)
+        except (TypeError, ValueError) as exc:
+            raise EngineProtocolError("cooperation policy is invalid") from exc
+        if tools:
+            raise EngineProtocolError("cooperative text review cannot execute tools")
+        cooperation_stage_count = len(cooperation_stages(normalized_cooperation))
+        max_model_turns = max(
+            _positive_int(max_model_turns, "max_model_turns", maximum=64),
+            cooperation_stage_count,
+        )
     actor = _text(actor_id, "actor_id", maximum=512)
     cap = _text(capability, "capability", maximum=256)
     idem = _text(idempotency_key, "idempotency_key", maximum=1024)
@@ -808,6 +953,13 @@ def command_from_context(
     }
     if resolved_output_tokens > 0:
         resource_budget["max_output_tokens"] = resolved_output_tokens
+    if normalized_cooperation is not None:
+        # Each finite stage is admitted once; this increases neither aggregate
+        # output tokens nor the operation's original wall/cost allowance.
+        resource_budget["max_provider_attempts"] = cooperation_stage_count
+        if resolved_output_tokens < 64 * resource_budget["max_provider_attempts"]:
+            raise EngineProtocolError("output allowance cannot cover every cooperation stage")
+        resource_budget["max_input_tokens"] = input_capacity * resource_budget["max_provider_attempts"]
     stop_policy = {
         "max_repeat_tool_batches": _positive_int(
             max_repeat_tool_batches,
@@ -885,12 +1037,24 @@ def command_from_context(
 
     if structured_output_schema is not None:
         from skeleton.skills.tool_contract import validate_json_schema
-        import json
 
         encoded_schema = json.dumps(dict(structured_output_schema), allow_nan=False, ensure_ascii=False)
         if len(encoded_schema.encode()) > 65536:
             raise EngineProtocolError("structured output schema exceeds64KiB")
         context_policy["structured_output_schema"] = validate_json_schema(json.loads(encoded_schema))
+    if normalized_cooperation is not None:
+        context_policy["cooperation"] = normalized_cooperation
+        context_policy["provider_input_limit"] = input_capacity
+        context_policy["cooperation_brief_digest"] = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
+        context_policy["cooperation_history_digest"] = hashlib.sha256(
+            json.dumps(
+                [{"role": role, "content": content} for role, content in normalized_history],
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
     execution_request = AIExecutionRequest(
         operation_id=context.operation_id,
         execution_id=context.execution_id,
@@ -962,6 +1126,7 @@ class EngineClient:
     """Bounded async HTTP client for the canonical engine API."""
 
     _TERMINAL_STATES = frozenset({"completed", "failed", "cancelled"})
+    _MAX_CANCEL_CLEANUPS = 64
 
     def __init__(
         self,
@@ -973,6 +1138,7 @@ class EngineClient:
             raise TypeError("config must be EngineClientConfig")
         self.config = config
         self._transport = transport
+        self._cancel_cleanups: dict[tuple[str, str, str], asyncio.Task[Any]] = {}
 
     @classmethod
     def from_env(
@@ -998,9 +1164,12 @@ class EngineClient:
             "authorization": "Bearer " + token,
             "x-zaibatsu-attester": self.config.service_principal,
             "accept": "application/json",
+            # Bound wire bytes directly. Do not allow a compressed response to
+            # expand before the application can apply its response ceiling.
+            "accept-encoding": "identity",
         }
-        if trace_id:
-            headers["x-trace-id"] = _text(
+        if trace_id is not None:
+            headers["x-trace-id"] = _header_text(
                 trace_id,
                 "trace_id",
                 maximum=512,
@@ -1016,26 +1185,8 @@ class EngineClient:
         params: Mapping[str, str] | None = None,
         trace_id: str | None = None,
         max_response_bytes: int | None = None,
+        surface_validation_rejection: bool = False,
     ) -> dict[str, Any]:
-        timeout = httpx.Timeout(self.config.request_timeout_s)
-        try:
-            async with httpx.AsyncClient(
-                timeout=timeout,
-                transport=self._transport,
-                follow_redirects=False,
-            ) as client:
-                response = await client.request(
-                    method,
-                    self._url(suffix),
-                    headers=self._headers(trace_id=trace_id),
-                    json=None if json_body is None else dict(json_body),
-                    params=None if params is None else dict(params),
-                )
-        except (httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise EngineUnavailableError("engine transport is unavailable") from exc
-        except httpx.HTTPError as exc:
-            raise EngineUnavailableError("engine transport failed") from exc
-
         response_limit = (
             self.config.max_response_bytes
             if max_response_bytes is None
@@ -1045,34 +1196,63 @@ class EngineClient:
                 maximum=128 * 1024 * 1024,
             )
         )
-        content_length = response.headers.get("content-length")
-        if content_length is not None:
-            try:
-                advertised = int(content_length)
-            except ValueError as exc:
-                raise EngineProtocolError("engine content-length is invalid") from exc
-            if advertised > response_limit:
-                raise EngineProtocolError("engine response exceeds configured size bound")
-        if len(response.content) > response_limit:
-            raise EngineProtocolError("engine response exceeds configured size bound")
-
-        if response.status_code == 404:
-            raise EngineNotFoundError("engine resource was not found")
-        if response.status_code == 409:
-            raise EngineConflictError("engine rejected conflicting request")
-        if response.status_code in {401, 403}:
-            raise EngineAuthorizationError("engine rejected delegated authority")
-        if response.status_code >= 500:
-            raise EngineUnavailableError("engine service is unavailable")
-        if response.status_code >= 400:
-            raise EngineProtocolError(f"engine rejected request with status {response.status_code}")
+        timeout = httpx.Timeout(self.config.request_timeout_s)
+        content = bytearray()
         try:
-            payload = response.json()
-        except ValueError as exc:
-            raise EngineProtocolError("engine returned invalid JSON") from exc
-        if not isinstance(payload, Mapping):
-            raise EngineProtocolError("engine response must be an object")
-        return dict(payload)
+            # HTTPX read timeouts alone can be renewed by a trickling peer.
+            # The existing request allowance covers the entire response.
+            async with asyncio.timeout(self.config.request_timeout_s):
+                async with httpx.AsyncClient(
+                    timeout=timeout,
+                    transport=self._transport,
+                    follow_redirects=False,
+                    # Never let HTTP_PROXY/HTTPS_PROXY route delegated engine
+                    # credentials to an unrelated network gateway.
+                    trust_env=False,
+                ) as client:
+                    async with client.stream(
+                        method,
+                        self._url(suffix),
+                        headers=self._headers(trace_id=trace_id),
+                        json=None if json_body is None else dict(json_body),
+                        params=None if params is None else dict(params),
+                    ) as response:
+                        content_length = response.headers.get("content-length")
+                        if content_length is not None:
+                            if not re.fullmatch(r"[0-9]{1,20}", content_length):
+                                raise EngineProtocolError("engine content-length is invalid")
+                            if int(content_length) > response_limit:
+                                raise EngineProtocolError("engine response exceeds configured size bound")
+                        if response.headers.get("content-encoding", "identity").strip().lower() not in {
+                            "",
+                            "identity",
+                        }:
+                            raise EngineProtocolError("engine response must use identity content encoding")
+                        if response.status_code == 404:
+                            raise EngineNotFoundError("engine resource was not found")
+                        if response.status_code == 409:
+                            raise EngineConflictError("engine rejected conflicting request")
+                        if response.status_code in {401, 403}:
+                            raise EngineAuthorizationError("engine rejected delegated authority")
+                        if response.status_code >= 500:
+                            raise EngineUnavailableError("engine service is unavailable")
+                        if surface_validation_rejection and response.status_code in {400, 422}:
+                            raise EngineRequestRejectedError("engine rejected runtime control policy")
+                        if response.status_code >= 400:
+                            raise EngineProtocolError(
+                                f"engine rejected request with status {response.status_code}"
+                            )
+                        if not 200 <= response.status_code < 300:
+                            raise EngineProtocolError("engine returned an unexpected non-success response")
+                        async for chunk in response.aiter_bytes(chunk_size=min(65_536, response_limit + 1)):
+                            if len(content) + len(chunk) > response_limit:
+                                raise EngineProtocolError("engine response exceeds configured size bound")
+                            content.extend(chunk)
+        except (TimeoutError, httpx.TimeoutException, httpx.NetworkError) as exc:
+            raise EngineUnavailableError("engine transport is unavailable") from exc
+        except httpx.HTTPError as exc:
+            raise EngineUnavailableError("engine transport failed") from exc
+        return _bounded_engine_json(content)
 
     @staticmethod
     def _validate_image_payload(
@@ -1545,6 +1725,519 @@ class EngineClient:
         tenant = _text(tenant_id, "tenant_id", maximum=512)
         return await self.provider_status(tenant_id=tenant, trace_id=trace_id)
 
+    @staticmethod
+    def _runtime_control_state(
+        payload: Mapping[str, Any], *, actor_id: str, tenant_id: str
+    ) -> dict[str, Any]:
+        """Accept only the versioned, identity-bound engine control snapshot."""
+
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("schema_version") != "skeleton.ai.runtime_control.v1"
+        ):
+            raise EngineProtocolError("engine runtime control schema is incompatible")
+        if payload.get("actor_id") != actor_id or payload.get("tenant_id") != tenant_id:
+            raise EngineProtocolError("engine runtime control identity mismatch")
+        _positive_int(payload.get("policy_version"), "runtime_control.policy_version", maximum=2**63 - 1)
+        for section in ("serving", "learning", "maintenance", "ratchet"):
+            if not isinstance(payload.get(section), Mapping):
+                raise EngineProtocolError(f"runtime_control.{section} must be an object")
+        for section in ("serving", "learning", "maintenance"):
+            if not isinstance(payload[section].get("policy"), Mapping):
+                raise EngineProtocolError(f"runtime_control.{section}.policy must be an object")
+        for name in ("capacity", "pressure", "cache"):
+            if not isinstance(payload["serving"].get(name), Mapping):
+                raise EngineProtocolError(f"runtime_control.serving.{name} must be an object")
+        if not isinstance(payload["serving"].get("draining"), bool):
+            raise EngineProtocolError("runtime_control.serving.draining must be boolean")
+        for section, names in (
+            ("learning", ("totals", "partitions")),
+            ("maintenance", ("status", "recent_tasks")),
+        ):
+            if any(name not in payload[section] for name in names):
+                raise EngineProtocolError(f"runtime_control.{section} is incomplete")
+        if not isinstance(payload["ratchet"].get("available"), bool):
+            raise EngineProtocolError("runtime_control.ratchet.available must be boolean")
+        try:
+            json.dumps(payload, allow_nan=False)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise EngineProtocolError("engine runtime control state is not finite JSON") from exc
+        return dict(payload)
+
+    async def runtime_control(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        learning_offset: int = 0,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Read engine-owned controls using the existing service-auth boundary."""
+
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        if type(learning_offset) is not int or not 0 <= learning_offset <= 127:
+            raise EngineProtocolError("runtime learning offset must be in [0, 127]")
+        payload = await self._request(
+            "GET",
+            "/runtime-control",
+            params={"actor_id": actor, "tenant_id": tenant, "learning_offset": str(learning_offset)},
+            trace_id=trace_id,
+            max_response_bytes=256 * 1024,
+        )
+        return self._runtime_control_state(payload, actor_id=actor, tenant_id=tenant)
+
+    async def configure_runtime_control(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        expected_version: int,
+        serving: Mapping[str, Any] | None = None,
+        learning: Mapping[str, Any] | None = None,
+        maintenance: Mapping[str, Any] | None = None,
+        action: str | None = None,
+        serving_route_id: str | None = None,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Forward one optimistic operator update; never retry a stale version."""
+
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        body: dict[str, Any] = {
+            "actor_id": actor,
+            "tenant_id": tenant,
+            "expected_version": _positive_int(expected_version, "expected_version", maximum=2**63 - 1),
+        }
+        for section, changes in (("serving", serving), ("learning", learning), ("maintenance", maintenance)):
+            if changes is not None:
+                if not isinstance(changes, Mapping) or not changes:
+                    raise EngineProtocolError(f"runtime_control.{section} must be a non-empty object")
+                try:
+                    body[section] = validate_runtime_policy_patch(section, changes)
+                except ValueError as exc:
+                    raise EngineProtocolError("runtime policy fields exceed their declared bounds") from exc
+        if action is not None:
+            if action not in {"trim_cache", "clear_cache", "drain", "resume"}:
+                raise EngineProtocolError("runtime control action is invalid")
+            body["action"] = action
+        if serving_route_id is not None:
+            if serving is None and action is None:
+                raise EngineProtocolError("a serving route requires a serving policy or action")
+            body["serving_route_id"] = _text(serving_route_id, "serving_route_id", maximum=384)
+        if len(body) == 3:
+            raise EngineProtocolError("runtime control update must contain a change")
+        try:
+            json.dumps(body, allow_nan=False)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise EngineProtocolError("runtime control update must be finite JSON") from exc
+        payload = await self._request(
+            "PATCH",
+            "/runtime-control",
+            json_body=body,
+            trace_id=trace_id,
+            max_response_bytes=256 * 1024,
+            surface_validation_rejection=True,
+        )
+        return self._runtime_control_state(payload, actor_id=actor, tenant_id=tenant)
+
+    async def export_runtime_learning_dataset(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        limit: int = 128,
+        cursor: str | None = None,
+        partition_id: str | None = None,
+        include_untrained: bool = False,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        count = _positive_int(limit, "limit", maximum=256)
+        if type(include_untrained) is not bool:
+            raise EngineProtocolError("runtime learning dataset filter must be boolean")
+        params = {
+            "actor_id": actor,
+            "tenant_id": tenant,
+            "limit": str(count),
+            "include_untrained": "true" if include_untrained else "false",
+        }
+        if cursor is not None:
+            params["cursor"] = _text(cursor, "cursor", maximum=6144)
+        if partition_id is not None:
+            if not isinstance(partition_id, str) or re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
+                raise EngineProtocolError("runtime learning dataset partition is invalid")
+            params["partition_id"] = partition_id
+        payload = await self._request(
+            "GET",
+            "/runtime-control/learning/dataset",
+            params=params,
+            trace_id=trace_id,
+            max_response_bytes=3 * 1024 * 1024,
+            surface_validation_rejection=True,
+        )
+        if (
+            payload.get("schema_version") != "skeleton.ai.runtime_learning_dataset.v1"
+            or payload.get("actor_id") != actor
+            or payload.get("tenant_id") != tenant
+        ):
+            raise EngineProtocolError("runtime learning dataset wrapper scope differs")
+        raw = payload.get("dataset_json")
+        if not isinstance(raw, str) or len(raw) > 1024 * 1024:
+            raise EngineProtocolError("runtime learning dataset text exceeds its bound")
+        try:
+            if len(raw.encode("utf-8")) > 1024 * 1024:
+                raise ValueError("dataset page byte bound")
+
+            def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+                value: dict[str, Any] = {}
+                for key, item in pairs:
+                    if key in value:
+                        raise ValueError("duplicate dataset key")
+                    value[key] = item
+                return value
+
+            def reject_constant(_value: str) -> None:
+                raise ValueError("non-finite dataset constant")
+
+            def finite_float(value: str) -> float:
+                number = float(value)
+                if not math.isfinite(number):
+                    raise ValueError("non-finite dataset number")
+                return number
+
+            dataset = json.loads(
+                raw, object_pairs_hook=unique_object, parse_constant=reject_constant, parse_float=finite_float
+            )
+        except (ValueError, RecursionError) as exc:
+            raise EngineProtocolError("runtime learning dataset is not bounded JSON") from exc
+        if (
+            not isinstance(dataset, Mapping)
+            or dataset.get("schema_version") != "skeleton.runtime.learning.dataset.v1"
+            or dataset.get("tenant_id") != tenant
+            or dataset.get("scope_id") != "tenant"
+            or dataset.get("filters")
+            != {"partition_id": partition_id, "include_untrained": include_untrained}
+            or not isinstance(dataset.get("rows"), list)
+            or len(dataset["rows"]) > count
+            or type(dataset.get("row_count")) is not int
+            or dataset["row_count"] != len(dataset["rows"])
+            or type(dataset.get("scanned_rows")) is not int
+            or not len(dataset["rows"]) <= dataset["scanned_rows"] <= count
+            or type(dataset.get("has_more")) is not bool
+        ):
+            raise EngineProtocolError("runtime learning dataset identity or row count differs")
+        continuation = dataset.get("next_cursor")
+        if continuation is not None and (
+            not isinstance(continuation, str) or not 1 <= len(continuation) <= 6144
+        ):
+            raise EngineProtocolError("runtime learning dataset continuation is invalid")
+        if dataset["has_more"] != (continuation is not None):
+            raise EngineProtocolError("runtime learning dataset continuation state differs")
+        try:
+            canonical = json.dumps(
+                {key: value for key, value in dataset.items() if key != "dataset_digest"},
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+            expected_digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        except (ValueError, TypeError, OverflowError, RecursionError) as exc:
+            raise EngineProtocolError("runtime learning dataset digest input is invalid") from exc
+        if dataset.get("dataset_digest") != expected_digest:
+            raise EngineProtocolError("runtime learning dataset digest differs")
+        return payload
+
+    async def reset_runtime_maintenance_circuit(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        kind: str,
+        expected_generation: int,
+        expected_failure_digest: str,
+        source_digest: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        kind = _text(kind, "kind", maximum=128)
+        if type(expected_generation) is not int or not 1 <= expected_generation < 9_000_000_000_000_000:
+            raise EngineProtocolError("runtime maintenance circuit generation is invalid")
+        for digest in (expected_failure_digest, source_digest):
+            if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise EngineProtocolError("runtime maintenance circuit failure/source binding is invalid")
+        payload = await self._request(
+            "POST",
+            "/runtime-control/maintenance/circuits/" + quote(kind, safe="") + "/reset",
+            json_body={
+                "actor_id": actor,
+                "tenant_id": tenant,
+                "expected_generation": expected_generation,
+                "expected_failure_digest": expected_failure_digest,
+                "source_digest": source_digest,
+            },
+            trace_id=trace_id,
+            max_response_bytes=384 * 1024,
+            surface_validation_rejection=True,
+        )
+        if (
+            payload.get("schema_version") != "skeleton.ai.runtime_maintenance_circuit_reset.v1"
+            or payload.get("actor_id") != actor
+            or payload.get("tenant_id") != tenant
+            or payload.get("kind") != kind
+        ):
+            raise EngineProtocolError("runtime maintenance circuit wrapper identity differs")
+        result = payload.get("result")
+        expected_scope = (
+            "runtime-tenant-"
+            + hashlib.sha256(
+                json.dumps(tenant, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+            ).hexdigest()[:32]
+        )
+        if (
+            not isinstance(result, Mapping)
+            or result.get("kind") != kind
+            or result.get("scope_id") != expected_scope
+            or type(result.get("generation")) is not int
+            or result.get("generation") != expected_generation + 1
+            or result.get("failure_digest") != expected_failure_digest
+            or result.get("source_digest") != source_digest
+            or result.get("state") != "closed"
+            or type(result.get("failures")) is not int
+            or result.get("failures") != 0
+            or type(result.get("open_until_ns")) is not int
+            or result.get("open_until_ns") != 0
+            or type(result.get("deduplicated")) is not bool
+        ):
+            raise EngineProtocolError("runtime maintenance circuit result binding differs")
+        self._runtime_control_state(payload.get("runtime"), actor_id=actor, tenant_id=tenant)
+        return payload
+
+    async def retry_runtime_maintenance(
+        self, *, actor_id: str, tenant_id: str, task_id: str,
+        source_digest: str, expected_attempts: int, trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Queue one exact failed task through its existing scoped owner.
+
+        A request is forwarded once. Queue admission preserves the source and
+        attempt counter; the ordinary maintenance grants still own execution.
+        """
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        task = _text(task_id, "task_id", maximum=64)
+        source = _text(source_digest, "source_digest", maximum=64)
+        if re.fullmatch(r"[0-9a-f]{64}", task) is None or re.fullmatch(r"[0-9a-f]{64}", source) is None:
+            raise EngineProtocolError("runtime maintenance task or source identity is invalid")
+        if type(expected_attempts) is not int or not 0 <= expected_attempts <= 1_000_000:
+            raise EngineProtocolError("runtime maintenance attempts must be in [0, 1000000]")
+        payload = await self._request(
+            "POST", "/runtime-control/maintenance/tasks/" + task + "/retry",
+            json_body={"actor_id": actor, "tenant_id": tenant,
+                "source_digest": source, "expected_attempts": expected_attempts},
+            trace_id=trace_id, max_response_bytes=384 * 1024,
+            surface_validation_rejection=True,
+        )
+        if (payload.get("schema_version") != "skeleton.ai.runtime_maintenance_retry.v1"
+            or payload.get("actor_id") != actor or payload.get("tenant_id") != tenant
+            or payload.get("task_id") != task or not isinstance(payload.get("result"), Mapping)
+            or not isinstance(payload.get("runtime"), Mapping)):
+            raise EngineProtocolError("runtime maintenance retry identity or receipt is incomplete")
+        result = payload["result"]
+        if (result.get("task_id") != task or result.get("source_digest") != source
+            or not isinstance(result.get("state"), str) or result["state"] not in {"ready", "retry_wait"}
+            or type(result.get("attempts")) is not int or result["attempts"] != expected_attempts
+            or type(result.get("deduplicated")) is not bool):
+            raise EngineProtocolError("runtime maintenance retry differs from the exact queued task")
+        self._runtime_control_state(payload["runtime"], actor_id=actor, tenant_id=tenant)
+        try:
+            json.dumps(payload, allow_nan=False)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise EngineProtocolError("runtime maintenance retry must be finite JSON") from exc
+        return dict(payload)
+
+    @staticmethod
+    def _learning_checkpoint_identity(
+        payload: Mapping[str, Any], *, actor_id: str, tenant_id: str,
+        partition_id: str, schema: str,
+    ) -> None:
+        if (payload.get("schema_version") != schema or payload.get("actor_id") != actor_id
+                or payload.get("tenant_id") != tenant_id or payload.get("partition_id") != partition_id):
+            raise EngineProtocolError("runtime learning checkpoint identity differs")
+
+    @staticmethod
+    def _learning_checkpoint_json(
+        raw: object, *, tenant_id: str, partition_id: str
+    ) -> dict[str, Any]:
+        """Inspect an opaque checkpoint without reserializing its numeric state."""
+
+        if not isinstance(raw, str) or not raw:
+            raise EngineProtocolError("runtime learning checkpoint_json must be non-empty UTF-8 JSON")
+        if len(raw) > 256 * 1024:
+            raise EngineProtocolError("runtime learning checkpoint_json exceeds its byte limit")
+        try:
+            encoded_size = len(raw.encode("utf-8", errors="strict"))
+        except UnicodeEncodeError as exc:
+            raise EngineProtocolError("runtime learning checkpoint_json contains invalid Unicode") from exc
+        if encoded_size > 256 * 1024:
+            raise EngineProtocolError("runtime learning checkpoint_json exceeds its byte limit")
+
+        def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            value: dict[str, Any] = {}
+            for key, item in pairs:
+                if key in value:
+                    raise EngineProtocolError("runtime learning checkpoint_json contains duplicate keys")
+                value[key] = item
+            return value
+
+        def reject_constant(_value: str) -> None:
+            raise EngineProtocolError("runtime learning checkpoint_json must contain finite JSON")
+
+        def finite_float(value: str) -> float:
+            number = float(value)
+            if not math.isfinite(number):
+                raise EngineProtocolError("runtime learning checkpoint_json must contain finite JSON")
+            return number
+
+        try:
+            checkpoint = json.loads(
+                raw, object_pairs_hook=unique_object,
+                parse_constant=reject_constant, parse_float=finite_float,
+            )
+        except (ValueError, RecursionError, OverflowError) as exc:
+            raise EngineProtocolError("runtime learning checkpoint_json is not valid bounded JSON") from exc
+        if not isinstance(checkpoint, dict):
+            raise EngineProtocolError("runtime learning checkpoint_json must encode an object")
+        if (
+            checkpoint.get("schema_version") != "skeleton.runtime.learning.checkpoint.v1"
+            or checkpoint.get("tenant_id") != tenant_id
+            or checkpoint.get("partition_id") != partition_id
+        ):
+            raise EngineProtocolError("runtime learning checkpoint scope differs")
+        return checkpoint
+
+    async def export_runtime_learning_checkpoint(
+        self, *, actor_id: str, tenant_id: str, partition_id: str,
+        expected_state_version: int | None = None, trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        partition = _text(partition_id, "partition_id", maximum=64)
+        if re.fullmatch(r"[0-9a-f]{64}", partition) is None:
+            raise EngineProtocolError("runtime learning partition identity is invalid")
+        params = {"actor_id": actor, "tenant_id": tenant}
+        if expected_state_version is not None:
+            params["expected_state_version"] = str(_positive_int(expected_state_version, "expected_state_version", maximum=2**63 - 1))
+        payload = await self._request(
+            "GET", "/runtime-control/learning/partitions/" + partition + "/checkpoint",
+            params=params, trace_id=trace_id, max_response_bytes=768 * 1024,
+            surface_validation_rejection=True,
+        )
+        self._learning_checkpoint_identity(
+            payload, actor_id=actor, tenant_id=tenant, partition_id=partition,
+            schema="skeleton.ai.runtime_learning_checkpoint.v1",
+        )
+        if "checkpoint_json" in payload:
+            if "checkpoint" in payload:
+                raise EngineProtocolError("runtime learning checkpoint representations are ambiguous")
+            self._learning_checkpoint_json(
+                payload["checkpoint_json"], tenant_id=tenant, partition_id=partition,
+            )
+            # The parsed numeric values are inspection-only. Returning the
+            # original wire string preserves exact values through browser UI.
+            return payload
+        checkpoint = payload.get("checkpoint")
+        if not isinstance(checkpoint, Mapping):
+            raise EngineProtocolError("runtime learning checkpoint is missing")
+        try:
+            legacy_json = json.dumps(
+                checkpoint, allow_nan=False, ensure_ascii=False, separators=(",", ":"),
+            ).encode("utf-8", errors="strict")
+        except (TypeError, ValueError, RecursionError, OverflowError) as exc:
+            raise EngineProtocolError("runtime learning checkpoint must be finite JSON") from exc
+        if len(legacy_json) > 256 * 1024:
+            raise EngineProtocolError("runtime learning checkpoint exceeds its byte limit")
+        if (checkpoint.get("schema_version") != "skeleton.runtime.learning.checkpoint.v1"
+                or checkpoint.get("tenant_id") != tenant or checkpoint.get("partition_id") != partition):
+            raise EngineProtocolError("runtime learning checkpoint scope differs")
+        return payload
+
+    async def configure_runtime_learning_checkpoint(
+        self, *, actor_id: str, tenant_id: str, partition_id: str, action: str,
+        expected_policy_version: int, expected_state_version: int,
+        model_selection_digest: str, checkpoint: Mapping[str, Any] | None = None,
+        checkpoint_json: str | None = None,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        partition = _text(partition_id, "partition_id", maximum=64)
+        if (re.fullmatch(r"[0-9a-f]{64}", partition) is None
+                or re.fullmatch(r"[0-9a-f]{64}", model_selection_digest) is None):
+            raise EngineProtocolError("runtime learning model or partition identity is invalid")
+        if action not in {"import", "reset", "restore_last_healthy"}:
+            raise EngineProtocolError("runtime learning action is invalid")
+        representations = int(checkpoint is not None) + int(checkpoint_json is not None)
+        if action == "import" and representations != 1:
+            raise EngineProtocolError("checkpoint import requires exactly one checkpoint or checkpoint_json")
+        if action != "import" and representations:
+            raise EngineProtocolError("only import accepts a checkpoint payload")
+        body: dict[str, Any] = {
+            "actor_id": actor, "tenant_id": tenant, "action": action,
+            "expected_policy_version": _positive_int(expected_policy_version, "expected_policy_version", maximum=2**63 - 1),
+            "expected_state_version": _positive_int(expected_state_version, "expected_state_version", maximum=2**63 - 1),
+            "model_selection_digest": model_selection_digest,
+        }
+        if checkpoint is not None:
+            if not isinstance(checkpoint, Mapping):
+                raise EngineProtocolError("runtime learning checkpoint must be an object")
+            try:
+                encoded = json.dumps(
+                    checkpoint, allow_nan=False, ensure_ascii=False, separators=(",", ":"),
+                ).encode("utf-8", errors="strict")
+            except (TypeError, ValueError, RecursionError) as exc:
+                raise EngineProtocolError("runtime learning checkpoint must be finite JSON") from exc
+            if len(encoded) > 256 * 1024:
+                raise EngineProtocolError("runtime learning checkpoint exceeds its byte limit")
+            body["checkpoint"] = dict(checkpoint)
+        if checkpoint_json is not None:
+            self._learning_checkpoint_json(
+                checkpoint_json, tenant_id=tenant, partition_id=partition,
+            )
+            body["checkpoint_json"] = checkpoint_json
+        payload = await self._request(
+            "POST", "/runtime-control/learning/partitions/" + partition + "/checkpoint",
+            json_body=body, trace_id=trace_id, max_response_bytes=384 * 1024,
+            surface_validation_rejection=True,
+        )
+        self._learning_checkpoint_identity(
+            payload, actor_id=actor, tenant_id=tenant, partition_id=partition,
+            schema="skeleton.ai.runtime_learning_control.v1",
+        )
+        if not isinstance(payload.get("receipt"), Mapping) or not isinstance(payload.get("runtime"), Mapping):
+            raise EngineProtocolError("runtime learning mutation receipt is incomplete")
+        receipt = payload["receipt"]
+        mutation = receipt.get("learning_checkpoint")
+        if (receipt.get("schema_version") != "skeleton.runtime.control.event.v1"
+                or receipt.get("tenant_id") != tenant
+                or receipt.get("version") != expected_policy_version + 1
+                or not isinstance(mutation, Mapping)
+                or mutation.get("partition_id") != partition or mutation.get("action") != action
+                or mutation.get("model_selection_digest") != model_selection_digest
+                or mutation.get("previous_state_version") != expected_state_version
+                or type(mutation.get("state_version")) is not int
+                or mutation["state_version"] <= expected_state_version):
+            raise EngineProtocolError("runtime learning mutation receipt binding differs")
+        for value in (receipt.get("receipt_digest"), mutation.get("state_digest"), mutation.get("previous_state_digest")):
+            if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+                raise EngineProtocolError("runtime learning mutation digest is invalid")
+        self._runtime_control_state(payload["runtime"], actor_id=actor, tenant_id=tenant)
+        if payload["runtime"]["policy_version"] < receipt["version"]:
+            raise EngineProtocolError("runtime learning mutation projection precedes its commit")
+        return dict(payload)
+
     async def provider_status(
         self,
         *,
@@ -1568,10 +2261,10 @@ class EngineClient:
         if not isinstance(available, bool):
             raise EngineProtocolError("provider_status.available must be boolean")
         raw_providers = payload.get("providers")
-        if not isinstance(raw_providers, list) or not raw_providers:
-            raise EngineProtocolError("provider_status.providers must be a non-empty list")
+        if not isinstance(raw_providers, list) or not 1 <= len(raw_providers) <= 16:
+            raise EngineProtocolError("provider_status.providers must contain between 1 and 16 exact models")
         providers: list[dict[str, Any]] = []
-        seen: set[str] = set()
+        seen: set[tuple[str, str | None]] = set()
         for index, raw in enumerate(raw_providers):
             if not isinstance(raw, Mapping):
                 raise EngineProtocolError(f"provider_status.providers[{index}] must be an object")
@@ -1581,14 +2274,24 @@ class EngineClient:
                 f"provider_status.providers[{index}].id",
                 maximum=128,
             )
-            if provider_id in seen:
-                raise EngineProtocolError("provider_status contains duplicate provider id")
-            seen.add(provider_id)
+            model_id = item.get("model")
+            if model_id is not None:
+                model_id = _text(model_id, f"provider_status.providers[{index}].model", maximum=256)
+            identity = (provider_id, model_id)
+            if identity in seen:
+                raise EngineProtocolError("provider_status contains duplicate provider/model identity")
+            seen.add(identity)
+            if "active" in item and not isinstance(item["active"], bool):
+                raise EngineProtocolError("provider_status model active flag must be boolean")
             if not isinstance(item.get("available"), bool):
                 raise EngineProtocolError(f"provider_status.providers[{index}].available must be boolean")
             providers.append(item)
-        if active not in seen:
+        if active not in {provider_id for provider_id, _model_id in seen}:
             raise EngineProtocolError("provider_status active provider is not declared")
+        if any("active" in item for item in providers):
+            active_models = [item for item in providers if item.get("active") is True]
+            if len(active_models) != 1 or active_models[0]["id"] != active:
+                raise EngineProtocolError("provider_status must identify one exact active model")
         return {
             "active": active,
             "available": available,
@@ -1903,6 +2606,8 @@ class EngineClient:
                 raise EngineProtocolError("engine event stream is not strictly ordered")
             last_sequence = sequence
             if event.get("type") == "execution.result":
+                if result is not None:
+                    raise EngineProtocolError("engine event stream contains multiple terminal results")
                 candidate = event.get("result")
                 if not isinstance(candidate, Mapping):
                     raise EngineProtocolError("execution.result event is malformed")
@@ -1925,6 +2630,9 @@ class EngineClient:
             tenant_id=tenant_id,
             trace_id=trace_id,
         )
+        if _text(status.get("execution_id"), "status.execution_id", maximum=192) != execution_id:
+            raise EngineProtocolError("terminal status execution identity mismatch")
+        operation_id = _text(status.get("operation_id"), "status.operation_id", maximum=192)
         state = _text(
             status.get("execution_state"),
             "execution_state",
@@ -1939,16 +2647,29 @@ class EngineClient:
             tenant_id=tenant_id,
             trace_id=trace_id,
         )
+        if events.get("execution_id") != execution_id:
+            raise EngineProtocolError("terminal event projection execution identity mismatch")
         result = self._result_from_events(events)
         if result is None:
             raise EngineProtocolError("terminal engine execution is missing result event")
+        if (
+            _text(result.get("execution_id"), "result.execution_id", maximum=192) != execution_id
+            or _text(result.get("operation_id"), "result.operation_id", maximum=192) != operation_id
+        ):
+            raise EngineProtocolError("terminal result execution/operation identity mismatch")
+        result_status = _text(result.get("status"), "result.status", maximum=64)
+        # Qualified/abstained results retain status=degraded while their
+        # execution reaches COMPLETED. They still follow the existing
+        # non-success publication policy; no other terminal pair may disagree.
+        expected_statuses = {"completed", "degraded"} if state == "completed" else {state}
+        if result_status not in expected_statuses or (
+            status.get("result_status") is not None and status["result_status"] != result_status
+        ):
+            raise EngineProtocolError("terminal result status conflicts with execution status")
         if state != "completed":
-            usage = result.get("usage")
-            failure_code = (
-                str(usage.get("error_code"))
-                if isinstance(usage, Mapping) and usage.get("error_code") is not None
-                else (None if status.get("failure_code") is None else str(status["failure_code"]))
-            )
+            failure_code = execution_failure_code(result)
+            if failure_code is None and status.get("failure_code") is not None:
+                failure_code = str(status["failure_code"])
             raise EngineExecutionFailed(
                 "engine execution reached non-success terminal state"
                 + (" (" + failure_code + ")" if failure_code else ""),
@@ -1982,23 +2703,39 @@ class EngineClient:
         )
         started = monotonic()
         attempts = 0
-        while True:
-            attempts += 1
-            if attempts > self.config.max_poll_attempts:
-                raise EngineUnavailableError("engine polling budget exhausted")
-            if monotonic() - started > timeout:
-                raise EngineUnavailableError("engine execution did not reach terminal state in time")
+        # Keep both configured bounds: a longer execution observation must not
+        # spend its finite request allowance at the short default cadence and
+        # abandon an admitted provider while it is still physically running.
+        # Slower probes only lengthen this interval; the absolute deadline and
+        # maximum number of probes remain authoritative.
+        poll_interval = max(self.config.poll_interval_s, timeout / self.config.max_poll_attempts)
+        try:
+            # One poll can read status, events and the terminal result. Their
+            # individual HTTP deadlines cannot extend this aggregate wait.
+            async with asyncio.timeout(timeout):
+                while True:
+                    attempts += 1
+                    if attempts > self.config.max_poll_attempts:
+                        raise EngineUnavailableError("engine polling budget exhausted")
+                    if monotonic() - started >= timeout:
+                        raise EngineUnavailableError("engine execution did not reach terminal state in time")
 
-            terminal = await self.terminal_result_if_available(
-                execution_id=execution_id,
-                actor_id=actor_id,
-                tenant_id=tenant_id,
-                trace_id=trace_id,
-            )
-            if terminal is not None:
-                return terminal
+                    terminal = await self.terminal_result_if_available(
+                        execution_id=execution_id,
+                        actor_id=actor_id,
+                        tenant_id=tenant_id,
+                        trace_id=trace_id,
+                    )
+                    if terminal is not None:
+                        if monotonic() - started >= timeout:
+                            raise EngineUnavailableError(
+                                "engine execution did not reach terminal state in time"
+                            )
+                        return terminal
 
-            await asyncio.sleep(self.config.poll_interval_s)
+                    await asyncio.sleep(poll_interval)
+        except TimeoutError as exc:
+            raise EngineUnavailableError("engine execution did not reach terminal state in time") from exc
 
     async def _recover_ambiguous_submit(
         self,
@@ -2059,7 +2796,18 @@ class EngineClient:
     ) -> None:
         """Best-effort bounded durable cancellation after caller interruption."""
 
-        try:
+        identity = (
+            command.operation.tenant_id,
+            command.operation.actor_id,
+            command.execution_request.execution_id,
+        )
+        cleanup = self._cancel_cleanups.get(identity)
+        if cleanup is None:
+            # Each request has its own absolute transport deadline. Retain and
+            # observe cleanup until that deadline, without allowing repeated
+            # disconnects to create unlimited detached requests.
+            if len(self._cancel_cleanups) >= self._MAX_CANCEL_CLEANUPS:
+                return
             cleanup = asyncio.create_task(
                 self.cancel(
                     command.execution_request.execution_id,
@@ -2069,15 +2817,27 @@ class EngineClient:
                     trace_id=command.operation.trace_id,
                 )
             )
+            self._cancel_cleanups[identity] = cleanup
+
+            def observe_cleanup(finished: asyncio.Task[Any]) -> None:
+                if self._cancel_cleanups.get(identity) is finished:
+                    self._cancel_cleanups.pop(identity, None)
+                if not finished.cancelled():
+                    finished.exception()
+
+            cleanup.add_done_callback(observe_cleanup)
+
+        # A client can outlive an application-loop restart. An already admitted
+        # cleanup on another loop is never a reason to issue another cancel or
+        # to await a foreign-loop task during caller cancellation.
+        if cleanup.get_loop() is not asyncio.get_running_loop():
+            return
+        try:
             await asyncio.wait_for(
                 asyncio.shield(cleanup),
                 timeout=min(self.config.request_timeout_s, 5.0),
             )
-        except (
-            asyncio.TimeoutError,
-            EngineClientError,
-            httpx.HTTPError,
-        ):
+        except (asyncio.CancelledError, Exception):
             # The caller cancellation remains primary. The engine execution is
             # durable, so a failed cleanup request can still be reconciled by
             # explicit status/cancel or server-side deadline/recovery policy.
@@ -2136,6 +2896,7 @@ __all__ = [
     "EngineExecutionFailed",
     "EngineNotFoundError",
     "EngineProtocolError",
+    "EngineRequestRejectedError",
     "EngineTerminalResult",
     "EngineUnavailableError",
     "command_from_context",

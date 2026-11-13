@@ -14,8 +14,8 @@ import re
 from collections import Counter
 from typing import Any, Dict, List, Mapping, Tuple
 
-from skeleton.retrieval.freshness import PlaneFreshness
-from skeleton.retrieval.fusion import ScoredResult
+from .freshness import PlaneFreshness
+from .fusion import ScoredResult
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 _INDEX_STATE_VERSION = 1

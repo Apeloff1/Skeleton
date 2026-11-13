@@ -60,7 +60,10 @@ class GovernedArtifactStore(Protocol):
         ...
 
 
-DEFAULT_ARTIFACTS_ROOT = Path(__file__).resolve().parents[1] / "artifacts" / "builds"
+# This is temporary assembly staging under the existing backend_data volume.
+# Canonical governed bytes continue to belong to the supplied artifact owner.
+# Resolving the path must not create directories while routes are imported.
+DEFAULT_ARTIFACTS_ROOT = Path(os.environ.get("GALAXY_BUILDS_VAULT_DIR", "/app/data/builds_vault")).parent / "gameforge-staging"
 
 _ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
 
@@ -161,6 +164,7 @@ def register_artifact(
     built_at: float | int | None = None,
     canonical_record: Any | None = None,
     tenant_id: str | None = None,
+    owner_id: str | None = None,
 ) -> dict[str, Any]:
     if canonical_record is None:
         if path is None:
@@ -197,14 +201,17 @@ def register_artifact(
         record["source_ref"] = source_ref
         record["governance_record_id"] = governance_record_id
         record["tenant_id"] = str(tenant_id or "").strip()
+    if owner_id is not None:
+        record["owner_id"] = owner_id
     try:
         database()["gameforge_builds"].update_one(
-            {"build_id": build_id},
+            {"build_id": build_id, **({"tenant_id": tenant_id, "owner_id": owner_id} if owner_id is not None else {})},
             {"$set": dict(record)},
             upsert=True,
         )
     except Exception:  # noqa: BLE001
-        pass
+        if owner_id is not None:
+            raise RuntimeError("Artifact metadata is unavailable") from None
     return record
 
 
@@ -300,6 +307,7 @@ def build_web_artifact(
     write_id: str | None = None,
     governed_store: GovernedArtifactStore | None = None,
     tenant_id: str | None = None,
+    owner_id: str | None = None,
     data_class: str = "internal",
     retention_until: float | None = None,
     exportable: bool = True,
@@ -383,13 +391,14 @@ fetch('game_data.json').then(r=>r.json()).then(d=>console.log('gamefiles',d));
 
     record = register_artifact(
         build_id,
-        safe_name,
+        game_name,
         "web",
         None if canonical_record is not None else zip_path,
         artifacts_root=artifacts_root,
         built_at=timestamp,
         canonical_record=canonical_record,
         tenant_id=tenant_id,
+        owner_id=owner_id,
     )
     record["download_url"] = f"/api/gameforge/build/download/{build_id}"
     record["ok"] = True
@@ -408,6 +417,7 @@ def build_source_artifact(
     write_id: str | None = None,
     governed_store: GovernedArtifactStore | None = None,
     tenant_id: str | None = None,
+    owner_id: str | None = None,
     data_class: str = "internal",
     retention_until: float | None = None,
     exportable: bool = True,
@@ -477,13 +487,14 @@ def build_source_artifact(
 
     record = register_artifact(
         build_id,
-        safe_name,
+        game_name,
         "source",
         None if canonical_record is not None else zip_path,
         artifacts_root=artifacts_root,
         built_at=timestamp,
         canonical_record=canonical_record,
         tenant_id=tenant_id,
+        owner_id=owner_id,
     )
     record["download_url"] = f"/api/gameforge/build/download/{build_id}"
     record["ok"] = True

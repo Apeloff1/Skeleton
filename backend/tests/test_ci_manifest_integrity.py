@@ -11,9 +11,16 @@ from pathlib import Path
 import re
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+def _workflow_source(name: str) -> Path:
+    active = REPO_ROOT / ".github" / "workflows" / name
+    archived = REPO_ROOT / ".github" / "workflows-archive" / name
+    # Archived lanes still must not refer to deleted or renamed test files.
+    return active if active.is_file() else archived
+
+
 WORKFLOWS = (
-    REPO_ROOT / ".github" / "workflows" / "product-convergence.yml",
-    REPO_ROOT / ".github" / "workflows" / "deployment-trust.yml",
+    _workflow_source("product-convergence.yml"),
+    _workflow_source("deployment-trust.yml"),
 )
 _TEST_REF = re.compile(r"(?<![A-Za-z0-9_.-])(?:backend/)?tests/[A-Za-z0-9_./-]+\.py")
 

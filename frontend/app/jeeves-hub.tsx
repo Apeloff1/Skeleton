@@ -1,5 +1,5 @@
 import { LazyMount } from '../src/utils/lazyMount';
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /jeeves-hub — Jeeves operator console.
  *
@@ -22,12 +22,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useFeatureFlag } from '../utils/featureFlags';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
-import JeevesRuntimeStatus from '../features/Jeeves/JeevesRuntimeStatus';
+import { useFeatureFlag } from '../src/utils/featureFlags';
+import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
+import JeevesRuntimeStatus from '../src/features/Jeeves/JeevesRuntimeStatus';
+import { apiFetch } from '../src/utils/apiController';
+import { resolveCreatorPrincipal } from '../src/product/creatorIdentity';
 
 const BACKEND = CANONICAL_API_BASE || '';
-const USER_ID = 'default_user';
 const REQUEST_TIMEOUT_MS = 10_000;
 const SLOW_THRESHOLD_MS = 1_500;
 
@@ -42,6 +43,7 @@ type Service = {
   icon: keyof typeof Ionicons.glyphMap;
   accent: string;
   voiceOnly?: boolean;
+  accountScoped?: boolean;
 };
 
 type Result = {
@@ -114,7 +116,8 @@ const SERVICES: Service[] = [
     id: 'daily',
     title: 'Daily Challenge',
     description: 'Current challenge feed for the default operator profile.',
-    endpoint: `/api/daily/challenge?user_id=${USER_ID}`,
+    endpoint: '/api/daily/challenge',
+    accountScoped: true,
     icon: 'flame-outline',
     accent: '#EF4444',
   },
@@ -130,7 +133,8 @@ const SERVICES: Service[] = [
     id: 'gamification',
     title: 'XP · Level · Achievements',
     description: 'Gamification profile, progression and achievements.',
-    endpoint: `/api/gamification/profile/${USER_ID}`,
+    endpoint: '/api/gamification/profile',
+    accountScoped: true,
     icon: 'medal-outline',
     accent: '#A3E635',
   },
@@ -211,7 +215,7 @@ async function fetchJsonWithTimeout(url: string): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await apiFetch(url, { signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
   } catch (error: any) {
@@ -234,10 +238,24 @@ function JeevesHubScreen() {
   const [filter, setFilter] = useState<Filter>('all');
   const [openId, setOpenId] = useState<string | null>(null);
   const [showModelReadiness, setShowModelReadiness] = useState(false);
+  const [principal, setPrincipal] = useState<string | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    resolveCreatorPrincipal().then(value => { if (current) setPrincipal(value); }).catch(() => { if (current) setPrincipal(null); });
+    return () => { current = false; };
+  }, []);
+
+  const accountServices = useMemo(() => SERVICES.map(service => {
+    if (!service.accountScoped || !principal) return service;
+    return service.id === 'daily'
+      ? { ...service, endpoint: `${service.endpoint}?user_id=${encodeURIComponent(principal)}` }
+      : { ...service, endpoint: `${service.endpoint}/${encodeURIComponent(principal)}` };
+  }), [principal]);
 
   const visibleServices = useMemo(
-    () => SERVICES.filter(service => !service.voiceOnly || flagVoice),
-    [flagVoice],
+    () => accountServices.filter(service => (!service.voiceOnly || flagVoice) && (!service.accountScoped || principal !== null)),
+    [accountServices, flagVoice, principal],
   );
 
   const checkService = useCallback(async (service: Service) => {

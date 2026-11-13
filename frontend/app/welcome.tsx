@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { safeSetItem } from '../utils/safeStorage';
+import { safeSetItem } from '../src/utils/safeStorage';
 
 const WELCOME_FLAG_KEY = '@codedock:welcome_seen:v1';
 
@@ -114,7 +114,7 @@ export default function WelcomeScreen() {
         </Animated.Text>
 
         <Animated.Text style={[styles.subtitle, { opacity: subOpacity }]}>
-          Hyperscale game-build factory · 600K+ knowledge assets · live RAG
+          Local-first game studio · AI tools and project workspaces
         </Animated.Text>
 
         <Animated.View

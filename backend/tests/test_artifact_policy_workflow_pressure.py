@@ -11,12 +11,16 @@ def _workflow_text() -> str:
     return WORKFLOW.read_text(encoding="utf-8")
 
 
-def test_non_pr_artifact_policy_runs_keep_per_generation_identity() -> None:
+def test_non_pr_artifact_policy_runs_are_never_cancelled() -> None:
     text = _workflow_text()
 
-    assert "group: artifact-policy-${{ github.event.pull_request.number || github.sha }}" in text
+    # Per-PR superseded heads coalesce; manual and scheduled full scans stay
+    # independently queued and are never cancelled. No duplicate push scan.
+    assert "group: artifact-policy-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}" in text
     assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in text
-    assert "github.ref }}" not in text.split("permissions:", 1)[0]
+    assert "workflow_dispatch:" in text
+    assert "schedule:" in text
+    assert "pull_request:" in text
 
 
 def test_main_push_artifact_policy_binds_event_before_commit() -> None:

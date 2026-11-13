@@ -1,0 +1,61 @@
+{
+  "project_id": "studio_roguelite_extraction_misty_breakwater",
+  "genre": "roguelite_extraction",
+  "biome": "misty_breakwater",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.visual.v1",
+  "art_direction": {
+    "environment": "mist-channel locks",
+    "landmark": "historic sea wall",
+    "palette": [
+      "#10293D",
+      "#356F91",
+      "#7BC6D5",
+      "#E8F7F8"
+    ],
+    "readability": "depth_and_high_contrast",
+    "inspiration": "original_asset_concepts_only"
+  },
+  "asset_recipes": [
+    {
+      "id": "navigator",
+      "type": "character",
+      "brief": "Distinct delver equipment, readable at handheld resolution",
+      "production": "design_only"
+    },
+    {
+      "id": "biome_modular",
+      "type": "landscape",
+      "brief": "Tessellated original mist-channel locks with reactive low-visibility tides",
+      "production": "design_only"
+    },
+    {
+      "id": "architecture",
+      "type": "modular_structure",
+      "brief": "Interlocking geometry derived from historic sea wall",
+      "production": "design_only"
+    },
+    {
+      "id": "resource",
+      "type": "prop_and_hud",
+      "brief": "Readable 3D and 2D depictions of fog horns",
+      "production": "design_only"
+    },
+    {
+      "id": "weather",
+      "type": "volumetric_effect",
+      "brief": "Performance-limited low-visibility tides field",
+      "production": "design_only"
+    }
+  ],
+  "streaming_profile": {
+    "target": "hardware_adaptive",
+    "gpu_budget_source": "measured_at_runtime",
+    "offload_strategy": "required_not_implemented"
+  },
+  "rights": {
+    "external_asset_source": "none",
+    "approval_pending": true
+  },
+  "owner": "existing game_builder original-studio and scene editor owners"
+}

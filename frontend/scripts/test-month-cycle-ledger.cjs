@@ -1,11 +1,12 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 function load() {
-  const name = path.join(__dirname, '../services/monthCycleLedger.ts');
+  const name = path.join(__dirname, '../src/services/monthCycleLedger.ts');
   const result = ts.transpileModule(fs.readFileSync(name, 'utf8'), {
     fileName: name, compilerOptions: {
       module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
@@ -14,7 +15,7 @@ function load() {
   });
   assert.equal(result.diagnostics.length, 0);
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', result.outputText)(require, module, module.exports);
+  compileFunction(result.outputText, ['require', 'module', 'exports'])(require, module, module.exports);
   return module.exports.MonthCycleLedger;
 }
 const Ledger = load(), DAY = 86_400_000, START = 1_800_000_000_000;

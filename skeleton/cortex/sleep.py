@@ -35,6 +35,9 @@ class SleepTrace:
     slack: float = 0.0
     conf: float = 0.0
 
+    def priority(self) -> float:
+        return max(0.05, float(self.conf) + 0.5 * max(0.0, float(self.slack)))
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "stim": self.stim[:160],
@@ -140,13 +143,26 @@ class SleepCycle:
         self.buffer.append(tr)
         return tr
 
-    def consolidate(self, neo, *, n: int = K_REPLAY, lr: float = 0.06) -> Dict[str, Any]:
+    def consolidate(
+        self,
+        neo,
+        *,
+        n: int = K_REPLAY,
+        lr: float = 0.06,
+        prioritized: bool = False,
+    ) -> Dict[str, Any]:
         """Replay. Heads step. Adapters distill. Callosum Hebbs. EMA updates."""
         buf = list(self.buffer)
         if not buf:
             return {"replays": 0, "cycles": self.cycles}
         k = min(max(1, int(n)), len(buf))
-        sample = buf if len(buf) <= k else self._rng.sample(buf, k)
+        if len(buf) <= k:
+            sample = buf
+        elif prioritized:
+            ranked = sorted(buf, key=lambda t: t.priority(), reverse=True)
+            sample = ranked[:k]
+        else:
+            sample = self._rng.sample(buf, k)
         heads_steps = 0
         distills = 0
         hebbs = 0
@@ -175,7 +191,7 @@ class SleepCycle:
                     if ex is not None:
                         ex.distill(h, mixed, lr=lr * 0.5)
                         distills += 1
-                        moe.credit(slot, lr=0.01)
+                        moe.credit(slot, lr=0.01, hidden=h)
             if callosum is not None and "left" in tr.fired and "right" in tr.fired:
                 callosum.hebb(h, lr=0.02)
                 hebbs += 1
@@ -196,6 +212,7 @@ class SleepCycle:
             "hebbs": hebbs,
             "cycles": self.cycles,
             "buffer": len(self.buffer),
+            "prioritized": bool(prioritized),
         }
 
     def prune(self, *, min_conf: float = 0.35) -> int:
@@ -262,4 +279,116 @@ class SleepCycle:
             "pruned": self.pruned,
             "cofire_lr": co,
             "ema": self.ema is not None,
+        }
+
+    def dream_counterfactuals(
+        self,
+        neo,
+        *,
+        dreams: int = 6,
+        lr: float = 0.04,
+    ) -> Dict[str, Any]:
+        """Counterfactual Dreaming Consolidation.
+
+        Synthesizes imaginative cross-era / cross-genre / cross-console
+        recombinant traces from high-priority episodic memories, simulates
+        thermal/TTK walk slack across mutated encounter mixes, and trains
+        the MoE heads, callosum, and speaking mouths on successful dreams.
+        """
+        from skeleton.cortex.heads import clamp_mix
+
+        buf = list(self.buffer)
+        if not buf:
+            for stim in ("soulslike extraction ttk elite dread", "roguelite deckbuilder buildcraft", "gb_dmg_rom 2bpp 16B tile palette"):
+                if hasattr(neo, "think"):
+                    neo.think(stim)
+            buf = list(self.buffer)
+        if not buf:
+            return {"dreamed": 0, "accepted_dreams": 0, "cycles": self.cycles}
+
+        ranked = sorted(buf, key=lambda t: t.priority(), reverse=True)
+        n_dreams = max(1, min(16, int(dreams)))
+        moe = getattr(neo, "moe", None)
+        callosum = getattr(neo, "callosum", None)
+        xf = getattr(neo, "transformer", None)
+        rms = getattr(neo, "neo_rms", None)
+
+        dream_records: List[Dict[str, Any]] = []
+        accepted = 0
+        dream_texts: List[str] = []
+
+        for idx in range(n_dreams):
+            tr_a = ranked[idx % len(ranked)]
+            tr_b = ranked[(idx + 1) % len(ranked)]
+            len_h = min(len(tr_a.hidden), len(tr_b.hidden))
+            alpha = 0.35 + 0.15 * ((idx % 3) / 2.0)
+            dream_h = [
+                (1.0 - alpha) * float(tr_a.hidden[d]) + alpha * float(tr_b.hidden[d])
+                for d in range(len_h)
+            ] if len_h > 0 else list(tr_a.hidden)
+
+            base_mix = tr_a.mix or tr_b.mix or (3.0, 1.0, 0.0)
+            delta_t = 1 if (idx % 2 == 0) else -1
+            delta_e = 1 if (idx % 3 == 0) else 0
+            cf_mix = clamp_mix(base_mix[0] + delta_t, base_mix[1] + delta_e, base_mix[2])
+
+            trash, elite, boss = cf_mix
+            pressure = 0.12 * trash + 0.28 * elite + 0.55 * boss
+            cf_slack = max(0.0, round(1.0 - abs(pressure - 0.68), 4))
+            base_slack = max(float(tr_a.slack), float(tr_b.slack), 0.35)
+            improved = cf_slack >= base_slack * 0.92
+
+            toks_a = (tr_a.stim or "soulslike ttk").split()[:4]
+            toks_b = (tr_b.stim or "roguelite synergy").split()[-4:]
+            dream_stim = " ".join(dict.fromkeys(toks_a + toks_b))
+
+            if improved:
+                accepted += 1
+                dream_texts.append(dream_stim)
+                if moe is not None and dream_h:
+                    if "left" in moe.experts:
+                        moe.experts["left"].head.step(dream_h, cf_mix, lr=lr)
+                    if "right" in moe.experts and (tr_a.bias or tr_b.bias):
+                        moe.experts["right"].head.step(dream_h, tr_a.bias or tr_b.bias or "combat", lr=lr)
+                    moe.credit("left", lr=0.015, hidden=dream_h)
+                if callosum is not None and dream_h:
+                    callosum.hebb(dream_h, lr=0.025)
+                self.buffer.append(
+                    SleepTrace(
+                        stim=dream_stim,
+                        hidden=tuple(dream_h),
+                        mix=tuple(float(x) for x in cf_mix),
+                        bias=tr_a.bias or tr_b.bias or "combat",
+                        route=tr_a.route or tr_b.route,
+                        veto=0.0,
+                        policy=tr_a.policy,
+                        fired=("left", "right", "midbrain"),
+                        slack=cf_slack,
+                        conf=min(1.0, max(tr_a.conf, tr_b.conf, 0.65) + 0.05),
+                    )
+                )
+
+            dream_records.append({
+                "dream_index": idx,
+                "stimulus": dream_stim,
+                "counterfactual_mix": list(cf_mix),
+                "counterfactual_slack": cf_slack,
+                "accepted": improved,
+            })
+
+        if dream_texts:
+            if xf is not None and hasattr(xf, "specialized_calibrate"):
+                xf.specialized_calibrate(dream_texts, epochs=1, lr=min(lr, 0.025))
+            if rms is not None and hasattr(rms, "specialized_calibrate"):
+                rms.specialized_calibrate(dream_texts, epochs=1, lr=min(lr, 0.025))
+
+        self._ema_update(neo)
+        self.cycles += 1
+        return {
+            "kind": "counterfactual-dreaming",
+            "dreamed": n_dreams,
+            "accepted_dreams": accepted,
+            "buffer_size": len(self.buffer),
+            "cycles": self.cycles,
+            "dreams": dream_records,
         }

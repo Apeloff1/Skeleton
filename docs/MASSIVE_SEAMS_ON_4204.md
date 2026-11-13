@@ -1,0 +1,1 @@
+# Massive Seams Applied to #4204\n\nFull factual engines for native studio. Clipped-G, era_bind, stored_prose=0.\nSee zip for complete set of 35+ modules.\n

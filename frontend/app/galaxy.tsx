@@ -15,8 +15,8 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
-const GalaxyStudioFactoryModal = lazyDefault(() => import('../features/GalaxyStudioFactory/GalaxyStudioFactoryModal'));
-import theme from '../theme/tokens';
+const GalaxyStudioFactoryModal = lazyDefault(() => import('../src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal'));
+import theme from '../src/theme/tokens';
 
 export default function GalaxyRoute() {
   const router = useRouter();

@@ -81,6 +81,28 @@ def test_detects_dropped_lane_dependency(repo_copy: Path) -> None:
     assert any("aggregate needs" in item for item in failures)
 
 
+def test_detects_dropped_restored_ci_lane(repo_copy: Path) -> None:
+    """#4104: the restored CI/CD gates must stay inside the required aggregate."""
+    _edit(
+        repo_copy / ".github/workflows/merge-readiness.yml",
+        "      - ci\n",
+        "",
+    )
+    failures, _ = guard.run(repo_copy, guard.DEFAULT_POLICY)
+    assert any("aggregate needs" in item for item in failures)
+
+
+def test_restored_ci_lane_is_reusable_and_required() -> None:
+    lanes = {lane["job_id"]: lane for lane in POLICY["aggregate_lanes"]}
+    assert lanes["ci"]["name"] == "CI/CD"
+    workflow = (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
+    assert "uses: ./.github/workflows/ci.yml" in workflow
+    ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert "workflow_call:" in ci
+    for job_name in ("Frontend", "Backend Test", "Skeleton GameForge", "Cockpit Smoke", "Docker Build"):
+        assert f'name: "{job_name}"' in ci
+
+
 def test_detects_renamed_required_job(repo_copy: Path) -> None:
     _edit(
         repo_copy / ".github/workflows/merge-readiness.yml",
@@ -148,7 +170,7 @@ def test_detects_protection_app_drift(repo_copy: Path) -> None:
 def test_detects_contract_checker_drift(repo_copy: Path) -> None:
     _edit(
         repo_copy / "scripts/check_merge_readiness_contract.py",
-        '    "pr_automation",\n)',
+        '    "ci",\n)',
         ")",
     )
     failures, _ = guard.run(repo_copy, guard.DEFAULT_POLICY)
@@ -439,3 +461,13 @@ def test_render_text_is_deterministic() -> None:
         json.loads(json.dumps(report))
     )
     assert "READY" in status.render_text(report)
+
+
+def test_reusable_lane_rolls_up_child_jobs() -> None:
+    """#4104: the CI/CD lane is a reusable workflow; its children decide it."""
+
+    green = [_run("CI/CD / Frontend", "success", run_id=1), _run("CI/CD / Docker Build", "skipped", run_id=2)]
+    assert status.classify_run("CI/CD", green, 15368).state in {"success", "neutral"}
+    red = [*green, _run("CI/CD / Backend Test", "failure", run_id=3)]
+    assert status.classify_run("CI/CD", red, 15368).state == "failure"
+    assert status.classify_run("CI/CD", [], 15368).state == "missing"

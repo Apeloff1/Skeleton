@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
@@ -9,7 +9,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { apiFetch } from '../utils/apiController';
+import { apiFetch } from '../src/utils/apiController';
 
 const API = CANONICAL_API_BASE || '';
 const SYS = `${API}/api/galaxy-studio/systems`;
@@ -28,11 +28,14 @@ export default function SystemsForge() {
   const [bigWins, setBigWins] = useState<any[]>([]);
   const [totals, setTotals] = useState<{ k: number; o: number }>({ k: 0, o: 0 });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [mountedError, setMountedError] = useState('');
   const [query, setQuery] = useState('');
 
   const [activeKey, setActiveKey] = useState<string>('');
   const [detail, setDetail] = useState<any>(null);
   const [detLoading, setDetLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
   const [chosen, setChosen] = useState<Record<string, string>>({});
   const [knobQuery, setKnobQuery] = useState('');
 
@@ -47,37 +50,46 @@ export default function SystemsForge() {
   const [ctxMeta, setCtxMeta] = useState<any[]>([]);
   const [ctxSaving, setCtxSaving] = useState(false);
   const [ctxOpen, setCtxOpen] = useState(false);
+  const [contextError, setContextError] = useState('');
 
   const flash = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(''), 2200); }, []);
 
   const loadMounted = useCallback(async (bid: string) => {
-    if (!bid.trim()) { setMounted([]); return; }
+    if (!bid.trim()) { setMounted([]); setMountedError(''); return; }
+    setMountedError('');
     try {
       const r = await apiFetch(`${SYS}/build/${encodeURIComponent(bid.trim())}`, { timeoutMs: 10000 });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
-      setMounted(d.systems || []);
-    } catch { /* ignore */ }
+      if (!d || !Array.isArray(d.systems) || d.systems.length > 256) throw new Error('Invalid mounted-system response');
+      setMounted(d.systems);
+    } catch {
+      setMounted([]);
+      setMountedError('Mounted systems could not be verified. Retry before applying changes to this build.');
+    }
   }, []);
   useEffect(() => { loadMounted(buildId); }, [buildId, loadMounted]);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
+  const loadCatalog = useCallback(async () => {
+      setLoading(true); setLoadError('');
       try {
         const [rs, rb] = await Promise.all([
           apiFetch(`${SYS}`, { timeoutMs: 12000 }),
           apiFetch(`${SYS}/big-wins`, { timeoutMs: 12000 }),
         ]);
+        if (!rs.ok || !rb.ok) throw new Error(`HTTP ${!rs.ok ? rs.status : rb.status}`);
         const d = await rs.json(); const b = await rb.json();
-        if (alive) {
-          setSystems(d.systems || []); setPipeline(d.pipeline || []);
-          setTotals({ k: d.total_knobs || 0, o: d.total_options || 0 });
-          setBigWins(b.big_wins || []);
-        }
-      } catch { /* ignore */ } finally { if (alive) setLoading(false); }
-    })();
-    return () => { alive = false; };
+        if (!Array.isArray(d.systems) || d.systems.length > 256 || !Array.isArray(d.pipeline) || d.pipeline.length > 32 ||
+            !Array.isArray(b.big_wins) || b.big_wins.length > 64) throw new Error('Invalid systems catalog');
+        setSystems(d.systems); setPipeline(d.pipeline);
+        setTotals({ k: Number.isSafeInteger(d.total_knobs) ? d.total_knobs : 0, o: Number.isSafeInteger(d.total_options) ? d.total_options : 0 });
+        setBigWins(b.big_wins);
+      } catch {
+        setSystems([]); setPipeline([]); setBigWins([]);
+        setLoadError('The systems catalog is unavailable. No generation options were inferred locally.');
+      } finally { setLoading(false); }
   }, []);
+  useEffect(() => { void loadCatalog(); }, [loadCatalog]);
 
   const mountedKeys = useMemo(() => new Set(mounted.map((m) => m.system)), [mounted]);
 
@@ -89,11 +101,14 @@ export default function SystemsForge() {
 
   const openSystem = useCallback(async (key: string) => {
     tap();
-    setActiveKey(key); setDetail(null); setDetLoading(true); setResult(null); setChosen({}); setKnobQuery('');
+    setActiveKey(key); setDetail(null); setDetailError(''); setDetLoading(true); setResult(null); setChosen({}); setKnobQuery('');
     try {
       const r = await apiFetch(`${SYS}/${key}`, { timeoutMs: 12000 });
-      setDetail(await r.json());
-    } catch { /* ignore */ } finally { setDetLoading(false); }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const value = await r.json();
+      if (!value?.system || !Array.isArray(value.knobs) || value.knobs.length > 256) throw new Error('Invalid system detail');
+      setDetail(value);
+    } catch { setDetailError('System details could not be loaded. Select the system again to retry.'); } finally { setDetLoading(false); }
   }, []);
 
   const pickKnob = useCallback((kk: string, ok: string) => {
@@ -126,11 +141,12 @@ export default function SystemsForge() {
         timeoutMs: useEnrich ? 75000 : 20000,
       });
       const d = await r.json();
+      if (!r.ok || !d || d.error || !d.blueprint) throw new Error(typeof d?.error === 'string' ? d.error : `HTTP ${r.status}`);
       setResult(d);
-      loadMounted(buildId);
+      await loadMounted(buildId);
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    } catch { setResult({ error: 'Generation failed' }); } finally { setRunning(false); }
-  }, [activeKey, buildId, chosen, enrich, loadMounted]);
+    } catch (error) { setResult({ error: error instanceof Error ? error.message : 'Generation failed' }); } finally { setRunning(false); }
+  }, [activeKey, buildId, chosen, enrich, loadMounted, ctx]);
 
   const applyBigWin = useCallback(async (bw: any) => {
     if (!buildId.trim()) { flash('⚠️ Enter a Build ID first'); return; }
@@ -143,7 +159,8 @@ export default function SystemsForge() {
         timeoutMs: bwAi ? 120000 : 30000,
       });
       const d = await r.json();
-      loadMounted(buildId);
+      if (!r.ok || !Number.isSafeInteger(d?.applied) || d.applied < 0) throw new Error(`HTTP ${r.status}`);
+      await loadMounted(buildId);
       flash(`✅ ${bw.label} → ${d.applied} systems mounted${bwAi ? ' · ✨ AI enriching in background' : ''}`);
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch { flash('❌ Could not apply playbook'); }
@@ -152,15 +169,17 @@ export default function SystemsForge() {
   useEffect(() => {
     if (!activeKey) return;
     let alive = true;
+    setContextError('');
     (async () => {
       try {
         const r = await apiFetch(`${SYS}/${activeKey}/context?build_id=${encodeURIComponent(buildId.trim())}`, { timeoutMs: 10000 });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
         if (alive) {
           setCtx({ vision: d.vision || '', implementation: d.implementation || '', quality: d.quality || '' });
           setCtxMeta(d.fields_meta || []);
         }
-      } catch { /* ignore */ }
+      } catch { if (alive) setContextError('Creator context could not be loaded. Existing fields were not replaced.'); }
     })();
     return () => { alive = false; };
   }, [activeKey, buildId]);
@@ -170,10 +189,14 @@ export default function SystemsForge() {
     tap();
     setCtxSaving(true);
     try {
-      await apiFetch(`${SYS}/${activeKey}/context`, {
+      const response = await apiFetch(`${SYS}/${activeKey}/context`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ build_id: buildId.trim(), ...ctx }), timeoutMs: 15000,
       });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const saved = await response.json().catch(() => null);
+      if (!saved || saved.error || saved.saved === false) throw new Error('Context save was not acknowledged');
+      setContextError('');
       flash('💾 Creator context saved → feeds AI + gates');
     } catch { flash('❌ Save failed'); } finally { setCtxSaving(false); }
   }, [activeKey, buildId, ctx, flash]);
@@ -223,6 +246,8 @@ export default function SystemsForge() {
         <View style={styles.center}><ActivityIndicator color={C.accent} /></View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 80 }} keyboardShouldPersistTaps="handled">
+          {!!loadError && <View style={styles.errorCard}><Text accessibilityRole="alert" style={styles.errorText}>{loadError}</Text><TouchableOpacity onPress={() => { void loadCatalog(); }} style={styles.retryButton}><Text style={styles.retryText}>Retry catalog</Text></TouchableOpacity></View>}
+          {!!mountedError && <View style={styles.errorCard}><Text accessibilityRole="alert" style={styles.errorText}>{mountedError}</Text><TouchableOpacity onPress={() => { void loadMounted(buildId); }} style={styles.retryButton}><Text style={styles.retryText}>Retry build status</Text></TouchableOpacity></View>}
           {/* BIG WINS */}
           <View style={styles.bwHead}>
             <Text style={[styles.sectionLabel, { marginBottom: 0, flex: 1 }]}>🏆 Big-Win Playbooks — one tap, multiple systems</Text>
@@ -278,6 +303,7 @@ export default function SystemsForge() {
           </View>
 
           {detLoading && <View style={styles.center}><ActivityIndicator color={C.accent} /></View>}
+          {!!detailError && <Text accessibilityRole="alert" style={styles.errorText}>{detailError}</Text>}
 
           {detail && !detLoading && (
             <View style={styles.panel}>
@@ -325,6 +351,7 @@ export default function SystemsForge() {
 
               {/* Creator context — 3 × 20k free-text dossiers fed to AI + gates */}
               <View style={styles.ctxCard} testID="sf-context-card">
+                {!!contextError && <Text accessibilityRole="alert" style={styles.errorText}>{contextError}</Text>}
                 <TouchableOpacity onPress={() => { tap(); setCtxOpen((v) => !v); }} style={styles.ctxHead} testID="sf-context-toggle">
                   <Text style={styles.ctxHeadTxt}>📝 Creator Context — 3 × 20,000 chars → drives AI + gates</Text>
                   <Text style={styles.ctxChevron}>{ctxOpen ? '▾' : '▸'}</Text>
@@ -463,6 +490,10 @@ const styles = StyleSheet.create({
   title: { color: C.text, fontSize: 18, fontWeight: '900' },
   sub: { color: C.muted, fontSize: 11, fontWeight: '600' },
   center: { paddingVertical: 30, alignItems: 'center' },
+  errorCard: { backgroundColor: '#34191f', borderColor: '#7f3342', borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 10 },
+  errorText: { color: '#ff9eaa', fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  retryButton: { alignSelf: 'flex-start', marginTop: 8, backgroundColor: C.alt, borderColor: '#7f3342', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  retryText: { color: C.text, fontSize: 12, fontWeight: '800' },
   sectionLabel: { color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 8, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
   bwCell: { width: 140, backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.gold + '55', padding: 12 },
   bwIcon: { fontSize: 22 },

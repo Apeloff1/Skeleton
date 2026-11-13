@@ -8,11 +8,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { api } from '../utils/apiController';
-import { bumpStat } from '../utils/userStore';
-import { openModalFromRoute } from '../utils/openModalFromRoute';
-import theme from '../theme/tokens';
-import { Screen, AppHeader } from '../components/UI';
+import { api } from '../src/utils/apiController';
+import { bumpStat } from '../src/utils/userStore';
+import { openModalFromRoute } from '../src/utils/openModalFromRoute';
+import theme from '../src/theme/tokens';
+import { Screen, AppHeader } from '../src/components/UI';
 
 interface Card { id: string; term: string; definition: string; }
 

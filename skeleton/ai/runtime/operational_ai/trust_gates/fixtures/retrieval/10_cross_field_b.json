@@ -1,0 +1,15 @@
+{
+  "case": "10_cross_field_b",
+  "gate": "retrieval",
+  "expect": "reject",
+  "reason": "Source SHA256 binds retrieved bytes",
+  "payload": {
+    "source_id": "doc_001",
+    "text": "hello world",
+    "span_start": 0,
+    "span_end": 5,
+    "excerpt": "hello",
+    "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "approved": true
+  }
+}

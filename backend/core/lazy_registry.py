@@ -52,6 +52,8 @@ _LOADERS = {
     'core.capability_readiness': lambda: importlib.import_module('core.capability_readiness'),
     'core.character_profile': lambda: importlib.import_module('core.character_profile'),
     'core.charter_policy': lambda: importlib.import_module('core.charter_policy'),
+    'core.chat_attachments': lambda: importlib.import_module('core.chat_attachments'),
+    'core.chat_sessions': lambda: importlib.import_module('core.chat_sessions'),
     'core.chat_turn_lifecycle': lambda: importlib.import_module('core.chat_turn_lifecycle'),
     'core.chat_turns': lambda: importlib.import_module('core.chat_turns'),
     'core.choice_gates': lambda: importlib.import_module('core.choice_gates'),
@@ -69,6 +71,7 @@ _LOADERS = {
     'core.content_store': lambda: importlib.import_module('core.content_store'),
     'core.contradiction_resolver': lambda: importlib.import_module('core.contradiction_resolver'),
     'core.control_plane': lambda: importlib.import_module('core.control_plane'),
+    'core.core_v1_webhooks': lambda: importlib.import_module('core.core_v1_webhooks'),
     'core.control_plane_deployment': lambda: importlib.import_module('core.control_plane_deployment'),
     'core.conversations': lambda: importlib.import_module('core.conversations'),
     'core.course_runtime': lambda: importlib.import_module('core.course_runtime'),
@@ -105,10 +108,21 @@ _LOADERS = {
     'core.deployment_receipts': lambda: importlib.import_module('core.deployment_receipts'),
     'core.dialogue_runtime': lambda: importlib.import_module('core.dialogue_runtime'),
     'core.director_agent': lambda: importlib.import_module('core.director_agent'),
+    'core.discourse_catalog': lambda: importlib.import_module('core.discourse_catalog'),
     'core.discourse_engine': lambda: importlib.import_module('core.discourse_engine'),
     'core.discovery_engine': lambda: importlib.import_module('core.discovery_engine'),
+    'core.dragon_conversation_binding': lambda: importlib.import_module('core.dragon_conversation_binding'),
+    'core.dragon_crawler': lambda: importlib.import_module('core.dragon_crawler'),
+    'core.dragon_delivery_routes': lambda: importlib.import_module('core.dragon_delivery_routes'),
+    'core.dragon_reference_practice': lambda: importlib.import_module('core.dragon_reference_practice'),
+    'core.dragon_research_session': lambda: importlib.import_module('core.dragon_research_session'),
+    'core.dragon_research_startup': lambda: importlib.import_module('core.dragon_research_startup'),
+    'core.dragon_runtime': lambda: importlib.import_module('core.dragon_runtime'),
+    'core.dragon_runtime_bridge': lambda: importlib.import_module('core.dragon_runtime_bridge'),
     'core.durable_outbox': lambda: importlib.import_module('core.durable_outbox'),
     'core.economy_runtime': lambda: importlib.import_module('core.economy_runtime'),
+    'core.ecosystem_cli': lambda: importlib.import_module('core.ecosystem_cli'),
+    'core.ecosystem_orchestrator': lambda: importlib.import_module('core.ecosystem_orchestrator'),
     'core.engine_chat': lambda: importlib.import_module('core.engine_chat'),
     'core.engine_client': lambda: importlib.import_module('core.engine_client'),
     'core.engine_text': lambda: importlib.import_module('core.engine_text'),
@@ -137,9 +151,22 @@ _LOADERS = {
     'core.forge_registry': lambda: importlib.import_module('core.forge_registry'),
     'core.forge_validator': lambda: importlib.import_module('core.forge_validator'),
     'core.full_roster': lambda: importlib.import_module('core.full_roster'),
+    'core.game_frontier_authoring': lambda: importlib.import_module('core.game_frontier_authoring'),
     'core.game_choices': lambda: importlib.import_module('core.game_choices'),
+    'core.game_console_build': lambda: importlib.import_module('core.game_console_build'),
+    'core.game_console_studio': lambda: importlib.import_module('core.game_console_studio'),
+    'core.game_content_uploads': lambda: importlib.import_module('core.game_content_uploads'),
     'core.game_knowledge_vault': lambda: importlib.import_module('core.game_knowledge_vault'),
+    'core.game_learning': lambda: importlib.import_module('core.game_learning'),
+    'core.game_learning_events': lambda: importlib.import_module('core.game_learning_events'),
+    'core.game_play': lambda: importlib.import_module('core.game_play'),
     'core.game_session': lambda: importlib.import_module('core.game_session'),
+    'core.game_studio_agent': lambda: importlib.import_module('core.game_studio_agent'),
+    'core.game_studio_health': lambda: importlib.import_module('core.game_studio_health'),
+    'core.game_studio_learning': lambda: importlib.import_module('core.game_studio_learning'),
+    'core.game_studio_review': lambda: importlib.import_module('core.game_studio_review'),
+    'core.game_studio_tools': lambda: importlib.import_module('core.game_studio_tools'),
+    'core.game_successor': lambda: importlib.import_module('core.game_successor'),
     'core.gamefile_pipeline': lambda: importlib.import_module('core.gamefile_pipeline'),
     'core.gameforge_artifact_builder': lambda: importlib.import_module('core.gameforge_artifact_builder'),
     'core.http_errors': lambda: importlib.import_module('core.http_errors'),
@@ -154,6 +181,8 @@ _LOADERS = {
     'core.knowledge_fabric': lambda: importlib.import_module('core.knowledge_fabric'),
     'core.legion_discourse': lambda: importlib.import_module('core.legion_discourse'),
     'core.live_session': lambda: importlib.import_module('core.live_session'),
+    'core.loop_local_asyncio': lambda: importlib.import_module('core.loop_local_asyncio'),
+    'core.massive_upgrades': lambda: importlib.import_module('core.massive_upgrades'),
     'core.model_catalog': lambda: importlib.import_module('core.model_catalog'),
     'core.model_router': lambda: importlib.import_module('core.model_router'),
     'core.mongo_guard': lambda: importlib.import_module('core.mongo_guard'),
@@ -164,15 +193,18 @@ _LOADERS = {
     'core.operation_stream_transport': lambda: importlib.import_module('core.operation_stream_transport'),
     'core.operator_control_projection': lambda: importlib.import_module('core.operator_control_projection'),
     'core.outcall_manager': lambda: importlib.import_module('core.outcall_manager'),
+    'core.path_safety': lambda: importlib.import_module('core.path_safety'),
     'core.perf': lambda: importlib.import_module('core.perf'),
     'core.phase_gates': lambda: importlib.import_module('core.phase_gates'),
     'core.platoons': lambda: importlib.import_module('core.platoons'),
     'core.playable_game': lambda: importlib.import_module('core.playable_game'),
+    'core.playable_literal_patch': lambda: importlib.import_module('core.playable_literal_patch'),
     'core.playable_simulation': lambda: importlib.import_module('core.playable_simulation'),
     'core.player_runtime': lambda: importlib.import_module('core.player_runtime'),
     'core.policy_repository': lambda: importlib.import_module('core.policy_repository'),
     'core.portable_claim_proof': lambda: importlib.import_module('core.portable_claim_proof'),
     'core.principal_seal': lambda: importlib.import_module('core.principal_seal'),
+    'core.public_exception_route': lambda: importlib.import_module('core.public_exception_route'),
     'core.product_control_plane': lambda: importlib.import_module('core.product_control_plane'),
     'core.product_control_runtime': lambda: importlib.import_module('core.product_control_runtime'),
     'core.product_default_executors': lambda: importlib.import_module('core.product_default_executors'),
@@ -198,8 +230,10 @@ _LOADERS = {
     'core.runtime_health': lambda: importlib.import_module('core.runtime_health'),
     'core.runtime_resilience': lambda: importlib.import_module('core.runtime_resilience'),
     'core.runtime_sessions': lambda: importlib.import_module('core.runtime_sessions'),
+    'core.safe_errors': lambda: importlib.import_module('core.safe_errors'),
     'core.save_envelope': lambda: importlib.import_module('core.save_envelope'),
     'core.scheduler': lambda: importlib.import_module('core.scheduler'),
+    'core.security_augmentation': lambda: importlib.import_module('core.security_augmentation'),
     'core.security_config': lambda: importlib.import_module('core.security_config'),
     'core.security_v2': lambda: importlib.import_module('core.security_v2'),
     'core.sensory_cues': lambda: importlib.import_module('core.sensory_cues'),
@@ -243,6 +277,7 @@ _LOADERS = {
     'core.universal_forge': lambda: importlib.import_module('core.universal_forge'),
     'core.user_control_receipts': lambda: importlib.import_module('core.user_control_receipts'),
     'core.vault_gdd': lambda: importlib.import_module('core.vault_gdd'),
+    'core.vault_secure_fs': lambda: importlib.import_module('core.vault_secure_fs'),
     'core.verified_curiosity': lambda: importlib.import_module('core.verified_curiosity'),
     'core.vfx_combat_catalog': lambda: importlib.import_module('core.vfx_combat_catalog'),
     'core.vfx_cues': lambda: importlib.import_module('core.vfx_cues'),
@@ -385,7 +420,8 @@ class _LazyModule:
 
 def lazy_import(module_name: str):
     """Defer one repository-owned literal loader without changing sys.modules."""
-    if not isinstance(module_name, str) or module_name not in _LOADERS:
+    # A str subclass can execute hostile __hash__/__eq__ during dict lookup.
+    if type(module_name) is not str or module_name not in _LOADERS:
         raise ValueError("module is not registered for deferred loading")
     return _LazyModule(module_name, _LOADERS[module_name])
 
@@ -473,7 +509,16 @@ def wrap_flagged() -> dict:
     for m in inv["biggest"]:
         if not m.get("lazy_eligible"):
             continue
-        mod = m["module"].replace("/", ".").removesuffix(".py")  # seeds/x.py → seeds.x
+        source_path = m["module"]
+        if type(source_path) is not str:
+            continue
+        mod = source_path.replace("/", ".").removesuffix(".py")  # seeds/x.py → seeds.x
+        # The inventory recurses into nested seed packages, while _LOADERS is
+        # a reviewed, literal list of importable modules. Never attempt a
+        # dynamic import or fail the whole storage endpoint for an unlisted
+        # nested source file that the size heuristic marks as eligible.
+        if not mod.startswith("seeds.") or mod not in _LOADERS:
+            continue
         if mod not in _noncore_proxies:
             _noncore_proxies[mod] = lazy_import(mod)
         out[mod] = _noncore_proxies[mod]

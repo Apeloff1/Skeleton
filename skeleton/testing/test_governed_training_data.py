@@ -5,7 +5,8 @@ import json
 import sqlite3
 import threading
 from dataclasses import replace
-from datetime import UTC, datetime
+from skeleton.compat.datetime_utc import UTC
+from datetime import datetime
 
 import pytest
 

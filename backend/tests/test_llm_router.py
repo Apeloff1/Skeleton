@@ -25,10 +25,10 @@ class TestSemanticCacheKey:
         b = _canonical("reply   with exactly one word:  pong!!!")
         assert a == b, f"canonical mismatch: {a!r} != {b!r}"
 
-    def test_cache_key_stable_across_cosmetic_variants(self):
+    def test_cache_key_preserves_exact_executable_prompt(self):
         k1 = _cache_key("fast", "", "Reply with exactly one word: PONG")
         k2 = _cache_key("fast", "", "reply with exactly one word: pong!!!")
-        assert k1 == k2
+        assert k1 != k2
 
     def test_cache_key_differs_by_task(self):
         assert _cache_key("fast", "", "hello") != _cache_key("code", "", "hello")
@@ -81,30 +81,58 @@ class TestPolicyAndCost:
 
 
 def _base_url() -> str:
-    base = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")
-    if not base:
-        with open("/app/frontend/.env") as fh:
-            for line in fh:
-                if line.startswith("EXPO_PUBLIC_BACKEND_URL="):
-                    base = line.split("=", 1)[1].strip().strip('"').rstrip("/")
-                    break
-    assert base
+    """Never require a developer's /app/frontend/.env at test collection."""
+    base = (
+        os.environ.get("EXPO_BACKEND_URL")
+        or os.environ.get("EXPO_PUBLIC_BACKEND_URL")
+        or ""
+    ).strip().rstrip("/")
+    if not base or not base.startswith(("http://", "https://")):
+        pytest.skip("Live LLM router test requires an explicit HTTP(S) backend URL")
     return base
 
 
-BASE_URL = _base_url()
+@pytest.fixture(scope="module")
+def live_backend_url():
+    return _base_url()
 
 
+@pytest.fixture(scope="module")
+def live_authenticated_headers():
+    token = (os.environ.get("LLM_ROUTER_TEST_BEARER_TOKEN") or "").strip()
+    if not token:
+        pytest.skip("Private LLM router test requires a credentialed test account")
+    return {"Authorization": "Bearer " + token}
+
+
+@pytest.mark.live_service
 class TestLiveEndpoints:
-    def test_policy_endpoint(self):
-        r = requests.get(f"{BASE_URL}/api/llm-router/policy", timeout=15)
+    def test_policy_endpoint(self, live_backend_url, live_authenticated_headers):
+        r = requests.get(f"{live_backend_url}/api/llm-router/policy",
+                         headers=live_authenticated_headers, timeout=15)
         assert r.status_code == 200, r.text
         d = r.json()
         assert "policy" in d and "models" in d and "key_configured" in d
 
-    def test_stats_endpoint_shape(self):
-        r = requests.get(f"{BASE_URL}/api/llm-router/stats", timeout=15)
+    def test_stats_endpoint_shape(self, live_backend_url, live_authenticated_headers):
+        r = requests.get(f"{live_backend_url}/api/llm-router/stats",
+                         headers=live_authenticated_headers, timeout=15)
         assert r.status_code == 200, r.text
         d = r.json()
         for k in ("total_calls", "cache_hits", "cache_hit_rate", "by_model", "by_task"):
             assert k in d
+
+
+
+def test_zero_cache_budget_disables_reuse_without_eviction_loop():
+    cache = _LRUCache(maxsize=0, ttl=120)
+    cache.set("a", {"text": "private"})
+    assert cache.get("a") is None
+    assert cache.clear() == 0
+
+
+def test_zero_cache_ttl_never_publishes_reusable_results():
+    cache = _LRUCache(maxsize=12, ttl=0)
+    cache.set("a", {"text": "private"})
+    assert cache.get("a") is None
+    assert cache.clear() == 0

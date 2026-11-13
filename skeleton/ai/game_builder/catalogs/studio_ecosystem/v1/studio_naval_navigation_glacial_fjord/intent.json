@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_naval_navigation_glacial_fjord",
+  "title": "Glacial Fjord: Naval Navigation",
+  "subtitle": "An original naval navigation brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610301810,
+  "width": 21,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "ocean",
+  "starting_health": 3
+}

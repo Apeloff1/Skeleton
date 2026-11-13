@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
-import { safeGetItem, safeSetItem } from '../utils/safeStorage';
+import { safeGetItem, safeSetItem } from '../src/utils/safeStorage';
 import {
   PRODUCT_JOURNEYS, initialJourneySession, journeyById, journeyStepHref,
   nextUnopened, normalizeJourneySession, recordJourneyOpen, validBuildId,

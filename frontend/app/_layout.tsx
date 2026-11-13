@@ -11,26 +11,31 @@ import { Slot, usePathname } from 'expo-router';
 import Head from 'expo-router/head';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import theme from '../theme/tokens';
-import { ErrorBoundary } from '../components/ErrorBoundary';
-import { NonCriticalHostBoundary } from '../components/NonCriticalHostBoundary';
-import ScreenGuard from '../components/withScreenGuard';
-import { ToastHost } from '../components/Toast';
-import { ActionSheetHost } from '../components/ActionSheet';
-import { traceStep, traceStepSync, installCrashTrace } from '../utils/bootTracer';
-import { installMemoryGuard, uninstallMemoryGuard, registerMemoryShedder } from '../utils/memoryGuard';
-import { clearMemCache } from '../utils/resilientNet';
-import { shedSafeStorageMirror } from '../utils/safeStorage';
-import { purgeThermalCachesIfPresent } from '../utils/thermalGuard';
-import { installGlobalGuards } from '../utils/globalGuards';
-import { installAppStateGuard, uninstallAppStateGuard } from '../utils/safeTimers';
-import { loadFeatureFlags } from '../utils/featureFlags';
+import theme from '../src/theme/tokens';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { NonCriticalHostBoundary } from '../src/components/NonCriticalHostBoundary';
+import ScreenGuard from '../src/components/withScreenGuard';
+import { ToastHost } from '../src/components/AppToast';
+import { ActionSheetHost } from '../src/components/ActionSheet';
+import { traceStep, traceStepSync, installCrashTrace } from '../src/utils/bootTracer';
+import { installMemoryGuard, uninstallMemoryGuard, registerMemoryShedder } from '../src/utils/memoryGuard';
+import { clearMemCache } from '../src/utils/resilientNet';
+import { shedSafeStorageMirror } from '../src/utils/safeStorage';
+import { purgeThermalCachesIfPresent } from '../src/utils/thermalGuard';
+import { installGlobalGuards } from '../src/utils/globalGuards';
+import { installAppStateGuard, uninstallAppStateGuard } from '../src/utils/safeTimers';
+import { loadFeatureFlags } from '../src/utils/featureFlags';
 import { FeatureFlagProvider } from '../src/feature-flags';
 import { StabilityBanner } from '../src/components/StabilityBanner';
 import { installGlobalErrorHandlers } from '../src/utils/globalErrors';
 import { startTunnelHeartbeat, stopTunnelHeartbeat } from '../src/utils/tunnelHeartbeat';
 import { initSkin, useActiveSkin } from '../src/utils/skinStore';
 import { LocaleProvider } from '../src/i18n';
+
+// Route-level fallback: expo-router renders this for errors thrown by any
+// route without its own ErrorBoundary export (the class boundaries below
+// remain the last line of defence).
+export { RouteErrorFallback as ErrorBoundary } from '../src/foundation/RouteErrorFallback';
 
 // Auxiliary diagnostics may not make importing the app itself fatal.
 try { installCrashTrace(); } catch {}
@@ -43,7 +48,7 @@ const HEARTBEAT_START_DELAY_MS = 1_500;
 function DiagnosticsOverlay() {
   if (!SHOW_DEV_LOG_OVERLAY) return null;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const DevLogOverlay = require('../components/DevLogOverlay').default;
+  const DevLogOverlay = require('../src/components/DevLogOverlay').default;
   return <DevLogOverlay />;
 }
 

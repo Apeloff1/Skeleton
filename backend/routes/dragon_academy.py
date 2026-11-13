@@ -19,6 +19,7 @@ import time
 from typing import Annotated, Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Path as URLPath, Query, Response
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StringConstraints, model_validator
 
 from routes.gameforge_auth import get_current_user
@@ -142,15 +143,35 @@ def academy_status(owner: str = Depends(_principal)) -> dict:
 
 
 @router.get("/crawler/feed")
-def crawler_feed(
+async def crawler_feed(
     after_sequence: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=250),
-    owner: str = Depends(_principal),
+    last_event_digest: str | None = Query(default=None, max_length=64),
+    user: dict | None = Depends(get_current_user),
 ) -> dict:
+    """Prefer the account's canonical crawl checkpoint, then the practice journal.
+
+    A digest cursor that does not match the checkpoint is a conflict. Storage
+    or checkpoint failures leave the practice-lab journal available.
+    """
+    owner = _principal(user)
+    scope = _crawler_scope(user)
+    canonical = None
+    try:
+        canonical = await crawler_application.companion_feed(
+            scope, after_sequence=after_sequence, limit=limit, expected_digest=last_event_digest,
+        )
+    except ValueError:
+        raise HTTPException(status_code=409, detail="Crawler journal replay unavailable") from None
+    except (PyMongoError, CrawlerError):
+        canonical = None
+    if canonical and canonical.get("active"):
+        return {"ok": True, **canonical}
     with _lab() as (lab, _):
         try:
             feed = DragonSessionProjection(lab.db).read(
-                owner, authorized=True, after_sequence=after_sequence, limit=limit
+                owner, authorized=True, after_sequence=after_sequence, limit=limit,
+                expected_digest=last_event_digest,
             )
         except ValueError:
             raise HTTPException(status_code=409, detail="Crawler journal replay unavailable") from None
@@ -193,9 +214,14 @@ def native_production_art_preview(
 
     if body.target not in TARGETS:
         raise HTTPException(status_code=422, detail="Original sprite tile preview adapter unavailable")
-    # Cartridge video asset palette classes are intentionally bounded: other
-    # UI themes map into a compatible handheld 2bpp tone class.
-    actual_palette = body.palette if body.palette in ("dmg_green", "handheld", "vga_dusk") else "handheld"
+    # Accept every explicitly supported original palette, but never silently
+    # reinterpret an unknown video palette as a supported cartridge asset.
+    # That would make a rejected request appear valid and misreport provenance.
+    from skeleton.ai.webcrawler.dragon_game_design import PALETTES
+
+    if body.palette not in PALETTES:
+        raise HTTPException(status_code=422, detail="Unsupported original sprite palette")
+    actual_palette = body.palette
     try:
         art, tiles = make_art(
             hero=body.hero,
@@ -777,7 +803,7 @@ def native_living_world_checkpoint_advance(
     owner: str = Depends(_native_source_editor),
 ) -> dict:
     from skeleton.ai.webcrawler.dragon_living_world_checkpoint import continue_world
-    from skeleton.ai.webcrawler.dragon_living_world import describe, terrain_for_state_for_state
+    from skeleton.ai.webcrawler.dragon_living_world import describe, terrain_for_state
 
     try:
         world = _dragon_living_world(body)
@@ -917,7 +943,9 @@ def native_living_world_restore(
     try:
         with sqlite3.connect(str(_database_path()), timeout=5) as db:
             db.execute("PRAGMA busy_timeout=5000")
-            return {"ok": True, **restore(db, world, owner, body.slot)}
+            # Match the actual JSON response when invoked directly as well as
+            # through FastAPI: persisted tuples are projected as JSON arrays.
+            return {"ok": True, **jsonable_encoder(restore(db, world, owner, body.slot))}
     except FileNotFoundError:
         raise HTTPException(
             status_code=404, detail="No original game save exists in this user's slot"
@@ -1029,14 +1057,14 @@ def native_living_world_temporal_maze(
 
 
 class NativeCodexWorldRequest(BaseModel):
-    """Exact 1024-bit+ world identity; Python decimal, never a JS float."""
+    """Exact versioned world identity; decimal strings, never a JS float."""
 
     model_config = ConfigDict(extra="forbid")
-    index: str = Field(default="0", strict=True, min_length=1, max_length=400, pattern=r"^(0|[1-9][0-9]*)$")
+    index: str = Field(default="0", strict=True, min_length=1, max_length=600, pattern=r"^(0|[1-9][0-9]*)$")
 
 
 class NativeCodexWorldEditRequest(NativeCodexWorldRequest):
-    changes: dict[str, StrictInt] = Field(default_factory=dict, max_length=128)
+    changes: dict[str, StrictInt] = Field(default_factory=dict, max_length=192)
 
 
 class NativeCodexWorldPlayRequest(NativeCodexWorldRequest):
@@ -1102,6 +1130,84 @@ def native_world_codex_edit(
         }
     except ValueError:
         raise HTTPException(status_code=422, detail="Original Codex axis or level unsupported") from None
+
+
+@router.post("/native/production/worlds/codex/impact")
+def native_world_codex_impact(
+    body: NativeCodexWorldEditRequest,
+    owner: str = Depends(_native_source_editor),
+) -> dict:
+    """Show observed design consequences before accepting an edited world ID.
+
+    Only compares deterministic source-generated gameplay and native tile bytes;
+    it does not pretend to have rendered a commercial 3D level or ROM binary.
+    """
+    from skeleton.ai.webcrawler.dragon_world_codex import (
+        unrank, edit, DOMAIN_AXIS, EXTENSION_DOMAIN_AXIS,
+    )
+    from skeleton.ai.webcrawler.dragon_world_codex_runtime import (
+        start, codex_cell, gate_catalog,
+    )
+    from skeleton.ai.webcrawler.dragon_codex_tiles import tile_pack
+
+    try:
+        old=unrank(body.index)
+        new=edit(body.index, body.changes)
+        old_state=start(old)
+        new_state=start(new)
+        before=codex_cell(old, old_state)
+        after=codex_cell(new, new_state)
+        old_gates=gate_catalog(old, old_state)
+        new_gates=gate_catalog(new, new_state)
+        original_tiles=tile_pack(old, "nes")
+        edited_tiles=tile_pack(new, "nes")
+        domains={**DOMAIN_AXIS,**EXTENSION_DOMAIN_AXIS}
+        return {
+            "ok": True,
+            "source_index":old.decimal_index,
+            "edited_index":new.decimal_index,
+            "version":new.schema,
+            "changed_axes":sorted(
+                axis for axis,level in body.changes.items()
+                if (old.values+old.extension_values)[
+                    tuple(axis for names in domains.values() for axis in names).index(axis)
+                ]!=level
+            ),
+            "affected_domains":[name for name,axes in domains.items()
+                                if any(axis in body.changes for axis in axes)],
+            "terrain": {
+                "before":before["codex_terrain"],
+                "after":after["codex_terrain"],
+                "aerial_before":before.get("aerial_topology"),
+                "aerial_after":after.get("aerial_topology"),
+                "changed":before["codex_cell_digest"]!=after["codex_cell_digest"],
+            },
+            "traversal":{
+                "before":old_gates,"after":new_gates,
+                "additional_route_names":[
+                    row["name"] for row in new_gates
+                    if row["name"] not in {gate["name"] for gate in old_gates}
+                ],
+            },
+            "tiles":{
+                "target":"nes",
+                "before_count":len(original_tiles.named_tiles),
+                "after_count":len(edited_tiles.named_tiles),
+                "changed":[name for name,h in zip(
+                    edited_tiles.named_tiles,edited_tiles.artwork_hashes)
+                    if name not in original_tiles.named_tiles or
+                    original_tiles.artwork_hashes[
+                        original_tiles.named_tiles.index(name)
+                    ]!=h],
+                "verified_roundtrip":edited_tiles.all_tile_roundtrips_verified,
+                "hardware_binary_compiled":False,
+            },
+        }
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail="World axis change or indexed gameplay design is unsupported",
+        ) from None
 
 
 @router.post("/native/production/worlds/codex/play")
@@ -1197,7 +1303,7 @@ def native_world_codex_story(
         return {
             "ok": True,
             "actual_decisions": list(body.decisions),
-            "original_story_world": story_report(source, narrative),
+            "original_story_world": jsonable_encoder(story_report(source, narrative)),
         }
     except ValueError:
         raise HTTPException(
@@ -1293,10 +1399,17 @@ def native_world_codex_access_proof(
     try:
         source = unrank(body.index)
         result = attempt_unlock(source, body.gate_id, horizon=body.horizon)
+        if (
+            result.get("gate") != body.gate_id
+            or result.get("original_world_digest") != source.codex_digest
+            or not result.get("proof_receipt_sha256")
+        ):
+            raise HTTPException(status_code=502, detail="Optional route proof integrity failed")
         return {"ok": True, **result}
     except ValueError:
         raise HTTPException(
-            status_code=422, detail="Original optional game-world gate is not implemented"
+            status_code=422,
+            detail="Original optional route request is invalid or cannot be replayed",
         ) from None
 
 
@@ -1709,7 +1822,7 @@ def native_original_mechanics_preview(
         return {
             "ok": True,
             "program": asdict(program),
-            "initial_game_state": asdict(state),
+            "initial_game_state": jsonable_encoder(asdict(state)),
             "playable_actions": choices(program, state),
             "causal_gameplay_proofs": demonstrate_mechanics(program),
             "fixed_win_required": False,
@@ -1740,7 +1853,7 @@ def native_original_mechanics_play(
             "program_index": program.decimal_index,
             "source_digest": program.source_digest,
             "played_actions": list(body.moves),
-            "current_game_state": asdict(state),
+            "current_game_state": jsonable_encoder(asdict(state)),
             "available_actions": choices(program, state),
             "playable_after_endings": True,
             "claim": "real original game-state choices, no mandatory world victory",
@@ -1963,7 +2076,7 @@ def native_living_world_indexed_design(
         raise HTTPException(
             status_code=422, detail="Requested original game address has no valid replayable route"
         ) from None
-    return {"ok": True, **report}
+    return {"ok": True, **jsonable_encoder(report)}
 
 
 class NativeAtlasWorldRequest(BaseModel):
@@ -2058,6 +2171,21 @@ class NativePuzzleGridValidationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     levels: list[NativeOriginalGrid] = Field(min_length=1, max_length=8)
 
+    @model_validator(mode="after")
+    def require_bounded_puzzle_actors(self):
+        # Shape and character admission alone allows boards with a player in
+        # every cell. Reject impossible actor layouts before solver work.
+        for rows in self.levels:
+            flat = "".join(rows)
+            players = flat.count("@")
+            crates = flat.count("$")
+            goals = flat.count("o")
+            if players != 1 or crates not in (1, 2, 3) or goals != crates:
+                raise ValueError(
+                    "Original puzzle needs one player and 1..3 crates with matching goals"
+                )
+        return self
+
 
 @router.post("/native/production/puzzle/validate")
 def native_production_validate_puzzle(
@@ -2142,9 +2270,15 @@ def native_production_analyze_campaign(
         "ok": True,
         "schema": "skeleton.ai.dragon.native_campaign_design_preview.v1",
         "original_campaign_digest": campaign.digest,
-        "chapter_paths": graph_report(chapters),
+        "chapter_paths": jsonable_encoder(graph_report(chapters)),
         "challenge": challenge_report(director),
-        "stages": [{"stage": index + 1, "routes": document} for index, document in enumerate(reports)],
+        # RoutePortfolio is a frozen dataclass containing tuple path evidence.
+        # The public API and independent replay verifier require JSON arrays;
+        # normalize at this boundary instead of leaking Python tuples.
+        "stages": [
+            {"stage": index + 1, "routes": jsonable_encoder(document)}
+            for index, document in enumerate(reports)
+        ],
         "claim": "solver-derived challenge and branching; no human player enjoyment certified",
     }
 
@@ -2184,7 +2318,10 @@ def native_production_multiple_routes(
         raise HTTPException(
             status_code=422, detail="Original puzzle board could not produce bounded proven route analysis"
         ) from None
-    return {"ok": True, **route_report(routes)}
+    # Keep direct Python and HTTP responses in the same JSON-compatible
+    # schema. The independent path verifier requires arrays, not Python
+    # tuple fields leaked through dataclasses.asdict.
+    return {"ok": True, **jsonable_encoder(route_report(routes))}
 
 
 @router.post("/native/production/puzzle/current-hint")
@@ -2481,6 +2618,8 @@ class CrawlerCreateRequest(CrawlerRequest):
     max_documents: int = Field(default=16, ge=1, le=64, strict=True)
     max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=32 * 1024 * 1024, strict=True)
     max_depth: int = Field(default=1, ge=0, le=3, strict=True)
+    discover_sitemaps: bool = Field(default=False, strict=True)
+    frontier_strategy: str = Field(default="fifo", pattern=r"^(fifo|balanced)$")
     consent: bool = Field(strict=True)
     rights_acknowledged: bool = Field(strict=True)
 
@@ -2525,6 +2664,52 @@ class CrawlerAutomationRequest(CrawlerWriteRequest):
     enabled: bool = Field(strict=True)
     max_slices: int = Field(default=16, ge=1, le=64, strict=True)
     max_seconds: int = Field(default=900, ge=15, le=3600, strict=True)
+
+
+class CrawlerSourceUseRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    max_age_seconds: int = Field(ge=60, le=86400, strict=True)
+
+
+
+class CrawlerAtlasObjective(BaseModel):
+    """Operator-authored bounded research intent, not crawler admission."""
+
+    model_config = ConfigDict(extra="forbid")
+    objective_id: str = Field(min_length=3, max_length=64,
+                              pattern=r"^[a-z][a-z0-9_-]{2,63}$")
+    question: str = Field(min_length=3, max_length=512)
+    dimension: str = Field(pattern=r"^(fact|method|timeline|source|counterexample|implementation)$")
+    stage: str = Field(pattern=r"^(discovery|collection|verification|review)$")
+    priority: float = Field(ge=0.0, le=1.0)
+    minimum_reviewable_passages: int = Field(default=1, ge=1, le=32, strict=True)
+    minimum_attested_groups: int = Field(default=1, ge=1, le=16, strict=True)
+    max_source_age_seconds: int = Field(default=3600, ge=60, le=86400, strict=True)
+    required_terms: list[str] = Field(default_factory=list, max_length=16)
+    blocked_terms: list[str] = Field(default_factory=list, max_length=16)
+
+
+class CrawlerAtlasEffort(BaseModel):
+    """Explicit human-effort estimate; never fabricated measured history."""
+
+    model_config = ConfigDict(extra="forbid")
+    task_type: str = Field(pattern=(
+        r"^(source_policy|passage_integrity|source_provenance|"
+        r"claim_contradiction|claim_corroboration|objective_gap|human_fact_review)$"
+    ))
+    estimated_minutes: StrictInt = Field(ge=1, le=180)
+    estimate_basis: str = Field(default="operator_estimate",
+                                pattern=r"^operator_estimate$")
+
+
+class CrawlerAtlasRequest(BaseModel):
+    """Read-only research inspection; explicit user goals are mandatory."""
+
+    model_config = ConfigDict(extra="forbid")
+    objectives: list[CrawlerAtlasObjective] = Field(min_length=1, max_length=8)
+    review_effort: list[CrawlerAtlasEffort] = Field(default_factory=list, max_length=7)
+    review_budget_minutes: StrictInt = Field(default=240, ge=1, le=1440)
+    retrieval_mode: str = Field(default="fusion", pattern=r"^(fusion|lexical_bm25)$")
 
 
 def _crawler_scope(user: dict | None = Depends(get_current_user)) -> dict[str, str]:
@@ -2631,17 +2816,8 @@ async def crawler_run(
 async def crawler_control(
     body: CrawlerControlRequest,
     session_id: str = URLPath(min_length=1, max_length=128),
-    scope: dict = Depends(_crawler_scope),
-    user: dict = Depends(get_current_user),
+    scope: dict = Depends(_crawler_write_scope),
 ) -> dict:
-    if body.action == "resume" and user.get("role") not in {"editor", "admin"}:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "code": "crawler_write_denied",
-                "message": "Editor permission is required to resume capture.",
-            },
-        )
     return {
         "ok": True,
         "session": await _crawler_result(
@@ -2652,9 +2828,9 @@ async def crawler_control(
 
 @router.post("/crawler/sessions/{session_id}/automation")
 async def crawler_automation(
-    session_id: str,
     body: CrawlerAutomationRequest,
-    scope: dict = Depends(_crawler_scope),
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_write_scope),
     user: dict = Depends(get_current_user),
 ) -> dict:
     return {
@@ -2665,9 +2841,57 @@ async def crawler_automation(
     }
 
 
+
+@router.get("/crawler/sessions/{session_id}/research/inspection")
+async def crawler_research_inspection(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Read-only evidence and frontier diagnostics under existing owner auth."""
+    return await _crawler_result(
+        crawler_application.campaign_inspection(scope, session_id)
+    )
+
+
+
+@router.post("/crawler/sessions/{session_id}/research/atlas")
+async def crawler_research_atlas(
+    body: CrawlerAtlasRequest,
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Read-only source-policy-first research audit, no external text returned."""
+    return await _crawler_result(
+        crawler_application.campaign_atlas(
+            scope, session_id,
+            tuple(goal.model_dump() for goal in body.objectives),
+            review_effort=tuple(estimate.model_dump()
+                                for estimate in body.review_effort),
+            review_budget_minutes=body.review_budget_minutes,
+            retrieval_mode=body.retrieval_mode,
+        )
+    )
+
+
+@router.get("/crawler/sessions/{session_id}/research/search")
+async def crawler_research_search(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    query: str = Query(min_length=1, max_length=512),
+    mode: str = Query(default="all", pattern="^(all|any)$"),
+    limit: int = Query(default=8, ge=1, le=8),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Search current retained evidence; withdrawals and consent checked now."""
+    return await _crawler_result(
+        crawler_application.campaign_index_search(
+            scope, session_id, query, mode=mode, limit=limit,
+        )
+    )
+
+
 @router.get("/crawler/sessions/{session_id}/search")
 async def crawler_search(
-    session_id: str,
+    session_id: str = URLPath(min_length=1, max_length=128),
     query: str = Query(min_length=1, max_length=512),
     limit: int = Query(default=8, ge=1, le=8),
     scope: dict = Depends(_crawler_scope),
@@ -2694,7 +2918,7 @@ async def crawler_sources(
 async def crawler_delete(
     body: CrawlerWriteRequest,
     session_id: str = URLPath(min_length=1, max_length=128),
-    scope: dict = Depends(_crawler_scope),
+    scope: dict = Depends(_crawler_write_scope),
 ) -> dict:
     return await _crawler_result(crawler_application.delete(scope, session_id, body.model_dump()))
 
@@ -2740,6 +2964,21 @@ async def crawler_source_text(
             offset=offset,
             max_chars=max_chars,
             expected_content_digest=expected_content_digest,
+        )
+    )
+
+
+@router.post("/crawler/sessions/{session_id}/sources/{source_id}/use")
+async def crawler_source_use(
+    body: CrawlerSourceUseRequest,
+    session_id: str = URLPath(min_length=1, max_length=128),
+    source_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    scope: dict = Depends(_crawler_write_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(
+        crawler_application.configure_source_use(
+            scope, session_id, source_id, body.model_dump(), principal=user
         )
     )
 

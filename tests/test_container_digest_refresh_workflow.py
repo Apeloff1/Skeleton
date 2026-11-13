@@ -5,7 +5,7 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = ROOT / ".github" / "workflows" / "container-digest-refresh.yml"
+WORKFLOW = ROOT / ".github" / "workflows-archive" / "container-digest-refresh.yml"
 
 
 def text() -> str:
@@ -52,7 +52,7 @@ def test_python_setup_is_immutable() -> None:
 
 
 def test_artifact_upload_is_immutable() -> None:
-    assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in text()
+    assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in text()
 
 
 def test_digest_refresh_uses_all_state_machine_phases() -> None:

@@ -26,7 +26,7 @@ import {
 import {
   loadLocalOverrides, setLocalOverride, clearLocalOverrides,
 } from '../src/feature-flags/overrides';
-import { toast } from '../components/Toast';
+import { toast } from '../src/components/AppToast';
 
 interface AuditRow { ts: number; name: string; action: string; diff: any; ip: string; user_agent: string; actor: string }
 
@@ -54,7 +54,9 @@ export default function FeatureFlagsAdminScreen() {
   const [tokenDraft, setTokenDraft] = React.useState<string>('');
   const [auditOpen, setAuditOpen]   = React.useState<string | null>(null);
   const [auditRows, setAuditRows]   = React.useState<AuditRow[]>([]);
+  const [auditLoading, setAuditLoading] = React.useState(false);
   const [overrides, setOverrides]   = React.useState<Record<string, boolean>>({});
+  const [screenError, setScreenError] = React.useState<string | null>(null);
 
   // Boot — hydrate token + local overrides.
   React.useEffect(() => {
@@ -63,11 +65,12 @@ export default function FeatureFlagsAdminScreen() {
       setToken(t); setTokenDraft(t);
       const o = await loadLocalOverrides();
       setOverrides({ ...o });
-    })();
+    })().catch(() => setScreenError('Feature flag preferences could not be restored on this device.'));
   }, []);
 
   const post = React.useCallback(async (name: string, body: any) => {
     setBusy(name);
+    setScreenError(null);
     try {
       const r = await api.post(`/api/feature-flags/${encodeURIComponent(name)}`, body, { headers: adminHeaders() });
       if (!r.ok) {
@@ -75,6 +78,9 @@ export default function FeatureFlagsAdminScreen() {
       } else {
         toast.success(`Updated ${name}`);
       }
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Feature flag update failed.';
+      setScreenError(message); toast.error(message);
     } finally { setBusy(null); await refresh(); }
   }, [refresh]);
 
@@ -86,46 +92,63 @@ export default function FeatureFlagsAdminScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         setBusy(f.name);
+        setScreenError(null);
         try {
           const r = await api.del(`/api/feature-flags/${encodeURIComponent(f.name)}`, { headers: adminHeaders() });
           if (!r.ok) toast.error(`Delete failed: ${r.error || r.status}`);
           else toast.success(`Deleted ${f.name}`);
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : 'Feature flag deletion failed.';
+          setScreenError(message); toast.error(message);
         } finally { setBusy(null); await refresh(); }
       }},
     ]);
   }, [refresh]);
 
   const onOpenAudit = React.useCallback(async (name: string) => {
-    setAuditOpen(name); setAuditRows([]);
-    const r = await api.get<{ ok: boolean; rows: AuditRow[] }>(`/api/feature-flags/audit?limit=50&name=${encodeURIComponent(name)}`);
-    setAuditRows((r.data?.rows as AuditRow[]) || []);
+    setAuditOpen(name); setAuditRows([]); setAuditLoading(true); setScreenError(null);
+    try {
+      const r = await api.get<{ ok: boolean; rows: AuditRow[] }>(`/api/feature-flags/audit?limit=50&name=${encodeURIComponent(name)}`);
+      if (!r.ok || !Array.isArray(r.data?.rows)) throw new Error(r.error || 'Audit history returned an invalid response.');
+      setAuditRows(r.data.rows.slice(0, 50));
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Audit history is unavailable.';
+      setScreenError(message); toast.error(message);
+    } finally { setAuditLoading(false); }
   }, []);
 
   const onSaveToken = React.useCallback(async () => {
-    await setAdminToken(tokenDraft.trim());
-    setToken(tokenDraft.trim());
-    toast.success(getAdminTokenCached() ? 'Admin token saved' : 'Admin token cleared');
+    try {
+      await setAdminToken(tokenDraft.trim());
+      setToken(tokenDraft.trim()); setScreenError(null);
+      toast.success(getAdminTokenCached() ? 'Admin token saved' : 'Admin token cleared');
+    } catch { setScreenError('The admin credential could not be stored securely on this device.'); }
   }, [tokenDraft]);
 
   const onToggleOverride = React.useCallback(async (f: ResolvedFlag) => {
-    const cur = overrides[f.name];
-    const next = cur === undefined ? !f.resolved : (cur ? null : null);  // cycle: unset → opposite → unset
-    if (next === null) {
-      await setLocalOverride(f.name, null);
-      const { [f.name]: _drop, ...rest } = overrides;
-      setOverrides(rest);
-      toast.show(`Local override cleared for ${f.name}`);
-    } else {
-      await setLocalOverride(f.name, next);
-      setOverrides({ ...overrides, [f.name]: next });
-      toast.show(`Local override → ${next ? 'ON' : 'OFF'} for ${f.name}`);
-    }
+    try {
+      const cur = overrides[f.name];
+      const next = cur === undefined ? !f.resolved : null;  // cycle: unset → opposite → unset
+      if (next === null) {
+        await setLocalOverride(f.name, null);
+        const { [f.name]: _drop, ...rest } = overrides;
+        setOverrides(rest);
+        toast.show(`Local override cleared for ${f.name}`);
+      } else {
+        await setLocalOverride(f.name, next);
+        setOverrides({ ...overrides, [f.name]: next });
+        toast.show(`Local override → ${next ? 'ON' : 'OFF'} for ${f.name}`);
+      }
+      setScreenError(null);
+    } catch { setScreenError(`Local override for ${f.name} could not be saved.`); }
   }, [overrides]);
 
   const onClearLocalOverrides = React.useCallback(async () => {
-    await clearLocalOverrides();
-    setOverrides({});
-    toast.success('All local overrides cleared');
+    try {
+      await clearLocalOverrides();
+      setOverrides({}); setScreenError(null);
+      toast.success('All local overrides cleared');
+    } catch { setScreenError('Local overrides could not be cleared.'); }
   }, []);
 
   const filteredGrouped = React.useMemo(() => {
@@ -154,6 +177,8 @@ export default function FeatureFlagsAdminScreen() {
         <Text style={styles.env}>{environment.toUpperCase()}</Text>
       </View>
 
+      {(screenError || error) && <View style={styles.errorBanner}><Text style={styles.errorText}>{screenError || error}</Text><TouchableOpacity onPress={() => { setScreenError(null); void refresh(); }}><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>}
+
       <View style={styles.userRow}>
         <Text style={styles.userLabel}>user_id</Text>
         <TextInput
@@ -163,7 +188,7 @@ export default function FeatureFlagsAdminScreen() {
           onSubmitEditing={() => setUserId(draft || null)}
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder="default_user"
+          placeholder="Optional evaluation subject"
           placeholderTextColor="#64748b"
         />
         <TouchableOpacity style={styles.applyBtn} onPress={() => setUserId(draft || null)}>
@@ -315,7 +340,8 @@ export default function FeatureFlagsAdminScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView style={{ maxHeight: 360 }}>
-              {auditRows.length === 0 ? (
+              {auditLoading ? <ActivityIndicator color="#3B82F6" style={{ margin: 20 }} /> : null}
+              {!auditLoading && auditRows.length === 0 ? (
                 <Text style={styles.emptySub}>No audit entries.</Text>
               ) : null}
               {auditRows.map((row, i) => (
@@ -359,6 +385,9 @@ const styles = StyleSheet.create({
   },
   applyBtn:   { backgroundColor: '#3b82f6', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
   applyTxt:   { color: '#fff', fontSize: 12, fontWeight: '600' },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 12, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#ef4444', backgroundColor: '#2a1116' },
+  errorText: { flex: 1, color: '#fecaca', fontSize: 12, lineHeight: 17 },
+  retryText: { color: '#93c5fd', fontSize: 12, fontWeight: '700' },
   overrideBanner: {
     flexDirection: 'row', justifyContent: 'space-between',
     paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#581c87',

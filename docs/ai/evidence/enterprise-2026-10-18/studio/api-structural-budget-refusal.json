@@ -1,0 +1,7 @@
+{
+  "operation": "api-structural-budget-refusal",
+  "http_status": 400,
+  "response": {
+    "error": "action data exceeds structural limits"
+  }
+}

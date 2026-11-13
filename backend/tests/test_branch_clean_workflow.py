@@ -84,7 +84,9 @@ def test_exact_main_new_branch_is_never_a_cleanup_candidate() -> None:
 def test_branch_cleanup_api_dependencies_fail_closed() -> None:
     text = _source()
 
-    assert "Process substitution hides gh failures from set -e." in text
+    assert text.count("if ! gh api --paginate") >= 3
+    assert 'candidate_file="$RUNNER_TEMP/open-pr-refs.candidate.tsv"' in text
+    assert 'if ! mv -f "$candidate_file" "$refs_file"; then' in text
     assert "if ! load_open_pr_refs; then" in text
     assert "if ! load_merged_pr_head_tips; then" in text
     assert "if ! load_branch_creation_history; then" in text
@@ -103,8 +105,8 @@ def test_branch_cleanup_api_dependencies_fail_closed() -> None:
 def test_branch_cleanup_preserves_stacked_pr_heads_and_bases() -> None:
     text = _source()
 
-    assert 'open_pr_heads["$branch"]=1' in text
-    assert 'open_pr_bases["$branch"]=1' in text
+    assert 'open_pr_heads["$head"]=1' in text
+    assert 'open_pr_bases["$base"]=1' in text
     assert "open-pr-head" in text
     assert "open-pr-base" in text
     assert "open-pr-head-late" in text
@@ -125,12 +127,14 @@ def test_branch_cleanup_keeps_all_redundancy_proofs_and_race_leases() -> None:
 def test_branch_cleanup_trigger_is_bounded() -> None:
     text = _source()
 
-    assert 'workflows: ["Actions Housekeeping CLI"]' in text
-    assert "types: [completed]" in text
-    assert 'branches:\n      - "*"\n      - "**"' in text
-    assert "github.event.workflow_run.head_repository.full_name == github.repository" in text
-    assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in text
-    assert "- cron: '3-58/5 * * * *'" in text
-    assert "paths: ['.github/workflows/branch-clean.yml']" in text
-    assert "group: branch-clean-v2-${{ github.repository }}" in text
-    assert "cancel-in-progress: false" in text
+    # The cleanup worker is intentionally operator-dispatched only: untrusted
+    # event churn must not trigger automatic branch deletion on a saturated
+    # repository. Exact-tip leases and API revalidation remain mandatory.
+    trigger = text.split("jobs:", 1)[0]
+    assert "on:\n  workflow_dispatch:" in trigger
+    assert "workflow_run:" not in trigger
+    assert "schedule:" not in trigger
+    assert "group: branch-clean-v4-${{ github.repository }}" in trigger
+    assert "cancel-in-progress: false" in trigger
+    assert "runs-on: ubuntu-24.04-arm" in text
+    assert "timeout-minutes: 15" in text

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_neon_undercity",
+  "title": "Neon Undercity: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010317452,
+  "width": 25,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 7,
+  "theme": "arcade",
+  "starting_health": 6
+}

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Apeloff1/Skeleton/blob/main/docs/schemas/jeeves-reviewed-asset-descriptor-2026.schema.json",
+  "title": "Jeeves authored asset-descriptor overlay",
+  "description": "Review source, never a claim of automatic copyright clearance, native rendering or image recognition.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "target_record_id",
+    "target_asset_id",
+    "title",
+    "description",
+    "alt_text",
+    "tags",
+    "roles",
+    "locale",
+    "rights_status",
+    "attribution"
+  ],
+  "properties": {
+    "kind": {
+      "const": "asset_descriptor"
+    },
+    "target_record_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "target_asset_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1400
+    },
+    "alt_text": {
+      "type": "string",
+      "maxLength": 512
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 24,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]{0,39}$"
+      }
+    },
+    "roles": {
+      "type": "array",
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "character",
+          "npc",
+          "terrain",
+          "environment",
+          "prop",
+          "item",
+          "ui",
+          "vfx",
+          "tile",
+          "cinematic",
+          "ambience",
+          "music",
+          "dialogue",
+          "sfx",
+          "other"
+        ]
+      }
+    },
+    "locale": {
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$"
+    },
+    "rights_status": {
+      "enum": [
+        "not_reviewed",
+        "self_authored_asserted",
+        "third_party_permission_asserted",
+        "public_domain_asserted"
+      ]
+    },
+    "attribution": {
+      "type": "string",
+      "maxLength": 320
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "rights_status": {
+            "enum": [
+              "third_party_permission_asserted",
+              "public_domain_asserted"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "attribution": {
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
+}

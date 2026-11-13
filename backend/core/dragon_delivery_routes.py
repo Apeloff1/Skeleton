@@ -5,7 +5,7 @@ binary compiler is created. Only the configured canonical authorities are used.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict
 import json
 import os
@@ -49,11 +49,20 @@ def _reviewed_delivery() -> Iterator[DragonDelivery]:
     path = Path(configured).expanduser()
     if not path.is_absolute() or path.is_symlink() or not path.is_file():
         raise HTTPException(status_code=503, detail="Reviewed knowledge storage unavailable")
-    try:
-        with ReviewedKnowledgeStore(path) as library:
+    # Database acquisition is the only operation whose failure belongs to the
+    # reviewed-knowledge store. Do not catch native practice/worker errors
+    # raised by the caller through the yielded context.
+    with ExitStack() as stack:
+        try:
+            library = stack.enter_context(ReviewedKnowledgeStore(path))
+        except (sqlite3.DatabaseError, OSError):
+            raise HTTPException(
+                status_code=503, detail="Reviewed knowledge storage unavailable"
+            ) from None
+        try:
             yield DragonDelivery(DragonAlmanacs(library))
-    except (sqlite3.DatabaseError, OSError):
-        raise HTTPException(status_code=503, detail="Reviewed knowledge storage unavailable") from None
+        except PermissionError as exc:
+            raise _error(exc) from None
 
 
 def _error(exc: Exception) -> HTTPException:
@@ -166,7 +175,7 @@ def register_delivery_routes(
                 return {"ok": True, **delivery.brief(
                     owner, design, body.query, now=_now(), authorized=True
                 )}
-        except (ValueError, PermissionError, TypeError) as exc:
+        except (ValueError, PermissionError, TypeError, sqlite3.DatabaseError, OSError) as exc:
             raise _error(exc) from None
 
     @router.post("/delivery/generate")
@@ -282,7 +291,11 @@ def register_delivery_routes(
                     }
         except HTTPException:
             raise
-        except (PermissionError, LookupError, ValueError, TypeError, ResourceLimitError, DragonPoolCapacityError) as exc:
+        except (
+            PermissionError, LookupError, ValueError, TypeError,
+            ResourceLimitError, DragonPoolCapacityError,
+            sqlite3.DatabaseError, OSError,
+        ) as exc:
             raise _error(exc) from None
 
     @router.post("/delivery/{attempt_id}/learning")

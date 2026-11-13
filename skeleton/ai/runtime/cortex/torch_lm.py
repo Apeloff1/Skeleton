@@ -80,6 +80,7 @@ class TorchAccel:
         self.prefill_query_chunk = prefill_query_chunk
         self.max_grad_norm = float(max_grad_norm) if max_grad_norm is not None else None
         self.last_grad_norm: float | None = None
+        self._adam_moments: dict[int, dict[str, Any]] = {}
         self.resident = False
         self._E = self._P = self._Wout = self._bout = None
         self._layers: List[Dict[str, Any]] = []
@@ -248,6 +249,7 @@ class TorchAccel:
         self._layers = staged_layers
         self._reset_decode_cache_unlocked()
         self._weights_modified = False
+        self._adam_moments = {}
         self.resident = True
         lm.resident = True
         lm.device = self.device_name
@@ -680,6 +682,138 @@ class TorchAccel:
             targets = self.torch.tensor(ids[1:], dtype=self.torch.long, device=self.device)
             loss = self.torch.nn.functional.cross_entropy(logits, targets, reduction="mean")
             return self._apply_sgd(loss, lr)
+
+    def adamw_sequence(
+        self,
+        ids: Sequence[int],
+        lr: float,
+        *,
+        weight_decay: float = 0.0,
+        beta1: float = 0.9,
+        beta2: float = 0.95,
+        eps: float = 1e-8,
+        z_loss: float = 0.0,
+    ) -> float:
+        """One AdamW update over a causal sequence.
+
+        Beta2 defaults to 0.95, the short-horizon transformer setting, and
+        decoupled decay applies only to matrices. A fresh pin drops moments
+        so they cannot be applied to a replaced weight set. Non-finite loss
+        or gradients are rejected before the first weight write.
+        """
+        with self._state_lock:
+            self._assert_training_integrity()
+            if not isinstance(ids, (list, tuple)) or not 2 <= len(ids) <= self.lm.ctx + 1:
+                raise ValueError("AdamW sequence needs 2..context+1 token IDs")
+            if any(type(i) is not int or not 0 <= i < self.lm.V for i in ids):
+                raise ValueError("AdamW sequence token ID outside vocabulary")
+            self._validate_adamw(lr, weight_decay, beta1, beta2, eps, z_loss)
+            self._prepare_sgd()
+            torch = self.torch
+            logits, _ = self._forward_ids(ids[:-1], all_positions=True)
+            targets = torch.tensor(ids[1:], dtype=torch.long, device=self.device)
+            loss = torch.nn.functional.cross_entropy(logits, targets, reduction="mean")
+            if z_loss:
+                log_partition = torch.logsumexp(logits.float(), dim=-1)
+                loss = loss + float(z_loss) * torch.mean(log_partition * log_partition)
+            return self._apply_adamw(
+                loss,
+                float(lr),
+                weight_decay=float(weight_decay),
+                beta1=float(beta1),
+                beta2=float(beta2),
+                eps=float(eps),
+            )
+
+    def _validate_adamw(
+        self,
+        lr: float,
+        weight_decay: float,
+        beta1: float,
+        beta2: float,
+        eps: float,
+        z_loss: float,
+    ) -> None:
+        def _unit(name: str, value: float, *, lower: float, upper: float, positive: bool) -> None:
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                raise ValueError(f"AdamW {name} must be finite")
+            number = float(value)
+            if positive:
+                if not lower < number <= upper:
+                    raise ValueError(f"AdamW {name} out of range")
+            elif not lower <= number <= upper:
+                raise ValueError(f"AdamW {name} out of range")
+
+        _unit("learning rate", lr, lower=0.0, upper=1.0, positive=True)
+        _unit("weight decay", weight_decay, lower=0.0, upper=1.0, positive=False)
+        _unit("beta1", beta1, lower=0.0, upper=1.0, positive=True)
+        _unit("beta2", beta2, lower=0.0, upper=1.0, positive=True)
+        _unit("eps", eps, lower=0.0, upper=1e-2, positive=True)
+        _unit("z_loss", z_loss, lower=0.0, upper=1.0, positive=False)
+        if not beta1 < 1.0 or not beta2 < 1.0:
+            raise ValueError("AdamW betas must be below 1")
+
+    def _apply_adamw(
+        self,
+        loss,
+        lr: float,
+        *,
+        weight_decay: float,
+        beta1: float,
+        beta2: float,
+        eps: float,
+    ) -> float:
+        torch = self.torch
+        params = tuple(self._params())
+        loss_value = float(loss.detach().cpu())
+        if not math.isfinite(loss_value):
+            raise ValueError("AdamW non-finite loss rejected before any weight update")
+        loss.backward()
+        norm = torch.nn.utils.clip_grad_norm_(
+            params,
+            max_norm=self.max_grad_norm if self.max_grad_norm is not None else float("inf"),
+            error_if_nonfinite=True,
+        )
+        norm_value = float(norm.detach().cpu())
+        if not math.isfinite(norm_value):
+            raise ValueError("AdamW non-finite gradient norm rejected")
+        self.last_grad_norm = norm_value
+        staged: list[tuple[Any, Any, Any, bool]] = []
+        with torch.no_grad():
+            for parameter in params:
+                if parameter.grad is None:
+                    continue
+                slot = self._adam_moments.get(id(parameter))
+                if slot is None or tuple(slot["m"].shape) != tuple(parameter.shape):
+                    slot = {
+                        "m": torch.zeros_like(parameter),
+                        "v": torch.zeros_like(parameter),
+                        "t": 0,
+                    }
+                    self._adam_moments[id(parameter)] = slot
+                slot["t"] += 1
+                step = int(slot["t"])
+                gradient = parameter.grad.detach()
+                slot["m"].mul_(beta1).add_(gradient, alpha=1.0 - beta1)
+                slot["v"].mul_(beta2).addcmul_(gradient, gradient, value=1.0 - beta2)
+                bias1 = 1.0 - beta1 ** step
+                bias2 = 1.0 - beta2 ** step
+                corrected_m = slot["m"] / bias1
+                corrected_v = slot["v"] / bias2
+                staged.append((parameter, corrected_m, corrected_v, parameter.ndim >= 2))
+        self._weights_modified = True
+        try:
+            with torch.no_grad():
+                for parameter, corrected_m, corrected_v, decay in staged:
+                    if decay and weight_decay:
+                        parameter.mul_(1.0 - lr * weight_decay)
+                    parameter.addcdiv_(corrected_m, corrected_v.sqrt().add(eps), value=-lr)
+        except Exception:
+            self._training_failed = True
+            self.reset_decode_cache()
+            raise
+        self.lm.steps += 1
+        return loss_value
 
     def _prepare_sgd(self) -> None:
         self.reset_decode_cache()

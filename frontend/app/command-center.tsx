@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * Gamefile Command Center (⌘K-style)
  * --------------------------------------------------------------------------
@@ -25,7 +25,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiFetch } from '../utils/apiController';
+import { apiFetch } from '../src/utils/apiController';
 
 const API = CANONICAL_API_BASE || '';
 const STORE_KEY = 'cc_active_build_id';
@@ -44,7 +44,17 @@ type Gamefile = {
 };
 
 function newBuildId(): string {
-  return 'cc-' + Math.floor(Date.now()).toString(36) + Math.floor(Math.random() * 1296).toString(36);
+  const suffix = globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+  return `cc-${suffix}`;
+}
+
+async function responseData(response: Response, action: string): Promise<any> {
+  let data: any;
+  try { data = await response.json(); } catch { throw new Error(`${action} returned an invalid response.`); }
+  if (!response.ok || data?.ok === false || data?.success === false || data?.disabled === true) {
+    throw new Error(data?.detail || data?.error || `${action} failed (HTTP ${response.status}).`);
+  }
+  return data;
 }
 
 export default function CommandCenter() {
@@ -57,6 +67,7 @@ export default function CommandCenter() {
   const [outputs, setOutputs] = useState<Gamefile[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [surfaceError, setSurfaceError] = useState<string | null>(null);
 
   // palette / composer modal
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -93,21 +104,23 @@ export default function CommandCenter() {
       if (!bid) bid = (await AsyncStorage.getItem(STORE_KEY)) || '';
       if (!bid) bid = newBuildId();
       setBuildId(bid);
-      await AsyncStorage.setItem(STORE_KEY, bid);
+      try { await AsyncStorage.setItem(STORE_KEY, bid); }
+      catch { setSurfaceError('The active build could not be persisted on this device.'); }
       try {
         const [adv, rec] = await Promise.all([
           AsyncStorage.getItem('cc_show_advanced'),
           AsyncStorage.getItem('cc_recent'),
         ]);
         if (adv === '1') setShowAdvanced(true);
-        if (rec) { try { setRecent(JSON.parse(rec)); } catch { /* ignore */ } }
-      } catch { /* ignore */ }
+        if (rec) { const parsed = JSON.parse(rec); if (Array.isArray(parsed)) setRecent(parsed.filter(value => typeof value === 'string').slice(0, 8)); }
+      } catch { setSurfaceError('Command Center preferences could not be restored.'); }
       try {
         const r = await apiFetch(`${API}/api/galaxy-studio/text-gamefile/generators`, { timeoutMs: 12000 });
-        const d = await r.json();
-        setGenerators(Array.isArray(d.generators) ? d.generators : []);
-      } catch { setGenerators([]); }
-    })();
+        const d = await responseData(r, 'Generator catalog');
+        if (!Array.isArray(d.generators)) throw new Error('Generator catalog is malformed.');
+        setGenerators(d.generators);
+      } catch (cause) { setGenerators([]); setSurfaceError(cause instanceof Error ? cause.message : 'Generator catalog is unavailable.'); }
+    })().catch((cause) => setSurfaceError(cause instanceof Error ? cause.message : 'Command Center could not initialize.'));
   }, [params.build]);
 
   // ── CHURN 2.0: load model catalog + daemon status ──
@@ -115,32 +128,37 @@ export default function CommandCenter() {
     (async () => {
       try {
         const r = await apiFetch(`${API}/api/churn/models`, { timeoutMs: 12000 });
-        const d = await r.json();
+        const d = await responseData(r, 'Churn model catalog');
         if (Array.isArray(d.models)) setChurnModels(d.models);
-      } catch { /* ignore */ }
+      } catch (cause) { setSurfaceError(cause instanceof Error ? cause.message : 'Churn models are unavailable.'); }
       try {
         const r = await apiFetch(`${API}/api/churn/daemon/status`, { timeoutMs: 10000 });
-        setDaemon(await r.json());
-      } catch { /* ignore */ }
+        setDaemon(await responseData(r, 'Churn daemon status'));
+      } catch (cause) { setSurfaceError(cause instanceof Error ? cause.message : 'Churn daemon status is unavailable.'); }
     })();
   }, []);
 
   const loadList = useCallback(async (bid: string) => {
     if (!bid) return;
     setLoadingList(true);
+    setSurfaceError(null);
     try {
       const r = await apiFetch(`${API}/api/galaxy-studio/text-gamefile/${encodeURIComponent(bid)}/list`, { timeoutMs: 12000 });
-      const d = await r.json();
-      setOutputs(Array.isArray(d.gamefiles) ? d.gamefiles : []);
-    } catch { /* keep current */ } finally { setLoadingList(false); }
+      const d = await responseData(r, 'Gamefile inventory');
+      if (!Array.isArray(d.gamefiles)) throw new Error('Gamefile inventory is malformed.');
+      setOutputs(d.gamefiles);
+    } catch (cause) { setSurfaceError(cause instanceof Error ? cause.message : 'Gamefiles could not be loaded.'); } finally { setLoadingList(false); }
   }, []);
 
   useEffect(() => { if (buildId) loadList(buildId); }, [buildId, loadList]);
 
   const saveBuild = useCallback(async (bid: string) => {
     const v = bid.trim() || newBuildId();
-    setBuildId(v); setEditingBuild(false);
-    await AsyncStorage.setItem(STORE_KEY, v);
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(v)) { setSurfaceError('Build ID must contain 1–128 letters, numbers, underscores, or hyphens.'); return; }
+    try {
+      await AsyncStorage.setItem(STORE_KEY, v);
+      setBuildId(v); setEditingBuild(false); setSurfaceError(null);
+    } catch { setSurfaceError('The active build could not be saved on this device.'); }
   }, []);
 
   const onRefresh = useCallback(async () => {
@@ -150,8 +168,10 @@ export default function CommandCenter() {
   }, [buildId, loadList]);
 
   const toggleAdvanced = useCallback(async (v: boolean) => {
-    setShowAdvanced(v);
-    await AsyncStorage.setItem('cc_show_advanced', v ? '1' : '0');
+    try {
+      await AsyncStorage.setItem('cc_show_advanced', v ? '1' : '0');
+      setShowAdvanced(v);
+    } catch { setSurfaceError('Advanced command preference could not be saved.'); }
   }, []);
 
   // pool respects the advanced toggle (advanced commands hidden unless on)
@@ -185,7 +205,7 @@ export default function CommandCenter() {
     setActiveCmd(g); setComposeText(''); setEnrich(false); setTier(null);
     setRecent((prev) => {
       const next = [g.key, ...prev.filter((k) => k !== g.key)].slice(0, 8);
-      AsyncStorage.setItem('cc_recent', JSON.stringify(next)).catch(() => {});
+      AsyncStorage.setItem('cc_recent', JSON.stringify(next)).catch(() => setSurfaceError('Recent commands could not be saved.'));
       return next;
     });
   };
@@ -200,12 +220,12 @@ export default function CommandCenter() {
         body: JSON.stringify({ build_id: buildId, text: composeText.trim(), enrich, tier }),
         timeoutMs: enrich ? 90000 : 20000,
       });
-      const gf = await r.json();
+      const gf = await responseData(r, 'Gamefile generation');
       if (gf && gf.id) {
         setOutputs((prev) => [gf, ...prev.filter((p) => p.id !== gf.id)]);
         setPaletteOpen(false); setActiveCmd(null); setComposeText(''); setQuery('');
-      }
-    } catch { /* swallow — surfaced by empty state */ } finally { setExecuting(false); }
+      } else throw new Error('Generation returned no gamefile identity.');
+    } catch (cause) { setSurfaceError(cause instanceof Error ? cause.message : 'Gamefile generation failed.'); } finally { setExecuting(false); }
   };
 
   const closePalette = () => { setPaletteOpen(false); setActiveCmd(null); setComposeText(''); setQuery(''); };
@@ -220,21 +240,21 @@ export default function CommandCenter() {
         body: JSON.stringify({ persist: true, auto_mint_enhancer: !!autoMint[gf.id] }),
         timeoutMs: 30000,
       });
-      const res = await r.json();
+      const res = await responseData(r, 'Gamefile pipeline');
       if (res && res.stages) {
         setPipe((p) => ({ ...p, [gf.id]: res }));
         loadList(buildId);   // surface the companion gamefiles the pipeline minted
-      }
-    } catch { /* ignore */ } finally { setPiping((p) => ({ ...p, [gf.id]: false })); }
+      } else throw new Error('Pipeline returned no stage evidence.');
+    } catch (cause) { setSurfaceError(cause instanceof Error ? cause.message : 'Gamefile pipeline failed.'); } finally { setPiping((p) => ({ ...p, [gf.id]: false })); }
   };
 
   const openHistory = async (gf: Gamefile) => {
     setHistoryOpenId(gf.id);
     try {
       const r = await apiFetch(`${API}/api/galaxy-studio/gamefile-pipeline/${encodeURIComponent(buildId)}/${encodeURIComponent(gf.id)}/history`, { timeoutMs: 12000 });
-      const d = await r.json();
+      const d = await responseData(r, 'Pipeline history');
       setHistory((p) => ({ ...p, [gf.id]: d }));
-    } catch { /* ignore */ }
+    } catch (cause) { setHistoryOpenId(null); setSurfaceError(cause instanceof Error ? cause.message : 'Pipeline history is unavailable.'); }
   };
 
   // ── CHURN 2.0 actions ──
@@ -243,14 +263,15 @@ export default function CommandCenter() {
       await new Promise((res) => setTimeout(res, 1200));
       try {
         const r = await apiFetch(`${API}/api/churn/job/${jobId}`, { timeoutMs: 12000 });
-        const d = await r.json();
+        const d = await responseData(r, 'Churn job');
         if (d.status === 'done' && d.result) {
           setChurn((p) => ({ ...p, [gid]: d.result }));
           return;
         }
-        if (d.status === 'error') return;
-      } catch { /* keep polling */ }
+        if (d.status === 'error') throw new Error(d.error || 'Churn job failed.');
+      } catch (cause) { setSurfaceError(cause instanceof Error ? cause.message : 'Churn job observation failed.'); return; }
     }
+    setSurfaceError('Churn job did not finish within the observation window.');
   };
 
   const runChurn = async (gf: Gamefile) => {
@@ -261,9 +282,10 @@ export default function CommandCenter() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gid: gf.id, model: churnModel }), timeoutMs: 20000,
       });
-      const d = await r.json();
-      if (d.job_id) await pollChurnJob(d.job_id, gf.id);
-    } catch { /* ignore */ } finally { setChurning((p) => ({ ...p, [gf.id]: false })); }
+      const d = await responseData(r, 'Churn submission');
+      if (typeof d.job_id !== 'string' || !d.job_id) throw new Error('Churn submission returned no job identity.');
+      await pollChurnJob(d.job_id, gf.id);
+    } catch (cause) { setSurfaceError(cause instanceof Error ? cause.message : 'Churn submission failed.'); } finally { setChurning((p) => ({ ...p, [gf.id]: false })); }
   };
 
   const applyVariant = async (gf: Gamefile, runId: string, variantId: string) => {
@@ -274,7 +296,7 @@ export default function CommandCenter() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ run_id: runId, variant_id: variantId }), timeoutMs: 20000,
       });
-      const d = await r.json();
+      const d = await responseData(r, 'Variant application');
       if (d && d.applied) {
         setChurn((p) => {
           const cur = p[gf.id]; if (!cur) return p;
@@ -282,8 +304,8 @@ export default function CommandCenter() {
           return { ...p, [gf.id]: { ...cur, alternatives: alts, _appliedVersion: d.churn_version } };
         });
         loadList(buildId);
-      }
-    } catch { /* ignore */ } finally { setApplying(null); }
+      } else throw new Error('Variant was not applied by the server.');
+    } catch (cause) { setSurfaceError(cause instanceof Error ? cause.message : 'Variant application failed.'); } finally { setApplying(null); }
   };
 
   const toggleDaemon = async () => {
@@ -293,8 +315,8 @@ export default function CommandCenter() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: next, interval_s: 180 }), timeoutMs: 12000,
       });
-      setDaemon(await r.json());
-    } catch { /* ignore */ }
+      setDaemon(await responseData(r, 'Churn daemon update'));
+    } catch (cause) { setSurfaceError(cause instanceof Error ? cause.message : 'Churn daemon could not be updated.'); }
   };
 
   // ── render helpers ────────────────────────────────────────────────────
@@ -347,6 +369,8 @@ export default function CommandCenter() {
         <Text style={styles.cmdTriggerTxt}>Run a command… {pool.length} systems</Text>
         <View style={styles.kbd}><Text style={styles.kbdTxt}>⌘K</Text></View>
       </TouchableOpacity>
+
+      {surfaceError && <View style={styles.errorBanner}><Ionicons name="alert-circle" size={17} color={C.bad} /><Text style={styles.errorText}>{surfaceError}</Text><TouchableOpacity onPress={() => { setSurfaceError(null); void loadList(buildId); }}><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>}
 
       {/* outputs feed */}
       <ScrollView
@@ -756,6 +780,9 @@ const styles = StyleSheet.create({
   countPill: { backgroundColor: C.chip, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 2 },
   countTxt: { color: C.accent, fontSize: 12, fontWeight: '900' },
   center: { paddingVertical: 30, alignItems: 'center' },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 10, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: C.bad, backgroundColor: '#2a1218' },
+  errorText: { flex: 1, color: C.text, fontSize: 12, lineHeight: 17 },
+  retryText: { color: C.accent, fontSize: 12, fontWeight: '900' },
 
   emptyWrap: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 20 },
   emptyIcon: { fontSize: 40, marginBottom: 10 },

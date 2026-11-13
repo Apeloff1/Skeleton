@@ -3920,7 +3920,7 @@
       "volume_ref": "VOL-022",
       "volume_title": "Autonomous Repository Engineering",
       "ordinal": 1,
-      "text": "Use inspect\u2192plan\u2192lease\u2192edit\u2192build\u2192test\u2192review\u2192verify as the canonical repository mutation flow.",
+      "text": "Use inspect→plan→lease→edit→build→test→review→verify as the canonical repository mutation flow.",
       "status": "specified",
       "acceptance": {
         "test_refs": [
@@ -8523,16 +8523,21 @@
       "status": "specified",
       "acceptance": {
         "test_refs": [
-          "planned:skeleton/testing/test_python_layering.py",
-          "planned:skeleton/testing/test_import_side_effects.py"
+          "tests/test_architecture_package_layers.py",
+          "tests/test_vol052_python_architecture_independent.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluation_refs": [
-          "planned:dependency-cycle scan",
-          "planned:cold-import determinism evaluation"
+          "scripts/check_architecture_package_layers.py",
+          "scripts/verify_vol052_python_architecture.py",
+          ".github/workflows/vol052-python-architecture.yml"
         ],
         "evidence_refs": [
           "skeleton/masterplan/closure.py",
-          "tests/flgb/test_masterplan_closure.py"
+          "tests/flgb/test_masterplan_closure.py",
+          "scripts/check_architecture_package_layers.py",
+          "scripts/verify_vol052_python_architecture.py",
+          ".github/workflows/vol052-python-architecture.yml"
         ]
       },
       "implementation_refs": [
@@ -8559,16 +8564,21 @@
       "status": "specified",
       "acceptance": {
         "test_refs": [
-          "planned:skeleton/testing/test_python_layering.py",
-          "planned:skeleton/testing/test_import_side_effects.py"
+          "tests/test_architecture_package_layers.py",
+          "tests/test_vol052_python_architecture_independent.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluation_refs": [
-          "planned:dependency-cycle scan",
-          "planned:cold-import determinism evaluation"
+          "scripts/check_architecture_package_layers.py",
+          "scripts/verify_vol052_python_architecture.py",
+          ".github/workflows/vol052-python-architecture.yml"
         ],
         "evidence_refs": [
           "skeleton/masterplan/closure.py",
-          "tests/flgb/test_masterplan_closure.py"
+          "tests/flgb/test_masterplan_closure.py",
+          "scripts/check_architecture_package_layers.py",
+          "scripts/verify_vol052_python_architecture.py",
+          ".github/workflows/vol052-python-architecture.yml"
         ]
       },
       "implementation_refs": [
@@ -8595,16 +8605,21 @@
       "status": "specified",
       "acceptance": {
         "test_refs": [
-          "planned:skeleton/testing/test_python_layering.py",
-          "planned:skeleton/testing/test_import_side_effects.py"
+          "tests/test_architecture_package_layers.py",
+          "tests/test_vol052_python_architecture_independent.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluation_refs": [
-          "planned:dependency-cycle scan",
-          "planned:cold-import determinism evaluation"
+          "scripts/check_architecture_package_layers.py",
+          "scripts/verify_vol052_python_architecture.py",
+          ".github/workflows/vol052-python-architecture.yml"
         ],
         "evidence_refs": [
           "skeleton/masterplan/closure.py",
-          "tests/flgb/test_masterplan_closure.py"
+          "tests/flgb/test_masterplan_closure.py",
+          "scripts/check_architecture_package_layers.py",
+          "scripts/verify_vol052_python_architecture.py",
+          ".github/workflows/vol052-python-architecture.yml"
         ]
       },
       "implementation_refs": [

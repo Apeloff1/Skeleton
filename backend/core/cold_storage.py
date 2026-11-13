@@ -44,10 +44,28 @@ from core.compressed_vault import (
 COLD_TTL_SEC = int(os.environ.get("COLD_TTL_SEC", "600"))  # 10 min idle → re-freeze
 SHARD_PREFIX = "coll__"  # to distinguish from swarm-agent shards
 
-_db = get_sync_db()
-_registry = _db["cold_registry"]
-_registry.create_index([("name", ASCENDING)], unique=True)
-_registry.create_index([("last_accessed", ASCENDING)])
+# Mongo handles stay unset until the first cold-storage operation. Importing
+# this module must not select a server or create indexes.
+_db_handle = None
+_registry_handle = None
+_indexes_ready = False
+_handle_lock = threading.Lock()
+
+
+def _handles():
+    """Open the shared sync client and ensure registry indexes once."""
+    global _db_handle, _registry_handle, _indexes_ready
+    if _indexes_ready and _db_handle is not None and _registry_handle is not None:
+        return _db_handle, _registry_handle
+    with _handle_lock:
+        if _db_handle is None:
+            _db_handle = get_sync_db()
+            _registry_handle = _db_handle["cold_registry"]
+        if not _indexes_ready:
+            _registry_handle.create_index([("name", ASCENDING)], unique=True)
+            _registry_handle.create_index([("last_accessed", ASCENDING)])
+            _indexes_ready = True
+    return _db_handle, _registry_handle
 
 # Collections that must NEVER be auto-frozen (system collections + very hot ones).
 # These can still be manually frozen by explicit API call with force=True.
@@ -113,6 +131,8 @@ def _shard_name(coll: str) -> str:
 
 def _iter_coll(coll_name: str, batch_size: int = 2000) -> Iterator[dict]:
     """Stream docs out of a Mongo collection, stripping _id to plain dicts."""
+    _db, _registry = _handles()
+    del _registry
     cur = _db[coll_name].find({}, batch_size=batch_size)
     for doc in cur:
         doc.pop("_id", None)
@@ -133,6 +153,7 @@ def freeze(
     compact=True    : run Mongo compact to release WiredTiger space to OS
     force=True      : allow freezing PROTECTED collections
     """
+    _db, _registry = _handles()
     if not force and name in PROTECTED:
         raise ValueError(f"Collection '{name}' is protected; pass force=True to override")
 
@@ -207,6 +228,7 @@ def freeze(
 
 def thaw(name: str, *, batch_size: int = 2000, mark_hot: bool = True) -> dict:
     """Restore a frozen collection back into Mongo (idempotent)."""
+    _db, _registry = _handles()
     # Already live?
     if name in _db.list_collection_names() and _db[name].estimated_document_count() > 0:
         if mark_hot:
@@ -279,6 +301,7 @@ def cold_query(name: str, filter: dict | None = None, limit: int = 50, offset: i
 
 def heat_touch(name: str, hydrate: bool = True) -> None:
     """Record an access, optionally thawing the collection."""
+    _db, _registry = _handles()
     _registry.update_one(
         {"name": name},
         {"$set": {"last_accessed": time.time(), "hot": True}},
@@ -290,6 +313,7 @@ def heat_touch(name: str, hydrate: bool = True) -> None:
 
 def evictor_tick(ttl: int = COLD_TTL_SEC, max_freeze: int = 10) -> dict:
     """Re-freeze idle thawed collections + purge phantom empty re-creations."""
+    _db, _registry = _handles()
     now = time.time()
     frozen = 0
     candidates: list[str] = []
@@ -330,6 +354,8 @@ def freeze_all(
     limit: int | None = None,
 ) -> dict:
     """Sweep: freeze every non-protected collection whose storage exceeds threshold."""
+    _db, _registry = _handles()
+    del _registry
     all_names = _db.list_collection_names()
     work: list[tuple[str, int]] = []
     for n in all_names:
@@ -379,6 +405,7 @@ def freeze_all(
 
 
 def stats() -> dict:
+    _db, _registry = _handles()
     live_cols = _db.list_collection_names()
     registry_docs = list(_registry.find({}))
     frozen = [r for r in registry_docs if r.get("status") in ("frozen", "dropped_empty")]
@@ -401,6 +428,8 @@ def stats() -> dict:
 
 
 def registry_list(status: str | None = None, limit: int = 400) -> list[dict]:
+    _db, _registry = _handles()
+    del _db
     q: dict[str, Any] = {}
     if status:
         q["status"] = status

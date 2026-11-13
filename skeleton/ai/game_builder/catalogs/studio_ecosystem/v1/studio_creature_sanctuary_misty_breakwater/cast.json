@@ -1,0 +1,93 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "project_id": "studio_creature_sanctuary_misty_breakwater",
+  "genre": "creature_sanctuary",
+  "biome": "misty_breakwater",
+  "release_certified": false,
+  "protagonist": {
+    "id": "protagonist",
+    "name": "Tavi Hale",
+    "role": "caretaker",
+    "public_goal": "protect vulnerable species during a rapid environmental shift",
+    "private_burden": "An earlier low-visibility tides report ignored by peers",
+    "abilities": [
+      "habitat preference, population feedback and ethical stewardship",
+      "care"
+    ],
+    "weakness": "Refuses to publish uncertain evidence",
+    "arc": "Learns transparent stewardship of other people's work"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Lio Nilo",
+      "role": "local testimony keeper",
+      "knows": "Three conflicting accounts of historic sea wall",
+      "relationship": "trust grows when corrections are acknowledged"
+    },
+    {
+      "id": "technician",
+      "name": "Pela Varis",
+      "role": "Maintainer of fog horns",
+      "knows": "Repair topology under tidal drift",
+      "relationship": "cooperates when measured evidence is shared"
+    },
+    {
+      "id": "rival",
+      "name": "Ari Rook",
+      "role": "contested operations director",
+      "organization": "an illegal collector consortium",
+      "goal": "Exclusive access to fog horns",
+      "relationship": "can relent under documented public review"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "interest": "security and agency",
+      "reputation": 0
+    },
+    {
+      "id": "operators",
+      "interest": "measurable restoration of food, shelter and water",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "interest": "priority over fog horns",
+      "reputation": 0
+    }
+  ],
+  "social_rules": [
+    {
+      "decision": "publish_ledger",
+      "reputation_delta": {
+        "residents": 2,
+        "operators": 1,
+        "claimants": -1
+      }
+    },
+    {
+      "decision": "private_deal",
+      "reputation_delta": {
+        "residents": -2,
+        "operators": 0,
+        "claimants": 2
+      }
+    },
+    {
+      "decision": "neutral_audit",
+      "reputation_delta": {
+        "residents": 1,
+        "operators": 2,
+        "claimants": 0
+      }
+    }
+  ],
+  "conversation_flags": [
+    "evidence_seen",
+    "consent_granted",
+    "repair_receipt_recorded",
+    "faction_proposal_accepted"
+  ]
+}

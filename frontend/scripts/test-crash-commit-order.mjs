@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { OrderedCommitQueue } from '../utils/OrderedCommitQueue.ts';
+import { OrderedCommitQueue } from '../src/utils/OrderedCommitQueue.ts';
 
 function deferred() {
   let resolve;

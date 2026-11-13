@@ -1,8 +1,8 @@
 const { test } = require('node:test');
 const { assert } = require('./helpers.cjs');
 const { makeStoryEventRequest, makeStoryRecallHandoff } =
-  require('../../features/Jeeves/storyContext.ts');
-const { parseHandoff } = require('../../features/Jeeves/workbench/context.ts');
+  require('../../src/features/Jeeves/storyContext.ts');
+const { parseHandoff } = require('../../src/features/Jeeves/workbench/context.ts');
 
 const form = (changes = {}) => ({
   gameId: 'game-X', branch: 'main', act: '1', scene: '500', beat: '2',

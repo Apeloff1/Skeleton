@@ -84,13 +84,15 @@ are complete, because correctness of a backlog is not completed engineering.
 
 ## Current evidence boundary
 
-The source parse index lists 22 fully signed volumes among 421 at the
-present baseline, with 251 implementation-signed open and 148 implementation
-unsigned. Those figures are **source-navigation metadata**, not newly
-verified by this document. No group of four/five in the initial roadmap
-contains only fully signed volumes; therefore **0/100 groups** are fully
-source-signed at the initial snapshot, and **0/100** is the only defensible
-independent milestone qualification count.
+The pinned main source navigation index (Git blob `74befe71443253db9ad87bb214707d5a5d0079fd`)
+currently reports **421 of 421 source-signed volumes** and therefore 100
+source-signed groups. Earlier reports of 22 signed and 399 incomplete
+volumes referred to a superseded snapshot. Source signatures do **not**
+establish independent exact-head or device qualification. The milestone
+overlay intentionally reports **0/100 independently qualified milestones**.
+See [421 source-bound volume dossiers](volume_completion/README.md) for
+individual implementation paths, tests, risk obligations, and L00–L13
+completion protocols; planned test entries remain separate from passing tests.
 
 It is not honest to label all 100 milestones "done" merely because the
 complete scope is defined. Full execution remains substantial engineering.

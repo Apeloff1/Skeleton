@@ -105,9 +105,11 @@ architecture service graph no longer exactly matches the runtime manifest.
 Runtime dependency direction is intentionally small:
 
 ```text
-mongo ───────► backend ───────► frontend
-   └─────────► skeleton ──────► frontend
+mongo ───────► backend
+   └─────────► skeleton ──────► backend
 
+frontend (independent startup for /setup and diagnostics)
+frontend -- authenticated API calls --> backend / skeleton (when ready)
 chroma  (optional data service)
 skeleton ──► native / Java acceleration (optional, fallback-safe)
 ```
@@ -128,8 +130,8 @@ At source level, the dependency rules are:
 
 | Interface | Contract |
 | --- | --- |
-| Frontend → Backend | canonical resolver in `frontend/utils/apiBase.ts`, then `/api/*` |
-| Frontend → Engine | canonical resolver in `frontend/utils/apiBase.ts`, then `/api/v1/*` |
+| Frontend → Backend | canonical resolver in `frontend/src/utils/apiBase.ts`, then `/api/*` |
+| Frontend → Engine | canonical resolver in `frontend/src/utils/apiBase.ts`, then `/api/v1/*` |
 | Backend health | `GET /api/health` |
 | Engine liveness | `GET /api/v1/health/live` |
 | Engine → native | bounded native ABI with Python fallback |
@@ -566,17 +568,20 @@ incomplete execution-profile semantics.
 Startup, readiness, shutdown, upgrade, and crash behavior are now part of the
 structural contract under `runtime_lifecycle`.
 
-Startup is dependency ordered:
+Startup is dependency ordered for protected services, while the setup UI is independent:
 
-0. **data-foundation** — `mongo`, `chroma` (parallel); barrier: started-and-health-probe-eligible
-1. **core-services** — `skeleton`, `backend` (parallel); barrier: ready-before-dependent-product-start
-2. **product-shell** — `frontend` (serial); barrier: ready-after-backend-and-engine
+0. **diagnostics-and-data-foundation** — `frontend`, `mongo`, `chroma` (parallel); the `/setup` route may render when storage, engine, or backend is unhealthy, but may not claim their readiness.
+1. **engine-service** — `skeleton` (serial); requires healthy MongoDB before protected engine readiness.
+2. **application-service** — `backend` (serial); requires healthy MongoDB and engine before protected API readiness.
+
+Frontend diagnostic liveness is **not** application readiness. Gameplay, guarded AI activation, save, and export remain unavailable until their actual authenticated dependencies pass.
 
 Shutdown is the inverse dependency order:
 
-0. **stop-product-admission** — `frontend` (parallel); stop new user mutations and preserve bounded resume state
-1. **drain-core-services** — `backend`, `skeleton` (parallel); stop admission, drain requests/streams, checkpoint or terminalize operations, flush evidence
-2. **stop-data-foundation** — `chroma`, `mongo` (parallel); fence writers, flush durable state, then stop stores
+0. **stop-product-admission** — `frontend` (parallel); stop new user mutations and preserve bounded resume state.
+1. **drain-application-service** — `backend` (serial); stop application admission and drain requests/streams.
+2. **drain-engine-service** — `skeleton` (serial); checkpoint or terminalize operations and flush evidence.
+3. **stop-data-foundation** — `chroma`, `mongo` (parallel); fence writers, flush durable state, then stop stores.
 
 The validator proves that each runtime node appears exactly once in both
 sequences, that every dependency is started before its consumer, and that every

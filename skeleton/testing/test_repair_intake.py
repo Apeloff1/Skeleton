@@ -304,65 +304,24 @@ def test_classify_intake_preempts_duplicate_stale_recovered_and_family_work() ->
     )
 
 
-def test_workflow_run_trigger_surface_is_bounded() -> None:
-    workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
-
-    assert "- Merge Readiness" in workflow
-    assert "- Malware Gate" in workflow
-    for workflow_name in ("CodeQL", "Dependency Review", "Repository Hygiene Gate"):
-        assert f"- {workflow_name}" not in workflow
-
-
-def test_workflow_concurrency_coalesces_superseded_pr_failures() -> None:
-    workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
-
-    assert (
-        "group: repair-intake-${{ github.event.workflow_run.head_branch }}"
-    ) in workflow
-    assert "cancel-in-progress: true" in workflow
-    assert "github.event.workflow_run.pull_requests[0]" not in workflow
+def test_retired_repair_intake_cannot_auto_admit_workflow_runs() -> None:
+    # The legacy workflow_run consumer was retired to preserve the bounded
+    # automatic workflow admission surface. Do not silently reactivate it.
+    assert not Path(".github/workflows/repair-intake.yml").exists()
+    traffic = Path(".github/workflows/automation-traffic-manager.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "workflow_run:" not in traffic
+    assert "repair-intake.yml" not in traffic
+    assert "permissions: {}" in traffic
+    assert "cancel-in-progress: false" in traffic
 
 
-def test_workflow_run_consumer_never_checks_out_triggering_code() -> None:
-    workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
-
-    assert "actions/checkout" not in workflow
-    assert "github.event.workflow_run.head_repository.full_name == github.repository" in workflow
-    assert 'branches:\n      - "*"\n      - "**"' in workflow
-    assert "toJSON(github.event.workflow_run.pull_requests.*.number)" in workflow
-    assert "github.event.workflow_run.workflow_id" in workflow
-    assert 'os.environ["HEAD_SHA"].casefold()' in workflow
-    assert r'^[0-9a-f]{40}$' in workflow
-    assert "workflow_run head SHA must be a 40-character hex commit OID" in workflow
-    assert "workflow_run head branch must be a canonical Git ref name" in workflow
-    assert "pull_requests[0]" not in workflow
-
-
-def test_workflow_preempts_stale_recovered_and_duplicate_family_queue_work() -> None:
-    workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
-
-    assert "/actions/workflows/{workflow_id}/runs" in workflow
-    assert "/actions/runs?" not in workflow
-    assert "per_page={page_size}&page={page}" in workflow
-    assert "skip_superseded" in workflow
-    assert "skip_recovered" in workflow
-    assert "skip_unreadable" in workflow
-    assert "skip_duplicate" in workflow
-    assert "skip_family" in workflow
-    assert "--state open" in workflow
-    assert "repair-intake:family=" in workflow
-    assert "head_branch.casefold()" not in workflow
-    assert "head_branch.lower()" not in workflow
-    assert '"family", head_branch' in workflow
-    assert "repair-intake fingerprint search exceeded bounded identity scan" in workflow
-    assert "repair-intake family search exceeded bounded identity scan" in workflow
-    assert "candidate_id > current_run_id" in workflow
-
-
-def test_issue_body_template_cannot_escape_yaml_shell_block() -> None:
-    workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
-
-    assert "printf -v body '%s\\n'" in workflow
-    assert "\n${marker}\n" not in workflow
-    assert "\n- Workflow: ${RUN_NAME}\n" not in workflow
-    assert "\nCorrelate this observation against existing findings" not in workflow
+def test_active_traffic_admission_stays_default_branch_and_policy_bound() -> None:
+    traffic = Path(".github/workflows/automation-traffic-manager.yml").read_text(
+        encoding="utf-8"
+    )
+    assert 'test "$TRAFFIC_EVENT_REF" = "$TRAFFIC_EXPECTED_REF"' in traffic
+    assert "if: ${{ needs.admission.outputs.admit == 'true' }}" in traffic
+    assert "Queue admitted repository supervisor" in traffic
+    assert "actions: write" in traffic

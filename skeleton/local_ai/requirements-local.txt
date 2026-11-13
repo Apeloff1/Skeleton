@@ -1,0 +1,3 @@
+# Local AI boilerplate requirements
+# No heavy deps. Pure Python.
+# Optional: pytest for tests
