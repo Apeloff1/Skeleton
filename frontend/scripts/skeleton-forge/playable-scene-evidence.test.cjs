@@ -68,6 +68,17 @@ test('result panel visibly distinguishes world boot, sidecar completion and orig
   assert.match(screen, /Playable pipeline scene completed in Godot/);
   assert.match(screen, /4 room objectives/);
   assert.match(screen, /source sealed/);
+  assert.match(screen, /Godot binary has not been verified against admitted release provenance/);
+  assert.match(screen, /Godot binary's release provenance is unverified/);
+});
+
+test('an admitted Godot binary does not emit provenance warning after separate successful boots', () => {
+  const passed = { status: 'passed', passed: true, verified: true };
+  const result = payload({ ...passed, scene: 'scenes/archetypes/pipeline/main.tscn' }, passed);
+  const screen = text(render(h(Panel, { phase: 'done', payload: result })));
+  assert.match(screen, /Playable pipeline scene completed in Godot/);
+  assert.doesNotMatch(screen, /binary's release provenance is unverified/);
+  assert.doesNotMatch(screen, /binary has not been verified/);
 });
 
 test('missing sidecar runtime proof stays explicitly unverified in finished panel', () => {
