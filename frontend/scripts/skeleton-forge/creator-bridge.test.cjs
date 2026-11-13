@@ -109,6 +109,26 @@ test('full questionnaire progress survives passive close and explicit return wit
   assert.equal(H.parseCreatorBridge({ ...toForge, step: 'not-a-step' }, 'forge', 1700000000002).step, 'brief');
 });
 
+test('Galaxy navigation retains opted-in playable sidecar scenes and original quest controls', () => {
+  const original = make(
+    { type: 'setVision', vision: 'An orbital dungeon crawler' },
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setQuestEnabled', value: true },
+    { type: 'setQuestLength', value: 4 },
+  );
+  const accepted = H.handoffFromForge(original, 1700000000000);
+  assert.equal(accepted.playable.enabled, true);
+  const outbound = H.handoffFromGalaxy(
+    { title: 'A new title', vision: '', genreId: null }, accepted,
+    1700000000000 + 24 * 60 * 60 * 1000,
+  );
+  const restored = H.forgeStateFromHandoff(outbound, outbound.createdMs + 1);
+  assert.equal(restored.playable.enabled, true);
+  assert.equal(restored.quest.length, 4);
+  assert.equal(Q.buildRunRequest(restored).playable_content, true);
+  assert.equal(Q.buildRunRequest(restored).quest_content, true);
+});
+
 test('Galaxy direct navigation populates only compatible Forge vocabulary', () => {
   const draft = H.handoffFromGalaxy({
     title: 'Harbor colony',

@@ -64,6 +64,45 @@ test('JSON target suppresses only native quest, keeping genre and authored desig
   assert.match(text(screen({ ...state, step: 'review' })), /Native room quests are disabled/);
 });
 
+test('native playable sidecar and room quest compose in the same Godot source request', () => {
+  const state = reduce(
+    { type: 'setVision', vision: 'An original planetary supply-chain escape game' },
+    { type: 'setBrief', facet: 'genre', value: 'automation' },
+    { type: 'setOption', key: 'archetype', value: 'pipeline' },
+    { type: 'setAxis', axis: 'risk', value: 0.4 },
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setQuestEnabled', value: true },
+    { type: 'setQuestLength', value: 7 },
+  );
+  const request = Q.buildRunRequest(state);
+  assert.equal(request.playable_content, true);
+  assert.equal(request.quest_content, true);
+  assert.equal(request.quest_length, 7);
+  assert.deepEqual(request.operator_axes, { risk: 0.4 });
+  assert.equal(request.archetype, 'pipeline');
+  const review = text(screen({ ...state, step: 'review' }));
+  assert.match(review, /Playable scene Godot pipeline prototype/);
+  assert.match(review, /Native quest 7 room-entry objectives/);
+});
+
+test('JSON blueprint never implicitly enables playable Godot, preserving authorship for later', () => {
+  const state = reduce(
+    { type: 'setVision', vision: 'A local puzzle-maker' },
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setQuestEnabled', value: true },
+    { type: 'setOption', key: 'target', value: 'json' },
+  );
+  const req = Q.buildRunRequest(state);
+  assert.equal(req.target, 'json');
+  assert.equal(req.playable_content, undefined);
+  assert.equal(req.quest_content, undefined);
+  assert.equal(state.playable.enabled, true);
+  assert.match(text(screen({ ...state, step: 'review' })), /Playable sidecar scenes require Godot output/);
+  assert.deepEqual(Q.buildRunRequest(Q.questionnaireReducer(state, {
+    type: 'setPlayableEnabled', value: false,
+  })).playable_content, undefined);
+});
+
 test('no opt-ins keep baseline request contract byte-compatible', () => {
   assert.deepEqual(Q.buildRunRequest(Q.INITIAL_STATE), {
     vision: '', era: null, archetype: 'auto', target: 'godot',
