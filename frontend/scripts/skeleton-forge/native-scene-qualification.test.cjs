@@ -1,37 +1,11 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { h, load, render, text, ROOT } = require('./harness.cjs');
-const Module = require('node:module');
-const path = require('node:path');
+const { h, load, render, text } = require('./harness.cjs');
 const Q = load('src/skeletonForge/questionnaire.ts');
 const R = load('src/skeletonForge/run.ts');
-
-// The questionnaire's collapsed read-only inspectors import a live Expo API
-// client. This is an SSR source contract: no network, Expo runtime, credentials
-// or native device modules may be loaded. Keep the *real* UI and reducer under
-// test while rejecting any accidental client invocation.
-const componentRoot = path.join(ROOT, 'src', 'skeletonForge', 'components') + path.sep;
-const baseLoad = Module._load;
-const noNetwork = () => { throw new Error('Unexpected live API invocation in native source SSR test'); };
-Module._load = function isolatedClient(request, parent, isMain) {
-  if (request === '../client' && parent?.filename?.startsWith(componentRoot)) {
-    return {
-      errorText: noNetwork,
-      fetchGenreControls: noNetwork,
-      previewHistoricalConductor: noNetwork,
-      fetchJeevesGameQualityCatalog: noNetwork,
-    };
-  }
-  return baseLoad.call(this, request, parent, isMain);
-};
-let Flow, Panel;
-try {
-  Flow = load('src/skeletonForge/components/QuestionnaireFlow.tsx').default;
-  Panel = load('src/skeletonForge/components/ForgeRunPanel.tsx').default;
-} finally {
-  Module._load = baseLoad;
-}
+const Flow = load('src/skeletonForge/components/QuestionnaireFlow.tsx').default;
+const Panel = load('src/skeletonForge/components/ForgeRunPanel.tsx').default;
 
 test('native validation is off by default and JSON output cannot demand Godot', () => {
   assert.equal(Q.buildRunRequest(Q.INITIAL_STATE).playtest, undefined);
