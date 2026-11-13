@@ -113,3 +113,31 @@ test('missing sidecar runtime proof stays explicitly unverified in finished pane
   assert.match(screen, /Playable scene not dynamically tested/);
   assert.doesNotMatch(screen, /Playable pipeline scene completed in Godot/);
 });
+
+test('mechanical tuning receipt identifies only axes actually implemented in Godot source', () => {
+  const x = payload(null);
+  const tuned = {
+    ...x,
+    playable_mechanics: {
+      schema: 'skeleton.forge.playable_mechanics.v1',
+      archetype: 'pipeline',
+      source_verified: true,
+      applied_axes: { tempo: 0.8, grind: 0.75, risk: 0.3 },
+    },
+  };
+  const html = text(render(h(Panel, { phase: 'done', payload: tuned })));
+  assert.match(html, /Native mechanics tuning/);
+  assert.match(html, /tempo 80%/);
+  assert.match(html, /grind 75%/);
+  assert.match(html, /risk 30%/);
+  const creativeOnly = text(render(h(Panel, { phase: 'done', payload: {
+    ...tuned, playable_mechanics: {
+      ...tuned.playable_mechanics, applied_axes: {},
+    },
+  } })));
+  assert.match(creativeOnly, /Original default mechanics/);
+  const unverified = text(render(h(Panel, { phase: 'done', payload: {
+    ...tuned, playable_mechanics: { ...tuned.playable_mechanics, source_verified: false },
+  } })));
+  assert.match(unverified, /Source tuning not verified/);
+});

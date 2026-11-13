@@ -109,6 +109,14 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Fact k="Simulation" v={sum.simPassed === null ? '—' : sum.simPassed ? 'passed' : 'failed'} />
               <Fact k="Ledger" v={sum.ledgerValid === null ? '—' : sum.ledgerValid ? 'valid' : 'INVALID'} />
               {payload.forge?.playable_archetype ? <Fact k="Playable scene" v={payload.forge.playable_archetype} /> : null}
+              {payload.playable_mechanics ? (
+                <Fact k="Native mechanics tuning" v={payload.playable_mechanics.source_verified === true
+                  ? (Object.keys(payload.playable_mechanics.applied_axes || {}).length
+                    ? Object.entries(payload.playable_mechanics.applied_axes || {})
+                        .map(([axis, value]) => axis + ' ' + Math.round(value * 100) + '%').join(' · ')
+                    : 'Original default mechanics (no explicit slider changes)')
+                  : 'Source tuning not verified'} />
+              ) : null}
               {payload.playable_portal ? (
                 <Fact k="In-game playable gateway" v={payload.playable_portal.sealed && payload.playable_portal.return_supported
                   ? 'Source sealed · launch + return' : 'Not source sealed'} />

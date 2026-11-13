@@ -185,6 +185,12 @@ export interface RunPayload {
     return_supported?: boolean; headless_inert?: boolean; sealed?: boolean;
   };
   operator_axes?: Record<string, number>;
+  /** Mechanical controls actually written into the native playable script. */
+  playable_mechanics?: {
+    schema?: 'skeleton.forge.playable_mechanics.v1';
+    archetype?: string; source_verified?: boolean;
+    applied_axes?: Record<string, number>;
+  } | null;
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];
   /** Actual emitted files, returned only with explicit and bounded source export. */

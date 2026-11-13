@@ -157,3 +157,16 @@ test('no opt-ins keep baseline request contract byte-compatible', () => {
     generation: null, answers: {},
   });
 });
+
+test('creator explicitly distinguishes mechanically applied sliders from design-only tensor controls', () => {
+  const state = reduce(
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setAxis', axis: 'tempo', value: 0.9 },
+    { type: 'setAxis', axis: 'intimacy', value: 0.2 },
+  );
+  const req = Q.buildRunRequest(state);
+  assert.deepEqual(req.operator_axes, { tempo: 0.9, intimacy: 0.2 });
+  const html = text(screen({ ...state, step: 'options' }));
+  assert.match(html, /sliders now modify the underlying generated Godot movement/);
+  assert.match(html, /other sliders currently tune the design tensor/);
+});
