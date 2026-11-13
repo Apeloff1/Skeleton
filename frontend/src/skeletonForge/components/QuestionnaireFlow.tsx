@@ -308,7 +308,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         </View>
       ) : null}
       <View style={st.group}>
-        <Button label={galaxyOpen ? 'Hide 67-genre catalog' : 'Advanced: choose from all 67 Galaxy genres'}
+        <Button label={galaxyOpen ? `Hide ${GALAXY_CHOICES.length}-genre catalog` : `Advanced: choose from all ${GALAXY_CHOICES.length} Galaxy genres`}
           tone="secondary" compact testID="q-galaxy-genres-toggle"
           onPress={() => setGalaxyOpen((open) => !open)} />
       </View>
@@ -321,7 +321,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           </Text>
           <TextInput testID="q-galaxy-genre-search" style={[st.input, { minHeight: TOUCH }]}
             value={genreSearch} onChangeText={setGenreSearch}
-            placeholder="Search 67 genres" accessibilityLabel="Search Galaxy genres"
+            placeholder={`Search ${GALAXY_CHOICES.length} genres`} accessibilityLabel="Search Galaxy genres"
             placeholderTextColor={C.dim} />
           <Text style={st.help}>{filteredGenres.length} matching genres. {filteredGenres.length > 24 ? 'Showing first 24; refine your search.' : ''}</Text>
           <View style={st.chips}>
