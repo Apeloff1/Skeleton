@@ -161,6 +161,7 @@ HTML = r"""<!doctype html>
       <button id="sidebar-toggle" class="small mobile-only" aria-controls="sidebar" aria-expanded="true">Library &amp; connection</button>
       <div><h1>Local model conversation</h1><p id="model">Not connected</p></div>
       <div id="indicator" class="indicator">LOCKED</div>
+      <div id="lease-indicator" class="indicator" role="status">Execution lock unknown</div>
       <button id="health-refresh" class="small" disabled>Check model</button>
       <button id="selftest-start" class="small" disabled>Run genuine local inference self-test</button>
     </header>
@@ -304,6 +305,13 @@ JAVASCRIPT = r"""'use strict';
       const observed = await api('GET', '/v1/status');
       if (epoch !== state.epoch || !state.connected) return;
       state.health = observed;
+      const ownership = observed.inference_lease?.state;
+      get('lease-indicator').textContent =
+        ownership === 'busy' ? 'LOCAL • ANOTHER EXECUTOR IS ACTIVE' :
+        ownership === 'unavailable' ? 'LOCAL • EXECUTION LOCK UNSAFE' :
+        ownership === 'idle' ? 'LOCAL • EXECUTION SLOT IDLE' :
+        ownership === 'uninitialized' ? 'LOCAL • FIRST EXECUTION NOT YET RUN' :
+        'LOCAL • OWNERSHIP UNKNOWN';
       get('budget').max = String(observed.max_output_tokens);
       if (Number(get('budget').value) > observed.max_output_tokens) {
         get('budget').value = String(observed.default_output_tokens);
@@ -344,6 +352,7 @@ JAVASCRIPT = r"""'use strict';
   function updateControls() {
     const locked = !state.connected;
     const working = state.busy || state.polling || unresolved();
+    const foreignLease = ['busy', 'unavailable'].includes(state.health?.inference_lease?.state);
     ['new', 'fork', 'delete', 'import', 'system-prompt', 'session-search', 'sessions-more'].forEach(id => {
       get(id).disabled = locked || working;
     });
@@ -358,7 +367,7 @@ JAVASCRIPT = r"""'use strict';
       get(id).disabled = locked || state.busy || !state.session;
     });
     ['prompt', 'budget', 'grounded'].forEach(id => {get(id).disabled = locked || working;});
-    get('send').disabled = locked || working || !state.session || state.health?.ready !== true;
+    get('send').disabled = locked || working || foreignLease || !state.session || state.health?.ready !== true;
     const scopeBlocked = get('grounded').checked && state.knowledgeScopeMode === 'selected' &&
       (state.selectedKnowledgeIds.size === 0 ||
         [...state.selectedKnowledgeIds].some(id => !state.availableKnowledgeIds.has(id)));
@@ -371,7 +380,7 @@ JAVASCRIPT = r"""'use strict';
     get('context-preserve').disabled = locked || working;
     get('connect').disabled = state.busy || state.connected;
     get('health-refresh').disabled = locked || state.busy;
-    get('selftest-start').disabled = locked || working || state.health?.ready !== true;
+    get('selftest-start').disabled = locked || working || foreignLease || state.health?.ready !== true;
     get('selftest-export').disabled = locked || !state.selfTestReport;
     for (const id of ['media-advisory-file', 'media-advisory-title',
                       'media-advisory-observation', 'media-advisory-review']) {
@@ -417,6 +426,7 @@ JAVASCRIPT = r"""'use strict';
       get('turn-label').textContent = labels[state.turn.state] || state.turn.state;
     }
     get('indicator').textContent = locked ? 'LOCKED' : unresolved() ? 'LOCAL • RUNNING' :
+      foreignLease ? 'LOCAL • EXECUTOR BUSY' :
       state.health?.ready === true ? 'LOCAL • READY' : 'LOCAL • DEGRADED';
   }
   function stopPolling() {
@@ -427,6 +437,7 @@ JAVASCRIPT = r"""'use strict';
     if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
     state.resourceTimer = null;
     get('resource-monitor').textContent = 'Connect to inspect your device.';
+    get('lease-indicator').textContent = 'Execution lock unknown';
     get('resource-plan-result').textContent = 'No workload planned.';
     get('longform-status').textContent = 'No staged source.';
     get('longform-work-status').textContent = 'No active work cursor.';
@@ -1138,6 +1149,12 @@ JAVASCRIPT = r"""'use strict';
     try {state.health = await api('GET', '/v1/status');}
     catch (error) {state.token = ''; throw error;}
     state.connected = true; get('secret').value = '';
+    get('lease-indicator').textContent =
+      state.health.inference_lease?.state === 'busy' ? 'LOCAL • ANOTHER EXECUTOR IS ACTIVE' :
+      state.health.inference_lease?.state === 'unavailable' ? 'LOCAL • EXECUTION LOCK UNSAFE' :
+      state.health.inference_lease?.state === 'idle' ? 'LOCAL • EXECUTION SLOT IDLE' :
+      state.health.inference_lease?.state === 'uninitialized' ? 'LOCAL • FIRST EXECUTION NOT YET RUN' :
+      'LOCAL • OWNERSHIP UNKNOWN';
     sidebar(false);
     get('model').textContent = state.health.runtime_kind + ' · ' + state.health.context_tokens + ' context tokens · ' + state.health.model_digest.slice(0, 16) + '…';
     get('budget').value = String(state.health.default_output_tokens);
