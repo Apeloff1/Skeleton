@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_puzzle_expedition_sunken_metro",
+  "title": "Sunken Metro: Puzzle Expedition",
+  "subtitle": "An original puzzle expedition brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610300137,
+  "width": 19,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 4,
+  "theme": "arcade",
+  "starting_health": 3
+}

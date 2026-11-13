@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_echo_caverns",
+  "title": "Echo Caverns: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Echo Caverns; prototype maps are not full genre implementations.",
+  "seed": 202610301024,
+  "width": 25,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 7,
+  "theme": "arcade",
+  "starting_health": 5
+}

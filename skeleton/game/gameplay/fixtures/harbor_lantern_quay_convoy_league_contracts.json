@@ -1,0 +1,120 @@
+[
+  {
+    "schema": "skeleton.game.harbor.convoy-contracts.v1",
+    "source_id": "lantern-quay",
+    "contracts": [
+      {
+        "id": "forge_lantern",
+        "kind": "craft",
+        "target": "lantern",
+        "requires": [],
+        "points": 3,
+        "required": true,
+        "token": "forge_ready"
+      },
+      {
+        "id": "first_crossing",
+        "kind": "visit",
+        "target": "1",
+        "requires": [
+          "forge_lantern"
+        ],
+        "points": 2,
+        "required": true,
+        "token": "first_crossing"
+      },
+      {
+        "id": "repel_raider",
+        "kind": "defeat",
+        "target": "canal_raider",
+        "requires": [
+          "first_crossing"
+        ],
+        "points": 5,
+        "required": true,
+        "token": "canal_safe"
+      },
+      {
+        "id": "protect_cargo",
+        "kind": "hull",
+        "target": "3",
+        "requires": [
+          "repel_raider"
+        ],
+        "points": 3,
+        "required": true,
+        "token": "cargo_intact"
+      },
+      {
+        "id": "dock_delivery",
+        "kind": "complete",
+        "target": "dock",
+        "requires": [
+          "protect_cargo"
+        ],
+        "points": 7,
+        "required": true,
+        "token": "dock_secured"
+      }
+    ]
+  },
+  {
+    "schema": "skeleton.game.harbor.convoy-contracts.v1",
+    "source_id": "lantern-quay",
+    "contracts": [
+      {
+        "id": "forge_lantern",
+        "kind": "craft",
+        "target": "lantern",
+        "requires": [],
+        "points": 3,
+        "required": true,
+        "token": "forge_ready"
+      },
+      {
+        "id": "first_crossing",
+        "kind": "visit",
+        "target": "1",
+        "requires": [
+          "forge_lantern"
+        ],
+        "points": 2,
+        "required": true,
+        "token": "first_crossing"
+      },
+      {
+        "id": "repel_marauder",
+        "kind": "defeat",
+        "target": "canal_marauder",
+        "requires": [
+          "first_crossing"
+        ],
+        "points": 5,
+        "required": true,
+        "token": "marauder_repelled"
+      },
+      {
+        "id": "protect_cargo",
+        "kind": "hull",
+        "target": "3",
+        "requires": [
+          "repel_marauder"
+        ],
+        "points": 3,
+        "required": true,
+        "token": "cargo_intact"
+      },
+      {
+        "id": "dock_delivery",
+        "kind": "complete",
+        "target": "dock",
+        "requires": [
+          "protect_cargo"
+        ],
+        "points": 7,
+        "required": true,
+        "token": "homecoming_secured"
+      }
+    ]
+  }
+]

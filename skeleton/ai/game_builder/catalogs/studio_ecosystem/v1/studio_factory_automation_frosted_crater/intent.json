@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_frosted_crater",
+  "title": "Frosted Crater: The Maker Commons",
+  "subtitle": "Original the maker commons design in Frosted Crater; only the grid preview compiles today.",
+  "seed": 203010312774,
+  "width": 21,
+  "height": 17,
+  "levels": 6,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "space",
+  "starting_health": 6
+}

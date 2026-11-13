@@ -1,0 +1,50 @@
+{
+  "schema": "skeleton.game.harbor.patrol-quest-board.v1",
+  "source_id": "lantern-quay",
+  "patrol_board_digest": "11a93a44fec5788e16b1ec8a97544981db2b19b471d23b09d0bac0ef3509f8a5",
+  "quests": [
+    {
+      "id": "recover_registry",
+      "requires": [],
+      "trigger": "collect",
+      "target": "tide_registry",
+      "reward": 5
+    },
+    {
+      "id": "forge_lantern",
+      "requires": [
+        "recover_registry"
+      ],
+      "trigger": "craft",
+      "target": "lantern",
+      "reward": 3
+    },
+    {
+      "id": "secure_manifest",
+      "requires": [
+        "forge_lantern"
+      ],
+      "trigger": "collect",
+      "target": "dock_manifest",
+      "reward": 8
+    },
+    {
+      "id": "dock_delivery",
+      "requires": [
+        "secure_manifest"
+      ],
+      "trigger": "deliver",
+      "target": "",
+      "reward": 4
+    },
+    {
+      "id": "quiet_extraction",
+      "requires": [
+        "dock_delivery"
+      ],
+      "trigger": "extract",
+      "target": "",
+      "reward": 10
+    }
+  ]
+}

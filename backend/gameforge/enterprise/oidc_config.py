@@ -36,6 +36,10 @@ def load_oidc_settings() -> OIDCSettings:
         issuer=os.getenv("GAMEFORGE_OIDC_ISSUER"),
         audience=os.getenv("GAMEFORGE_OIDC_AUDIENCE"),
         jwks_url=os.getenv("GAMEFORGE_OIDC_JWKS_URL"),
-        dev_open=os.getenv("GAMEFORGE_DEV_OPEN", "1") == "1",
+        dev_open=(
+            os.getenv("GAMEFORGE_DEV_OPEN", "0") == "1"
+            and os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).strip().lower()
+            not in {"production", "prod", "staging", "stage", "preview"}
+        ),
         api_token_configured=bool(os.getenv("GAMEFORGE_API_TOKEN")),
     )

@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for cinderfall."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('cinderfall_arrival', (), (), ('arrival_record',)), Quest('cinderfall_source', ('cinderfall_arrival',), ('arrival_record',), ('source_proof',)), Quest('cinderfall_witness', ('cinderfall_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('cinderfall_reconcile', ('cinderfall_source', 'cinderfall_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('cinderfall_crossing', ('cinderfall_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('cinderfall_conclusion', ('cinderfall_crossing',), ('crossing_pass',), ('ending_unlocked',)))

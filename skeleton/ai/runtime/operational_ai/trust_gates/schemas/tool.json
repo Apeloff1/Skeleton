@@ -1,0 +1,51 @@
+{
+  "type": "object",
+  "fields": {
+    "grant_id": {
+      "type": "text",
+      "max_bytes": 96,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    },
+    "tool_id": {
+      "type": "text",
+      "max_bytes": 64,
+      "enum": [
+        "read_text",
+        "list_files",
+        "shell",
+        "network"
+      ]
+    },
+    "args": {
+      "type": "object",
+      "fields": {
+        "path": {
+          "type": "text",
+          "max_bytes": 240
+        },
+        "byte_limit": {
+          "type": "int",
+          "min": 1,
+          "max": 262144
+        }
+      }
+    },
+    "risk": {
+      "type": "text",
+      "max_bytes": 64,
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "approved": {
+      "type": "bool"
+    },
+    "request_id": {
+      "type": "text",
+      "max_bytes": 96,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    }
+  }
+}

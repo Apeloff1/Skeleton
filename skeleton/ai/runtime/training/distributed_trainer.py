@@ -20,7 +20,7 @@ import threading
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone; UTC = timezone.utc
 from multiprocessing.connection import Connection
 from typing import Any, Self
 

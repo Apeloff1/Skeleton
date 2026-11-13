@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_roguelite_extraction_orbital_gardens",
+  "title": "Orbital Gardens: Roguelite Extraction",
+  "subtitle": "An original roguelite extraction brief in Orbital Gardens; prototype maps are not full genre implementations.",
+  "seed": 202610303004,
+  "width": 25,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 4,
+  "theme": "space",
+  "starting_health": 5
+}

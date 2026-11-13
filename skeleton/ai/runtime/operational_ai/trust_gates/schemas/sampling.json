@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "fields": {
+    "request_id": {
+      "type": "text",
+      "max_bytes": 96,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    },
+    "temperature": {
+      "type": "number",
+      "min": 0,
+      "max": 2
+    },
+    "top_p": {
+      "type": "number",
+      "min": 0,
+      "max": 1
+    },
+    "max_output": {
+      "type": "int",
+      "min": 1,
+      "max": 8192
+    },
+    "context_window": {
+      "type": "int",
+      "min": 128,
+      "max": 262144
+    },
+    "seed": {
+      "type": "int",
+      "min": 0,
+      "max": 4294967295
+    },
+    "repetition_penalty": {
+      "type": "number",
+      "min": 0.5,
+      "max": 2
+    }
+  }
+}
