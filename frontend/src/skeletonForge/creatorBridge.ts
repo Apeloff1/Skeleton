@@ -3,7 +3,7 @@
  * Legacy GameForge axes, quest option and answered beats are carried unmodified when
  * visiting Galaxy, and restored when returning. Galaxy matrices remain Galaxy-owned.
  */
-import type { QuestionnaireState } from './questionnaire';
+import { STEPS, type QuestionnaireState } from './questionnaire';
 import { DESIGN_AXES } from './instruments';
 import { GALAXY_CHOICES, mappedBriefGenre } from './galaxyGenres';
 import { GENRE_CHOICES } from './genreCatalog';
@@ -16,6 +16,8 @@ export interface CreatorBridgeDraft {
   schema: typeof CREATOR_BRIDGE_SCHEMA;
   target: CreatorBridgeTarget;
   createdMs: number;
+  /** Retain the user's current place in the questionnaire. */
+  step: QuestionnaireState['step'];
   vision: string;
   brief: Record<string, string>;
   beats: Record<string, string>;
@@ -72,6 +74,9 @@ export function parseCreatorBridge(
       typeof input.createdMs !== 'number' || !Number.isSafeInteger(input.createdMs) ||
       !Number.isFinite(now) || input.createdMs > now + 30_000 ||
       now - input.createdMs > CREATOR_BRIDGE_TTL_MS) return null;
+  const step: QuestionnaireState['step'] =
+    typeof input.step === 'string' && STEPS.includes(input.step as QuestionnaireState['step'])
+      ? input.step as QuestionnaireState['step'] : 'brief';
   const vision = cleanText(input.vision, 4000);
   const brief = cleanChoices(input.brief, 5, allowedBrief);
   if (brief.genre && !availableGenres.has(brief.genre)) delete brief.genre;
@@ -96,7 +101,7 @@ export function parseCreatorBridge(
     (rawQuest.length as number) >= 1 && (rawQuest.length as number) <= 8 ? rawQuest.length as number : 3;
   return {
     schema: CREATOR_BRIDGE_SCHEMA, target, createdMs: input.createdMs,
-    vision, brief, beats, instruments, galaxyGenre: genre,
+    step, vision, brief, beats, instruments, galaxyGenre: genre,
     options: { archetype, target: originalTarget, era, generation },
     quest: { enabled: rawQuest?.enabled === true, length },
   };
@@ -105,7 +110,7 @@ export function parseCreatorBridge(
 export function handoffFromForge(state: QuestionnaireState, now: number = Date.now()): CreatorBridgeDraft {
   const raw = {
     schema: CREATOR_BRIDGE_SCHEMA, target: 'galaxy', createdMs: now,
-    vision: state.vision, brief: state.brief, beats: state.beats,
+    step: state.step, vision: state.vision, brief: state.brief, beats: state.beats,
     instruments: state.instruments, galaxyGenre: state.galaxyGenre,
     options: state.options, quest: state.quest,
   };
@@ -150,7 +155,7 @@ export function handoffFromGalaxy(
     cleanText(selection.title, 160).trim() || previous?.vision || '';
   const raw = {
     schema: CREATOR_BRIDGE_SCHEMA, target: 'forge', createdMs: now,
-    vision, brief, beats: previous?.beats ?? {}, instruments: previous?.instruments ?? {},
+    step: previous?.step ?? 'brief', vision, brief, beats: previous?.beats ?? {}, instruments: previous?.instruments ?? {},
     galaxyGenre: genre, options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
     quest: previous?.quest ?? { enabled: false, length: 3 },
   };
@@ -163,7 +168,7 @@ export function forgeStateFromHandoff(raw: CreatorBridgeDraft, now: number = Dat
   const draft = parseCreatorBridge(raw, 'forge', now);
   if (!draft) return null;
   return {
-    step: 'brief', vision: draft.vision, brief: draft.brief, beats: draft.beats,
+    step: draft.step, vision: draft.vision, brief: draft.brief, beats: draft.beats,
     instruments: draft.instruments, galaxyGenre: draft.galaxyGenre,
     options: draft.options, quest: draft.quest,
   };
