@@ -32,6 +32,8 @@ export function cockpitTabMove(current: CockpitTab, event: KeyEventLike): Cockpi
 export interface ForgeCockpitViewProps {
   tab: CockpitTab;
   onTab: (tab: CockpitTab) => void;
+  /** Only visible when the original project has a verified Studio origin. */
+  onReturnToStudio?: () => void;
   badges: Record<CockpitTab, TabBadge>;
   questionnaire: QuestionnaireFlowProps;
   compose: ComposePanelProps;
@@ -103,6 +105,15 @@ export default function ForgeCockpitView(props: ForgeCockpitViewProps) {
       <View style={st.header}>
         <Text style={st.title} accessibilityRole="header">Skeleton Forge</Text>
         <Text style={st.subtitle}>{COCKPIT_TAB_HINTS[tab]}</Text>
+        {props.onReturnToStudio ? (
+          <Pressable testID="forge-return-to-studio" accessibilityRole="button"
+            accessibilityLabel="Return authored Forge design to original Studio project"
+            onPress={props.onReturnToStudio}
+            style={{ alignSelf: 'flex-start', paddingVertical: 10, paddingHorizontal: 12, minHeight: TOUCH,
+              borderRadius: 8, borderWidth: 1, borderColor: C.green, marginTop: 8 }}>
+            <Text style={{ color: C.textStrong, fontWeight: '700' }}>Return to original Studio project</Text>
+          </Pressable>
+        ) : null}
       </View>
       <CockpitTabBar tab={tab} onTab={props.onTab} badges={props.badges} reduceMotion={reduceMotion} />
       {notice ? (
