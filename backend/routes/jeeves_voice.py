@@ -24,6 +24,8 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from routes.playable_access import project_router, scoped_database, reauthorize_project_context
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
@@ -34,7 +36,7 @@ import os
 import uuid
 import random
 
-router = APIRouter(prefix="/api/jeeves-voice", tags=["Jeeves Voice & Personality"])
+router = project_router(prefix="/api/jeeves-voice", tags=["Jeeves Voice & Personality"])
 
 # ============================================================================
 # JEEVES PERSONALITY SYSTEM - YOUNG ENGLISH BUTLER
@@ -829,6 +831,7 @@ async def voice_speak(req: ExpressiveSpeakRequest):
 @router.get("/voice/preview")
 async def voice_preview(tone: str = "butler"):
     """Audition a tone — returns HD audio of a short sample line in that tone."""
+    await reauthorize_project_context(mutate=True)
     preset = resolve_tone(tone)
     line = _PREVIEW_LINES.get(preset["id"], _PREVIEW_LINES["butler"])
     try:
@@ -897,6 +900,7 @@ async def _resolve_build_blurb(pid: str) -> Dict:
     try:
         from core.databases import client as _MONGO
         db = _MONGO[os.environ.get("DB_NAME", "test_database")]
+        db = scoped_database(db)
         g = await db.playables.find_one({"playable_id": pid},
                                         {"_id": 0, "title": 1, "brief": 1, "genre": 1, "cover_image": 1})
         if g:
@@ -948,6 +952,7 @@ async def voiced_trailer(req: TrailerRequest):
                 if req.pid:
                     from core.databases import client as _MONGO
                     db = _MONGO[os.environ.get("DB_NAME", "test_database")]
+                    db = scoped_database(db)
                     await db.playables.update_one(
                         {"playable_id": req.pid},
                         {"$set": {"cover_image": cover,

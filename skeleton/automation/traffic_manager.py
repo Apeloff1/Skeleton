@@ -24,11 +24,12 @@ import json
 import os
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from .automation_safety import AutomationSafety, load_automation_safety
 from .build_authority import APPROVED_BUILD_LABELS
 from .free_model import redact_secrets
 
@@ -57,6 +58,34 @@ MANAGED_WORKFLOW_MARKERS = (
     "repository supervisor",
     "repository secretary",
 )
+
+
+# Immutable owner-reviewed GitHub run identities with independent HTTP 409/403
+# provider refusals. A pinned identity alone never authorizes exclusion: every
+# observation must also verify that GitHub reports zero jobs for that run.
+# Do not add future/unknown runs based only on age or workflow name.
+PROVIDER_ORPHAN_EVIDENCE: dict[int, tuple[str, str, str, str]] = {
+    37539069375: ("3048d670be32bf3720a5efcb90be20d5479060d6", "2026-10-06T22:12:20Z", "Secret scanning", "pull_request"),
+    37539069791: ("3048d670be32bf3720a5efcb90be20d5479060d6", "2026-10-06T22:12:20Z", "VOL-004 Runtime Supervision Closure", "pull_request"),
+    37642345734: ("cd6693a1dfc4ddccac3efb9dcb8c17d601cff656", "2026-10-07T15:06:59Z", "P2 CI Qualification Evidence", "workflow_run"),
+    37642355681: ("cd6693a1dfc4ddccac3efb9dcb8c17d601cff656", "2026-10-07T15:07:13Z", "P2 CI Qualification Evidence", "workflow_run"),
+    37642358530: ("cd6693a1dfc4ddccac3efb9dcb8c17d601cff656", "2026-10-07T15:07:17Z", "P2 CI Qualification Evidence", "workflow_run"),
+    37642383890: ("cd6693a1dfc4ddccac3efb9dcb8c17d601cff656", "2026-10-07T15:09:04Z", "P2 CI Qualification Evidence", "workflow_run"),
+    37642388873: ("cd6693a1dfc4ddccac3efb9dcb8c17d601cff656", "2026-10-07T15:10:03Z", "Automated Repair Intake", "workflow_run"),
+    37642398158: ("cd6693a1dfc4ddccac3efb9dcb8c17d601cff656", "2026-10-07T15:11:13Z", "Automated Repair Intake", "workflow_run"),
+    37642398159: ("cd6693a1dfc4ddccac3efb9dcb8c17d601cff656", "2026-10-07T15:11:13Z", "PR Automation Index", "workflow_run"),
+    37642398161: ("cd6693a1dfc4ddccac3efb9dcb8c17d601cff656", "2026-10-07T15:11:13Z", "Auto-Merge Control Plane", "workflow_run"),
+    37655496094: ("cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b", "2026-10-07T16:52:54Z", "P2 CI Qualification Evidence", "workflow_run"),
+    37655496139: ("cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b", "2026-10-07T16:52:54Z", "Autonomous Build Feedback", "workflow_run"),
+    37655521563: ("cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b", "2026-10-07T16:55:06Z", "Autonomous Build Feedback", "workflow_run"),
+    37655522865: ("cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b", "2026-10-07T16:55:13Z", "Autonomous Build Feedback", "workflow_run"),
+    37655530898: ("cfd5229a9c5f511ce8b8b9cf30dd4f4e622e045b", "2026-10-07T16:56:55Z", "P2 CI Qualification Evidence", "workflow_run"),
+    38320296726: ("3293dff9480994d538a10b9e55983c65d649fb1d", "2026-10-12T23:05:35Z", "Backend Quality", "pull_request"),
+    38320664775: ("eb71db3ab303d20cfcfeb1f2d67770db560d44f9", "2026-10-12T23:09:53Z", "Competitive AI Engineering Ladder", "pull_request"),
+    38320664778: ("eb71db3ab303d20cfcfeb1f2d67770db560d44f9", "2026-10-12T23:09:53Z", "CI/CD", "pull_request"),
+    38320665862: ("eb71db3ab303d20cfcfeb1f2d67770db560d44f9", "2026-10-12T23:09:53Z", "AI Chat Story Continuity Closure", "pull_request"),
+    40470377670: ("75b9f280e90e2eff07253b0bfc281f67252d526e", "2026-10-27T07:58:28Z", "CodeQL", "dynamic"),
+}
 
 
 class TrafficManagerError(RuntimeError):
@@ -89,8 +118,11 @@ class TrafficPolicy:
             self.max_stale_queued_runs,
             self.provider_tombstone_seconds,
         )
-        if any(isinstance(value, bool) or value <= 0 for value in values):
-            raise TrafficManagerError("traffic policy values must be positive")
+        # Queue capacity, admission thresholds and cooldown periods are
+        # discrete bounded counts. NaN/fractional values can defeat the
+        # positive-only check and make later comparisons non-deterministic.
+        if any(type(value) is not int or value <= 0 for value in values):
+            raise TrafficManagerError("traffic policy values must be positive integers")
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,6 +337,29 @@ def _queued_age_seconds(
     return age if age >= 0 else None
 
 
+
+def _matches_pinned_provider_orphan(run: dict[str, Any]) -> bool:
+    """Exact ID, SHA, immutable timestamps, event, and name are required."""
+    run_id = run.get("databaseId")
+    if type(run_id) is not int:
+        return False
+    pinned = PROVIDER_ORPHAN_EVIDENCE.get(run_id)
+    if pinned is None:
+        return False
+    sha, timestamp, name, event = pinned
+    return (
+        _run_status(run) == "queued"
+        and run.get("conclusion") is None
+        and run.get("headSha") == sha
+        and run.get("createdAt") == timestamp
+        and run.get("updatedAt") == timestamp
+        and run.get("name") == name
+        and run.get("event") == event
+    )
+
+
+
+
 def _recent_success_age(snapshot: TrafficSnapshot) -> int | None:
     ages: list[int] = []
     for run in _visible_runs(snapshot):
@@ -389,7 +444,8 @@ def evaluate(
     provider_tombstones = tuple(
         run
         for run in observed_active
-        if _run_status(run) == "queued"
+        if _matches_pinned_provider_orphan(run)
+        and run.get("providerOrphanJobsVerified") is True
         and (
             (age := _queued_age_seconds(snapshot, run)) is not None
             and age >= policy.provider_tombstone_seconds
@@ -637,6 +693,28 @@ def _observe_runs(repository: str) -> list[dict[str, Any]]:
             raise TrafficManagerError(
                 "repository traffic observation exceeded bounded active page limit"
             )
+    # Independently recheck every pinned candidate with GitHub's jobs API.
+    # Any API failure, unexpected count, or missing row leaves the queued run
+    # visible in capacity/admission metrics (fail closed, not a false pass).
+    for run in merged.values():
+        if not _matches_pinned_provider_orphan(run):
+            continue
+        run_id = run["databaseId"]
+        try:
+            jobs = _gh_json([
+                "api",
+                f"/repos/{repository}/actions/runs/{run_id}/jobs?per_page=1",
+                "--jq",
+                "[{totalCount: .total_count}]",
+            ])
+        except TrafficManagerError:
+            continue
+        if (
+            len(jobs) == 1
+            and type(jobs[0].get("totalCount")) is int
+            and jobs[0]["totalCount"] == 0
+        ):
+            run["providerOrphanJobsVerified"] = True
     return list(merged.values())
 
 
@@ -819,7 +897,7 @@ def write_step_summary(decision: TrafficDecision) -> None:
             f"`{decision.stale_queued_runs}`"
         ),
         (
-            "- Provider tombstones (24h+ queued): "
+            "- Verified provider orphans (pinned ID, SHA, zero jobs, 24h+): "
             f"`{decision.provider_tombstones}`"
         ),
         (
@@ -857,6 +935,29 @@ def write_step_summary(decision: TrafficDecision) -> None:
     )
 
 
+
+def enforce_operator_safety(
+    decision: TrafficDecision, safety: AutomationSafety
+) -> TrafficDecision:
+    """Operator holds fence both new admissions and bounded Actions relief.
+
+    Preserve measured repository pressure and the original immutable decision
+    fingerprint so the hold cannot fabricate a healthy queue snapshot.
+    """
+    if not isinstance(decision, TrafficDecision) or not isinstance(safety, AutomationSafety):
+        raise TrafficManagerError("operator safety requires typed admission records")
+    if not safety.blocked:
+        return decision
+    return replace(
+        decision,
+        admit=False,
+        relieve=False,
+        reason="operator-" + safety.status,
+        lane="hold",
+        relief_reason="operator-hold",
+        forced=False,
+    )
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -875,6 +976,9 @@ def main() -> int:
         "GITHUB_RUN_ID", ""
     ).strip()
     force = _bool_env("TRAFFIC_FORCE")
+    # Fail before queue observation if an operator safety control is malformed.
+    # A force flag can never override a pause or quarantine.
+    safety = load_automation_safety()
 
     snapshot = observe(
         repository,
@@ -885,6 +989,7 @@ def main() -> int:
         snapshot,
         force=force,
     )
+    decision = enforce_operator_safety(decision, safety)
 
     print(
         json.dumps(

@@ -29,11 +29,14 @@ export function useQuery<T>(key: QueryKey, fetcher: () => Promise<T>, opts: UseQ
   const subscribe = useCallback((cb: () => void) => cache.subscribe(id, cb), [cache, id]);
   const getSnapshot = useCallback(() => cache.get<T>(id), [cache, id]);
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const idle = state.status === 'idle';
 
   useEffect(() => {
     if (!enabled) return;
     cache.fetch(id, () => fetcherRef.current(), { staleTimeMs }).catch(() => {});
-  }, [cache, id, enabled, staleTimeMs]);
+    // A session change clears cached projections. Mounted readers must load
+    // again for the current account without waiting for a navigation/remount.
+  }, [cache, id, enabled, staleTimeMs, idle]);
 
   const refetch = useCallback(
     () => cache.fetch(id, () => fetcherRef.current(), { force: true }).catch(() => undefined),

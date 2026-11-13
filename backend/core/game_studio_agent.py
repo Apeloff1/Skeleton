@@ -3256,9 +3256,6 @@ async def _prepare(scope, row, token):
         allow_nan=False,
         separators=(",", ":"),
     )
-    prompt, allowed, capacity_receipt = await _fit_planner_context(
-        scope, row, context, schemas, allowed, prompt, workflow=workflow
-    )
     allow_done = (
         not row.get("completion_requirements") or context.get("completion", {}).get("verified") is True
     )
@@ -3269,6 +3266,10 @@ async def _prepare(scope, row, token):
         payload_schemas=_planner_payload_schemas(
             schemas, allowed, context, workflow_stage=workflow.get("stage") if workflow else None
         ),
+    )
+    prompt, allowed, capacity_receipt = await _fit_planner_context(
+        scope, row, context, schemas, allowed, prompt, workflow=workflow,
+        response_schema=response_schema,
     )
     _json({"prompt": prompt}, 256 * 1024)
     pending = {
@@ -3297,7 +3298,8 @@ async def _prepare(scope, row, token):
     )
 
 
-async def _fit_planner_context(scope, row, context, schemas, allowed, full_prompt, *, workflow=None):
+async def _fit_planner_context(scope, row, context, schemas, allowed, full_prompt, *, workflow=None,
+                               response_schema=None):
     """Fit actual data to canonical capacity without changing frozen work or budgets."""
     from core.engine_client import EngineClient
     from core.model_catalog import (
@@ -3305,6 +3307,7 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
         resolve_selection,
         context_budget_for_selection,
         estimate_context_tokens,
+        selection_may_use_llama_cpp,
         catalog_digest,
         ModelSelectionError,
     )
@@ -3328,13 +3331,27 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
         budget.max_segment_tokens,
         budget.input_capacity(tools_enabled=False) - max(budget.reserved_policy_tokens, policy_tokens),
     )
+    native_frame_overhead = None
+    if selection_may_use_llama_cpp(catalog, selection):
+        from skeleton.ai.runtime.inference.llama_cpp import llama_cpp_prompt_tokens_upper_bound
+
+        # The renderer preserves prompt bytes verbatim. Size the exact schema
+        # and longest known native framing once, then substitute each candidate.
+        native_frame_overhead = llama_cpp_prompt_tokens_upper_bound(LocalInferenceRequest(
+            prompt="x", instructions=PLANNER_SYSTEM, structured_output_schema=response_schema,
+        )) - 1
 
     def count(prompt):
         return estimate_context_tokens(prompt, selection)
 
     def fits(prompt):
         framed = LocalInferenceRequest(prompt=prompt, instructions=PLANNER_SYSTEM).rendered_input
-        return count(prompt) <= capacity and count(framed) <= budget.input_capacity(tools_enabled=False)
+        return (
+            count(prompt) <= capacity
+            and count(framed) <= budget.input_capacity(tools_enabled=False)
+            and (native_frame_overhead is None or
+                 native_frame_overhead + len(prompt.encode("utf-8")) <= budget.input_capacity(tools_enabled=False))
+        )
 
     prompt, projected = full_prompt, False
     stage = workflow.get("stage") if workflow else None
@@ -3558,6 +3575,8 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
             "prompt_capacity": capacity,
             "prompt_tokens": count(prompt),
             "system_tokens": policy_tokens,
+            **({"native_framed_input_upper_bound": native_frame_overhead + len(prompt.encode("utf-8"))}
+               if native_frame_overhead is not None else {}),
             "projected": projected,
             "workflow_stage": stage,
             "full_prompt_digest": _digest({"prompt": full_prompt}),

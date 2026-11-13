@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_copper_mesa",
+  "title": "Copper Mesa: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Copper Mesa; prototype maps are not full genre implementations.",
+  "seed": 202610300769,
+  "width": 19,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "desert",
+  "starting_health": 6
+}

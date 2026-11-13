@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for spindlefen."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('spindlefen_arrival', (), (), ('arrival_record',)), Quest('spindlefen_source', ('spindlefen_arrival',), ('arrival_record',), ('source_proof',)), Quest('spindlefen_witness', ('spindlefen_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('spindlefen_reconcile', ('spindlefen_source', 'spindlefen_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('spindlefen_crossing', ('spindlefen_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('spindlefen_conclusion', ('spindlefen_crossing',), ('crossing_pass',), ('ending_unlocked',)))

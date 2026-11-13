@@ -185,14 +185,14 @@ def test_qualification_never_reports_success_if_second_inference_fails(
     original = offline_qualification.OfflineAISession.ask
     attempts = {"count": 0}
 
-    async def fail_on_second(self, prompt, *, max_output_tokens=32, inference_prompt=None):
+    async def fail_on_second(self, prompt, *, max_output_tokens=32, grounding_context=None):
         attempts["count"] += 1
         if attempts["count"] == 2:
             raise RuntimeError("injected second-turn model crash")
         return await original(
             self, prompt,
             max_output_tokens=max_output_tokens,
-            inference_prompt=inference_prompt,
+            grounding_context=grounding_context,
         )
 
     monkeypatch.setattr(

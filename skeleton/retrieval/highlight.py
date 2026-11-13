@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Tuple
 
-from skeleton.retrieval.query_language import QueryTerm
+from .query_language import QueryTerm
 
 
 class Highlighter:

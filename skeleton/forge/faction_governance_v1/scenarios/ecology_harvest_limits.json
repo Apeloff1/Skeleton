@@ -1,0 +1,87 @@
+{
+  "schema": "skeleton.faction_ballot_scenario.v1",
+  "policy_id": "ecology_harvest_limits",
+  "domain": "ecology",
+  "topic": "harvest_limits",
+  "delegates": [
+    "delegate_1",
+    "delegate_2",
+    "delegate_3",
+    "delegate_4",
+    "delegate_5",
+    "delegate_6",
+    "delegate_7"
+  ],
+  "quorum": 4,
+  "approval": 3,
+  "commands": [
+    {
+      "id": "ecology_harvest_limits:open",
+      "action": "open",
+      "proposal": "ecology_harvest_limits",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 0
+    },
+    {
+      "id": "ecology_harvest_limits:vote:0",
+      "action": "cast",
+      "proposal": "ecology_harvest_limits",
+      "delegate": "delegate_1",
+      "choice": "yes",
+      "expected_version": 1
+    },
+    {
+      "id": "ecology_harvest_limits:vote:1",
+      "action": "cast",
+      "proposal": "ecology_harvest_limits",
+      "delegate": "delegate_2",
+      "choice": "yes",
+      "expected_version": 2
+    },
+    {
+      "id": "ecology_harvest_limits:vote:2",
+      "action": "cast",
+      "proposal": "ecology_harvest_limits",
+      "delegate": "delegate_3",
+      "choice": "yes",
+      "expected_version": 3
+    },
+    {
+      "id": "ecology_harvest_limits:vote:3",
+      "action": "cast",
+      "proposal": "ecology_harvest_limits",
+      "delegate": "delegate_4",
+      "choice": "yes",
+      "expected_version": 4
+    },
+    {
+      "id": "ecology_harvest_limits:finalize",
+      "action": "finalize",
+      "proposal": "ecology_harvest_limits",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 5
+    }
+  ],
+  "expected": {
+    "phase": "approved",
+    "voted": 4,
+    "yes": 4,
+    "final_version": 6
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate-event",
+    "duplicate-delegate",
+    "insufficient-quorum",
+    "mismatched-proposal",
+    "terminal-phase"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "real_world_election": false,
+    "production_authority": false,
+    "release_certified": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_naval_navigation_sunken_metro",
+  "title": "Sunken Metro: Naval Navigation",
+  "subtitle": "An original naval navigation brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610301929,
+  "width": 19,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "arcade",
+  "starting_health": 6
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_cloud_canopy",
+  "title": "Cloud Canopy: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010317119,
+  "width": 27,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 13,
+  "theme": "forest",
+  "starting_health": 5
+}

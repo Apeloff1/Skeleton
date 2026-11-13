@@ -476,7 +476,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
         {phase === 'ready' && welcomeSeen === false && (
           <>
             <Text style={styles.subtitle}>
-              Hyperscale game-build factory · 600K+ knowledge assets · live RAG
+              Local-first game studio · AI tools and project workspaces
             </Text>
             <TouchableOpacity
               style={styles.primaryBtn}

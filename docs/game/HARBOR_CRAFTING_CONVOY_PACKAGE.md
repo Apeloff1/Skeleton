@@ -1,0 +1,9 @@
+# Portable convoy packages and CAS journals
+
+The original Lantern Quay convoy vertical can be distributed as a bounded, source-bound JSON package containing the validated world, authored route, tactical encounters and content identity. `convoy-package-build` produces the package, `convoy-package-verify` reconstructs and checks it, `convoy-package-play --convoy-package package.json --actions actions.json --require-all` runs a complete original game, and `convoy-package-verify-play --convoy-play save.json --require-all` independently replays the canonical world and tactical side effects.
+
+`convoy-package-resume --convoy-play partial.json --actions continuation.json --expected-convoy-play-digest SHA256` resumes only the exact expected save and preserves the original authored package. A terminal or stale play is rejected.
+
+`convoy-journal-init --convoy-package package.json` creates an empty append-only history. `convoy-journal-append --convoy-journal journal.json --actions segment.json --expected-convoy-journal-digest SHA256` adds a bounded segment with a parent digest and replay-derived terminal digest. `convoy-journal-verify --convoy-journal journal.json` replays every segment and rejects fabricated ancestry, rewards or terminal states. `convoy-journal-at --convoy-journal journal.json --convoy-revision-index 1` exports an independently verified historical checkpoint that can fork without overwriting the original.
+
+Safety bounds: at most 32 journal segments, 32 actions per segment, 256 total actions and fixed serialized byte ceilings. These are integrity checks, not authentication, authorization, multiplayer conflict resolution or signed distribution. Tests: `pytest -q skeleton/testing/test_harbor_crafting_convoy.py skeleton/testing/test_harbor_crafting_convoy_package.py`. Draft and release gates remain mandatory.

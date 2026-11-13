@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_stealth_route_frosted_crater",
+  "genre": "stealth_route",
+  "biome": "frosted_crater",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Frosted Crater: Stealth Route",
+  "foundation": {
+    "setting": "Frosted Crater",
+    "era": "near-future renewal",
+    "environment": "frozen crater rims",
+    "history": "The impact-hollow vault was built to protect basalt shelters, but cryogenic pockets interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Lio Halden, a courier, must deliver a sealed civic charter using shadow traversal while cryogenic pockets threatens the impact-hollow vault.",
+  "central_conflict": "a surveillance guild seeks control of basalt shelters; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "cryogenic pockets isolates the impact-hollow vault",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "a surveillance guild offers privileged access to basalt shelters",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "impact-hollow vault",
+    "critical_resource": "basalt shelters",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}

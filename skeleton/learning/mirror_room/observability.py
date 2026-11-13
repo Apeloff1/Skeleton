@@ -381,7 +381,7 @@ def mirror_room_file_tree() -> Mapping[str, object]:
             },
             {
                 "name": "Observatory UI",
-                "path": "frontend/features/MirrorRoom",
+                "path": "frontend/src/features/MirrorRoom",
                 "kind": "ui",
                 "children": [
                     {
@@ -419,8 +419,8 @@ def mirror_room_file_tree() -> Mapping[str, object]:
                 ],
             },
             {
-                "name": "Extension CI Gate",
-                "path": ".github/workflows/mirror-room-extensions.yml",
+                "name": "Canonical Domain CI Gate",
+                "path": ".github/workflows/merge-readiness.yml",
                 "kind": "ci",
             },
         ],

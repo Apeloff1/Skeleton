@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_naval_navigation_amber_highlands",
+  "title": "Amber Highlands: Naval Navigation",
+  "subtitle": "An original naval navigation brief in Amber Highlands; prototype maps are not full genre implementations.",
+  "seed": 202610302031,
+  "width": 23,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "forest",
+  "starting_health": 4
+}

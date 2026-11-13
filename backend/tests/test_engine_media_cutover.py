@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from core import expressive_tts
 from routes import image_generation
@@ -59,8 +60,18 @@ class _FakeMediaClient:
         }
 
 
+@pytest.fixture
+def authorized_media_scope(monkeypatch):
+    """Scope the delegation-only tests without bypassing production auth."""
+    async def verified_context(*, mutate: bool = False):
+        assert mutate is True
+        return {"tenant_id": "tenant-media", "owner_id": "media@example.invalid"}
+
+    monkeypatch.setattr(image_generation, "reauthorize_project_context", verified_context)
+
+
 @pytest.mark.asyncio
-async def test_image_generation_delegates_to_engine(monkeypatch) -> None:
+async def test_image_generation_delegates_to_engine(monkeypatch, authorized_media_scope) -> None:
     fake = _FakeMediaClient()
     monkeypatch.setattr(
         image_generation.EngineClient,
@@ -77,13 +88,13 @@ async def test_image_generation_delegates_to_engine(monkeypatch) -> None:
 
     assert result["status"] == "success"
     assert result["images"][0]["data"] == "aGVsbG8="
-    assert fake.generated[0]["actor_id"] == "image-generation"
-    assert fake.generated[0]["tenant_id"] == "default"
+    assert fake.generated[0]["actor_id"] == "media@example.invalid"
+    assert fake.generated[0]["tenant_id"] == "tenant-media"
     assert fake.generated[0]["prompt"] == "draw a robot"
 
 
 @pytest.mark.asyncio
-async def test_image_variation_and_edit_delegate_to_engine(monkeypatch) -> None:
+async def test_image_variation_and_edit_delegate_to_engine(monkeypatch, authorized_media_scope) -> None:
     fake = _FakeMediaClient()
     monkeypatch.setattr(
         image_generation.EngineClient,
@@ -100,6 +111,8 @@ async def test_image_variation_and_edit_delegate_to_engine(monkeypatch) -> None:
     )
     assert variation["status"] == "success"
     assert fake.variations[0][0] == b"hello"
+    assert fake.variations[0][1]["actor_id"] == "media@example.invalid"
+    assert fake.variations[0][1]["tenant_id"] == "tenant-media"
 
     edit = await image_generation.edit_image(
         image_generation.ImageEditRequest(
@@ -112,6 +125,20 @@ async def test_image_variation_and_edit_delegate_to_engine(monkeypatch) -> None:
     assert edit["status"] == "success"
     assert fake.edits[0][0] == b"hello"
     assert fake.edits[0][1]["mask"] == b"mask"
+    assert fake.edits[0][1]["actor_id"] == "media@example.invalid"
+    assert fake.edits[0][1]["tenant_id"] == "tenant-media"
+
+
+@pytest.mark.asyncio
+async def test_media_generation_without_private_scope_fails_before_provider(monkeypatch) -> None:
+    fake = _FakeMediaClient()
+    monkeypatch.setattr(
+        image_generation.EngineClient, "from_env", classmethod(lambda cls, **kwargs: fake),
+    )
+    with pytest.raises(HTTPException) as denial:
+        await image_generation.generate_with_openai("test", "1024x1024", "standard", 1)
+    assert denial.value.status_code == 401
+    assert not fake.generated
 
 
 @pytest.mark.asyncio

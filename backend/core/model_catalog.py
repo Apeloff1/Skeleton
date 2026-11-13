@@ -72,6 +72,14 @@ _READINESS = {
         "The local model artifact could not be loaded safely.",
         "Ask an administrator to replace the artifact with a valid governed model and restart the engine.",
     ),
+    "local_guard_unavailable": (
+        "Local AI is unavailable because its required safety components are not configured.",
+        "Ask an administrator to complete the trusted local AI setup and restart the engine.",
+    ),
+    "local_guard_configuration_invalid": (
+        "The local AI safety configuration is invalid.",
+        "Ask an administrator to correct the local AI safety configuration and restart the engine.",
+    ),
     "local_artifact_identity_invalid": (
         "The activated local model identity changed.",
         "Ask an administrator to verify its artifact and restart the engine.",
@@ -126,7 +134,7 @@ _READINESS = {
     ),
     "cooperation_budget_insufficient": (
         "The selected output allowance is too small for every requested review stage.",
-        "Increase the output allowance or choose fewer review rounds.",
+        "Increase the output allowance or choose fewer drafts or review rounds.",
     ),
     "cooperation_context_too_small": (
         "The selected context cannot reserve enough room for review artifacts and control policy.",
@@ -556,6 +564,35 @@ def resolve_selection(
     }
 
 
+def selection_may_use_llama_cpp(
+    catalog: Mapping[str, Any], selection: Mapping[str, Any], *, cooperation: Mapping[str, Any] | None = None,
+) -> bool:
+    """Identify declared llama.cpp routes, including automatic fallbacks.
+
+    Inventory does not expose a prompt-template identity, so this is only a
+    route test; callers must not infer an exact native profile from it.
+    """
+    if selection.get("selection_mode") == "explicit":
+        routes = [selection]
+    else:
+        routes = [row for row in catalog.get("models", ()) if row.get("active") or row.get("fallback")]
+    if cooperation is not None:
+        from skeleton.intelligence.cooperation import normalize_cooperation_policy
+
+        policy = normalize_cooperation_policy(cooperation)
+        assert policy is not None
+        routes.extend(
+            resolve_selection(catalog, provider_id=pair["provider_id"], model_id=pair["model_id"])
+            for pair in policy["roles"].values()
+        )
+    return any(
+        row.get("execution_mode") == "local"
+        and isinstance(row.get("activation"), Mapping)
+        and row["activation"].get("runtime_kind") == "llama.cpp-cli"
+        for row in routes
+    )
+
+
 def _context_tokenizer(profile: str) -> str:
     """The backend never impersonates an engine-owned native tokenizer."""
 
@@ -603,11 +640,11 @@ def cooperation_context_selection(
 
     if cooperation is None:
         return dict(selection)
-    from skeleton.intelligence.cooperation import normalize_cooperation_policy
+    from skeleton.intelligence.cooperation import cooperation_stages, normalize_cooperation_policy
 
     policy = normalize_cooperation_policy(cooperation)
     output = selection["default_output_tokens"] if output_tokens is None else output_tokens
-    if type(output) is not int or output < 64 * (2 + 2 * policy["review_rounds"]):
+    if type(output) is not int or output < 64 * len(cooperation_stages(policy)):
         raise ModelSelectionError("cooperation_budget_insufficient")
     rows = [selection]
     for pair in policy["roles"].values():
@@ -632,12 +669,16 @@ def cooperation_context_budget(budget: ContextBudget, cooperation: Mapping[str, 
 
     if cooperation is None:
         return budget
-    from skeleton.intelligence.cooperation import normalize_cooperation_policy
+    from skeleton.intelligence.cooperation import cooperation_stages, normalize_cooperation_policy
 
     policy = normalize_cooperation_policy(cooperation)
-    stages = 2 + 2 * policy["review_rounds"]
+    stages = len(cooperation_stages(policy))
     stage_output = min(policy["max_stage_output_tokens"], budget.reserved_output_tokens // stages)
-    headroom = min(4096, max(1024, 2 * stage_output + 128 * stages))
+    drafts = int(policy.get("draft_count", 1))
+    # Preserve legacy reservations for one draft. The first multi-draft
+    # refinement also carries every candidate, the plan and its critique.
+    artifact_slots = 2 if drafts == 1 else drafts + 2
+    headroom = min(4096, max(1024, artifact_slots * stage_output + 128 * stages))
     reserve = budget.reserved_policy_tokens + headroom
     if reserve + 512 >= budget.input_capacity(tools_enabled=False):
         raise ModelSelectionError("cooperation_context_too_small")

@@ -94,8 +94,8 @@ test('legacy light and dark roles read canonical and active skin values', () => 
 });
 
 test('Deluxe cards and Forge status colors follow skin transitions without stale captures', () => {
-  assert.equal(typeof tokens.elevation.glow, 'object');
-  assert.ok(tokens.elevation.glow);
+  assert.equal(typeof tokens.default.elevation.glow, 'object');
+  assert.ok(tokens.default.elevation.glow);
   const deluxe = transpile('src/theme/deluxe.ts', {
     './tokens': tokens,
   });

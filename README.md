@@ -68,10 +68,32 @@ deterministic; it does not call a model provider.
 
 ## First install
 
+**Tester release is not ready.** The default local AI provider requires trusted
+guard components that the current Compose startup does not yet supply, so local
+chat remains unavailable even after model provisioning. Full-profile Chroma
+startup is blocked pending safe persistence recovery. The current revision has
+not been qualified on the target Windows laptop.
+
+Before any package or container installation, the read-only preload now checks the
+source-bounded backend Python image, all three Docker COPY build contexts and
+private context-exclusion rules. The Windows payload must retain
+`Dockerfile.dockerignore` alongside `Dockerfile`. Missing or incompatible
+build inputs fail before credentials are generated; do not remove the
+preflight or bypass its failure.
+
+Runtime doctor and `app check --runtime` also read `.env` through a bounded,
+descriptor-checked path. A symlink, hardlink, named pipe, oversized file,
+invalid encoding or replaced source fails closed with redacted remediation.
+Do not delete a suspicious existing `.env` or reinitialize persistent Mongo
+credentials to make diagnostics pass. Preserve the file for operator-led
+recovery. Healthy service probes are not trained-model activation evidence.
+
 Install **Git**, **Python 3.11+**, and **Docker Desktop or Docker Engine with Compose v2**.
 Start Docker before running the installer. Host Node/Yarn are optional; the
 container build supplies frontend dependencies. Initial dependency/image builds
-need internet access. Models, compiler SDKs, cores and firmware have separate setup.
+need internet access and at least **6 GiB free** on the installation filesystem;
+**12 GiB** is recommended for safe Docker build headroom. Models, compiler SDKs,
+cores and firmware have separate setup.
 
 ### Linux and macOS
 
@@ -84,20 +106,48 @@ python scripts/install_app.py --production --start
 python -m skeleton app doctor --live --studio --json
 ```
 
-### Windows PowerShell
+### Windows with WSL 2
+
+For the pinned local AI model, use an Ubuntu WSL 2 distribution on an Intel or
+AMD Windows laptop. Install and start Docker Desktop with its WSL 2 backend,
+then enable integration for that Ubuntu distribution in Docker Desktop. Install
+WSL and Ubuntu from PowerShell if they are not already installed:
 
 ```powershell
+wsl --install -d Ubuntu
+```
+
+Restart Windows if prompted, finish Ubuntu's first-run setup, and open Ubuntu.
+Run the following **inside the Ubuntu shell**, keeping the checkout in its Linux
+home directory rather than under `/mnt/c`. Install Git, Python 3 and the Python
+venv package in Ubuntu first if they are missing; `docker compose version` must
+work in that shell before installation:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git python3 python3-venv python3-pip nano
+docker compose version
+uname -m
+cd ~
 git clone https://github.com/Apeloff1/Skeleton.git
 cd Skeleton
-py -3 -m venv .venv
-.\.venv\Scripts\python.exe scripts/install_app.py --production --start
-.\.venv\Scripts\python.exe -m skeleton app doctor --live --studio --json
+python3 -m venv .venv
+source .venv/bin/activate
+python scripts/install_app.py --production --start
+python -m skeleton app doctor --live --studio --json
 ```
+
+The `uname -m` result must be `x86_64` for the pinned Linux model/runtime below.
+PR #4357 has been merged; a fresh clone uses the default branch. The hosted
+Windows installer smoke test covered an earlier revision, not the current source
+or an installation on your laptop. Check the [current readiness report](docs/ai/CONSUMER_READINESS_2026-10-31.md)
+before using this path for a tester.
 
 Open **http://localhost:3000/setup** first, then **http://localhost:3000/product**.
 The production flag serves the built web app through Nginx. Later commands must
-use the same Python environment. On PowerShell, invoking its Python executable
-directly works without changing execution policy.
+use the same Python environment. Docker Desktop forwards the published local
+ports to the Windows browser. Native PowerShell installation and model preparation
+remain separately unqualified; see the [Windows notes](docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md#windows-x64-and-wsl-2).
 
 The installer installs Python dependencies, creates a private `.env`, and starts
 the four application services. Preserve `.env` and Docker data volumes across
@@ -124,8 +174,10 @@ There is no shared administrator password or automatic first-user elevation.
 
 ### Enable AI
 
-For the optional pinned **Linux x86-64 glibc** CPU model/runtime, explicitly provision
-artifacts, select the deployment in private `.env`, and recreate the engine:
+The pinned **Linux x86-64 glibc** CPU model/runtime can be prepared with the
+commands below, but the default Compose startup currently lacks the trusted guard
+bootstrap needed to activate local inference. Provisioning alone will not make
+local chat available. Windows users run these commands in the Ubuntu shell:
 
 ```bash
 python scripts/provision_local_ai.py --target linux-x86_64-glibc \
@@ -135,6 +187,7 @@ python scripts/provision_local_ai.py --target linux-x86_64-glibc \
 ```dotenv
 AI_PROVIDER=local
 AI_LOCAL_MODEL_PATH=
+AI_LOCAL_MODEL_CATALOG_PATH=
 AI_LOCAL_DEPLOYMENT_PATH=/app/local-ai/deployment.json
 SKELETON_LOCAL_MODEL_DIR=./data/local-ai
 ```
@@ -153,6 +206,11 @@ Hosted providers and already installed GGUF models are alternatives. Follow the
 [complete AI and crawler setup](docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md) for activation,
 platform details, offline inputs and private configuration.
 
+An optional [local coding profile](docs/ai/LOCAL_CODING_PROFILE.md) pins the
+official Qwen2.5-Coder-1.5B Q4 model and can reuse an existing verified runtime.
+Activation is explicit and preserves the original chat model directory. Model
+availability and valid output formatting do not establish generated-game quality.
+
 ## Use the studio
 
 | Task | Open | What it does |
@@ -168,11 +226,14 @@ Original-world completion tracks saved edits, positive simulation, measured revi
 a compiled desktop package, and source/package export preparation. The console
 editor reports approved cores, content and toolchain readiness separately.
 
-Enable **Review and refine** in chat for a bounded plan, draft, critique and
+Enable **Review and refine** in chat for a bounded plan, one to three draft candidates, critique and
 refinement workflow. The stages share the original request, source snapshot,
 deadline and resource allowance. Live progress and final details show actual
 provider receipts and model identities. Configure roles and recovery using the
 [cooperative AI guide](docs/ai/COOPERATIVE_AI_EXECUTION.md).
+
+AI reviews remain advisory. Source changes invalidate old reviews; a high model
+score cannot substitute for execution evidence or grant release approval.
 
 Expand the AI conversation status bar to open **Runtime optimization**. It shows
 observed local pressure, admission capacity, numeric outcome learning and idle
@@ -202,7 +263,8 @@ requests keep their identity and explicit Stop intent. Setup shows database heal
 before sign-in and clears account-specific observations when the account changes.
 See [failure recovery and artifact operations](docs/ai/AI_FOUNDATIONS_AND_RECOVERY.md)
 for partial expansion/package results, interrupted cleanup and uncertain remote
-submissions. These source changes remain unqualified for runtime reliability.
+submissions. The [installed verification report](docs/ai/CONSUMER_READINESS_2026-10-28.md)
+records finite recovery observations and remaining reliability limits.
 The advanced policy form uses the server's actual editable fields and installed
 capacity limits. Administrators can also preview and download bounded pages of
 retained numeric learning data, and reset an eligible maintenance circuit against
@@ -277,11 +339,14 @@ service readiness and recovery boundaries.
 
 ## Current capability boundaries
 
-- The studio has a working bounded creation/build/export workflow. Desktop packages
-  are browser-rendered launchers; cross-compilation does not prove execution on every OS.
+- The studio supports bounded original-world editing, human/AI reference play,
+  policy training and source export. AI-generated HTML needs actual browser
+  verification; model scores cannot certify playability. Desktop packages are
+  browser-rendered launchers; cross-compilation does not prove execution on every OS.
 - Native emulation and builds require approved cores, suitable content/firmware,
   compiler SDKs and the sandbox. The default Alpine backend does not make every
-  host native tool executable. The recorded inventory still has 70 unmapped targets.
+  host native tool executable. The verification VM has no approved native console
+  core; inventory entries do not establish emulation accuracy.
 - Learning updates game policies and records compatible lessons. It does not
   automatically change Jeeves's transformer weights or guarantee creative quality.
 - Compressed design corpora are optional reference text, not measured gameplay
@@ -289,9 +354,10 @@ service readiness and recovery boundaries.
 - Docker service health, AI availability, native target readiness and production
   acceptance are separate states. This repository does not certify every console,
   arbitrary-ROM semantic understanding, or superiority over commercial games.
-- Adaptive serving, operational MLP learning and maintenance are a construction
-  draft, not enterprise certification. No automated tests were run for this build,
-  as requested; implementation and compilation do not establish production quality.
+- Adaptive serving, operational learning and maintenance remain an implementation
+  candidate. The current installation pass runs automated tests and real workflows;
+  [installation evidence and release blockers](docs/ai/CONSUMER_READINESS_2026-10-28.md)
+  distinguish verified behavior from consumer and enterprise qualification.
 
 Exact historical observations are in the
 [creation qualification](docs/ai/STUDIO_CREATION_QUALIFICATION_2026-10-15.md).

@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-POLICY = (ROOT / "frontend" / "utils" / "requestRecoveryPolicy.ts").read_text()
+POLICY = (ROOT / "frontend" / "src" / "utils" / "requestRecoveryPolicy.ts").read_text()
 DOC = (ROOT / "docs" / "engineering" / "PERFORMANCE_BUDGETS.md").read_text()
 
 

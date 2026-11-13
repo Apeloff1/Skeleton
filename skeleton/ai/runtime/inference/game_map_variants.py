@@ -865,7 +865,7 @@ def train_map_budget(
     seen: set[str] = set()
     resumed = False
     if ckpt_path.exists():
-        loaded = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        loaded = torch.load(ckpt_path, map_location="cpu", weights_only=True)
         if int(loaded.get("hidden", -1)) != hidden:
             raise ValueError("checkpoint hidden size does not match")
         model.load_state_dict(loaded["best_state"])
@@ -880,7 +880,7 @@ def train_map_budget(
         family_kept = {str(key): int(value) for key, value in (loaded.get("family_kept") or {}).items()}
         resumed = True
     elif source is not None:
-        loaded = torch.load(source, map_location="cpu", weights_only=False)
+        loaded = torch.load(source, map_location="cpu", weights_only=True)
         if int(loaded["hidden"]) != hidden:
             raise ValueError("source checkpoint hidden size does not match")
         model.load_state_dict(loaded["best_state"])

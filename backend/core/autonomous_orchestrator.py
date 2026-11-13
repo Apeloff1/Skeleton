@@ -20,6 +20,11 @@ import threading
 import time
 import uuid
 
+from fastapi import HTTPException
+from routes.galaxy_studio_access import (
+    capture_private_principal, private_identity, private_work_scope, require_owned_build,
+)
+
 # ── node kinds the orchestrator can execute ──────────────────────────────────
 NODE_KINDS = ("forge", "gate", "churn", "review")
 
@@ -83,6 +88,7 @@ def plan_from_directive(build_id: str, directive: str,
     chained linearly by default (each depends on the previous) so later gate/churn
     steps consume earlier forge outputs — the user can edit depends_on later.
     """
+    identity = require_owned_build(build_id, mutation=True)
     idx = _gen_index()
     nodes: list[dict] = []
     raw_steps: list[dict] = []
@@ -114,6 +120,7 @@ def plan_from_directive(build_id: str, directive: str,
         prev_id = nid
 
     plan = {
+        **identity,
         "plan_id": uuid.uuid4().hex[:12], "build_id": build_id,
         "directive": (directive or "")[:1000], "version": 1,
         "nodes": nodes, "node_count": len(nodes),
@@ -151,8 +158,74 @@ def _dependency_index(nodes: list[dict]) -> tuple[dict[str, dict], dict[str, lis
     return by_id, dependents
 
 
+def _forge_gamefile(build_id: str, node: dict) -> dict:
+    """Keep deterministic generation while routing enrichment through the engine.
+
+    The legacy text-gamefile optional helper does not carry Galaxy principal
+    authority; orchestration never invokes that provider path.
+    """
+    from core import text_gamefile as tg
+
+    require_owned_build(build_id, mutation=True)
+    gf = tg.generate(node["target"], build_id, node.get("text") or node["target"],
+                     enrich=False, tier=node.get("tier"), store=False)
+    model = node.get("model")
+    if model:
+        import asyncio
+        import json
+        from core.engine_chat import EngineChat, UserMessage
+        from routes.llm_router import MODEL_CATALOG
+        from skeleton.context.instruction_policy import InstructionPolicy
+
+        async def _request():
+            identity = require_owned_build(build_id, mutation=True)
+            chat = EngineChat(
+                session_id="orchestrator-" + uuid.uuid4().hex,
+                tenant_id=identity["tenant_id"], actor_id=identity["owner_id"],
+                data_class="confidential",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.orchestrator.forge", version="1",
+                    instructions="Refine this gamefile. Return JSON with brief (string) and fields (object)."),
+            ).with_model(MODEL_CATALOG.get(model, {}).get("provider", "openai"), model)
+            require_owned_build(build_id, mutation=True)
+            response = await chat.send_message(UserMessage(text=json.dumps(gf)[:14000]))
+            require_owned_build(build_id, mutation=True)
+            return response.content if hasattr(response, "content") else str(response)
+
+        try:
+            raw = asyncio.run(_request()) or ""
+            start, end = raw.find("{"), raw.rfind("}")
+            result = json.loads(raw[start:end + 1]) if start >= 0 and end > start else {}
+            if isinstance(result.get("fields"), dict):
+                gf["fields"].update({k: v for k, v in result["fields"].items() if k in gf["fields"] and v})
+                gf["llm_enriched"] = True
+            if isinstance(result.get("brief"), str) and result["brief"]:
+                gf["brief"] = result["brief"][:tg.MAX_BRIEF_CHARS]
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # Optional enrichment retains the deterministic artifact.
+    require_owned_build(build_id, mutation=True)
+    from core.databases import get_sync_db
+    from core import unbulk
+
+    document = {"_id": f"{build_id}:{gf['id']}", **gf}
+    unbulk.compress_field(document, "fields")
+    unbulk.compress_field(document, "brief")
+    get_sync_db()["galaxy_text_gamefiles"].replace_one({"_id": document["_id"]}, document, upsert=True)
+    try:
+        from core import build_ledger
+
+        build_ledger.log(build_id, "gamefile_generated", {
+            "system": node["target"], "type": gf.get("type"), "id": gf["id"], "llm": gf.get("llm_enriched", False)})
+    except Exception:
+        pass
+    return gf
+
+
 def _exec_node(build_id: str, node: dict, by_id: dict) -> dict:
     """Run a single node. Returns the node's result dict."""
+    require_owned_build(build_id, mutation=True)
     from core import text_gamefile as tg
     kind = node["kind"]
     up_gid = None
@@ -166,8 +239,8 @@ def _exec_node(build_id: str, node: dict, by_id: dict) -> dict:
             if not key or not tg.get_generator(key):
                 node["status"] = "manual_review"
                 return {"error": "no_generator_matched", "hint": node.get("text")}
-            gf = tg.generate(key, build_id, node.get("text") or key,
-                             enrich=bool(node.get("model")), tier=node.get("tier"), store=True)
+            gf = _forge_gamefile(build_id, node)
+            require_owned_build(build_id, mutation=True)
             node["produced_gid"] = gf.get("id")
             node["status"] = "done"
             return {"gid": gf.get("id"), "label": gf.get("label"), "type": gf.get("type")}
@@ -178,6 +251,7 @@ def _exec_node(build_id: str, node: dict, by_id: dict) -> dict:
                 return {"error": "no_target_gamefile"}
             from core import gamefile_pipeline as gp
             r = gp.run_pipeline(build_id, gid, persist=True)
+            require_owned_build(build_id, mutation=True)
             node["produced_gid"] = gid
             node["status"] = "done"
             return {"gid": gid, "overall_score": r.get("overall_score"),
@@ -198,6 +272,8 @@ def _exec_node(build_id: str, node: dict, by_id: dict) -> dict:
         if kind == "review":
             node["status"] = "manual_review"
             return {"awaiting": "human sign-off", "note": node.get("text")}
+    except HTTPException:
+        raise
     except Exception:
         node["status"] = "error"
         return {"error": "node_failed"}
@@ -303,30 +379,49 @@ def replan_from(plan_id: str, node_id: str) -> dict:
 
 # ── persistence ──────────────────────────────────────────────────────────────
 def _save_plan(plan: dict) -> None:
+    identity = require_owned_build(plan.get("build_id"), mutation=True)
+    if any(plan.get(key) != value for key, value in identity.items()):
+        raise HTTPException(404, "Plan not found")
     try:
         from core.databases import get_sync_db
         get_sync_db()["galaxy_build_plans"].replace_one(
-            {"_id": plan["plan_id"]}, {"_id": plan["plan_id"], **plan}, upsert=True)
+            {"_id": plan["plan_id"], "build_id": plan["build_id"], **identity},
+            {"_id": plan["plan_id"], **plan}, upsert=True)
     except Exception:
         pass
 
 
 def get_plan(plan_id: str) -> dict | None:
+    identity = private_identity()
     try:
         from core.databases import get_sync_db
-        doc = get_sync_db()["galaxy_build_plans"].find_one({"_id": plan_id}, {"_id": 0})
-        return doc
+
+        collection = get_sync_db()["galaxy_build_plans"]
+        query = {"_id": plan_id, **identity}
+        metadata = collection.find_one(query, {"_id": 0, "build_id": 1, "tenant_id": 1, "owner_id": 1})
     except Exception:
-        return None
+        raise HTTPException(503, "Plan authority unavailable") from None
+    if not metadata or any(metadata.get(key) != value for key, value in identity.items()):
+        raise HTTPException(404, "Plan not found")
+    require_owned_build(metadata.get("build_id"))
+    try:
+        doc = collection.find_one({**query, "build_id": metadata["build_id"]}, {"_id": 0})
+    except Exception:
+        raise HTTPException(503, "Plan unavailable") from None
+    if not doc or doc.get("build_id") != metadata["build_id"] or any(doc.get(key) != value for key, value in identity.items()):
+        raise HTTPException(404, "Plan not found")
+    return doc
 
 
 def list_plans(build_id: str, limit: int = 20) -> dict:
+    identity = require_owned_build(build_id)
     rows = []
     try:
         from core.databases import get_sync_db
         rows = list(get_sync_db()["galaxy_build_plans"]
-                    .find({"build_id": build_id}, {"_id": 0, "nodes": 0})
-                    .sort("created", -1).limit(limit))
+                    .find({"build_id": build_id, **identity}, {"_id": 0, "nodes": 0})
+                    .sort("created", -1).limit(max(1, min(100, limit))))
+        rows = [row for row in rows if row.get("build_id") == build_id and all(row.get(k) == v for k, v in identity.items())]
     except Exception:
         pass
     return {"build_id": build_id, "count": len(rows), "plans": rows}
@@ -346,23 +441,56 @@ def _put(jid: str, patch: dict):
 
 
 def get_job(jid: str) -> dict:
+    identity = private_identity()
     with _LOCK:
-        return dict(_JOBS.get(jid) or {"status": "unknown", "job_id": jid})
+        job = dict(_JOBS.get(jid) or {})
+    if not job or any(job.get(k) != v for k, v in identity.items()):
+        raise HTTPException(404, "Job not found")
+    require_owned_build(job.get("build_id"))
+    plan = get_plan(job.get("plan_id"))
+    if plan.get("build_id") != job["build_id"]:
+        raise HTTPException(404, "Job not found")
+    return job
+
+
+def cancel_job(jid: str) -> dict:
+    job = get_job(jid)
+    require_owned_build(job["build_id"], mutation=True)
+    with _LOCK:
+        current = _JOBS.get(jid)
+        if current and current.get("status") == "running":
+            current["cancel_requested"] = True
+    return get_job(jid)
 
 
 def start_execute_job(plan_id: str) -> str:
+    plan = get_plan(plan_id)
+    build_id = plan["build_id"]
+    identity = require_owned_build(build_id, mutation=True)
+    principal = capture_private_principal()
     jid = uuid.uuid4().hex[:12]
-    _put(jid, {"job_id": jid, "status": "running", "plan_id": plan_id,
+    _put(jid, {**identity, "job_id": jid, "status": "running", "plan_id": plan_id, "build_id": build_id,
                "started": time.time(), "current": None, "result": None})
+
+    def _cancelled():
+        with _LOCK:
+            return jid not in _JOBS or bool(_JOBS[jid].get("cancel_requested"))
 
     def _worker():
         try:
-            def _prog(node, plan):
-                _put(jid, {"current": f"{node['kind']}:{node.get('target') or node['id']}"})
-            res = execute_plan(plan_id, on_progress=_prog)
-            _put(jid, {"status": "error" if res.get("error") else "done", "result": res})
+            with private_work_scope(principal, _cancelled):
+                require_owned_build(build_id, mutation=True)
+                if get_plan(plan_id)["build_id"] != build_id:
+                    raise HTTPException(404, "Plan not found")
+                def _prog(node, plan):
+                    require_owned_build(build_id, mutation=True)
+                    _put(jid, {"current": f"{node['kind']}:{node.get('target') or node['id']}"})
+                res = execute_plan(plan_id, on_progress=_prog)
+                require_owned_build(build_id, mutation=True)
+                _put(jid, {"status": "error" if res.get("error") else "done", "result": res})
         except Exception:
-            _put(jid, {"status": "error", "error": "execute_failed"})
+            _put(jid, {"status": "cancelled" if _cancelled() else "error",
+                       "result": None, "current": None, "error": "execute_failed"})
 
     threading.Thread(target=_worker, daemon=True, name=f"orch-{jid}").start()
     return jid

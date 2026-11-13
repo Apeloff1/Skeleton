@@ -1,0 +1,67 @@
+{
+  "project_id": "studio_industrial_logistics_ashen_archipelago",
+  "genre": "industrial_logistics",
+  "biome": "ashen_archipelago",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_industrial_logistics_ashen_archipelago:restore",
+  "objective": "restart a failing supply corridor",
+  "stage_graph": [
+    {
+      "id": "arrival",
+      "entry": "new_game",
+      "location": "basalt islands",
+      "verb": "survey",
+      "requirements": [
+        "Trace a safe route before volcanic ash"
+      ],
+      "alternatives": [
+        "inspect_markers",
+        "interview_residents"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "dispute",
+      "entry": "arrival_complete",
+      "location": "cliffside signal tower",
+      "verb": "route",
+      "requirements": [
+        "Establish control of freshwater cisterns"
+      ],
+      "alternatives": [
+        "publish_witness_records",
+        "negotiate_with_claimants"
+      ],
+      "reward": "social_legitimacy"
+    },
+    {
+      "id": "repair",
+      "entry": "dispute_complete",
+      "location": "cliffside signal tower",
+      "verb": "audit",
+      "requirements": [
+        "Demonstrate restoration of the cliffside signal tower"
+      ],
+      "alternatives": [
+        "cooperative_governance",
+        "independent_distribution"
+      ],
+      "reward": "world_state_update"
+    }
+  ],
+  "branch_outcomes": [
+    "public_proof",
+    "self_organized_repair",
+    "minimal_access"
+  ],
+  "risk_register": [
+    "volcanic ash",
+    "a brittle monopoly"
+  ],
+  "resource_constraints": {
+    "resource": "freshwater cisterns",
+    "max_mint_without_source": 0
+  },
+  "genre_runtime_implemented": false
+}

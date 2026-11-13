@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_copper_mesa",
+  "title": "Copper Mesa: The Maker Commons",
+  "subtitle": "Original the maker commons design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010312552,
+  "width": 19,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 8,
+  "theme": "desert",
+  "starting_health": 4
+}

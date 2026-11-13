@@ -1,0 +1,60 @@
+{
+  "project_id": "studio_aerial_traversal_verdant_caldera",
+  "genre": "aerial_traversal",
+  "biome": "verdant_caldera",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Daro Lark",
+    "role": "pilot",
+    "skill": "wind-aware movement",
+    "objective": "deliver emergency medicine",
+    "weakness": "Personal responsibility for the geothermal plumes aftermath",
+    "development": "Shares ownership of the remedy with residents"
+  },
+  "support": [
+    {
+      "id": "guide",
+      "name": "Rika Sen",
+      "knows": "Safe routes through stepped jungle terraces",
+      "trust": "earned_by_documented_aid"
+    },
+    {
+      "id": "antagonist",
+      "name": "Mira Alto",
+      "affiliation": "a disrupted air network",
+      "agenda": "Privatize access to mineral terraces",
+      "trust": "conditional_on_public_agreement"
+    }
+  ],
+  "factions": [
+    {
+      "id": "settlers",
+      "objective": "public welfare",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "objective": "scarce resource security",
+      "reputation": 0
+    }
+  ],
+  "dialogue_branches": [
+    {
+      "choice": "disclose_proof",
+      "reputation_delta": {
+        "settlers": 2,
+        "claimants": -1
+      }
+    },
+    {
+      "choice": "exclusive_license",
+      "reputation_delta": {
+        "settlers": -2,
+        "claimants": 2
+      }
+    }
+  ],
+  "rights": "original_story_material_only"
+}

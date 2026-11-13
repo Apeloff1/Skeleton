@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_glass_steppe",
+  "title": "Glass Steppe: The Maker Commons",
+  "subtitle": "Original the maker commons design in Glass Steppe; only the grid preview compiles today.",
+  "seed": 203010312922,
+  "width": 19,
+  "height": 17,
+  "levels": 6,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 4,
+  "theme": "desert",
+  "starting_health": 6
+}

@@ -119,6 +119,10 @@ def _local_model(before: bytes, *, path: str = "skeleton/core.py") -> LocalModel
                 model_id="vs002-local-engineer",
                 model_digest=digest,
                 runner=runner,
+                # This fixture emits a typed structured proposal. It must
+                # declare that capability instead of bypassing the engine's
+                # fail-closed undeclared-feature validation.
+                protocol_capabilities=("text-generation", "structured-output"),
             )
         )
     )

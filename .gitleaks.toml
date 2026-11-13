@@ -115,3 +115,11 @@ description = "Inherited generic API key rule with Skeleton documentation false-
   regexTarget = "line"
   regexes = ['''^\s*elif tokenizer == "utf8_bytes_upper_bound" or not counter:$''']
   paths = ['''^skeleton/ai/runtime/inference/local\.py$''']
+
+  [[rules.allowlists]]
+  description = "Historical public input-accounting enum check; exact commit, path and line only"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''^\s*demand\(\['native_tokenizer', 'utf8_byte_tokens', 'reference_tokens', 'conservative_utf8_bytes', 'backend_token_counter'\]\.includes\(basis\) && \(accounting\.exact === null \|\| typeof accounting\.exact === 'boolean'\) && typeof accounting\.prepared_input === 'boolean'\);\s*$''']
+  paths = ['''^frontend/src/features/Jeeves/RuntimeFoundationDetails\.tsx$''']
+  commits = ["411d0f1ded21fc7b5629e0073df2dbd85b6b2db9"]
