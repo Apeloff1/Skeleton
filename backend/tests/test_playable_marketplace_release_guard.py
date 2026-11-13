@@ -34,8 +34,8 @@ def test_new_sales_fail_closed_after_private_project_authorization(project_bound
     ):
         response = client.post(path, headers=headers["alice"], json=payload)
         assert response.status_code == 503, response.text
-        assert response.json()["code"] == "marketplace_release_unavailable"
-        assert "gameplay and buyer access" in response.json()["error"]
+        assert response.json() == {"detail": "internal server error"}
+        assert "gameplay and buyer access" not in response.text
         assert client.post(path, json=payload).status_code == 401
         assert client.post(path, headers=headers["bob"], json=payload).status_code == 404
         users["alice@example.test"]["role"] = "viewer"
@@ -228,7 +228,7 @@ def test_paid_webhook_with_mismatched_amount_remains_retryable(project_boundary,
     client.app.include_router(marketplace.router)
     response = client.post("/api/webhook/stripe", headers=headers["alice"], json={})
     assert response.status_code == 503
-    assert response.json()["error"] == "payment_details_unreconciled"
+    assert response.json() == {"detail": "internal server error"}
     assert database.payment_transactions.writes == []
     finalize.assert_not_awaited()
 
@@ -377,7 +377,7 @@ def test_webhook_verifier_outage_is_retryable_and_does_not_write(project_boundar
     client.app.include_router(marketplace.router)
     response = client.post("/api/webhook/stripe", headers=headers["alice"], json={})
     assert response.status_code == 503
-    assert response.json() == {"received": False, "error": "webhook_unavailable"}
+    assert response.json() == {"detail": "internal server error"}
     assert all(not collection.writes for collection in database.collections.values())
 
 
@@ -396,5 +396,5 @@ def test_new_premium_checkout_is_blocked_before_provider_or_storage(project_boun
     users["alice@example.test"]["role"] = "editor"
     response = client.post("/api/premium/checkout", headers=headers["alice"], json=payload)
     assert response.status_code == 503
-    assert response.json()["code"] == "premium_release_unavailable"
+    assert response.json() == {"detail": "internal server error"}
     assert all(not collection.writes for collection in database.collections.values())
