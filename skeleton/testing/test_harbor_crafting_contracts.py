@@ -52,7 +52,7 @@ def test_play_is_actual_canonical_gameplay_not_claimed_score():
     world, board = inputs()
     root = build_save(world, board, [])
     partial = play_save(root, demo_actions(), expected_digest=root["save_digest"])
-    with pytest.raises(HarborError, match="consequence"):
+    with pytest.raises(HarborError, match="duplicate contract replay"):
         play_save(partial, demo_actions(), expected_digest=partial["save_digest"])
     shelter = [{"op": "wait"}] + demo_actions()
     shelter[-1] = {"op": "choose", "choice": "shelter"}
