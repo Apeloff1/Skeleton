@@ -56,7 +56,7 @@ export interface RepairView {
 }
 
 export interface PlaytestView {
-  state: 'off' | 'passed' | 'failed' | 'unavailable';
+  state: 'off' | 'passed' | 'failed' | 'unavailable' | 'unverified';
   tone: Tone;
   label: string;
 }
@@ -155,12 +155,32 @@ export function repairView(payload: RunPayload | null | undefined, verify: Verif
 }
 
 export function playtestView(payload: RunPayload | null | undefined): PlaytestView {
-  const p = (payload as any)?.playtest;
+  const p = payload?.playtest;
   if (!p || typeof p !== 'object') return { state: 'off', tone: 'idle', label: 'Headless playtest off' };
-  const status = String(p.status ?? '');
-  if (status === 'passed' || p.passed === true) return { state: 'passed', tone: 'ok', label: 'Headless Godot playtest passed' };
-  if (status === 'unavailable') return { state: 'unavailable', tone: 'warn', label: `Playtest unavailable${p.reason ? ` (${p.reason})` : ''}` };
+  if (p.status === 'passed' && p.passed === true) {
+    return p.verified === true
+      ? { state: 'passed', tone: 'ok', label: 'Main-world Godot boot passed with admitted binary' }
+      : { state: 'unverified', tone: 'warn', label: 'Main world booted; Godot binary provenance unverified' };
+  }
+  if (p.status === 'unavailable') return { state: 'unavailable', tone: 'warn', label: `Playtest unavailable${p.reason ? ` (${p.reason})` : ''}` };
   return { state: 'failed', tone: 'bad', label: 'Headless Godot playtest failed' };
+}
+
+/** Independent native sidecar completion; no green badge for missing provenance. */
+export function playableSceneView(payload: RunPayload | null | undefined): PlaytestView | null {
+  const archetype = payload?.forge?.playable_archetype;
+  if (!archetype) return null;
+  const p = payload?.playable_scene_playtest;
+  if (!p) return { state: 'off', tone: 'idle', label: 'Playable scene not dynamically tested' };
+  if (p.status === 'passed' && p.passed === true) {
+    return p.verified === true
+      ? { state: 'passed', tone: 'ok', label: `Playable ${archetype} scene completed with admitted Godot binary` }
+      : { state: 'unverified', tone: 'warn', label: `Playable ${archetype} scene completed; engine integrity unverified` };
+  }
+  if (p.status === 'unavailable') {
+    return { state: 'unavailable', tone: 'warn', label: 'Playable scene unverified (Godot unavailable)' };
+  }
+  return { state: 'failed', tone: 'bad', label: 'Playable scene qualification failed' };
 }
 
 export function summarizeRun(payload: RunPayload | null | undefined): RunSummary {

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -33,6 +33,7 @@ class RunRequest(BaseModel):
     playable_content: bool = False
     playable_archetype: Optional[str] = Field(default=None, max_length=64)
     playable_main_scene: bool = False
+    playtest: Optional[Literal["off", "auto", "require"]] = None
     blend: Optional[list] = None
     t: float = 0.5
     generation: Optional[str] = None
@@ -98,6 +99,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
             **({"playable_content": True, "playable_archetype": req.playable_archetype,
                 "playable_main_scene": req.playable_main_scene} if req.playable_content else {}),
+            **({"playtest": req.playtest} if req.playtest and req.playtest != "off" else {}),
         )
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

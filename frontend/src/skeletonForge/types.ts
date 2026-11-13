@@ -136,6 +136,8 @@ export interface RunRequest {
   playable_content?: boolean;
   playable_archetype?: string;
   playable_main_scene?: boolean;
+  /** Explicit native execution validation. "require" blocks publication on failure. */
+  playtest?: 'auto' | 'require';
   generation?: string | null;
   include_files?: boolean;
 }
@@ -199,6 +201,14 @@ export interface RunPayload {
   build_plan?: BuildPlanPayload | null;
   operator_axes?: Record<string, number>;
   galaxy_profile?: { sha256?: string; matrices?: number; source?: string; artifact?: string };
+  /** Main-world native Godot boot; execution and binary integrity are separate. */
+  playtest?: { status?: string; passed?: boolean; verified?: boolean; reason?: string; errors?: string[] } | null;
+  /** Completion of the exact independent playable scene, not merely the main world. */
+  playable_scene_playtest?: {
+    schema?: string; status?: string; passed?: boolean; verified?: boolean;
+    scene?: string; archetype?: string; binary_source?: string;
+    reason?: string; errors?: string[];
+  } | null;
   playable_prototype?: {
     schema?: string;
     mode?: string;
