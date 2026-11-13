@@ -7,7 +7,7 @@ from typing import Any, Dict, Literal, Optional
 import re
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
@@ -39,22 +39,47 @@ def _safe_export_path(name: str) -> bool:
 
 class RunRequest(BaseModel):
     vision: str = Field(default="", max_length=4000)
-    era: Optional[str] = None
-    archetype: str = "extraction"
-    target: str = "godot"
-    project_root: Optional[str] = None
+    era: Optional[str] = Field(default=None, max_length=80)
+    archetype: str = Field(default="extraction", max_length=80)
+    target: str = Field(default="godot", max_length=16)
+    project_root: Optional[str] = Field(default=None, max_length=1024)
     overwrite: bool = False
     include_files: bool = False
     answers: Dict[str, str] = Field(default_factory=dict, max_length=64)
     # Sparse, explicit design-instrument edits. Raw values are validated by GameForge.
-    operator_axes: Optional[Dict[str, Any]] = None
+    operator_axes: Optional[Dict[str, Any]] = Field(default=None, max_length=16)
     blend: Optional[list] = Field(default=None, max_length=3)
     t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
-    generation: Optional[str] = None
+    generation: Optional[str] = Field(default=None, max_length=80)
     playable_content: bool = False
     playtest: Optional[Literal["off", "auto", "require"]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
+
+    @field_validator("answers")
+    @classmethod
+    def _validate_brief_answers(cls, answers: Dict[str, str]) -> Dict[str, str]:
+        # The guided brief is a bounded list of facet/beat votes, not an
+        # arbitrary unbounded prompt injection or bulk JSON transport.
+        if any(
+            re.fullmatch(r"[a-z][a-z0-9_-]{0,47}", key) is None
+            or len(value) > 80
+            for key, value in answers.items()
+        ):
+            raise ValueError("GameForge answer facets must be bounded design votes")
+        return answers
+
+    @field_validator("operator_axes")
+    @classmethod
+    def _validate_axis_payload(cls, axes: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if axes is None:
+            return None
+        if any(
+            re.fullmatch(r"[a-z][a-z0-9_-]{0,47}", key) is None
+            for key in axes
+        ):
+            raise ValueError("GameForge operator axis IDs must be bounded")
+        return axes
 
 
 @router.get("/eras")
