@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_ashen_archipelago",
+  "title": "Ashen Archipelago: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010312135,
+  "width": 23,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 11,
+  "theme": "ocean",
+  "starting_health": 5
+}

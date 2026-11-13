@@ -7,7 +7,7 @@ const {validate, EXPECTED} = require("./check-expo-native-compat.cjs");
 const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
 const lock = fs.readFileSync(path.join(__dirname, "..", "yarn.lock"), "utf8");
 
-test("reviewed Expo 54 dependency matrix matches committed manifest and lock", () => {
+test("reviewed Expo 55 dependency matrix matches committed manifest and lock", () => {
   assert.deepEqual(validate(manifest, lock), []);
 });
 test("independent RN and React major upgrades fail closed", () => {
@@ -20,12 +20,12 @@ test("independent RN and React major upgrades fail closed", () => {
 });
 test("a correct selector cannot hide a mismatched resolved native version", () => {
   for (const [selector, forged] of [
-    ["react-native@0.81.5", "0.87.1"],
-    ["react-native-reanimated@~4.1.1", "4.7.1"],
-    ["expo@~54.0.35", "55.0.0"],
+    ["react-native@0.83.10", "0.87.1"],
+    ["react-native-reanimated@4.2.1", "4.7.1"],
+    ["expo@~55.0.32", "56.0.0"],
   ]) {
     // Read the *current* lockfile resolution, not an obsolete patch release:
-    // changing an SDK54-compatible patch should never break the test itself.
+    // changing an SDK55-compatible patch should never break the test itself.
     const lines = lock.split("\n");
     const position = lines.findIndex(line => line === selector + ":");
     assert.ok(position >= 0, selector + " source lock selector");
@@ -49,10 +49,10 @@ test("missing pinned lockfile selectors cannot claim compatibility", () => {
 test("a development pin cannot mask an upgraded production native runtime", () => {
   const bad = JSON.parse(JSON.stringify(manifest));
   bad.dependencies["react-native-reanimated"] = "~4.7.1";
-  bad.devDependencies["react-native-reanimated"] = "~4.1.1";
+  bad.devDependencies["react-native-reanimated"] = "4.2.1";
   const errors = validate(bad, lock);
   assert.ok(errors.some(error => error.includes("react-native-reanimated is duplicated")));
-  assert.ok(errors.some(error => error.includes("react-native-reanimated expected ~4.1.1")));
+  assert.ok(errors.some(error => error.includes("react-native-reanimated expected 4.2.1")));
 });
 
 test("duplicate dependency keys fail even when both pins match", () => {

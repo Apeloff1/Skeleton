@@ -1,0 +1,24 @@
+{
+  "schema": "offline-cognition-case.v1",
+  "family": "token_limit",
+  "id": "35_string_operations",
+  "expected": "reject",
+  "payload": {
+    "name": "token_limit",
+    "category": "native",
+    "source_role": "user",
+    "retrieval_mode": "hybrid",
+    "context_limit": 5632,
+    "byte_limit": 61440,
+    "latency_ms": 65000,
+    "min_evidence": 4,
+    "priority": 8,
+    "rank_lexical": 0.55,
+    "rank_dense": 0.3,
+    "rank_freshness": 0.15,
+    "operations": "all"
+  },
+  "risk": "Refuse string operations",
+  "native_e2e": false,
+  "release_certified": false
+}

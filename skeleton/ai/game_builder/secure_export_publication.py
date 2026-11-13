@@ -125,6 +125,51 @@ def _write_one(stage_fd: int, relative: str, payload: bytes) -> None:
         os.close(current)
 
 
+
+def preflight_generated_tree_destination(destination: str | Path) -> Path:
+    """Reject predictable unsafe export targets before game construction.
+
+    This read-only check is not a lock or permission to publish. The atomic
+    publisher rechecks the pinned parent and performs no-replace publication.
+    """
+    if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+        raise AtomicDirectoryPublicationError(
+            "descriptor-safe source publication requires POSIX O_NOFOLLOW"
+        )
+    target = Path(destination).expanduser().absolute()
+    if target.name in ("", ".", "..") or len(target.name) > 127:
+        raise AtomicDirectoryPublicationError("invalid destination name")
+    try:
+        parent_fd = _root_fd(target.parent)
+    except (OSError, TypeError, ValueError) as exc:
+        raise AtomicDirectoryPublicationError("unsafe destination parent") from exc
+    try:
+        parent = os.fstat(parent_fd)
+        if (not stat.S_ISDIR(parent.st_mode)
+                or parent.st_uid != os.geteuid()
+                or parent.st_mode & 0o022):
+            raise AtomicDirectoryPublicationError(
+                "destination parent must be private and operator-owned"
+            )
+        _assert_original_root(target.parent, parent_fd)
+        try:
+            os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise AtomicDirectoryPublicationError("game export already exists")
+        _assert_original_root(target.parent, parent_fd)
+    except (OSError, ValueError) as exc:
+        if isinstance(exc, AtomicDirectoryPublicationError):
+            raise
+        raise AtomicDirectoryPublicationError(
+            "unsafe game export destination"
+        ) from exc
+    finally:
+        os.close(parent_fd)
+    return target
+
+
 def publish_generated_tree(
     files: Mapping[str, bytes], destination: str | Path,
 ) -> Path:
@@ -226,5 +271,6 @@ def publish_generated_tree(
 
 
 __all__ = [
-    "AtomicDirectoryPublicationError", "publish_generated_tree",
+    "AtomicDirectoryPublicationError", "preflight_generated_tree_destination",
+    "publish_generated_tree",
 ]

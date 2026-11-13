@@ -1,0 +1,16 @@
+{
+  "case": "08_surrogate_unicode",
+  "gate": "replay",
+  "expect": "reject",
+  "reason": "Surrogate Unicode cannot be canonical evidence",
+  "payload": {
+    "request_id": "\ud800",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expected_model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "request_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "stored_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "revision": 1,
+    "replayed": true,
+    "has_generation": false
+  }
+}

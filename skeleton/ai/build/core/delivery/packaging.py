@@ -23,6 +23,15 @@ from skeleton.build.delivery.artifact_manifest import MAX_ARTIFACT_BYTES, Artifa
 DEFAULT_EPOCH = 315532800  # 1980-01-01, the earliest timestamp zip supports
 EXECUTABLE_SUFFIXES = (".sh",)
 MAX_PACKAGE_FILES = 20000
+MAX_PACKAGE_PATH_BYTES = 4096  # bounded UTF-8 archive member names
+MAX_PACKAGE_EPOCH = (1 << 32) - 1  # portable gzip mtime field
+
+
+def _validate_epoch(epoch: int, *, zip_format: bool) -> None:
+    if type(epoch) is not int or not 0 <= epoch <= MAX_PACKAGE_EPOCH:
+        raise DeliveryError("package epoch must be a bounded integer")
+    if zip_format and epoch < DEFAULT_EPOCH:
+        raise DeliveryError("zip timestamps cannot precede 1980")
 
 
 @dataclass(frozen=True)
@@ -37,14 +46,18 @@ class PackageResult:
 
 
 def _normalize_files(files: Mapping[str, bytes], prefix: str | None) -> list[tuple[str, bytes]]:
-    if not isinstance(files, Mapping) or not files:
+    if not isinstance(files, Mapping):
         raise DeliveryError("files mapping must be non-empty")
+    # Mapping.__bool__/__len__ may lie about the actual items iterator. Do
+    # not skip that iterator based on a falsy length or the bound is bypassed.
     if len(files) > MAX_PACKAGE_FILES:
         raise DeliveryError("too many files to package")
     out: dict[str, bytes] = {}
     total = 0
     root = normalize_relpath(prefix, field="prefix") if prefix else None
-    for raw, data in files.items():
+    for count, (raw, data) in enumerate(files.items(), 1):
+        if count > MAX_PACKAGE_FILES:
+            raise DeliveryError("too many files to package")
         if not isinstance(data, (bytes, bytearray)):
             raise DeliveryError(f"file {raw!r} must be bytes")
         size = len(data)
@@ -52,11 +65,17 @@ def _normalize_files(files: Mapping[str, bytes], prefix: str | None) -> list[tup
             raise DeliveryError("uncompressed package input exceeds byte limit")
         path = normalize_relpath(raw)
         if root:
-            path = f"{root}/{path}"
+            path = normalize_relpath(f"{root}/{path}")
+        # The combined archive member is the real authority, not its
+        # independently validated prefix and relative filename.
+        if len(path.encode("utf-8")) > MAX_PACKAGE_PATH_BYTES:
+            raise DeliveryError("combined package member path exceeds byte limit")
         if path in out:
             raise DeliveryError(f"duplicate path after normalization: {path}")
         out[path] = bytes(data)
         total += size
+    if not out:
+        raise DeliveryError("files mapping must be non-empty")
     return sorted(out.items())
 
 
@@ -77,8 +96,9 @@ def build_tarball(
     epoch: int = DEFAULT_EPOCH,
     executables: frozenset[str] = frozenset(),
 ) -> PackageResult:
-    if not name.endswith(".tar.gz"):
+    if type(name) is not str or not name.endswith(".tar.gz"):
         raise DeliveryError("tarball name must end with .tar.gz")
+    _validate_epoch(epoch, zip_format=False)
     entries = _normalize_files(files, prefix)
     raw = io.BytesIO()
     with tarfile.open(fileobj=raw, mode="w", format=tarfile.PAX_FORMAT) as tar:
@@ -106,10 +126,9 @@ def build_zip(
     epoch: int = DEFAULT_EPOCH,
     executables: frozenset[str] = frozenset(),
 ) -> PackageResult:
-    if not name.endswith(".zip"):
+    if type(name) is not str or not name.endswith(".zip"):
         raise DeliveryError("zip name must end with .zip")
-    if epoch < DEFAULT_EPOCH:
-        raise DeliveryError("zip timestamps cannot precede 1980")
+    _validate_epoch(epoch, zip_format=True)
     import time
 
     stamp = time.gmtime(epoch)[:6]

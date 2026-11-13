@@ -7,6 +7,8 @@ share /api/nexus.
 """
 from __future__ import annotations
 
+from core.public_exception_route import PublicExceptionRoute
+
 from dataclasses import asdict
 import sys
 from pathlib import Path
@@ -22,7 +24,7 @@ from core.curiosity_service import curiosity_service
 from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.truth_watch import TruthEventKind
 
-router = APIRouter(prefix="/api/nexus", tags=["knowledge-nexus"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/nexus", tags=["knowledge-nexus"])
 _NX = str(Path(__file__).resolve().parent.parent / "knowledge_nexus")
 
 
@@ -120,7 +122,7 @@ class CalibrationForecastBody(BaseModel):
 
 
 class TruthWatchEventBody(BaseModel):
-    kind: str
+    kind: str = Field(min_length=1, max_length=64)
     target: str = Field(min_length=1, max_length=10000)
     reason: str = Field(default="", max_length=2000)
     provider: str = Field(min_length=1, max_length=300)
@@ -140,7 +142,7 @@ class TransparencyHeadBody(BaseModel):
 class TruthEvidenceBody(BaseModel):
     source_id: str = Field(min_length=1, max_length=1000)
     locator: str = Field(default="", max_length=2000)
-    kind: str
+    kind: str = Field(min_length=1, max_length=64)
     supports: bool = True
     independence_group: str = Field(min_length=1, max_length=500)
     quality: float = Field(ge=0.0, le=1.0)
@@ -271,7 +273,7 @@ async def curiosity_watch_status(limit: int = Query(default=100, ge=1, le=1000))
 @router.post("/curiosity/watch")
 async def curiosity_watch_ingest(body: TruthWatchEventBody):
     try: TruthEventKind(body.kind)
-    except ValueError as exc: raise HTTPException(status_code=422, detail=f"unsupported truth watch event kind: {body.kind}") from exc
+    except ValueError as exc: raise HTTPException(status_code=422, detail="unsupported truth watch event kind") from None
     return curiosity_service().ingest_watch(
         kind=body.kind, target=body.target, reason=body.reason,
         provider=body.provider, provider_cursor=body.provider_cursor,
@@ -290,7 +292,7 @@ async def curiosity_verify_claim(body: VerifyClaimBody):
     evidence: list[EvidenceItem] = []
     for row in body.evidence:
         try: kind = EvidenceKind(row.kind)
-        except ValueError as exc: raise HTTPException(status_code=422, detail=f"unsupported evidence kind: {row.kind}") from exc
+        except ValueError as exc: raise HTTPException(status_code=422, detail="unsupported evidence kind") from None
         evidence.append(EvidenceItem(source_id=row.source_id, locator=row.locator, kind=kind, supports=row.supports,
             independence_group=row.independence_group, quality=row.quality, observed_at=row.observed_at,
             reproducible=row.reproducible, peer_reviewed=row.peer_reviewed, primary=row.primary, notes=row.notes,

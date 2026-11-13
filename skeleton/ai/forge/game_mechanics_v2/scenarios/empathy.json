@@ -1,0 +1,55 @@
+{
+  "schema": "skeleton.game_mechanic_scenario.v1",
+  "name": "empathy",
+  "domain": "social",
+  "initial": 59,
+  "capacity": 120,
+  "events": [
+    {
+      "id": "empathy:gain:1",
+      "action": "gain",
+      "amount": 12,
+      "tick": 1
+    },
+    {
+      "id": "empathy:spend:2",
+      "action": "spend",
+      "amount": 10,
+      "tick": 2
+    },
+    {
+      "id": "empathy:recover:3",
+      "action": "recover",
+      "amount": 2,
+      "tick": 3
+    },
+    {
+      "id": "empathy:observe:4",
+      "action": "observe",
+      "amount": 0,
+      "tick": 4
+    },
+    {
+      "id": "empathy:decay:5",
+      "action": "decay",
+      "amount": 1,
+      "tick": 5
+    }
+  ],
+  "assertions": {
+    "bounds": [
+      0,
+      120
+    ],
+    "accepted_receipts": 5,
+    "duplicate_receipts_change_state": false,
+    "stable_ordering": true,
+    "no_authorization_side_effects": true
+  },
+  "notes": [
+    "Designed for social simulation with bounded standing units.",
+    "Event IDs carry replay identity within a world instance.",
+    "Timestamps are logical ticks, not wall-clock time.",
+    "This fixture is synthetic and does not claim gameplay/device qualification."
+  ]
+}

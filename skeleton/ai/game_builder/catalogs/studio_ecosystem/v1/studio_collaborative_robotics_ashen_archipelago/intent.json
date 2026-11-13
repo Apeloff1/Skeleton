@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_ashen_archipelago",
+  "title": "Ashen Archipelago: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010317536,
+  "width": 23,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 10,
+  "theme": "ocean",
+  "starting_health": 4
+}

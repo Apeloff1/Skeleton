@@ -1,0 +1,20 @@
+{
+  "case": "07_wrong_last_type",
+  "gate": "artifact",
+  "expect": "reject",
+  "reason": "No arbitrary object as a typed value",
+  "payload": {
+    "model_id": "local-gguf",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bytes": 200,
+    "shard_bytes": [
+      100,
+      100
+    ],
+    "license": "operator-reviewed-license",
+    "approved": true,
+    "source": {
+      "untrusted": true
+    }
+  }
+}

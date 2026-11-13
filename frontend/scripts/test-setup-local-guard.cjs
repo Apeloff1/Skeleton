@@ -6,7 +6,7 @@ const { test } = require('node:test');
 const { compileFunction } = require('node:vm');
 const ts = require('typescript');
 
-function clientWithChat(chat) {
+function clientWithChat(chat, checkMeImpl) {
   const source = fs.readFileSync(path.join(__dirname, '../src/product/appReadinessClient.ts'), 'utf8');
   const compiled = ts.transpileModule(source, { reportDiagnostics: true, compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,
@@ -15,7 +15,7 @@ function clientWithChat(chat) {
   const dependencies = {
     '../utils/apiClient': { default: { get: async path => path === '/api/ai/chat/readiness' ? { ok: true, data: chat } : null } },
     '../auth/gameforgeAuth': { authHeaders: () => ({}), getAuthToken: () => 'local-test-token', getAuthEpoch: () => 1,
-      checkMe: async () => ({ observed: true, authenticated: true, role: 'admin' }) },
+      checkMe: checkMeImpl || (async () => ({ observed: true, authenticated: true, role: 'admin' })) },
     './appHealthClient': { probeAppHealth: async () => ({ services: [] }) },
   };
   const mod = { exports: {} };
@@ -50,4 +50,17 @@ test('setup ignores untrusted, contradictory guard codes', async () => {
   assert.equal(chat.status, 'blocked');
   assert.doesNotMatch(chat.message, /trusted guard|malicious-secret/i);
   assert.doesNotMatch(chat.action, /malicious-secret/i);
+});
+
+test('setup remains observable but denies privileged readiness when account transport throws', async () => {
+  const state = await clientWithChat(chatReadiness('local_guard_unavailable'), async () => {
+    throw new Error('private upstream transport failure');
+  }).readAppReadiness();
+  const account = state.checks.find(item => item.id === 'account');
+  const chat = state.checks.find(item => item.id === 'chat');
+  const crawler = state.checks.find(item => item.id === 'crawler');
+  assert.equal(account.status, 'unknown');
+  assert.equal(chat.status, 'unknown');
+  assert.equal(crawler.status, 'unknown');
+  assert.doesNotMatch(JSON.stringify(state.checks), /private upstream transport failure/);
 });

@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:quest-session:v1",
+  "title": "Offline source-bound quest transaction save",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_digest",
+    "events",
+    "state",
+    "state_digest",
+    "save_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "plan_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "quest_id",
+          "event_type",
+          "source_id",
+          "payload_digest"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "quest_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "event_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "payload_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "plan_digest",
+        "completed",
+        "inventory",
+        "currency",
+        "ending_id"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "plan_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "completed": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "string"
+          }
+        },
+        "inventory": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "minimum": 1
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "currency": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "ending_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "state_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "save_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_puzzle_expedition_ashen_archipelago",
+  "title": "Ashen Archipelago: Puzzle Expedition",
+  "subtitle": "An original puzzle expedition brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610300035,
+  "width": 23,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 5,
+  "theme": "ocean",
+  "starting_health": 5
+}

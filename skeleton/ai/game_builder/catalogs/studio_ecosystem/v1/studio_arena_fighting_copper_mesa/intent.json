@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_copper_mesa",
+  "title": "Copper Mesa: The Open Tournament",
+  "subtitle": "Original the open tournament design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010310588,
+  "width": 19,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 4,
+  "theme": "desert",
+  "starting_health": 4
+}

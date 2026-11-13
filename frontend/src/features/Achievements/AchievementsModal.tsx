@@ -55,6 +55,9 @@ export const AchievementsModal: React.FC<Props> = ({ visible, onClose, colors })
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [view, setView] = useState<'browse'|'stats'>('browse');
+  const [listError, setListError] = useState<string|null>(null);
+  const [statsError, setStatsError] = useState<string|null>(null);
+  const requestVersion = React.useRef(0);
   const LIMIT = 50;
 
   useEffect(() => {
@@ -71,30 +74,55 @@ export const AchievementsModal: React.FC<Props> = ({ visible, onClose, colors })
   }, [selectedCategory, selectedRarity]);
 
   const loadStats = async () => {
+    setStatsError(null);
     try {
       const res = await apiFetch(`${API}/api/academy/achievements/stats`);
-      if (res.ok) setStats(await res.json());
-    } catch {}
+      if (!res.ok) throw new Error(`Statistics unavailable (${res.status})`);
+      const value = await res.json();
+      if (!value || !Number.isSafeInteger(value.total) || value.total < 0 ||
+          !value.by_category || typeof value.by_category !== 'object' ||
+          !value.by_rarity || typeof value.by_rarity !== 'object') {
+        throw new Error('The achievement statistics response is invalid.');
+      }
+      setStats(value);
+    } catch (cause) {
+      setStats(null);
+      setStatsError(cause instanceof Error ? cause.message : 'Achievement statistics are unavailable.');
+    }
   };
 
   const loadAchievements = async (fresh = false) => {
     if (fresh) { setLoading(true); setSkip(0); }
     else setLoadingMore(true);
     const newSkip = fresh ? 0 : skip;
+    const version = ++requestVersion.current;
+    setListError(null);
     try {
       let url = `${API}/api/academy/achievements?limit=${LIMIT}&skip=${newSkip}`;
       if (selectedCategory) url += `&category=${selectedCategory}`;
       if (selectedRarity) url += `&rarity=${selectedRarity}`;
       const res = await apiFetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        const items = data.achievements || [];
-        if (fresh) setAchievements(items);
-        else setAchievements(prev => [...prev, ...items]);
-        setSkip(newSkip + items.length);
-        setHasMore(items.length === LIMIT);
+      if (!res.ok) throw new Error(`Achievements unavailable (${res.status})`);
+      const data = await res.json();
+      if (!data || !Array.isArray(data.achievements) || data.achievements.length > LIMIT ||
+          data.achievements.some((item: unknown) => !item || typeof item !== 'object' ||
+            typeof (item as AchItem).id !== 'string' || typeof (item as AchItem).name !== 'string' ||
+            typeof (item as AchItem).description !== 'string')) {
+        throw new Error('The achievement catalog response is invalid.');
       }
-    } catch {}
+      if (version !== requestVersion.current) return;
+      const items = data.achievements as AchItem[];
+      if (fresh) setAchievements(items);
+      else setAchievements(prev => [...prev, ...items]);
+      setSkip(newSkip + items.length);
+      setHasMore(items.length === LIMIT);
+    } catch (cause) {
+      if (version === requestVersion.current) {
+        setListError(cause instanceof Error ? cause.message : 'Achievements are unavailable.');
+        if (fresh) setAchievements([]);
+      }
+    }
+    if (version !== requestVersion.current) return;
     setLoading(false);
     setLoadingMore(false);
   };
@@ -160,7 +188,7 @@ export const AchievementsModal: React.FC<Props> = ({ visible, onClose, colors })
             <Text style={st.sectionLabel}>BY RARITY</Text>
             {RARITY_ORDER.map(r => {
               const count = stats.by_rarity[r] || 0;
-              const pct = Math.round(count / stats.total * 100);
+              const pct = stats.total > 0 ? Math.round(count / stats.total * 100) : 0;
               return (
                 <TouchableOpacity key={r} style={st.rarRow} onPress={() => { setSelectedRarity(r === selectedRarity ? null : r); setView('browse'); }}>
                   <View style={[st.rarDot, { backgroundColor: RARITY_COLORS[r] }]} />
@@ -182,6 +210,14 @@ export const AchievementsModal: React.FC<Props> = ({ visible, onClose, colors })
             ))}
             <View style={{ height: 40 }} />
           </ScrollView>
+        ) : view === 'stats' ? (
+          <View style={st.loadWrap}>
+            <Ionicons name="alert-circle-outline" size={32} color="#F59E0B" />
+            <Text style={st.errorText}>{statsError || 'Achievement statistics have not been observed.'}</Text>
+            <TouchableOpacity style={st.retryButton} onPress={() => { void loadStats(); }}>
+              <Text style={st.retryText}>Retry statistics</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <>
             {/* Search & Filters */}
@@ -235,7 +271,15 @@ export const AchievementsModal: React.FC<Props> = ({ visible, onClose, colors })
               </View>
             )}
 
-            {loading ? (
+            {listError ? (
+              <View style={st.loadWrap}>
+                <Ionicons name="cloud-offline-outline" size={32} color="#EF4444" />
+                <Text style={st.errorText}>{listError}</Text>
+                <TouchableOpacity style={st.retryButton} onPress={() => { void loadAchievements(true); }}>
+                  <Text style={st.retryText}>Retry catalog</Text>
+                </TouchableOpacity>
+              </View>
+            ) : loading ? (
               <View style={st.loadWrap}>
                 <ActivityIndicator size="large" color="#8B5CF6" />
                 <Text style={st.loadText}>Loading achievements...</Text>
@@ -298,6 +342,9 @@ const st = StyleSheet.create({
   loadText: { color: '#94A3B8', fontSize: 14 },
   endText: { textAlign: 'center', color: '#64748B', fontSize: 12, padding: 16 },
   emptyText: { textAlign: 'center', color: '#64748B', fontSize: 14, padding: 40 },
+  errorText: { color: '#CBD5E1', fontSize: 14, lineHeight: 20, textAlign: 'center', maxWidth: 360 },
+  retryButton: { backgroundColor: '#7C3AED', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  retryText: { color: '#FFF', fontSize: 13, fontWeight: '800' },
   // Stats view
   statsView: { flex: 1, paddingHorizontal: 16 },
   statsTitle: { fontSize: 11, fontWeight: '800', color: '#64748B', letterSpacing: 1.5, marginTop: 16, marginBottom: 12 },

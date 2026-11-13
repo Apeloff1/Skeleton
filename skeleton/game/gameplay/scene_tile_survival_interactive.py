@@ -161,7 +161,6 @@ def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton scene-survival-play")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo")
-    sub.add_parser("demo-script")
     play = sub.add_parser("play")
     play.add_argument("--source-json", required=True)
     resume = sub.add_parser("resume")
@@ -175,12 +174,6 @@ def cli(argv: Sequence[str]) -> int:
         if args.command == "demo":
             source, _ = original_survival()
             result = play_survival(source=source)
-        elif args.command == "demo-script":
-            from io import StringIO
-            source, actions = original_survival()
-            script = "".join(json.dumps(action, sort_keys=True) + "\n"
-                             for action in actions)
-            result = play_survival(source=source, input_stream=StringIO(script))
         else:
             options = {
                 "expected_source_digest": args.expected_source_digest,

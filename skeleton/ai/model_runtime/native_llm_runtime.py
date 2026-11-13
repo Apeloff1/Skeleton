@@ -221,6 +221,20 @@ class NativeLLMRuntime:
             weights_digest=self.model_digest,
         )
 
+    def spill_cpu_kv(self, cache: KVCache, store: object) -> str:
+        """Persist an admitted CPU reference KV cache; no GPU tensor migration."""
+        from .cpu_kv_spill import CpuKVSpillStore
+        if not isinstance(store, CpuKVSpillStore):
+            raise RuntimeContractError("CpuKVSpillStore required")
+        return store.stage(self, cache)
+
+    def restore_cpu_kv(self, digest: str, store: object) -> KVCache:
+        """Restore exact native CPU KV state under the current model identity."""
+        from .cpu_kv_spill import CpuKVSpillStore
+        if not isinstance(store, CpuKVSpillStore):
+            raise RuntimeContractError("CpuKVSpillStore required")
+        return store.restore(self, digest)
+
     def estimate_kv_bytes(self, tokens: int) -> int:
         count = max(0, int(tokens))
         return count * self.model.n_layers * self.model.dim * 2 * 8 + count * 8
@@ -409,6 +423,7 @@ class NativeLLMRuntime:
         *,
         use_cache: bool = True,
         interrupt: Callable[[], None] | None = None,
+        cache: KVCache | None = None,
     ) -> InferenceResult:
         """Run embeddings → position/RoPE → transformer blocks → LM head.
 
@@ -422,6 +437,21 @@ class NativeLLMRuntime:
             interrupt()
         if not isinstance(use_cache, bool):
             raise RuntimeContractError("use_cache must be boolean")
+        if cache is not None:
+            if not use_cache or not isinstance(cache, KVCache):
+                raise RuntimeContractError("explicit KV cache requires cache-enabled inference")
+            if cache.n_layers != self.model.n_layers or cache.ctx != self.limits.max_context:
+                raise RuntimeContractError("explicit KV cache architecture mismatch")
+            if (self.device.actual != "cpu" or self.model.resident
+                    or getattr(self.model, "_accel", None) is not None):
+                raise RuntimeContractError("external KV cache requires exact CPU execution")
+            if cache.owner is not None and (
+                cache.owner is not self.model or cache.revision != (
+                    self.model.steps, self.model.fitted, self.model.tied,
+                    self.model.device, self.model.resident,
+                )
+            ):
+                raise RuntimeContractError("explicit KV cache has stale model ownership")
         self.assert_model_unchanged()
         self._assert_execution_device()
         try:
@@ -446,9 +476,10 @@ class NativeLLMRuntime:
         window = sequence.token_ids[-self.limits.max_context:]
         binding = (self.model_digest, self.tokenizer.digest, self.architecture.digest,
                    self.device.digest, self.limits, self.device_policy)
-        cache = KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None
-        raw_logits = (self.model._logits_window(window, cache) if interrupt is None
-                      else self.model._logits_window(window, cache, interrupt=interrupt))
+        active_cache = (cache if cache is not None else
+                        KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None)
+        raw_logits = (self.model._logits_window(window, active_cache) if interrupt is None
+                      else self.model._logits_window(window, active_cache, interrupt=interrupt))
         if interrupt is not None:
             interrupt()
         logits = tuple(float(value) for value in raw_logits)
@@ -468,7 +499,7 @@ class NativeLLMRuntime:
         return InferenceResult(
             prompt_sequence=sequence,
             logits=logits,
-            cache_tokens=len(cache.tokens) if cache is not None else 0,
+            cache_tokens=len(active_cache.tokens) if active_cache is not None else 0,
             model_digest=self.model_digest,
             architecture_digest=self.architecture.digest,
         )

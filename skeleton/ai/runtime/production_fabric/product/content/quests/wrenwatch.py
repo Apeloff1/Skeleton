@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for wrenwatch."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('wrenwatch_arrival', (), (), ('arrival_record',)), Quest('wrenwatch_source', ('wrenwatch_arrival',), ('arrival_record',), ('source_proof',)), Quest('wrenwatch_witness', ('wrenwatch_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('wrenwatch_reconcile', ('wrenwatch_source', 'wrenwatch_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('wrenwatch_crossing', ('wrenwatch_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('wrenwatch_conclusion', ('wrenwatch_crossing',), ('crossing_pass',), ('ending_unlocked',)))

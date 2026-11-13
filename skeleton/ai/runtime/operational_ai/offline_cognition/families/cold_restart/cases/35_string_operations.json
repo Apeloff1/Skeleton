@@ -1,0 +1,24 @@
+{
+  "schema": "offline-cognition-case.v1",
+  "family": "cold_restart",
+  "id": "35_string_operations",
+  "expected": "reject",
+  "payload": {
+    "name": "cold_restart",
+    "category": "lifecycle",
+    "source_role": "system",
+    "retrieval_mode": "lexical",
+    "context_limit": 9728,
+    "byte_limit": 71680,
+    "latency_ms": 51000,
+    "min_evidence": 3,
+    "priority": 11,
+    "rank_lexical": 0.6,
+    "rank_dense": 0.3,
+    "rank_freshness": 0.1,
+    "operations": "source"
+  },
+  "risk": "Refuse string operations",
+  "native_e2e": false,
+  "release_certified": false
+}

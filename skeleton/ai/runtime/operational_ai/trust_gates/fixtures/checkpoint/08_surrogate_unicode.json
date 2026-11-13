@@ -1,0 +1,16 @@
+{
+  "case": "08_surrogate_unicode",
+  "gate": "checkpoint",
+  "expect": "reject",
+  "reason": "Surrogate Unicode cannot be canonical evidence",
+  "payload": {
+    "model_id": "\ud800",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "format": "gguf-v3",
+    "bytes": 5000,
+    "max_bytes": 100000000,
+    "step": 1,
+    "approved": true
+  }
+}

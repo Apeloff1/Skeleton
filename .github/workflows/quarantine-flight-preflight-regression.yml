@@ -1,0 +1,57 @@
+name: Quarantine flight and laptop preflight regression
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/runtime/operational_ai/transport/flight/http_sota.py"
+      - "skeleton/ai/runtime/operational_ai/transport/flight/event_stream/service_sota.py"
+      - "skeleton/ai/runtime/operational_ai/offline_cognition/first_laptop_preflight_sota.py"
+      - "skeleton/testing/test_flight_sota_quarantine.py"
+      - "skeleton/testing/test_first_laptop_preflight_quarantine.py"
+      - "skeleton/ai/runtime/operational_ai/context/knowledge_plane/ingest.py"
+      - "skeleton/testing/test_knowledge_quarantine_restoration.py"
+      - ".github/workflows/quarantine-flight-preflight-regression.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quarantine-flight-preflight-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  source_qualification:
+    name: Verify authenticated event bytes and fail-closed local preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout immutable PR head without credential persistence
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Refuse stale checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Install supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Verify Python syntax for quarantine components and tests
+        run: |
+          python -m compileall -q \
+            skeleton/ai/runtime/operational_ai/transport/flight/http_sota.py \
+            skeleton/ai/runtime/operational_ai/transport/flight/event_stream/service_sota.py \
+            skeleton/ai/runtime/operational_ai/offline_cognition/first_laptop_preflight_sota.py \
+            skeleton/testing/test_flight_sota_quarantine.py \
+            skeleton/testing/test_first_laptop_preflight_quarantine.py \
+            skeleton/ai/runtime/operational_ai/context/knowledge_plane/ingest.py \
+            skeleton/testing/test_knowledge_quarantine_restoration.py
+      - name: Run focused negative-first regression suite
+        run: |
+          python -m unittest -v \
+            skeleton.testing.test_first_laptop_preflight_quarantine \
+            skeleton.testing.test_flight_sota_quarantine \
+            skeleton.testing.test_knowledge_quarantine_restoration

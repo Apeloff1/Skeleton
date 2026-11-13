@@ -1,0 +1,15 @@
+{
+  "case": "02_missing_field",
+  "gate": "checkpoint",
+  "expect": "reject",
+  "reason": "Missing authority field cannot default to allowance",
+  "payload": {
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "format": "gguf-v3",
+    "bytes": 5000,
+    "max_bytes": 100000000,
+    "step": 1,
+    "approved": true
+  }
+}
