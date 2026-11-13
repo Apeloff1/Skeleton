@@ -1,0 +1,896 @@
+{
+  "schema": 1,
+  "source_pr": 5079,
+  "source_head": "372784e34521319d261c1ad73cb2fc3779d184a6",
+  "merge_base": "e00bfb0809b34573c2df313ea16e17fd10bead38",
+  "current_main": "42c9908bee87bacde621b99e6015250cb41d64da",
+  "covered_by_subtree": 4097,
+  "adopted_subtrees": [
+    {
+      "path": "skeleton/ai/game_builder/catalogs",
+      "type": "tree",
+      "mode": "040000",
+      "sha": "41f12d3e3b57013db366d2b72b9a3218c92d1f9e"
+    }
+  ],
+  "adopted_files": [
+    {
+      "path": ".github/workflows/release-images.yml",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "2ad59d9ad30f07d1e7e40d04f88493b0a6adfcc6"
+    },
+    {
+      "path": ".github/workflows/reproducible-release.yml",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "01c66cf79205cb85534045b3463d38b8b2bfb859"
+    },
+    {
+      "path": "frontend/scripts/test-setup-local-guard.cjs",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "cfbcfc11e56412731744c269c39414b0d7451b0d"
+    },
+    {
+      "path": "skeleton/app/consumer_first_run_readiness.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "5e666d8a26bf21752b2b55b0ad9375395f7b2c24"
+    },
+    {
+      "path": "skeleton/godot_export/report.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "76152d1793e69924aadc042eac434806db83bf0d"
+    },
+    {
+      "path": "skeleton/local_ai/doctor.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "bfdc3289f0f48a13afc60311a4e81260e81ecbda"
+    },
+    {
+      "path": "skeleton/local_ai/health.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "8115f22ace9405284a6ab2fbe3963174b5900256"
+    },
+    {
+      "path": "skeleton/local_ai/inference_loop.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "f79ba57946674ffd07142dd517791a4171ee0f6c"
+    },
+    {
+      "path": "skeleton/local_ai/operational_engine.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "5a65b2867c51bc2a54c027d2971db3590563fdd4"
+    },
+    {
+      "path": ".github/workflows/draft19-gguf-source-qualification.yml",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "0f5b965de872b4fd0859ac97c644beb1f2a47f44"
+    },
+    {
+      "path": ".github/workflows/full-repo-audit-20261106.yml",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "cbebc1f187ffda00edaec58a4539ed7990f67ff4"
+    },
+    {
+      "path": "docs/game/STUDIO_B_SCENE_BYTE_CUSTODY.md",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "4b6f2329044a450459145ae2a870be01eb223d99"
+    },
+    {
+      "path": "docs/qa/DRAFT_19_RECONCILIATION_2026-11-08.md",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "2a6b6940c48ce16dd2b89c83cdfdf2cd42c39467"
+    },
+    {
+      "path": "docs/qa/PR_5081_SOURCE_OVERLAP_RECONCILIATION_2026-11-08.md",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "9490223afe0cc64aa91630ef1ecff51a3b98275d"
+    },
+    {
+      "path": "machine/draft19_reconciliation.json",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "5c429e894a196af0acefff773acb82199a77c42c"
+    },
+    {
+      "path": "scripts/audit_pytest_shard_20261106.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "f3037693caa31db468b068f55c9fba962c09686b"
+    },
+    {
+      "path": "scripts/audit_sweep_20261106.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "1280cc73027346530984011b28a82f931f9b90e2"
+    },
+    {
+      "path": "scripts/check_draft19_reconciliation.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "289440deb6167c44f2f283cf6ac32a098e544040"
+    },
+    {
+      "path": "scripts/check_studio_ecosystem_catalog.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "6ee78b2fb5cfef58a3c29004c5bd68423c082610"
+    },
+    {
+      "path": "scripts/check_studio_ecosystem_continuity.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "1eaad27fa30264ef50516ed954238aa786095c6c"
+    },
+    {
+      "path": "scripts/studio_ecosystem_cli.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "afd16e6623ff43526d4abf70d2e62ea448a45378"
+    },
+    {
+      "path": "scripts/studio_ecosystem_production_cli.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "10a1555757b52fb0e996fe14a39027761b4bed04"
+    },
+    {
+      "path": "scripts/studio_producer_cli.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "4fb0445ff4d999b7536801df6ad631e3367b4090"
+    },
+    {
+      "path": "scripts/studio_quest_transcript_cli.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "cf89a234a5b63ea40d5b1db86ba62fe41b58c4a2"
+    },
+    {
+      "path": "scripts/studio_walk_transcript_cli.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "fc41d6e88fe6af9d026b7b2cb18168a74eb540b8"
+    },
+    {
+      "path": "scripts/studio_work_operator.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "0774fb23ba4465792b95017ad68dd8207303c3e5"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/export_verification.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "82bb9f0b378fe6dd128c9f3c75b54cff02988e4e"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_assets.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "7f29286c43fbc6178809143095d289a0c0d1856d"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_audio.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "fc6ff7592cfa4968053a16c775c91f736d6f1381"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_autoplay.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "e1be31d64b2510b4ea3a60c3ef6b0aadec9a820f"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_batch.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "ac042605da060f76fe04e4e20d5732c087b45c19"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_capacity.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "b1c2f4528dd2194b400111cffb1a2ebd1531d9c4"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_catalog.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "48725b7188cd1900d3d0dd230656f272ca3d086d"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_census.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "81ed07252cc8e84dfa46f0d4451e4ce1811b796b"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_checkpoint_store.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "c5d018adc3ed4244d823bde50bb171e37d93360a"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_cohort_audit.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "62f53339e6cb3a75c0d0ffe163d8c72333e0b29e"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_continuity.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "1b7566cb788b2916b1fbd521a4a6556d9988639d"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_encounters.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "66acc8e46dcbcb5c8f6af54c89cf1fd69adb82fd"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_endings.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "79061db74919658cd0acecbfce3a7033025a78d2"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_fence.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "97fc81b04b93248aa056b8476c07d283c7730f28"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_filing.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "eef312ddecab65a1b5b5d02c96bc0c6dd1cc5ed7"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_frame.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "f8b6a397fab1cba999fbded066e1d016831bfd44"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_hardware.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "ed197793a050ed5408749ca66672bc89470ddf41"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_incomplete_quarantine.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "1da9661cb7e446a4ed976a5beb31d76b6e31c6da"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_journal.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "eb50541ea24ffa4a88facd30ce9cf3fbe41c475f"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_leases.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "50e936a0cbfb24e4336002ccd4191883d4d03e05"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_manifest.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "d1488ce634d1e28611885cf6306b1f22850fb96b"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_media_corpus.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "833979f523f25147a668ea564509c2ad02b5094b"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_media_quality.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "6646679a2e8387064991f27850f7d863d505d467"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_media_worker.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "ae397680fdde3f442517bf59d57392dc29175515"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_navigation.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "39436052736200806dcbc4faf2ba31577daf155c"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_npc_patrol.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "3efb9026ddc845b665ac39a687536b9dbd150436"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_npc_review.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "16d4abead86bd82edb9ec2962a1dd21bd44909cb"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_objects.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "08ce26657f04c33795ddd9d98b814ab773c56d52"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_offline_bundle.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "e0245ca3b28e28f33cf8993c7ea814e68254db5a"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_offline_verify.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "e89cd082da5f3ead763f4483ebad51b940d98368"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_parallel.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "9156e448f550ddc2129efbf391b8d177ec218a8a"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_portfolio.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "a2a7eff400e207c76b92e6fcab29a52a1c720c1f"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_preview_batch.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "b8913552b904d07b0dc757e92410f5c81e7e62cf"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_preview_worker.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "dbf15008acc35c2676f6d812bff581733c4d1cd8"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_quest.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "ff496e5cbfd259c45b9c793d7a924cc17cede042"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_queue.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "7f349c3ac89f98246d7a181b0e8a8fb5ecb5175f"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_recovery.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "884311eb96135517db3059ec6fbde61c07a08670"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_resources.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "497202215251b8efcf9c0f5ca4ae80c25462f484"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_resume_batch.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "f7ad827c9b1cc6f0b57e96f6fb68ed49b89ac98a"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_rights.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "b11f72e23e3d5af0bbe8804191fc0fb1fc82731b"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_route_coverage.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "17d9d41efc42064d024a4ed7faf8e09d68eaa525"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_save.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "96519299f27f0062065a8afe7e81eaa494311133"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_scene.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "dcb4518021978617269540151a11633ae6c0fc46"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_search.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "c7edb30df71620f200947445424dddee9a5cf42d"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_social.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "aa51d5f61ff94f36da4599999eb1e6332ec9e47b"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_spool.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "ae853ee7556b35f567e3109e0e2dfd73e7c09340"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_spool_audit.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "67bead9f470a10109812b5e5b7837390ef4abf77"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_story_html.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "dd525ce89d02fd40c431bc1464cafc4e4a66d2d2"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_story_review.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "02c84dbf6a277c52d6a066694f3d7fd9c78d19a3"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_supervisor.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "ab79936e89c7ccbe1c9608b2757ac67d105e3da8"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_synth_audio.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "a3a280c718ba3d7b74bb7a1512d351ec3601f882"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_turn.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "f3a30e8962e6895585b8909c7ac6ce655e53e63f"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_vector_art.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "b5b44f907a3225327522c494b8a84807e2f3ec9e"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_walk_checkpoint.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "b9c6d46c62ca8655ab1247aa837e8a68e21c24f4"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_walk_replay.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "0b698073506cf29d9ea7bff4f78c29fbc912c657"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_walk_review.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "e25e18a26c6484bd0423a4a2379ee9570a7131a4"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_walkable.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "21ab77f0a7ba73787090358410af837934491695"
+    },
+    {
+      "path": "skeleton/ai/game_builder/studio_ecosystem_work.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "471cdda4cbad183af16f43ae13add5826e85e11d"
+    },
+    {
+      "path": "skeleton/app/consumer_first_run_handoff.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "a3ae09d7e9acc7add75c1880a4bc2a2e7bb182d1"
+    },
+    {
+      "path": "skeleton/game/gameplay/grid_save_custody.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "c6119cbb8417c4e2ee2efcbea3eedaee6dcfa3ee"
+    },
+    {
+      "path": "skeleton/game/gameplay/scene_bytes.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "32282757d524068e1ba4a874245ee988566fb8a2"
+    },
+    {
+      "path": "skeleton/jeeves/worlds/export_verification.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "82bb9f0b378fe6dd128c9f3c75b54cff02988e4e"
+    }
+  ],
+  "already_in_main": 2354,
+  "deferred_semantic_conflicts": [
+    {
+      "path": ".github/workflows/jeeves-integrated-source-qualification.yml",
+      "reason": "concurrent-main-edit",
+      "base": "40deb3fba6b22beefd9334ee375002b3e5e82794",
+      "head": "f7a985477e1b83e36d52e814fc1c5e3220c77471",
+      "main": "2cc0b7c8e7ed024586717ab272b84d5181940e7c"
+    },
+    {
+      "path": ".github/workflows/owner-historical-actions-cleanup.yml",
+      "reason": "concurrent-main-edit",
+      "base": "fcf8811bd03f87e7ccc11ca21c61bbd9ef406183",
+      "head": "691165eabeb952a60ccdd438b26e620dc3d4b915",
+      "main": "96fe607e2a61c2555d25859e57264d95cebaebba"
+    },
+    {
+      "path": ".machine/repository.toml",
+      "reason": "concurrent-main-edit",
+      "base": "14af3cdca79fe8081896d67bde432dcee3dfc175",
+      "head": "9d42587a4ffb319c1d89c4d6a79bdf0b0c499f50",
+      "main": "23679e89f91573e21a012a7cf832df5686597052"
+    },
+    {
+      "path": "backend/Dockerfile",
+      "reason": "concurrent-main-edit",
+      "base": "8c93f7bd7416f8e810878853a6697f52946b9132",
+      "head": "1c1b2095286ab1a560968ab0bdbed4ad49f6d867",
+      "main": "4a180a7aa22d9559b28cd05da654c65d0cc79fe7"
+    },
+    {
+      "path": "backend/core/engine_client.py",
+      "reason": "concurrent-main-edit",
+      "base": "ae3ffa421b5b13bbdbecf9cba457873a21898009",
+      "head": "39749c50f711322cf700688c4f586004848ac2fa",
+      "main": "4ddda1b11980d3cd75f73d70adba5225e49116cc"
+    },
+    {
+      "path": "backend/core/expressive_tts.py",
+      "reason": "concurrent-main-edit",
+      "base": "d95cd8c364c592bdac8f738782d92eb17cf35dd3",
+      "head": "14d17b2cdb23382544a8398bf2364487dce65728",
+      "main": "690215e2f9374c3b20b2088fc1cfb1403c104a3b"
+    },
+    {
+      "path": "backend/core/lazy_registry.py",
+      "reason": "concurrent-main-edit",
+      "base": "00b3baf7a35055761f28020363759a88c176b5d1",
+      "head": "517b15ec0aefe769f6dc74996e94d485b3a7faba",
+      "main": "3b6237d360ab58f2f2a68337df3130c7cded8813"
+    },
+    {
+      "path": "backend/gameforge/knowledge/free_apis.py",
+      "reason": "concurrent-main-edit",
+      "base": "a2137fd28ad31ac5580ac15d6f7a9accff56f94c",
+      "head": "9838e2cac9f4fe519e7c2bda82779c75f11529fd",
+      "main": "92d6e70f490fd696b43f9a9fe18f87a6126faf4a"
+    },
+    {
+      "path": "backend/gameforge/rooms/room_api_gateway.py",
+      "reason": "concurrent-main-edit",
+      "base": "29ed091f9e4846e9e251f1ca49839b052ef7055d",
+      "head": "6a69fb756d76c12e1dc25e92d36f2b6ddc3ffbe4",
+      "main": "b0c64843018733db53068eb831637810d884568e"
+    },
+    {
+      "path": "backend/requirements.txt",
+      "reason": "concurrent-main-edit",
+      "base": "758bb81c6853243f6afe21f187abc86bfcc28c46",
+      "head": "98f6a6f8a03b2225110576d83ea11e523ebd21d3",
+      "main": "b7e305c4b3eaf01020d897c14c7e6e82fb61fa69"
+    },
+    {
+      "path": "backend/routes/compiler_tools.py",
+      "reason": "concurrent-main-edit",
+      "base": "79ea3e11b7dabd97af8998cdae397ecc8b5902f6",
+      "head": "00a50aab584d384fd287b6f0e92cc3447d79e200",
+      "main": "8a8a47bfc52401a42cce51d2f90f98e44d6b0bc0"
+    },
+    {
+      "path": "backend/routes/dragon_academy.py",
+      "reason": "concurrent-main-edit",
+      "base": "01e595d9f195d33b623a395c920f252fd5c640aa",
+      "head": "21e54a74b14ca4fdf6aa8b17ad22558607bdea0c",
+      "main": "7a1fcb9c5be1939b7711d34a7120bc50649098ab"
+    },
+    {
+      "path": "backend/routes/swarm_hub.py",
+      "reason": "concurrent-main-edit",
+      "base": "33bfeb37076ae1af2feed161e21cef31a964d745",
+      "head": "c0666502cc78a7716f053cd62b09b15c5f748fd3",
+      "main": "905d203f84e97d619c0f73a3529204e02a10296d"
+    },
+    {
+      "path": "docker-compose.yml",
+      "reason": "concurrent-main-edit",
+      "base": "859a71af1d54da70402ebe124e4b076e5b691d51",
+      "head": "6e204db231cd1d8db0f64829504e5bbf4f2d4a6d",
+      "main": "3cbf37077221df322e5f9e17ffb1b29eef688389"
+    },
+    {
+      "path": "frontend/src/product/appReadinessClient.ts",
+      "reason": "concurrent-main-edit",
+      "base": "39902d0d3f1d97b03ace89c3491b08de3678a712",
+      "head": "ea1e7e75b497a7b8bec3504fe03b531973045763",
+      "main": "5ab7aa0509cd4b890d64f912eda8a8c5ec12a8ee"
+    },
+    {
+      "path": "machine/ai_file_tree.json",
+      "reason": "concurrent-main-edit",
+      "base": "76b1a388ed32cd296a2b384198759568c72fe79b",
+      "head": "9aeb51d2909b706989bcaef1ee2d2bcd3e3d71ce",
+      "main": "1fc4f79bf6ab796da1cf96d709eb22d0c89ac54c"
+    },
+    {
+      "path": "machine/ci_workflow_tiers.json",
+      "reason": "concurrent-main-edit",
+      "base": "db501006d555b2d3228cc61c5908a30043b5ca62",
+      "head": "44c358441cf803d221354b7eb437d272ae624661",
+      "main": "a3c4bbce83961d3572147c3a5c9edac4f1ae29c2"
+    },
+    {
+      "path": "scripts/check_ci_workflow_tiers.py",
+      "reason": "concurrent-main-edit",
+      "base": "7dfb1da75fee88d86cc730b889c12d391f48cd4c",
+      "head": "32e8b18cb263dee95de58dfa60c222cb220f6bcc",
+      "main": "9e535c5bde8c2550111c8ecf2afc5b0f59df26d2"
+    },
+    {
+      "path": "scripts/check_toolchain_contract.py",
+      "reason": "concurrent-main-edit",
+      "base": "d78088123c59dabea0a4000c94130d9be05fef84",
+      "head": "baaaf44c0c07167f7a28e620656a35a271fbd11e",
+      "main": "8c2b0ee12b7a39357534a5cf8bd50ad18de89421"
+    },
+    {
+      "path": "scripts/game/offline_grid_campaign.py",
+      "reason": "concurrent-main-edit",
+      "base": "de8e209a31a39f841ba87fbc77b8f04e364f2691",
+      "head": "2efbd25bfc510a85382d9d12fa20dccdab12d864",
+      "main": "1d0528a7b1035808f8855bd9201cdf076ee9b44e"
+    },
+    {
+      "path": "scripts/windows/check_payload_zip.py",
+      "reason": "concurrent-main-edit",
+      "base": "b2906cd40a46834e83c6fdfe023bed234f511261",
+      "head": "239f90f2f5c09a0810a2923643e537828b2fb3cf",
+      "main": "9e5cbeee72d672ca448c95026dee3b325af301c1"
+    },
+    {
+      "path": "scripts/windows/test_payload_zip.py",
+      "reason": "concurrent-main-edit",
+      "base": "8445664cf62969ae4e572f40dcbd087321ae3b6f",
+      "head": "18b561cc1ccdce0a2ac0563e7fe96addd0505eed",
+      "main": "32d2f23bde03c5674173de6c832379f241f65720"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dual_runtime_verify.py",
+      "reason": "concurrent-main-edit",
+      "base": "a598ed682e502ec4ddfba1d72952a460c6d32c75",
+      "head": "189d25a408c8a029ce69a8e7f5b91fd654b3236a",
+      "main": "e8ce65d72b79fc365aa4b1f526cd3eef5fa3596f"
+    },
+    {
+      "path": "skeleton/ai/model_runtime/__init__.py",
+      "reason": "concurrent-main-edit",
+      "base": "9c39086824d01e00cfa9a19e94ed0bc92fc75d6c",
+      "head": "3650afaeab52bfa509d8236caad8011c51619c53",
+      "main": "a9cda85813e6025735d59d05fd459da72c8fa403"
+    },
+    {
+      "path": "skeleton/ai/research/legacy/gameforge/knowledge/free_apis.py",
+      "reason": "concurrent-main-edit",
+      "base": "a2137fd28ad31ac5580ac15d6f7a9accff56f94c",
+      "head": "9838e2cac9f4fe519e7c2bda82779c75f11529fd",
+      "main": "92d6e70f490fd696b43f9a9fe18f87a6126faf4a"
+    },
+    {
+      "path": "skeleton/ai/runtime/native/profile_gate.py",
+      "reason": "concurrent-main-edit",
+      "base": "cfc9477bd509516b61edd4d0d551545f889332aa",
+      "head": "4aa2c8b6807fa66bbbf475f92b86b6b0e063680a",
+      "main": "b6a8abe0cc92bc2690c2092db89a5e5204c56c0a"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/model/qualification/bench.py",
+      "reason": "concurrent-main-edit",
+      "base": "ee58f5c6fbdecb33d78963b6bf441c74d44b6580",
+      "head": "54f84f24badf215710c3fdfda67f421f768a5821",
+      "main": "1fb8e59471988a74f85c0ddd180634140326fdb3"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/reliability_fabric/flows/evidence_bundle.py",
+      "reason": "concurrent-main-edit",
+      "base": "9148156d656e9191966a569c506cf351bb507983",
+      "head": "d109ebd5645f53286341327eeb8fe2610ad14c8d",
+      "main": "8401d526bda9eda30611ad08dc266e5d90a14b67"
+    },
+    {
+      "path": "skeleton/ai/runtime/production_fabric/product/api.py",
+      "reason": "concurrent-main-edit",
+      "base": "e485da409090e4946f087a350595674eca6c8fd9",
+      "head": "7b36dfb2142ae45ea521fedd534e48d59ba3dcf4",
+      "main": "31dfa80e480064e38769818bbfc86e70d75790be"
+    },
+    {
+      "path": "skeleton/ai/simulation/game/__init__.py",
+      "reason": "concurrent-main-edit",
+      "base": "dc658d4a5b2cbdacd9acb7cc52eb4d3442033eb8",
+      "head": "4ff39b9cfcd1f7b0851c9e852932088497aa2f24",
+      "main": "168e5b5e5dc7b3bd8e61a13eb6c486b41980a583"
+    },
+    {
+      "path": "skeleton/app/health.py",
+      "reason": "concurrent-main-edit",
+      "base": "2c30e1a3ff44f8d74f748333866d2e2d4054e4c9",
+      "head": "fef260c01a5f5c8aa7a1b03007db5d15cc86df69",
+      "main": "84aaa0c4dbb5dd320fe64a6a7a5a7df6a3dacb46"
+    },
+    {
+      "path": "skeleton/app/installer.py",
+      "reason": "concurrent-main-edit",
+      "base": "54f9e4d5dc457f430c671495c3a5fefeebb3708c",
+      "head": "c1b6834a5feff82618383bf282e069e8a1e9a213",
+      "main": "44f6b4563c538ba74aac954ca14f0639d2319dc2"
+    },
+    {
+      "path": "skeleton/app/offline_delivery_archive.py",
+      "reason": "concurrent-main-edit",
+      "base": "334f0a3fee25b14cc5438aad0c6189ab9a65913a",
+      "head": "66f80e016cc84661e08950012e9977a2a84c6aaa",
+      "main": "104a74db40ceb99c091c71f42355272d45bff0e9"
+    },
+    {
+      "path": "skeleton/app/studio_readiness.py",
+      "reason": "concurrent-main-edit",
+      "base": "4b952476e0f8b01035a5beb33870e8bb96686762",
+      "head": "57aae47c60106eef26eb940e96d499c6fb763a96",
+      "main": "f5b431be8f3a804c31355b5e65d8c0daaed263c6"
+    },
+    {
+      "path": "skeleton/game/flgb_editor_runtime.py",
+      "reason": "concurrent-main-edit",
+      "base": "f79b36d13b2585cd3df8fa86e95013900c88471f",
+      "head": "e53fe78cef4faca4d67aee45bc2b64a96867a0b8",
+      "main": "8018e9f4214217c0ac0fca1943b24b6dee8875bf"
+    },
+    {
+      "path": "skeleton/game/simulation/flgb_simulation_runtime.py",
+      "reason": "concurrent-main-edit",
+      "base": "590cfcf0457e97c352ec0de024bab84fc831a359",
+      "head": "373217c6b47bcb303c34ac5eee29036d08b6fb8d",
+      "main": "f4cc6320fbdd472588ca08b2c3bb1f454cec9d80"
+    },
+    {
+      "path": "skeleton/godot_export/runner.py",
+      "reason": "concurrent-main-edit",
+      "base": "3d19b0a04d0353d60b22551d8adfabeb3cda4949",
+      "head": "724eefd87e53db42e6e517f1182526761fd44150",
+      "main": "0f32373021173a4103672b64035196f127226396"
+    },
+    {
+      "path": "skeleton/jeeves/worlds/world_canon.py",
+      "reason": "concurrent-main-edit",
+      "base": "05fde3634c305aca9502a5e839bb93dfa939b760",
+      "head": "c40cb4b09086a317e4525f1ebde557434b272997",
+      "main": "5bcc9de45c7c4d187019dfbb9c434323d269f5d8"
+    },
+    {
+      "path": "skeleton/local_ai/model_loader.py",
+      "reason": "concurrent-main-edit",
+      "base": "51c9a1adb0d9ef98e3b2a091f1014ebeed56fe63",
+      "head": "c6ee1da4d1b395b9ef95fb464c2c20218e1adc9f",
+      "main": "c1c201318762663651d685937641d7338774c0e0"
+    },
+    {
+      "path": "skeleton/native/profile_gate.py",
+      "reason": "concurrent-main-edit",
+      "base": "cfc9477bd509516b61edd4d0d551545f889332aa",
+      "head": "4aa2c8b6807fa66bbbf475f92b86b6b0e063680a",
+      "main": "b6a8abe0cc92bc2690c2092db89a5e5204c56c0a"
+    },
+    {
+      "path": ".github/workflows/dragon-atlas-backend-bridge.yml",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "32e1484733355198d6657b627cd8ff8c2ed8b370",
+      "main": "b8f8ce84b279ddffaeb9490d02d4e78f5d4d4487"
+    },
+    {
+      "path": ".github/workflows/dragon-campaign-frontend-checks.yml",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "e66d37f2831ab8a641bff9d7d8ad9a89d7f75e01",
+      "main": "1069462e9f18dc2c990bd5922853f8397004b08a"
+    },
+    {
+      "path": ".github/workflows/dragon-campaign-source-tests.yml",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "6deefe4e550eabb42e75298590718ac77274f19f",
+      "main": "00ed988197309d3058325241cf0d50b128cfcde3"
+    },
+    {
+      "path": ".github/workflows/masterplan-421-dossier-integrity.yml",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "79720c04afab5ead57cbf0430a7f299e455533df",
+      "main": "335a381fe6ea3e929fb4acde28d52fb45f3dfab5"
+    },
+    {
+      "path": "backend/tests/test_free_api_dns_pin.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "250fa34f37d6452d95eaa24584ec216612029af3",
+      "main": "a843209598214917d3212fef31ce087b1f858864"
+    },
+    {
+      "path": "backend/tests/test_room_api_dns_pin.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "98a8207db206ff7fa1743ae4d19e69981e9ee83b",
+      "main": "3b180d8033ba8c9bb7b8628f41ba62ddac7ecdc2"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/session.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "a7bf719bff8cde2765cbddd8a3574390fbacb8bd",
+      "main": "9043d01d87c74926e5f6f626ac20ad5b0c1855ab"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/world_canon.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "c40cb4b09086a317e4525f1ebde557434b272997",
+      "main": "5bcc9de45c7c4d187019dfbb9c434323d269f5d8"
+    },
+    {
+      "path": "skeleton/godot_export/artifact_custody.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "1cad07bbe06ad3694296d76544e34da54c394b14",
+      "main": "ec9aaabadeaa5a79f05db72ac93ae61b2d0e84bd"
+    }
+  ],
+  "unindexed_tree_paths": 9482,
+  "all_security_ci_device_release_holds_active": true,
+  "source_parent_preserved": true,
+  "note": "Source-safe subtrees/files only. Deferred changes require independent review. This is a held review branch, not a merge authorization."
+}

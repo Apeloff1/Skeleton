@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_glacial_fjord",
+  "title": "Glacial Fjord: The Open Tournament",
+  "subtitle": "Original the open tournament design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010310625,
+  "width": 21,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 6,
+  "theme": "ocean",
+  "starting_health": 5
+}

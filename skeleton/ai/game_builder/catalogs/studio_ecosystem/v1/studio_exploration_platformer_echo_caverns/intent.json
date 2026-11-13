@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_exploration_platformer_echo_caverns",
+  "title": "Echo Caverns: Exploration Platformer",
+  "subtitle": "An original exploration platformer brief in Echo Caverns; prototype maps are not full genre implementations.",
+  "seed": 202610301280,
+  "width": 25,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "arcade",
+  "starting_health": 6
+}

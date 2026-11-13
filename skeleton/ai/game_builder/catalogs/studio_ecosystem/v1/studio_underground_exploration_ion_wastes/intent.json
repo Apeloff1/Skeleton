@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underground_exploration_ion_wastes",
+  "title": "Ion Wastes: Underground Exploration",
+  "subtitle": "An original underground exploration brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610303670,
+  "width": 21,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 8,
+  "theme": "space",
+  "starting_health": 6
+}

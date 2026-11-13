@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "trail_rations exchange command",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "side",
+    "quantity",
+    "expected_version",
+    "tick"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "side": {
+      "type": "string",
+      "enum": [
+        "buy",
+        "sell"
+      ]
+    },
+    "quantity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 32
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "$comment": "Market frontier_trail_rations; unit base 92; integer pricing, no external currencies or network settlement."
+}

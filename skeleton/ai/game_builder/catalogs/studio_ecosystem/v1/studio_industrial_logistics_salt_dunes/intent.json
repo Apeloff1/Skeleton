@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_salt_dunes",
+  "title": "Salt Dunes: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610302424,
+  "width": 25,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 5,
+  "theme": "desert",
+  "starting_health": 3
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_ashen_archipelago",
+  "title": "Ashen Archipelago: The Open Tournament",
+  "subtitle": "Original the open tournament design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010310662,
+  "width": 23,
+  "height": 17,
+  "levels": 6,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 8,
+  "theme": "ocean",
+  "starting_health": 6
+}

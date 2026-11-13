@@ -1,18 +1,22 @@
 """Rosetta Challenge Mode — Translate code between languages, auto-graded via playground"""
-from fastapi import APIRouter, Query
+from core.public_exception_route import PublicExceptionRoute
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
 from dotenv import load_dotenv
 from pathlib import Path
 from datetime import datetime, timezone
-import os, random
+import difflib
+import os, random, uuid
 
 from core.exec_guard import code_execution_enabled, execution_disabled_message
+from routes.gameforge_auth import get_current_user
 
 load_dotenv(Path(__file__).parent.parent / '.env')
 
-router = APIRouter(prefix="/api/rosetta-challenge", tags=["rosetta-challenge"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/rosetta-challenge", tags=["rosetta-challenge"])
 _client = _SHARED_MONGO_CLIENT  # consolidated → core.databases.client
 _db = _client[os.environ.get('DB_NAME', 'codedock')]
 PROJ = {"_id": 0}
@@ -21,9 +25,34 @@ EXEC_LANGS = ["Python", "JavaScript", "TypeScript", "Go", "Rust", "C", "C++"]
 LANG_MAP = {"Python":"python","JavaScript":"javascript","TypeScript":"typescript","Go":"go","Rust":"rust","C":"c","C++":"cpp"}
 
 
+class ChallengeSubmission(BaseModel):
+    challenge_id: str = Field(..., min_length=10, max_length=128, pattern=r"^rc_[A-Za-z0-9_-]+$")
+    target_language: str = Field(..., min_length=1, max_length=32)
+    user_code: str = Field(..., min_length=1, max_length=100_000)
+
+
+def _owner(user: dict) -> str:
+    if not user or user.get("disabled") or user.get("dev_mode"):
+        raise HTTPException(status_code=401, detail="Sign in to use Rosetta challenges")
+    owner = str(user.get("email") or user.get("user_id") or "").strip()
+    if not owner:
+        raise HTTPException(status_code=401, detail="Authenticated account identity is unavailable")
+    return owner
+
+
 @router.get("/generate")
-async def generate_challenge(difficulty: str = Query("medium"), source_lang: str = None, target_lang: str = None):
+async def generate_challenge(
+    difficulty: str = Query("medium", pattern=r"^(easy|medium|hard|expert)$"),
+    source_lang: str | None = Query(default=None, max_length=32),
+    target_lang: str | None = Query(default=None, max_length=32),
+    user: dict = Depends(get_current_user),
+):
     """Generate a Rosetta Challenge — translate code from one language to another."""
+    owner = _owner(user)
+    if source_lang and source_lang not in EXEC_LANGS or target_lang and target_lang not in EXEC_LANGS:
+        raise HTTPException(status_code=422, detail="Unsupported Rosetta language")
+    if source_lang and target_lang and source_lang == target_lang:
+        raise HTTPException(status_code=422, detail="Source and target languages must differ")
     if not source_lang:
         source_lang = random.choice(EXEC_LANGS)
     if not target_lang:
@@ -52,12 +81,22 @@ async def generate_challenge(difficulty: str = Query("medium"), source_lang: str
     )
 
     if not source_entry or not target_entry:
-        return {"error": "Could not generate challenge", "concept": concept}
+        raise HTTPException(status_code=503, detail=f"No reviewed Rosetta pair is available for {concept}")
 
     hint_lines = target_entry.get("code", "").split("\n")[:3]
 
+    challenge_id = f"rc_{uuid.uuid4().hex}"
+    await _db.rosetta_challenge_authority.insert_one({
+        "challenge_id": challenge_id,
+        "owner": owner,
+        "concept": concept,
+        "source_language": source_lang,
+        "target_language": target_lang,
+        "reference_code": target_entry.get("code", ""),
+        "created_at": datetime.now(timezone.utc),
+    })
     return {
-        "challenge_id": f"rc_{concept}_{source_lang}_{target_lang}_{random.randint(1000,9999)}",
+        "challenge_id": challenge_id,
         "concept": concept,
         "concept_name": concept.replace("_", " ").title(),
         "difficulty": difficulty,
@@ -72,24 +111,29 @@ async def generate_challenge(difficulty: str = Query("medium"), source_lang: str
 
 @router.post("/submit")
 async def submit_challenge(
-    challenge_id: str = Query(...),
-    user_id: str = Query("default_user"),
-    target_language: str = Query(...),
-    user_code: str = Query(...),
+    submission: ChallengeSubmission,
+    user: dict = Depends(get_current_user),
 ):
     """Submit a challenge solution — execute and grade."""
+    owner = _owner(user)
+    authority = await _db.rosetta_challenge_authority.find_one(
+        {"challenge_id": submission.challenge_id, "owner": owner}, PROJ
+    )
+    if not authority:
+        raise HTTPException(status_code=404, detail="Rosetta challenge not found for this account")
+    if authority.get("target_language") != submission.target_language:
+        raise HTTPException(status_code=409, detail="The submitted target language does not match this challenge")
     if not code_execution_enabled():
-        return {
-            "compiled": False,
-            "output": "",
-            "error": execution_disabled_message("Rosetta challenge execution"),
-            "score": 0,
-        }
+        raise HTTPException(status_code=503, detail=execution_disabled_message("Rosetta challenge execution"))
+
+    challenge_id = submission.challenge_id
+    target_language = submission.target_language
+    user_code = submission.user_code
 
     lang_key = LANG_MAP.get(target_language, target_language.lower())
 
     import subprocess, tempfile
-    env = {**os.environ, "PATH": f"{os.environ.get('PATH','')}:/usr/local/go/bin:/root/.cargo/bin", "HOME": "/root", "GOCACHE": "/tmp/go-cache", "GOPATH": "/tmp/gopath"}
+    env = {**os.environ, "PATH": f"{os.environ.get('PATH','')}:/usr/local/go/bin:/root/.cargo/bin", "GOCACHE": "/tmp/go-cache", "GOPATH": "/tmp/gopath"}
     timeout = 10
 
     try:
@@ -144,22 +188,23 @@ async def submit_challenge(
 
     compiled = result.returncode == 0
     has_output = bool(result.stdout.strip())
-    score = 0
-    if compiled and has_output: score = 100
-    elif compiled: score = 70
-    elif result.stderr and "warning" in result.stderr.lower(): score = 30
+    reference = str(authority.get("reference_code") or "")
+    similarity = difflib.SequenceMatcher(None, "".join(user_code.split()), "".join(reference.split())).ratio() if reference else 0.0
+    score = round((60 if compiled else 0) + similarity * 40)
+    passed = bool(compiled and score >= 70)
 
     # Award XP
     try:
         from routes.xp_helper import award_xp
-        xp = 50 if score == 100 else 25 if score >= 70 else 10
-        await award_xp(user_id, "rosetta_challenge", f"rosetta_{target_language.lower()}", xp)
+        xp = 50 if score >= 90 else 25 if passed else 0
+        if xp:
+            await award_xp(owner, "rosetta_challenge", f"rosetta_{target_language.lower()}", xp)
     except (ImportError, OSError, RuntimeError):
         pass
 
     # Save result
     await _db.rosetta_challenges.insert_one({
-        "challenge_id": challenge_id, "user_id": user_id,
+        "challenge_id": challenge_id, "user_id": owner,
         "target_language": target_language, "score": score,
         "compiled": compiled, "timestamp": datetime.now(timezone.utc).isoformat(),
     })
@@ -170,17 +215,26 @@ async def submit_challenge(
         "output": result.stdout[:2000] if result.stdout else "",
         "error": result.stderr[:1000] if result.stderr else None,
         "score": score,
-        "xp_awarded": 50 if score == 100 else 25 if score >= 70 else 10,
-        "feedback": "Perfect! Code compiles and produces output." if score == 100 else
-                    "Good! Code compiles but no output detected." if score >= 70 else
+        "passed": passed,
+        "xp_awarded": 50 if score >= 90 else 25 if passed else 0,
+        "feedback": "Excellent translation: it compiles and closely matches the reviewed implementation." if score >= 90 else
+                    "The translation compiles and meets the structural acceptance threshold." if passed else
                     "Code has errors. Check the error output and try again." if not compiled else
-                    "Partial credit.",
+                    "The code compiles, but it does not yet implement enough of the reviewed translation.",
     }
 
 
 @router.get("/history/{user_id}")
-async def challenge_history(user_id: str, limit: int = Query(20, le=50)):
+async def challenge_history(
+    user_id: str,
+    limit: int = Query(20, ge=1, le=50),
+    user: dict = Depends(get_current_user),
+):
     """Get user's challenge history."""
+    owner = _owner(user)
+    if user_id not in {owner, "me"}:
+        raise HTTPException(status_code=404, detail="Rosetta history not found")
+    user_id = owner
     results = await _db.rosetta_challenges.find({"user_id": user_id}, PROJ).sort("timestamp", -1).limit(limit).to_list(limit)
     total = await _db.rosetta_challenges.count_documents({"user_id": user_id})
     perfect = await _db.rosetta_challenges.count_documents({"user_id": user_id, "score": 100})

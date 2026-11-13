@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_settlement_survival_salt_dunes",
+  "title": "Salt Dunes: Settlement Survival",
+  "subtitle": "An original settlement survival brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610301656,
+  "width": 25,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "desert",
+  "starting_health": 4
+}

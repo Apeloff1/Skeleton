@@ -30,7 +30,7 @@ class Backend:
 
 class FlightCapacityTests(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(prefix='ai-flight-capacity-',dir=Path.home())
+        self.temp=tempfile.TemporaryDirectory(prefix='ai-flight-context-',dir=Path.home())
         state=Path(self.temp.name)/'private';state.mkdir(mode=0o700)
         lock=state/'locks';lock.mkdir(mode=0o700)
         self.db=SpineDatabase(state);self.gate=SessionGate(lock)

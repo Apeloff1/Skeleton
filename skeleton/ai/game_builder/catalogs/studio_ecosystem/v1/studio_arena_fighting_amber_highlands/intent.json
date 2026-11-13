@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_amber_highlands",
+  "title": "Amber Highlands: The Open Tournament",
+  "subtitle": "Original the open tournament design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010311106,
+  "width": 27,
+  "height": 17,
+  "levels": 6,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 8,
+  "theme": "forest",
+  "starting_health": 6
+}

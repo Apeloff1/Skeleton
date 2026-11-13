@@ -1,0 +1,55 @@
+{
+  "schema": "skeleton.game_mechanic_scenario.v1",
+  "name": "temperature",
+  "domain": "survival",
+  "initial": 65,
+  "capacity": 100,
+  "events": [
+    {
+      "id": "temperature:gain:1",
+      "action": "gain",
+      "amount": 9,
+      "tick": 1
+    },
+    {
+      "id": "temperature:spend:2",
+      "action": "spend",
+      "amount": 7,
+      "tick": 2
+    },
+    {
+      "id": "temperature:recover:3",
+      "action": "recover",
+      "amount": 2,
+      "tick": 3
+    },
+    {
+      "id": "temperature:observe:4",
+      "action": "observe",
+      "amount": 0,
+      "tick": 4
+    },
+    {
+      "id": "temperature:decay:5",
+      "action": "decay",
+      "amount": 1,
+      "tick": 5
+    }
+  ],
+  "assertions": {
+    "bounds": [
+      0,
+      100
+    ],
+    "accepted_receipts": 5,
+    "duplicate_receipts_change_state": false,
+    "stable_ordering": true,
+    "no_authorization_side_effects": true
+  },
+  "notes": [
+    "Designed for survival simulation with bounded condition units.",
+    "Event IDs carry replay identity within a world instance.",
+    "Timestamps are logical ticks, not wall-clock time.",
+    "This fixture is synthetic and does not claim gameplay/device qualification."
+  ]
+}

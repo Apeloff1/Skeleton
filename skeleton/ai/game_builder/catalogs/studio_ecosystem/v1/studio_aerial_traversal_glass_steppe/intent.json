@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_aerial_traversal_glass_steppe",
+  "title": "Glass Steppe: Aerial Traversal",
+  "subtitle": "An original aerial traversal brief in Glass Steppe; prototype maps are not full genre implementations.",
+  "seed": 202610302731,
+  "width": 23,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 9,
+  "theme": "desert",
+  "starting_health": 3
+}

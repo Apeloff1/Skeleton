@@ -5,12 +5,13 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
-router = APIRouter(prefix="/sota", tags=["SOTA 2026"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/sota", tags=["SOTA 2026"])
 
 # LLM Setup
 from core.engine_chat import EngineChat, UserMessage
@@ -31,7 +32,7 @@ def _policy_chat(policy_id: str, instructions: str) -> EngineChat:
         ),
         actor_id="sota-2026",
         capability="assistant.compat",
-    ).with_model("openai", "gpt-4o")
+    )
 
 
 # ============================================================================

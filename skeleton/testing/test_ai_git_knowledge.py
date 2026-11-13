@@ -110,7 +110,7 @@ class GitKnowledge(unittest.TestCase):
                 GitSource(self.repo,commit=commit)
 
     def test_invalid_secret_matches_but_no_echo(self):
-        for raw in ((b'-----BEGIN ' + b'PRIVATE KEY-----\nABC\n'),
+        for raw in (b'-----BEGIN ' + b'PRIVATE KEY' + b'-----\nABC\n',
                     b'ghp_' + b'x'*30,b'AKIA' + b'X'*16,
                     b'api_key="'+b'q'*40+b'"'):
             with self.subTest(raw=raw[:8]),self.assertRaises(GitSourceError):

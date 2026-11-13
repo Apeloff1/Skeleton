@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_misty_breakwater",
+  "title": "Misty Breakwater: The Four Harvests",
+  "subtitle": "Original the four harvests design in Misty Breakwater; only the grid preview compiles today.",
+  "seed": 203010315451,
+  "width": 23,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 13,
+  "theme": "ocean",
+  "starting_health": 5
+}

@@ -1,0 +1,102 @@
+name: First-install source qualification
+
+# Source-only qualification runs on drafts; no Windows, Docker, GGUF or release claim.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/first-install-source-qualification.yml'
+      - '.env.example'
+      - 'Dockerfile'
+      - 'Dockerfile.dockerignore'
+      - 'backend/Dockerfile'
+      - 'backend/Dockerfile.dockerignore'
+      - 'docker-compose.yml'
+      - 'frontend/Dockerfile'
+      - 'frontend/.dockerignore'
+      - 'skeleton/app/**'
+      - 'skeleton/testing/test_app_assembly.py'
+      - 'skeleton/testing/test_app_installer.py'
+      - 'skeleton/testing/test_app_installer_epoch.py'
+      - 'skeleton/testing/test_app_offline_install_quarantine.py'
+      - 'skeleton/testing/test_app_offline_delivery_archive.py'
+      - 'skeleton/app/offline_delivery_archive.py'
+      - 'skeleton/testing/test_app_studio_journey.py'
+      - 'skeleton/testing/test_dual_runtime_verify.py'
+      - 'skeleton/ai/game_builder/dual_runtime_verify.py'
+      - 'skeleton/ai/game_builder/original_game_studio.py'
+      - 'skeleton/testing/test_app_install_source_contracts.py'
+      - 'skeleton/testing/test_app_compose_parity.py'
+      - 'skeleton/testing/test_windows_installer.py'
+      - 'scripts/check_app_assembly.py'
+      - 'scripts/check_app_compose_parity.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: first-install-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  installer_source_contracts:
+    name: Exact-head first-install source contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Checkout exact PR head without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact-head identity before qualification
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD" || {
+            echo "First-install source qualification checkout mismatch"
+            exit 1
+          }
+      - name: Set up canonical Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install source-test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          -e .
+          "pytest>=8,<9" "pytest-asyncio>=0.24,<2"
+          "PyYAML>=6,<7" "numpy>=2,<3" "Pillow>=13.0.0,<14"
+      - name: Verify Python syntax at the exact head
+        run: |
+          python -m compileall -q skeleton/app
+          python -m compileall -q skeleton/testing/test_app_install_source_contracts.py skeleton/testing/test_app_assembly.py skeleton/testing/test_app_installer.py skeleton/testing/test_app_installer_epoch.py
+          python -m compileall -q scripts/check_app_assembly.py scripts/check_app_compose_parity.py
+      - name: Qualify actual first-install assembly and required source inputs
+        run: python scripts/check_app_assembly.py
+      - name: Run focused host-portable first-install regressions
+        run: |
+          python -m pytest -q --maxfail=1 \
+            skeleton/testing/test_app_install_source_contracts.py \
+            skeleton/testing/test_app_assembly.py \
+            skeleton/testing/test_app_installer.py \
+            skeleton/testing/test_app_installer_epoch.py \
+            skeleton/testing/test_app_compose_parity.py \
+            skeleton/testing/test_app_assembly_source_paths.py \
+            skeleton/testing/test_app_offline_install_quarantine.py \
+            skeleton/testing/test_app_offline_delivery_archive.py \
+            skeleton/testing/test_dual_runtime_verify.py \
+            skeleton/testing/test_app_studio_journey.py \
+            skeleton/testing/test_app_offline_install_preflight.py \
+            skeleton/testing/test_app_offline_install_reconciliation.py \
+            skeleton/testing/test_first_install_required_routes.py \
+            skeleton/testing/test_windows_installer.py
+      - name: Verify construction and provider-owner contracts
+        run: |
+          python scripts/check_architecture_map.py
+          python scripts/check_ai_app_construction.py
+          python scripts/check_capability_interfaces.py
+          python scripts/check_provider_bootstrap.py
