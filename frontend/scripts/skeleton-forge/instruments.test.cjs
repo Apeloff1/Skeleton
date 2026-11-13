@@ -106,3 +106,40 @@ test('expanded 158-genre creator brief exposes categorized search without losing
   assert.equal(built.answers.genre, 'city-builder');
   assert.equal(Q.buildRunRequest({ ...state, brief: { genre: 'colony-sim' } }).answers.genre, 'colony-sim');
 });
+
+
+test('the original 67-genre catalog feeds canonical Forge run semantics', () => {
+  const G = load('src/skeletonForge/galaxyGenres.ts');
+  assert.equal(G.GALAXY_CHOICES.length, 67);
+  assert.deepEqual(new Set(Object.keys(G.GALAXY_TO_FORGE_BRIEF)), new Set(G.GALAXY_CHOICES.map((g) => g.id)));
+  const known = Q.BRIEF_FACETS.find((f) => f.id === 'genre').options;
+  for (const item of G.GALAXY_CHOICES) {
+    assert.ok(known.includes(G.mappedBriefGenre(item.id)), item.id + ' lacks a supported backend genre');
+  }
+  let state = Q.questionnaireReducer(Q.INITIAL_STATE, { type: 'setGalaxyGenre', genre: 'racing' });
+  assert.equal(state.brief.genre, 'simulation');
+  assert.equal(state.galaxyGenre, 'racing');
+  assert.deepEqual(Q.buildRunRequest(state).answers, { genre: 'simulation' });
+  assert.match(Q.buildRunRequest(state).vision, /Racing Game/);
+  assert.equal(Q.questionnaireReducer(state, { type: 'setGalaxyGenre', genre: '__bogus__' }), state);
+  state = Q.questionnaireReducer(state, { type: 'setBrief', facet: 'genre', value: 'rpg' });
+  assert.equal(state.galaxyGenre, null);
+  assert.equal(state.brief.genre, 'rpg');
+});
+
+test('historical specialized genre preserves long authored vision over generated hint', () => {
+  const G = load('src/skeletonForge/galaxyGenres.ts');
+  assert.equal(G.specializedVision('x'.repeat(4000), 'racing', 4000).length, 4000);
+  assert.equal(G.specializedVision('hello', '__bogus__', 4000), 'hello');
+  assert.match(G.specializedVision('hello', 'visual_novel'), /Visual Novel/);
+});
+
+test('63+ genre options are discoverable within the existing five-step Forge', () => {
+  const state = { ...Q.INITIAL_STATE, step: 'options', vision: 'a 2D builder' };
+  const html = render(h(Flow, {
+    state, dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {},
+  }));
+  assert.match(text(html), /all 67 Galaxy genres/);
+  assert.match(html, /data-testid="q-galaxy-genres-toggle"/);
+});
+

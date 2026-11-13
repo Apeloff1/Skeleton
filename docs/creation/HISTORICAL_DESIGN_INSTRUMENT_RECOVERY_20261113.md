@@ -84,6 +84,27 @@ matrices have become canonical GameForge runtime inputs.** That schema mapping
 requires project-scoped handoff with explicit ownership, versioned validation,
 provenance and gameplay/export acceptance rather than blind JSON pass-through.
 
+## Guided Forge now accepts all 67 specialized Galaxy genres
+
+The full 67-genre catalog is imported from Galaxy Studio's existing
+`FALLBACK_GENRES` and shown via a searchable advanced selector in the
+existing Forge Options step. Every specialty has an explicit mapping to
+one of the 36 backend-recognized `BRIEF_ERA_VOTES.genre` categories.
+The exact historic specialty is retained in the questionnaire state and
+as a bounded, human-readable specialization in the **actual forge vision**,
+so the vision-derived composer can act on the requested game identity.
+
+Selecting a broad creative-brief genre clears specialization, preventing
+silent conflicting controls. The mapping is intentionally lossy at the
+base-genre level: the system does not claim that merely selecting
+`flight_sim`, `racing` or `moba` implements all domain-specific gameplay.
+Full native control contracts from the historical B023/B024 recovery are
+tracked separately in PR #5302.
+
+Tests pin all 67 selections against the literal existing Galaxy source,
+assert the target category is supported, verify reducer precedence,
+protect authored vision from truncation, and preserve offline operation.
+
 
 ## Follow-up: 158-genre creator taxonomy (stacked review)
 
@@ -93,3 +114,4 @@ follow-up introduces 158 searchable categories and subgenres (preserving all
 36 legacy era votes), with parity tests and a read-only `/api/skeleton/genres`
 endpoint. See `docs/creation/EXPANDED_GAME_GENRE_CATALOG_20261113.md`.
 This is intake classification, not 158 verified distinct gameplay runtimes.
+
