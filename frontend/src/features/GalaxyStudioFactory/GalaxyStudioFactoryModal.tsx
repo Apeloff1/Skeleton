@@ -380,6 +380,7 @@ export default function GalaxyStudioFactoryModal
   const [handoffBusy, setHandoffBusy] = useState(false);
   const handoffLock = useRef(false);
   const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
+  const [draftSaveNotice, setDraftSaveNotice] = useState<string | null>(null);
   // ★ 2026-05 SOTA UX: Quick / Advanced mode toggle.
   // Default ON (Quick) so first-time users see a focused, friendly form.
   // Turning it OFF reveals the full 100-slider depth for power users.
@@ -1635,6 +1636,23 @@ export default function GalaxyStudioFactoryModal
       await saveGalaxyDraft(snapshot);
   };
 
+  const saveGalaxyDraftOnly = async () => {
+    if (handoffLock.current || handoffBusy || step !== 'pick') return;
+    handoffLock.current = true;
+    setHandoffBusy(true);
+    setDraftSaveError(null);
+    setDraftSaveNotice(null);
+    try {
+      await persistGalaxyDraft();
+      setDraftSaveNotice('Saved a local snapshot. Edits made after this save require another save or a normal editor close.');
+    } catch {
+      setDraftSaveError('Galaxy draft could not be saved. Your editor remains open.');
+    } finally {
+      handoffLock.current = false;
+      setHandoffBusy(false);
+    }
+  };
+
   const transferToForge = async () => {
     if (!onSendToForge || handoffLock.current || handoffBusy || step !== 'pick') return;
     handoffLock.current = true;
@@ -2603,6 +2621,18 @@ export default function GalaxyStudioFactoryModal
             </Text>
           </View>
         ) : null}
+        <View style={{ padding: 12, backgroundColor: T.surfaceAlt, borderRadius: 12, marginVertical: 10 }}>
+          <TouchableOpacity
+            testID="galaxy-save-draft" accessibilityRole="button"
+            accessibilityLabel="Save the full Galaxy game design locally"
+            disabled={handoffBusy} onPress={saveGalaxyDraftOnly}
+            style={{ backgroundColor: '#166534', padding: 12, borderRadius: 9, alignItems: 'center' }}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>{handoffBusy ? 'Saving…' : 'Save Galaxy draft on device'}</Text>
+          </TouchableOpacity>
+          {draftSaveNotice ? <Text style={{ color: '#86EFAC', marginTop: 6 }} testID="galaxy-draft-saved">{draftSaveNotice}</Text> : null}
+          {!onSendToForge && draftSaveError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24', marginTop: 6 }}>{draftSaveError}</Text> : null}
+        </View>
         {onSendToForge ? (
           <View style={{ padding: 12, backgroundColor: T.surfaceAlt, borderRadius: 12, marginVertical: 10 }}>
             <TouchableOpacity
