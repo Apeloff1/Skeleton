@@ -237,7 +237,7 @@ test('Galaxy and Forge routes only hand off after explicit user action', () => {
   const forgeRoute = fs.readFileSync(path.join(root, 'app/skeleton-forge.tsx'), 'utf8');
   const galaxyRoute = fs.readFileSync(path.join(root, 'app/galaxy.tsx'), 'utf8');
   const galaxyModal = fs.readFileSync(path.join(root, 'src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'), 'utf8');
-  assert.match(forgeRoute, /storeCreatorBridge\(handoffFromForge\(draft\)\)/);
+  assert.match(forgeRoute, /storeCreatorBridge\(handoffFromForge\(draft, Date\.now\(\), incoming\)\)/);
   assert.match(forgeRoute, /onOpenGalaxyStudio=\{openGalaxy\}/);
   assert.match(galaxyRoute, /storeCreatorBridge\(handoffFromGalaxy\(selection, incoming\)\)/);
   assert.match(galaxyModal, /testID="galaxy-continue-in-gameforge"/);
