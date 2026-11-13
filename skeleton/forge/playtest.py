@@ -189,4 +189,93 @@ def playtest(files: Mapping[str, str], *, binary: Optional[str] = None,
             shutil.rmtree(root, ignore_errors=True)
 
 
-__all__ = ["PLAYTEST_MODES", "normalise_mode", "resolve_binary", "scan_log", "playtest"]
+def playtest_archetype_scene(
+    files: Mapping[str, str], archetype: str, *,
+    frames: int = 6000, timeout: float = 180.0,
+) -> Dict[str, Any]:
+    """Boot the separately emitted archetype scene, not just the main world.
+
+    Success requires Godot exit 0 and the scene's exact completion marker;
+    failures, unavailability and timeouts are never accepted as passes.
+    No remote services, shell, downloads or persistent project publication.
+    """
+    from skeleton.forge.archetype_content import (
+        COMPLETE_MARKER, FAILED_MARKER, content_archetypes,
+    )
+    from skeleton.forge.projector import write_project
+
+    if type(archetype) is not str or archetype not in content_archetypes():
+        raise ValueError("unknown playable archetype")
+    if type(frames) is not int or not 1 <= frames <= 12000:
+        raise ValueError("playable scene frame budget must be 1..12000")
+    if type(timeout) not in (int, float) or not 1 <= timeout <= 300:
+        raise ValueError("playable scene timeout must be 1..300 seconds")
+    scene = f"scenes/archetypes/{archetype}/main.tscn"
+    required = (
+        "project.godot", scene,
+        f"scripts/archetypes/{archetype}/core_loop.gd",
+        f"scripts/archetypes/{archetype}/player_controller.gd",
+    )
+    if not isinstance(files, Mapping) or any(
+        path not in files or not isinstance(files[path], str) for path in required
+    ):
+        raise ValueError("playable scene source is incomplete")
+
+    binary, source, verified = resolve_binary()
+    base = {"scene": scene, "archetype": archetype, "binary_source": source,
+            "verified": verified, "frames": frames, "passed": False}
+    if binary is None:
+        return {**base, "status": "unavailable", "errors": [], "reason": source}
+
+    root = Path(tempfile.mkdtemp(prefix="forge-playable-"))
+    deadline = time.monotonic() + float(timeout)
+    steps: List[Dict[str, Any]] = []
+    errors: List[str] = []
+    completed = False
+    try:
+        write_project(root, dict(files), overwrite=True)
+        expected = f"{COMPLETE_MARKER} {archetype}"
+        failure = f"{FAILED_MARKER} {archetype}"
+        for step, cmd in (
+            ("import", [binary, "--headless", "--path", str(root), "--import"]),
+            ("scene", [
+                binary, "--headless", "--fixed-fps", "60",
+                "--quit-after", str(frames), "--path", str(root), f"res://{scene}",
+            ]),
+        ):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                errors.append("playable scene deadline exceeded")
+                break
+            rc, log, timed_out = _run(cmd, root, remaining)
+            found = scan_log(log)
+            has_failure = any(line.startswith(failure) for line in log.splitlines())
+            has_success = any(line.startswith(expected) for line in log.splitlines())
+            steps.append({
+                "step": step, "returncode": rc, "timed_out": timed_out,
+                "errors": found[:12], "log_tail": log[-2000:],
+                "complete_marker": has_success, "failed_marker": has_failure,
+            })
+            errors.extend(found[:12])
+            if timed_out:
+                errors.append(f"{step}: deadline exceeded")
+            if rc != 0:
+                errors.append(f"{step}: engine exited {rc}")
+            if has_failure:
+                errors.append("native playable loop reported failure")
+            if step == "scene":
+                completed = has_success and not has_failure
+                if not has_success:
+                    errors.append("native playable completion marker missing")
+            if errors:
+                break
+        passed = completed and not errors and len(steps) == 2
+        return {
+            **base, "status": "passed" if passed else "failed",
+            "passed": bool(passed), "errors": errors[:24], "steps": steps,
+        }
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+__all__ = ["PLAYTEST_MODES", "normalise_mode", "resolve_binary", "scan_log", "playtest", "playtest_archetype_scene"]
