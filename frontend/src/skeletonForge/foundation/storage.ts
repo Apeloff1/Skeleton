@@ -84,9 +84,12 @@ export function saveFoundation(store: Kv, snap: PersistSnapshot): Promise<void> 
   // A failed earlier save must surface to its caller but must NOT permanently
   // poison the queue for a subsequent explicit retry.
   const job = previous.catch(() => {}).then(async () => {
+    // The main authored project snapshot is the final publication write.
+    // If device preferences or onboarding persistence fails, no partial
+    // project revision is committed and a returning Forge handoff can retry.
+    await store.setItem(KEYS.prefs, prefs);
     await store.setItem(KEYS.onboarded, onboarded);
     await store.setItem(KEYS.projects, projects);
-    await store.setItem(KEYS.prefs, prefs);
   });
   saveTails.set(store, job);
   void job.then(() => {
