@@ -24,6 +24,8 @@ class RunRequest(BaseModel):
     overwrite: bool = False
     include_files: bool = False
     answers: Dict[str, str] = Field(default_factory=dict)
+    # Sparse, explicit design-instrument edits. Raw values are validated by GameForge.
+    operator_axes: Optional[Dict[str, Any]] = None
     blend: Optional[list] = None
     t: float = 0.5
     generation: Optional[str] = None
@@ -47,6 +49,13 @@ def eras() -> Dict[str, Any]:
     return {"eras": out, "count": len(out)}
 
 
+@router.get("/genres")
+def genres() -> Dict[str, Any]:
+    """Read-only grouped genre vocabulary, mapped to existing design eras."""
+    from skeleton.context.genre_catalog import genre_catalog_payload
+    return genre_catalog_payload()
+
+
 @router.get("/generations")
 def generations() -> Dict[str, Any]:
     from skeleton.forge.hardware import catalog
@@ -66,6 +75,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             project_root=req.project_root,
             overwrite=req.overwrite,
             answers=req.answers or None,
+            **({"operator_axes": req.operator_axes} if req.operator_axes is not None else {}),
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),

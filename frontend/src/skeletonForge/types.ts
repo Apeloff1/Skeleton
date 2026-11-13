@@ -109,6 +109,8 @@ export interface RunRequest {
   archetype: string;
   target: string;
   answers: Record<string, string>;
+  /** Sparse, explicitly overridden design tensor axes (0..1). */
+  operator_axes?: Record<string, number>;
   generation?: string | null;
   include_files?: boolean;
   /** Optional native room-entry quest attached to the generated Godot project. */
@@ -169,6 +171,7 @@ export interface RunPayload {
   jeeves?: { next?: { text?: string; action?: string; priority?: number } | null; briefing?: string } | null;
   sim?: { passed?: boolean; primary_dps?: number } | null;
   build_plan?: BuildPlanPayload | null;
+  operator_axes?: Record<string, number>;
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];
   native_quest?: {
