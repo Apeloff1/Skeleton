@@ -13,6 +13,116 @@ from typing import Any, Mapping
 SCHEMA_VERSION = "skeleton.game_design_spec.v1"
 SPEC_VERSION = 1
 BRIEF_MAX = 4000
+GAMEPLAY_FIELDS = frozenset({"difficulty", "theme", "objective_label", "player_speed", "encounter_style"})
+GAMEPLAY_ENUMS = {
+    "difficulty": ("easy", "normal", "hard"),
+    "theme": ("moss", "neon", "ember", "frost"),
+    "encounter_style": ("swarm", "patrol", "ranged"),
+}
+_GENRE_OBJECTIVES = {
+    "top_down_shooter": "Clear the encounters and reach the exit",
+    "platformer": "Reach the far gate",
+    "rpg_roguelike": "Recover the relic and return to the exit",
+}
+
+
+class GameplayValidationError(ValueError):
+    """Bounded field-level errors; proposals never become executable code."""
+
+    def __init__(self, violations: tuple[str, ...]) -> None:
+        self.violations = violations
+        super().__init__("invalid gameplay design: " + ", ".join(violations))
+
+
+def default_gameplay(genre: str = "top_down_shooter") -> dict[str, Any]:
+    """Deterministic projection for historical v1 specs without gameplay."""
+    if not isinstance(genre, str) or genre not in _GENRE_OBJECTIVES:
+        raise ValueError("unsupported gameplay genre")
+    return {
+        "difficulty": "normal", "theme": "moss",
+        "objective_label": _GENRE_OBJECTIVES[genre],
+        "player_speed": 230, "encounter_style": "patrol",
+    }
+
+
+def validate_gameplay(value: object, *, genre: str = "top_down_shooter") -> dict[str, Any]:
+    """Validate a complete, closed data-only gameplay object without coercion.
+
+    The field itself is optional for legacy spec v1. Once supplied, all five
+    keys are mandatory. Neither unknown fields nor partial proposals may be
+    silently turned into authority over generated scripts, paths or providers.
+    """
+    default_gameplay(genre)
+    if not isinstance(value, Mapping):
+        raise GameplayValidationError(("invalid:gameplay",))
+    keys = set(value)
+    errors: list[str] = []
+    if keys - GAMEPLAY_FIELDS:
+        errors.append("unknown:gameplay")
+    for key in sorted(GAMEPLAY_FIELDS - keys):
+        errors.append("missing:gameplay." + key)
+    for key, allowed in GAMEPLAY_ENUMS.items():
+        if key in value and (not isinstance(value[key], str) or value[key] not in allowed):
+            errors.append("invalid:gameplay." + key)
+    if "player_speed" in value and (
+            type(value["player_speed"]) is not int or not 120 <= value["player_speed"] <= 360):
+        errors.append("invalid:gameplay.player_speed")
+    if "objective_label" in value:
+        label = value["objective_label"]
+        valid = isinstance(label, str) and 1 <= len(label) <= 100 and bool(label.strip())
+        if valid:
+            try:
+                valid = (len(label.encode("utf-8", errors="strict")) <= 400
+                         and not any(ord(ch) < 32 or ord(ch) == 127
+                                     or ch in "\u2028\u2029" for ch in label))
+            except UnicodeError:
+                valid = False
+        if not valid:
+            errors.append("invalid:gameplay.objective_label")
+    if errors:
+        raise GameplayValidationError(tuple(errors))
+    return {key: value[key] for key in sorted(GAMEPLAY_FIELDS)}
+
+
+def gameplay_for_spec(spec: Mapping[str, Any]) -> dict[str, Any]:
+    """Read validated gameplay, retaining legacy v1 specs' default behavior."""
+    genre = str(spec.get("genre") or "top_down_shooter")
+    return (validate_gameplay(spec["gameplay"], genre=genre) if "gameplay" in spec
+            else default_gameplay(genre))
+
+
+def gameplay_constraints(brief: str) -> dict[str, Any]:
+    """Return validated explicit user labels that a model may not override."""
+    if not isinstance(brief, str):
+        raise ValueError("brief must be a string")
+    brief = _clean(brief, BRIEF_MAX)
+    selected: dict[str, Any] = {}
+    labels = {
+        "difficulty": r"difficulty", "theme": r"theme",
+        "objective_label": r"objective(?: label)?",
+        "player_speed": r"player[ _-]speed",
+        "encounter_style": r"encounter[ _-]style",
+    }
+    for field, label in labels.items():
+        for match in re.finditer(r"(?:^|[.;]\s*|\s)(?:" + label + r")\s*:\s*([^.;]*)", brief, re.I):
+            raw = match.group(1).strip()
+            if field == "player_speed":
+                # No float, sign, scientific notation, booleans or coercion.
+                if (re.fullmatch(r"[0-9]{1,3}", raw) is None
+                        or re.match(r"\.\d", brief[match.end():])):
+                    raise GameplayValidationError(("invalid:gameplay.player_speed",))
+                parsed: Any = int(raw)
+            else:
+                parsed = raw.lower() if field in GAMEPLAY_ENUMS else raw
+            if field in selected and selected[field] != parsed:
+                raise GameplayValidationError(("conflicting:gameplay." + field,))
+            selected[field] = parsed
+    validated = validate_gameplay({**default_gameplay(_genre(brief)), **selected}, genre=_genre(brief))
+    return {key: validated[key] for key in selected}
+
+
+def _brief_gameplay(brief: str, genre: str) -> dict[str, Any]:
+    return validate_gameplay({**default_gameplay(genre), **gameplay_constraints(brief)}, genre=genre)
 
 _WORD = re.compile(r"[a-z0-9][a-z0-9'+-]*", re.I)
 _FANTASY = re.compile(r"fantasy:\s*([^.]{1,180})", re.I)
@@ -147,6 +257,7 @@ def compile_brief(brief: str, *, era: str = "") -> dict[str, Any]:
             "physics",
         ],
         "engine": "godot4",
+        "gameplay": _brief_gameplay(text, genre),
     }
     encoded = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     body["spec_id"] = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
