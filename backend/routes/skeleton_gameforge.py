@@ -181,6 +181,31 @@ def historical_conductor_preview(req: HistoricalConductorPreviewRequest) -> Dict
     }
 
 
+@router.get("/jeeves/game-quality")
+def jeeves_game_quality_catalog() -> Dict[str, Any]:
+    """Discover deterministic public diagnostic coverage; never invoke a model.
+
+    Scores from this public taskset cannot certify model quality or authorize
+    project publication. Inference remains operator-controlled and local-only.
+    """
+    from skeleton.eval.game_builder_quality import (
+        TASKSET_ID, SCORER_ID, DIMENSIONS, TASKS, taskset_digest,
+    )
+    return {
+        "schema": "skeleton.jeeves.game_quality.catalog.v1",
+        "taskset_id": TASKSET_ID,
+        "scorer_id": SCORER_ID,
+        "taskset_sha256": taskset_digest(),
+        "task_count": len(TASKS),
+        "categories": sorted({task.category for task in TASKS}),
+        "dimensions": list(DIMENSIONS),
+        "evidence_kind": "public_deterministic_diagnostics",
+        "model_quality_certified": False,
+        "inference_started": False,
+        "local_gguf_required_for_run": True,
+    }
+
+
 class ComposeRequest(BaseModel):
     vision: str = Field(default="", max_length=4000)
 

@@ -14,6 +14,7 @@ import { suggestPlayableMode } from '../playableSuggestions';
 import DesignInstruments from './DesignInstruments';
 import GenreControlsPreview from './GenreControlsPreview';
 import ConductorPreviewPanel from './ConductorPreviewPanel';
+import JeevesQualityPanel from './JeevesQualityPanel';
 import DesignPresetPanel from './DesignPresetPanel';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
@@ -34,6 +35,8 @@ export interface QuestionnaireFlowProps {
   onForge: (req: RunRequest) => void;
   /** Navigate to the full historical Galaxy Studio matrix/slider questionnaire. */
   onOpenGalaxyStudio?: () => void;
+  /** Explicitly restore the current account's device-local Galaxy full design. */
+  onRestoreGalaxyProfile?: () => void;
   forging?: boolean;
   /** Short compose summary shown on the review step. */
   composeSummary?: string | null;
@@ -234,7 +237,7 @@ function BeatsStep({ state, dispatch, beats, beatsLive }: QuestionnaireFlowProps
   );
 }
 
-function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio }: QuestionnaireFlowProps) {
+function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio, onRestoreGalaxyProfile }: QuestionnaireFlowProps) {
   const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
@@ -268,6 +271,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
       <DesignPresetPanel state={state} dispatch={dispatch} />
       <ConductorPreviewPanel vision={state.vision} />
+      <JeevesQualityPanel />
 
       <View style={st.group} testID="q-playable-slice-options" accessibilityRole="radiogroup" accessibilityLabel="Playable original mini-game">
         <Text style={st.q}>Playable genre prototypes</Text>
@@ -415,6 +419,14 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
               GameForge category: {mappedBriefGenre(state.galaxyGenre)}
             </Text>
           ) : null}
+        </View>
+      ) : null}
+      {onRestoreGalaxyProfile ? (
+        <View style={st.group} testID="q-galaxy-saved-design-restore">
+          <Text style={st.q}>Saved your complete Galaxy questionnaire?</Text>
+          <Text style={st.help}>Restore an explicitly saved on-device design into this Forge draft. This replaces the Galaxy-sourced vision, genre and mapped axes but keeps your other Forge choices.</Text>
+          <Button label="Restore saved full Galaxy design" tone="secondary" compact
+            onPress={onRestoreGalaxyProfile} testID="q-galaxy-restore-saved" />
         </View>
       ) : null}
       {onOpenGalaxyStudio ? (
