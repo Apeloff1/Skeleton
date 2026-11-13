@@ -417,3 +417,92 @@ def test_full_galaxy_tensor_and_quest_can_compile_one_tuned_playable_bundle(monk
     assert ctx["playable_receipt"]["tuning"] == json.loads(generated[SOURCE_PATH])
     assert ctx["playable_receipt"]["source_files"][SOURCE_PATH] == manifest["files"][SOURCE_PATH]
     assert generated["data/rooms.json"] == source["data/rooms.json"]
+
+
+
+@pytest.mark.parametrize("mode", SUPPORTED)
+@pytest.mark.parametrize("startup", [False, True])
+def test_authoritative_playable_provenance_reconstructs_tuned_source(mode, startup, monkeypatch):
+    from skeleton.context import pipeline
+    from skeleton.forge.playable_provenance import verify_playable_source
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    ctx = {
+        "era": "extraction_now", "target": "godot",
+        "files": godot_files(), "project_root": None, "playtest_mode": "off",
+        "playable_content": True, "playable_archetype_selection": mode,
+        "playable_main_scene": startup,
+        "operator_axes": {"tempo": 0.8, "risk": 0.9, "lethality": 0.4, "scarcity": 0.7},
+    }
+    pipeline._stage_emit(ctx)
+    source, receipt = ctx["files"], ctx["playable_receipt"]
+    assert verify_playable_source(source, receipt)
+    assert receipt["tuning"]["axes"] == {
+        "lethality": 0.4, "risk": 0.9, "scarcity": 0.7, "tempo": 0.8,
+    }
+    assert receipt["tuning"]["mapped_axes"] != []
+    assert receipt["source_files"]["data/playable_tuning.json"] == \
+        source_manifest(source)["files"]["data/playable_tuning.json"]
+
+
+def test_recomputed_unkeyed_hash_cannot_hide_adulterated_gdscript(monkeypatch):
+    from skeleton.context import pipeline
+    from skeleton.forge.playable_provenance import verify_playable_source
+    import hashlib
+
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    ctx = {
+        "era": "extraction_now", "target": "godot",
+        "files": godot_files(), "project_root": None, "playtest_mode": "off",
+        "playable_content": True, "playable_archetype_selection": "racing",
+        "playable_main_scene": True,
+        "operator_axes": {"risk": 0.8, "tempo": 0.6},
+    }
+    pipeline._stage_emit(ctx)
+    good_files, good_receipt = ctx["files"], ctx["playable_receipt"]
+    assert verify_playable_source(good_files, good_receipt)
+
+    forged_files = dict(good_files)
+    loop = "scripts/archetypes/racing/core_loop.gd"
+    forged_files[loop] = forged_files[loop].replace(
+        "const GOAL_LAPS := 3", "const GOAL_LAPS := 999",
+    )
+    forged_receipt = deepcopy(good_receipt)
+    forged_receipt["source_files"] = {
+        path: source_manifest(forged_files)["files"][path]
+        for path in forged_receipt["source_files"]
+    }
+    forged_receipt["source_sha256"] = hashlib.sha256(json.dumps(
+        forged_receipt["source_files"], sort_keys=True, separators=(",", ":"),
+    ).encode()).hexdigest()
+    assert not verify_playable_source(forged_files, forged_receipt)
+    assert verify_playable_source(good_files, good_receipt)
+
+
+def test_tuning_receipt_and_launcher_cannot_be_rebound_to_other_prototype(monkeypatch):
+    from skeleton.context import pipeline
+    from skeleton.forge.playable_provenance import verify_playable_source
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    ctx = {
+        "era": "extraction_now", "target": "godot",
+        "files": godot_files(), "project_root": None, "playtest_mode": "off",
+        "playable_content": True, "playable_archetype_selection": "survival",
+        "playable_main_scene": False,
+        "operator_axes": {"tempo": 0.9, "scarcity": 0.7},
+    }
+    pipeline._stage_emit(ctx)
+    files, receipt = ctx["files"], ctx["playable_receipt"]
+    assert verify_playable_source(files, receipt)
+
+    forged = deepcopy(receipt)
+    forged["mode"] = "racing"
+    assert not verify_playable_source(files, forged)
+    forged = deepcopy(receipt)
+    forged["tuning"]["axes"]["scarcity"] = 0.1
+    assert not verify_playable_source(files, forged)
+    forged = deepcopy(receipt)
+    forged["launcher"] = None
+    assert not verify_playable_source(files, forged)
+    altered = dict(files)
+    altered[receipt["launcher"]] += "\n# actor-swapped"
+    assert not verify_playable_source(altered, receipt)
+    assert not verify_playable_source(files, {"schema": "skeleton.gameforge.playable_source.v1"})

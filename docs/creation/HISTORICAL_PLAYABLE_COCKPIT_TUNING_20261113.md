@@ -52,3 +52,19 @@ Plus exact-head backend/frontend/static guards. A Godot runtime test must
 independently show all eight native completion witnesses and real device
 controls. Native unavailability and skipped security jobs are **not passes**.
 No merge/release until qualified.
+
+
+## Independent reconstruction of playable source
+
+The exact-playable receipt is now verified by
+\`skeleton.forge.playable_provenance.verify_playable_source\` before the
+canonical Godot static and manifest gates. Unlike a self-consistent SHA-256
+list, this verifier recreates every scene, controller, mini-game script,
+optional launcher and tuning document from the versioned authored
+templates and selected bounded axis values. It then checks that every
+source file, launch-scene path, file hash and receipt digest exactly
+matches. A forged game script with newly calculated checksums is rejected.
+
+The invariant establishes known-source convergence only. It does not
+authenticate a repository owner, digitally sign binaries, prove hardware
+playability, or make offline saves resistant to local modifications.

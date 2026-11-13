@@ -603,6 +603,9 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
             "source_sha256": source_digest,
             **({"tuning": ctx["playable_tuning"]} if ctx.get("playable_tuning") else {}),
         }
+        from skeleton.forge.playable_provenance import verify_playable_source
+        if not verify_playable_source(files, ctx["playable_receipt"]):
+            raise ValueError("playable prototype differs from deterministic authored source")
     ok, problems = check_ok(files)
     if not ok:
         raise RuntimeError("gdscript check failed: " + "; ".join(problems[:8]))
