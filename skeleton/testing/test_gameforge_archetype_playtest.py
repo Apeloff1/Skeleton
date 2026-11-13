@@ -124,6 +124,15 @@ def test_required_world_boot_without_playable_opt_in_does_not_run_sidecar(monkey
     assert result["playable_scene_playtest"] is None
 
 
+def test_non_godot_output_rejects_headless_playtest_before_side_effects():
+    from skeleton.context.pipeline import GameForgeRun
+    with pytest.raises(ValueError, match="requires the Godot target"):
+        GameForgeRun().execute(
+            "An original cross-platform blueprint", target="json",
+            playtest="require",
+        )
+
+
 def test_http_qualifier_mode_reaches_pipeline_only_when_explicit(monkeypatch):
     from skeleton.context.pipeline import GameForgeRun
     seen = []
