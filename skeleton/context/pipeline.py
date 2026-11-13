@@ -252,6 +252,11 @@ class GameForgeRun:
                            if hasattr(run.context.get("build_plan"), "to_dict")
                            else run.context.get("build_plan")),
         }
+        if playable_content and run.context.get("playable_portal_receipt") is not None:
+            payload["playable_portal"] = {
+                **run.context["playable_portal_receipt"],
+                "sealed": bool(run.succeeded and emitted_manifest is not None),
+            }
         if playable_content and run.context.get("playable_scene_playtest") is not None:
             payload["playable_scene_playtest"] = run.context["playable_scene_playtest"]
         if axis_overrides:
@@ -489,9 +494,20 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.forge.archetype_content import content_archetypes, attach_archetype_content
         requested = ctx.get("archetype") or "extraction"
         files = attach_archetype_content(files, requested)
+        archetype_name = requested if requested in content_archetypes() else "extraction"
+        # Source-admitted in-game launcher: without it the playable sidecar
+        # only exists as a hidden file in the Godot editor and cannot be
+        # reached from the shipped world's main scene.
+        from skeleton.forge.playable_portal import (
+            attach_playable_portal, verify_playable_portal,
+        )
+        files, portal_receipt = attach_playable_portal(files, archetype_name)
+        if not verify_playable_portal(files, archetype_name):
+            raise RuntimeError("playable world-to-prototype portal source verification failed")
         ctx["files"] = files
         ctx["file_count"] = len(files)
-        ctx["playable_archetype"] = requested if requested in content_archetypes() else "extraction"
+        ctx["playable_archetype"] = archetype_name
+        ctx["playable_portal_receipt"] = portal_receipt
     if ctx.get("quest_content"):
         from skeleton.ai.game_builder.godot_quest_bridge import attach_native_quest
         files, receipt = attach_native_quest(
@@ -542,6 +558,8 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "check": "ok",
         "playtest": None if played is None else played.get("status"),
     }
+    if ctx.get("playable_portal_receipt"):
+        details["playable_portal_sha256"] = ctx["playable_portal_receipt"]["source_sha256"]
     if scene_played is not None:
         details["playable_scene_playtest"] = scene_played.get("status")
     if ctx.get("native_quest_receipt"):
