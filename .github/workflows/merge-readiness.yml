@@ -247,6 +247,45 @@ jobs:
           python -m unittest discover -s tests -p test_environment_replay_admission_bounds.py -v
       - name: Install frontend dependencies
         run: yarn --cwd frontend install --ignore-scripts --non-interactive
+      # Existing protected Lint Type Security check admits the restored
+      # creator; no extra automatic workflow is registered.
+      - name: Exact-head historical GameForge frontend and native acceptance
+        shell: bash
+        env:
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GODOT_ARCHIVE_SHA256: "cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4"
+        run: |
+          set -euo pipefail
+          ORIGINAL_SHA="$(git rev-parse HEAD)"
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid exact PR head"; exit 2; }
+            [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid PR base"; exit 2; }
+            git cat-file -e "$CANDIDATE_SHA^{commit}"
+            git cat-file -e "$BASE_SHA^{commit}"
+            # Download the native engine only when creator code changed.
+            if ! git diff --name-only "$BASE_SHA" "$CANDIDATE_SHA" | grep -Eq '^(skeleton/(forge/(archetype_content|playable_tuning|playable_provenance|godot_emit)\.py|ai/game_builder/|testing/test_(multi|native_godot|gameforge|galaxy|historical)|context/(pipeline|galaxy_profile)\.py)|frontend/src/skeletonForge/|frontend/scripts/skeleton-forge/|backend/routes/skeleton_gameforge\.py|\.github/workflows/merge-readiness\.yml)'; then
+              echo "No changed creator contracts; generic quality gates still apply"
+              exit 0
+            fi
+            git -c advice.detachedHead=false checkout -q -f "$CANDIDATE_SHA"
+            trap 'git checkout -q -f "$ORIGINAL_SHA"' EXIT
+            test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          fi
+          yarn --cwd frontend test:skeleton-forge
+          mkdir -p "$RUNNER_TEMP/gameforge-godot"
+          curl --fail --location --show-error --retry 2 \
+            --output "$RUNNER_TEMP/gameforge-godot/godot.zip" \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo "$GODOT_ARCHIVE_SHA256  $RUNNER_TEMP/gameforge-godot/godot.zip" | sha256sum --check
+          unzip -qq "$RUNNER_TEMP/gameforge-godot/godot.zip" -d "$RUNNER_TEMP/gameforge-godot"
+          GODOT_BINARY="$RUNNER_TEMP/gameforge-godot/Godot_v4.7.2-stable_linux.x86_64"
+          test -f "$GODOT_BINARY"
+          chmod 700 "$GODOT_BINARY"
+          # A missing native engine is a failure, not a pytest skip.
+          GODOT_BINARY="$GODOT_BINARY" PYTHONPATH=".:backend" \
+            PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+              skeleton/testing/test_multigenre_native_godot.py
       - name: Verify filesystem and encrypted compliance CodeQL regressions
         working-directory: backend
         env:
