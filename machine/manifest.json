@@ -856,7 +856,16 @@
         "latency"
       ],
       "authority": "measurement only; generated code is never executed and scores do not promote model or release quality",
-      "state": "operator-private diagnostic artifacts; not conversation or model-state authority"
+      "state": "operator-private diagnostic artifacts; not conversation or model-state authority",
+      "optional_reference_pack": {
+        "owner": "skeleton/eval/game_builder_reference_pack.py",
+        "operator_flag": "--reference-pack godot46",
+        "version": "godot46-game-building-basics@1",
+        "scope": "category-only gdscript/debugging; identical source context for eight tasks; sixteen control prompts unchanged",
+        "trust": "bounded untrusted user-context data; agent summaries of cited Godot 4.6 primary documentation",
+        "budget": "1309 UTF-8 context bytes; whole-campaign input and output admission before dispatch; no truncation",
+        "qualification": "post-diagnostic development grounding; no hidden holdout, model promotion or quality claim"
+      }
     }
   }
 }

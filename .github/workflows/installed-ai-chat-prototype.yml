@@ -8,7 +8,9 @@ on:
       - "scripts/build_jeeves_game.py"
       - "scripts/evaluate_jeeves_game_builder_quality.py"
       - "skeleton/eval/game_builder_quality.py"
+      - "skeleton/eval/game_builder_reference_pack.py"
       - "skeleton/ai/evaluation/game_builder_quality.py"
+      - "skeleton/ai/evaluation/game_builder_reference_pack.py"
       - "skeleton/forge/game_builder.py"
       - "skeleton/forge/game_design_spec.py"
       - "skeleton/forge/game_content.py"
@@ -23,6 +25,7 @@ on:
       - "skeleton/ai/forge/ai_builder/**"
       - "tests/forge_ai_builder/**"
       - "tests/test_game_builder_quality.py"
+      - "tests/test_game_builder_reference_pack.py"
       - "tests/test_forge_gameplay_design.py"
       - "tests/test_forge_interactive_runtime.py"
       - "tests/test_build_jeeves_game.py"
@@ -118,6 +121,13 @@ jobs:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: python -m pytest -q --noconftest -p pytest_asyncio.plugin tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py skeleton/testing/test_local_model_deployment.py tests/test_jeeves_advisory.py tests/test_jeeves_media_advisory.py tests/test_jeeves_live_local_advanced.py tests/test_jeeves_context_window.py tests/test_jeeves_document_scope.py tests/test_jeeves_inference_circuit.py tests/test_jeeves_durable_integrity.py tests/test_jeeves_local_lease.py tests/test_jeeves_conversation_organization.py tests/test_app_offline_http.py
+      - name: Compile bounded game-builder quality and grounding tools
+        run: >-
+          python -m compileall -q
+          skeleton/eval/game_builder_quality.py
+          skeleton/eval/game_builder_reference_pack.py
+          scripts/evaluate_jeeves_game_builder_quality.py
+          tests/test_game_builder_reference_pack.py
       - name: Verify typed local game design, playable output and bounded operator build contracts
         env:
           PYTHONPATH: "."
@@ -128,6 +138,7 @@ jobs:
           python -m pytest -q --noconftest
           tests/forge_ai_builder
           tests/test_game_builder_quality.py
+          tests/test_game_builder_reference_pack.py
           tests/test_forge_gameplay_design.py
           tests/test_forge_interactive_runtime.py
           tests/test_build_jeeves_game.py

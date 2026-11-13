@@ -10420,7 +10420,7 @@
         "ranged"
       ]
     },
-    "evaluation": "24 public diagnostic tasks; plain and structured modes bind distinct configurations; no score-based self-promotion",
+    "evaluation": "24 fixed public diagnostic tasks; plain, structured and optional category-scoped Godot 4.6 reference-pack modes bind distinct configurations; all requests preflight existing input/output budgets; no score-based self-promotion",
     "acceptance": [
       "strict whole-proposal and explicit-label preservation",
       "legacy spec compatibility",
