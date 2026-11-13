@@ -79,6 +79,10 @@ def test_watchdog_does_not_send_issue_alerts_for_failed_retry_attempts() -> None
     text = WORKFLOW.read_text(encoding="utf-8")
     retries = text.split('if gh run rerun "$id" --repo "$REPO"; then', 1)[1]
     assert 'gh issue comment "$issue" --repo "$REPO" --body "CI watchdog retrying' in retries
-    failed = retries.split("else", 1)[1].split("fi", 1)[0]
+    # Match whole shell control tokens, not "fi" embedded in comments
+    # or words such as "notification".
+    failed = retries.split("\n            else\n", 1)[1].split(
+        "\n            fi\n", 1
+    )[0]
     assert "gh issue comment" not in failed
     assert "echo \"::warning::CI watchdog could not rerun" in failed

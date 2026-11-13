@@ -12,12 +12,13 @@ import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
   StyleSheet, SafeAreaView, TextInput, useWindowDimensions, RefreshControl, Modal, Platform, Image,
-  Linking, Share,
+  Linking, Share, Alert,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { validProjectId, projectHref } from '../src/product/worldWorkspace';
 import api from '../src/utils/apiClient';
+import PrivateImage, { savePrivateImage } from '../src/components/PrivateImage';
 import { useHaptics } from '../src/hooks/useHaptics';
 
 const BACKEND = CANONICAL_API_BASE || '';
@@ -327,7 +328,10 @@ export default function Worldforge() {
   const openHeightmap = async () => {
     haptics.selection();
     const url = `${BACKEND}/api/worldforge/heightmap.png?scale=${COSMIC.has(scale) ? 'region' : scale}&seed=${cfg.seed}&size=${Math.max(cfg.size, 64)}&palette=${cfg.palette}&climate=${cfg.climate}&zoom=${zoom}&pan_x=${panX}&pan_y=${panY}`;
-    try { await Linking.openURL(url); } catch { /* noop */ }
+    try {
+      const result = await savePrivateImage(url, 'world-heightmap.png');
+      Alert.alert('Heightmap image', result === 'saved' ? 'Heightmap downloaded.' : 'Heightmap copied.');
+    } catch { Alert.alert('Heightmap unavailable', 'Sign in and try saving the heightmap again.'); }
   };
   const runSim = async () => {
     haptics.notify('success'); setShowSim(true); setSim(null); setSimLoading(true);
@@ -447,7 +451,7 @@ export default function Worldforge() {
                 ))}
               </ScrollView>
             ) : null}
-            <Image testID="wf-map" source={{ uri: renderUrl }} style={[styles.worldImg, { width: mapW, height: mapW }]} resizeMode="cover" />
+            <PrivateImage testID="wf-map" uri={renderUrl} style={[styles.worldImg, { width: mapW, height: mapW }]} resizeMode="cover" />
             </>
           )}
           {loading && mode !== 'photoreal' ? <View style={styles.imgLoading}><ActivityIndicator color="#60A5FA" /></View> : null}

@@ -36,7 +36,12 @@ from skeleton.app.local_ai import (
     private_desktop_database,
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
-from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES
+from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
+from skeleton.app.offline_resource_fabric import AdaptiveResourceFabric
+from skeleton.app.offline_longform_virtual import (
+    LongformVirtualMemory, LongformMemoryError,
+)
+from skeleton.app.offline_resources import LocalResourcePressure
 from skeleton.app.offline_background_job import LocalJobRejected, LocalReferenceJob
 from skeleton.app.offline_reference_read import (
     LocalReferenceRead, ReferenceReadConflict, ReferenceReadDenied,
@@ -134,6 +139,7 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         self.backend = backend
         self.database = Path(database)
+        self.resource_fabric = AdaptiveResourceFabric(self.database)
         self.token = token
         self.model_digest = backend.model_digest
         self.tokenizer_digest = _model_tokenizer_digest(backend)
@@ -143,7 +149,11 @@ class OfflineHTTPApplication:
         self._active_session: str | None = None
         self._closing = False
         self._store = OfflineChatStore(database)
+        self.longform = None
         try:
+            self.longform = LongformVirtualMemory(
+                self.database.with_name(self.database.name + ".longform.sqlite3")
+            )
             self.knowledge = OfflineKnowledgeLibrary(
                 self._store, self.model_digest, self.tokenizer_digest
             )
@@ -151,6 +161,8 @@ class OfflineHTTPApplication:
             self.reference_writes = LocalReferenceWrite(self.knowledge)
             self.reference_jobs = LocalReferenceJob(self.knowledge)
         except BaseException:
+            if self.longform is not None:
+                self.longform.close()
             self._store.close()
             raise
 
@@ -167,6 +179,8 @@ class OfflineHTTPApplication:
         for worker in workers:
             if worker is not threading.current_thread():
                 worker.join()
+        if self.longform is not None:
+            self.longform.close()
         self._store.close()
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
@@ -426,6 +440,115 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(405, "unsupported local API method")
         if body is None:
             body = {}
+        if path == "/v1/resources" and method == "GET":
+            try:
+                return 200, self.resource_fabric.monitor()
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise OfflineHTTPError(503, "local resource telemetry unavailable") from exc
+        if path == "/v1/resources/plan" and method == "POST":
+            _fields(body, {"source_bytes", "desired_streams", "requested_gpu_bytes",
+                           "allow_gpu"}, {"source_bytes"})
+            try:
+                return 200, self.resource_fabric.plan(
+                    body["source_bytes"],
+                    desired_streams=body.get("desired_streams", 1),
+                    requested_gpu_bytes=body.get("requested_gpu_bytes", 0),
+                    allow_gpu=body.get("allow_gpu", False),
+                ).as_dict()
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise OfflineHTTPError(422, "resource plan rejected by live hardware policy") from exc
+        if path == "/v1/resources/stage" and method == "POST":
+            # An explicit authenticated local operator may stage selected
+            # regular files for read-only, digest-verified concurrent I/O.
+            # No file contents or credential-bearing paths are returned.
+            _fields(body, {"root", "paths", "desired_streams", "approved"},
+                    {"root", "paths", "approved"})
+            if body["approved"] is not True:
+                raise OfflineHTTPError(403, "read-only file staging requires operator approval")
+            if (not isinstance(body["root"], str) or
+                    not isinstance(body["paths"], list) or
+                    not all(isinstance(item, str) for item in body["paths"])):
+                raise OfflineHTTPError(400, "invalid selected local sources")
+            try:
+                records = self.resource_fabric.stream_readonly(
+                    body["root"], body["paths"],
+                    desired_streams=body.get("desired_streams", 4),
+                )
+                return 200, {"schema": "skeleton.offline.readonly-staging.v1",
+                             "sources": list(records), "verified": True,
+                             "gpu_transfer_executed": False}
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise OfflineHTTPError(422, "local read-only staging rejected") from exc
+        if path.startswith("/v1/resources/longform/"):
+            if method != "POST" or self.longform is None:
+                raise OfflineHTTPError(405, "unsupported local longform operation")
+            action = path[len("/v1/resources/longform/"):]
+            try:
+                if action == "ingest":
+                    _fields(body, {"root", "relative_path", "approved", "request_id"},
+                            {"root", "relative_path", "approved"})
+                    if body["approved"] is not True:
+                        raise OfflineHTTPError(
+                            403, "longform disk ingestion requires explicit operator approval"
+                        )
+                    if not isinstance(body["root"], str) or not isinstance(
+                        body["relative_path"], str
+                    ):
+                        raise OfflineHTTPError(400, "invalid selected longform path")
+                    outcome = self.longform.ingest(
+                        body["root"], body["relative_path"],
+                        request_id=body.get("request_id"),
+                    )
+                    return (200 if outcome["replayed"] else 201), outcome
+                if action == "source-status":
+                    _fields(body, {"source_id"}, {"source_id"})
+                    return 200, self.longform.inspect_source(body["source_id"])
+                if action == "work-start":
+                    _fields(body, {"source_id", "approved"},
+                            {"source_id", "approved"})
+                    if body["approved"] is not True:
+                        raise OfflineHTTPError(
+                            403, "longform work cursor requires operator approval"
+                        )
+                    return 201, self.longform.start_work(body["source_id"])
+                if action == "work-status":
+                    _fields(body, {"work_id"}, {"work_id"})
+                    return 200, self.longform.inspect_work(body["work_id"])
+                if action == "work-next":
+                    _fields(
+                        body, {"work_id", "expected_revision",
+                               "request_id", "pages"},
+                        {"work_id", "expected_revision", "request_id"},
+                    )
+                    return 200, self.longform.advance_work(
+                        body["work_id"],
+                        expected_revision=body["expected_revision"],
+                        request_id=body["request_id"],
+                        pages=body.get("pages", 1),
+                    )
+                if action == "window":
+                    _fields(body, {"source_id", "start_page", "pages"},
+                            {"source_id"})
+                    return 200, self.longform.read_window(
+                        body["source_id"], start_page=body.get("start_page", 0),
+                        pages=body.get("pages", 1),
+                    )
+                if action == "search":
+                    _fields(body, {"source_id", "query", "limit"},
+                            {"source_id", "query"})
+                    return 200, self.longform.search(
+                        body["source_id"], body["query"],
+                        limit=body.get("limit", 5),
+                    )
+                if action == "verify":
+                    _fields(body, {"source_id"}, {"source_id"})
+                    return 200, self.longform.verify(body["source_id"])
+                raise OfflineHTTPError(404, "unknown longform operation")
+            except (LongformMemoryError, LocalResourcePressure,
+                    sqlite3.Error, OSError, ValueError, UnicodeError) as exc:
+                raise OfflineHTTPError(
+                    422, "longform virtual-memory operation rejected"
+                ) from exc
         if path == "/v1/status" and method == "GET":
             with self._turn_lock:
                 active = next((t for t in self._turns.values()
@@ -443,6 +566,9 @@ class OfflineHTTPApplication:
                 "local_only": True, "ready": True,
                 "runtime_kind": ("native" if hasattr(self.backend, "runtime")
                                  else "llama.cpp"),
+                "adaptive_metal_launch": getattr(
+                    self.backend, "adaptive_metal_receipt", None,
+                ),
                 "model_digest": self.model_digest,
                 "tokenizer_digest": self.tokenizer_digest,
                 "session_list_limit": 100,
@@ -757,7 +883,7 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
             raise OfflineHTTPError(411, "numeric request length required")
         limit = (
             MAX_JSON_BYTES if path == "/v1/sessions/import"
-            else MAX_DOCUMENT_BYTES * 6 + 8192 if path == "/v1/knowledge/documents"
+            else MAX_JSON_BYTES if path == "/v1/knowledge/documents"
             else MAX_CHAT_REQUEST_BYTES
         )
         length = int(declared)

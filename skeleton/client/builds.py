@@ -123,7 +123,7 @@ class BuildsClient:
         :func:`skeleton.client.events.stream_realtime`, filtered server-side with
         ``?job_id=<execution_id>`` with required actor/tenant scope and the
         GatewayClient bearer service credential. Resumes
-        from ``last_event_id`` (or ``cursor``; both are sent as Last-Event-ID),
+        from ``last_event_id`` (or ``cursor``; #4140 sends it as Last-Event-ID and ``?cursor=``),
         reconnects with jittered backoff, and yields ``stream.reset`` /
         ``stream.lagged`` control events. Runs until ``cancel`` fires or the
         generator is closed. Seal: the gateway's ``x-gf-seal`` per connect.

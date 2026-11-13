@@ -9,6 +9,8 @@ objects already in the repository. Existing imports remain compatibility paths. 
 ## Layout
 
 - `providers/` — provider contract and credential-bearing runtime boundary.
+- `runtime/inference/` — executable local transformer/GGUF backends, pinned artifact/deployment/catalog loaders, fair admission and resource accounting.
+- `model_runtime/` — native model execution, tokenization, checkpoints and standalone offline chat.
 - `runtime/contracts/` — operation/conversation/context contracts.
 - `runtime/persistence/` — durable state and recovery.
 - `runtime/context/` — context compilation.
@@ -39,6 +41,36 @@ objects already in the repository. Existing imports remain compatibility paths. 
 No compatibility source may be deleted until imports, ownership, focused
 tests, rollback evidence, App Assembly, and signed accountability are explicit.
 Relocation alone never completes an AIQ task or work package.
+
+## Running application composition
+
+The product uses the existing application and engine processes. The active path
+is `frontend/src/features/Jeeves` → `backend/routes/ai.py` →
+`skeleton/api/engine_runtime.py` → `skeleton/provider_runtime.py`. The governed
+`runtime/api` and `runtime/intelligence` destinations mirror those canonical
+owners; the provider destinations remain non-owning facades. Edit the owning
+source and synchronize its governed mirror instead of creating another executor.
+
+| Capability | Implementation and operating behavior |
+| --- | --- |
+| Local model selection | `runtime/inference/{artifact,deployment,catalog}.py`; explicit pinned artifacts or up to eight named models, without implicit downloads or external fallback. |
+| Serving | `runtime/inference/{local,adaptive_serving,llama_cpp,native_runtime}.py`; one admission owner for trusted tenant/deadline scopes, bounded batches, memory headroom and physical worker drainage. |
+| Response cooperation | `skeleton/intelligence/cooperation.py` and the canonical execution loop; bounded plan/draft/critique/refine stages preserve the original context and operation budget. |
+| Operational learning | `skeleton/intelligence/runtime_learning.py` and `skeleton/persistence/execution_repository.py`; numeric feedback, drift, deferred replay credits, checkpoint recovery and bounded derived retention. Transformer weights do not train themselves through these controls. |
+| Idle upkeep | `skeleton/jeeves/ai/studio_maintenance.py`; optional admitted chunks, durable result reuse, postcommit acknowledgements, physical custody and explicit failed-task retry. |
+| Studio improvement | `backend/core/game_studio_agent.py`; source-bound child reconciliation, opt-in compatible numeric memory and explicit incumbent restoration through the existing editor gates. |
+| Operator interface | Jeeves runtime optimization and the AI model inventory; current model, recovery, learner and maintenance observations plus administrator controls. |
+
+Persistent engine execution uses one coordinator and one pinned engine namespace
+per execution database. The coordinator holds OS file custody through drainage,
+rejects inherited fork ownership and scans restart work in bounded pages. Parallel
+model workers and game/training instances operate inside their existing admission
+budgets. Separate engine installations need separate state volumes.
+
+Use [AI and crawler first install](../../docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md)
+for the configuration helper, portable model bindings, explicit administrator
+bootstrap and startup commands. Build compilation and a materialized file tree
+do not establish enterprise qualification or measured game quality.
 
 
 ## Standalone offline AI chat entry points

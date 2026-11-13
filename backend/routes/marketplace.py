@@ -1,5 +1,5 @@
 """
-VI.3 Creator Marketplace — MONETIZATION (one-time purchase via Stripe Checkout).
+VI.3 Creator Marketplace — legacy one-time purchase via Stripe Checkout.
 
 A creator LISTS a generated game for sale at a price; a buyer purchases one-time
 access through Stripe Checkout. The price is ALWAYS resolved server-side from the
@@ -14,31 +14,73 @@ Flow:
   POST /api/webhook/stripe                    — Stripe webhook (source of truth)
   GET  /api/marketplace/purchases            — a buyer's purchased games
 
-Buyer/creator identity is a client-generated visitor id (no auth layer yet).
+Project routes require an authenticated, scoped account. New listings and
+checkout are unavailable until runtime qualification and buyer delivery exist;
+existing listing reads and payment settlement paths remain in place.
 """
 from __future__ import annotations
+
+from routes.playable_access import project_router, scoped_database, reauthorize_project_context
 
 import os
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.anti_farm import rate_ok
 from emergentintegrations.payments.stripe.checkout import (
-    StripeCheckout, CheckoutSessionRequest,
+    StripeCheckout, CheckoutSessionRequest, paid_amount_matches,
 )
 
-router = APIRouter(prefix="/api", tags=["marketplace"])
+router = project_router(prefix="/api", tags=["marketplace"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "") or None
 MIN_PRICE = 0.50
 MAX_PRICE = 500.0
 
+
+def _marketplace_release_unavailable() -> JSONResponse:
+    """Do not accept money without verified gameplay and buyer delivery."""
+    return JSONResponse(status_code=503, content={
+        "error": "Selling and purchasing games is unavailable until gameplay and buyer access can be verified.",
+        "code": "marketplace_release_unavailable",
+    })
+
+
+def _marketplace_release_ready() -> bool:
+    """No runtime qualification or buyer-delivery authority is wired yet.
+
+    This is deliberately not an environment toggle or a model-supplied flag.
+    Re-enabling sales requires an implemented, scoped authority and tests.
+    """
+    return False
+
+
+def _marketplace_order_is_bound(txn: dict) -> bool:
+    """Require the persisted checkout identity before settling a game sale."""
+    metadata = txn.get("metadata") if isinstance(txn, dict) else None
+    if not isinstance(metadata, dict) or metadata.get("source") != "marketplace":
+        return False
+    for key in ("playable_id", "buyer_id"):
+        value = txn.get(key)
+        if (not isinstance(value, str) or not value or value != value.strip()
+                or metadata.get(key) != value):
+            return False
+    return True
+
+
+def _same_marketplace_order(before: dict, after: dict) -> bool:
+    return (_marketplace_order_is_bound(before) and _marketplace_order_is_bound(after)
+            and all(before.get(key) == after.get(key) for key in (
+                "session_id", "playable_id", "buyer_id", "amount", "currency", "metadata",
+            )))
 _GAME_LIGHT = {
     "_id": 0, "playable_id": 1, "title": 1, "genre": 1, "has_cover": 1, "asset_status": 1,
     "plays": 1, "playability_score": 1, "evaluation.overall": 1, "moderation_status": 1,
@@ -70,6 +112,11 @@ async def create_listing(body: ListBody, request: Request):
     """Creator lists a ready playable for one-time sale. Re-listing updates price.
     VII.5: blocks games hidden by moderation, and attaches a near-duplicate
     similarity warning (IP protection) without blocking the listing."""
+    # There is no trusted browser qualification or buyer entitlement owner
+    # for this legacy HTML pipeline. Never turn an advisory score into a sale.
+    if not _marketplace_release_ready():
+        return _marketplace_release_unavailable()
+
     if not rate_ok(request, "mkt_list", rate_per_sec=0.2, burst=6):
         return {"error": "rate_limited", "detail": "Too many listing attempts — slow down."}
     pid = (body.playable_id or "").strip()
@@ -185,6 +232,11 @@ class CheckoutBody(BaseModel):
 async def checkout(body: CheckoutBody, request: Request):
     """Create a Stripe Checkout session. Price is resolved from the listing
     server-side; the client cannot set the amount."""
+    # Historical listings and payment settlement remain readable, but no new
+    # checkout may be created without verified gameplay and buyer delivery.
+    if not _marketplace_release_ready():
+        return _marketplace_release_unavailable()
+
     if not STRIPE_API_KEY:
         return {"error": "payments not configured"}
     pid = (body.playable_id or "").strip()
@@ -238,8 +290,8 @@ async def _finalize_purchase(txn: dict):
     """Idempotently record a paid purchase + bump listing aggregates."""
     if txn.get("processed"):
         return
-    # Premium-pass sessions are finalized by the premium status endpoint, not here.
-    if (txn.get("metadata") or {}).get("source") == "premium":
+    # Unknown or premium sessions cannot be turned into game purchases.
+    if not _marketplace_order_is_bound(txn) or txn.get("payment_status") != "paid":
         return
     pid = txn.get("playable_id")
     buyer = txn.get("buyer_id", "anon")
@@ -277,24 +329,41 @@ async def _finalize_purchase(txn: dict):
 async def checkout_status(session_id: str, request: Request):
     """Poll Stripe for the session's payment status; record the purchase on first
     'paid'. Safe to poll repeatedly (idempotent)."""
+    await reauthorize_project_context(mutate=True)
     if not STRIPE_API_KEY:
         return {"error": "payments not configured"}
     txn = await _db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     if not txn:
         return {"error": "unknown session"}
+    if not _marketplace_order_is_bound(txn):
+        return JSONResponse(status_code=409, content={"error": "payment_source_mismatch"})
     sc = _checkout(str(request.base_url))
     try:
         status = await sc.get_checkout_status(session_id)
     except Exception:
         return {"error": "stripe_error", "payment_status": txn.get("payment_status")}
 
-    await _db.payment_transactions.update_one(
-        {"session_id": session_id},
-        {"$set": {"status": status.status, "payment_status": status.payment_status,
-                  "updated_at": _now()}})
     if status.payment_status == "paid":
+        if not paid_amount_matches(txn, status.amount_total, status.currency):
+            return JSONResponse(status_code=409, content={"error": "payment_details_mismatch"})
+        try:
+            await _db.payment_transactions.update_one(
+                {"session_id": session_id, "amount": txn["amount"], "currency": txn["currency"],
+                 "metadata": txn["metadata"], "playable_id": txn["playable_id"], "buyer_id": txn["buyer_id"]},
+                {"$set": {"status": status.status, "payment_status": "paid", "updated_at": _now()}})
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            return JSONResponse(status_code=409, content={"error": "payment_details_mismatch"})
+        before = txn
         txn = await _db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+        if not txn or not _same_marketplace_order(before, txn) or not paid_amount_matches(txn, status.amount_total, status.currency):
+            return JSONResponse(status_code=409, content={"error": "payment_details_mismatch"})
         await _finalize_purchase(txn)
+    else:
+        # Do not let an out-of-order unpaid response downgrade a paid order.
+        await _db.payment_transactions.update_one(
+            {"session_id": session_id}, {"$set": {"status": status.status, "updated_at": _now()}})
     return {
         "session_id": session_id,
         "status": status.status,
@@ -307,26 +376,46 @@ async def checkout_status(session_id: str, request: Request):
 
 @router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
-    """Stripe webhook — the source of truth. Marks the transaction paid + records
-    the purchase on checkout.session.completed."""
+    """Settle an existing transaction only on an explicitly paid session event."""
     if not STRIPE_API_KEY:
-        return {"received": False}
+        return JSONResponse(status_code=503, content={"received": False, "error": "payments_not_configured"})
     body = await request.body()
     sig = request.headers.get("Stripe-Signature")
     sc = _checkout(str(request.base_url))
     try:
         ev = await sc.handle_webhook(body, sig)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"received": False, "error": "webhook_rejected"})
     except Exception:
-        return {"received": False, "error": "webhook_rejected"}
-    if ev.session_id:
-        await _db.payment_transactions.update_one(
-            {"session_id": ev.session_id},
-            {"$set": {"payment_status": ev.payment_status or "unknown",
-                      "webhook_event": ev.event_type, "updated_at": _now()}})
-        if (ev.payment_status == "paid") or (ev.event_type == "checkout.session.completed"):
-            txn = await _db.payment_transactions.find_one({"session_id": ev.session_id}, {"_id": 0})
-            if txn:
-                await _finalize_purchase(txn)
+        # A missing secret or unavailable verifier is a server-side outage;
+        # acknowledge neither the event nor the error as a bad signature.
+        return JSONResponse(status_code=503, content={"received": False, "error": "webhook_unavailable"})
+    # Completion can precede payment for delayed methods. An absent status is
+    # not evidence of payment, and late unpaid events must not downgrade a paid
+    # transaction. Payment-status polling remains available for existing orders.
+    if (ev.session_id and ev.payment_status == "paid" and ev.event_type in {
+        "checkout.session.completed", "checkout.session.async_payment_succeeded",
+    }):
+        txn = await _db.payment_transactions.find_one({"session_id": ev.session_id}, {"_id": 0})
+        if (not txn or not _marketplace_order_is_bound(txn)
+                or not paid_amount_matches(txn, getattr(ev, "amount_total", None), getattr(ev, "currency", None))):
+            return JSONResponse(status_code=503, content={"received": False, "error": "payment_details_unreconciled"})
+        try:
+            await _db.payment_transactions.update_one(
+                {"session_id": ev.session_id, "amount": txn["amount"], "currency": txn["currency"],
+                 "metadata": txn["metadata"], "playable_id": txn["playable_id"], "buyer_id": txn["buyer_id"]},
+                {"$set": {"payment_status": "paid",
+                          "webhook_event": ev.event_type, "updated_at": _now()}})
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            return JSONResponse(status_code=503, content={"received": False, "error": "payment_details_unreconciled"})
+        before = txn
+        txn = await _db.payment_transactions.find_one({"session_id": ev.session_id}, {"_id": 0})
+        if (not txn or not _same_marketplace_order(before, txn)
+                or not paid_amount_matches(txn, getattr(ev, "amount_total", None), getattr(ev, "currency", None))):
+            return JSONResponse(status_code=503, content={"received": False, "error": "payment_details_unreconciled"})
+        await _finalize_purchase(txn)
     return {"received": True}
 
 

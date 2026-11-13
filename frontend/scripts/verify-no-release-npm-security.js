@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { verifyDeepmergePrototypeGuard } = require('./verify-deepmerge-security.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -122,7 +123,8 @@ function verifyNodeForgeNestedDigestAlgorithmGuard() {
 verifyBracesDepthGuard();
 verifyHttpCacheMaxStaleGuard();
 verifyNodeForgeNestedDigestAlgorithmGuard();
+verifyDeepmergePrototypeGuard();
 
 console.log(
-  '[verify-no-release-npm-security] braces, http-cache-semantics, and node-forge mitigations verified',
+  '[verify-no-release-npm-security] braces, http-cache-semantics, node-forge, and deepmerge mitigations verified',
 );

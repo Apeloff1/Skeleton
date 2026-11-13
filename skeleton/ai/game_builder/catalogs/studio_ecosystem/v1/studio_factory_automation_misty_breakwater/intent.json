@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_misty_breakwater",
+  "title": "Misty Breakwater: The Maker Commons",
+  "subtitle": "Original the maker commons design in Misty Breakwater; only the grid preview compiles today.",
+  "seed": 203010312996,
+  "width": 23,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "ocean",
+  "starting_health": 4
+}

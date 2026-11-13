@@ -1,0 +1,398 @@
+{
+  "schema": 1,
+  "source_pr": 5062,
+  "source_head": "45d24f0d493de4e3d03003534b39973cf15f4a7f",
+  "target_main": "42c9908bee87bacde621b99e6015250cb41d64da",
+  "merge_base": "e00bfb0809b34573c2df313ea16e17fd10bead38",
+  "security_hold": "do-not-merge",
+  "review_only": true,
+  "adopted": [
+    {
+      "path": ".github/workflows/release-images.yml",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "2ad59d9ad30f07d1e7e40d04f88493b0a6adfcc6"
+    },
+    {
+      "path": ".github/workflows/reproducible-release.yml",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "01c66cf79205cb85534045b3463d38b8b2bfb859"
+    },
+    {
+      "path": "frontend/scripts/test-setup-local-guard.cjs",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "cfbcfc11e56412731744c269c39414b0d7451b0d"
+    },
+    {
+      "path": "skeleton/app/consumer_first_run_readiness.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "5e666d8a26bf21752b2b55b0ad9375395f7b2c24"
+    },
+    {
+      "path": "skeleton/godot_export/report.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "76152d1793e69924aadc042eac434806db83bf0d"
+    },
+    {
+      "path": "skeleton/local_ai/doctor.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "bfdc3289f0f48a13afc60311a4e81260e81ecbda"
+    },
+    {
+      "path": "skeleton/local_ai/health.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "8115f22ace9405284a6ab2fbe3963174b5900256"
+    },
+    {
+      "path": "skeleton/local_ai/inference_loop.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "f79ba57946674ffd07142dd517791a4171ee0f6c"
+    },
+    {
+      "path": "skeleton/local_ai/operational_engine.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "5a65b2867c51bc2a54c027d2971db3590563fdd4"
+    },
+    {
+      "path": ".github/workflows/full-repo-audit-20261106.yml",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "cbebc1f187ffda00edaec58a4539ed7990f67ff4"
+    },
+    {
+      "path": "docs/game/STUDIO_B_SCENE_BYTE_CUSTODY.md",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "4b6f2329044a450459145ae2a870be01eb223d99"
+    },
+    {
+      "path": "scripts/audit_pytest_shard_20261106.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "f3037693caa31db468b068f55c9fba962c09686b"
+    },
+    {
+      "path": "scripts/audit_sweep_20261106.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "1280cc73027346530984011b28a82f931f9b90e2"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/export_verification.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "82bb9f0b378fe6dd128c9f3c75b54cff02988e4e"
+    },
+    {
+      "path": "skeleton/app/consumer_first_run_handoff.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "a3ae09d7e9acc7add75c1880a4bc2a2e7bb182d1"
+    },
+    {
+      "path": "skeleton/game/gameplay/grid_save_custody.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "c6119cbb8417c4e2ee2efcbea3eedaee6dcfa3ee"
+    },
+    {
+      "path": "skeleton/game/gameplay/scene_bytes.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "32282757d524068e1ba4a874245ee988566fb8a2"
+    },
+    {
+      "path": "skeleton/jeeves/worlds/export_verification.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "82bb9f0b378fe6dd128c9f3c75b54cff02988e4e"
+    },
+    {
+      "path": "skeleton/testing/test_app_compose_loopback_contract.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "095a195939a3d97e35b8fbcf986891ff4de7d512"
+    },
+    {
+      "path": "skeleton/testing/test_app_consumer_first_run_handoff.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "afc69976378ee4e6858d4d4c97bbbf2f5cdf016d"
+    },
+    {
+      "path": "skeleton/testing/test_app_health_probe_timing.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "375ede7af768677a75b6766da96ac99dd8ca252f"
+    }
+  ],
+  "already_in_main": 1658,
+  "deferred": [
+    {
+      "path": ".github/workflows/owner-historical-actions-cleanup.yml",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "fcf8811bd03f87e7ccc11ca21c61bbd9ef406183",
+      "source_sha": "691165eabeb952a60ccdd438b26e620dc3d4b915",
+      "main_sha": "96fe607e2a61c2555d25859e57264d95cebaebba"
+    },
+    {
+      "path": ".machine/repository.toml",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "14af3cdca79fe8081896d67bde432dcee3dfc175",
+      "source_sha": "91becc7a95970294cdb68ecff64cee8cf4e155e9",
+      "main_sha": "23679e89f91573e21a012a7cf832df5686597052"
+    },
+    {
+      "path": "backend/Dockerfile",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "8c93f7bd7416f8e810878853a6697f52946b9132",
+      "source_sha": "1c1b2095286ab1a560968ab0bdbed4ad49f6d867",
+      "main_sha": "4a180a7aa22d9559b28cd05da654c65d0cc79fe7"
+    },
+    {
+      "path": "docker-compose.yml",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "859a71af1d54da70402ebe124e4b076e5b691d51",
+      "source_sha": "6e204db231cd1d8db0f64829504e5bbf4f2d4a6d",
+      "main_sha": "3cbf37077221df322e5f9e17ffb1b29eef688389"
+    },
+    {
+      "path": "frontend/src/product/appReadinessClient.ts",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "39902d0d3f1d97b03ace89c3491b08de3678a712",
+      "source_sha": "ea1e7e75b497a7b8bec3504fe03b531973045763",
+      "main_sha": "5ab7aa0509cd4b890d64f912eda8a8c5ec12a8ee"
+    },
+    {
+      "path": "machine/ai_file_tree.json",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "76b1a388ed32cd296a2b384198759568c72fe79b",
+      "source_sha": "a5183009bbff0c27b372f8f8f114b65aa3ea6609",
+      "main_sha": "1fc4f79bf6ab796da1cf96d709eb22d0c89ac54c"
+    },
+    {
+      "path": "machine/ci_workflow_tiers.json",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "db501006d555b2d3228cc61c5908a30043b5ca62",
+      "source_sha": "ca008cadaf880621163ab2d01f535efe2c9354fc",
+      "main_sha": "a3c4bbce83961d3572147c3a5c9edac4f1ae29c2"
+    },
+    {
+      "path": "scripts/check_ci_workflow_tiers.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "7dfb1da75fee88d86cc730b889c12d391f48cd4c",
+      "source_sha": "df8104acbe0715f5117bca414d96f2608aab0fb5",
+      "main_sha": "9e535c5bde8c2550111c8ecf2afc5b0f59df26d2"
+    },
+    {
+      "path": "scripts/check_toolchain_contract.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "d78088123c59dabea0a4000c94130d9be05fef84",
+      "source_sha": "baaaf44c0c07167f7a28e620656a35a271fbd11e",
+      "main_sha": "8c2b0ee12b7a39357534a5cf8bd50ad18de89421"
+    },
+    {
+      "path": "scripts/game/offline_grid_campaign.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "de8e209a31a39f841ba87fbc77b8f04e364f2691",
+      "source_sha": "2efbd25bfc510a85382d9d12fa20dccdab12d864",
+      "main_sha": "1d0528a7b1035808f8855bd9201cdf076ee9b44e"
+    },
+    {
+      "path": "scripts/windows/check_payload_zip.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "b2906cd40a46834e83c6fdfe023bed234f511261",
+      "source_sha": "239f90f2f5c09a0810a2923643e537828b2fb3cf",
+      "main_sha": "9e5cbeee72d672ca448c95026dee3b325af301c1"
+    },
+    {
+      "path": "scripts/windows/test_payload_zip.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "8445664cf62969ae4e572f40dcbd087321ae3b6f",
+      "source_sha": "18b561cc1ccdce0a2ac0563e7fe96addd0505eed",
+      "main_sha": "32d2f23bde03c5674173de6c832379f241f65720"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dual_runtime_verify.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "a598ed682e502ec4ddfba1d72952a460c6d32c75",
+      "source_sha": "189d25a408c8a029ce69a8e7f5b91fd654b3236a",
+      "main_sha": "e8ce65d72b79fc365aa4b1f526cd3eef5fa3596f"
+    },
+    {
+      "path": "skeleton/ai/model_runtime/__init__.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "9c39086824d01e00cfa9a19e94ed0bc92fc75d6c",
+      "source_sha": "3650afaeab52bfa509d8236caad8011c51619c53",
+      "main_sha": "a9cda85813e6025735d59d05fd459da72c8fa403"
+    },
+    {
+      "path": "skeleton/ai/runtime/native/profile_gate.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "cfc9477bd509516b61edd4d0d551545f889332aa",
+      "source_sha": "4aa2c8b6807fa66bbbf475f92b86b6b0e063680a",
+      "main_sha": "b6a8abe0cc92bc2690c2092db89a5e5204c56c0a"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/model/qualification/bench.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "ee58f5c6fbdecb33d78963b6bf441c74d44b6580",
+      "source_sha": "54f84f24badf215710c3fdfda67f421f768a5821",
+      "main_sha": "1fb8e59471988a74f85c0ddd180634140326fdb3"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/reliability_fabric/flows/evidence_bundle.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "9148156d656e9191966a569c506cf351bb507983",
+      "source_sha": "d109ebd5645f53286341327eeb8fe2610ad14c8d",
+      "main_sha": "8401d526bda9eda30611ad08dc266e5d90a14b67"
+    },
+    {
+      "path": "skeleton/ai/runtime/production_fabric/product/api.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "e485da409090e4946f087a350595674eca6c8fd9",
+      "source_sha": "7b36dfb2142ae45ea521fedd534e48d59ba3dcf4",
+      "main_sha": "31dfa80e480064e38769818bbfc86e70d75790be"
+    },
+    {
+      "path": "skeleton/ai/simulation/game/__init__.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "dc658d4a5b2cbdacd9acb7cc52eb4d3442033eb8",
+      "source_sha": "4ff39b9cfcd1f7b0851c9e852932088497aa2f24",
+      "main_sha": "168e5b5e5dc7b3bd8e61a13eb6c486b41980a583"
+    },
+    {
+      "path": "skeleton/app/health.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "2c30e1a3ff44f8d74f748333866d2e2d4054e4c9",
+      "source_sha": "fef260c01a5f5c8aa7a1b03007db5d15cc86df69",
+      "main_sha": "84aaa0c4dbb5dd320fe64a6a7a5a7df6a3dacb46"
+    },
+    {
+      "path": "skeleton/app/installer.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "54f9e4d5dc457f430c671495c3a5fefeebb3708c",
+      "source_sha": "c1b6834a5feff82618383bf282e069e8a1e9a213",
+      "main_sha": "44f6b4563c538ba74aac954ca14f0639d2319dc2"
+    },
+    {
+      "path": "skeleton/app/studio_readiness.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "4b952476e0f8b01035a5beb33870e8bb96686762",
+      "source_sha": "57aae47c60106eef26eb940e96d499c6fb763a96",
+      "main_sha": "f5b431be8f3a804c31355b5e65d8c0daaed263c6"
+    },
+    {
+      "path": "skeleton/game/flgb_editor_runtime.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "f79b36d13b2585cd3df8fa86e95013900c88471f",
+      "source_sha": "e53fe78cef4faca4d67aee45bc2b64a96867a0b8",
+      "main_sha": "8018e9f4214217c0ac0fca1943b24b6dee8875bf"
+    },
+    {
+      "path": "skeleton/game/simulation/flgb_simulation_runtime.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "590cfcf0457e97c352ec0de024bab84fc831a359",
+      "source_sha": "373217c6b47bcb303c34ac5eee29036d08b6fb8d",
+      "main_sha": "f4cc6320fbdd472588ca08b2c3bb1f454cec9d80"
+    },
+    {
+      "path": "skeleton/godot_export/runner.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "3d19b0a04d0353d60b22551d8adfabeb3cda4949",
+      "source_sha": "724eefd87e53db42e6e517f1182526761fd44150",
+      "main_sha": "0f32373021173a4103672b64035196f127226396"
+    },
+    {
+      "path": "skeleton/jeeves/worlds/world_canon.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "05fde3634c305aca9502a5e839bb93dfa939b760",
+      "source_sha": "c40cb4b09086a317e4525f1ebde557434b272997",
+      "main_sha": "5bcc9de45c7c4d187019dfbb9c434323d269f5d8"
+    },
+    {
+      "path": "skeleton/local_ai/model_loader.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "51c9a1adb0d9ef98e3b2a091f1014ebeed56fe63",
+      "source_sha": "66f3756b3a986b9ce793bee18be8d4e3910b60a1",
+      "main_sha": "c1c201318762663651d685937641d7338774c0e0"
+    },
+    {
+      "path": "skeleton/native/profile_gate.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "cfc9477bd509516b61edd4d0d551545f889332aa",
+      "source_sha": "4aa2c8b6807fa66bbbf475f92b86b6b0e063680a",
+      "main_sha": "b6a8abe0cc92bc2690c2092db89a5e5204c56c0a"
+    },
+    {
+      "path": "skeleton/simulation/game/__init__.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "dc658d4a5b2cbdacd9acb7cc52eb4d3442033eb8",
+      "source_sha": "4ff39b9cfcd1f7b0851c9e852932088497aa2f24",
+      "main_sha": "168e5b5e5dc7b3bd8e61a13eb6c486b41980a583"
+    },
+    {
+      "path": "skeleton/testing/test_ai_git_knowledge.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "4cfd3e5e848fa6f3ee3f03ca369fb165f2cc702f",
+      "source_sha": "7caa09ef75da153c76fcc22f9bbc59eb37f48356",
+      "main_sha": "78bb41ec6b3cb86602015d6ef67a2e05ee909183"
+    },
+    {
+      "path": "skeleton/testing/test_ai_real_model_qualification.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "770db1b124840acc81b8575904ec20df0f566a42",
+      "source_sha": "a131acda6480b13148418e4af64029546b2696ea",
+      "main_sha": "1076da45e640cab9c6dcfc8e5657803e853d8abc"
+    },
+    {
+      "path": "skeleton/testing/test_app_offline_signed_game_library_audit.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": "efe7229637853dc495a20e7b60b177fb0ad7b314",
+      "source_sha": "86976f182c9261153fb0c275f73b7e95adf797ed",
+      "main_sha": "d0271fdbfc1139f18bb3d076dc5c7828fd5a5565"
+    },
+    {
+      "path": "skeleton/testing/test_dual_runtime_verify.py",
+      "reason": "main-tree-unindexed",
+      "sha": "1c308d993da6f6fdb33c3501778bc9dc66d58aa7"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/session.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": null,
+      "source_sha": "a7bf719bff8cde2765cbddd8a3574390fbacb8bd",
+      "main_sha": "9043d01d87c74926e5f6f626ac20ad5b0c1855ab"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/world_canon.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": null,
+      "source_sha": "c40cb4b09086a317e4525f1ebde557434b272997",
+      "main_sha": "5bcc9de45c7c4d187019dfbb9c434323d269f5d8"
+    },
+    {
+      "path": "skeleton/godot_export/artifact_custody.py",
+      "reason": "main-changed-since-merge-base",
+      "base_sha": null,
+      "source_sha": "1cad07bbe06ad3694296d76544e34da54c394b14",
+      "main_sha": "ec9aaabadeaa5a79f05db72ac93ae61b2d0e84bd"
+    }
+  ],
+  "coverage": {
+    "main_root_until": "skeleton/cue/gb46/caps/c1462_replay_022.py",
+    "main_skeleton_until": "testing/test_combat_design.py",
+    "source_root_until": "skeleton/cue/gb46/caps/c2395_export_155.py",
+    "source_skeleton_until": "testing/test_game_original_rom_ai_acceptance.py",
+    "unknown_tree_paths": 1825
+  },
+  "notes": "Source tree fully retained as first-parent history. Only blobs unchanged on main since merge base were overlaid. Deferred paths are not declared semantically resolved; no CI/merge/release approval."
+}

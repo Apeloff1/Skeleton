@@ -720,11 +720,21 @@ async def regenerate_assistant_message(
             from skeleton.context.sources import artifact_segment
 
             metadata, original = await read_prepared(
-                thread=thread, user_message=causal, tenant_id=tenant_id, owner_id=owner_id
+                thread=thread,
+                user_message=causal,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                authority=conversation_authority,
             )
             frozen_segments = ()
             if original is not None:
-                await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+                await assert_current_dependencies(
+                    metadata,
+                    user=user,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    authority=conversation_authority,
+                )
                 if any(
                     "BEGIN UNTRUSTED CONTEXT DATA" in text for _, text in original.compiled_context.history
                 ):

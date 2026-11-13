@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_echo_caverns",
+  "title": "Echo Caverns: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010310652,
+  "width": 19,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 9,
+  "theme": "arcade",
+  "starting_health": 6
+}

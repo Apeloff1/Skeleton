@@ -13,6 +13,8 @@ Endpoints (prefix /api/physics):
   GET  /export/{pid}       — engine-ready physics config (JSON)
   GET  /bundle/{pid}       — ⭐ unified engine bundle (physics + camera + mechanics)
 """
+
+from routes.playable_access import project_router, scoped_database
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
@@ -20,8 +22,9 @@ import os
 
 from core.databases import client as _MONGO
 
-router = APIRouter(prefix="/api/physics", tags=["physics-pipeline"])
+router = project_router(prefix="/api/physics", tags=["physics-pipeline"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 
 
 # Reference presets the physics engineer composes from — for the UI.

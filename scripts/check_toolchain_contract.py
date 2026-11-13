@@ -16,13 +16,13 @@ UV_REQUIRED_VERSION = "==0.12.15"
 JAVA_BOOTSTRAP_MAJOR = 21
 GIT_BOOTSTRAP_MINIMUM = "2.40"
 BOOTSTRAP_COMMAND = "mise run bootstrap"
-RUFF_CI_VERSION = "0.9.10"
-RUFF_DEV_REQUIREMENT = "ruff>=0.9,<0.17"
-EXPO_SDK_VERSION = "~54.0.35"
-REACT_VERSION = "19.1.0"
-REACT_NATIVE_VERSION = "0.81.5"
-REACT_NATIVE_REANIMATED_VERSION = "~4.1.1"
-REACT_NATIVE_WORKLETS_VERSION = "0.5.1"
+RUFF_CI_VERSION = "0.17.2"
+RUFF_DEV_REQUIREMENT = "ruff>=0.17.2,<0.18"
+EXPO_SDK_VERSION = "~55.0.32"
+REACT_VERSION = "19.2.0"
+REACT_NATIVE_VERSION = "0.83.10"
+REACT_NATIVE_REANIMATED_VERSION = "4.2.1"
+REACT_NATIVE_WORKLETS_VERSION = "0.7.4"
 
 PROCESS_TESTS = (
     "test_process_safety_gate.py",
@@ -136,12 +136,18 @@ def ref_scoped_cancellation(workflow: str) -> bool:
     )
 
 
-def pr_only_ref_scoped_cancellation(workflow: str) -> bool:
-    """Return true when PRs cancel superseded runs but branch pushes queue."""
+def pr_only_ref_or_sha_scoped_cancellation(workflow: str) -> bool:
+    """Require PR-only preemption and a group bounded to PR or immutable main SHA."""
     group = re.search(r"^\s*group:\s*(.+)$", workflow, re.MULTILINE)
     return bool(
         group
-        and "${{ github.event.pull_request.number || github.ref }}" in group.group(1)
+        and any(
+            fallback in group.group(1)
+            for fallback in (
+                "${{ github.event.pull_request.number || github.ref }}",
+                "${{ github.event.pull_request.number || github.sha }}",
+            )
+        )
         and re.search(
             r"^\s*cancel-in-progress:\s*\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}\s*(?:#.*)?$",
             workflow,
@@ -149,6 +155,58 @@ def pr_only_ref_scoped_cancellation(workflow: str) -> bool:
         )
         is not None
     )
+
+
+def ci_preserves_main_run_evidence(workflow: str) -> bool:
+    """Validate top-level reusable-CI concurrency, never nested job settings.
+
+    Main commits must not cancel one another. PR heads may supersede their
+    own checks; other events must retain an immutable SHA group or never
+    cancel. Reject ambiguous or duplicated top-level concurrency entries.
+    """
+    lines = workflow.splitlines()
+    # The YAML top-level key must be exactly unindented; scanning arbitrary
+    # group/cancel lines could accept an unsafe top-level setting if a nested
+    # job declared an unrelated safe-looking concurrency rule.
+    indices = [i for i, line in enumerate(lines) if line == "concurrency:"]
+    if len(indices) != 1:
+        return False
+
+    settings: dict[str, str] = {}
+    for line in lines[indices[0] + 1:]:
+        if line and not line[0].isspace() and not line.startswith("#"):
+            break
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        match = re.fullmatch(r"  (group|cancel-in-progress):\s*(.+)", line)
+        if match is None:
+            return False
+        key, value = match.groups()
+        if key in settings:
+            return False
+        settings[key] = value.strip()
+    if set(settings) != {"group", "cancel-in-progress"}:
+        return False
+
+    group = settings["group"]
+    cancellation = settings["cancel-in-progress"]
+    # A trailing YAML comment is not part of the actual GitHub group value.
+    # Never accept a safety-critical SHA token that appears only in a comment.
+    if "#" in group or "#" in cancellation:
+        return False
+    if cancellation == "false":
+        return True
+    if cancellation == "true":
+        return "${{ github.sha }}" in group
+    if cancellation == "${{ github.event_name == 'pull_request' }}":
+        return any(
+            term in group
+            for term in (
+                "${{ github.event.pull_request.number || github.sha }}",
+                "${{ github.event.pull_request.number || github.ref }}",
+            )
+        )
+    return False
 
 
 def pinned_action_count(workflow: str, action: str, generation: str) -> int:
@@ -163,6 +221,26 @@ def main() -> int:
     failures: list[str] = []
 
     root_project = tomllib.loads(read("pyproject.toml"))
+    root_dev = (
+        root_project.get("project", {}).get("optional-dependencies", {}).get("dev", [])
+    )
+    require(
+        RUFF_DEV_REQUIREMENT in root_dev,
+        "root Python development Ruff range drifted from canonical toolchain",
+        failures,
+    )
+    require(
+        RUFF_DEV_REQUIREMENT in read("requirements-dev.txt").splitlines(),
+        "requirements-dev Ruff range drifted from canonical toolchain",
+        failures,
+    )
+    require(
+        RUFF_DEV_REQUIREMENT in {
+            line.strip() for line in read("setup.cfg").splitlines()
+        },
+        "setup.cfg dev Ruff range drifted from canonical toolchain",
+        failures,
+    )
     require(
         root_project.get("tool", {}).get("uv", {}).get("required-version")
         == UV_REQUIRED_VERSION,
@@ -327,7 +405,7 @@ def main() -> int:
     }
     require(
         actual_frontend_matrix == expected_frontend_matrix,
-        "Expo SDK 54 dependency matrix drifted: "
+        "Expo SDK 55 dependency matrix drifted: "
         f"expected {expected_frontend_matrix!r}, got {actual_frontend_matrix!r}",
         failures,
     )
@@ -384,9 +462,20 @@ def main() -> int:
         "CI frontend must consume the canonical pinned Node version",
         failures,
     )
+    # Expo's direct Yarn wrapper can hang after exporting dist. The reviewed
+    # supervisor invokes the same pinned Expo CLI, verifies non-stale HTML,
+    # bounds the export and reaps the process; it is strictly stronger than
+    # a bare `yarn export:web` command. Preserve that actual CI authority.
     require_all(
         ci,
-        ("yarn lint:ci", "yarn typecheck", "yarn export:web"),
+        (
+            "yarn lint:ci",
+            "yarn typecheck",
+            "node --test scripts/test-guarded-expo-export.cjs",
+            "node scripts/guarded-expo-export.cjs",
+            "test -s dist/index.html",
+            "test -s dist/setup.html || test -s dist/setup/index.html",
+        ),
         "CI frontend scripts drifted",
         failures,
     )
@@ -396,16 +485,13 @@ def main() -> int:
         failures,
     )
     require(
-        cancel_false(ci)
-        or sha_scoped_cancellation(ci)
-        or ref_scoped_cancellation(ci)
-        or pr_only_ref_scoped_cancellation(ci),
+        ci_preserves_main_run_evidence(ci),
         "CI concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )
     require(
         pinned_action_count(ci, "actions/checkout", "v7.0.1") > 0
-        and pinned_action_count(ci, "actions/setup-python", "v7.0.0") > 0
+        and pinned_action_count(ci, "actions/setup-python", "v7.1.0") == 8
         and pinned_action_count(ci, "actions/setup-node", "v7.1.0") > 0,
         "CI must use immutable proven core action generations",
         failures,
@@ -414,13 +500,16 @@ def main() -> int:
     # not merely an arbitrary 40-hex ref followed by a version comment.
     require(
         ci.count("actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0") == 1
-        and ci.count("astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0") == 3,
+        and ci.count("actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0") == 8
+        and ci.count("actions/setup-python@") == 8
+        and ci.count("astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3") == 3
+        and ci.count("astral-sh/setup-uv@") == 3,
         "CI Node/uv action SHA identities must match verified upstream release pins",
         failures,
     )
     require(
-        pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.0") == 3,
-        "CI must use exactly three immutable setup-uv v10.3.0 sites backed by the repository uv pin",
+        pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.3") == 3,
+        "CI must use exactly three immutable setup-uv v10.3.3 sites backed by the repository uv pin",
         failures,
     )
     ruff_command = f'uvx --from "ruff=={RUFF_CI_VERSION}" ruff check . --output-format=github'
@@ -518,7 +607,8 @@ def main() -> int:
     require(
         cancel_false(backend_quality)
         or sha_scoped_cancellation(backend_quality)
-        or ref_scoped_cancellation(backend_quality),
+        or ref_scoped_cancellation(backend_quality)
+        or ci_preserves_main_run_evidence(backend_quality),
         "Backend Quality concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )

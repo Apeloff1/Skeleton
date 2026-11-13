@@ -23,12 +23,13 @@ import httpx
 import pytest
 from starlette.testclient import TestClient
 
-# Import the FastAPI app.
+# Make backend modules importable without constructing the application during
+# collection. Provider-neutral engine suites intentionally do not install every
+# backend integration dependency.
 _BACKEND_ROOT = Path(__file__).resolve().parents[1]
 for _candidate in (str(_BACKEND_ROOT), "/app/backend"):
     if _candidate not in sys.path and Path(_candidate).is_dir():
         sys.path.insert(0, _candidate)
-from server import app
 
 
 _LIVE_ENV_KEYS = ("EXPO_PUBLIC_BACKEND_URL", "EXPO_BACKEND_URL")
@@ -78,6 +79,8 @@ def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool 
 @pytest.fixture(scope="session")
 def client() -> Generator[TestClient, None, None]:
     """Create a synchronous test client with session scope."""
+    from server import app
+
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
 
@@ -158,7 +161,9 @@ _AI_CHAT_ROUTE_TEST_FILES = {
     "test_ai_chat_engine_cutover.py",
     "test_ai_chat_local_engine_e2e.py",
     "test_ai_chat_memory_policy.py",
+    "test_ai_chat_request_reconciliation.py",
     "test_ai_chat_turn_route_cutover.py",
+    "test_conversation_regeneration_route.py",
 }
 
 
@@ -171,6 +176,7 @@ def ai_chat_turn_test_authority(request: pytest.FixtureRequest, monkeypatch):
         return
 
     import routes.ai as ai
+    import core.chat_sessions as sessions
     from core.chat_turn_lifecycle import ChatTurnLifecycle
     from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository
 
@@ -184,11 +190,17 @@ def ai_chat_turn_test_authority(request: pytest.FixtureRequest, monkeypatch):
         async def get_operation(self, operation_id, **kwargs):
             return self.repo.get_operation(operation_id, **kwargs)
 
+        async def reconstruct(self, operation_id, **kwargs):
+            return self.repo.reconstruct(operation_id, **kwargs)
+
         async def append_event(self, event, **kwargs):
             return self.repo.append_event(event, **kwargs)
 
         async def list_events(self, operation_id, **kwargs):
             return self.repo.list_events(operation_id, **kwargs)
+
+        async def reconstruct(self, operation_id, **kwargs):
+            return self.repo.reconstruct(operation_id, **kwargs)
 
         async def acquire_lease(self, operation_id, **kwargs):
             return self.repo.acquire_lease(operation_id, **kwargs)
@@ -203,6 +215,21 @@ def ai_chat_turn_test_authority(request: pytest.FixtureRequest, monkeypatch):
             return self.repo.assert_lease(lease, **kwargs)
 
     authority = AsyncSQLiteTurnAuthority()
+    class CurrentConversationOwner:
+        def __getattr__(self, name):
+            return getattr(ai.conversation_authority, name)
+
+    # Route fixtures replace the canonical owner, not just its transcript API.
+    # Keep preparation/recovery on that same test owner instead of connecting
+    # to the application's real Mongo database through an imported singleton.
+    monkeypatch.setattr(sessions, "conversation_authority", CurrentConversationOwner())
+
+    async def initialized_test_owners():
+        # SQLite fixture constructors create their canonical indexes eagerly.
+        # Index migration itself is exercised by storage-specific tests.
+        return None
+
+    monkeypatch.setattr(ai, "initialize_chat_runtime", initialized_test_owners)
     monkeypatch.setattr(
         ai,
         "chat_turn_lifecycle",

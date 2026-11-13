@@ -5,11 +5,12 @@ from __future__ import annotations
 import base64
 import binascii
 import hmac
+import sqlite3
 from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from skeleton.api.engine_authority import EngineAuthorityError
 from skeleton.api.engine_service import (
@@ -42,6 +43,143 @@ class EngineCancelBody(BaseModel):
     actor_id: str = Field(min_length=1, max_length=512)
     tenant_id: str = Field(min_length=1, max_length=512)
     reason: str = Field(min_length=1, max_length=2048)
+
+
+class EngineRuntimePolicyPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def validate_fields(self):
+        if not self.model_fields_set or any(getattr(self, field) is None for field in self.model_fields_set):
+            raise ValueError("runtime policy requires non-null fields")
+        return self
+
+
+class EngineRuntimeServingPatch(EngineRuntimePolicyPatch):
+    enabled: bool | None = None
+    min_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
+    max_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
+    target_latency_ms: float | None = Field(default=None, ge=100, le=600000)
+    cooldown_seconds: float | None = Field(default=None, ge=0.5, le=300)
+    recovery_samples: int | None = Field(default=None, ge=2, le=128)
+    max_queue_wait_seconds: float | None = Field(default=None, ge=0.05, le=3600)
+    background_max_concurrency: int | None = Field(default=None, ge=0, le=32)
+    cache_max_bytes: int | None = Field(default=None, ge=0, le=1073741824)
+    cache_ttl_seconds: float | None = Field(default=None, ge=0, le=86400)
+    memory_high_watermark: float | None = Field(default=None, ge=0.5, le=0.99)
+    memory_low_watermark: float | None = Field(default=None, ge=0.1, le=0.95)
+    max_active_per_tenant: int | None = Field(default=None, ge=1, le=32)
+    max_queued_per_tenant: int | None = Field(default=None, ge=0, le=65536)
+    background_starvation_seconds: float | None = Field(default=None, ge=0.1, le=3600)
+    memory_shed_watermark: float | None = Field(default=None, ge=0.5, le=1)
+
+
+class EngineRuntimeLearningPatch(EngineRuntimePolicyPatch):
+    enabled: bool | None = None
+    min_samples: int | None = Field(default=None, ge=4, le=10000)
+    replay_capacity: int | None = Field(default=None, ge=8, le=256)
+    replay_steps: int | None = Field(default=None, ge=0, le=3)
+    learning_rate: float | None = Field(default=None, ge=1e-05, le=0.05)
+    gradient_clip: float | None = Field(default=None, ge=0.01, le=5)
+    max_effort_rounds: int | None = Field(default=None, ge=1, le=3)
+    target_latency_seconds: float | None = Field(default=None, ge=0.1, le=86400)
+    pressure_threshold: float | None = Field(default=None, ge=0.1, le=1)
+    uncertainty_ceiling: float | None = Field(default=None, ge=0.05, le=0.75)
+    partition_limit: int | None = Field(default=None, ge=1, le=128)
+    retained_outcomes: int | None = Field(default=None, ge=128, le=100000)
+    outcome_max_age_days: int | None = Field(default=None, ge=1, le=3650)
+    maintenance_receipt_retention: int | None = Field(default=None, ge=16, le=100000)
+
+
+class EngineRuntimeMaintenancePatch(EngineRuntimePolicyPatch):
+    enabled: bool | None = None
+    augmentation_enabled: bool | None = None
+    maximum_tasks_per_tick: int | None = Field(default=None, ge=1, le=8)
+    maximum_queue: int | None = Field(default=None, ge=1, le=8192)
+    maximum_scope_queue: int | None = Field(default=None, ge=1, le=8192)
+    maximum_retained_tasks: int | None = Field(default=None, ge=1, le=8192)
+    maximum_chunk_wall_ms: int | None = Field(default=None, ge=1, le=5000)
+    maximum_chunk_cpu_ms: int | None = Field(default=None, ge=1, le=5000)
+    maximum_chunk_polls: int | None = Field(default=None, ge=4, le=65536)
+    maximum_memory_drop_ppm: int | None = Field(default=None, ge=0, le=1000000)
+    maximum_consecutive_failures: int | None = Field(default=None, ge=1, le=32)
+    initial_backoff_ms: int | None = Field(default=None, ge=1, le=300000)
+    maximum_backoff_ms: int | None = Field(default=None, ge=1, le=86400000)
+    preemption_backoff_ms: int | None = Field(default=None, ge=1, le=300000)
+    circuit_failure_threshold: int | None = Field(default=None, ge=1, le=32)
+    circuit_cooldown_ms: int | None = Field(default=None, ge=1, le=86400000)
+    interrupted_lease_grace_ms: int | None = Field(default=None, ge=1000, le=300000)
+    priority_aging_ms: int | None = Field(default=None, ge=1000, le=86400000)
+    maximum_admission_wait_ms: int | None = Field(default=None, ge=1000, le=3600000)
+    clock_jump_tolerance_ms: int | None = Field(default=None, ge=100, le=60000)
+    maximum_owner_heartbeat_ms: int | None = Field(default=None, ge=10000, le=300000)
+    maximum_chunk_results: int | None = Field(default=None, ge=1, le=16384)
+    maximum_ack_retries_per_tick: int | None = Field(default=None, ge=1, le=16)
+
+
+EngineRuntimeEnabledPatch = EngineRuntimeLearningPatch
+
+
+class EngineRuntimeControlPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    expected_version: int = Field(ge=1, le=2**63 - 1)
+    serving: EngineRuntimeServingPatch | None = None
+    learning: EngineRuntimeLearningPatch | None = None
+    maintenance: EngineRuntimeMaintenancePatch | None = None
+    action: str | None = Field(default=None, pattern="^(trim_cache|clear_cache|drain|resume)$")
+    serving_route_id: str | None = Field(default=None, min_length=1, max_length=384)
+
+    @model_validator(mode="after")
+    def validate_patch(self):
+        fields = self.model_fields_set - {"actor_id", "tenant_id", "expected_version", "serving_route_id"}
+        if not fields or any(getattr(self, field) is None for field in fields):
+            raise ValueError("runtime control requires a non-null patch")
+        if self.serving is not None:
+            if not self.serving.model_fields_set or any(
+                getattr(self.serving, field) is None for field in self.serving.model_fields_set
+            ):
+                raise ValueError("serving policy requires non-null fields")
+        return self
+
+
+class EngineLearningCheckpointUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    action: str = Field(pattern="^(import|reset|restore_last_healthy)$")
+    expected_policy_version: int = Field(ge=1, le=2**63 - 1)
+    expected_state_version: int = Field(ge=1, le=2**63 - 1)
+    model_selection_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    checkpoint: dict[str, Any] | None = None
+    checkpoint_json: str | None = Field(default=None, max_length=256 * 1024)
+
+    @model_validator(mode="after")
+    def validate_checkpoint(self):
+        count = int(self.checkpoint is not None) + int(self.checkpoint_json is not None)
+        if count != (1 if self.action == "import" else 0):
+            raise ValueError("import requires exactly one checkpoint representation; other actions accept neither")
+        if self.checkpoint_json is not None and len(self.checkpoint_json.encode("utf-8")) > 256 * 1024:
+            raise ValueError("checkpoint exceeds the 256 KiB limit")
+        return self
+
+
+class EngineMaintenanceRetry(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    source_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    expected_attempts: int = Field(ge=0, le=1_000_000)
+
+
+class EngineMaintenanceCircuitReset(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    expected_generation: int = Field(ge=1, le=8_999_999_999_999_999)
+    expected_failure_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    source_digest: str = Field(pattern="^[0-9a-f]{64}$")
 
 
 class EngineImageGenerateBody(BaseModel):
@@ -266,11 +404,13 @@ def providers(
         "limits_source", "tokenizer", "supports_temperature", "artifact",
         "model_family", "protocol_capabilities", "generation_limits",
         "model_digest", "runtime_digest", "execution_profile_digest", "capacity", "runtime",
+        "semantic_verifier_configured", "semantic_verifier_route",
     )
     rows = [{key: value[key] for key in fields if key in value} for value in registry.statuses()]
     artifact_fields = (
         "schema", "model_id", "model_digest", "artifact_sha256", "artifact_bytes",
         "manifest_digest", "runtime_digest", "runtime_kind", "reference",
+        "source_model_id", "catalog_digest", "catalog_entry_digest", "catalog_source_sha256",
     )
     for row in rows:
         row.setdefault("id", row.get("provider_id"))
@@ -279,10 +419,21 @@ def providers(
             row["artifact"] = {
                 key: artifact[key] for key in artifact_fields if key in artifact
             }
+        runtime = row.get("runtime")
+        serving = runtime.get("serving") if isinstance(runtime, dict) else None
+        if isinstance(serving, dict) and isinstance(serving.get("capacity"), dict):
+            row["serving_state"] = {
+                "draining": serving["draining"],
+                "active": runtime["active"],
+                "queued": runtime["queued"],
+                "effective_concurrency": serving["capacity"]["effective_concurrency"],
+            }
         for field, allowed in {
             "generation_limits": (
                 "context_window", "max_output_tokens", "max_total_tokens", "shared_context",
                 "tokenizer", "limits_source",
+                "tokenizer_max_chars", "tokenizer_max_tokens",
+                "max_output_utf8_bytes",
             ),
             "capacity": ("max_concurrency", "max_batch_size", "max_queue_size", "cache_entries"),
             "runtime": ("active", "queued", "completed", "failed", "cancelled", "overloaded", "cache_hits", "cache_entries"),
@@ -308,6 +459,175 @@ def _media_adapter(coordinator):
         ) from exc
 
 
+def _authorize_runtime_control(
+    request: Request, service: EngineExecutionService, service_token: str,
+    *, tenant_id: str, write: bool = False,
+) -> None:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        grant = service.authorities.grant_for(principal)
+    except EngineAuthorityError as exc:
+        raise HTTPException(status_code=403, detail="engine runtime authority denied") from exc
+    scope = "engine:runtime-control" if write else "engine:read"
+    if scope not in grant.scopes or not grant.allows_tenant(tenant_id):
+        raise HTTPException(status_code=403, detail="engine runtime authority denied")
+    if write and not grant.allows_capability("assistant.runtime.control"):
+        raise HTTPException(status_code=403, detail="engine runtime capability denied")
+
+
+@router.get("/runtime-control")
+def runtime_control_snapshot(
+    request: Request,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+    actor_id: Annotated[str, Query(min_length=1, max_length=512)],
+    tenant_id: Annotated[str, Query(min_length=1, max_length=512)],
+    learning_offset: Annotated[int, Query(ge=0, le=127)] = 0,
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=tenant_id)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.snapshot(actor_id=actor_id, tenant_id=tenant_id, learning_offset=learning_offset)
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
+@router.patch("/runtime-control")
+def configure_runtime_control(
+    request: Request,
+    body: EngineRuntimeControlPatch,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+) -> dict[str, Any]:
+    # The application checks the authenticated operator's administrator role;
+    # the engine separately grants this sealed application service write scope.
+    _authorize_runtime_control(request, service, service_token, tenant_id=body.tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.configure(
+            actor_id=body.actor_id,
+            tenant_id=body.tenant_id,
+            expected_version=body.expected_version,
+            serving=None if body.serving is None else body.serving.model_dump(exclude_unset=True),
+            learning=None if body.learning is None else body.learning.model_dump(exclude_unset=True),
+            maintenance=None if body.maintenance is None else body.maintenance.model_dump(exclude_unset=True),
+            action=body.action,
+            serving_route_id=body.serving_route_id,
+        )
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
+@router.get("/runtime-control/learning/partitions/{partition_id}/checkpoint")
+def export_runtime_learning_checkpoint(
+    request: Request,
+    partition_id: str,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+    actor_id: Annotated[str, Query(min_length=1, max_length=512)],
+    tenant_id: Annotated[str, Query(min_length=1, max_length=512)],
+    expected_state_version: Annotated[int | None, Query(ge=1, le=2**63 - 1)] = None,
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.export_learning_checkpoint(
+            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
+            expected_state_version=expected_state_version,
+        )
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
+@router.get("/runtime-control/learning/dataset")
+def export_runtime_learning_dataset(
+    request: Request,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+    actor_id: Annotated[str, Query(min_length=1, max_length=512)],
+    tenant_id: Annotated[str, Query(min_length=1, max_length=512)],
+    limit: Annotated[int, Query(ge=1, le=256)] = 128,
+    cursor: Annotated[str | None, Query(min_length=1, max_length=6144)] = None,
+    partition_id: Annotated[str | None, Query(pattern="^[0-9a-f]{64}$")] = None,
+    include_untrained: bool = False,
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.export_learning_dataset(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            limit=limit,
+            cursor=cursor,
+            partition_id=partition_id,
+            include_untrained=include_untrained,
+        )
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
+@router.post("/runtime-control/maintenance/circuits/{kind}/reset")
+def reset_runtime_maintenance_circuit(
+    request: Request,
+    kind: str,
+    body: EngineMaintenanceCircuitReset,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=body.tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.reset_maintenance_circuit(kind=kind, **body.model_dump())
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
+@router.post("/runtime-control/maintenance/tasks/{task_id}/retry")
+def retry_runtime_maintenance(
+    request: Request, task_id: str, body: EngineMaintenanceRetry,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=body.tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.retry_maintenance(
+            task_id=task_id, **body.model_dump(),
+        )
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
+@router.post("/runtime-control/learning/partitions/{partition_id}/checkpoint")
+def update_runtime_learning_checkpoint(
+    request: Request, partition_id: str, body: EngineLearningCheckpointUpdate,
+    service: Annotated[EngineExecutionService, Depends(_engine_service)],
+    coordinator: Annotated[Any, Depends(_engine_coordinator)],
+    service_token: Annotated[str, Depends(_engine_service_token)],
+) -> dict[str, Any]:
+    _authorize_runtime_control(request, service, service_token, tenant_id=body.tenant_id, write=True)
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine runtime control unavailable")
+    try:
+        return coordinator.runtime_control.configure_learning_checkpoint(
+            partition_id=partition_id, **body.model_dump(exclude_unset=True),
+        )
+    except (ExecutionRepositoryError, ValueError, TypeError, sqlite3.Error) as exc:
+        _raise_engine_error(exc)
+
+
 def _decode_media(raw: str, field: str, *, maximum: int = 20 * 1024 * 1024) -> bytes:
     try:
         decoded = base64.b64decode(raw, validate=True)
@@ -325,6 +645,8 @@ def _decode_media(raw: str, field: str, *, maximum: int = 20 * 1024 * 1024) -> b
 
 
 def _raise_engine_error(exc: Exception) -> None:
+    if isinstance(exc, sqlite3.Error):
+        raise HTTPException(status_code=503, detail="engine durable state is temporarily unavailable") from exc
     if isinstance(exc, EngineAuthorityError):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

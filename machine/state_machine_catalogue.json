@@ -214,21 +214,17 @@
       "status": "implementation-candidate"
     },
     {
+      "domain_id": "dragon-conversation-micro-projection",
+      "owner_plane": "retrieval",
+      "authority": "derived",
+      "status": "opt-in-derived-projection"
+    },
+    {
       "domain_id": "dragon-practice-state",
       "owner_plane": "feedback-learning",
       "authority": "authoritative",
       "status": "implementation-candidate"
     }
   ],
-  "unbound_state_domain_candidates": [
-    {
-      "domain_id": "dragon-conversation-micro-projection",
-      "owner_plane": "retrieval",
-      "authority": "derived",
-      "status": "canonical-lifecycle-hooks-implemented-consent-runtime-binding-required",
-      "reason": "Added to this catalogue by #3923 without a matching machine/state_topology.json state_domains entry or backing implementation; state_domain_refs is a projection of state_topology, so this candidate is parked here until a topology owner binds it.",
-      "source_commit": "6d5493e227e6e724a96cf064120a9ca82f4e8d9c",
-      "status": "opt-in-derived-projection"
-    }
-  ]
+  "unbound_state_domain_candidates": []
 }

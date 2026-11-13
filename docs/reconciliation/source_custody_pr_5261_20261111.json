@@ -1,0 +1,174 @@
+{
+  "schema": 1,
+  "source_pr": 5261,
+  "source_head": "ceaa4bcfbc87c37a3b19c8616ac7ec720705505f",
+  "main_base": "42c9908bee87bacde621b99e6015250cb41d64da",
+  "merge_base": "91b151916b974026f7757e34a18b638b3e91e421",
+  "type": "held source-custody reconciliation, not merge approval",
+  "transplanted": [
+    {
+      "path": "backend/core/telemetry_privacy.py",
+      "status": "added",
+      "blob": "47dd3e07105ea5b4baf11ad9e7dcd5d38d8b9fc7"
+    },
+    {
+      "path": "backend/routes/gameforge_build.py",
+      "status": "modified",
+      "blob": "d55415a3e7a874a6ffa914872b26375dd104d897"
+    },
+    {
+      "path": "backend/routes/nexus.py",
+      "status": "modified",
+      "blob": "bb2f6eb7402bf19bc6aa9c8150113ec3bcd6f648"
+    },
+    {
+      "path": "backend/routes/ops.py",
+      "status": "modified",
+      "blob": "0febffeba8945e89a2a1684a5e015249637268cf"
+    },
+    {
+      "path": "backend/routes/snowball.py",
+      "status": "modified",
+      "blob": "0fb35e35cb63017407e3fb4496f2a5f742538dd8"
+    },
+    {
+      "path": "backend/tests/test_api_token_and_enum_security.py",
+      "status": "added",
+      "blob": "48922fad2a1c4bb490466d5c8dc8e1d25fc81fe0"
+    },
+    {
+      "path": "backend/tests/test_binary_atomic_security_20261111.py",
+      "status": "added",
+      "blob": "b01873543b9be2ddfed575b9b8c15c75137c1dac"
+    },
+    {
+      "path": "backend/tests/test_room_api_admission_security.py",
+      "status": "added",
+      "blob": "e4ea7178d5f67214648f5a49d53085a3439fc9d2"
+    },
+    {
+      "path": "backend/tests/test_room_api_egress_policy_regressions.py",
+      "status": "added",
+      "blob": "04f846ba2e115c3574729229f9f4caf11b02fc64"
+    },
+    {
+      "path": "backend/tests/test_telemetry_privacy_boundary.py",
+      "status": "added",
+      "blob": "bd6cacc14b0b05c6ff033b1cb922eee5be846c5d"
+    },
+    {
+      "path": "frontend/scripts/test-quickwins-prototype-guard.cjs",
+      "status": "modified",
+      "blob": "8e7628abff7d90de3e046ec13d6b0ac9403947b4"
+    },
+    {
+      "path": "frontend/scripts/test-telemetry-privacy.mjs",
+      "status": "added",
+      "blob": "9cf8e0cf0f2870afc11c57801f350618bd9e1fed"
+    },
+    {
+      "path": "frontend/scripts/test-telemetry-redaction.cjs",
+      "status": "added",
+      "blob": "a33ec52ade08bee82f7238a7dc366d581f76cffd"
+    },
+    {
+      "path": "frontend/scripts/test-wasm-guest-sandbox.cjs",
+      "status": "added",
+      "blob": "b677287b694fc1df9732e0a256f671b8588c0b4b"
+    },
+    {
+      "path": "frontend/src/utils/securityTelemetry.ts",
+      "status": "added",
+      "blob": "d92ab92b2174169685fa1aee54a877cc17dee646"
+    },
+    {
+      "path": "scripts/check_pr_merge_hold.py",
+      "status": "modified",
+      "blob": "b92931ba7bf2caba672aaa9018cb3e8fd846e155"
+    },
+    {
+      "path": "tests/test_pr_merge_hold_gate.py",
+      "status": "modified",
+      "blob": "54b5358655d20a21ab524daa613cdd08e22afddd"
+    }
+  ],
+  "deferred": [
+    {
+      "path": ".github/workflows/backend-literal-lazy-loader-qualification.yml",
+      "head_blob": "04a41b488c092b865ea09280bdb5de497d9246bb",
+      "status": "added"
+    },
+    {
+      "path": ".github/workflows/merge-readiness.yml",
+      "head_blob": "fc1a7d549d7503592c44a86825499d93e8965e10",
+      "status": "modified"
+    },
+    {
+      "path": "backend/core/lazy_registry.py",
+      "head_blob": "1bc0a8241219302136ace0370320f88340db83a0",
+      "status": "modified"
+    },
+    {
+      "path": "backend/core/public_exception_route.py",
+      "head_blob": "329e39918cae724ce7491a70d95e035c3aee0cf5",
+      "status": "modified"
+    },
+    {
+      "path": "backend/gameforge/rooms/room_api_gateway.py",
+      "head_blob": "c02256f321e22558181c0cc886b5bec59f5b9217",
+      "status": "modified"
+    },
+    {
+      "path": "backend/routes/playable_access.py",
+      "head_blob": "7163b77f51e4f18a13eea7b325a8d170269fe447",
+      "status": "modified"
+    },
+    {
+      "path": "backend/routes/telemetry.py",
+      "head_blob": "140635a6c10e4e6dda434c7e0f5e725e336e1736",
+      "status": "modified"
+    },
+    {
+      "path": "backend/services/binary_builder.py",
+      "head_blob": "37a3229e38fac1f24b27841e6171c2d247e5e73d",
+      "status": "modified"
+    },
+    {
+      "path": "backend/tests/test_public_exception_route_security.py",
+      "head_blob": "53dfce5d42f6497405cfb037fca0b2858772dc23",
+      "status": "modified"
+    },
+    {
+      "path": "backend/tests/test_room_api_dns_pin.py",
+      "head_blob": "4c094680bd3237ff5db5dc6c744031bbe8c8b12f",
+      "status": "modified"
+    },
+    {
+      "path": "backend/tests/test_storage_lazy_registry.py",
+      "head_blob": "d0a77c51797f1959dfe080b078d6eae736630179",
+      "status": "modified"
+    },
+    {
+      "path": "frontend/src/features/WasmCompiler/WasmCompiler.ts",
+      "head_blob": "027f0c67a5d7563b9231faec46b3fc97ce6f0bef",
+      "status": "modified"
+    },
+    {
+      "path": "frontend/src/utils/modalLogger.ts",
+      "head_blob": "95f93c981ca21c11c34f7839686ea0d4a421aa9d",
+      "status": "modified"
+    },
+    {
+      "path": "frontend/src/utils/telemetryPrivacy.ts",
+      "head_blob": "c931f2c791e9d36d08b176e3695bf82dad55c6a1",
+      "status": "added"
+    },
+    {
+      "path": "machine/product_surface_specification.json",
+      "head_blob": "a6bb423da82c54750e75157d3c3691be59dbcecb",
+      "status": "modified"
+    }
+  ],
+  "hold": "do-not-merge",
+  "notes": "Only touched paths absent from all main changes since true merge base were carried. Live current-main edits remain authoritative. Deferred source remains in PR's original first-parent history."
+}

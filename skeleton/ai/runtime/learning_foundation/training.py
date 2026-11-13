@@ -256,6 +256,25 @@ class TrainingRun:
     observation: TrainingObservation
 
 
+def _artifact_snapshot(artifact: ModelArtifact) -> ModelArtifact:
+    payload = artifact.as_dict()
+    payload.pop("schema_version")
+    return ModelArtifact(**payload)
+
+
+def _run_snapshot(run: TrainingRun) -> TrainingRun:
+    # Public projections thaw the model contracts' immutable JSON identities.
+    # Reconstruct validated, detached contracts instead of pickling mappingproxy.
+    return TrainingRun(
+        spec=TrainingSpec(**run.spec.as_dict()),
+        plan=deepcopy(run.plan),
+        artifact=_artifact_snapshot(run.artifact),
+        receipt=TrainingReceipt(**run.receipt.as_dict()),
+        checkpoint=deepcopy(run.checkpoint),
+        observation=deepcopy(run.observation),
+    )
+
+
 class LocalTrainingControlPlane:
     """Reference control plane over the existing local model-development registry."""
 
@@ -332,7 +351,7 @@ class LocalTrainingControlPlane:
         if not isinstance(spec, TrainingSpec):
             raise TypeError("spec must be TrainingSpec")
         # Snapshot caller-owned containers before admitting a replay or executing.
-        spec = deepcopy(spec)
+        spec = TrainingSpec(**spec.as_dict())
         datasets = deepcopy(tuple(datasets))
         corpora = {key: tuple(value) for key, value in corpora.items()}
         by_identity = {record.identity: record for record in datasets}
@@ -355,7 +374,7 @@ class LocalTrainingControlPlane:
         if spec.run_id in self._runs:
             if self._run_bindings[spec.run_id] != binding:
                 raise TrainingControlError("run identity is bound to different training inputs")
-            return deepcopy(self._runs[spec.run_id])
+            return _run_snapshot(self._runs[spec.run_id])
         for record in datasets:
             try:
                 training_dataset = record.as_training_dataset()
@@ -393,7 +412,7 @@ class LocalTrainingControlPlane:
         ):
             raise TrainingControlError("registry training receipt identity differs from admitted request")
         try:
-            artifact = ModelArtifact(**asdict(artifact))
+            artifact = _artifact_snapshot(artifact)
             artifact.load_reference_model()
         except (ModelProgramError, ValueError, TypeError) as exc:
             raise TrainingControlError("registry model artifact failed integrity verification") from exc
@@ -443,9 +462,9 @@ class LocalTrainingControlPlane:
             checkpoint=checkpoint,
             observation=observation,
         )
-        self._runs[spec.run_id] = deepcopy(result)
+        self._runs[spec.run_id] = _run_snapshot(result)
         self._run_bindings[spec.run_id] = binding
-        return deepcopy(result)
+        return _run_snapshot(result)
 
     @_serialized
     def recover(

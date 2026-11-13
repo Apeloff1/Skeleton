@@ -17,12 +17,13 @@ import os
 import json
 import subprocess
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 from dotenv import load_dotenv
 from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 # Sub-router — NO prefix so the parent's "/api/galaxy-studio" prefix applies.
-router = APIRouter(tags=["galaxy-studio"])
+router = APIRouter(route_class=PublicExceptionRoute, tags=["galaxy-studio"])
 
 load_dotenv()  # one-shot, idempotent across imports
 

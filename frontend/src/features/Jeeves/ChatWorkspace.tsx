@@ -8,19 +8,22 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import StudioLoginGate from '../../auth/StudioLoginGate';
 import { getAuthToken } from '../../auth/gameforgeAuth';
-import { accountChatStorage, archiveCanonicalChat, deleteCanonicalChat, renameCanonicalChat, cancelCanonicalChat, canonicalChatHistory, canonicalChatLibrary, exportCanonicalChat, sendCanonicalChat, verifiedChatScope } from '../../product/chatSessionClient';
+import { accountChatStorage, archiveCanonicalChat, deleteCanonicalChat, renameCanonicalChat, cancelCanonicalChat, canonicalChatHistory, canonicalChatLibrary, chatReadinessMessage, exportCanonicalChat, sendCanonicalChat, verifiedChatScope } from '../../product/chatSessionClient';
 import { WorkspaceController } from './WorkspaceController';
 import MessageContent from './MessageContent';
 import JeevesRuntimeStatus from './JeevesRuntimeStatus';
 import ChatModelCapabilities from './ChatModelCapabilities';
 import ChatCooperationDetails from './ChatCooperationDetails';
 import ChatResponseReviewControl from './ChatResponseReviewControl';
+import WorkflowTemplatePicker from './WorkflowTemplatePicker';
+import type { WorkflowTemplate } from '../../product/aiWorkflowClient';
 import { cooperationConfigurationIssues, reviewedResponsePolicy } from '../../product/chatCooperation';
 import { useChatReadiness } from '../../product/useChatReadiness';
 import { chatProgressLabel } from '../../product/chatProgress';
 import ChatTaskActions from './workbench/ChatTaskActions';
 import ChatSceneActions from './ChatSceneActions';
 import ChatStoryActions from './ChatStoryActions';
+import JeevesStudioPalette from './JeevesStudioPalette';
 import { MAX_CONTEXT, MAX_TEXT, searchConversations } from './workspace';
 import { getJeevesRequestContext } from '../../state/settingsStore';
 import type { Artifact, Conversation, Message } from './workspace';
@@ -94,7 +97,10 @@ function MessageCard({ message, controller, busy }: { message: Message; controll
           void Clipboard.setStringAsync(message.text).then(() => controller.notify('Message copied.')).catch(() => controller.notify('Clipboard is unavailable. Select the message text to copy it.'));
         }} />
         {failed && <Button icon="cloud-download-outline" label="Check server" disabled={busy} onPress={() => {
-          void controller.refreshCanonical().then(() => {
+          const conversationId = controller.active.id;
+          void controller.refreshCanonical(conversationId).then(confirmed => {
+            if (controller.active.id !== conversationId) return;
+            if (!confirmed) { controller.notify('Server history could not be confirmed. The saved turn was not resubmitted.'); return; }
             const current = controller.active.messages.find(item => item.id === message.id);
             controller.notify(current?.status === 'complete'
               ? 'The completed reply was recovered from canonical history.'
@@ -161,22 +167,28 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
     accountChatStorage(scope), sendCanonicalChat, canonicalChatHistory,
     { cancel: cancelCanonicalChat, library: canonicalChatLibrary, archive: archiveCanonicalChat, remove: deleteCanonicalChat, rename: renameCanonicalChat },
   ));
-  const { readiness, refresh: refreshModels } = useChatReadiness();
+  const { readiness, refresh: refreshModels, error: readinessError, observedAt: readinessObservedAt } = useChatReadiness();
   const [reviewResponse, setReviewResponse] = useState(false);
   const [reviewPolicy, setReviewPolicy] = useState(reviewedResponsePolicy);
   const [reviewFieldError, setReviewFieldError] = useState<string | null>(null);
   const [model, setModel] = useState<string>('automatic');
   const [modelPicker, setModelPicker] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [outputTokens, setOutputTokens] = useState(1024);
+  const [outputTokens, setOutputTokens] = useState<number | null>(null);
   const [knowledge, setKnowledge] = useState(false);
   const [knowledgeQuery, setKnowledgeQuery] = useState('');
   const selectedModel = readiness?.models.models.find(row => row.id === model);
   const modelReady = readiness?.available === true && (model === 'automatic' ? readiness.models.automatic_available : selectedModel?.selectable === true && selectedModel.available);
-  const answerTokenLimit = selectedModel ? Math.min(outputTokens, selectedModel.max_output_tokens, 16384) : undefined;
+  const automaticRoutes = readiness?.models.models.filter(row => row.active || row.fallback === true) ?? [];
+  const automaticOutputLimit = readiness?.models.automatic_available && automaticRoutes.length ? Math.min(...automaticRoutes.map(row => row.max_output_tokens)) : undefined;
+  const automaticDefaultOutput = readiness?.models.automatic_available && automaticRoutes.length ? Math.min(...automaticRoutes.map(row => row.default_output_tokens)) : undefined;
+  const observedOutputLimit = selectedModel?.max_output_tokens ?? (model === 'automatic' ? automaticOutputLimit : undefined);
+  const observedDefaultOutput = selectedModel?.default_output_tokens ?? (model === 'automatic' ? automaticDefaultOutput : undefined);
+  const answerTokenLimit = observedOutputLimit !== undefined && observedDefaultOutput !== undefined ? Math.min(outputTokens ?? observedDefaultOutput, observedOutputLimit, 16384) : undefined;
   const reviewAvailable = readiness?.capabilities.cooperative_review === true;
   const reviewIssues = cooperationConfigurationIssues(reviewPolicy, readiness?.models.models ?? [], answerTokenLimit);
   const reviewBudgetReady = !reviewResponse || reviewAvailable && !reviewFieldError && reviewIssues.length === 0;
+  const knowledgeReady = readiness?.capabilities.crawler_context === true && readiness?.checks.crawler?.available === true;
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const conversation = controller.active;
   const busy = snapshot.busyId !== null;
@@ -187,6 +199,34 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
   const [showCompanion, setShowCompanion] = useState(false);
   const [composerHeight, setComposerHeight] = useState(168);
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const tail = conversation.messages.at(-1);
+  const workflowDraftReady = snapshot.ready && !busy && !conversation.archived
+    && !(tail?.role === 'user' && tail.status !== 'complete' && !tail.terminal);
+  const workflowContextKey = JSON.stringify([
+    conversation.id, model, modelReady, reviewAvailable, observedOutputLimit,
+    selectedModel?.activation ?? automaticRoutes.map(row => [row.id, row.activation]),
+  ]);
+  const workflowUnavailableReason = (value: WorkflowTemplate): string | null => {
+    if (value.surface !== 'chat') return 'Choose a chat template for this composer.';
+    const live = controller.getSnapshot();
+    const currentConversation = controller.active;
+    const currentTail = currentConversation.messages.at(-1);
+    if (!workflowDraftReady || !live.ready || live.busyId !== null || currentConversation.id !== conversation.id
+      || currentConversation.archived || currentTail?.role === 'user' && currentTail.status !== 'complete' && !currentTail.terminal) return 'Resolve the current turn before changing the next message settings.';
+    if (!modelReady || !Number.isSafeInteger(observedOutputLimit)) return 'Choose an available model and refresh its output limits before applying a template.';
+    if (value.settings.max_tokens > observedOutputLimit!) return `This template needs ${value.settings.max_tokens.toLocaleString()} answer tokens; the selected route permits ${observedOutputLimit!.toLocaleString()}.`;
+    if (value.settings.review_response) {
+      if (!reviewAvailable) return 'Cooperative response review is unavailable for the current account and engine.';
+      return reviewFieldError || cooperationConfigurationIssues(reviewPolicy, readiness?.models.models ?? [], value.settings.max_tokens)[0] || null;
+    }
+    return null;
+  };
+  const applyWorkflowTemplate = (value: WorkflowTemplate) => {
+    const reason = workflowUnavailableReason(value);
+    if (reason || value.surface !== 'chat') throw new Error(reason || 'Choose a chat template.');
+    setOutputTokens(value.settings.max_tokens);
+    setReviewResponse(value.settings.review_response);
+  };
 
   useEffect(() => {
     void controller.initialize();
@@ -209,10 +249,11 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
   const storageLabel = useMemo(() => ({ loading: 'Opening chat cache…', saving: 'Caching…', saved: 'Account cache saved', error: 'Cache not saved' })[snapshot.saveState], [snapshot.saveState]);
 
   const send = () => {
-    if (!snapshot.ready || busy || !conversation.draft.trim()) return;
+    if (scope.token !== getAuthToken() || !snapshot.ready || busy || !conversation.draft.trim()) return;
     if (reviewResponse && !reviewAvailable) { controller.notify('Response review is unavailable. Refresh readiness or turn off review to continue.'); return; }
     if (!reviewBudgetReady) { controller.notify(reviewFieldError || reviewIssues[0] || 'Review the response settings before sending.'); return; }
     if (!modelReady) { controller.notify('Choose a ready model or open Setup to finish the AI connection.'); return; }
+    if (knowledge && !knowledgeReady) { controller.notify('Captured knowledge is unavailable. Refresh readiness or turn off Captured context to send this draft.'); return; }
     if (knowledge && !knowledgeQuery.trim()) { controller.notify('Enter a query for the explicit captured-knowledge context.'); return; }
     let requestContext: string;
     try {
@@ -224,7 +265,8 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
     const pending = controller.send(undefined, {
       context: requestContext,
       ...(reviewResponse ? { cooperation: reviewPolicy } : {}),
-      ...(selectedModel ? { provider_id: selectedModel.provider_id, model_id: selectedModel.model_id, max_output_tokens: answerTokenLimit } : {}),
+      ...(selectedModel ? { provider_id: selectedModel.provider_id, model_id: selectedModel.model_id } : {}),
+      ...(answerTokenLimit !== undefined ? { max_output_tokens: answerTokenLimit } : {}),
       ...(knowledge ? { crawler_context: { query: knowledgeQuery.trim(), max_documents: 4, max_characters: 16000 } } : {}),
     });
     void pending;
@@ -248,10 +290,10 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
         <Button icon="refresh-outline" label="Refresh" disabled={busy} onPress={() => { void controller.refreshCanonical(); }} />
         <Button icon="options-outline" label="Details" onPress={() => { setTitle(conversation.title); setContext(conversation.context); setSettings(true); }} />
       </View>
-      <JeevesRuntimeStatus readiness={readiness} refresh={refreshModels} />
+      <JeevesRuntimeStatus readiness={readiness} refresh={refreshModels} readinessError={readinessError?.message} observedAt={readinessObservedAt} />
       <View style={s.chatToolbar}>
         <Button icon="hardware-chip-outline" label={selectedModel?.label || 'Automatic model'} disabled={busy} onPress={() => setModelPicker(true)} />
-        <Text style={[s.small, s.flex]}>{modelReady ? 'Ready for a new turn' : 'A ready model and conversation storage are required'}</Text>
+        <Text style={[s.small, s.flex]}>{busy ? 'Following the saved turn' : !workflowDraftReady ? 'Resolve the saved turn before sending a new message' : modelReady ? 'Ready for a new turn' : 'A ready model and conversation storage are required'}</Text>
         <Button icon="globe-outline" label="Web capture" onPress={() => router.push('/crawler' as never)} />
       </View>
       {(snapshot.notice || snapshot.saveState === 'error') && <View style={s.notice} accessibilityRole="alert">
@@ -279,6 +321,14 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
         {busy && <View style={s.composing}><ActivityIndicator color={C.purple} /><Text style={s.small}>{chatProgressLabel(snapshot.progress?.state)}</Text><Button icon="stop-outline" label={snapshot.progress?.state === 'cancelling' ? 'Stopping…' : 'Stop'} disabled={snapshot.progress?.state === 'cancelling'} onPress={() => { void controller.cancel(); }} /></View>}
       </ScrollView>
       <View style={s.composer} onLayout={event => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}>
+        <JeevesStudioPalette disabled={busy}
+          onCompose={draft => controller.edit({ draft })}
+          onNavigate={path => router.push(path as never)} />
+        {!busy && !modelReady && <View style={{ gap: 6 }}>
+          <Text accessibilityLiveRegion="polite" style={s.small}>{readinessError?.message || (readiness && !readiness.available ? chatReadinessMessage(readiness) : selectedModel?.readiness.message || readiness?.models.readiness?.message) || 'AI readiness has not confirmed an available conversation engine. Your draft stays here while you finish setup.'}</Text>
+          <View style={s.row}><Button icon="refresh-outline" label="Check readiness" onPress={() => { void refreshModels(); }} /><Button icon="settings-outline" label="Finish AI setup" onPress={() => router.push('/setup' as never)} /><Button icon="hardware-chip-outline" label="Choose model" onPress={() => setModelPicker(true)} /></View>
+        </View>}
+        {knowledge && !knowledgeReady && <Text accessibilityRole="alert" style={s.error}>Captured knowledge is unavailable. Turn off Captured context or refresh readiness; the draft is preserved.</Text>}
         {knowledge && <View style={{ gap: 6 }}><Text style={s.small}>Explicitly retrieve from your captured sources for this message. External text remains source material.</Text><TextInput accessibilityLabel="Captured knowledge query" value={knowledgeQuery} onChangeText={setKnowledgeQuery} maxLength={1024} style={s.field} placeholder="Search your captured sources…" placeholderTextColor={C.muted} /></View>}
         <TextInput value={conversation.draft} onChangeText={draft => controller.edit({ draft })} style={s.composerInput} multiline maxLength={MAX_TEXT}
           placeholder="Ask Jeeves about your next step…" placeholderTextColor={C.muted} accessibilityLabel="Message Jeeves" testID="chat-input" onKeyPress={event => {
@@ -286,13 +336,15 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
             if (Platform.OS === 'web' && key.key === 'Enter' && (key.ctrlKey || key.metaKey)) { event.preventDefault(); send(); }
           }} />
         <View style={s.composerActions}>
-          <Button icon="library-outline" label="Captured context" selected={knowledge} disabled={busy || readiness?.capabilities.crawler_context !== true || readiness?.checks.crawler?.available !== true} onPress={() => setKnowledge(value => !value)} />
+          <Button icon="library-outline" label="Captured context" selected={knowledge} disabled={busy || !knowledge && !knowledgeReady} onPress={() => setKnowledge(value => !value)} />
           <View style={s.flex} />
           <TouchableOpacity onPress={send} disabled={busy || !modelReady || !reviewBudgetReady || !conversation.draft.trim()} style={[s.send, (busy || !modelReady || !reviewBudgetReady || !conversation.draft.trim()) && s.disabled]} accessibilityRole="button" accessibilityLabel="Send message" testID="chat-send"><Ionicons name="arrow-up" size={22} color={C.bg} /></TouchableOpacity>
         </View>
         <ChatResponseReviewControl enabled={reviewResponse} change={setReviewResponse} disabled={busy} available={reviewAvailable} answerTokenLimit={answerTokenLimit}
           policy={reviewPolicy} changePolicy={setReviewPolicy} models={readiness?.models.models ?? []} mainModel={selectedModel}
           fieldError={reviewFieldError} changeFieldError={setReviewFieldError} issues={reviewIssues} refreshModels={refreshModels} />
+        <WorkflowTemplatePicker surface="chat" contextKey={workflowContextKey} disabled={!workflowDraftReady}
+          unavailableReason={workflowUnavailableReason} onApply={applyWorkflowTemplate} />
         <Text style={s.composerHint}>{`${conversation.draft.length.toLocaleString()} / 16,000 · Text chat · Saved account history${Platform.OS === 'web' ? ' · Ctrl/Cmd+Enter to send' : ''}`}</Text>
       </View>
     </KeyboardAvoidingView>}
@@ -301,10 +353,10 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
       <View style={s.sectionHeader}><Text style={s.sectionTitle}>Choose a model</Text><Button icon="close" label="Close" onPress={() => setModelPicker(false)} /></View>
       <Text style={s.small}>The engine owns model availability and credentials. A selection applies to the next new turn; Resume keeps the original saved selection.</Text>
       <Button icon="refresh-outline" label="Refresh models" onPress={() => void refreshModels()} />
-      <Button icon="git-branch-outline" label="Automatic engine route" selected={model === 'automatic'} disabled={!readiness?.models.automatic_available} onPress={() => { setModel('automatic'); setModelPicker(false); }} />
+      <Button icon="git-branch-outline" label="Automatic engine route" selected={model === 'automatic'} disabled={!readiness?.models.automatic_available} onPress={() => { setModel('automatic'); setOutputTokens(null); setModelPicker(false); }} />
       {!readiness && <Text style={s.error}>The configured model catalog could not be observed. Open Setup and refresh.</Text>}
-      {readiness?.models.models.map(row => <View key={row.id} style={s.artifact}><Text style={s.label}>{row.label}</Text><Text style={s.small}>{row.readiness.message}{row.credential_free ? ' · Local, no hosted credential required' : ''}</Text>{row.readiness.action && <Text style={s.small}>{row.readiness.action}</Text>}<ChatModelCapabilities modelFamily={row.model_family} capabilities={row.capabilities} contextWindow={row.context_window} outputLimit={row.max_output_tokens} /><Button icon="checkmark-outline" label={row.selectable ? model === row.id ? 'Selected' : 'Use model' : 'Unavailable'} disabled={!row.selectable} selected={model === row.id} onPress={() => { setModel(row.id); setOutputTokens(Math.min(row.default_output_tokens, row.max_output_tokens, 16384)); setModelPicker(false); }} /></View>)}
-      {selectedModel && <><Text style={s.label}>Maximum answer tokens</Text><View style={s.row}>{[128, 256, 512, 1024, 2048, 4096].filter(value => value <= selectedModel.max_output_tokens).map(value => <Button key={value} icon="text-outline" label={String(value)} selected={outputTokens === value} onPress={() => setOutputTokens(value)} />)}</View></>}
+      {readiness?.models.models.map(row => <View key={row.id} style={s.artifact}><Text style={s.label}>{row.label}</Text><Text style={s.small}>{row.readiness.message}{row.credential_free ? ' · Local, no hosted credential required' : ''}</Text>{row.readiness.action && <Text style={s.small}>{row.readiness.action}</Text>}<ChatModelCapabilities modelFamily={row.model_family} capabilities={row.capabilities} contextWindow={row.context_window} outputLimit={row.max_output_tokens} activation={row.activation} tokenizer={row.tokenizer} limitsSource={row.limits_source} runtimeFacts={row} /><Button icon="checkmark-outline" label={row.selectable ? model === row.id ? 'Selected' : 'Use model' : 'Unavailable'} disabled={!row.selectable} selected={model === row.id} onPress={() => { setModel(row.id); setOutputTokens(Math.min(row.default_output_tokens, row.max_output_tokens, 16384)); setModelPicker(false); }} /></View>)}
+      {observedOutputLimit !== undefined && <><Text style={s.label}>Shared answer budget · {answerTokenLimit?.toLocaleString()} tokens</Text>{model === 'automatic' && <Text style={s.small}>The observed limit is the smallest capacity across the declared primary and fallback routes. Automatic routing remains engine-owned.</Text>}<View style={s.row}>{[128, 256, 512, 1024, 2048, 4096].filter(value => value <= observedOutputLimit).map(value => <Button key={value} icon="text-outline" label={String(value)} selected={answerTokenLimit === value} onPress={() => setOutputTokens(value)} />)}</View></>}
       <Text style={s.small}>Attachments and all-forms generation are unavailable in canonical chat. No file is uploaded from this screen.</Text>
       <Button icon="settings-outline" label="Setup & readiness" onPress={() => { setModelPicker(false); router.push('/setup' as never); }} />
     </ScrollView></SafeAreaView></Modal>

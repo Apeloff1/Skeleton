@@ -194,7 +194,7 @@ def seed_expanded_checkpoint(
     root.mkdir(parents=True, exist_ok=True)
     path = root / "checkpoint.pt"
     if path.exists():
-        existing = torch.load(path, map_location="cpu", weights_only=False)
+        existing = torch.load(path, map_location="cpu", weights_only=True)
         if int(existing.get("hidden", -1)) == hidden and int(existing.get("bytes_done", 0)) > 0:
             status_path = root / "status.json"
             cycle_complete = False
@@ -209,7 +209,7 @@ def seed_expanded_checkpoint(
                 "seeded": False,
                 "cycle_complete": cycle_complete,
             }
-    loaded = torch.load(source, map_location="cpu", weights_only=False)
+    loaded = torch.load(source, map_location="cpu", weights_only=True)
     current = int(loaded["hidden"])
     model = ByteRNN(current)
     model.load_state_dict(loaded["best_state"])
@@ -241,7 +241,7 @@ def seed_expanded_checkpoint(
 
 
 def _source_digest(source: Path | str) -> str:
-    loaded = torch.load(source, map_location="cpu", weights_only=False)
+    loaded = torch.load(source, map_location="cpu", weights_only=True)
     model = ByteRNN(int(loaded["hidden"]))
     model.load_state_dict(loaded["best_state"])
     _pin(model)

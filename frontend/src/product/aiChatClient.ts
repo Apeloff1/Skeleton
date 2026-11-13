@@ -10,7 +10,7 @@ import {
 } from './governedConversationClient';
 import { ChatClientError, asChatError, chatAbortError, chatApiError } from './chatErrors';
 import { normalizeChatCooperation, validateChatCooperationReceipts, validateChatCooperationSummary, type ChatCooperationPolicy } from './chatCooperation';
-import { validateChatModel } from './chatModelCatalog';
+import { validateChatModel, type ChatModelRuntimeFacts } from './chatModelCatalog';
 
 export { ChatClientError } from './chatErrors';
 
@@ -22,6 +22,7 @@ export type ChatModel = {
   available: boolean;
   selectable: boolean;
   active: boolean;
+  fallback?: boolean;
   credential_free: boolean;
   supports_temperature?: boolean;
   execution_mode?: string;
@@ -34,7 +35,7 @@ export type ChatModel = {
   capabilities: string[];
   readiness: { code: string; message: string; action?: string | null } | null;
   activation?: Record<string, unknown> | null;
-};
+} & ChatModelRuntimeFacts;
 
 export type ChatModelCatalog = {
   schema_version: string | number;
@@ -47,9 +48,11 @@ export type ChatModelCatalog = {
 };
 
 export async function getChatModels(input: ConversationRequestOptions = {}): Promise<ChatModelCatalog> {
+  const token = getAuthToken();
   const result = await api.get<ChatModelCatalog>('/api/ai/models', {
-    signal: input.signal, headers: authHeaders(input.headers), retries: 0,
+    signal: input.signal, headers: authHeaders(input.headers), retries: 0, timeoutMs: 15000, maxResponseChars: 256 * 1024,
   });
+  if (token !== getAuthToken()) throw new ChatClientError('Your account changed. Refresh the configured models for the current account.', { kind: 'authorization', retryable: false });
   if (!result.ok || !result.data) throw chatApiError(result, 'Could not load available models.');
   const catalog = result.data;
   if (!catalog || typeof catalog.available !== 'boolean' || !Array.isArray(catalog.models) || catalog.models.length > 256

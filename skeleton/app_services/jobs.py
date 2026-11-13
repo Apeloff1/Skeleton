@@ -10,6 +10,8 @@ Event emit points (envelope v1, see ``events.py``) all go through
 from __future__ import annotations
 
 import json
+import logging
+import sqlite3
 import time
 import uuid
 from typing import Any, Callable, Mapping, Optional, Sequence
@@ -23,12 +25,18 @@ from skeleton.app_services.events import (
 from skeleton.app_services.ports import Build, BuildRepository, Job
 from skeleton.observability.redaction import safe_exception_text
 
+_log = logging.getLogger(__name__)
+
 JOB_STATUSES = ("queued", "running", "succeeded", "failed", "dead", "cancelled")
 BUILD_JOB_KIND = "game.build"
 
 
 class LeaseLost(RuntimeError):
     pass
+
+
+class OwnedJobConflict(ValueError):
+    """An existing job cannot prove the submitted owner/body binding."""
 
 
 class SqliteJobQueue:
@@ -52,7 +60,8 @@ class SqliteJobQueue:
 
     def enqueue(self, kind: str, payload: Mapping[str, Any], *, max_attempts: int = 3,
                 delay_s: float = 0.0, correlation_id: str = "",
-                idempotency_key: Optional[str] = None) -> Job:
+                idempotency_key: Optional[str] = None, actor_id: str = "",
+                tenant_id: str = "") -> Job:
         if max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
         now = self.clock()
@@ -68,7 +77,45 @@ class SqliteJobQueue:
                 " VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (jid, kind, "queued", json.dumps(dict(payload), sort_keys=True), max_attempts,
                  now + delay_s, correlation_id, idempotency_key, now, now))
+            if actor_id or tenant_id:
+                # Same transaction as the INSERT: a worker can never claim this
+                # job before its owner is recorded (no unowned events).
+                c.execute("UPDATE jobs SET actor_id=?, tenant_id=? WHERE job_id=?",
+                          (actor_id, tenant_id, jid))
         return self.get(jid)  # type: ignore[return-value]
+
+    def enqueue_owned(self, kind: str, payload: Mapping[str, Any], *, actor_id: str,
+                      tenant_id: str, request_hash: str, timeout_s: float,
+                      execution_id: Optional[str] = None, project_id: Optional[str] = None,
+                      idempotency_key: Optional[str] = None, legacy_key: Optional[str] = None,
+                      max_attempts: int = 1, correlation_id: str = "",
+                      prepare_payload: Optional[Callable[[Any, str], tuple[Mapping[str, Any], str]]] = None
+                      ) -> tuple[Job, bool]:
+        """Publish ownership and ready work in the same existing queue transaction."""
+        if max_attempts < 1 or not actor_id or not tenant_id or not request_hash:
+            raise ValueError("owned jobs require an owner, request hash and positive max_attempts")
+        now = self.clock()
+        jid = f"job_{uuid.uuid4().hex}"
+        with self.db.tx() as c:
+            for key in dict.fromkeys(k for k in (idempotency_key, legacy_key) if k):
+                prior = c.execute("SELECT * FROM jobs WHERE idempotency_key=?", (key,)).fetchone()
+                if prior is not None:
+                    if (prior["actor_id"] != actor_id or prior["tenant_id"] != tenant_id
+                            or prior["kind"] != kind or prior["request_hash"] != request_hash
+                            or prior["project_id"] != project_id or not prior["execution_id"]):
+                        raise OwnedJobConflict("idempotency owner or request body mismatch")
+                    return self._job(prior), True
+            if prepare_payload is not None:
+                payload, execution_id = prepare_payload(c, jid)
+            c.execute(
+                "INSERT INTO jobs (job_id,kind,status,payload,max_attempts,run_after,correlation_id,"
+                "idempotency_key,created_at,updated_at,actor_id,tenant_id,project_id,execution_id,"
+                "timeout_s,request_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (jid, kind, "queued", json.dumps(dict(payload), sort_keys=True), max_attempts, now,
+                 correlation_id, idempotency_key, now, now, actor_id, tenant_id, project_id,
+                 execution_id or jid, float(timeout_s), request_hash))
+            row = c.execute("SELECT * FROM jobs WHERE job_id=?", (jid,)).fetchone()
+            return self._job(row), False
 
     def claim(self, worker_id: str, *, kinds: Optional[Sequence[str]] = None,
               lease_s: float = 60.0) -> Optional[Job]:
@@ -111,18 +158,22 @@ class SqliteJobQueue:
         return True
 
     def complete(self, job_id: str, worker_id: str,
-                 result: Optional[Mapping[str, Any]] = None) -> Job:
-        with self.db.tx() as c:
+                 result: Optional[Mapping[str, Any]] = None, *, transaction: Any = None) -> Job:
+        def finish(c):
             self._owned(c, job_id, worker_id)
             c.execute("UPDATE jobs SET status='succeeded', progress=1, result=?, lease_owner='',"
                       " updated_at=? WHERE job_id=?",
                       (json.dumps(dict(result or {}), sort_keys=True), self.clock(), job_id))
-        return self.get(job_id)  # type: ignore[return-value]
+            return self._job(c.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone())
+        if transaction is not None:
+            return finish(transaction)
+        with self.db.tx() as c:
+            return finish(c)
 
     def fail(self, job_id: str, worker_id: str, error: str, *,
-             retry_delay_s: float = 5.0) -> Job:
+             retry_delay_s: float = 5.0, transaction: Any = None) -> Job:
         now = self.clock()
-        with self.db.tx() as c:
+        def finish(c):
             self._owned(c, job_id, worker_id)
             r = c.execute("SELECT attempts, max_attempts FROM jobs WHERE job_id=?", (job_id,)).fetchone()
             if r["attempts"] >= r["max_attempts"]:
@@ -132,7 +183,11 @@ class SqliteJobQueue:
                 backoff = retry_delay_s * (2 ** (r["attempts"] - 1))
                 c.execute("UPDATE jobs SET status='queued', error=?, lease_owner='', run_after=?,"
                           " updated_at=? WHERE job_id=?", (error[:4000], now + backoff, now, job_id))
-        return self.get(job_id)  # type: ignore[return-value]
+            return self._job(c.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone())
+        if transaction is not None:
+            return finish(transaction)
+        with self.db.tx() as c:
+            return finish(c)
 
     def cancel(self, job_id: str) -> bool:
         with self.db.tx() as c:
@@ -165,6 +220,10 @@ class BuildContext:
         self._runner._emit("build.log", self.job, self.build_id,
                            {"line": line[:2000], "level": level})
 
+    def agent_events(self) -> "AgentEventEmitter":
+        """agent.* emitter carrying this build's submitting principal."""
+        return self._runner.agent_emitter(self.job)
+
 
 BuildExecutor = Callable[[BuildContext], Mapping[str, Any]]
 
@@ -177,12 +236,12 @@ class BuildService:
 
     def submit(self, project_id: str, *, target: str = "", options: Optional[Mapping[str, Any]] = None,
                correlation_id: str = "", idempotency_key: Optional[str] = None,
-               max_attempts: int = 2) -> Build:
+               max_attempts: int = 2, actor_id: str = "", tenant_id: str = "") -> Build:
         build = self.builds.create_build(project_id, target)
         job = self.queue.enqueue(BUILD_JOB_KIND, {"build_id": build.build_id, "project_id": project_id,
                                                    "target": target, "options": dict(options or {})},
                                  max_attempts=max_attempts, correlation_id=correlation_id,
-                                 idempotency_key=idempotency_key)
+                                 idempotency_key=idempotency_key, actor_id=actor_id, tenant_id=tenant_id)
         return self.builds.set_status(build.build_id, "queued", job_id=job.job_id)
 
     def cancel(self, build_id: str) -> bool:
@@ -203,10 +262,35 @@ class BuildJobRunner:
         self.worker_id = worker_id or f"wrk_{uuid.uuid4().hex[:12]}"
         self.publisher: JobEventPublisher = publisher or NullJobEventPublisher()
         self.lease_s, self.retry_delay_s = lease_s, retry_delay_s
+        self._owners: dict[str, tuple[str, str]] = {}
+
+    def _owner(self, job_id: str) -> tuple[str, str]:
+        """Submitting principal for ``job_id``; one SELECT per job, cached."""
+        cached = self._owners.get(job_id)
+        if cached is not None:
+            return cached
+        try:
+            rows = self.queue.db.query("SELECT actor_id, tenant_id FROM jobs WHERE job_id=?", (job_id,))
+        except sqlite3.OperationalError:  # pre-v7 schema: no ownership columns
+            _log.warning("job %s: ownership columns unavailable; events will be unowned", job_id)
+            return "", ""
+        owner = (str(rows[0]["actor_id"] or ""), str(rows[0]["tenant_id"] or "")) if rows else ("", "")
+        if len(self._owners) > 1024:
+            self._owners.clear()
+        self._owners[job_id] = owner
+        return owner
+
+    def agent_emitter(self, job: Job) -> "AgentEventEmitter":
+        """AgentEventEmitter bound to ``job``'s submitting principal and job_id."""
+        actor_id, tenant_id = self._owner(job.job_id)
+        return AgentEventEmitter(self.publisher, actor_id=actor_id, tenant_id=tenant_id,
+                                 job_id=job.job_id, correlation_id=job.correlation_id)
 
     def _emit(self, type_: str, job: Job, build_id: str, payload: Mapping[str, Any]) -> None:
+        actor_id, tenant_id = self._owner(job.job_id)
         env = make_envelope("build", type_, {"build_id": build_id, **payload},
-                            correlation_id=job.correlation_id, job_id=job.job_id)
+                            correlation_id=job.correlation_id, job_id=job.job_id,
+                            actor_id=actor_id, tenant_id=tenant_id)
         try:
             self.publisher.publish(env)
         except Exception:  # pragma: no cover - sinks must never break builds
@@ -247,12 +331,19 @@ class BuildJobRunner:
 class AgentEventEmitter:
     """Optional helper for agent runs to emit agent.* envelopes on the same sink."""
 
-    def __init__(self, publisher: Optional[JobEventPublisher] = None) -> None:
+    def __init__(self, publisher: Optional[JobEventPublisher] = None, *, actor_id: str = "",
+                 tenant_id: str = "", job_id: str = "", correlation_id: str = "") -> None:
         self.publisher: JobEventPublisher = publisher or NullJobEventPublisher()
+        # Submitting principal of the work this agent runs for; stamped
+        # top-level on every agent.* envelope (never in payload).
+        self.actor_id, self.tenant_id = actor_id, tenant_id
+        self.job_id, self.correlation_id = job_id, correlation_id
 
     def _emit(self, type_: str, payload: Mapping[str, Any], correlation_id: str, job_id: str) -> None:
         self.publisher.publish(make_envelope("agent", type_, payload,
-                                             correlation_id=correlation_id, job_id=job_id))
+                                             correlation_id=correlation_id or self.correlation_id,
+                                             job_id=job_id or self.job_id,
+                                             actor_id=self.actor_id, tenant_id=self.tenant_id))
 
     def started(self, agent: str, *, correlation_id: str = "", job_id: str = "") -> None:
         self._emit("agent.started", {"agent": agent}, correlation_id, job_id)

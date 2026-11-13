@@ -21,6 +21,7 @@ import sys as _sys, os as _os, time as _time
 _sys.stdout.reconfigure(line_buffering=True) if hasattr(_sys.stdout, "reconfigure") else None
 print(f"[BOOT] {_time.strftime('%Y-%m-%d %H:%M:%S')} server.py module import begin pid={_os.getpid()}", flush=True)
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks, Depends, Query, Request, WebSocket
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -2453,7 +2454,7 @@ async def lifespan(app: FastAPI):
                 entry["status"] = "failed"
                 entry["completed_at"] = time.time()
                 entry["error"] = "boot_task_failed"
-                logger.warning(f"[stagger] {label} failed: {e}")
+                logger.warning(f"[stagger] {label} failed: {type(e).__name__}")
             finally:
                 _runtime_lifecycle.release_work(lease)
 
@@ -2516,7 +2517,7 @@ async def lifespan(app: FastAPI):
         except asyncio.TimeoutError:
             logger.warning("MongoDB index creation timed out - indexes will be created on first use")
         except Exception as e:
-            logger.warning(f"MongoDB index creation deferred: {e}")
+            logger.warning(f"MongoDB index creation deferred: {type(e).__name__}")
     _kick(2, "mongo-indexes", _kick_index_creation)
 
     # Empty schema initialization is explicitly enabled by the operator. It
@@ -2538,7 +2539,7 @@ async def lifespan(app: FastAPI):
             res = await asyncio.to_thread(train_at_launch, get_sync_db())
             logger.info(f"[jeeves] self-training at launch: {res}")
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"[jeeves] self-training deferred: {e}")
+            logger.warning(f"[jeeves] self-training deferred: {type(e).__name__}")
     if not _skip_heavy:
         _kick(3, "jeeves-self-training", _kick_jeeves_training)
 
@@ -2549,7 +2550,7 @@ async def lifespan(app: FastAPI):
             await asyncio.to_thread(seed_admin)
             logger.info("[auth] account indexes and optional operator bootstrap initialized")
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"[auth] admin seed deferred: {e}")
+            logger.warning(f"[auth] admin seed deferred: {type(e).__name__}")
     _kick(4, "seed-admin", _kick_seed_admin)
 
     # P3 — Feature flags warmup + audit indexes + metrics flusher.
@@ -2563,7 +2564,7 @@ async def lifespan(app: FastAPI):
             await _ff_metrics.start_flusher()
             logger.info("[feature-flags] warmup complete (cache + audit indexes + metrics flusher)")
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"[feature-flags] warmup failed: {type(e).__name__}: {e}")
+            logger.warning(f"[feature-flags] warmup failed: {type(e).__name__}: {type(e).__name__}")
     _kick(3, "feature-flags-warmup", _kick_feature_flags_warmup)
 
     # Stability hardening — Tunnel watchdog start + JSON log adapter install.
@@ -2572,13 +2573,13 @@ async def lifespan(app: FastAPI):
             from core import tunnel_watchdog as _tw
             await _tw.start()
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"[tunnel_watchdog] start failed: {type(e).__name__}: {e}")
+            logger.warning(f"[tunnel_watchdog] start failed: {type(e).__name__}: {type(e).__name__}")
         try:
             from core.structured_log import install_json_adapter
             if install_json_adapter():
                 logger.info("[structured_log] JSON adapter installed (LOG_FORMAT=json)")
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"[structured_log] install failed: {type(e).__name__}: {e}")
+            logger.warning(f"[structured_log] install failed: {type(e).__name__}: {type(e).__name__}")
     _kick(3, "stability-hardening", _kick_stability_hardening)
 
     # SOTA Boot Orchestrator — mirror critical kicks into the new declarative
@@ -2638,7 +2639,7 @@ async def lifespan(app: FastAPI):
             logger.info("[boot-stages] registry initialized — %s",
                         reg.summary().get("counts"))
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"[boot-stages] register failed: {type(e).__name__}: {e}")
+            logger.warning(f"[boot-stages] register failed: {type(e).__name__}: {type(e).__name__}")
     _kick(4, "boot-stages-register", _kick_register_boot_stages)
 
     # Build watchdog — RE-ENABLED 2026-02-18 (post rate-limit work).
@@ -2680,7 +2681,7 @@ async def lifespan(app: FastAPI):
         except asyncio.TimeoutError:
             logger.warning("Database seeding timed out — will retry on next restart")
         except Exception as e:
-            logger.warning(f"Database seeding deferred: {e}")
+            logger.warning(f"Database seeding deferred: {type(e).__name__}")
     if not _skip_heavy:
         _kick(5, "tutolage-seed", _kick_tutolage_seed)
         logger.info("Tutolage seed kicked off in background")
@@ -2692,7 +2693,7 @@ async def lifespan(app: FastAPI):
             boot_result = await asyncio.wait_for(bootstrap_agent_dbs(db), timeout=30)
             logger.info(f"Agent DB bootstrap: tutorial={boot_result.get('tutorial_progress', 'n/a')} agent_colls={boot_result.get('agent_collections', {})}")
         except Exception as e:
-            logger.warning(f"Agent DB bootstrap deferred: {e}")
+            logger.warning(f"Agent DB bootstrap deferred: {type(e).__name__}")
     _kick(8, "agent-bootstrap", _kick_agent_bootstrap)
 
     # ─── Android APK toolchain auto-install (idempotent) ───
@@ -2721,7 +2722,7 @@ async def lifespan(app: FastAPI):
             await proc.communicate()
             logger.info(f"[android-toolchain] installer exit: {proc.returncode}")
         except Exception as e:
-            logger.warning(f"[android-toolchain] install deferred: {e}")
+            logger.warning(f"[android-toolchain] install deferred: {type(e).__name__}")
     if not _skip_heavy:
         _kick(10, "android-toolchain", _kick_android_toolchain)
 
@@ -2750,7 +2751,7 @@ async def lifespan(app: FastAPI):
         except asyncio.TimeoutError:
             logger.warning("game_code_library count_documents timed out — skipping seed check on this boot")
         except Exception as e:
-            logger.warning(f"game_code_library check deferred: {e}")
+            logger.warning(f"game_code_library check deferred: {type(e).__name__}")
     
     # ═══ Seed 200-collection Mega Game Asset DB — non-blocking ═══
     # ★ FIX 2026-02 (final): seed into content_db (where the routing config
@@ -2778,7 +2779,7 @@ async def lifespan(app: FastAPI):
         except asyncio.TimeoutError:
             logger.warning("Mega-DB spot-check timed out — skipping seed on this boot")
         except Exception as e:
-            logger.warning(f"Mega-DB seed check deferred: {e}")
+            logger.warning(f"Mega-DB seed check deferred: {type(e).__name__}")
 
     # ═══ Seed language_classes (500 langs) — fixes empty Language Academy modal ═══
     if not _skip_heavy:
@@ -2796,7 +2797,7 @@ async def lifespan(app: FastAPI):
         except asyncio.TimeoutError:
             logger.warning("language_classes count timed out — skipping seed on this boot")
         except Exception as e:
-            logger.warning(f"language_classes seed check deferred: {e}")
+            logger.warning(f"language_classes seed check deferred: {type(e).__name__}")
 
     # ═══ Seed FULL agent knowledge fabric — patch_notes (curated + extended),
     # github_code_refs, code_synthesis, procedural assets, game design, engine schemas.
@@ -2818,36 +2819,36 @@ async def lifespan(app: FastAPI):
                 from seeds.engine_api_seed      import seed_engine_api
                 results = {}
                 try: results["patch_notes_curated"] = await seed_patch_notes(_agk_db)
-                except Exception as e: results["patch_notes_curated_error"] = str(e)[:200]
+                except Exception as e: results["patch_notes_curated_error"] = type(e).__name__
                 try: results["patch_notes_extended"] = await seed_extended_patch_notes(_agk_db)
-                except Exception as e: results["patch_notes_extended_error"] = str(e)[:200]
+                except Exception as e: results["patch_notes_extended_error"] = type(e).__name__
                 try: results["github_code"] = await seed_github_code(_agk_db)
-                except Exception as e: results["github_code_error"] = str(e)[:200]
+                except Exception as e: results["github_code_error"] = type(e).__name__
                 try: results["code_synthesis"] = await seed_code_synthesis(_agk_db)
-                except Exception as e: results["code_synthesis_error"] = str(e)[:200]
+                except Exception as e: results["code_synthesis_error"] = type(e).__name__
                 try: results["procedural_assets"] = await seed_procedural_assets(_agk_db)
-                except Exception as e: results["procedural_assets_error"] = str(e)[:200]
+                except Exception as e: results["procedural_assets_error"] = type(e).__name__
                 try: results["game_design"] = await seed_game_design(_agk_db)
-                except Exception as e: results["game_design_error"] = str(e)[:200]
+                except Exception as e: results["game_design_error"] = type(e).__name__
                 try: results["engine_api"] = await seed_engine_api(_agk_db)
-                except Exception as e: results["engine_api_error"] = str(e)[:200]
+                except Exception as e: results["engine_api_error"] = type(e).__name__
                 # ─── NEW: gamestate / qa-oracles / ai-weights / build-recipes ───
                 try:
                     from seeds.gamestate_schemas_seed import seed_gamestate_schemas
                     results["gamestate_schemas"] = await seed_gamestate_schemas(_agk_db)
-                except Exception as e: results["gamestate_schemas_error"] = str(e)[:200]
+                except Exception as e: results["gamestate_schemas_error"] = type(e).__name__
                 try:
                     from seeds.qa_oracles_seed import seed_qa_oracles
                     results["qa_oracles"] = await seed_qa_oracles(_agk_db)
-                except Exception as e: results["qa_oracles_error"] = str(e)[:200]
+                except Exception as e: results["qa_oracles_error"] = type(e).__name__
                 try:
                     from seeds.ai_generative_weights_seed import seed_ai_generative_weights
                     results["ai_generative_weights"] = await seed_ai_generative_weights(_agk_db)
-                except Exception as e: results["ai_generative_weights_error"] = str(e)[:200]
+                except Exception as e: results["ai_generative_weights_error"] = type(e).__name__
                 try:
                     from seeds.build_recipes_seed import seed_build_recipes
                     results["build_recipes"] = await seed_build_recipes(_agk_db)
-                except Exception as e: results["build_recipes_error"] = str(e)[:200]
+                except Exception as e: results["build_recipes_error"] = type(e).__name__
                 # ─── BATCH 3 (2026-05): 14 additional knowledge collections ───
                 _ext_seeds = [
                     ("input_haptics",            "input_haptics_seed",            "seed_input_haptics"),
@@ -2869,13 +2870,13 @@ async def lifespan(app: FastAPI):
                     try:
                         m = __import__(f"seeds.{mod}", fromlist=[fn])
                         results[label] = await getattr(m, fn)(_agk_db)
-                    except Exception as e: results[f"{label}_error"] = str(e)[:200]
+                    except Exception as e: results[f"{label}_error"] = type(e).__name__
                 # ─── Phase 4: anti-piracy + academic + training recipes + scrapers ───
                 try:
                     from seeds.phase4_knowledge_seed import seed_phase4_all
                     results["phase4"] = await seed_phase4_all(_agk_db)
                 except Exception as e:
-                    results["phase4_error"] = str(e)[:200]
+                    results["phase4_error"] = type(e).__name__
                 logger.info(f"[agent-knowledge] seeding complete: {results}")
             _kick(30, "agent-knowledge", _kick_agent_knowledge)
             logger.info("[agent-knowledge] full knowledge fabric seed kicked off")
@@ -2887,10 +2888,10 @@ async def lifespan(app: FastAPI):
                     r = await seed_jeeves_persona()
                     logger.info(f"[jeeves-persona] seeded: {r}")
                 except Exception as e:
-                    logger.warning(f"[jeeves-persona] seed failed: {e}")
+                    logger.warning(f"[jeeves-persona] seed failed: {type(e).__name__}")
             _kick(35, "jeeves-persona", _kick_jeeves_persona)
         except Exception as e:
-            logger.warning(f"[agent-knowledge] seed kickoff failed: {e}")
+            logger.warning(f"[agent-knowledge] seed kickoff failed: {type(e).__name__}")
 
     # ═══ Live web-scrapers — background loop (off-by-default per job) ═══
     if not _skip_heavy:
@@ -2905,7 +2906,7 @@ async def lifespan(app: FastAPI):
                 _kick(120, "live-scrapers", lambda: scraper_loop(_scrape_db, interval_seconds=1800))
                 logger.info("[live-scrapers] background loop started (30-min cadence)")
         except Exception as e:
-            logger.warning(f"[live-scrapers] loop kickoff failed: {e}")
+            logger.warning(f"[live-scrapers] loop kickoff failed: {type(e).__name__}")
 
     # ═══ Seed unique_flair (50k creative entries) — non-blocking ═══
     if not _skip_heavy:
@@ -2922,7 +2923,7 @@ async def lifespan(app: FastAPI):
         except asyncio.TimeoutError:
             logger.warning("unique_flair count_documents timed out — skipping seed on this boot")
         except Exception as e:
-            logger.warning(f"unique_flair check deferred: {e}")
+            logger.warning(f"unique_flair check deferred: {type(e).__name__}")
 
     # ═══ Seed academy sub-collections (reading_library, bugfix_library, study_paths) ═══
     # reading_library + bugfix_library → content_db (regenerable, big)
@@ -2950,7 +2951,7 @@ async def lifespan(app: FastAPI):
                         await content_db.reading_library.insert_many(out)
                         logger.info(f"[academy-extras] reading_library: {len(out)} books inserted (content_db)")
                 except Exception as _re:
-                    logger.warning(f"[academy-extras] reading_library seed failed: {_re}")
+                    logger.warning(f"[academy-extras] reading_library seed failed: {type(_re).__name__}")
             # ── Bug/Fix library ── content_db
             if await content_db.bugfix_library.count_documents({}, limit=1) == 0:
                 try:
@@ -2970,7 +2971,7 @@ async def lifespan(app: FastAPI):
                         await content_db.bugfix_library.insert_many(out)
                         logger.info(f"[academy-extras] bugfix_library: {len(out)} entries inserted (content_db)")
                 except Exception as _be:
-                    logger.warning(f"[academy-extras] bugfix_library seed failed: {_be}")
+                    logger.warning(f"[academy-extras] bugfix_library seed failed: {type(_be).__name__}")
             # ── Study paths ── core db (small, user-facing)
             if await db.study_paths.count_documents({}, limit=1) == 0:
                 try:
@@ -2983,7 +2984,7 @@ async def lifespan(app: FastAPI):
                         await db.study_paths.insert_many(sps)
                         logger.info(f"[academy-extras] study_paths: {len(sps)} paths inserted (core db)")
                 except Exception as _se:
-                    logger.warning(f"[academy-extras] study_paths seed failed: {_se}")
+                    logger.warning(f"[academy-extras] study_paths seed failed: {type(_se).__name__}")
         except Exception as ex:
             logger.warning(f"[academy-extras] top-level failure: {ex}")
     if not _skip_heavy:
@@ -3008,7 +3009,7 @@ async def lifespan(app: FastAPI):
                         imported += 1
                 logger.info(f"[reading-content] open-license registry import: {imported} new, {len(records) - imported} updated")
             except Exception as e:
-                logger.warning(f"[reading-content] open-license import skipped: {e}")
+                logger.warning(f"[reading-content] open-license import skipped: {type(e).__name__}")
 
             # 2) Background prewarm — fill content cache so APK clients get instant responses
             #    Bounded to avoid OOM on bootup. Iterates in 5-second sleep batches.
@@ -3052,7 +3053,7 @@ async def lifespan(app: FastAPI):
                             continue
                 logger.info(f"[reading-content] background prewarm complete: {warmed} chapters cached")
             except Exception as e:
-                logger.warning(f"[reading-content] prewarm interrupted: {e}")
+                logger.warning(f"[reading-content] prewarm interrupted: {type(e).__name__}")
         except Exception as ex:
             logger.warning(f"[reading-content] warmup top-level failure: {ex}")
 
@@ -3081,7 +3082,7 @@ async def lifespan(app: FastAPI):
             else:
                 logger.info(f"[swarm] hyperscale vault ready: {stats['shard_count']} shards, {stats['total_rows']} rows, {round(stats['total_compressed_bytes']/1024/1024,2)} MB compressed")
         except Exception as e:
-            logger.warning(f"[swarm] hyperscale bootstrap deferred: {e}")
+            logger.warning(f"[swarm] hyperscale bootstrap deferred: {type(e).__name__}")
 
     # ═══ Seed Narrative Vault (6 core libs) + Specialized Vault (200 topics)
     # + Game Knowledge Vault (500 topics) — idempotent, non-blocking.  ═══
@@ -3101,11 +3102,11 @@ async def lifespan(app: FastAPI):
                     rep_gk = await seed_game_knowledge_vault(content_db, target_per_topic_per_genre=6)
                     logger.info(f"[game_knowledge] seed: {rep_gk} (content_db)")
                 except Exception as _ve:
-                    logger.warning(f"[narrative_vault/game_knowledge] seed failed: {_ve}")
+                    logger.warning(f"[narrative_vault/game_knowledge] seed failed: {type(_ve).__name__}")
             _kick(55, "vault-seed", _kick_vault_seed)
             logger.info("[narrative_vault+game_knowledge] seeders kicked off in background (content_db)")
         except Exception as e:
-            logger.warning(f"[narrative_vault] kick failed: {e}")
+            logger.warning(f"[narrative_vault] kick failed: {type(e).__name__}")
 
     # ═══ Rosetta Stone (~268k code samples × language matrix) ═══
     # Idempotent, content_db-routed, heavy first-time / instant on warm boots.
@@ -3122,15 +3123,15 @@ async def lifespan(app: FastAPI):
                         await content_db.rosetta_stone.create_index("category")
                         await content_db.rosetta_stone.create_index("language_family")
                     except Exception as _ie:
-                        logger.warning(f"[rosetta_stone] index create deferred: {_ie}")
+                        logger.warning(f"[rosetta_stone] index create deferred: {type(_ie).__name__}")
                     rep = await seed_rosetta_stone(content_db)
                     logger.info(f"[rosetta_stone] result: {rep}")
                 except Exception as _re:
-                    logger.warning(f"[rosetta_stone] seed failed: {_re}")
+                    logger.warning(f"[rosetta_stone] seed failed: {type(_re).__name__}")
             _kick(65, "rosetta-stone", _kick_rosetta_stone)
             logger.info("[rosetta_stone] seeder kicked off in background (content_db)")
         except Exception as e:
-            logger.warning(f"[rosetta_stone] kick failed: {e}")
+            logger.warning(f"[rosetta_stone] kick failed: {type(e).__name__}")
 
     # ═══ Hyperscale References (encyclopedia aggregator) ═══
     # Snippets, cheatsheets, interview prep, glossary, etc. — 500+ entries.
@@ -3171,11 +3172,11 @@ async def lifespan(app: FastAPI):
                     total = await coll.count_documents({})
                     logger.info(f"[hyperscale_references] seeded: total={total}")
                 except Exception as _he:
-                    logger.warning(f"[hyperscale_references] seed failed: {_he}")
+                    logger.warning(f"[hyperscale_references] seed failed: {type(_he).__name__}")
             _kick(70, "hyperscale-refs", _kick_hyperscale_refs)
             logger.info("[hyperscale_references] seeder kicked off in background (content_db)")
         except Exception as e:
-            logger.warning(f"[hyperscale_references] kick failed: {e}")
+            logger.warning(f"[hyperscale_references] kick failed: {type(e).__name__}")
 
     # ═══ Cold-storage auto-reseal: DISABLED in this build.
     # This used to re-freeze collections that startup seeders rehydrated,
@@ -3249,7 +3250,7 @@ async def lifespan(app: FastAPI):
                         thawed += 1
                         total_rows += res.get("rows", 0)
                 except Exception as _te:
-                    logger.warning(f"[academy-thaw] {nm} failed: {_te}")
+                    logger.warning(f"[academy-thaw] {nm} failed: {type(_te).__name__}")
             if thawed:
                 logger.info(f"[academy-thaw] restored {thawed} frozen user-facing collections ({total_rows} total rows)")
         except Exception as _ex:
@@ -3397,7 +3398,7 @@ app.add_middleware(
 from api_middleware import install_middleware as _install_api_middleware, get_stats as _api_stats  # noqa: E402
 _install_api_middleware(app)
 
-api_router = APIRouter(prefix="/api")
+api_router = APIRouter(route_class=PublicExceptionRoute, prefix="/api")
 
 #====================================================================================================
 # API ROUTES
@@ -3445,11 +3446,87 @@ async def health():
 import logging as _probe_logging
 _probe_log = _probe_logging.getLogger("probes")
 
+from skeleton.app.assembly import load_manifest as _load_health_manifest
+_health_manifest = _load_health_manifest()
+_BACKEND_HEALTH_IDENTITY = {
+    "name": _health_manifest.name,
+    "version": _health_manifest.version,
+    "component": "backend",
+    "ingress_prefix": _health_manifest.service("backend").ingress_prefix,
+}
+
 
 def _probe_event(probe: str, outcome: str, **fields):
     """Emit a structured probe log line."""
     extra = " ".join(f"{k}={v}" for k, v in fields.items())
     _probe_log.info(f"probe={probe} outcome={outcome} {extra}")
+
+
+def _probe_vault_io(directory):
+    """Check a vault without overwriting files or racing other probes."""
+    # A fixed filename can clobber user data and concurrent health requests can
+    # remove each other's files. NamedTemporaryFile uses exclusive creation and
+    # cleans up even if the write or read fails.
+    with tempfile.NamedTemporaryFile(
+        mode="w+", encoding="utf-8", prefix=".health-probe-", dir=directory
+    ) as probe:
+        probe.write("rw_test")
+        probe.flush()
+        probe.seek(0)
+        if probe.read() != "rw_test":
+            raise OSError("vault probe readback failed")
+
+
+def _collect_vault_readiness():
+    """Perform blocking filesystem work outside the event-loop thread."""
+    checks = {}
+    try:
+        from routes.galaxy_studio import VAULT_DIR as vault_dir
+        _probe_vault_io(vault_dir)
+        checks["vault_galaxy"] = {"ok": True, "path": str(vault_dir)}
+    except Exception as exc:
+        logger.warning("health probe failed (vault_galaxy): %s", type(exc).__name__)
+        checks["vault_galaxy"] = {"ok": False, "error": "probe_failed"}
+    try:
+        from core import build_vault
+        if build_vault.BUILDS_VAULT_FALLBACK:
+            raise OSError("persistent build vault unavailable")
+        _probe_vault_io(str(build_vault.BUILDS_ROOT))
+        checks["vault_builds"] = {"ok": True, "path": str(build_vault.BUILDS_ROOT)}
+    except Exception as exc:
+        logger.warning("health probe failed (vault_builds): %s", type(exc).__name__)
+        checks["vault_builds"] = {"ok": False, "error": "probe_failed"}
+    return checks
+
+
+async def _bounded_vault_observation(slot, worker):
+    """Share one worker per probe kind; timeouts never enqueue more work."""
+    attribute = f"_vault_observation_{slot}"
+    task = getattr(app.state, attribute, None)
+    if task is None or task.done():
+        task = asyncio.create_task(asyncio.to_thread(worker))
+        setattr(app.state, attribute, task)
+
+        def consume_result(done):
+            if not done.cancelled():
+                done.exception()
+
+        task.add_done_callback(consume_result)
+    try:
+        return await asyncio.wait_for(asyncio.shield(task), timeout=1.0)
+    except Exception:
+        return None
+
+
+async def _probe_mongo_readiness():
+    try:
+        from services.database import db
+        await asyncio.wait_for(db.command("ping"), timeout=2.0)
+        return {"ok": True, "latency_ms_lt": 2000}
+    except Exception as exc:
+        logger.warning("health probe failed (mongo): %s", type(exc).__name__)
+        return {"ok": False, "error": "probe_failed",
+                "note": "Required database is warming up or unreachable"}
 
 
 @api_router.get("/health/live")
@@ -3471,29 +3548,22 @@ async def health_live():
 async def health_ready():
     """Readiness probe — can we serve real requests right now?
 
-    Checks: Mongo ping (5s timeout), AI key presence, and that the
-    persistent vault dirs are writable. Returns 503 if anything fails so
-    K8s can stop sending traffic until we recover.
+    Checks the required Mongo dependency, vault access and critical routes.
+    AI availability is reported separately because it is optional for some
+    product operations. Required failures return 503 until they recover.
     """
     checks: dict = {}
     overall_ok = True
 
-    # 1) Mongo ping — SOFT check. On a cold/slow managed Mongo (e.g. Atlas) the
-    #    first connection can exceed the probe budget; we must NOT fail readiness
-    #    on a transient downstream DB, otherwise K8s never marks the pod Ready and
-    #    the deploy "stalls on healthcheck". Endpoints that need Mongo handle their
-    #    own errors; the app also has deterministic fallbacks. So Mongo is reported
-    #    as degraded-but-ready, never a hard 503.
-    try:
-        from services.database import db as _db
-        import asyncio as _aio
-        await _aio.wait_for(_db.command("ping"), timeout=4.0)
-        checks["mongo"] = {"ok": True, "latency_ms_lt": 4000}
-    except Exception as e:
-        logger.warning("health probe failed (mongo): %s", type(e).__name__)
-        checks["mongo"] = {"ok": False, "soft": True, "warming": True,
-                           "error": "probe_failed",
-                           "note": "DB warming/unreachable — readiness not failed (soft check)"}
+    # Probe independent dependencies concurrently so their individual 2s and
+    # 1s budgets fit within the product's 2.5s aggregate deadline.
+    mongo_check, vault_checks = await asyncio.gather(
+        _probe_mongo_readiness(),
+        _bounded_vault_observation("ready", _collect_vault_readiness),
+    )
+    checks["mongo"] = mongo_check
+    if not mongo_check["ok"]:
+        overall_ok = False
 
     # 2) Canonical AI provider + architecture receipt
     try:
@@ -3509,30 +3579,15 @@ async def health_ready():
         logger.warning("health probe failed (ai_provider): %s", type(e).__name__)
         checks["ai_provider"] = {"ok": False, "error": "probe_failed"}
 
-    # 3) Vault writable (galaxy-studio)
-    try:
-        from routes.galaxy_studio import VAULT_DIR as _vault_dir
-        test_path = os.path.join(_vault_dir, ".probe")
-        with open(test_path, "w") as f:
-            f.write("ok")
-        os.remove(test_path)
-        checks["vault_galaxy"] = {"ok": True, "path": _vault_dir}
-    except Exception as e:
-        logger.warning("health probe failed (vault_galaxy): %s", type(e).__name__)
-        checks["vault_galaxy"] = {"ok": False, "error": "probe_failed"}
-        overall_ok = False
-
-    # 4) Build-vault writable
-    try:
-        from core import build_vault as _bv
-        test_path = os.path.join(str(_bv.BUILDS_ROOT), ".probe")
-        with open(test_path, "w") as f:
-            f.write("ok")
-        os.remove(test_path)
-        checks["vault_builds"] = {"ok": True, "path": str(_bv.BUILDS_ROOT)}
-    except Exception as e:
-        logger.warning("health probe failed (vault_builds): %s", type(e).__name__)
-        checks["vault_builds"] = {"ok": False, "error": "probe_failed"}
+    # One retained worker prevents repeated health requests from queuing
+    # unbounded blocked filesystem calls while a mount is stalled.
+    if vault_checks is None:
+        vault_checks = {
+            "vault_galaxy": {"ok": False, "error": "probe_timeout_or_unavailable"},
+            "vault_builds": {"ok": False, "error": "probe_timeout_or_unavailable"},
+        }
+    checks.update(vault_checks)
+    if not all(item.get("ok") for item in vault_checks.values()):
         overall_ok = False
 
     # A running process is not ready to serve the product if mandatory
@@ -3552,11 +3607,20 @@ async def health_ready():
     _probe_event("readiness", "ok" if overall_ok else "degraded",
                  failing=",".join(k for k, v in checks.items() if not v.get("ok")) or "none")
 
-    body = {"status": "ready" if overall_ok else "not_ready", "checks": checks}
+    body = {
+        "status": "ready" if overall_ok else "not_ready",
+        "checks": checks,
+        "canonical_application": dict(_BACKEND_HEALTH_IDENTITY),
+    }
     if not overall_ok:
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=503, content=body)
     return body
+
+
+# The aggregate application status uses the exact same backend readiness
+# decision; a responsive status route alone cannot attest durable storage.
+app.state.backend_readiness_probe = health_ready
 
 
 @api_router.get("/health/startup")
@@ -3592,8 +3656,7 @@ async def health_startup():
     return body
 
 
-@api_router.get("/health/vault")
-async def health_vault():
+def _collect_vault_deep():
     """Deep vault probe — write/read/delete round-trip on both vaults.
 
     Useful for ops: confirms that builds will actually persist to disk
@@ -3605,13 +3668,10 @@ async def health_vault():
     # Galaxy vault (ZIPs + APKs)
     try:
         from routes.galaxy_studio import VAULT_DIR as _gv
-        tp = os.path.join(_gv, ".probe_rw")
-        with open(tp, "w") as f: f.write("rw_test")
-        with open(tp) as f: assert f.read() == "rw_test"
-        os.remove(tp)
+        _probe_vault_io(_gv)
         # also list a few entries to confirm dir is readable
         zip_count = len(os.listdir(os.path.join(_gv, "zips"))) if os.path.isdir(os.path.join(_gv, "zips")) else 0
-        out["checks"]["galaxy_vault"] = {"ok": True, "path": _gv, "zips": zip_count}
+        out["checks"]["galaxy_vault"] = {"ok": True, "path": str(_gv), "zips": zip_count}
     except Exception as e:
         logger.warning("health probe failed (galaxy_vault): %s", type(e).__name__)
         out["checks"]["galaxy_vault"] = {"ok": False, "error": "probe_failed"}
@@ -3620,11 +3680,10 @@ async def health_vault():
     # Build vault (shards)
     try:
         from core import build_vault as _bv
+        if _bv.BUILDS_VAULT_FALLBACK:
+            raise OSError("persistent build vault unavailable")
         root = str(_bv.BUILDS_ROOT)
-        tp = os.path.join(root, ".probe_rw")
-        with open(tp, "w") as f: f.write("rw_test")
-        with open(tp) as f: assert f.read() == "rw_test"
-        os.remove(tp)
+        _probe_vault_io(root)
         build_count = len([x for x in os.listdir(root) if os.path.isdir(os.path.join(root, x))])
         out["checks"]["build_vault"] = {"ok": True, "path": root, "builds": build_count}
     except Exception as e:
@@ -3635,7 +3694,8 @@ async def health_vault():
     # Disk free
     try:
         import shutil as _sh
-        total, used, free = _sh.disk_usage("/app/backend/data")
+        from core import build_vault as _disk_vault
+        total, used, free = _sh.disk_usage(str(_disk_vault.BUILDS_ROOT))
         out["disk"] = {
             "total_gb": round(total / 1_073_741_824, 2),
             "used_gb": round(used / 1_073_741_824, 2),
@@ -3648,6 +3708,8 @@ async def health_vault():
     except Exception as e:
         logger.warning("health probe failed (disk): %s", type(e).__name__)
         out["disk"] = {"error": "probe_failed"}
+        out["checks"]["disk_pressure"] = {"ok": False, "error": "probe_failed"}
+        overall = False
 
     out["status"] = "ok" if overall else "degraded"
     _probe_event("vault", "ok" if overall else "degraded")
@@ -3655,6 +3717,16 @@ async def health_vault():
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=503, content=out)
     return out
+
+
+@api_router.get("/health/vault")
+async def health_vault():
+    result = await _bounded_vault_observation("deep", _collect_vault_deep)
+    if result is None:
+        return JSONResponse(status_code=503, content={
+            "status": "degraded", "checks": {"vault": {"ok": False, "error": "probe_timeout_or_unavailable"}}
+        })
+    return result
 
 
 @api_router.get("/health/deep")
@@ -5101,7 +5173,7 @@ try:
         return response
     logger.info("[reliability] LoadShedding + DLQ + reliability endpoints installed")
 except Exception as e:
-    logger.warning(f"[reliability] layer unavailable: {e}")
+    logger.warning(f"[reliability] layer unavailable: {type(e).__name__}")
 
 # Final raw ASGI request-header boundary. This is intentionally installed
 # after every other middleware registration because Starlette wraps middleware
@@ -5168,22 +5240,22 @@ try:
     from core.cold_storage import start_evictor as _start_evictor
     _start_evictor()
 except Exception as _e:
-    logger.warning(f"[cold_storage] evictor not started: {_e}")
+    logger.warning(f"[cold_storage] evictor not started: {type(_e).__name__}")
 
 
 def _kick_build_watchdog_start():
     """Galaxy Studio build watchdog — self-heals stuck/orphaned builds.
 
     Called from lifespan() via ``_kick(30, "build-watchdog", ...)``. Scans
-    every 20s, resurrects orphaned runners, snapshots to vault, and
-    force-completes builds that have run past their target duration.
+    every 20s, recovers orphaned runners within admission limits, and
+    requests expired builds to stop while preserving partial work until drain.
     """
     try:
         from core.build_watchdog import start_watchdog
         start_watchdog()
         logger.info("[watchdog] Galaxy Studio build watchdog started")
     except Exception as _e:
-        logger.warning(f"[watchdog] failed to start: {_e}")
+        logger.warning(f"[watchdog] failed to start: {type(_e).__name__}")
 
 
 # ─── Declarative router mounts ───────────────────────────────────────────

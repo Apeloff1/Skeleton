@@ -9,10 +9,11 @@ import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput,
-  StyleSheet, SafeAreaView, Image, RefreshControl,
+  StyleSheet, SafeAreaView, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
+import PrivateImage from '../src/components/PrivateImage';
 import { useHaptics } from '../src/hooks/useHaptics';
 
 const BACKEND = CANONICAL_API_BASE || '';
@@ -28,7 +29,7 @@ type Tournament = {
 function MiniCover({ id, hasCover, size = 30 }: { id?: string; hasCover?: boolean; size?: number }) {
   const [err, setErr] = React.useState(false);
   if (!id || !hasCover || err) return <View style={[styles.mini, { width: size, height: size }]}><Text>🎮</Text></View>;
-  return <Image source={{ uri: `${BACKEND}/api/playable/${id}/cover.png` }} style={{ width: size, height: size, borderRadius: 6 }} onError={() => setErr(true)} />;
+  return <PrivateImage uri={`${BACKEND}/api/playable/${id}/cover.png`} style={{ width: size, height: size, borderRadius: 6 }} onError={() => setErr(true)} />;
 }
 
 export default function Tournaments() {

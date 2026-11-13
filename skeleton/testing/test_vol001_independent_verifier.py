@@ -12,8 +12,13 @@ SPEC.loader.exec_module(MOD)
 def test_receipt_is_exact_head_bound_authority_neutral_and_deterministic():
     head = "a" * 40
     first = MOD.build_receipt(head, actual_head_sha=head)
-    second = MOD.build_receipt(head)
+    second = MOD.build_receipt(head, actual_head_sha=head)
     assert first == second
+    # A declared SHA must not silently stand in for the checked-out repository HEAD.
+    unbound = MOD.build_receipt(head)
+    assert unbound["valid"] is False
+    assert unbound["completion_authority"] is False
+    assert "declared head_sha does not match checked-out repository HEAD" in unbound["errors"]
     assert first["head_sha"] == head
     assert first["valid"] is True
     assert first["authority_scope"] == "verification-evidence-only"

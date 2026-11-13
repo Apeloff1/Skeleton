@@ -19,16 +19,19 @@ router = APIRouter(prefix="/health", tags=["health"])
 # First-party product routes whose absence must fail deployment readiness.
 # Optional plugins may degrade, but these shipped application capabilities may
 # not silently disappear behind register_routes' optional import fallback.
-CRITICAL_BOOT_ROUTERS = frozenset({
-    "routes.creator_economy",
-    "routes.marketplace",
-    "routes.git_operations",
-    "routes.jeeves_media",
-    "routes.lafs",
-    "routes.sorting_vault",
-    "routes.swarm_cold_legion",
-    "routes.swarm_hub",
-})
+# A required capability must mount its expected public endpoint; an unrelated
+# route or empty APIRouter is never evidence of product readiness.
+CRITICAL_ROUTE_PATHS: dict[str, str] = {
+    "routes.creator_economy": "/api/creators",
+    "routes.git_operations": "/api/git/status",
+    "routes.jeeves_media": "/api/jeeves/media/types",
+    "routes.lafs": "/api/lafs/stats",
+    "routes.marketplace": "/api/marketplace/listings",
+    "routes.sorting_vault": "/api/sorting-vault/connections",
+    "routes.swarm_cold_legion": "/api/galaxy-studio/swarm/cold/stats",
+    "routes.swarm_hub": "/api/galaxy-studio/swarm/agents",
+}
+CRITICAL_BOOT_ROUTERS = frozenset(CRITICAL_ROUTE_PATHS)
 
 # Filled in by core.routes_registry.register_known_routes — the helper
 # stores its last summary report here so we can surface it via API.
@@ -55,13 +58,27 @@ def critical_router_readiness() -> dict[str, Any]:
     from core.routes_registry import KNOWN_ROUTES, KNOWN_ROUTES_WITH_PREFIX
 
     registered = {entry[0] for entry in (*KNOWN_ROUTES, *KNOWN_ROUTES_WITH_PREFIX)}
-    skipped = {
-        str(failure).split(" ", 1)[0]
-        for failure in _LAST_REPORT.get("skipped_names", ())
-    }
-    missing = sorted((CRITICAL_BOOT_ROUTERS - registered) | (CRITICAL_BOOT_ROUTERS & skipped))
-    checked = bool(_LAST_REPORT.get("at")) and (
-        int(_LAST_REPORT.get("ok", 0)) + int(_LAST_REPORT.get("skipped", 0)) > 0
+    # A declared route is not a mounted route. Require positive evidence of
+    # actual FastAPI registration from the current boot, not merely absence
+    # from the skipped list (which could be truncated or malformed).
+    mounted = _LAST_REPORT.get("mounted_names")
+    observed_mounts = {
+        item for item in mounted if isinstance(item, str)
+    } if isinstance(mounted, list) else set()
+    observed_paths = _LAST_REPORT.get("mounted_paths")
+    route_paths = observed_paths if isinstance(observed_paths, dict) else {}
+    checked = (
+        bool(_LAST_REPORT.get("at"))
+        and isinstance(mounted, list)
+        and isinstance(observed_paths, dict)
+        and int(_LAST_REPORT.get("ok", 0)) + int(_LAST_REPORT.get("skipped", 0)) > 0
+    )
+    missing = sorted(
+        module for module, required_path in CRITICAL_ROUTE_PATHS.items()
+        if module not in registered
+        or module not in observed_mounts
+        or not isinstance(route_paths.get(module), list)
+        or required_path not in route_paths[module]
     )
     return {"ok": checked and not missing, "missing": missing, "report_available": checked}
 
@@ -72,6 +89,7 @@ async def registry_report() -> dict[str, Any]:
     that no optional router got silently skipped during a deploy."""
     return {
         **_LAST_REPORT,
+        "critical_routes": critical_router_readiness(),
         "now": time.time(),
         "age_s": (time.time() - _LAST_REPORT.get("at", 0.0)) if _LAST_REPORT.get("at") else None,
         "env": "production" if os.environ.get("EMERGENT_DEPLOY") else "dev",

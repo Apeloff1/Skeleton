@@ -5,13 +5,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Modal, ActivityIndicator, Platform, Image,
-} from 'react-native';
+  Modal, ActivityIndicator, Platform, } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { apiFetch } from '../../utils/apiController';
 import { API_BASE } from '../../utils/apiBase';
+import PrivateImage from '../../components/PrivateImage';
 
 interface VaultModalProps {
   visible: boolean;
@@ -169,7 +169,7 @@ export const VaultModal: React.FC<VaultModalProps> = ({ visible, onClose, colors
                     {genesisAssets.map((a: any) => (
                       <View key={a.id} testID={`vault-genesis-${a.id}`}
                         style={{ width: '31%', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 10, padding: 6, borderWidth: 1, borderColor: colors.border }}>
-                        <Image source={{ uri: `${API_BASE}/api/assets/genesis/${a.id}.png` }}
+                        <PrivateImage uri={`${API_BASE}/api/assets/genesis/${a.id}.png`}
                           style={{ width: '100%', aspectRatio: 1, borderRadius: 8, backgroundColor: '#0E1626' }} resizeMode="cover" />
                         <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 10, marginTop: 4, fontWeight: '600' }}>
                           {a.asset_type || 'asset'}

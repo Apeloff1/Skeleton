@@ -1,0 +1,67 @@
+{
+  "project_id": "studio_time_loop_detective_amber_highlands",
+  "genre": "time_loop_detective",
+  "biome": "amber_highlands",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_time_loop_detective_amber_highlands:restore",
+  "objective": "prevent a repeat reactor incident",
+  "stage_graph": [
+    {
+      "id": "arrival",
+      "entry": "new_game",
+      "location": "terraced ridgepaths",
+      "verb": "survey",
+      "requirements": [
+        "Trace a safe route before landslides"
+      ],
+      "alternatives": [
+        "inspect_markers",
+        "interview_residents"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "dispute",
+      "entry": "arrival_complete",
+      "location": "mountain hospice",
+      "verb": "replay",
+      "requirements": [
+        "Establish control of resin lamps"
+      ],
+      "alternatives": [
+        "publish_witness_records",
+        "negotiate_with_claimants"
+      ],
+      "reward": "social_legitimacy"
+    },
+    {
+      "id": "repair",
+      "entry": "dispute_complete",
+      "location": "mountain hospice",
+      "verb": "audit",
+      "requirements": [
+        "Demonstrate restoration of the mountain hospice"
+      ],
+      "alternatives": [
+        "cooperative_governance",
+        "independent_distribution"
+      ],
+      "reward": "world_state_update"
+    }
+  ],
+  "branch_outcomes": [
+    "public_proof",
+    "self_organized_repair",
+    "minimal_access"
+  ],
+  "risk_register": [
+    "landslides",
+    "a self-reinforcing paradox"
+  ],
+  "resource_constraints": {
+    "resource": "resin lamps",
+    "max_mint_without_source": 0
+  },
+  "genre_runtime_implemented": false
+}

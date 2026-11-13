@@ -23,6 +23,7 @@ import GameTrainingInstances from './GameTrainingInstances';
 import GameTrainingPolicyPanel from './GameTrainingPolicyPanel';
 import GameContentUpload from './GameContentUpload';
 import GameConsoleEditor from './GameConsoleEditor';
+import GameFrontierAuthoringPanel from './GameFrontierAuthoringPanel';
 import GameSuccessorStudio from './GameSuccessorStudio';
 import GameStudioLearningPanel from './GameStudioLearningPanel';
 import GameCompiledRomPanel from './GameCompiledRomPanel';
@@ -34,10 +35,11 @@ import { getGamePlay, getGameResources, listGameRecordings, type GamePlay, type 
 import s, { gameLearningColors as C } from './GameLearningWorkspace.styles';
 
 type Icon = keyof typeof Ionicons.glyphMap;
-type Tab = 'overview' | 'console' | 'successor' | 'editor' | 'sources' | 'observe' | 'learn' | 'build';
+type Tab = 'overview' | 'console' | 'forge' | 'successor' | 'editor' | 'sources' | 'observe' | 'learn' | 'build';
 const TABS: { id: Tab; label: string; icon: Icon }[] = [
   { id: 'overview', label: 'Studio overview', icon: 'pulse-outline' },
   { id: 'console', label: 'Console studio', icon: 'color-palette-outline' },
+  { id: 'forge', label: 'Forge Studio · 50 editors', icon: 'brush-outline' },
   { id: 'successor', label: 'Original successor', icon: 'sparkles-outline' },
   { id: 'editor', label: 'Editor', icon: 'code-slash-outline' },
   { id: 'sources', label: 'Sources', icon: 'file-tray-full-outline' },
@@ -266,7 +268,7 @@ export default function GameLearningWorkspace() {
     try {
       const value = await getLearningProject(id, { signal: controller.signal });
       if (!mounted.current || requestEpoch !== epoch.current || token !== getAuthToken()) return;
-      acceptProject(value, true); setTrainSessions([]); setTrainDemonstrations([]); setDemonstrations([]); setObservedJob(''); setNotice(null); setVisualDirty(false); setWorldDirty(false); setTab(value.files?.some(file => file.path === 'game/successor/spec.json') ? 'successor' : value.files?.some(file => file.path === 'game/editor/console.json') ? 'console' : 'editor');
+      acceptProject(value, true); setTrainSessions([]); setTrainDemonstrations([]); setDemonstrations([]); setObservedJob(''); setNotice(null); setVisualDirty(false); setWorldDirty(false); setTab(value.files?.some(file => file.path === 'game/editor/frontier_studio.json') ? 'forge' : value.files?.some(file => file.path === 'game/successor/spec.json') ? 'successor' : value.files?.some(file => file.path === 'game/editor/console.json') ? 'console' : 'editor');
     } catch (caught) { if (!controller.signal.aborted && mounted.current) setError(caught instanceof Error ? caught.message : 'This project could not be opened.'); }
     finally { if (mounted.current && requestEpoch === epoch.current) setLoading(false); }
   }, [acceptProject]);
@@ -537,6 +539,10 @@ export default function GameLearningWorkspace() {
           {tab === 'overview' && profile?.external_emulator && <Section title="Selected console execution prerequisites" detail="Core installation and operator approval are separate from a compatible game actually loading."><Text style={profile.external_emulator.available ? s.success : s.unavailable}>{profile.external_emulator.readiness?.message || (profile.external_emulator.available ? 'Approved core is available for content admission.' : 'This target has no available approved core.')}</Text>{profile.external_emulator.core_installations?.map(core => <View key={core.core_id} style={s.source}><Text style={s.projectName}>{human(core.core_id)}</Text><Text style={s.muted}>{core.installation_present ? 'Installed' : 'Installation required'} · {core.operator_approved ? 'Operator approved' : 'Approval required'} · {core.available ? 'Available for admission' : human(core.readiness.code)}</Text><Text style={s.dim}>Accepted entrypoints: {core.content_admission.admitted_entrypoint_extensions.join(', ') || 'None declared'}</Text>{!!core.content_admission.unsupported_descriptor_extensions.length && <Text style={s.notice}>Unsupported descriptors: {core.content_admission.unsupported_descriptor_extensions.join(', ')}</Text>}</View>)}<Text style={s.dim}>Extension support is an admission rule. The isolated core still checks the actual content, required firmware and companion files. A catalogue entry does not verify commercial-game compatibility.</Text><Button label="Open content sources" icon="folder-open-outline" disabled={dirty || !!busy} onPress={() => setTab('sources')} /><Button label="Open actual build readiness" icon="hammer-outline" disabled={dirty || !!busy} onPress={() => setTab('build')} /></Section>}
           {tab === 'overview' && <GameStudioReadinessPanel key={'readiness:' + project.project_id + ':' + accountToken} project={project} jobs={allJobs} dirty={dirty} onOpenJob={id => { void perform('Opening issued job', async (current, signal) => { const job = await getLearningJob(id, { signal }); if (job.project_id !== current.project_id) throw new Error('This job belongs to another project.'); if (!signal.aborted) { acceptStudioJob(job); setObservedJob(id); setLearningPane('local'); setTab('learn'); } }); }} onOpenPlay={id => { void perform('Opening actual play', async (current, signal) => { const play = await getGamePlay(id, { signal }); if (play.project_id !== current.project_id) throw new Error('This play belongs to another project.'); if (!signal.aborted) acceptCompiledPlay(play); }); }} onOpenGoal={id => { setFocusedGoal(id || undefined); setLearningPane('assistant'); setTab('learn'); }} onCampaigns={id => { setFocusedCampaign(id); setLearningPane('campaign'); setTab('learn'); }} onBuild={() => setTab('build')} onSources={() => setTab('sources')} />}
           {tab === 'console' && <GameConsoleEditor key={project.project_id + ':' + accountToken} project={project} disabled={!!busy || sourceDirty} onSaved={acceptVisualProject} onDirtyChange={setVisualDirty} onPlay={() => setTab('observe')} onBuild={() => setTab('build')} />}
+          {tab === 'forge' && <GameFrontierAuthoringPanel
+            key={project.project_id + ':' + accountToken} project={project}
+            disabled={!!busy || sourceDirty || worldDirty}
+            onSaved={acceptVisualProject} onDirtyChange={setVisualDirty} />}
           {tab === 'successor' && <GameSuccessorStudio key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={!!busy || sourceDirty || visualDirty} onSaved={acceptVisualProject} onJob={acceptStudioJob} onDirtyChange={setWorldDirty} onPlay={() => setTab('observe')} onAssistant={() => { setLearningPane('assistant'); setTab('learn'); }} onLearn={() => { setLearningPane('campaign'); setTab('learn'); }} onNewOriginal={createOriginal} />}
           {tab === 'editor' && <>
             <Section title="Project source" detail="Changes are saved to this project’s exact server revision. They run only through the selected engine.">

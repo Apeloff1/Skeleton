@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+import gc
 from uuid import NAMESPACE_URL, uuid4, uuid5
+from time import monotonic
 
 import httpx
 import pytest
@@ -14,6 +16,7 @@ from core.engine_client import (
     EngineConflictError,
     EngineExecutionFailed,
     EngineProtocolError,
+    EngineTerminalResult,
     EngineUnavailableError,
     command_from_context,
 )
@@ -251,6 +254,39 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     assert command.execution_request.context_policy["handoff_digest"] == (
         command.compiled_context.handoff_digest
     )
+
+
+@pytest.mark.parametrize("drafts,rounds", [(1, 1), (2, 1), (3, 1), (3, 2)])
+def test_multidraft_command_reserves_exact_attempts_without_multiplying_output_or_time(drafts, rounds):
+    context = _context()
+    started = _now()
+    deadline = started + timedelta(seconds=90)
+    command = command_from_context(
+        context=context, actor_id="actor-a", capability="assistant.chat",
+        idempotency_key="multiple-drafts", instructions="Follow the policy.", prompt="Design the editor.",
+        created_at=started, deadline=deadline,
+        cooperation={"schema_version": "skeleton.ai.cooperation.v1", "draft_count": drafts, "review_rounds": rounds},
+    )
+    budget = command.execution_request.resource_budget
+    stages = 1 + drafts + 2 * rounds
+    assert budget["max_provider_attempts"] == stages
+    assert budget["max_model_turns"] == stages
+    assert budget["max_output_tokens"] == context.budget.reserved_output_tokens
+    assert budget["max_elapsed_seconds"] == 90
+    assert budget["max_input_tokens"] == stages * context.budget.input_capacity(tools_enabled=False)
+    policy = command.execution_request.context_policy["cooperation"]
+    assert policy.get("draft_count", 1) == drafts
+    if drafts == 1:
+        assert "draft_count" not in policy
+
+
+def test_multidraft_command_refuses_more_candidates_than_the_output_reserve_can_cover():
+    with pytest.raises(EngineProtocolError, match="output allowance cannot cover"):
+        command_from_context(
+            context=_context(), actor_id="actor-a", capability="assistant.chat",
+            idempotency_key="too-many-drafts", instructions="Follow the policy.", prompt="Design the editor.",
+            cooperation={"schema_version": "skeleton.ai.cooperation.v1", "draft_count": 3, "review_rounds": 3},
+        )
 
 
 def test_command_from_context_uses_context_projection_over_legacy_text() -> None:
@@ -1017,6 +1053,267 @@ async def test_terminal_failure_is_not_converted_to_local_success() -> None:
     assert caught.value.execution_id == execution_id
     assert caught.value.status == "failed"
     assert caught.value.failure_code == "provider_unavailable"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fault", [
+    "status_execution", "status_operation", "event_projection", "result_execution",
+    "result_operation", "conflicting_terminal", "duplicate_terminal",
+])
+async def test_foreign_or_conflicting_terminal_truth_is_never_execution_failure(monkeypatch, fault):
+    command = _command()
+    execution_id = command.execution_request.execution_id
+    operation_id = command.operation.operation_id
+    result = {"operation_id": operation_id, "execution_id": execution_id, "status": "failed",
+              "usage": {"error_code": "provider_unavailable"}}
+    status = {"operation_id": operation_id, "execution_id": execution_id, "execution_state": "failed"}
+    events = {"execution_id": execution_id, "events": [
+        {"event_id": "result", "sequence": 1, "type": "execution.result", "result": result},
+    ]}
+    if fault == "status_execution":
+        status["execution_id"] = "foreign"
+    elif fault == "status_operation":
+        status["operation_id"] = "foreign"
+    elif fault == "event_projection":
+        events["execution_id"] = "foreign"
+    elif fault == "result_execution":
+        result["execution_id"] = "foreign"
+    elif fault == "result_operation":
+        result["operation_id"] = "foreign"
+    elif fault == "conflicting_terminal":
+        result["status"] = "cancelled"
+    else:
+        events["events"].append({"event_id": "other-result", "sequence": 2,
+                                 "type": "execution.result", "result": dict(result)})
+    client = EngineClient(EngineClientConfig(base_url="http://engine", service_token=_SERVICE_TOKEN))
+
+    async def read_status(*args, **kwargs):
+        return status
+
+    async def read_events(*args, **kwargs):
+        return events
+
+    monkeypatch.setattr(client, "status", read_status)
+    monkeypatch.setattr(client, "events", read_events)
+    with pytest.raises(EngineProtocolError):
+        await client.terminal_result_if_available(execution_id=execution_id, actor_id="actor-a", tenant_id="tenant-a")
+
+
+@pytest.mark.asyncio
+async def test_terminal_poll_has_one_absolute_deadline_and_cancels_blocked_probe(monkeypatch):
+    client = EngineClient(EngineClientConfig(base_url="http://engine", service_token=_SERVICE_TOKEN))
+    probe_cancelled = asyncio.Event()
+
+    async def blocked_probe(**kwargs):
+        try:
+            await asyncio.Event().wait()
+        finally:
+            probe_cancelled.set()
+
+    async def forbidden_mutation(*args, **kwargs):
+        pytest.fail("poll deadline must not cancel or resubmit canonical work")
+
+    monkeypatch.setattr(client, "terminal_result_if_available", blocked_probe)
+    monkeypatch.setattr(client, "submit", forbidden_mutation)
+    monkeypatch.setattr(client, "cancel", forbidden_mutation)
+    with pytest.raises(EngineUnavailableError, match="in time"):
+        await asyncio.wait_for(client.wait_for_terminal(
+            execution_id="execution", actor_id="actor", tenant_id="tenant", timeout_s=0.02,
+        ), timeout=2)
+    assert probe_cancelled.is_set()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("override", [False, True], ids=["configured-window", "per-call-window"])
+async def test_poll_request_allowance_spans_the_actual_observation_window(monkeypatch, override):
+    # Production used a 660s deadline but burned 2,400 short polls in ~240s.
+    # Scale that mismatch down: completion happens after the old polling cap
+    # would have expired, and must be observed without more probes or submits.
+    client = EngineClient(EngineClientConfig(base_url="http://engine", service_token=_SERVICE_TOKEN,
+        execution_timeout_s=1.8 if override else 0.6, poll_interval_s=0.001, max_poll_attempts=3))
+    completed = asyncio.Event()
+    probes = []
+    expected = EngineTerminalResult.from_payload({
+        "operation_id": "op", "execution_id": "execution", "status": "completed",
+        "final_output": "The original admitted execution completed.", "usage": {"model_turns": 1},
+        "provider_receipts": ["provider:original"],
+    })
+    async def complete_later():
+        await asyncio.sleep(0.12)
+        completed.set()
+    async def observe(**kwargs):
+        probes.append(dict(kwargs))
+        return expected if completed.is_set() else None
+    async def forbidden_mutation(*args, **kwargs):
+        pytest.fail("observation may not resubmit or cancel canonical work")
+    monkeypatch.setattr(client, "terminal_result_if_available", observe)
+    monkeypatch.setattr(client, "submit", forbidden_mutation)
+    monkeypatch.setattr(client, "cancel", forbidden_mutation)
+    completion = asyncio.create_task(complete_later())
+    try:
+        result = await client.wait_for_terminal(execution_id="execution", actor_id="actor", tenant_id="tenant",
+                                                **({"timeout_s": 0.6} if override else {}))
+    finally:
+        completion.cancel()
+        await asyncio.gather(completion, return_exceptions=True)
+    assert result is expected and completed.is_set()
+    assert 1 < len(probes) <= 3
+    assert all(probe["execution_id"] == "execution" for probe in probes)
+
+
+@pytest.mark.asyncio
+async def test_paced_polling_retains_absolute_deadline_and_explicit_request_cap(monkeypatch):
+    client = EngineClient(EngineClientConfig(base_url="http://engine", service_token=_SERVICE_TOKEN,
+        execution_timeout_s=0.1, poll_interval_s=0.001, max_poll_attempts=2))
+    probes = []
+    async def observe(**kwargs):
+        probes.append(kwargs)
+        return None
+    monkeypatch.setattr(client, "terminal_result_if_available", observe)
+    started = monotonic()
+    with pytest.raises(EngineUnavailableError, match="in time"):
+        await client.wait_for_terminal(execution_id="execution", actor_id="actor", tenant_id="tenant")
+    assert monotonic() - started >= 0.08
+    assert len(probes) <= 2
+
+
+@pytest.mark.asyncio
+async def test_late_disconnect_cleanup_is_deduplicated_retained_and_observed(monkeypatch):
+    command = _command()
+    client = EngineClient(EngineClientConfig(
+        base_url="http://engine", service_token=_SERVICE_TOKEN, request_timeout_s=0.02,
+    ))
+    release = asyncio.Event()
+    calls = []
+    failures = []
+    loop = asyncio.get_running_loop()
+    previous_handler = loop.get_exception_handler()
+    loop.set_exception_handler(lambda _loop, context: failures.append(context))
+
+    async def cancel(execution_id, **kwargs):
+        calls.append(execution_id)
+        await release.wait()
+        raise EngineUnavailableError("late cleanup transport failure")
+
+    monkeypatch.setattr(client, "cancel", cancel)
+    try:
+        await asyncio.gather(*(client._cancel_after_client_abort(command) for _ in range(8)))
+        assert calls == [command.execution_request.execution_id]
+        assert len(client._cancel_cleanups) == 1
+        release.set()
+        async with asyncio.timeout(2):
+            while client._cancel_cleanups:
+                await asyncio.sleep(0)
+        gc.collect()
+        await asyncio.sleep(0)
+        assert failures == []
+    finally:
+        release.set()
+        loop.set_exception_handler(previous_handler)
+
+
+@pytest.mark.asyncio
+async def test_disconnect_cleanup_capacity_cannot_admit_unlimited_requests(monkeypatch):
+    client = EngineClient(EngineClientConfig(
+        base_url="http://engine", service_token=_SERVICE_TOKEN, request_timeout_s=0.02,
+    ))
+    monkeypatch.setattr(client, "_MAX_CANCEL_CLEANUPS", 2)
+    commands = [_command() for _ in range(3)]
+    release = asyncio.Event()
+    calls = []
+
+    async def cancel(execution_id, **kwargs):
+        calls.append(execution_id)
+        await release.wait()
+        return {}
+
+    monkeypatch.setattr(client, "cancel", cancel)
+    try:
+        await asyncio.gather(*(client._cancel_after_client_abort(command) for command in commands))
+        assert len(calls) == len(client._cancel_cleanups) == 2
+        await client._cancel_after_client_abort(commands[0])
+        assert len(calls) == 2
+    finally:
+        release.set()
+        async with asyncio.timeout(2):
+            while client._cancel_cleanups:
+                await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_repeated_caller_cancel_preserves_original_cancel_and_cleanup_custody(monkeypatch):
+    command = _command()
+    client = EngineClient(EngineClientConfig(base_url="http://engine", service_token=_SERVICE_TOKEN))
+    polling = asyncio.Event()
+    cancelling = asyncio.Event()
+    release = asyncio.Event()
+
+    async def submit(_command):
+        return {"execution_id": command.execution_request.execution_id,
+                "operation_id": command.operation.operation_id}
+
+    async def wait(**kwargs):
+        polling.set()
+        await asyncio.Event().wait()
+
+    async def cancel(*args, **kwargs):
+        cancelling.set()
+        await release.wait()
+        return {}
+
+    monkeypatch.setattr(client, "submit", submit)
+    monkeypatch.setattr(client, "wait_for_terminal", wait)
+    monkeypatch.setattr(client, "cancel", cancel)
+    task = asyncio.create_task(client.execute(command))
+    try:
+        await asyncio.wait_for(polling.wait(), timeout=2)
+        task.cancel()
+        await asyncio.wait_for(cancelling.wait(), timeout=2)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert len(client._cancel_cleanups) == 1
+    finally:
+        release.set()
+        async with asyncio.timeout(2):
+            while client._cancel_cleanups:
+                await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_streamed_engine_response_closes_under_absolute_read_deadline():
+    closed = asyncio.Event()
+
+    class Trickle(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            yield b'{"execution_id":'
+            await asyncio.Event().wait()
+
+        async def aclose(self):
+            closed.set()
+
+    async def handler(request):
+        return httpx.Response(200, stream=Trickle())
+
+    client = EngineClient(EngineClientConfig(
+        base_url="http://engine", service_token=_SERVICE_TOKEN, request_timeout_s=0.02,
+    ), transport=httpx.MockTransport(handler))
+    with pytest.raises(EngineUnavailableError):
+        await asyncio.wait_for(client.status("execution", actor_id="actor", tenant_id="tenant"), timeout=2)
+    assert closed.is_set()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("body", [
+    b'{"execution_id":"expected","execution_id":"foreign"}',
+    b'{"value":NaN}', b'{"value":Infinity}', b'{"value":1e9999}',
+    b'{"value":"\\ud800"}',
+])
+async def test_engine_response_rejects_ambiguous_or_nonfinite_json(body):
+    client = EngineClient(EngineClientConfig(base_url="http://engine", service_token=_SERVICE_TOKEN),
+                          transport=httpx.MockTransport(lambda request: httpx.Response(200, content=body)))
+    with pytest.raises(EngineProtocolError):
+        await client.status("execution", actor_id="actor", tenant_id="tenant")
 
 
 @pytest.mark.asyncio

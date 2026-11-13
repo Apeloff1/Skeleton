@@ -1399,10 +1399,17 @@ def native_world_codex_access_proof(
     try:
         source = unrank(body.index)
         result = attempt_unlock(source, body.gate_id, horizon=body.horizon)
+        if (
+            result.get("gate") != body.gate_id
+            or result.get("original_world_digest") != source.codex_digest
+            or not result.get("proof_receipt_sha256")
+        ):
+            raise HTTPException(status_code=502, detail="Optional route proof integrity failed")
         return {"ok": True, **result}
     except ValueError:
         raise HTTPException(
-            status_code=422, detail="Original optional game-world gate is not implemented"
+            status_code=422,
+            detail="Original optional route request is invalid or cannot be replayed",
         ) from None
 
 
@@ -2265,7 +2272,13 @@ def native_production_analyze_campaign(
         "original_campaign_digest": campaign.digest,
         "chapter_paths": jsonable_encoder(graph_report(chapters)),
         "challenge": challenge_report(director),
-        "stages": [{"stage": index + 1, "routes": document} for index, document in enumerate(reports)],
+        # RoutePortfolio is a frozen dataclass containing tuple path evidence.
+        # The public API and independent replay verifier require JSON arrays;
+        # normalize at this boundary instead of leaking Python tuples.
+        "stages": [
+            {"stage": index + 1, "routes": jsonable_encoder(document)}
+            for index, document in enumerate(reports)
+        ],
         "claim": "solver-derived challenge and branching; no human player enjoyment certified",
     }
 
@@ -2305,7 +2318,10 @@ def native_production_multiple_routes(
         raise HTTPException(
             status_code=422, detail="Original puzzle board could not produce bounded proven route analysis"
         ) from None
-    return {"ok": True, **route_report(routes)}
+    # Keep direct Python and HTTP responses in the same JSON-compatible
+    # schema. The independent path verifier requires arrays, not Python
+    # tuple fields leaked through dataclasses.asdict.
+    return {"ok": True, **jsonable_encoder(route_report(routes))}
 
 
 @router.post("/native/production/puzzle/current-hint")
@@ -2602,6 +2618,8 @@ class CrawlerCreateRequest(CrawlerRequest):
     max_documents: int = Field(default=16, ge=1, le=64, strict=True)
     max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=32 * 1024 * 1024, strict=True)
     max_depth: int = Field(default=1, ge=0, le=3, strict=True)
+    discover_sitemaps: bool = Field(default=False, strict=True)
+    frontier_strategy: str = Field(default="fifo", pattern=r"^(fifo|balanced)$")
     consent: bool = Field(strict=True)
     rights_acknowledged: bool = Field(strict=True)
 
@@ -2646,6 +2664,52 @@ class CrawlerAutomationRequest(CrawlerWriteRequest):
     enabled: bool = Field(strict=True)
     max_slices: int = Field(default=16, ge=1, le=64, strict=True)
     max_seconds: int = Field(default=900, ge=15, le=3600, strict=True)
+
+
+class CrawlerSourceUseRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    max_age_seconds: int = Field(ge=60, le=86400, strict=True)
+
+
+
+class CrawlerAtlasObjective(BaseModel):
+    """Operator-authored bounded research intent, not crawler admission."""
+
+    model_config = ConfigDict(extra="forbid")
+    objective_id: str = Field(min_length=3, max_length=64,
+                              pattern=r"^[a-z][a-z0-9_-]{2,63}$")
+    question: str = Field(min_length=3, max_length=512)
+    dimension: str = Field(pattern=r"^(fact|method|timeline|source|counterexample|implementation)$")
+    stage: str = Field(pattern=r"^(discovery|collection|verification|review)$")
+    priority: float = Field(ge=0.0, le=1.0)
+    minimum_reviewable_passages: int = Field(default=1, ge=1, le=32, strict=True)
+    minimum_attested_groups: int = Field(default=1, ge=1, le=16, strict=True)
+    max_source_age_seconds: int = Field(default=3600, ge=60, le=86400, strict=True)
+    required_terms: list[str] = Field(default_factory=list, max_length=16)
+    blocked_terms: list[str] = Field(default_factory=list, max_length=16)
+
+
+class CrawlerAtlasEffort(BaseModel):
+    """Explicit human-effort estimate; never fabricated measured history."""
+
+    model_config = ConfigDict(extra="forbid")
+    task_type: str = Field(pattern=(
+        r"^(source_policy|passage_integrity|source_provenance|"
+        r"claim_contradiction|claim_corroboration|objective_gap|human_fact_review)$"
+    ))
+    estimated_minutes: StrictInt = Field(ge=1, le=180)
+    estimate_basis: str = Field(default="operator_estimate",
+                                pattern=r"^operator_estimate$")
+
+
+class CrawlerAtlasRequest(BaseModel):
+    """Read-only research inspection; explicit user goals are mandatory."""
+
+    model_config = ConfigDict(extra="forbid")
+    objectives: list[CrawlerAtlasObjective] = Field(min_length=1, max_length=8)
+    review_effort: list[CrawlerAtlasEffort] = Field(default_factory=list, max_length=7)
+    review_budget_minutes: StrictInt = Field(default=240, ge=1, le=1440)
+    retrieval_mode: str = Field(default="fusion", pattern=r"^(fusion|lexical_bm25)$")
 
 
 def _crawler_scope(user: dict | None = Depends(get_current_user)) -> dict[str, str]:
@@ -2752,17 +2816,8 @@ async def crawler_run(
 async def crawler_control(
     body: CrawlerControlRequest,
     session_id: str = URLPath(min_length=1, max_length=128),
-    scope: dict = Depends(_crawler_scope),
-    user: dict = Depends(get_current_user),
+    scope: dict = Depends(_crawler_write_scope),
 ) -> dict:
-    if body.action == "resume" and user.get("role") not in {"editor", "admin"}:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "code": "crawler_write_denied",
-                "message": "Editor permission is required to resume capture.",
-            },
-        )
     return {
         "ok": True,
         "session": await _crawler_result(
@@ -2773,9 +2828,9 @@ async def crawler_control(
 
 @router.post("/crawler/sessions/{session_id}/automation")
 async def crawler_automation(
-    session_id: str,
     body: CrawlerAutomationRequest,
-    scope: dict = Depends(_crawler_scope),
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_write_scope),
     user: dict = Depends(get_current_user),
 ) -> dict:
     return {
@@ -2786,9 +2841,57 @@ async def crawler_automation(
     }
 
 
+
+@router.get("/crawler/sessions/{session_id}/research/inspection")
+async def crawler_research_inspection(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Read-only evidence and frontier diagnostics under existing owner auth."""
+    return await _crawler_result(
+        crawler_application.campaign_inspection(scope, session_id)
+    )
+
+
+
+@router.post("/crawler/sessions/{session_id}/research/atlas")
+async def crawler_research_atlas(
+    body: CrawlerAtlasRequest,
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Read-only source-policy-first research audit, no external text returned."""
+    return await _crawler_result(
+        crawler_application.campaign_atlas(
+            scope, session_id,
+            tuple(goal.model_dump() for goal in body.objectives),
+            review_effort=tuple(estimate.model_dump()
+                                for estimate in body.review_effort),
+            review_budget_minutes=body.review_budget_minutes,
+            retrieval_mode=body.retrieval_mode,
+        )
+    )
+
+
+@router.get("/crawler/sessions/{session_id}/research/search")
+async def crawler_research_search(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    query: str = Query(min_length=1, max_length=512),
+    mode: str = Query(default="all", pattern="^(all|any)$"),
+    limit: int = Query(default=8, ge=1, le=8),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Search current retained evidence; withdrawals and consent checked now."""
+    return await _crawler_result(
+        crawler_application.campaign_index_search(
+            scope, session_id, query, mode=mode, limit=limit,
+        )
+    )
+
+
 @router.get("/crawler/sessions/{session_id}/search")
 async def crawler_search(
-    session_id: str,
+    session_id: str = URLPath(min_length=1, max_length=128),
     query: str = Query(min_length=1, max_length=512),
     limit: int = Query(default=8, ge=1, le=8),
     scope: dict = Depends(_crawler_scope),
@@ -2815,7 +2918,7 @@ async def crawler_sources(
 async def crawler_delete(
     body: CrawlerWriteRequest,
     session_id: str = URLPath(min_length=1, max_length=128),
-    scope: dict = Depends(_crawler_scope),
+    scope: dict = Depends(_crawler_write_scope),
 ) -> dict:
     return await _crawler_result(crawler_application.delete(scope, session_id, body.model_dump()))
 
@@ -2861,6 +2964,21 @@ async def crawler_source_text(
             offset=offset,
             max_chars=max_chars,
             expected_content_digest=expected_content_digest,
+        )
+    )
+
+
+@router.post("/crawler/sessions/{session_id}/sources/{source_id}/use")
+async def crawler_source_use(
+    body: CrawlerSourceUseRequest,
+    session_id: str = URLPath(min_length=1, max_length=128),
+    source_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    scope: dict = Depends(_crawler_write_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(
+        crawler_application.configure_source_use(
+            scope, session_id, source_id, body.model_dump(), principal=user
         )
     )
 

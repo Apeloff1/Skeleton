@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Literal, Mapping, Optional
 
 from skeleton.app_services.events import JobEventPublisher, NullJobEventPublisher, make_envelope
-from skeleton.app_services.jobs import LeaseLost, SqliteJobQueue
+from skeleton.app_services.jobs import LeaseLost, OwnedJobConflict, SqliteJobQueue
 from skeleton.observability.redaction import safe_exception_text
 from skeleton.persistence.app_foundation.db import Database
 from skeleton.persistence.app_foundation.repositories import SqliteBuildRepository
@@ -71,6 +71,15 @@ class JobResult:
     error: Optional[dict]  # {"code": str, "message": str}
 
 
+@dataclass(frozen=True)
+class JobIdentity:
+    job_id: str
+    execution_id: str
+    kind: str
+    actor_id: str
+    tenant_id: str
+
+
 def request_hash(kind: str, payload: Mapping[str, Any]) -> str:
     return hashlib.sha256(json.dumps({"kind": kind, "payload": payload}, sort_keys=True,
                                      separators=(",", ":"), default=str).encode()).hexdigest()
@@ -109,6 +118,12 @@ class JobContext:
         self.heartbeat(progress=f, message=message)
         self._svc._emit("build.progress", self, {"progress": f, "message": message})
 
+    def agent_events(self):
+        """agent.* emitter carrying this job's submitting principal (top-level, not payload)."""
+        from skeleton.app_services.jobs import AgentEventEmitter
+        return AgentEventEmitter(self._svc.publisher, actor_id=self.actor_id, tenant_id=self.tenant_id,
+                                 job_id=self.job_id, correlation_id=self.correlation_id)
+
     def log(self, line: str, level: str = "info") -> None:
         self.heartbeat()
         self._svc._emit("build.log", self, {"line": str(line)[:2000], "level": level})
@@ -127,6 +142,8 @@ class JobService:
         self.publisher: JobEventPublisher = publisher or NullJobEventPublisher()
         self.visibility_timeout_s = visibility_timeout_s
         self._handlers: dict[str, Handler] = {}
+        self._worker_lock = threading.Lock()
+        self._worker: Optional[JobWorker] = None
 
     # ---- registry -------------------------------------------------------
     def register_handler(self, kind: str, fn: Handler) -> None:
@@ -137,40 +154,72 @@ class JobService:
     def handler_kinds(self) -> tuple[str, ...]:
         return tuple(self._handlers)
 
+    def start_worker(self, *, poll_s: float = 1.0) -> "JobWorker":
+        """Start one worker for this service, including injected app services."""
+        with self._worker_lock:
+            if self._worker is None:
+                self._worker = JobWorker(self, poll_s=poll_s)
+            return self._worker.start()
+
+    def stop_worker(self, timeout: Optional[float] = None) -> bool:
+        with self._worker_lock:
+            if self._worker is not None:
+                self._worker.stop(timeout)
+                return not self._worker.running
+            return True
+
     # ---- producer -------------------------------------------------------
     def enqueue(self, kind: str, payload: Mapping[str, Any], *, actor_id: str, tenant_id: str,
                 project_id: Optional[str] = None, idempotency_key: Optional[str] = None,
                 correlation_id: Optional[str] = None, timeout_s: float = DEFAULT_TIMEOUT_S,
-                max_attempts: int = 1) -> JobHandle:
+                max_attempts: int = 1, request_digest: Optional[str] = None) -> JobHandle:
         if not actor_id or not tenant_id:
             raise ValueError("actor_id and tenant_id are required")
         if not (0 < float(timeout_s) <= 6 * 3600):
             raise ValueError("timeout_s must be in (0, 21600]")
         payload = dict(payload)
-        rhash = request_hash(kind, payload)
-        scoped = f"{tenant_id}:{actor_id}:{kind}:{idempotency_key}" if idempotency_key else None
-        if scoped:
-            prior = self.db.query("SELECT * FROM jobs WHERE idempotency_key=?", (scoped,))
+        if request_digest is not None and (not isinstance(request_digest, str) or len(request_digest) != 64
+                or any(char not in "0123456789abcdef" for char in request_digest)):
+            raise ValueError("request_digest must be a SHA-256 hex digest")
+        rhash = request_digest if request_digest is not None else request_hash(kind, payload)
+        scoped = ("owned:" + hashlib.sha256(json.dumps([tenant_id, actor_id, kind, idempotency_key],
+                  separators=(",", ":")).encode()).hexdigest()) if idempotency_key else None
+        legacy = f"{tenant_id}:{actor_id}:{kind}:{idempotency_key}" if idempotency_key else None
+        for key in dict.fromkeys(k for k in (scoped, legacy) if k):
+            prior = self.db.query("SELECT * FROM jobs WHERE idempotency_key=?", (key,))
             if prior:
                 r = prior[0]
-                if r["request_hash"] and r["request_hash"] != rhash:
+                if (r["actor_id"] != actor_id or r["tenant_id"] != tenant_id or r["kind"] != kind
+                        or r["request_hash"] != rhash or r["project_id"] != project_id
+                        or not r["execution_id"]):
                     raise IdempotencyMismatch(idempotency_key)
-                return JobHandle(r["job_id"], r["execution_id"] or r["job_id"], _status_name(r["status"]), True)
-        execution_id = None
+                return JobHandle(r["job_id"], r["execution_id"], _status_name(r["status"]), True)
+        prepare_payload = None
         if kind in BUILD_KINDS_WITH_ROW and project_id:
-            build = self.builds.create_build(project_id, str(payload.get("target", "")))
-            execution_id = build.build_id
-            payload.setdefault("build_id", build.build_id)
-        job = self.queue.enqueue(kind, payload, max_attempts=max_attempts,
-                                 correlation_id=correlation_id or "", idempotency_key=scoped)
-        execution_id = execution_id or job.job_id
-        with self.db.tx() as c:
-            c.execute("UPDATE jobs SET actor_id=?, tenant_id=?, project_id=?, execution_id=?, timeout_s=?,"
-                      " request_hash=? WHERE job_id=?",
-                      (actor_id, tenant_id, project_id, execution_id, float(timeout_s), rhash, job.job_id))
-        if execution_id != job.job_id:
-            self.builds.set_status(execution_id, "queued", job_id=job.job_id)
-        return JobHandle(job.job_id, execution_id, "queued", False)
+            from skeleton.persistence.app_foundation.projects_v1 import ProjectsV1Store
+            if ProjectsV1Store(self.db).get(actor_id, tenant_id, project_id) is None:
+                raise ValueError("project is not owned by the actor and tenant")
+            def prepare_payload(connection, job_id):
+                build = self.builds.create_build(project_id, str(payload.get("target", "")),
+                                                 job_id=job_id, transaction=connection)
+                # Link before publishing the queued job, in the same durable
+                # transaction. A live worker cannot claim an unlinked build.
+                if ProjectsV1Store(self.db).link(actor_id, tenant_id, project_id,
+                                                 build.build_id, transaction=connection) is None:
+                    raise ValueError("project is not owned by the actor and tenant")
+                prepared = dict(payload)
+                prepared["build_id"] = build.build_id
+                return prepared, build.build_id
+        try:
+            job, replayed = self.queue.enqueue_owned(
+                kind, payload, actor_id=actor_id, tenant_id=tenant_id, request_hash=rhash,
+                timeout_s=timeout_s, project_id=project_id, prepare_payload=prepare_payload,
+                max_attempts=max_attempts, correlation_id=correlation_id or "",
+                idempotency_key=scoped, legacy_key=legacy)
+        except OwnedJobConflict as exc:
+            raise IdempotencyMismatch(idempotency_key) from exc
+        execution_id = self.get_identity(job.job_id).execution_id
+        return JobHandle(job.job_id, execution_id, _status_name(job.status), replayed)
 
     def _row(self, job_id: str):
         rows = self.db.query("SELECT * FROM jobs WHERE job_id=?", (job_id,))
@@ -186,6 +235,15 @@ class JobService:
         return JobStatus(r["job_id"], status, float(r["progress"]), r["message"], r["started_at"],
                          float(r["updated_at"]), int(r["attempts"]))
 
+    def get_identity(self, job_id: str) -> JobIdentity:
+        """Read the durable owner projection before exposing job state or results."""
+        rows = self.db.query("SELECT job_id,execution_id,kind,actor_id,tenant_id FROM jobs WHERE job_id=?",
+                             (job_id,))
+        if not rows:
+            raise KeyError(job_id)
+        r = rows[0]
+        return JobIdentity(r["job_id"], r["execution_id"], r["kind"], r["actor_id"], r["tenant_id"])
+
     def get_result(self, job_id: str) -> JobResult:
         r = self._row(job_id)
         status = _status_name(r["status"])
@@ -197,11 +255,28 @@ class JobService:
         return JobResult(status, None, None)
 
     def cancel(self, job_id: str) -> bool:
-        r = self._row(job_id)
-        ok = self.queue.cancel(job_id)
-        if ok and r["execution_id"] and r["execution_id"] != job_id:
-            self.builds.set_status(r["execution_id"], "cancelled")
-        return ok
+        # Publish the job and its build projection together. A running worker
+        # must not observe a cancelled job with a still-runnable projection.
+        with self.db.tx() as c:
+            r = c.execute("SELECT execution_id FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+            if r is None:
+                raise KeyError(job_id)
+            now = self.clock()
+            changed = c.execute(
+                "UPDATE jobs SET status='cancelled', lease_owner='', updated_at=? "
+                "WHERE job_id=? AND status IN ('queued','running')", (now, job_id)
+            ).rowcount > 0
+            if changed and r["execution_id"] and r["execution_id"] != job_id:
+                updated = c.execute(
+                    "UPDATE builds SET status='cancelled', updated_at=?, error='' "
+                    "WHERE build_id=? AND job_id=?", (now, r["execution_id"], job_id)
+                ).rowcount
+                if updated != 1:
+                    # Cancellation must still fence work if a projection was
+                    # deleted or no longer belongs to this job. Never rewrite
+                    # another job's build to hide a corrupt association.
+                    _log.error("cancelled job %s has no matching build projection", job_id)
+            return changed
 
     def get_by_execution(self, execution_id: str) -> Optional[str]:
         rows = self.db.query("SELECT job_id FROM jobs WHERE execution_id=?", (execution_id,))
@@ -213,16 +288,40 @@ class JobService:
             self.publisher.publish(make_envelope(
                 "build", type_, {"build_id": ctx.execution_id, "execution_id": ctx.execution_id,
                                  "kind": ctx.kind, **payload},
-                correlation_id=ctx.correlation_id, job_id=ctx.job_id))
+                correlation_id=ctx.correlation_id, job_id=ctx.job_id,
+                actor_id=ctx.actor_id, tenant_id=ctx.tenant_id))
         except Exception:  # sinks never break jobs
             _log.debug("job event sink failed", exc_info=True)
 
-    def _sync_build(self, r, status: str, **kw) -> None:
+    def _sync_build(self, r, status: str, *, worker_id: Optional[str] = None,
+                    result: Optional[Mapping[str, Any]] = None, error: str = "") -> bool:
+        """Fence a build projection to the exact current job attempt and lease."""
+        expected = {"running": "running", "succeeded": "succeeded", "failed": "dead", "queued": "queued"}[status]
+        with self.db.tx() as c:
+            live = c.execute("SELECT status, lease_owner, attempts FROM jobs WHERE job_id=?",
+                             (r["job_id"],)).fetchone()
+            if (live is None or live["status"] != expected or live["attempts"] != r["attempts"]
+                    or status == "running" and live["lease_owner"] != worker_id):
+                return False
+            self._write_build_projection(c, r, status, result=result, error=error)
+            return True
+
+    def _write_build_projection(self, c, r, status: str, *,
+                                result: Optional[Mapping[str, Any]] = None, error: str = "") -> None:
         if r["execution_id"] and r["execution_id"] != r["job_id"]:
-            try:
-                self.builds.set_status(r["execution_id"], status, **kw)
-            except KeyError:
-                pass
+            columns = "status=?, updated_at=?, error=?"
+            args: list[Any] = [status, self.clock(), error]
+            if result is not None:
+                columns += ", result=?"
+                args.append(json.dumps(dict(result), sort_keys=True))
+            args.extend([r["execution_id"], r["job_id"]])
+            if c.execute(f"UPDATE builds SET {columns} WHERE build_id=? AND job_id=?", args).rowcount != 1:
+                raise RuntimeError("job build projection unavailable")
+
+    def _require_attempt(self, c, r) -> None:
+        live = c.execute("SELECT attempts FROM jobs WHERE job_id=?", (r["job_id"],)).fetchone()
+        if live is None or live["attempts"] != r["attempts"]:
+            raise LeaseLost(r["job_id"])
 
     def run_once(self, worker_id: str) -> Optional[str]:
         kinds = list(self._handlers)
@@ -240,7 +339,8 @@ class JobService:
             c.execute("UPDATE jobs SET started_at=COALESCE(started_at, ?) WHERE job_id=?", (now, job.job_id))
         r = self._row(job.job_id)
         ctx = JobContext(self, r, worker_id, lease)
-        self._sync_build(r, "running")
+        if not self._sync_build(r, "running", worker_id=worker_id):
+            return job.job_id
         self._emit("build.started", ctx, {"attempt": job.attempts})
         try:
             result = dict(self._handlers[job.kind](ctx, dict(job.payload)) or {})
@@ -253,22 +353,29 @@ class JobService:
             self._finish_failed(job.job_id, worker_id, r, ctx, "handler_error", safe_exception_text(exc))
             return job.job_id
         try:
-            self.queue.complete(job.job_id, worker_id, result)
+            # Commit the terminal queue record and build projection together.
+            # A crash or storage failure cannot publish one without the other.
+            with self.db.tx() as c:
+                self._require_attempt(c, r)
+                self.queue.complete(job.job_id, worker_id, result, transaction=c)
+                self._write_build_projection(c, r, "succeeded", result=result)
         except LeaseLost:
             return job.job_id
-        self._sync_build(r, "succeeded", result=result)
         self._emit("build.completed", ctx, {"result": result})
         return job.job_id
 
     def _finish_failed(self, job_id, worker_id, r, ctx, code, message) -> None:
         try:
-            done = self.queue.fail(job_id, worker_id, message, retry_delay_s=5.0)
+            # Retry and terminal failure transitions share the queue owner and
+            # the build projection in one transaction, with exact attempt scope.
+            with self.db.tx() as c:
+                self._require_attempt(c, r)
+                done = self.queue.fail(job_id, worker_id, message, retry_delay_s=5.0, transaction=c)
+                final = done.status == "dead"
+                c.execute("UPDATE jobs SET error_code=? WHERE job_id=?", (code, job_id))
+                self._write_build_projection(c, r, "failed" if final else "queued", error=message)
         except LeaseLost:
             return
-        final = done.status == "dead"
-        with self.db.tx() as c:
-            c.execute("UPDATE jobs SET error_code=? WHERE job_id=?", (code, job_id))
-        self._sync_build(r, "failed" if final else "queued", error=message)
         self._emit("build.failed", ctx, {"error": {"code": code, "message": message}, "will_retry": not final})
 
 
@@ -282,10 +389,13 @@ class JobWorker:
         self._thread: Optional[threading.Thread] = None
 
     def start(self) -> "JobWorker":
-        if self._thread is None or not self._thread.is_alive():
-            self._stop.clear()
-            self._thread = threading.Thread(target=self._loop, name=f"job-worker-{self.worker_id}", daemon=True)
-            self._thread.start()
+        if self._thread is not None and self._thread.is_alive():
+            if self._stop.is_set():
+                raise RuntimeError("job worker is still stopping")
+            return self
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._loop, name=f"job-worker-{self.worker_id}", daemon=True)
+        self._thread.start()
         return self
 
     def stop(self, timeout: Optional[float] = None) -> None:
@@ -316,7 +426,6 @@ class JobWorker:
 # ---- process-wide default (lazy) ----------------------------------------
 _lock = threading.Lock()
 _service: Optional[JobService] = None
-_worker: Optional[JobWorker] = None
 
 
 def get_job_service() -> JobService:
@@ -330,11 +439,11 @@ def get_job_service() -> JobService:
 
 def set_job_service(svc: Optional[JobService]) -> None:
     """Test/composition hook."""
-    global _service, _worker
+    global _service
     with _lock:
-        if _worker is not None:
-            _worker.stop(0)
-        _service, _worker = svc, None
+        previous, _service = _service, svc
+    if previous is not None and previous is not svc:
+        previous.stop_worker(0)
 
 
 def register_handler(kind: str, fn: Handler) -> None:
@@ -343,14 +452,20 @@ def register_handler(kind: str, fn: Handler) -> None:
 
 def enqueue(kind: str, payload: Mapping[str, Any], *, actor_id: str, tenant_id: str,
             project_id: Optional[str] = None, idempotency_key: Optional[str] = None,
-            correlation_id: Optional[str] = None, timeout_s: float = DEFAULT_TIMEOUT_S) -> JobHandle:
+            correlation_id: Optional[str] = None, timeout_s: float = DEFAULT_TIMEOUT_S,
+            request_digest: Optional[str] = None) -> JobHandle:
     return get_job_service().enqueue(kind, payload, actor_id=actor_id, tenant_id=tenant_id,
                                      project_id=project_id, idempotency_key=idempotency_key,
-                                     correlation_id=correlation_id, timeout_s=timeout_s)
+                                     correlation_id=correlation_id, timeout_s=timeout_s,
+                                     request_digest=request_digest)
 
 
 def get_status(job_id: str) -> JobStatus:
     return get_job_service().get_status(job_id)
+
+
+def get_identity(job_id: str) -> JobIdentity:
+    return get_job_service().get_identity(job_id)
 
 
 def get_result(job_id: str) -> JobResult:
@@ -363,17 +478,12 @@ def cancel(job_id: str) -> bool:
 
 def start_worker(*, poll_s: float = 1.0) -> JobWorker:
     """Start (idempotently) the process-wide background worker thread."""
-    global _worker
-    svc = get_job_service()
-    with _lock:
-        if _worker is None:
-            _worker = JobWorker(svc, poll_s=poll_s)
-        return _worker.start()
+    return get_job_service().start_worker(poll_s=poll_s)
 
 
 __all__ = [
     "DEFAULT_TIMEOUT_S", "Handler", "IdempotencyMismatch", "JobContext", "JobHandle", "JobResult",
     "JobService", "JobStatus", "JobStatusName", "JobTimeout", "JobWorker", "cancel", "enqueue",
-    "get_job_service", "get_result", "get_status", "register_handler", "request_hash",
+    "get_job_service", "get_result", "get_status", "get_identity", "JobIdentity", "register_handler", "request_hash",
     "set_job_service", "start_worker",
 ]

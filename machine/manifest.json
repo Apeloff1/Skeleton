@@ -701,12 +701,16 @@
     "compose": "docker-compose.yml",
     "hot_overlay": "docker-compose.hot.yml",
     "audit": "scripts/check_app_assembly.py",
+    "vertical_readiness_contract": "machine/product_vertical_readiness.json",
+    "vertical_readiness_validator": "scripts/check_product_vertical_readiness.py",
     "workflow": ".github/workflows/app-assembly.yml",
     "modes": [
       "development",
       "hot",
       "production"
-    ]
+    ],
+    "surface_specification_contract": "machine/product_surface_specification.json",
+    "surface_specification_validator": "scripts/check_product_surface_specification.py"
   },
   "architecture": {
     "contract": "machine/architecture.json",
@@ -725,6 +729,7 @@
     "state_topology_validator": "scripts/check_state_topology.py",
     "runtime_schema_catalog": "machine/ai_runtime_schemas.json",
     "capability_registry": "machine/ai_capabilities.json",
+    "product_vertical_readiness": "machine/product_vertical_readiness.json",
     "implementation_handoff": "machine/ai_implementation_handoff.json",
     "closure_evidence_ledger": "machine/ai_closure_evidence.json"
   },
@@ -807,7 +812,9 @@
       "qualification": "manifest admission is not trained-model or runtime qualification"
     },
     "session_adapter": "skeleton/app/local_ai.py",
-    "runtime_status_projection": "frontend/src/features/Jeeves/JeevesRuntimeStatus.tsx reads existing /api/ai/chat/readiness; never executes or selects a provider",
-    "durable_status_recovery": "expired or failed tickets may project a verified committed SQLite receipt; uncommitted work is never inferred"
+    "runtime_status_projection": "frontend/src/features/Jeeves/JeevesRuntimeStatus.tsx mounts authenticated RuntimeOptimizationPanel: exact model controls, actual server policy field catalog, bounded tenant learner checkpoint and numeric dataset export, maintenance retry/circuit reset and worker coordination. Explicit admin mutations preserve CAS/failure/source pins and durable audit; frontend owns no provider execution or policy authority.",
+    "durable_status_recovery": "expired or failed tickets may project a verified committed SQLite receipt; uncommitted work is never inferred",
+    "studio_foundation_surfaces": "Existing chat/studio/crawler forms consume authenticated bounded draft-only workflow templates; RuntimeOptimizationPanel projects activated local execution limits, scoped operational predictor explanations and observed maintenance queue/handler/task blockers. Existing owner validation, grants, canonical receipts and physical-custody recovery remain authoritative.",
+    "operational_gap_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.operational_gap_continuation"
   }
 }

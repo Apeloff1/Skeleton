@@ -18,6 +18,7 @@ import math
 import os
 import platform
 import socket
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -26,7 +27,7 @@ from collections import deque
 from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, timedelta
+from skeleton.compat_datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from importlib import metadata as package_metadata
 from importlib.util import find_spec
@@ -90,6 +91,14 @@ class ProviderError(RuntimeError):
 
 class ProviderUnavailableError(ProviderError):
     """Raised when the selected provider cannot be used."""
+
+
+class _LocalGuardUnavailable(ProviderUnavailableError):
+    """A safe, typed reason for a retained local provider's guard failure."""
+
+    def __init__(self, message: str, *, readiness_code: str) -> None:
+        super().__init__(message)
+        self.readiness_code = readiness_code
 
 
 class ProviderInvocationError(ProviderError):
@@ -353,6 +362,14 @@ def provider_response_deltas(
 
     if not isinstance(response, ProviderResponse):
         raise TypeError("response must be ProviderResponse")
+    # A naive datetime silently adopts the runner's local timezone when
+    # astimezone() is called. Never invent UTC evidence from that ambiguity.
+    if emitted_at is not None and (
+        not isinstance(emitted_at, datetime)
+        or emitted_at.tzinfo is None
+        or emitted_at.utcoffset() is None
+    ):
+        raise ProviderProtocolViolationError("emitted_at must be timezone-aware")
     instant = datetime.now(UTC) if emitted_at is None else emitted_at.astimezone(UTC)
     sequence = 0
     deltas: list[ProviderDelta] = []
@@ -3143,6 +3160,192 @@ class OpenAISyncProviderAdapter:
         raise ProviderInvocationError("model provider request failed") from last_error
 
 
+class _GovernedLocalAdapter(ProviderAdapter):
+    """Bind activated local execution to the canonical policy/accounting owner.
+
+    The underlying adapter retains its tokenizer, workers, cache and native
+    receipts. This facade grants no additional model or network authority.
+    """
+
+    provider_id = "local"
+
+    def __init__(
+        self, adapter: ProviderAdapter, *, admission_runtime: AdmissionRuntime, timeout_seconds: float
+    ) -> None:
+        self._adapter = adapter
+        self.model = adapter.model
+        self.admission_runtime = admission_runtime
+        self.timeout_seconds = timeout_seconds
+        self.max_retries = 0
+        self._activated_model_digest = adapter.engine.model.model_digest
+        self._source_model_id = adapter.engine.model.model_id
+        self._architecture_receipt = None
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._adapter, name)
+
+    def _ensure_architecture(self) -> None:
+        try:
+            receipt = load_provider_architecture(self.provider_id)
+        except ProviderArchitectureError as exc:
+            raise ProviderUnavailableError("local provider architecture acknowledgement failed") from exc
+        if not isinstance(receipt, ProviderArchitectureReceipt) or receipt.provider_id != self.provider_id:
+            raise ProviderUnavailableError("local provider architecture acknowledgement is invalid")
+        self._architecture_receipt = receipt
+
+    @property
+    def available(self) -> bool:
+        try:
+            self._ensure_architecture()
+            return self.model == self._adapter.model and self._adapter.available
+        except (OSError, ValueError, RuntimeError, TypeError, AttributeError):
+            return False
+
+    @property
+    def supports_cooperative_cancellation(self) -> bool:
+        return self._adapter.supports_cooperative_cancellation
+
+    def execution_identity(self) -> dict[str, object]:
+        self._ensure_architecture()
+        try:
+            backend = self.engine.model
+            if (
+                backend.model_digest != self._activated_model_digest
+                or backend.model_id != self._source_model_id
+            ):
+                raise ValueError("activated model identity differs")
+            check = getattr(backend, "assert_identity", None)
+            if callable(check):
+                check()
+        except (OSError, ValueError, RuntimeError, TypeError, AttributeError) as exc:
+            raise ProviderUnavailableError("local artifact identity drift") from exc
+        return provider_execution_identity(self)
+
+    def status(self) -> dict[str, Any]:
+        try:
+            result = self._adapter.status()
+        except (OSError, ValueError, RuntimeError, TypeError, AttributeError) as exc:
+            raise ProviderUnavailableError("local artifact identity drift") from exc
+        result["available"] = self.available
+        return result
+
+    async def close(self, *, cancel_running: bool = True) -> None:
+        await self._adapter.close(cancel_running=cancel_running)
+
+    async def generate(self, request: ProviderRequest) -> ProviderResponse:
+        from skeleton.ai.runtime.inference.local import (
+            LocalInferenceCancelled,
+            _LOCAL_DISPATCH_OBSERVER,
+            _LocalUsageLimitViolation,
+        )
+
+        started = time.perf_counter()
+        self._ensure_architecture()
+        _validate_request(request, default_model=self.model)
+        if not self.available:
+            raise ProviderUnavailableError("local artifact identity drift or activated model unavailable")
+        data_class, purpose, tenant_id = _effective_governance_fields(
+            data_class=request.data_class,
+            purpose=request.purpose,
+            tenant_id=request.tenant_id,
+            governance_context=request.governance_context,
+        )
+        try:
+            governance = require_provider_transfer(
+                ProviderTransferRequest(
+                    provider_id=self.provider_id,
+                    data_class=data_class,
+                    purpose=purpose,
+                    tenant_id=tenant_id,
+                    source="skeleton/provider_runtime.py",
+                )
+            )
+        except DataGovernanceDenied as exc:
+            raise ProviderPolicyError("local model transfer denied by governance policy") from exc
+        limits = self.generation_limits()
+        requested_output = (
+            request.max_output_tokens
+            if request.max_output_tokens is not None
+            else min(256, request.resource_budget.max_output_tokens, limits["max_output_tokens"])
+        )
+        if type(requested_output) is not int or requested_output < 1:
+            raise ProviderPolicyError("local model requires a positive admitted output allowance")
+        timeout = _remaining_provider_timeout(
+            request, min(self.timeout_seconds, request.resource_budget.max_wall_seconds)
+        )
+        execution_deadline = datetime.now(UTC) + timedelta(seconds=timeout)
+        if request.deadline is not None:
+            execution_deadline = min(execution_deadline, request.deadline.astimezone(UTC))
+        bounded_request = replace(request, deadline=execution_deadline)
+        # Local execution never reserves a caller-supplied hosted-model cost.
+        lease, estimate = _admit_provider_request(
+            self.admission_runtime,
+            replace(request, estimated_cost_usd=0.0),
+            tenant_id=tenant_id,
+            requested_output_tokens=requested_output,
+            timeout_seconds=timeout,
+            provider_attempts=1,
+        )
+        dispatched = threading.Event()
+        observer = _LOCAL_DISPATCH_OBSERVER.set(dispatched.set)
+
+        def complete_usage(input_tokens: int, output_tokens: int):
+            actual = UsageEstimate(
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost_usd=0.0,
+                wall_seconds=max(0.0, time.perf_counter() - started),
+                provider_attempts=1,
+            )
+            try:
+                _meter_provider_actual_usage(self.admission_runtime, lease, actual)
+                return self.admission_runtime.complete(lease.operation_id, actual)
+            except AdmissionRuntimeError as exc:
+                _quarantine_provider_usage(
+                    self.admission_runtime, lease, reason="local-usage-reconciliation-failed"
+                )
+                raise ProviderPolicyError("local model usage reconciliation failed") from exc
+
+        try:
+            response = await self._adapter.generate(bounded_request)
+            if response.provider != self.provider_id or response.model != self.model:
+                raise ProviderProtocolViolationError("local response differs from its activated route")
+            _require_accountable_provider_usage(self.admission_runtime, lease, response.usage)
+        except _LocalUsageLimitViolation as exc:
+            complete_usage(exc.input_tokens, exc.output_tokens)
+            raise ProviderPolicyError("local model actual usage exceeded its admitted budget") from exc
+        except BaseException as exc:
+            if dispatched.is_set():
+                _quarantine_provider_usage(
+                    self.admission_runtime, lease, reason="local-dispatch-or-response-ambiguous"
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
+            if isinstance(exc, LocalInferenceCancelled):
+                raise ProviderInvocationError("local model deadline exceeded or execution cancelled") from exc
+            if isinstance(exc, ProviderPolicyError):
+                raise ProviderPolicyError("local model admission denied: " + str(exc)) from exc
+            raise
+        finally:
+            _LOCAL_DISPATCH_OBSERVER.reset(observer)
+        actual = _actual_provider_usage(
+            response,
+            estimate=estimate,
+            wall_seconds=time.perf_counter() - started,
+            attempts_used=1,
+            normalized_usage=response.usage,
+        )
+        completion = complete_usage(actual.input_tokens, actual.output_tokens)
+        if completion.operation_overrun:
+            raise ProviderPolicyError("local model actual usage exceeded its admitted budget")
+        return replace(
+            response,
+            governance_decision_id=governance.decision_id,
+            admission_decision_id=lease.decision.decision_id,
+            data_class=governance.data_class,
+        )
+
+
 class _UnavailableLocalAdapter(ProviderAdapter):
     """Startup diagnostics only; this descriptor cannot perform inference."""
 
@@ -3173,9 +3376,22 @@ class ProviderRegistry:
         architecture_loader: Callable[[str], ProviderArchitectureReceipt] = load_provider_architecture,
     ) -> None:
         normalized_adapters = tuple(adapters)
-        self._adapters = {adapter.provider_id: adapter for adapter in normalized_adapters}
-        if len(self._adapters) != len(normalized_adapters):
-            raise ValueError("provider ids must be unique")
+        self._adapters: dict[str, ProviderAdapter] = {}
+        self._model_adapters: dict[tuple[str, str | None], ProviderAdapter] = {}
+        for adapter in normalized_adapters:
+            provider_id = adapter.provider_id
+            model_id = getattr(adapter, "model", None)
+            identity = (provider_id, model_id)
+            if identity in self._model_adapters:
+                raise ValueError("provider/model identities must be unique")
+            if provider_id in self._adapters and provider_id != "local":
+                raise ValueError("hosted provider ids must be unique")
+            if provider_id == "local" and provider_id in self._adapters and (
+                not isinstance(model_id, str) or not model_id or model_id != model_id.strip()
+            ):
+                raise ValueError("additional local models require an exact model identity")
+            self._adapters.setdefault(provider_id, adapter)
+            self._model_adapters[identity] = adapter
         self.active_id = active.strip().lower()
         normalized_fallbacks = tuple(str(item).strip().lower() for item in fallback_ids)
         if len(set(normalized_fallbacks)) != len(normalized_fallbacks):
@@ -3197,15 +3413,24 @@ class ProviderRegistry:
         *,
         admission_runtime: AdmissionRuntime | None = None,
         retain_unavailable: bool = False,
+        guarded_components: Any | None = None,
+        require_guarded_local: bool | None = None,
     ) -> ProviderRegistry:
         try:
-            return cls._from_env(admission_runtime=admission_runtime)
-        except ProviderUnavailableError:
+            return cls._from_env(
+                admission_runtime=admission_runtime,
+                guarded_components=guarded_components,
+                require_guarded_local=require_guarded_local,
+            )
+        except ProviderUnavailableError as exc:
             if not retain_unavailable or os.getenv("AI_PROVIDER", "openai").strip().lower() != "local":
                 raise
             model_path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
             deployment_path = os.getenv("AI_LOCAL_DEPLOYMENT_PATH", "").strip()
-            if any(
+            catalog_path = os.getenv("AI_LOCAL_MODEL_CATALOG_PATH", "").strip()
+            if isinstance(exc, _LocalGuardUnavailable):
+                code = exc.readiness_code
+            elif any(
                 os.getenv(name, "").strip()
                 for name in (
                     "AI_SECONDARY_API_KEY",
@@ -3216,10 +3441,12 @@ class ProviderRegistry:
                 code = "local_external_fallback_denied"
             elif os.getenv("AI_VERIFICATION_MODEL", "").strip():
                 code = "local_external_verifier_denied"
-            elif not model_path and not deployment_path:
+            elif not model_path and not deployment_path and not catalog_path:
                 code = "local_model_not_configured"
-            elif model_path and deployment_path:
+            elif sum(bool(value) for value in (model_path, deployment_path, catalog_path)) != 1:
                 code = "local_configuration_invalid"
+            elif catalog_path:
+                code = "local_catalog_invalid"
             else:
                 code = "local_artifact_invalid"
             return cls([_UnavailableLocalAdapter(code)], active="local")
@@ -3229,8 +3456,50 @@ class ProviderRegistry:
         cls,
         *,
         admission_runtime: AdmissionRuntime | None = None,
+        guarded_components: Any | None = None,
+        require_guarded_local: bool | None = None,
     ) -> ProviderRegistry:
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
+        raw_guard = os.getenv("AI_LOCAL_GUARD_REQUIRED", "").strip().lower()
+        if raw_guard not in {"", "0", "false", "1", "true"}:
+            raise _LocalGuardUnavailable(
+                "invalid AI_LOCAL_GUARD_REQUIRED policy", readiness_code="local_guard_configuration_invalid"
+            )
+        if require_guarded_local is not None and type(require_guarded_local) is not bool:
+            raise _LocalGuardUnavailable(
+                "local guard policy must be a boolean", readiness_code="local_guard_configuration_invalid"
+            )
+        development_legacy = (
+            active == "local" and raw_guard in {"0", "false"}
+            and require_guarded_local is False and guarded_components is None
+            and os.getenv("AI_DEPLOYMENT_ENV", "").strip().lower() == "development"
+            and os.getenv("AI_LOCAL_LEGACY_DEV_ACK", "") == "unsafe-local-dev-only"
+        )
+        if active == "local" and (raw_guard in {"0", "false"} or require_guarded_local is False) and not development_legacy:
+            raise _LocalGuardUnavailable(
+                "unguarded local model requires explicit development-only authorization",
+                readiness_code="local_guard_configuration_invalid",
+            )
+        guarded_required = (
+            (active == "local" and not development_legacy)
+            or raw_guard in {"1", "true"}
+            or require_guarded_local is True
+            or guarded_components is not None
+        )
+        if guarded_required and active != "local":
+            raise ProviderUnavailableError("guarded local dependencies require AI_PROVIDER=local")
+        if guarded_required:
+            from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
+            if not isinstance(guarded_components, ProtectedLocalComponents):
+                raise _LocalGuardUnavailable(
+                    "guard-required local startup lacks trusted dependencies",
+                    readiness_code="local_guard_unavailable",
+                )
+            if raw_guard in {"0", "false"} or require_guarded_local is False:
+                raise _LocalGuardUnavailable(
+                    "guarded local startup cannot disable its enforcement",
+                    readiness_code="local_guard_configuration_invalid",
+                )
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
         secondary_values = {
@@ -3242,6 +3511,9 @@ class ProviderRegistry:
             "AI_VERIFICATION_MODEL",
             "",
         ).strip()
+        catalog_path = os.getenv("AI_LOCAL_MODEL_CATALOG_PATH", "").strip()
+        if catalog_path and active != "local":
+            raise ProviderUnavailableError("local model catalogs require AI_PROVIDER=local")
 
         if active == "local":
             if any(secondary_values.values()):
@@ -3252,11 +3524,45 @@ class ProviderRegistry:
                 raise ProviderUnavailableError("local provider mode forbids semantic verifier configuration")
             model_path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
             deployment_path = os.getenv("AI_LOCAL_DEPLOYMENT_PATH", "").strip()
-            if bool(model_path) == bool(deployment_path):
+            if sum(bool(value) for value in (model_path, deployment_path, catalog_path)) != 1:
                 raise ProviderUnavailableError(
-                    "local provider requires exactly one artifact or deployment manifest"
+                    "local provider requires exactly one artifact, deployment manifest or model catalog"
                 )
             capacity = _local_execution_capacity()
+            cache_size, default_seed = _local_model_configuration(
+                default_cache_size=0 if catalog_path or deployment_path else 128
+            )
+            local_admission = admission_runtime or AdmissionRuntime()
+
+            def guarded(adapter: ProviderAdapter) -> ProviderAdapter:
+                return _GovernedLocalAdapter(
+                    adapter, admission_runtime=local_admission, timeout_seconds=timeout
+                )
+
+            if catalog_path:
+                try:
+                    from skeleton.ai.runtime.inference.catalog import LocalModelCatalogError, load_local_model_catalog
+
+                    activation = load_local_model_catalog(
+                        catalog_path,
+                        cache_size=cache_size,
+                        default_seed=default_seed,
+                        require_guarded_inference=guarded_required,
+                        guarded_components=guarded_components,
+                        **capacity,
+                    )
+                except (LocalModelCatalogError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
+                    raise ProviderUnavailableError("local provider catalog failed activation") from exc
+                configured = {id(adapter): guarded(adapter) for adapter in activation.adapters}
+                return cls(
+                    tuple(configured.values()),
+                    active="local",
+                    verification_adapter=(
+                        None
+                        if activation.verification_adapter is None
+                        else configured[id(activation.verification_adapter)]
+                    ),
+                )
             if deployment_path:
                 try:
                     from skeleton.ai.runtime.inference.deployment import (
@@ -3266,14 +3572,16 @@ class ProviderRegistry:
 
                     adapter = load_local_model_adapter(
                         deployment_path,
-                        cache_size=_env_int("AI_LOCAL_MODEL_CACHE_SIZE", 0, minimum=0),
-                        default_seed=_env_int("AI_LOCAL_MODEL_SEED", 0, minimum=0),
+                        cache_size=cache_size,
+                        default_seed=default_seed,
                         rehash_artifacts_each_run=True,
+                        require_guarded_inference=guarded_required,
+                        guarded_components=guarded_components,
                         **capacity,
                     )
-                except (LocalModelDeploymentError, OSError, TypeError, ValueError) as exc:
+                except (LocalModelDeploymentError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider deployment failed activation") from exc
-                return cls([adapter], active="local")
+                return cls([guarded(adapter)], active="local")
             try:
                 from skeleton.ai.runtime.inference import (
                     LocalInferenceEngine,
@@ -3283,29 +3591,26 @@ class ProviderRegistry:
                 )
 
                 loaded = load_local_model_artifact(model_path)
-                cache_size = _env_int(
-                    "AI_LOCAL_MODEL_CACHE_SIZE",
-                    128,
-                    minimum=0,
-                )
-                default_seed = _env_int(
-                    "AI_LOCAL_MODEL_SEED",
-                    0,
-                    minimum=0,
-                )
-                local_adapter = LocalModelAdapter(
-                    LocalInferenceEngine(
+                engine = LocalInferenceEngine(
                         loaded.model,
                         cache_size=cache_size,
+                        require_guarded_context=guarded_required,
                         **capacity,
-                    ),
-                    default_seed=default_seed,
-                    artifact_status=loaded.receipt.as_dict(),
                 )
-            except (LocalModelArtifactError, TypeError, ValueError) as exc:
+                if guarded_required:
+                    from skeleton.ai.runtime.inference.guarded_composition import compose_protected_local_adapter
+                    local_adapter = compose_protected_local_adapter(
+                        engine, components=guarded_components,
+                        default_seed=default_seed, artifact_status=loaded.receipt.as_dict(),
+                    )
+                else:
+                    local_adapter = LocalModelAdapter(
+                        engine, default_seed=default_seed, artifact_status=loaded.receipt.as_dict(),
+                    )
+            except (LocalModelArtifactError, ProviderPolicyError, TypeError, ValueError) as exc:
                 raise ProviderUnavailableError("local provider model artifact failed activation") from exc
             return cls(
-                [local_adapter],
+                [guarded(local_adapter)],
                 active="local",
             )
 
@@ -3410,7 +3715,7 @@ class ProviderRegistry:
             or model_id != model_id.strip()
         ):
             raise ProviderUnavailableError("explicit provider selection is malformed")
-        adapter = self._adapters.get(provider_id)
+        adapter = self._model_adapters.get((provider_id, model_id))
         if adapter is None or getattr(adapter, "model", None) != model_id:
             raise ProviderUnavailableError("selected provider/model is not configured")
         self._architecture_receipt(provider_id)
@@ -3474,6 +3779,55 @@ class ProviderRegistry:
             "routing": routing,
         }
 
+    def runtime_serving_engines(self) -> tuple[Any, ...]:
+        """Return registered local serving owners, without activating a route.
+
+        Runtime pressure and maintenance never create a provider, resolve
+        credentials, change a selected model or alter activation identity.
+        Shared engines are returned once even when several adapters use them.
+        A separately supplied local verifier is also an activated owner, even
+        when it is intentionally absent from selectable generation routes.
+        """
+        engines: list[Any] = []
+        seen: set[int] = set()
+        for adapter in (*self._model_adapters.values(), self._verification_adapter):
+            if adapter is None or adapter.provider_id != "local":
+                continue
+            engine = getattr(adapter, "engine", None)
+            if (
+                engine is not None
+                and id(engine) not in seen
+                and callable(getattr(engine, "configure_serving", None))
+                and callable(getattr(engine, "maintain", None))
+            ):
+                engines.append(engine)
+                seen.add(id(engine))
+        return tuple(engines)
+
+    def runtime_serving_routes(self) -> tuple[dict[str, Any], ...]:
+        """Name each local serving owner by its configured exact route identity."""
+
+        routes: list[dict[str, Any]] = []
+        for (provider_id, model_id), adapter in sorted(
+            self._model_adapters.items(), key=lambda item: (item[0][0], item[0][1] or "")
+        ):
+            engine = getattr(adapter, "engine", None)
+            if (
+                provider_id == "local"
+                and isinstance(model_id, str)
+                and engine is not None
+                and callable(getattr(engine, "configure_serving", None))
+                and callable(getattr(engine, "maintain", None))
+            ):
+                routes.append({
+                    "route_id": provider_id + ":" + model_id,
+                    "provider_id": provider_id,
+                    "model_id": model_id,
+                    "model_digest": getattr(getattr(engine, "model", None), "model_digest", None),
+                    "engine": engine,
+                })
+        return tuple(routes)
+
     def verification_adapter_for(
         self,
         generator: ProviderAdapter,
@@ -3493,15 +3847,28 @@ class ProviderRegistry:
         if not adapter.available:
             return None
         self._architecture_receipt(adapter.provider_id)
-        same_provider = adapter.provider_id == generator.provider_id
-        same_model = getattr(adapter, "model", None) == getattr(
-            generator,
-            "model",
-            None,
-        )
-        if same_provider and same_model:
-            return None
-        return adapter
+        return adapter if self._independent_models(generator, adapter) else None
+
+    @staticmethod
+    def _independent_models(generator: ProviderAdapter, verifier: ProviderAdapter) -> bool:
+        if (generator.provider_id, getattr(generator, "model", None)) == (
+            verifier.provider_id, getattr(verifier, "model", None),
+        ):
+            return False
+        if generator.provider_id == verifier.provider_id == "local":
+            digests = [
+                getattr(getattr(getattr(adapter, "engine", None), "model", None), "model_digest", None)
+                for adapter in (generator, verifier)
+            ]
+            if any(
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(character not in "0123456789abcdef" for character in digest)
+                for digest in digests
+            ):
+                return False
+            return digests[0] != digests[1]
+        return True
 
     def architecture_receipt(self, provider_id: str | None = None) -> dict[str, Any]:
         target = (provider_id or self.active_id).strip().lower()
@@ -3511,7 +3878,9 @@ class ProviderRegistry:
 
     def statuses(self) -> list[dict[str, Any]]:
         statuses = []
-        for provider_id, adapter in sorted(self._adapters.items()):
+        for (provider_id, _model_id), adapter in sorted(
+            self._model_adapters.items(), key=lambda item: (item[0][0], item[0][1] or "")
+        ):
             local = provider_id == "local"
             try:
                 status = adapter.status()
@@ -3579,8 +3948,8 @@ class ProviderRegistry:
                     ),
                 }
             )
-            status["active"] = provider_id == self.active_id
-            status["fallback"] = provider_id in self._fallback_ids
+            status["active"] = adapter is self.active
+            status["fallback"] = provider_id in self._fallback_ids and adapter is self._adapters[provider_id]
             status["routing"] = (
                 self.redundancy_status() if provider_id == self.active_id and self._fallback_ids else None
             )
@@ -3588,8 +3957,9 @@ class ProviderRegistry:
             status["semantic_verifier_configured"] = bool(
                 verifier is not None
                 and verifier.provider_id == provider_id
-                and getattr(verifier, "model", None) != getattr(adapter, "model", None)
+                and self._independent_models(adapter, verifier)
             )
+            status["semantic_verifier_route"] = adapter is verifier
             try:
                 receipt = self._architecture_receipt(provider_id)
             except ProviderUnavailableError:
@@ -3627,12 +3997,14 @@ def _execution_source_identity() -> dict[str, object]:
         "intelligence/verification_runtime.py",
         "intelligence/verification_policy.py",
         "ai/runtime/inference/local.py",
+        "ai/runtime/inference/adaptive_serving.py",
         "ai/runtime/inference/artifact.py",
         "ai/runtime/inference/neural.py",
         "ai/runtime/inference/native_runtime.py",
         "ai/runtime/inference/native_transformer.py",
         "ai/runtime/inference/llama_cpp.py",
         "ai/runtime/inference/deployment.py",
+        "ai/runtime/inference/catalog.py",
         "cortex/attn.py",
         "cortex/bpe.py",
         "cortex/transformer.py",
@@ -3738,6 +4110,10 @@ def provider_execution_identity(adapter: ProviderAdapter) -> dict[str, object]:
                         "artifact_sha256",
                         "runtime_digest",
                         "manifest_digest",
+                        "source_model_id",
+                        "catalog_digest",
+                        "catalog_entry_digest",
+                        "catalog_source_sha256",
                     )
                 },
                 "default_seed": getattr(route, "default_seed", None),
@@ -3813,9 +4189,12 @@ def _env_float(name: str, default: float, *, minimum: float) -> float:
     if raw is None:
         return default
     try:
-        return max(minimum, float(raw))
-    except ValueError:
-        return default
+        value = float(raw)
+    except ValueError as exc:
+        raise ProviderUnavailableError(name + " must be finite numeric within configured bounds") from exc
+    if not math.isfinite(value) or value < minimum:
+        raise ProviderUnavailableError(name + " is outside configured bounds")
+    return value
 
 
 def _env_int(name: str, default: int, *, minimum: int) -> int:
@@ -3823,9 +4202,20 @@ def _env_int(name: str, default: int, *, minimum: int) -> int:
     if raw is None:
         return default
     try:
-        return max(minimum, int(raw))
-    except ValueError:
-        return default
+        value = int(raw)
+    except ValueError as exc:
+        raise ProviderUnavailableError(name + " must be an integer within configured bounds") from exc
+    if value < minimum:
+        raise ProviderUnavailableError(name + " is outside configured bounds")
+    return value
+
+
+def _local_model_configuration(*, default_cache_size: int) -> tuple[int, int]:
+    cache = _env_int("AI_LOCAL_MODEL_CACHE_SIZE", default_cache_size, minimum=0)
+    seed = _env_int("AI_LOCAL_MODEL_SEED", 0, minimum=0)
+    if cache > 4096 or seed > 2**64 - 1:
+        raise ProviderUnavailableError("local model cache or seed is outside configured bounds")
+    return cache, seed
 
 
 __all__ = [

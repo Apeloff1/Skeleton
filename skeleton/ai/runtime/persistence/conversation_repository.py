@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -236,6 +237,24 @@ class SQLiteConversationRepository:
 
                 CREATE INDEX IF NOT EXISTS idx_conversation_message_thread
                 ON conversation_message(namespace, thread_id, sequence);
+
+                CREATE TABLE IF NOT EXISTS conversation_chat_execution (
+                    namespace TEXT NOT NULL,
+                    thread_id TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL,
+                    dispatch_state TEXT NOT NULL DEFAULT 'ready'
+                        CHECK(dispatch_state IN ('ready', 'submitting', 'admitted', 'withdrawn')),
+                    cancel_requested INTEGER NOT NULL DEFAULT 0
+                        CHECK(cancel_requested IN (0, 1)),
+                    PRIMARY KEY(namespace, message_id),
+                    FOREIGN KEY(namespace, thread_id)
+                        REFERENCES conversation_thread(namespace, thread_id)
+                        ON DELETE CASCADE,
+                    FOREIGN KEY(namespace, message_id)
+                        REFERENCES conversation_message(namespace, message_id)
+                        ON DELETE CASCADE
+                );
                 """
             )
             columns = {
@@ -262,6 +281,19 @@ class SQLiteConversationRepository:
                 if column not in columns:
                     self._connection.execute(
                         f"ALTER TABLE conversation_message ADD COLUMN {declaration}"
+                    )
+            dispatch_columns = {
+                row["name"] for row in self._connection.execute(
+                    "PRAGMA table_info(conversation_chat_execution)"
+                ).fetchall()
+            }
+            for column, declaration in (
+                ("dispatch_state", "dispatch_state TEXT NOT NULL DEFAULT 'ready'"),
+                ("cancel_requested", "cancel_requested INTEGER NOT NULL DEFAULT 0"),
+            ):
+                if column not in dispatch_columns:
+                    self._connection.execute(
+                        f"ALTER TABLE conversation_chat_execution ADD COLUMN {declaration}"
                     )
 
     @staticmethod
@@ -542,9 +574,67 @@ class SQLiteConversationRepository:
         owner_id: str,
         expected_thread_version: int,
         activate_branch: bool = True,
+        execution_metadata: dict[str, object] | None = None,
     ) -> tuple[ConversationThread, ConversationMessage]:
         if not isinstance(message, ConversationMessage):
             raise TypeError("message must be a ConversationMessage")
+        encoded_execution = None
+        if execution_metadata is not None:
+            if (
+                message.author_type is not ConversationAuthorType.USER
+                or "chat-prepared-execution:v1" not in message.attachment_refs
+                or not isinstance(execution_metadata, dict)
+            ):
+                raise ConversationConflict("prepared execution must be bound to a canonical USER")
+            try:
+                encoded_execution = json.dumps(
+                    execution_metadata, ensure_ascii=False, allow_nan=False,
+                    sort_keys=True, separators=(",", ":"),
+                )
+            except (TypeError, ValueError, RecursionError, OverflowError) as exc:
+                raise ConversationConflict("prepared execution metadata is not canonical JSON") from exc
+            if len(encoded_execution.encode("utf-8")) > 2 * 1024 * 1024:
+                raise ConversationConflict("prepared execution metadata exceeds its byte bound")
+            # The portable owner shares the same canonical, digest-sealed
+            # envelope as Mongo. Full engine-command semantic checks happen
+            # at preparation/read; malformed envelopes cannot be published.
+            mandatory = {
+                "schema_version", "request_digest", "command",
+                "dependencies", "command_digest", "record_digest",
+            }
+            if (
+                set(execution_metadata) != mandatory
+                or execution_metadata["schema_version"] != "backend.ai.chat-execution.v1"
+                or not isinstance(execution_metadata["command"], dict)
+                or not isinstance(execution_metadata["dependencies"], dict)
+            ):
+                raise ConversationConflict("prepared execution envelope is invalid")
+            request_digest = execution_metadata["request_digest"]
+            if (
+                not isinstance(request_digest, str)
+                or len(request_digest) != 64
+                or any(digit not in "0123456789abcdef" for digit in request_digest)
+                or "chat-request-sha256:" + request_digest not in message.attachment_refs
+            ):
+                raise ConversationConflict("prepared execution request identity differs")
+            def canonical_digest(value: object) -> str:
+                data = json.dumps(
+                    value, ensure_ascii=False, allow_nan=False,
+                    sort_keys=True, separators=(",", ":"),
+                ).encode("utf-8")
+                return hashlib.sha256(data).hexdigest()
+            if (
+                execution_metadata["command_digest"]
+                != canonical_digest(execution_metadata["command"])
+                or execution_metadata["record_digest"]
+                != canonical_digest({
+                    key: value for key, value in execution_metadata.items()
+                    if key != "record_digest"
+                })
+            ):
+                raise ConversationConflict("prepared execution digest differs")
+        elif "chat-prepared-execution:v1" in message.attachment_refs:
+            raise ConversationConflict("prepared USER requires its original execution metadata")
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
@@ -556,10 +646,26 @@ class SQLiteConversationRepository:
                 if not thread.writable:
                     raise ConversationConflict("thread is not writable")
 
+                # A replay may not replace or drop the frozen engine command
+                # under the same immutable USER/idempotency identity.
+                def matching_execution(existing_id: str) -> bool:
+                    stored = self._connection.execute(
+                        """
+                        SELECT metadata_json FROM conversation_chat_execution
+                        WHERE namespace = ? AND thread_id = ? AND message_id = ?
+                        """,
+                        (self.namespace, message.thread_id, existing_id),
+                    ).fetchone()
+                    if encoded_execution is None:
+                        return stored is None
+                    return stored is not None and stored["metadata_json"] == encoded_execution
+
                 by_id = self._message_row(message.message_id)
                 if by_id is not None:
                     existing = self._message_from_row(by_id)
                     if self._same_message_identity(existing, message):
+                        if not matching_execution(existing.message_id):
+                            raise ConversationConflict("replayed execution metadata differs")
                         self._connection.execute("COMMIT")
                         return thread, existing
                     raise ConversationConflict("message_id was reused with different content")
@@ -574,6 +680,8 @@ class SQLiteConversationRepository:
                 if idem is not None:
                     existing = self._message_from_row(idem)
                     if self._same_message_identity(existing, message):
+                        if not matching_execution(existing.message_id):
+                            raise ConversationConflict("replayed execution metadata differs")
                         self._connection.execute("COMMIT")
                         return thread, existing
                     raise ConversationConflict("idempotency_key was reused with different content")
@@ -650,6 +758,15 @@ class SQLiteConversationRepository:
                         message.schema_version,
                     ),
                 )
+                if encoded_execution is not None:
+                    self._connection.execute(
+                        """
+                        INSERT INTO conversation_chat_execution(
+                            namespace, thread_id, message_id, metadata_json
+                        ) VALUES (?, ?, ?, ?)
+                        """,
+                        (self.namespace, message.thread_id, message.message_id, encoded_execution),
+                    )
                 now = _utc()
                 next_thread = replace(
                     thread,
@@ -683,6 +800,194 @@ class SQLiteConversationRepository:
             except BaseException:
                 self._connection.execute("ROLLBACK")
                 raise
+
+    def chat_execution(
+        self,
+        thread_id: str,
+        message_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+    ) -> dict[str, object] | None:
+        """Read only the frozen command belonging to an authorized USER."""
+        with self._lock:
+            row = self._thread_row(thread_id)
+            if row is None:
+                raise ConversationNotFound(thread_id)
+            self._authorize(self._thread_from_row(row), tenant_id, owner_id)
+            message_row = self._message_row(message_id)
+            if message_row is None or message_row["thread_id"] != thread_id:
+                raise ConversationNotFound(message_id)
+            stored = self._connection.execute(
+                """
+                SELECT metadata_json FROM conversation_chat_execution
+                WHERE namespace = ? AND thread_id = ? AND message_id = ?
+                """,
+                (self.namespace, thread_id, message_id),
+            ).fetchone()
+            if stored is None:
+                return None
+            try:
+                value = json.loads(stored["metadata_json"])
+            except (TypeError, ValueError, UnicodeError) as exc:
+                raise ConversationRepositoryCorruption("prepared chat metadata is unreadable") from exc
+            if not isinstance(value, dict):
+                raise ConversationRepositoryCorruption("prepared chat metadata has invalid shape")
+            return value
+
+    def chat_dispatch(
+        self,
+        thread_id: str,
+        message_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        record_digest: str,
+        action: str = "read",
+    ) -> dict[str, object] | None:
+        """Serialize exact-command submission and cancellation in SQLite.
+
+        A claim is permitted only for the original digest-bound command.
+        Read, claim, cancel and admitted mirror Mongo's fail-closed transition
+        semantics, without fabricating a missing prepared command or custody.
+        """
+        if action not in {"read", "claim", "cancel", "admitted"}:
+            raise ValueError("unsupported chat dispatch transition")
+        if (
+            not isinstance(record_digest, str)
+            or len(record_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in record_digest)
+        ):
+            raise ConversationConflict("chat dispatch record digest is invalid")
+        with self._lock:
+            if action != "read":
+                self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                # Recheck owner scope inside the write lock; another SQLite
+                # connection must not change custody between auth and CAS.
+                row = self._thread_row(thread_id)
+                if row is None:
+                    raise ConversationNotFound(thread_id)
+                thread = self._thread_from_row(row)
+                self._authorize(thread, tenant_id, owner_id)
+                message = self._message_row(message_id)
+                if (
+                    message is None
+                    or message["thread_id"] != thread_id
+                    or message["author_type"] != ConversationAuthorType.USER.value
+                    or message["sequence"] > thread.message_sequence
+                ):
+                    state = None
+                else:
+                    stored = self._connection.execute(
+                        """
+                        SELECT metadata_json, dispatch_state, cancel_requested
+                        FROM conversation_chat_execution
+                        WHERE namespace = ? AND thread_id = ? AND message_id = ?
+                        """,
+                        (self.namespace, thread_id, message_id),
+                    ).fetchone()
+                    state = None
+                    if stored is not None:
+                        try:
+                            metadata = json.loads(stored["metadata_json"])
+                        except (TypeError, ValueError) as exc:
+                            raise ConversationRepositoryCorruption(
+                                "prepared chat command is unreadable"
+                            ) from exc
+                        if (
+                            not isinstance(metadata, dict)
+                            or metadata.get("record_digest") != record_digest
+                        ):
+                            state = None
+                        else:
+                            old = stored["dispatch_state"]
+                            cancel_flag = stored["cancel_requested"]
+                            if (
+                                old not in {"ready", "submitting", "admitted", "withdrawn"}
+                                or type(cancel_flag) is not int
+                                or cancel_flag not in (0, 1)
+                            ):
+                                raise ConversationRepositoryCorruption("chat dispatch state is invalid")
+                            cancel = bool(cancel_flag)
+                            if action == "claim" and old in {"ready", "submitting"} and not cancel:
+                                old = "submitting"
+                            elif action == "admitted" and old in {"submitting", "admitted"}:
+                                old = "admitted"
+                            elif action == "cancel":
+                                if old == "ready":
+                                    old = "withdrawn"
+                                cancel = True
+                            elif action in {"claim", "admitted"}:
+                                old = None
+                            if old is not None:
+                                if action != "read":
+                                    self._connection.execute(
+                                        """
+                                        UPDATE conversation_chat_execution
+                                        SET dispatch_state = ?, cancel_requested = ?
+                                        WHERE namespace = ? AND thread_id = ? AND message_id = ?
+                                        """,
+                                        (old, int(cancel), self.namespace, thread_id, message_id),
+                                    )
+                                state = {"state": old, "cancel_requested": cancel}
+                if action != "read":
+                    self._connection.execute("COMMIT")
+                return state
+            except BaseException:
+                if action != "read":
+                    self._connection.execute("ROLLBACK")
+                raise
+
+    def chat_history_dependencies(
+        self,
+        thread_id: str,
+        message_ids: Iterable[str],
+        *,
+        tenant_id: str,
+        owner_id: str,
+    ) -> list[tuple[ConversationMessage, dict[str, object] | None, None]]:
+        """Read exact owner-bound causal USER messages and original commands.
+
+        The reference SQLite authority has no legacy command storage. The
+        caller must treat an unprepared USER as legacy evidence and must never
+        fabricate an absent original engine command.
+        """
+        ids = set(message_ids)
+        if len(ids) > 256:
+            raise ConversationConflict("selected chat history exceeds causal dependency bounds")
+        with self._lock:
+            row = self._thread_row(thread_id)
+            if row is None:
+                raise ConversationNotFound(thread_id)
+            thread = self._thread_from_row(row)
+            self._authorize(thread, tenant_id, owner_id)
+            result: list[tuple[ConversationMessage, dict[str, object] | None, None]] = []
+            encoded_bytes = 0
+            for message_id in sorted(ids):
+                if not isinstance(message_id, str):
+                    raise ConversationConflict("selected chat causal user identity is invalid")
+                message_row = self._message_row(message_id)
+                if (
+                    message_row is None
+                    or message_row["thread_id"] != thread_id
+                    or message_row["author_type"] != ConversationAuthorType.USER.value
+                    or message_row["sequence"] > thread.message_sequence
+                ):
+                    raise ConversationConflict("selected chat causal user lineage is incomplete")
+                message = self._message_from_row(message_row)
+                metadata = self.chat_execution(
+                    thread_id, message_id, tenant_id=tenant_id, owner_id=owner_id,
+                )
+                if metadata is not None:
+                    encoded_bytes += len(json.dumps(
+                        metadata, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    ).encode("utf-8"))
+                if encoded_bytes > 8 * 1024 * 1024:
+                    raise ConversationConflict("selected chat execution metadata exceeds its byte bound")
+                result.append((message, metadata, None))
+            return result
 
     def list_messages(
         self,

@@ -19,7 +19,7 @@ import time
 from typing import Any, Dict, List, Literal, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -52,10 +52,13 @@ from core.chat_turn_lifecycle import ChatTurnLifecycle
 from core.chat_turns import chat_turn_authority
 from core.conversations import ConversationStorageUnavailable, conversation_authority
 from core.engine_client import (
+    EngineAuthorizationError,
     EngineClient,
     EngineClientError,
+    EngineConflictError,
     EngineExecutionFailed,
     EngineNotFoundError,
+    EngineRequestRejectedError,
     EngineUnavailableError,
     command_from_context,
 )
@@ -369,6 +372,140 @@ class AIChatResumeRequest(BaseModel):
     response_mode: Literal["deferred", "wait"] = "deferred"
 
 
+class AIRuntimePolicyPatch(BaseModel):
+    """Finite operator patch; omitted fields preserve canonical engine policy."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def require_change(self):
+        if not self.model_fields_set or any(
+            getattr(self, name) is None for name in self.model_fields_set
+        ):
+            raise ValueError("runtime policy patches require a non-null policy change")
+        return self
+
+
+class AIRuntimeServingPatch(AIRuntimePolicyPatch):
+    enabled: bool | None = None
+    min_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
+    max_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
+    target_latency_ms: float | None = Field(default=None, ge=100, le=600000)
+    cooldown_seconds: float | None = Field(default=None, ge=0.5, le=300)
+    recovery_samples: int | None = Field(default=None, ge=2, le=128)
+    max_queue_wait_seconds: float | None = Field(default=None, ge=0.05, le=3600)
+    background_max_concurrency: int | None = Field(default=None, ge=0, le=32)
+    cache_max_bytes: int | None = Field(default=None, ge=0, le=1073741824)
+    cache_ttl_seconds: float | None = Field(default=None, ge=0, le=86400)
+    memory_high_watermark: float | None = Field(default=None, ge=0.5, le=0.99)
+    memory_low_watermark: float | None = Field(default=None, ge=0.1, le=0.95)
+    max_active_per_tenant: int | None = Field(default=None, ge=1, le=32)
+    max_queued_per_tenant: int | None = Field(default=None, ge=0, le=65536)
+    background_starvation_seconds: float | None = Field(default=None, ge=0.1, le=3600)
+    memory_shed_watermark: float | None = Field(default=None, ge=0.5, le=1)
+
+
+class AIRuntimeLearningPatch(AIRuntimePolicyPatch):
+    enabled: bool | None = None
+    min_samples: int | None = Field(default=None, ge=4, le=10000)
+    replay_capacity: int | None = Field(default=None, ge=8, le=256)
+    replay_steps: int | None = Field(default=None, ge=0, le=3)
+    learning_rate: float | None = Field(default=None, ge=1e-05, le=0.05)
+    gradient_clip: float | None = Field(default=None, ge=0.01, le=5)
+    max_effort_rounds: int | None = Field(default=None, ge=1, le=3)
+    target_latency_seconds: float | None = Field(default=None, ge=0.1, le=86400)
+    pressure_threshold: float | None = Field(default=None, ge=0.1, le=1)
+    uncertainty_ceiling: float | None = Field(default=None, ge=0.05, le=0.75)
+    partition_limit: int | None = Field(default=None, ge=1, le=128)
+    retained_outcomes: int | None = Field(default=None, ge=128, le=100000)
+    outcome_max_age_days: int | None = Field(default=None, ge=1, le=3650)
+    maintenance_receipt_retention: int | None = Field(default=None, ge=16, le=100000)
+
+
+class AIRuntimeMaintenancePatch(AIRuntimePolicyPatch):
+    enabled: bool | None = None
+    augmentation_enabled: bool | None = None
+    maximum_tasks_per_tick: int | None = Field(default=None, ge=1, le=8)
+    maximum_queue: int | None = Field(default=None, ge=1, le=8192)
+    maximum_scope_queue: int | None = Field(default=None, ge=1, le=8192)
+    maximum_retained_tasks: int | None = Field(default=None, ge=1, le=8192)
+    maximum_chunk_wall_ms: int | None = Field(default=None, ge=1, le=5000)
+    maximum_chunk_cpu_ms: int | None = Field(default=None, ge=1, le=5000)
+    maximum_chunk_polls: int | None = Field(default=None, ge=4, le=65536)
+    maximum_memory_drop_ppm: int | None = Field(default=None, ge=0, le=1000000)
+    maximum_consecutive_failures: int | None = Field(default=None, ge=1, le=32)
+    initial_backoff_ms: int | None = Field(default=None, ge=1, le=300000)
+    maximum_backoff_ms: int | None = Field(default=None, ge=1, le=86400000)
+    preemption_backoff_ms: int | None = Field(default=None, ge=1, le=300000)
+    circuit_failure_threshold: int | None = Field(default=None, ge=1, le=32)
+    circuit_cooldown_ms: int | None = Field(default=None, ge=1, le=86400000)
+    interrupted_lease_grace_ms: int | None = Field(default=None, ge=1000, le=300000)
+    priority_aging_ms: int | None = Field(default=None, ge=1000, le=86400000)
+    maximum_admission_wait_ms: int | None = Field(default=None, ge=1000, le=3600000)
+    clock_jump_tolerance_ms: int | None = Field(default=None, ge=100, le=60000)
+    maximum_owner_heartbeat_ms: int | None = Field(default=None, ge=10000, le=300000)
+    maximum_chunk_results: int | None = Field(default=None, ge=1, le=16384)
+    maximum_ack_retries_per_tick: int | None = Field(default=None, ge=1, le=16)
+
+
+class AIRuntimeControlUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    expected_version: int = Field(ge=1, le=2**63 - 1)
+    serving: AIRuntimeServingPatch | None = None
+    learning: AIRuntimeLearningPatch | None = None
+    maintenance: AIRuntimeMaintenancePatch | None = None
+    action: Literal["trim_cache", "clear_cache", "drain", "resume"] | None = None
+    serving_route_id: str | None = Field(default=None, min_length=1, max_length=384)
+
+    @model_validator(mode="after")
+    def require_change(self):
+        changes = self.model_fields_set - {"expected_version", "serving_route_id"}
+        if not changes or any(getattr(self, name) is None for name in changes):
+            raise ValueError("runtime control updates require a non-null policy change or action")
+        return self
+
+
+class AIRuntimeMaintenanceRetry(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    source_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    expected_attempts: int = Field(ge=0, le=1_000_000)
+
+
+class AIRuntimeMaintenanceCircuitReset(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    expected_generation: int = Field(ge=1, le=8_999_999_999_999_999)
+    expected_failure_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    source_digest: str = Field(pattern="^[0-9a-f]{64}$")
+
+
+class AIRuntimeLearningCheckpointUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    action: Literal["import", "reset", "restore_last_healthy"]
+    expected_policy_version: int = Field(ge=1, le=2**63 - 1)
+    expected_state_version: int = Field(ge=1, le=2**63 - 1)
+    model_selection_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    checkpoint: dict[str, Any] | None = None
+    checkpoint_json: str | None = Field(default=None, max_length=256 * 1024)
+
+    @model_validator(mode="after")
+    def validate_checkpoint(self):
+        count = int(self.checkpoint is not None) + int(self.checkpoint_json is not None)
+        if count != (1 if self.action == "import" else 0):
+            raise ValueError("import requires exactly one checkpoint representation; other actions accept neither")
+        if self.checkpoint_json is not None and len(self.checkpoint_json.encode("utf-8")) > 256 * 1024:
+            raise ValueError("checkpoint exceeds the 256 KiB limit")
+        if self.checkpoint is not None:
+            try:
+                encoded = json.dumps(self.checkpoint, allow_nan=False, ensure_ascii=False, separators=(",", ":")).encode()
+            except (TypeError, ValueError, RecursionError) as exc:
+                raise ValueError("checkpoint must be finite JSON") from exc
+            if len(encoded) > 256 * 1024:
+                raise ValueError("checkpoint exceeds the 256 KiB limit")
+        return self
+
+
 class AIChatCancelRequest(BaseModel):
     idempotency_key: str = Field(
         ...,
@@ -495,6 +632,31 @@ def _chat_request_digest_candidates(request: AIChatRequest) -> set[str]:
                 ).encode()
             ).hexdigest()
         )
+        # The original v1 request identity omitted optional execution selectors
+        # altogether. Only accept that exact historical form when no extra
+        # semantics are supplied; otherwise it could alias distinct requests.
+        if (
+            not request.attachment_refs
+            and request.provider_id is None
+            and request.model_id is None
+            and request.max_output_tokens is None
+            and request.temperature is None
+        ):
+            original_payload = {
+                "schema_version": "backend.ai.chat-request.v1",
+                "message": request.message,
+                "idempotency_key": request.idempotency_key,
+                "context_sha256": payload["context_sha256"],
+                "memory_policy": payload["memory_policy"],
+            }
+            candidates.add(
+                hashlib.sha256(
+                    json.dumps(
+                        original_payload, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest()
+            )
     return candidates
 
 
@@ -617,6 +779,7 @@ async def _replayed_cooperation(*, thread, user_message, assistant_message, tena
     try:
         if policy is None:
             _metadata, command = await read_prepared(
+                authority=conversation_authority,
                 thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
             )
             if command is None:
@@ -693,6 +856,7 @@ async def _terminal_chat_evidence(
             code = None
         if command is None:
             _metadata, command = await read_prepared(
+                authority=conversation_authority,
                 thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
             )
         cooperation = cooperation_progress_projection(status, command=command)
@@ -834,6 +998,65 @@ def _engine_chat_error(exc: EngineClientError) -> HTTPException:
     if isinstance(exc, EngineExecutionFailed):
         return HTTPException(status_code=502, detail="AI execution failed")
     return HTTPException(status_code=502, detail="AI engine request failed")
+
+
+def _runtime_control_engine() -> EngineClient:
+    try:
+        engine = EngineClient.from_env()
+    except EngineClientError as exc:
+        raise EngineUnavailableError("runtime control engine configuration is unavailable") from exc
+    if engine is None:
+        raise EngineUnavailableError("runtime control engine is not configured")
+    return engine
+
+
+def _runtime_control_error(exc: EngineClientError) -> HTTPException:
+    """Keep control failures actionable without exposing engine or provider data."""
+
+    if isinstance(exc, EngineConflictError):
+        return HTTPException(
+            status_code=409,
+            detail={
+                "code": "runtime_control_conflict",
+                "message": "Runtime policy changed before this update was applied.",
+                "action": "Refresh runtime controls and reapply the change using the current policy version.",
+            },
+        )
+    if isinstance(exc, EngineAuthorizationError):
+        return HTTPException(
+            status_code=403,
+            detail={
+                "code": "runtime_control_forbidden",
+                "message": "The engine denied runtime control for this identity and tenant.",
+                "action": "Ask an administrator to check the engine service grant for this tenant.",
+            },
+        )
+    if isinstance(exc, EngineRequestRejectedError):
+        return HTTPException(
+            status_code=422,
+            detail={
+                "code": "runtime_control_policy_rejected",
+                "message": "The engine rejected this change under its configured runtime policy.",
+                "action": "Refresh runtime controls and use values within the reported operator capacity.",
+            },
+        )
+    if isinstance(exc, (EngineUnavailableError, EngineNotFoundError)):
+        return HTTPException(
+            status_code=503,
+            detail={
+                "code": "runtime_control_unavailable",
+                "message": "The configured engine runtime control service is unavailable.",
+                "action": "Start or update the configured Skeleton engine, then refresh runtime controls.",
+            },
+        )
+    return HTTPException(
+        status_code=502,
+        detail={
+            "code": "runtime_control_protocol_error",
+            "message": "The engine returned an incompatible runtime control response.",
+            "action": "Update the application and engine together, then refresh runtime controls.",
+        },
+    )
 
 
 def _engine_configured() -> bool:
@@ -1432,6 +1655,7 @@ async def _prepare_new_chat_execution(
         ]
     dependencies = await inherit_history_dependencies(
         dependencies,
+        authority=conversation_authority,
         thread=thread,
         transcript=transcript,
         selected_segments=context.selected_segments,
@@ -1472,7 +1696,7 @@ async def _prepare_new_chat_execution(
     metadata = prepare_metadata(
         command, request_digest=_chat_request_digest(request), dependencies=dependencies
     )
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     return message, metadata
 
 
@@ -1749,6 +1973,7 @@ async def ai_chat(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread,
         user_message=user_message,
         tenant_id=tenant_id,
@@ -1757,8 +1982,19 @@ async def ai_chat(
     )
     if prepared_command is None:
         # Validate an existing legacy binding, but never synthesize a replacement
-        # for the old USER-before-command crash window.
-        await conversation_authority.user_engine_command(
+        # for the old USER-before-command crash window. Reference authorities
+        # without a legacy command store must fail closed, not crash with
+        # AttributeError or silently start a second engine execution.
+        legacy_command_reader = getattr(conversation_authority, "user_engine_command", None)
+        if not callable(legacy_command_reader):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "legacy_command_not_admitted",
+                    "message": "The exact original legacy command is unavailable; it cannot be reconstructed or replaced.",
+                },
+            )
+        await legacy_command_reader(
             thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
         )
         try:
@@ -1787,7 +2023,8 @@ async def ai_chat(
     if prepared_command is not None:
         require_writable_tip(thread, transcript, user_message)
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+            authority=conversation_authority,
         )
         if retrying_incomplete_turn:
             return await resume_ai_chat_turn(
@@ -1965,7 +2202,8 @@ async def ai_chat(
                 if prepared_command is not None:
                     command = prepared_command
                     await assert_current_dependencies(
-                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+                        authority=conversation_authority,
                     )
                     if command_expired(command):
                         raise HTTPException(
@@ -2360,7 +2598,8 @@ async def ai_chat(
     if prepared_metadata is not None:
         try:
             await assert_current_dependencies(
-                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+                authority=conversation_authority,
             )
         except BaseException:
             await _release_chat_turn_execution(turn_lease)
@@ -2625,6 +2864,7 @@ async def get_ai_chat_turn(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if prepared_command is not None and chat_turn is None:
@@ -2869,7 +3109,8 @@ async def get_ai_chat_turn(
                 },
             )
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+            authority=conversation_authority,
         )
     try:
         _validate_chat_handoff_binding(
@@ -3374,6 +3615,7 @@ async def cancel_ai_chat_turn(
         }
 
     metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if metadata is not None:
@@ -3557,6 +3799,186 @@ async def get_ai_models(user=Depends(require_role("viewer"))):
     return await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
 
 
+@router.get("/runtime-control")
+async def get_ai_runtime_control(
+    response: Response,
+    learning_offset: int = Query(default=0, ge=0, le=127),
+    user=Depends(require_role("viewer")),
+):
+    """Observe the canonical runtime in the authenticated caller's tenant scope."""
+
+    tenant_id, actor_id = _chat_identity(user)
+    try:
+        state = await _runtime_control_engine().runtime_control(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            learning_offset=learning_offset,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return state
+
+
+@router.patch("/runtime-control")
+async def configure_ai_runtime_control(
+    update: AIRuntimeControlUpdate,
+    response: Response,
+    user=Depends(require_role("admin")),
+):
+    """Apply one administrator-controlled CAS update through the engine owner."""
+
+    tenant_id, actor_id = _chat_identity(user)
+    changes = update.model_dump(mode="json", exclude_unset=True, exclude_none=True)
+    try:
+        state = await _runtime_control_engine().configure_runtime_control(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            **changes,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return state
+
+
+@router.post("/runtime-control/maintenance/tasks/{task_id}/retry")
+async def retry_ai_runtime_maintenance(
+    task_id: str, update: AIRuntimeMaintenanceRetry, response: Response,
+    user=Depends(require_role("admin")),
+):
+    """Queue an exact failed maintenance task without changing runtime grants."""
+    tenant_id, actor_id = _chat_identity(user)
+    if re.fullmatch(r"[0-9a-f]{64}", task_id) is None:
+        raise HTTPException(status_code=422, detail="Maintenance task identity is invalid", headers={"Cache-Control": "no-store"})
+    try:
+        result = await _runtime_control_engine().retry_runtime_maintenance(
+            actor_id=actor_id, tenant_id=tenant_id, task_id=task_id,
+            source_digest=update.source_digest, expected_attempts=update.expected_attempts,
+        )
+    except EngineClientError as exc:
+        error = _runtime_control_error(exc)
+        if isinstance(exc, EngineConflictError):
+            error.detail = {
+                "code": "runtime_control_conflict",
+                "message": "Maintenance task source, attempt count, or state changed before retry admission.",
+                "action": "Refresh runtime maintenance tasks and retry the exact retained failed task.",
+            }
+        error.headers = {**(error.headers or {}), "Cache-Control": "no-store"}
+        raise error from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.get("/runtime-control/learning/partitions/{partition_id}/checkpoint")
+async def export_ai_learning_checkpoint(
+    partition_id: str, response: Response,
+    expected_state_version: int | None = Query(default=None, ge=1, le=2**63 - 1),
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
+        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
+    try:
+        result = await _runtime_control_engine().export_runtime_learning_checkpoint(
+            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
+            expected_state_version=expected_state_version,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.get("/runtime-control/learning/dataset")
+async def export_ai_learning_dataset(
+    response: Response,
+    limit: int = Query(default=128, ge=1, le=256),
+    cursor: str | None = Query(default=None, min_length=1, max_length=6144),
+    partition_id: str | None = Query(default=None, pattern="^[0-9a-f]{64}$"),
+    include_untrained: bool = Query(default=False),
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    try:
+        result = await _runtime_control_engine().export_runtime_learning_dataset(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            limit=limit,
+            cursor=cursor,
+            partition_id=partition_id,
+            include_untrained=include_untrained,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.post("/runtime-control/maintenance/circuits/{kind}/reset")
+async def reset_ai_runtime_maintenance_circuit(
+    kind: str,
+    update: AIRuntimeMaintenanceCircuitReset,
+    response: Response,
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    try:
+        result = await _runtime_control_engine().reset_runtime_maintenance_circuit(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            kind=kind,
+            **update.model_dump(mode="json"),
+        )
+    except EngineClientError as exc:
+        error = _runtime_control_error(exc)
+        if isinstance(exc, (EngineConflictError, EngineRequestRejectedError)) and isinstance(
+            error.detail, dict
+        ):
+            error.detail = {
+                **error.detail,
+                "message": "The circuit's failure, generation or physical custody changed.",
+                "action": "Refresh maintenance circuits and review the current failure before resetting.",
+            }
+        raise error from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.post("/runtime-control/learning/partitions/{partition_id}/checkpoint")
+async def configure_ai_learning_checkpoint(
+    partition_id: str, update: AIRuntimeLearningCheckpointUpdate, response: Response,
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
+        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
+    try:
+        result = await _runtime_control_engine().configure_runtime_learning_checkpoint(
+            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
+            **update.model_dump(mode="json", exclude_unset=True),
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.get("/workflow-templates")
+async def workflow_templates(response: Response, user=Depends(require_role("viewer"))):
+    """Expose scoped draft settings without granting execution authority."""
+    from skeleton.contracts.ai_workflows import workflow_template_catalog
+
+    tenant_id, actor_id = _chat_identity(user)
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "schema_version": "skeleton.ai.workflow_templates.v1",
+        "actor_id": actor_id,
+        "tenant_id": tenant_id,
+        "catalog": workflow_template_catalog(),
+    }
+
+
 @router.get("/chat/readiness")
 async def chat_readiness(user=Depends(require_role("viewer"))):
     tenant_id, owner_id = _chat_identity(user)
@@ -3701,6 +4123,7 @@ async def resume_ai_chat_turn(
         raise HTTPException(status_code=404, detail="Chat turn not found")
     require_writable_tip(thread, transcript, message)
     metadata, command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=message, tenant_id=tenant_id, owner_id=owner_id
     )
     if command is None:
@@ -3725,7 +4148,7 @@ async def resume_ai_chat_turn(
             "server_resume_available": False,
             "cancellation_requested": True,
         }
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     if command_expired(command):
         raise HTTPException(
             status_code=409,
@@ -3773,7 +4196,7 @@ async def resume_ai_chat_turn(
             await conversation_authority.active_transcript(thread_id, tenant_id=tenant_id, owner_id=owner_id),
             message,
         )
-        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
         await chat_turn_lifecycle.advance(
             turn,
             TurnState.MODEL_RUNNING,
@@ -4033,7 +4456,7 @@ async def get_ai_providers() -> Dict[str, Any]:
                 row["artifact"] = allowed
         public_providers.append(row)
 
-    return {
+    result = {
         "providers": public_providers,
         "active": runtime["active"],
         "engine": "skeleton-engine",
@@ -4041,6 +4464,16 @@ async def get_ai_providers() -> Dict[str, Any]:
         "configured": True,
         "availability_observed": True,
     }
+    # A small allowlist lets the host doctor distinguish a broken guard from
+    # missing weights without exposing arbitrary engine error text or paths.
+    active = [row for row in runtime["providers"] if row.get("active") is True]
+    if (runtime["available"] is False and runtime["active"] == "local" and len(active) == 1
+            and active[0].get("id") == "local" and active[0].get("available") is False
+            and active[0].get("architecture_acknowledged") is True):
+        code = active[0].get("readiness_code")
+        if isinstance(code, str) and code in {"local_guard_unavailable", "local_guard_configuration_invalid"}:
+            result["active_readiness_code"] = code
+    return result
 
 
 @router.post("/quick-actions")

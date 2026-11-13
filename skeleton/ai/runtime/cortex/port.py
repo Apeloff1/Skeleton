@@ -94,6 +94,28 @@ class ModelPort(Protocol):
     def perplexity(self, texts: Iterable[str]) -> float: ...
 
 
+def negotiate_port_protocol(port: Any) -> Dict[str, Any]:
+    """Inspect a ModelPort and return its negotiated protocol capabilities."""
+    methods = ("think", "fit", "decode", "snapshot", "perplexity")
+    supported = [m for m in methods if callable(getattr(port, m, None))]
+    has_transformer = getattr(port, "transformer", None) is not None
+    has_neural = getattr(port, "neural", None) is not None
+    has_ngram = getattr(port, "lm", None) is not None
+    return {
+        "name": str(getattr(port, "name", type(port).__name__)),
+        "slot": str(getattr(port, "slot", "unknown")),
+        "scale": str(getattr(port, "scale", "unknown")),
+        "methods": supported,
+        "compliant": len(supported) == len(methods),
+        "substrates": {
+            "ngram": has_ngram,
+            "neural": has_neural,
+            "transformer": has_transformer,
+        },
+        "self_learn_capable": bool(has_transformer or has_neural or has_ngram),
+    }
+
+
 class EchoBackend:
     """Identity backend — proves a slot is interchangeable."""
 

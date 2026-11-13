@@ -14,12 +14,18 @@ on:
       - "scripts/quality-gates.sh"
       - "scripts/check_repository_python_sast.py"
       - "scripts/check_quality_gate_parity.py"
+      - "scripts/check_ci_workflow_tiers.py"
+      - "machine/ci_workflow_tiers.json"
+      - "tests/test_ci_workflow_tiers.py"
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".emergent/cron/**"
       - ".github/ci/security-exceptions.json"
+      - ".github/workflows/dragon-*.yml"
+      - "scripts/check_dragon_workflow_scope.py"
+      - "tests/test_dragon_workflow_scope.py"
       - "backend/**"
       - "skeleton/**"
       - "frontend/**"
@@ -31,6 +37,9 @@ on:
       - "scripts/check_context_execution_boundary.py"
       - "scripts/check_instruction_policy_boundary.py"
       - "scripts/check_quality_gate_parity.py"
+      - "scripts/check_ci_workflow_tiers.py"
+      - "machine/ci_workflow_tiers.json"
+      - "tests/test_ci_workflow_tiers.py"
       - "scripts/check_repository_python_sast.py"
       - "scripts/container_digest_refresh.py"
       - "scripts/quality-gates.sh"
@@ -47,15 +56,82 @@ on:
 permissions:
   contents: read
 
+# A PR's newer head supersedes only that PR; main SHA evidence is immutable.
 concurrency:
-  group: backend-quality-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: backend-quality-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Keep the strictly bounded 20 automatic-workflow budget. The three Dragon
+  # suites are still mandatory on relevant changes, but are now read-only
+  # reusable jobs inside this existing protected Backend Quality admission.
+  dragon_scope:
+    if: github.event_name == 'pull_request'
+    name: Exact-head Dragon source scope (fail closed)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      backend: ${{ steps.scope.outputs.backend }}
+      source: ${{ steps.scope.outputs.source }}
+      frontend: ${{ steps.scope.outputs.frontend }}
+    steps:
+      - name: Checkout actual PR head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+      - name: Pin supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Fetch immutable base and verify exact head
+        env:
+          DRAGON_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DRAGON_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$DRAGON_HEAD_SHA"
+          git fetch --no-tags --depth=1 origin "$DRAGON_BASE_SHA"
+      - name: Select exhaustive fail-closed Dragon jobs
+        id: scope
+        env:
+          DRAGON_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DRAGON_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/check_dragon_workflow_scope.py
+
+  dragon_backend:
+    needs: dragon_scope
+    if: ${{ needs.dragon_scope.outputs.backend == 'true' }}
+    name: Dragon Atlas backend adapter qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dragon-atlas-backend-bridge.yml
+
+  dragon_source:
+    needs: dragon_scope
+    if: ${{ needs.dragon_scope.outputs.source == 'true' }}
+    name: Dragon campaign source qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dragon-campaign-source-tests.yml
+
+  dragon_frontend:
+    needs: dragon_scope
+    if: ${{ needs.dragon_scope.outputs.frontend == 'true' }}
+    name: Dragon Atlas frontend qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dragon-campaign-frontend-checks.yml
+
   ruff:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Full fail-closed repository scans exceeded the prior 45-minute deadline
+    # on exact-head run 41362780272 (cancelled during malware IOC scanning).
+    # Preserve every existing security step and required ruff job name.
+    timeout-minutes: 90
     defaults:
       run:
         working-directory: backend
@@ -95,19 +171,19 @@ jobs:
             echo "full=false" >> "$GITHUB_OUTPUT"
             echo "plan_only=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.11.16"
       - name: Install full quality dependencies
         if: steps.scope.outputs.full == 'true'
         run: >-
           python -m pip install --disable-pip-version-check
-          "pytest>=8,<9" "fastapi==0.136.1"
-          "pydantic-settings>=2.1,<3" "httpx==0.28.1" "pymongo>=4,<5" "motor>=3,<4"
+          "pytest>=8,<9" "fastapi==0.161.1"
+          "pydantic-settings>=2.15.0,<3" "httpx==0.28.1" "pymongo>=4,<5" "motor>=3,<4"
           "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2"
       - name: Install plan-only quality runtime
         if: steps.scope.outputs.plan_only == 'true'
-        run: python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic>=2,<3"
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic>=2.14.1,<3"
       - name: Validate plan-only masterplan contract
         if: steps.scope.outputs.plan_only == 'true'
         working-directory: ${{ github.workspace }}
@@ -121,6 +197,14 @@ jobs:
       # .github/workflows/ci.yml. Repeating them here queued a second runner
       # on every backend pull request.
       # Deep suite remains available on explicit specialized dispatch.
+      - name: GGUF descriptor-bound source and parent-replacement regression
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m py_compile skeleton/native/gguf_preflight.py tests/test_native_gguf_preflight.py
+          python -m unittest discover -s tests -p 'test_native_gguf_preflight.py' -v
       - name: Jeeves game development, fidelity and continuous production contracts
         if: steps.scope.outputs.full == 'true' && github.event_name == 'workflow_dispatch'
         working-directory: .
@@ -144,6 +228,162 @@ jobs:
           skeleton/testing/test_jeeves_game_authoring.py
           skeleton/testing/test_jeeves_game_cli.py
           skeleton/testing/test_game_creator_cli.py
+      - name: Jeeves working memory, adversarial verifier and code quality release
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: |
+          python -m py_compile \
+            skeleton/jeeves/agent/working_context_cycle.py \
+            skeleton/jeeves/agent/adversarial_verifier_review.py \
+            skeleton/jeeves/agent/code_scrutiny_loop.py \
+            skeleton/jeeves/agent/code_delivery_quality.py \
+            skeleton/jeeves/agent/final_delivery_reviews.py \
+            skeleton/jeeves/agent/delivery_evidence_journal.py \
+            skeleton/jeeves/agent/delivery_assurance_milestones.py \
+            skeleton/jeeves/agent/delivery_milestone_workbench.py \
+            skeleton/jeeves/agent/delivery_milestone_queue.py \
+            skeleton/jeeves/agent/delivery_milestone_store.py \
+            skeleton/jeeves/agent/delivery_milestone_driver.py \
+            skeleton/jeeves/agent/runtime.py \
+            skeleton/jeeves/agent/adaptive_runtime.py
+          python -m pytest -q --noconftest \
+            tests/test_jeeves_working_context_cycle.py \
+            tests/test_jeeves_adversarial_verifier_review.py \
+            tests/test_jeeves_code_delivery_quality.py \
+            tests/test_jeeves_final_delivery_reviews.py \
+            tests/test_jeeves_delivery_evidence_journal.py \
+            tests/test_jeeves_delivery_assurance_milestones.py \
+            tests/test_jeeves_delivery_milestone_workbench.py \
+            tests/test_jeeves_delivery_milestone_queue.py \
+            tests/test_jeeves_delivery_milestone_store.py \
+            tests/test_jeeves_delivery_milestone_driver.py \
+            tests/test_jeeves_durable_milestone_runtime.py \
+            tests/test_ai_100_real_milestone_execution.py \
+            tests/test_jeeves_agent_mirror.py \
+            skeleton/testing/test_operation_runtime.py
+          python scripts/check_jeeves_agent_mirror.py
+
+      - name: Jeeves source-bound asset compilers and exact Godot candidate checks
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: |
+          python -m compileall -q \
+            skeleton/jeeves/ai/studio_world_chunks.py \
+            skeleton/jeeves/ai/studio_world_spatial_index.py \
+            skeleton/jeeves/ai/studio_world_streamer_godot.py
+          python -m pytest -q --noconftest \
+            skeleton/testing/test_jeeves_studio_asset_compilers_2026.py \
+            skeleton/testing/test_jeeves_studio_mesh_lod_2026.py \
+            skeleton/testing/test_jeeves_studio_mesh_physics_2026.py \
+            skeleton/testing/test_jeeves_studio_mesh_placements_2026.py \
+            skeleton/testing/test_jeeves_studio_native_mesh_probe_2026.py \
+            skeleton/testing/test_jeeves_studio_world_spatial_index_2026.py \
+            skeleton/testing/test_jeeves_studio_world_chunks_2026.py \
+            skeleton/testing/test_jeeves_studio_world_streamer_2026.py \
+            skeleton/testing/test_jeeves_studio_world_streaming_activation_2026.py \
+            skeleton/testing/test_jeeves_studio_world_streaming_native_probe_2026.py
+      - name: Frontier expedition playable multi-route world and Forge Studio
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: |
+          python -m py_compile \
+            skeleton/jeeves/game_frontier_expedition.py \
+            skeleton/jeeves/game_frontier_expedition_generation.py \
+            skeleton/jeeves/game_frontier_expedition_godot.py \
+            skeleton/jeeves/game_frontier_expedition_native_verify.py \
+            skeleton/jeeves/game_frontier_expedition_native_runner.py \
+            skeleton/jeeves/game_frontier_expedition_qa.py \
+            skeleton/jeeves/game_frontier_expedition_save_store.py \
+            skeleton/jeeves/game_frontier_expedition_controllers.py \
+            skeleton/jeeves/game_frontier_expedition_narrative.py \
+            skeleton/jeeves/game_frontier_expedition_assets.py \
+            skeleton/jeeves/game_frontier_expedition_dragon.py \
+            skeleton/jeeves/game_frontier_expedition_endurance.py \
+            skeleton/jeeves/game_frontier_expedition_campaign.py \
+            skeleton/jeeves/game_frontier_expedition_input.py \
+            skeleton/jeeves/game_frontier_expedition_quests.py \
+            skeleton/jeeves/game_frontier_expedition_audio.py \
+            skeleton/jeeves/game_frontier_expedition_cinematics.py \
+            skeleton/jeeves/game_frontier_expedition_render.py \
+            skeleton/jeeves/game_frontier_expedition_dragon_review.py \
+            skeleton/jeeves/game_frontier_expedition_crash.py \
+            skeleton/jeeves/game_frontier_expedition_session.py \
+            skeleton/jeeves/game_frontier_expedition_plot_audit.py \
+            skeleton/jeeves/game_frontier_expedition_native_cinema_verify.py \
+            skeleton/jeeves/game_frontier_expedition_audio_mix.py \
+            skeleton/jeeves/game_frontier_expedition_npcs.py \
+            skeleton/jeeves/game_frontier_expedition_ecology.py \
+            skeleton/jeeves/game_frontier_expedition_learning.py \
+            skeleton/jeeves/game_frontier_expedition_production_store.py \
+            skeleton/jeeves/game_frontier_expedition_animation.py \
+            skeleton/jeeves/game_frontier_expedition_society.py \
+            skeleton/jeeves/game_frontier_expedition_performance.py \
+            skeleton/jeeves/game_frontier_expedition_visual_lab.py \
+            skeleton/jeeves/game_frontier_expedition_controller_latency.py \
+            skeleton/jeeves/game_frontier_expedition_watchdog.py \
+            skeleton/jeeves/game_frontier_expedition_seven_review.py \
+            skeleton/jeeves/game_frontier_ik.py \
+            skeleton/jeeves/game_frontier_ragdoll.py \
+            skeleton/jeeves/game_frontier_supply.py \
+            skeleton/jeeves/game_frontier_blocking.py \
+            skeleton/jeeves/game_frontier_visual_capture.py \
+            skeleton/jeeves/game_frontier_postproduction.py \
+            skeleton/jeeves/game_frontier_controller_parity.py \
+            skeleton/jeeves/game_frontier_soak.py \
+            skeleton/jeeves/game_frontier_campaign_seven_audits.py \
+            skeleton/jeeves/game_frontier_expedition_navigation_advanced.py \
+            skeleton/jeeves/game_frontier_expedition_production_tools.py \
+            skeleton/jeeves/game_frontier_expedition_release.py \
+            skeleton/jeeves/game_frontier_expedition_studio_tools.py \
+            skeleton/jeeves/game_studio_tools.py \
+            scripts/build_original_expedition.py \
+            scripts/build_original_campaign.py \
+            skeleton/forge/game_frontier_studio.py
+          python -m pytest -q --noconftest \
+            tests/test_game_frontier_expedition.py \
+            tests/test_game_frontier_expedition_studio.py \
+            tests/test_game_frontier_expedition_godot.py \
+            tests/test_game_frontier_expedition_native_verify.py \
+            tests/test_game_frontier_expedition_native_runner.py \
+            tests/test_original_expedition_cli.py \
+            tests/test_game_frontier_expedition_qa.py \
+            tests/test_game_frontier_expedition_save_store.py \
+            tests/test_game_frontier_expedition_release.py \
+            tests/test_game_frontier_expedition_studio_tools.py \
+            tests/test_game_frontier_expedition_controllers.py \
+            tests/test_game_frontier_expedition_narrative.py \
+            tests/test_game_frontier_expedition_assets.py \
+            tests/test_game_frontier_expedition_dragon.py \
+            tests/test_game_frontier_expedition_endurance.py \
+            tests/test_game_frontier_expedition_campaign.py \
+            tests/test_original_campaign_cli.py \
+            tests/test_game_frontier_expedition_input.py \
+            tests/test_game_frontier_expedition_quests.py \
+            tests/test_game_frontier_expedition_audio.py \
+            tests/test_game_frontier_expedition_cinematics.py \
+            tests/test_game_frontier_expedition_render.py \
+            tests/test_game_frontier_expedition_dragon_review.py \
+            tests/test_game_frontier_expedition_crash.py \
+            tests/test_game_frontier_production_seven.py \
+            tests/test_game_frontier_expedition_production_store.py \
+            tests/test_game_frontier_expedition_production_tools.py \
+            tests/test_game_frontier_advanced_seven.py \
+            tests/test_game_frontier_next_seven.py \
+            tests/test_game_frontier_campaign_seven_audits.py \
+            tests/test_game_frontier_navigation_advanced.py \
+            tests/test_game_frontier_world_assurance.py \
+            tests/test_game_frontier_postproduction.py \
+            tests/test_game_frontier_campaign_delivery.py \
+            tests/test_original_campaign_cli.py
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
@@ -241,7 +481,12 @@ jobs:
       - name: Verify specialized CI tier contract
         if: steps.scope.outputs.full == 'true'
         working-directory: .
-        run: python scripts/check_ci_workflow_tiers.py
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: |
+          python scripts/check_ci_workflow_tiers.py
+          python -m pytest -q --noconftest tests/test_ci_workflow_tiers.py
       - name: GitHub Actions trigger-fanout audit
         if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_trigger_fanout.py
@@ -329,3 +574,251 @@ jobs:
           tests/test_arm64_workflow_trigger_scope.py
           tests/test_ci_java_accelerator_dependencies.py
           tests/test_backend_quality_plan_fast_path.py
+
+  e2e_source_admission:
+    # The source-only guard runs on draft PRs; live E2E remains a separate hold.
+    # Reuse Backend Quality instead of adding an independent Actions subscriber.
+    name: Exact-head E2E source admission (no live readiness claim)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      PYTHONPATH: "."
+    steps:
+      - name: Checkout exact source without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact immutable SHA before checks
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up Python for source admission
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Set up Node for negative live E2E fixtures
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Install bounded test imports
+        run: python -m pip install --disable-pip-version-check --no-input "PyYAML>=6,<7" "pytest>=8,<9"
+      - name: Check E2E source and adversarial admission
+        run: |
+          set -euo pipefail
+          python scripts/check_app_foundation_e2e_admission.py
+          python -m pytest -q --noconftest tests/test_app_foundation_e2e_admission.py tests/test_app_foundation_e2e_build_isolation.py
+      - name: Verify bounded Expo supervisor and Node negative subprocesses
+        run: |
+          set -euo pipefail
+          node --test frontend/scripts/test-guarded-expo-export.cjs
+          node --test frontend/scripts/test-app-foundation-e2e-admission.cjs
+
+  backend_source_convergence:
+    # Draft-safe, host-portable backend regression evidence only; not a full
+    # Backend Quality, release, device or live network qualification.
+    name: Exact-head backend security and source convergence (review only)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ".:backend"
+      PYTHONNOUSERSITE: "1"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Checkout immutable backend source without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Prove exact test source revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up supported Python runtime
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install reviewed isolated backend test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          -e .
+          "pytest>=8,<9" "pytest-asyncio>=1.4.0,<2"
+          "PyJWT==2.15.1" "zstandard==0.25.0"
+          "PyYAML>=6,<7" "numpy>=2,<3" "Pillow>=13.0.0,<14"
+      - name: Verify explicit live-service boundary (not a live service test)
+        run: |
+          set -euo pipefail
+          python scripts/check_backend_source_convergence.py
+          python backend/scripts/check_live_service_test_boundaries.py
+          python -m pytest -q --maxfail=6 --noconftest \
+            tests/test_backend_source_convergence_ci.py \
+            tests/test_repo_machine_live_taxonomy.py
+      - name: Exercise true backend source, replay and security regressions
+        run: |
+          set -euo pipefail
+          python -m pytest -q -p pytest_asyncio.plugin --maxfail=12 --noconftest --import-mode=importlib \
+            backend/tests/test_live_service_test_boundaries.py \
+            backend/tests/test_queue_drain_workflow.py \
+            backend/tests/test_workflow_concurrency_gate.py \
+            backend/tests/test_free_api_dns_pin.py \
+            backend/tests/test_galaxy_file_budget.py \
+            backend/tests/test_storage_lazy_registry.py \
+            backend/tests/test_discourse_judge_admission.py \
+            backend/tests/test_code_intelligence_engine_boundary.py \
+            backend/tests/test_engine_text_route_cutovers.py
+
+  discourse_surface_contracts:
+    # Source proof only: no remote provider, no fabricated independent consensus.
+    name: Exact-head Discourse jobs and product surface contracts (review only)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      PYTHONNOUSERSITE: "1"
+    steps:
+      - name: Checkout exact product candidate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Prove exact product source identity
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Set up Node for bounded source-only TypeScript test
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Install isolated source test dependencies
+        run: python -m pip install --disable-pip-version-check --no-input "pytest>=8,<9"
+      - name: Enforce full Expo route and delegated API contract
+        run: |
+          set -euo pipefail
+          python scripts/check_product_surface_specification.py
+          python -m pytest -q --maxfail=8 --noconftest \
+            tests/test_product_surface_specification.py \
+            tests/test_product_surface_delegated_backend_20261110.py
+      - name: Exercise authenticated Discourse job source with negative fixtures
+        run: node --test frontend/scripts/test-discourse-async-jobs.mjs
+
+  godot_source_custody:
+    # Source-only; no Godot engine launch, Windows installer or signed release.
+    name: Exact-head Godot/Forge export provenance and ancestor custody (review only)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      PYTHONNOUSERSITE: "1"
+    steps:
+      - name: Checkout exact Godot provenance candidate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Prove immutable Godot tested revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install reviewed offline source test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-cache-dir
+          pytest==8.4.2 cryptography==50.0.2
+      - name: Compile verified Godot and Forge custody modules
+        run: >-
+          python -m compileall -q skeleton/godot_export/provenance.py
+          skeleton/godot_export/cli.py skeleton/forge/export.py
+          skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py
+          skeleton/testing/test_forge_native_output_custody_20261110.py
+      - name: Exercise hostile provenance, symlink, ancestor and export fixtures
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            skeleton/testing/test_godot_provenance_ancestor_custody_20261110.py \
+            skeleton/testing/test_forge_native_output_custody_20261110.py \
+            skeleton/testing/test_godot_export_provenance.py \
+            skeleton/testing/test_godot_export_provenance_negative.py \
+            skeleton/testing/test_forge_export_quarantine.py
+
+  mainline_failure_replay:
+    # These are exact failing tests from main Merge Readiness run 42929562768.
+    # This job runs on held draft PRs; it is additional source evidence only,
+    # never a substitute for full non-skipped Merge Readiness or release gates.
+    name: Mainline CI failure replay (review only)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact PR head without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Prove exact tested revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up supported canonical Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install canonical domain test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input -e .
+          "PyYAML>=6,<7" "pytest>=8,<9" "pytest-asyncio>=0.24,<2"
+          "httpx>=0.28.1,<1" "motor==3.7.1" "pymongo==4.19.0"
+          "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3"
+          "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2"
+          "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027" "zstandard==0.25.0" "PyJWT==2.15.1"
+      - name: Replay seven reproduced mainline domain blockers
+        env:
+          PYTHONPATH: ".:backend"
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_app_offline_archive_schema_parity.py::test_resealed_source_archive_cannot_bypass_studio_custody
+          skeleton/testing/test_harbor_crafting_journal_transfer.py::test_unrelated_world_is_rejected_before_play
+          skeleton/testing/test_ecs_ai.py::test_utility_curves_and_choice
+          skeleton/testing/test_ai_native_endurance.py::EnduranceTests::test_empty_output_refused
+          skeleton/testing/test_harbor_crafting_patrol_guidance.py::test_cli_hints_are_user_reachable
+          skeleton/testing/test_jeeves_native_batch.py::TestNativeBatchWithRealSqlite::test_cli_real_path_commits_synthetic_source_only_batch
+          skeleton/testing/test_delivery_packaging.py::test_package_builders_bound_malicious_mapping_iteration
+      - name: Replay mainline backend inventory and Galaxy regressions
+        env:
+          PYTHONPATH: ".:backend"
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          backend/tests/test_galaxy_file_budget.py::test_unavailable_generation_fails_closed_without_stub_or_fallback_files
+          backend/tests/test_storage_lazy_registry.py::test_literal_loader_inventory_matches_declared_repository_modules
+          backend/tests/test_storage_lazy_registry.py::test_wrapping_storage_modules_does_not_execute_them

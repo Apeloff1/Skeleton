@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Apeloff1/Skeleton/blob/main/docs/schemas/jeeves-original-mesh-instance-2026.schema.json",
+  "title": "Jeeves original GLB or physics body game-scene instance",
+  "description": "Stored under a reviewed scene_forge record; Python compiler enforces exact source dependencies, project ownership, non-fabricated imported GLBs, and real scene instancing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "instance_id",
+    "base_record_id",
+    "asset_id",
+    "physics_record_id",
+    "position_mm",
+    "rotation_deg",
+    "scale_per_mille"
+  ],
+  "properties": {
+    "kind": {
+      "const": "original_mesh_instance"
+    },
+    "instance_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "base_record_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "asset_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "physics_record_id": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        }
+      ]
+    },
+    "position_mm": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer",
+        "minimum": -10000000,
+        "maximum": 10000000
+      }
+    },
+    "rotation_deg": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer",
+        "minimum": -360,
+        "maximum": 360
+      }
+    },
+    "scale_per_mille": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 10000
+    }
+  }
+}

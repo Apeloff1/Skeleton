@@ -182,8 +182,14 @@ compound-action behavior.
 
 Each advance uses the returned goal version and a new idempotency key. An exact
 retry of an uncertain request uses its original request and key. One request
-joins at most one model poll; an unfinished poll retains its canonical engine
-operation/execution identity. Inspection does not start model work.
+can process one to four serial planner decisions using
+`max_planner_decisions` (default one). `wait_for_work_seconds` permits up to ten
+seconds of bounded child waiting (default zero). The entire request shares a
+20-second dispatch slice and the original goal deadline and resource grants.
+Every decision refreshes context from actual committed receipts. Unfinished
+work retains its canonical engine operation/execution identity; increasing the
+slice does not renew authorization or replenish any budget. An uncertain retry
+must preserve both options and the original key. Inspection starts no model work.
 
 The optional browser continuation control sends serial version-fenced advances
 only while the route is visible and the current finite goal permits them. It
@@ -202,11 +208,28 @@ Use these authenticated owner routes when operating through the API:
 | Pause, resume or cancel | `POST /api/game-studio-agent/goals/{goal_id}/control` |
 | Explicitly recover an issued planner/action/child | `POST /api/game-studio-agent/goals/{goal_id}/retry` |
 | Explicitly renew time, without replenishing spent budgets | `POST /api/game-studio-agent/goals/{goal_id}/authorization` |
+| Explicitly adopt the observed current editor revision | `POST /api/game-studio-agent/goals/{goal_id}/source-refresh` |
 
 Live execution remains under the existing goal lease and canonical EngineChat.
 Cancellation takes effect at the current issued-operation boundary. Prepared
 editor recovery reuses the exact original editor operation and source rights;
 another editor's pending write is not bypassed.
+
+After an external or manual source edit, inspect the current project version and
+tree digest before selecting **Refresh source**. That operation requires explicit
+acknowledgement, the observed goal version and a new idempotency key. It can adopt
+the current revision only after pending planner/action work is resolved; already
+issued children must be terminal before they can be joined. The original
+baseline, history, consents and spent grants remain intact. Advice and sharing
+that are incompatible with the new source structure are withheld. Old uncertain
+advance keys retain their original meaning and cannot restart planning against
+the refreshed source.
+
+The planner receives bounded round feedback from matched baseline/candidate
+reviews and exact edit receipts, including rejected candidates and restorations.
+The panel exposes those actual facts. Failed numeric proposals are filtered from
+compatible suggestions so the next decision can use the observed rejection;
+neither the feedback nor repeated attempts invent an improvement score.
 
 Completed numerical reviews also supply bounded same-project observations to
 later original-goal context. Each retains its source, review, input and finding

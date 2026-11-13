@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from skeleton.ai.training.jeeves_game_corpus import (
-    FAMILIES, RIGHTS_SCHEMA, SCHEMA, load_approved_corpus,
+    FAMILIES, RIGHTS_SCHEMA, SCHEMA, _read_bounded_regular_file, load_approved_corpus,
 )
 from skeleton.ai.training.jeeves_production_game_train import ProductionCheckpointError
 
@@ -105,6 +107,26 @@ class JeevesGameCorpusTests(unittest.TestCase):
             "Repair a forest bridge", "Negotiate peace with strangers near the harbor."
         ))
 
+    def test_loader_rejects_short_embedded_prompts_in_either_split(self) -> None:
+        for short_is_heldout in (True, False):
+            with self.subTest(short_is_heldout=short_is_heldout), tempfile.TemporaryDirectory() as d:
+                train, heldout, regenerate = self._fixtures(Path(d))
+                short = "Unlock hidden gate"
+                long = "When exploring the ruins, unlock hidden gate before sunset."
+                train[0]["prompt"], heldout[0]["prompt"] = (long, short) if short_is_heldout else (short, long)
+                with self.assertRaisesRegex(ProductionCheckpointError, "prompt leaked"):
+                    load_approved_corpus(regenerate())
+
+    def test_loader_rejects_short_embedded_answers_in_either_split(self) -> None:
+        for short_is_heldout in (True, False):
+            with self.subTest(short_is_heldout=short_is_heldout), tempfile.TemporaryDirectory() as d:
+                train, heldout, regenerate = self._fixtures(Path(d))
+                short = "Restore broken lantern"
+                long = "At dusk restore broken lantern before the storm reaches the village."
+                train[0]["answer"], heldout[0]["answer"] = (long, short) if short_is_heldout else (short, long)
+                with self.assertRaisesRegex(ProductionCheckpointError, "answer near-duplicates"):
+                    load_approved_corpus(regenerate())
+
     def test_file_modification_invalidates_admission_sha(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -114,6 +136,15 @@ class JeevesGameCorpusTests(unittest.TestCase):
                 output.write(b"{}\n")
             with self.assertRaisesRegex(ProductionCheckpointError, "SHA-256"):
                 load_approved_corpus(path)
+
+    def test_manifest_receipt_binds_the_bytes_loaded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            _, _, regenerate = self._fixtures(Path(temp))
+            manifest = regenerate()
+            expected = hashlib.sha256(manifest.read_bytes()).hexdigest()
+            _, _, receipt = load_approved_corpus(manifest)
+            self.assertEqual(receipt["manifest_sha256"], expected)
+            self.assertEqual(receipt["manifest_path"], str(manifest.absolute()))
 
     def test_rights_denial_never_enters_training(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -201,6 +232,83 @@ class JeevesGameCorpusTests(unittest.TestCase):
             path.write_text(json.dumps(data))
             with self.assertRaisesRegex(ProductionCheckpointError, "basename"):
                 load_approved_corpus(path)
+
+
+class BoundedCorpusSnapshotTests(unittest.TestCase):
+    def _read(self, path: Path) -> bytes:
+        return _read_bounded_regular_file(path, minimum=16, maximum=64, label="test corpus")
+
+    def test_replacement_between_admission_and_open_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "dataset.jsonl"
+            path.write_bytes(b"original reviewed data")
+            replacement = path.with_suffix(".replacement")
+            replacement.write_bytes(b"unreviewed replacement")
+            original_open = os.open
+            opened = []
+
+            def replace_then_open(name, flags):
+                replacement.replace(path)
+                descriptor = original_open(name, flags)
+                opened.append(descriptor)
+                return descriptor
+
+            with patch("skeleton.ai.training.jeeves_game_corpus.os.open", side_effect=replace_then_open):
+                with self.assertRaisesRegex(ProductionCheckpointError, "changed while being opened"):
+                    self._read(path)
+            self.assertEqual(len(opened), 1)
+            with self.assertRaises(OSError):
+                os.fstat(opened[0])
+
+    def test_growth_during_read_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "dataset.jsonl"
+            path.write_bytes(b"original reviewed data")
+            original_fstat = os.fstat
+            calls = 0
+
+            def mutate_before_final_stat(descriptor):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    with path.open("ab") as output:
+                        output.write(b" changed after read")
+                return original_fstat(descriptor)
+
+            with patch("skeleton.ai.training.jeeves_game_corpus.os.fstat", side_effect=mutate_before_final_stat):
+                with self.assertRaisesRegex(ProductionCheckpointError, "changed while being read"):
+                    self._read(path)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo") and getattr(os, "O_NONBLOCK", 0), "POSIX FIFO required")
+    def test_fifo_swap_is_rejected_without_waiting_for_a_writer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "dataset.jsonl"
+            path.write_bytes(b"original reviewed data")
+            original_open = os.open
+
+            def replace_with_fifo(name, flags):
+                self.assertTrue(flags & os.O_NONBLOCK, "opening a swapped FIFO must not block")
+                path.unlink()
+                os.mkfifo(path)
+                return original_open(name, flags)
+
+            with patch("skeleton.ai.training.jeeves_game_corpus.os.open", side_effect=replace_with_fifo):
+                with self.assertRaisesRegex(ProductionCheckpointError, "bounded regular file"):
+                    self._read(path)
+
+    def test_symlink_and_oversized_files_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "dataset.jsonl"
+            path.write_bytes(b"x" * 65)
+            with self.assertRaisesRegex(ProductionCheckpointError, "bounded regular file"):
+                self._read(path)
+            link = path.with_suffix(".link")
+            try:
+                link.symlink_to(path)
+            except OSError:
+                self.skipTest("symlink creation unavailable")
+            with self.assertRaisesRegex(ProductionCheckpointError, "bounded regular file"):
+                self._read(link)
 
 
 if __name__ == "__main__":

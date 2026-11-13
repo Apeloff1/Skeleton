@@ -212,6 +212,221 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
     if operation not in {"job.cancel", "play.stop", "campaign.pause", "campaign.cancel"}:
         binding = await workspace._input(scope, project, require_execution=False)
         await workspace._authority(scope, binding)
+    if operation.startswith("game.studio.curriculum.") or operation == "game.studio.book.manifest":
+        # Existing game-learning project and source authority were checked
+        # above; this is a real Jeeves tool surface, not an independent
+        # model runtime, queue, provider or persistence owner.
+        from skeleton.jeeves import game_frontier_book_curriculum as books
+        from skeleton.forge.game_frontier_studio import StudioError
+        from core import game_frontier_authoring as forge_author
+
+        if operation in {"game.studio.curriculum.path", "game.studio.curriculum.worklist"}:
+            from skeleton.jeeves.game_frontier_curriculum_path import (
+                learning_path, batch_program,
+            )
+            _only(payload, ("generation", "index", "sessions", "stride"),
+                  required=("generation", "index"))
+            if operation == "game.studio.curriculum.path":
+                _only(payload, ("generation", "index"),
+                      required=("generation", "index"))
+                return learning_path(payload["generation"], payload["index"])
+            return batch_program(payload["generation"], payload["index"],
+                                 sessions=payload.get("sessions", 8),
+                                 stride=payload.get("stride", 1))
+        if operation == "game.studio.curriculum.catalog":
+            _only(payload, ())
+            return books.curriculum_catalog()
+        if operation in {"game.studio.curriculum.reference", "game.studio.curriculum.lesson",
+                         "game.studio.book.manifest"}:
+            _only(payload, ("generation", "index"), required=("generation", "index"))
+            if operation == "game.studio.curriculum.reference":
+                return books.reference(payload["generation"], payload["index"])
+            if operation == "game.studio.curriculum.lesson":
+                return books.lesson(payload["generation"], payload["index"])
+            # The actual Markdown plus verifiable SHA is returned. Physical
+            # download is offered separately by the authenticated API.
+            return books.manifest(payload["generation"], payload["index"])
+        if operation == "game.studio.curriculum.assess":
+            _only(payload, ("generation", "index", "answers"),
+                  required=("generation", "index", "answers"))
+            return books.assessment(payload["generation"], payload["index"],
+                                    payload["answers"])
+        if operation in {
+            "game.studio.curriculum.automation.plan",
+            "game.studio.curriculum.automation.preview",
+            "game.studio.curriculum.automation.commit",
+            "game.studio.curriculum.practice",
+        }:
+            fields = ("books", "parameters", "expected_revision", "expected_sha256",
+                      "idempotency_key", "approved_candidate_sha256")
+            if operation == "game.studio.curriculum.practice":
+                _only(payload, fields, required=("books", "parameters",
+                                                "expected_revision", "expected_sha256"))
+            elif operation == "game.studio.curriculum.automation.plan":
+                _only(payload, fields[:2], required=fields[:2])
+            elif operation == "game.studio.curriculum.automation.preview":
+                _only(payload, fields, required=fields[:4])
+            else:
+                _only(payload, fields, required=fields)
+            requested = payload["books"]
+            if type(requested) is not list or not 1 <= len(requested) <= 4:
+                raise StudioError("Jeeves automation requires 1..4 exact books per action")
+            chosen = []
+            seen = set()
+            for item in requested:
+                if type(item) is not dict or set(item) != {"generation", "index"}:
+                    raise StudioError("Jeeves source book reference must be exact")
+                generation, index = item["generation"], item["index"]
+                book = books.reference(generation, index)
+                if book["ref"] in seen:
+                    raise StudioError("Duplicated book source in one automated edit")
+                seen.add(book["ref"])
+                chosen.append((book, books.exemplar(generation, index)))
+            params = payload["parameters"]
+            if (type(params) is not dict or len(params) > 32
+                    or not all(type(v) is str for v in params.keys())):
+                raise StudioError("Training source parameters must be bounded typed map")
+            # Each book gives one real exact operation; generation is never
+            # inferred from a free-text LLM response or trusted shell code.
+            steps = [{"action": action, "parameters": dict(params)} for _, action in chosen]
+            doc = await forge_author.document(scope, command.project_id)
+            approved = {
+                "expected_version": doc["expected_version"],
+                "expected_sha256": doc["source_sha256"],
+                "idempotency_key": payload.get("idempotency_key", "jeeves-book-preview"),
+                "steps": steps,
+            }
+            if operation == "game.studio.curriculum.automation.plan":
+                return {
+                    "schema": "skeleton.jeeves.forge_automation_plan.v1",
+                    "project_id": command.project_id,
+                    "source_sha256": doc["source_sha256"],
+                    "expected_revision": doc["expected_version"],
+                    "books": [book["ref"] for book, _ in chosen],
+                    "operations": [action for _, action in chosen],
+                    "planned_steps": len(steps),
+                    "approved": False, "persisted": False,
+                    "needs_explicit_preview": True,
+                    "needs_operator_commit_approval": True,
+                    "neural_training_complete": False,
+                }
+            if (type(payload["expected_revision"]) is not int
+                    or doc["expected_version"] != payload["expected_revision"]
+                    or doc["source_sha256"] != payload["expected_sha256"]):
+                raise StudioError("Source changed since approved Jeeves curriculum plan")
+            proof = await forge_author.edit(
+                scope, command.project_id, approved, preview=True)
+            candidate = proof["candidate_sha256"]
+            base = {
+                "schema": "skeleton.jeeves.forge_practical_training.v1",
+                "source_sha256": doc["source_sha256"],
+                "candidate_sha256": candidate,
+                "books": [book["ref"] for book, _ in chosen],
+                "operations": [action for _, action in chosen],
+                "batch_receipt": proof["batch_receipt"],
+                "measured_changed": candidate != doc["source_sha256"],
+                "native_executed": False, "trained_weights": False,
+                "candidate_only": True,
+            }
+            if operation == "game.studio.curriculum.practice":
+                if len(chosen) != 1:
+                    raise StudioError("One exact source book per independently verified practice")
+                from skeleton.jeeves.game_frontier_curriculum_practice import (
+                    verify_source_practice,
+                )
+                record = verify_source_practice(
+                    command.project_id, chosen[0][0]["generation"],
+                    chosen[0][0]["index"], proof["batch_receipt"],
+                    current_source_sha256=doc["source_sha256"],
+                    expected_candidate_sha256=candidate,
+                )
+                return {**base,
+                        "schema": "skeleton.jeeves.forge_practice_attested.v1",
+                        "practical_attestation": record,
+                        "persisted": False,
+                        "requires_explicit_operator_approval": True}
+            if operation != "game.studio.curriculum.automation.commit":
+                return {**base, "persisted": False,
+                        "requires_explicit_operator_approval": True}
+            if (type(payload["approved_candidate_sha256"]) is not str
+                    or payload["approved_candidate_sha256"] != candidate
+                    or not base["measured_changed"]
+                    or type(payload["idempotency_key"]) is not str
+                    or not payload["idempotency_key"]):
+                raise StudioError("Jeeves may not commit without approved exact preview hash")
+            actual = await forge_author.edit(
+                scope, command.project_id, approved, preview=False)
+            if (actual.get("source_sha256") != candidate
+                    or actual.get("persisted") is not True):
+                raise StudioError("Host did not commit the exact verified Jeeves source")
+            return {**base,
+                    "schema": "skeleton.jeeves.forge_automation_committed.v1",
+                    "candidate_only": False, "persisted": True,
+                    "saved_source_sha256": actual["source_sha256"],
+                    "saved_revision": actual["expected_version"],
+                    "requires_separate_native_qualification": True}
+
+    if operation.startswith("game.studio.author."):
+        # Real Forge editor operations use the canonical authenticated project
+        # workspace. No model-injected database, project owner or file path.
+        from core import game_frontier_authoring as forge_author
+        if operation == "game.studio.author.inspect":
+            _only(payload, ())
+            return await forge_author.document(scope, command.project_id)
+        if operation == "game.studio.author.copy":
+            _only(payload, ("layer", "x", "y", "width", "height"),
+                  required=("layer", "x", "y", "width", "height"))
+            return await forge_author.copy_tiles(
+                scope, command.project_id, **payload)
+        if operation in {"game.studio.author.preview", "game.studio.author.edit"}:
+            writer = operation.endswith(".edit")
+            allowed = ("expected_revision", "expected_sha256", "steps", "idempotency_key")
+            _only(payload, allowed, required=allowed if writer else allowed[:-1])
+            command_body = {
+                "expected_version": payload["expected_revision"],
+                "expected_sha256": payload["expected_sha256"],
+                "steps": payload["steps"],
+                "idempotency_key": payload.get("idempotency_key", "preview-only"),
+            }
+            return await forge_author.edit(
+                scope, command.project_id, command_body, preview=not writer)
+        if operation == "game.studio.author.compile":
+            _only(payload, ())
+            return await forge_author.document(scope, command.project_id)
+        if operation == "game.studio.author.game":
+            _only(payload, ("seed", "islands"))
+            return await forge_author.compile_game(
+                scope, command.project_id,
+                seed=payload.get("seed", 42),
+                islands=payload.get("islands", 12),
+                include_godot=False,
+            )
+        if operation == "game.studio.author.gameplay":
+            _only(payload, ("position_xyz_m", "mass_kg", "now_ms",
+                            "current_signals", "previous_signals", "flags"),
+                  required=("position_xyz_m",))
+            return await forge_author.simulate_gameplay(
+                scope, command.project_id, {
+                    "position_xyz_m": payload["position_xyz_m"],
+                    "mass_kg": payload.get("mass_kg", 75.0),
+                    "now_ms": payload.get("now_ms", 0),
+                    "current_signals": payload.get("current_signals", {}),
+                    "previous_signals": payload.get("previous_signals", {}),
+                    "flags": payload.get("flags", {}),
+                })
+        if operation == "game.studio.author.export":
+            required = ("expected_revision", "expected_sha256", "idempotency_key")
+            _only(payload, (*required, "seed", "islands"), required=required)
+            return await forge_author.export_native_project(
+                scope, command.project_id, {
+                    "expected_version": payload["expected_revision"],
+                    "expected_sha256": payload["expected_sha256"],
+                    "idempotency_key": payload["idempotency_key"],
+                    "seed": payload.get("seed", 42),
+                    "islands": payload.get("islands", 12),
+                })
+        raise GameLearningError("studio_operation_unknown",
+                                "Unknown original Forge Studio authoring action.", 422)
     if operation in {"job.resume", "job.cancel"}:
         identifier = _id(payload, "job_id")
         _only(payload, ("job_id",), required=("job_id",))

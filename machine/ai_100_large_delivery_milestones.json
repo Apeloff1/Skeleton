@@ -6,7 +6,7 @@
   "source_pins": {
     "master_plan": {
       "path": "machine/ai_master_plan.json",
-      "git_blob_sha": "9b9a758c300d378fa22fcb5de3beac9afa1eefa9"
+      "git_blob_sha": "0a3ce46ae06ec8396e143638a924f04b9fcd273e"
     },
     "advanced_ladder": {
       "path": "machine/advanced_ai_structure_100.json",
@@ -14,7 +14,7 @@
     },
     "accountability_index": {
       "path": "machine/ai_masterplan_parse_index.json",
-      "git_blob_sha": "4cc8ec8fb8fc23eb0c197da30c552e69d0c37454"
+      "git_blob_sha": "74befe71443253db9ad87bb214707d5a5d0079fd"
     },
     "accountability": {
       "path": "machine/ai_build_accountability.json",
@@ -1243,8 +1243,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_python_layering.py",
-            "planned:skeleton/testing/test_import_side_effects.py"
+            "tests/test_architecture_package_layers.py",
+            "tests/test_vol052_python_architecture_independent.py"
           ],
           "required_outcome": [
             "Separate contracts/domain/runtime/adapters/testing concerns with explicit dependency direction.",

@@ -1,0 +1,39 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "clockwork_sanctuary__herbalist",
+  "chapter": 11,
+  "title": "Clockwork Sanctuary: The Herbalist's Meridian Key",
+  "theme": "clockwork_sanctuary",
+  "discipline": "herbalist",
+  "region": "Clockwork Sanctuary",
+  "premise": "In an overgrown observatory driven by silent brass escapements, the herbalist must isolate the cure from hazardous blooms using a woven specimen satchel.",
+  "signal": "hour-wheel",
+  "key_name": "hour-wheel attunement",
+  "objective_name": "Meridian Key",
+  "ending": "Recover the Meridian Key and return with the restorative field formula; Custodians of Dawn can finally verify the source testimony.",
+  "faction": "Custodians of Dawn",
+  "challenge": "Survive charged gearfall while evading the watchmaker automaton without sacrificing the restorative field formula.",
+  "choice_yes": "Disclose evidence and ask Custodians of Dawn to witness the woven specimen satchel.",
+  "choice_no": "Keep the evidence sealed until the expedition's replay record is complete.",
+  "dilemma": "whether to harvest a rare living specimen",
+  "tool": "woven specimen satchel",
+  "reward": "restorative field formula",
+  "enemy": "watchmaker automaton",
+  "chapter_links": [
+    "clockwork_sanctuary__machinist",
+    "clockwork_sanctuary__sentinel"
+  ],
+  "provenance": "original-game-source",
+  "goal": [
+    "collect_source_key",
+    "recover_objective",
+    "reach_exit"
+  ],
+  "side_goals": [
+    "faction_contact",
+    "dialogue_choice",
+    "lore_discovered"
+  ],
+  "rewind": "deterministic_commands",
+  "safety": "headless_offline_no_plugins"
+}

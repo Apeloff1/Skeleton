@@ -32,13 +32,14 @@ id = "generic-api-key"
 description = "Inherited generic API key rule with Skeleton documentation false-positive allowlist"
 
   [[rules.allowlists]]
-  description = "Three reviewed public tokenizer-profile enum lines, never credential values"
+  description = "Four reviewed public tokenizer-profile enum lines, never credential values"
   condition = "AND"
   regexTarget = "line"
   regexes = [
     '''^\s*tokenizer_kind = "utf8_bytes_upper_bound"$''',
     '''^\s*"tokenizer": getattr\(model, "tokenizer_kind", "utf8_bytes_upper_bound"\),$''',
-    '''^\s*tokenizer = "utf8_bytes_upper_bound"$'''
+    '''^\s*tokenizer = "utf8_bytes_upper_bound"$''',
+    '''^\s*tokenizer = supplied\.get\("tokenizer", "utf8_bytes_upper_bound"\)$'''
   ]
   paths = [
     '''^skeleton/ai/runtime/inference/llama_cpp\.py$''',
@@ -107,3 +108,18 @@ description = "Inherited generic API key rule with Skeleton documentation false-
     '^\s*"normal-api-requests\.json": "2e93eb5e78e85813323f81125fb256c979b678469acb73cd1cabf0703474f829",?$'
   ]
   paths = ['^machine/ai_first_install_session_evidence_2026-10-15\.json$']
+
+  [[rules.allowlists]]
+  description = "Historical fixed local tokenizer enum branch; reviewed non-credential"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''^\s*elif tokenizer == "utf8_bytes_upper_bound" or not counter:$''']
+  paths = ['''^skeleton/ai/runtime/inference/local\.py$''']
+
+  [[rules.allowlists]]
+  description = "Historical public input-accounting enum check; exact commit, path and line only"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''^\s*demand\(\['native_tokenizer', 'utf8_byte_tokens', 'reference_tokens', 'conservative_utf8_bytes', 'backend_token_counter'\]\.includes\(basis\) && \(accounting\.exact === null \|\| typeof accounting\.exact === 'boolean'\) && typeof accounting\.prepared_input === 'boolean'\);\s*$''']
+  paths = ['''^frontend/src/features/Jeeves/RuntimeFoundationDetails\.tsx$''']
+  commits = ["411d0f1ded21fc7b5629e0073df2dbd85b6b2db9"]
