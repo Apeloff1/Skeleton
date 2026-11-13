@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_amber_highlands",
+  "title": "Amber Highlands: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010316016,
+  "width": 27,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 6,
+  "theme": "forest",
+  "starting_health": 4
+}

@@ -55,7 +55,9 @@ class OriginalSynthesisTests(unittest.TestCase):
             ("sample_rate", 44101), ("frequency_millihz", 25000000),
             ("duration_ms", 30001), ("gain_permille", -1),
             ("attack_ms", 30001), ("release_ms", -1), ("seed", 0),
-            ("seed", True), ("patch_id", "bad"), ("author", ""),
+            ("seed", True), ("patch_id", "bad"),
+            ("patch_id", r"SFX\Q"), ("patch_id", "SFXxHARBOR_CHIME"),
+            ("author", ""),
         ]
         for field, value in cases:
             raw = copy.deepcopy(self.raw)

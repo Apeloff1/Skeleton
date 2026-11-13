@@ -1,0 +1,18 @@
+{
+  "case": "01_valid_variant",
+  "gate": "actor",
+  "expect": "accept",
+  "reason": "Alternative legitimate operation",
+  "payload": {
+    "tenant": "local",
+    "user": "operator",
+    "request_id": "r_001",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "scope": "local:operator",
+    "rights": [
+      "inference",
+      "read"
+    ]
+  }
+}

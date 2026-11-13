@@ -1,0 +1,86 @@
+{
+  "schema": "skeleton.game.harbor.quest-events.v1",
+  "source_id": "lantern-quay",
+  "quests": [
+    {
+      "id": "collect_timber",
+      "trigger": "gather",
+      "target": "wood",
+      "requires_flags": [],
+      "requires_sites": [
+        "timber_marker"
+      ],
+      "requires_tokens": [],
+      "min_energy": 0,
+      "reward": 2,
+      "grant_token": "wood_found",
+      "required": true
+    },
+    {
+      "id": "craft_lantern",
+      "trigger": "craft",
+      "target": "lantern",
+      "requires_flags": [],
+      "requires_sites": [
+        "ore_marker"
+      ],
+      "requires_tokens": [
+        "wood_found"
+      ],
+      "min_energy": 0,
+      "reward": 3,
+      "grant_token": "beacon_ready",
+      "required": true
+    },
+    {
+      "id": "merchant_permit",
+      "trigger": "talk",
+      "target": "permit",
+      "requires_flags": [
+        "dock_pass"
+      ],
+      "requires_sites": [],
+      "requires_tokens": [
+        "beacon_ready"
+      ],
+      "min_energy": 0,
+      "reward": 5,
+      "grant_token": "merchant_trust",
+      "required": true
+    },
+    {
+      "id": "deliver_supplies",
+      "trigger": "deliver",
+      "target": "any",
+      "requires_flags": [
+        "dock_pass"
+      ],
+      "requires_sites": [
+        "dock_approach"
+      ],
+      "requires_tokens": [
+        "merchant_trust"
+      ],
+      "min_energy": 0,
+      "reward": 8,
+      "grant_token": "supplies_delivered",
+      "required": true
+    },
+    {
+      "id": "signal_beacon",
+      "trigger": "choose",
+      "target": "signal",
+      "requires_flags": [
+        "dock_pass"
+      ],
+      "requires_sites": [],
+      "requires_tokens": [
+        "supplies_delivered"
+      ],
+      "min_energy": 0,
+      "reward": 10,
+      "grant_token": "beacon_lit",
+      "required": true
+    }
+  ]
+}

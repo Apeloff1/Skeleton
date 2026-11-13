@@ -1,0 +1,15 @@
+{
+  "case": "08_surrogate_unicode",
+  "gate": "memory",
+  "expect": "reject",
+  "reason": "Surrogate Unicode cannot be canonical evidence",
+  "payload": {
+    "tenant": "\ud800",
+    "source_tenant": "local",
+    "source_id": "note_001",
+    "approved": true,
+    "revision": 1,
+    "expires_at": 2000000,
+    "now": 1000000
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "case": "08_surrogate_unicode",
+  "gate": "sampling",
+  "expect": "reject",
+  "reason": "Invalid surrogate must not enter canonical request",
+  "payload": {
+    "request_id": "\ud800",
+    "temperature": 0.8,
+    "top_p": 0.95,
+    "max_output": 128,
+    "context_window": 2048,
+    "seed": 7,
+    "repetition_penalty": 1
+  }
+}

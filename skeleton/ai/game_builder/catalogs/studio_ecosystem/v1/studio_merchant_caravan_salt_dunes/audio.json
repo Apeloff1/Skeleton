@@ -1,0 +1,66 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.audio.v1",
+  "project_id": "studio_merchant_caravan_salt_dunes",
+  "genre": "merchant_caravan",
+  "biome": "salt_dunes",
+  "release_certified": false,
+  "sound_design": {
+    "acoustics": "wind over salt crust",
+    "genre": "merchant_caravan",
+    "tempo_bpm": 92,
+    "meter": "4/4",
+    "tonality": "modal",
+    "rendered": false
+  },
+  "sound_layers": [
+    {
+      "id": "ambient",
+      "trigger": "outdoor_salt_dunes",
+      "source": "Original environmental Foley emphasizing wind over salt crust",
+      "spatial": "outdoor_binaural",
+      "ducking": "below_dialogue"
+    },
+    {
+      "id": "mechanic",
+      "trigger": "barter",
+      "source": "Percussive feedback to convoy routing, demand elasticity and risk pricing",
+      "spatial": "diegetic_close",
+      "ducking": "below_warning"
+    },
+    {
+      "id": "risk",
+      "trigger": "salt storms",
+      "source": "Nonverbal hazard escalation for salt corrosion",
+      "spatial": "wide_dynamic",
+      "ducking": "priority_warning"
+    },
+    {
+      "id": "resolution",
+      "trigger": "verified_branch",
+      "source": "Original acoustic theme varying with cargo capacity and provisions stewardship",
+      "spatial": "narrative_bus",
+      "ducking": "dialogue_priority"
+    }
+  ],
+  "dialogue_voice": {
+    "casts": [
+      "protagonist",
+      "witness",
+      "technician",
+      "rival"
+    ],
+    "performance_requirement": "new_original_voice_material",
+    "localized_content": "not_recorded"
+  },
+  "audio_accessibility": [
+    "complete_captions",
+    "no_audio_only_navigation",
+    "adjustable_mixer",
+    "dynamic_range_modes"
+  ],
+  "audio_processing": {
+    "cpu_budget": "runtime_measured",
+    "compression": "hardware_profile_adaptive",
+    "sample_quality": "audited_per_target"
+  }
+}

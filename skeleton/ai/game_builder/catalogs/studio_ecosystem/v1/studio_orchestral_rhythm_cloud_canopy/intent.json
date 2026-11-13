@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_cloud_canopy",
+  "title": "Cloud Canopy: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Cloud Canopy; only the grid preview compiles today.",
+  "seed": 203010310245,
+  "width": 27,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 11,
+  "theme": "forest",
+  "starting_health": 3
+}

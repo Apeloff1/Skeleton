@@ -1,0 +1,87 @@
+{
+  "schema": "skeleton.faction_ballot_scenario.v1",
+  "policy_id": "maritime_fishing_quotas",
+  "domain": "maritime",
+  "topic": "fishing_quotas",
+  "delegates": [
+    "delegate_1",
+    "delegate_2",
+    "delegate_3",
+    "delegate_4",
+    "delegate_5",
+    "delegate_6",
+    "delegate_7"
+  ],
+  "quorum": 4,
+  "approval": 3,
+  "commands": [
+    {
+      "id": "maritime_fishing_quotas:open",
+      "action": "open",
+      "proposal": "maritime_fishing_quotas",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 0
+    },
+    {
+      "id": "maritime_fishing_quotas:vote:0",
+      "action": "cast",
+      "proposal": "maritime_fishing_quotas",
+      "delegate": "delegate_1",
+      "choice": "yes",
+      "expected_version": 1
+    },
+    {
+      "id": "maritime_fishing_quotas:vote:1",
+      "action": "cast",
+      "proposal": "maritime_fishing_quotas",
+      "delegate": "delegate_2",
+      "choice": "yes",
+      "expected_version": 2
+    },
+    {
+      "id": "maritime_fishing_quotas:vote:2",
+      "action": "cast",
+      "proposal": "maritime_fishing_quotas",
+      "delegate": "delegate_3",
+      "choice": "yes",
+      "expected_version": 3
+    },
+    {
+      "id": "maritime_fishing_quotas:vote:3",
+      "action": "cast",
+      "proposal": "maritime_fishing_quotas",
+      "delegate": "delegate_4",
+      "choice": "yes",
+      "expected_version": 4
+    },
+    {
+      "id": "maritime_fishing_quotas:finalize",
+      "action": "finalize",
+      "proposal": "maritime_fishing_quotas",
+      "delegate": "",
+      "choice": "",
+      "expected_version": 5
+    }
+  ],
+  "expected": {
+    "phase": "approved",
+    "voted": 4,
+    "yes": 4,
+    "final_version": 6
+  },
+  "negative_cases": [
+    "stale-version",
+    "duplicate-event",
+    "duplicate-delegate",
+    "insufficient-quorum",
+    "mismatched-proposal",
+    "terminal-phase"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "real_world_election": false,
+    "production_authority": false,
+    "release_certified": false
+  }
+}

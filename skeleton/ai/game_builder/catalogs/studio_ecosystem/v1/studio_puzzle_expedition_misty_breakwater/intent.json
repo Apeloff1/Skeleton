@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_puzzle_expedition_misty_breakwater",
+  "title": "Misty Breakwater: Puzzle Expedition",
+  "subtitle": "An original puzzle expedition brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610300205,
+  "width": 19,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "ocean",
+  "starting_health": 3
+}

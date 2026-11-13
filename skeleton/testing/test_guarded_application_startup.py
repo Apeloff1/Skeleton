@@ -188,7 +188,7 @@ def test_canonical_source_edit_during_inference_suppresses_answer():
         with pytest.raises(SealedContextReplayError, match="changed"):
             await service.generate(Request(), tenant_scope_id="tenant", context_id=_CONTEXT)
         assert engine.calls == 1
-        assert loader.calls == 2
+        assert loader.calls == 3
 
     asyncio.run(scenario())
 

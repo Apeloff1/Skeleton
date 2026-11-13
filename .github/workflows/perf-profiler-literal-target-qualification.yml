@@ -1,0 +1,62 @@
+name: Performance Profiler Literal Target Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - '.github/workflows/perf-profiler-literal-target-qualification.yml'
+      - 'skeleton/perf_profiler/cli.py'
+      - 'skeleton/perf_profiler/frames.py'
+      - 'tests/perf_profiler/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-profiler-literal-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  literal_target_qualification:
+    name: Preloaded callable contract and no dynamic target import
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify immutable head
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install pinned test runner
+        run: python -m pip install pytest==8.4.2
+      - name: Compile and validate canonical source identity
+        run: |
+          python -m compileall -q skeleton/perf_profiler tests/perf_profiler
+          python scripts/check_ai_file_tree.py
+      - name: Run profiler focused regression suite
+        run: python -m pytest -q tests/perf_profiler
+      - name: Qualify repository-wide dynamic import policy
+        run: python scripts/check_repository_dynamic_import_safety.py
+      - name: Reject runtime-selected import in profiler CLI
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          tree = ast.parse(Path("skeleton/perf_profiler/cli.py").read_text(encoding="utf-8"))
+          for node in ast.walk(tree):
+              if not isinstance(node, ast.Call):
+                  continue
+              func = node.func
+              assert not (isinstance(func, ast.Name) and func.id == "__import__")
+              assert not (isinstance(func, ast.Attribute) and func.attr == "import_module")
+          PY

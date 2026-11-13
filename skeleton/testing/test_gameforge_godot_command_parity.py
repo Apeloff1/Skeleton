@@ -55,7 +55,7 @@ def test_godot_rejects_invalid_answers_before_any_pipeline_call():
 def test_legacy_json_target_still_uses_existing_game_spec():
     state = _state()
     state.gameforge.run.return_value.to_dict.return_value = {"spec_id": "abc"}
-    result = _run_handler(state)({"answers": {"genre": "rpg"}})
+    result = _run_handler(state)({"target": "json", "answers": {"genre": "rpg"}})
     assert result == {"game": {"spec_id": "abc"}, "status": "generated"}
     assert state.gameforge.run.call_args.kwargs["target"] == "json"
 

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_verdant_caldera",
+  "title": "Verdant Caldera: The Maker Commons",
+  "subtitle": "Original the maker commons design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010312885,
+  "width": 27,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 14,
+  "theme": "forest",
+  "starting_health": 5
+}

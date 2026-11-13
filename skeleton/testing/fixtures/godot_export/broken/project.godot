@@ -1,0 +1,15 @@
+config_version=5
+
+[application]
+
+config/name="GF-D Broken Fixture"
+run/main_scene="res://missing_main.tscn"
+config/features=PackedStringArray("Forward Plus")
+
+[autoload]
+
+Ghost="*res://scripts/ghost.gd"
+
+[physics]
+
+common/physics_ticks_per_second=144

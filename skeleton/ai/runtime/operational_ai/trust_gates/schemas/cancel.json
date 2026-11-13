@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "fields": {
+    "request_id": {
+      "type": "text",
+      "max_bytes": 96,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    },
+    "state": {
+      "type": "text",
+      "max_bytes": 64,
+      "enum": [
+        "running",
+        "cancelled",
+        "complete"
+      ]
+    },
+    "now_ns": {
+      "type": "int",
+      "min": 0,
+      "max": 9000000000000000000
+    },
+    "deadline_ns": {
+      "type": "int",
+      "min": 1,
+      "max": 9000000000000000000
+    },
+    "generated_tokens": {
+      "type": "int",
+      "min": 0,
+      "max": 8192
+    },
+    "acked": {
+      "type": "bool"
+    },
+    "backend_active": {
+      "type": "bool"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_ion_wastes",
+  "title": "Ion Wastes: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010315683,
+  "width": 19,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 12,
+  "theme": "space",
+  "starting_health": 3
+}

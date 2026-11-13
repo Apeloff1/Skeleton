@@ -60,6 +60,7 @@ def review_queue(root: Path, *, page: int = 0, page_size: int = 32) -> dict[str,
     start = page * page_size
     subset = rows[start:start + page_size]
     return {
+        "ok": True,
         "schema": "skeleton.jeeves.dragon_review_queue.v1",
         "action": "dragon-observe-review-queue",
         "total": len(rows), "page": page, "page_size": page_size,

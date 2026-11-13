@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stellar_colony_ashen_archipelago",
+  "title": "Ashen Archipelago: Outer Settlement",
+  "subtitle": "Original outer settlement design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010311153,
+  "width": 23,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 9,
+  "theme": "ocean",
+  "starting_health": 3
+}

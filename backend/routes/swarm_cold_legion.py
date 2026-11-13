@@ -4,6 +4,8 @@ Cold-storage API & Legion discourse endpoints.
 All prefixed /api/galaxy-studio/swarm/*  to stay under the existing hub.
 """
 from __future__ import annotations
+
+from core.public_exception_route import PublicExceptionRoute
 import asyncio
 from typing import Any
 from fastapi import APIRouter, HTTPException
@@ -22,7 +24,7 @@ from core.swarm_agents import (
     SWARM_DOMAINS, BY_ID, BY_NUMBER, BY_CATEGORY, BY_TEAM, BY_LEGION,
 )
 
-router = APIRouter(prefix="/api/galaxy-studio/swarm", tags=["swarm-cold-legion"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/galaxy-studio/swarm", tags=["swarm-cold-legion"])
 
 
 # ── Cold Storage ────────────────────────────────────────────────────────

@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_settlement_survival_ion_wastes",
+  "genre": "settlement_survival",
+  "biome": "ion_wastes",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Ion Wastes: Settlement Survival",
+  "foundation": {
+    "setting": "Ion Wastes",
+    "era": "near-future renewal",
+    "environment": "charged dunes",
+    "history": "The drifting relay station was built to protect shielded relay coils, but electromagnetic storms interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Iri Rene, a builder, must establish a resilient shelter network using needs and crafting while electromagnetic storms threatens the drifting relay station.",
+  "central_conflict": "an approaching storm seeks control of shielded relay coils; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "electromagnetic storms isolates the drifting relay station",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "an approaching storm offers privileged access to shielded relay coils",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "drifting relay station",
+    "critical_resource": "shielded relay coils",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}

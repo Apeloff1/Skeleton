@@ -1,0 +1,17 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "08_attack",
+  "domain": "replay",
+  "expected": "reject",
+  "payload": {
+    "session_id": "s_1",
+    "request_id": "r_1",
+    "prompt": "hello",
+    "execute": "shell"
+  },
+  "reason": "Refuse adversarial replay variant 8",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational replay contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

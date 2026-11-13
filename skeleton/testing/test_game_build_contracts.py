@@ -402,6 +402,240 @@ def test_job_timeout_is_the_builder_deadline(monkeypatch, fallback_queue):
     assert seen == [30.0, 45.0]
 
 
+@pytest.mark.parametrize("payload", [
+    {"brief": "A small platformer", "binary": "/untrusted/program", "playtest": "require"},
+    {"options": {"binary": "/untrusted/program", "playtest": "require"}},
+    {"options": {"binary": None}},
+])
+def test_queued_payload_cannot_select_a_native_executable(tmp_path, monkeypatch, payload):
+    """Historical durable jobs must not bypass current request admission."""
+    from skeleton.app_services.container import AppServices
+    from skeleton.forge.game_build_queue import handle_game_build
+
+    def never_build(*args, **kwargs):
+        pytest.fail("a client-selected executable must be rejected before build dispatch")
+
+    monkeypatch.setattr("skeleton.forge.game_builder.build_playable_game", never_build)
+    svc = AppServices.open(tmp_path)
+    try:
+        svc.jobs.register_handler("game.build", handle_game_build)
+        job = svc.jobs.enqueue("game.build", payload, actor_id="alice", tenant_id="tenant")
+        svc.jobs.run_once("worker")
+        assert svc.jobs.get_status(job.job_id).status == "failed"
+        result = svc.jobs.get_result(job.job_id)
+        assert result.result is None
+        assert result.error["message"] == "GameBuildFailed"
+        assert "/untrusted/program" not in result.error["message"]
+    finally:
+        svc.close()
+
+
+@pytest.mark.parametrize("target", ["gb", "../../target", True, 0, None])
+def test_old_queued_unsupported_target_fails_before_build(tmp_path, monkeypatch, target):
+    from skeleton.app_services.container import AppServices
+    from skeleton.forge.game_build_queue import handle_game_build
+
+    def never_build(*args, **kwargs):
+        pytest.fail("an unsupported target must not reach the build executor")
+
+    monkeypatch.setattr("skeleton.forge.game_builder.build_playable_game", never_build)
+    svc = AppServices.open(tmp_path)
+    try:
+        svc.jobs.register_handler("game.build", handle_game_build)
+        job = svc.jobs.enqueue("game.build", {"brief": "Adventure", "target": target},
+                               actor_id="alice", tenant_id="tenant")
+        svc.jobs.run_once("worker")
+        assert svc.jobs.get_status(job.job_id).status == "failed"
+        assert svc.jobs.get_result(job.job_id).error["message"] == "GameBuildFailed"
+    finally:
+        svc.close()
+
+
+@pytest.mark.parametrize("result", [
+    None,
+    {"ok": False, "schema_version": RUN_SCHEMA, "error": "/private/model/path"},
+    {"ok": 1, "schema_version": RUN_SCHEMA},
+    {"ok": True, "schema_version": "unexpected"},
+    {"ok": True, "schema_version": RUN_SCHEMA},
+])
+def test_failed_or_malformed_build_is_not_reported_as_succeeded(tmp_path, monkeypatch, result):
+    from skeleton.app_services.container import AppServices
+    from skeleton.forge.game_build_queue import handle_game_build
+
+    monkeypatch.setattr("skeleton.forge.game_builder.build_playable_game", lambda *a, **kw: result)
+    svc = AppServices.open(tmp_path)
+    try:
+        svc.jobs.register_handler("game.build", handle_game_build)
+        job = svc.jobs.enqueue("game.build", {"brief": "A small platformer"},
+                               actor_id="alice", tenant_id="tenant")
+        svc.jobs.run_once("worker")
+        assert svc.jobs.get_status(job.job_id).status == "failed"
+        published = svc.jobs.get_result(job.job_id)
+        assert published.result is None
+        assert published.error["message"] == "GameBuildFailed"
+        assert "/private/model/path" not in published.error["message"]
+    finally:
+        svc.close()
+
+
+def test_project_build_resolves_persisted_owner_brief_at_dispatch(tmp_path, monkeypatch):
+    from skeleton.app_services.container import AppServices
+    from skeleton.contracts.projects import ProjectBrief
+    from skeleton.forge.game_build_queue import handle_game_build
+    from skeleton.persistence.app_foundation.projects_v1 import ProjectsV1Store
+
+    captured = []
+
+    def build(brief, **kwargs):
+        captured.append((brief, kwargs))
+        return {"ok": True, "schema_version": RUN_SCHEMA, "file_names": [], "stubbed": []}
+
+    monkeypatch.setattr("skeleton.forge.game_builder.build_playable_game", build)
+    svc = AppServices.open(tmp_path)
+    try:
+        alice = svc.auth.register("alice@example.com", "long-password-1").user_id
+        session_id = svc.auth.login("alice@example.com", "long-password-1").principal.session_id
+        project, _ = ProjectsV1Store(svc.db).create(
+            alice, "tenant", ProjectBrief(title="Real brief", summary="A forest adventure")
+        )
+        svc.jobs.register_handler("game.build", handle_game_build)
+        job = svc.jobs.enqueue("game.build", {"brief": project.brief.as_dict(),
+                                                "options": {"brief": "forged brief"},
+                                                "project_build_authorized": True,
+                                                "project_build_session_id": session_id},
+                               actor_id=alice, tenant_id="tenant", project_id=project.project_id)
+        svc.jobs.run_once("worker")
+        assert svc.jobs.get_status(job.job_id).status == "succeeded"
+        assert captured[0][0] == project.brief.as_dict()
+        assert "binary" not in captured[0][1]
+        assert captured[0][1]["deadline_s"] == 120.0
+        # A stale job with a changed principal cannot load another owner's brief.
+        from types import SimpleNamespace
+        from skeleton.forge.game_build_queue import GameBuildFailed, _authorized_brief
+        other = SimpleNamespace(project_id=project.project_id, actor_id="another-user",
+                                tenant_id="tenant", _svc=svc.jobs)
+        with pytest.raises(GameBuildFailed, match="Project build is unavailable"):
+            _authorized_brief(other, {"brief": "forged"})
+    finally:
+        svc.close()
+
+
+@pytest.mark.parametrize("drift", ["missing_snapshot", "forged_snapshot", "project_changed"])
+def test_project_dispatch_rejects_missing_or_changed_admitted_brief(tmp_path, monkeypatch, drift):
+    import json
+    from skeleton.app_services.container import AppServices
+    from skeleton.contracts.projects import ProjectBrief
+    from skeleton.forge.game_build_queue import handle_game_build
+    from skeleton.persistence.app_foundation.projects_v1 import ProjectsV1Store
+
+    def never_build(*args, **kwargs):
+        pytest.fail("a missing or changed admitted project brief must not run")
+
+    monkeypatch.setattr("skeleton.forge.game_builder.build_playable_game", never_build)
+    svc = AppServices.open(tmp_path)
+    try:
+        alice = svc.auth.register("alice@example.com", "long-password-1").user_id
+        session = svc.auth.login("alice@example.com", "long-password-1").principal.session_id
+        project, _ = ProjectsV1Store(svc.db).create(alice, "tenant", ProjectBrief(title="Adventure"))
+        payload = {"options": {}, "project_build_authorized": True, "project_build_session_id": session,
+                   "brief": project.brief.as_dict()}
+        if drift == "missing_snapshot":
+            del payload["brief"]
+        elif drift == "forged_snapshot":
+            payload["brief"] = {"title": "Other"}
+        svc.jobs.register_handler("game.build", handle_game_build)
+        job = svc.jobs.enqueue("game.build", payload, actor_id=alice, tenant_id="tenant",
+                               project_id=project.project_id)
+        if drift == "project_changed":
+            with svc.db.tx() as conn:
+                conn.execute("UPDATE projects SET brief_json=? WHERE project_id=?", (
+                    json.dumps(ProjectBrief(title="Changed").as_dict()), project.project_id))
+        svc.jobs.run_once("worker")
+        assert svc.jobs.get_status(job.job_id).status == "failed"
+        assert svc.jobs.get_result(job.job_id).error["message"] == "GameBuildFailed"
+    finally:
+        svc.close()
+
+
+@pytest.mark.parametrize("timeout,deadline", [
+    (10 ** 400, None), (float("inf"), None), (True, None),
+    (120, 10 ** 400), (120, float("nan")), (120, 121), (120, True), (120, "10"),
+])
+def test_queued_build_rejects_invalid_or_overflowing_time_budgets(timeout, deadline):
+    from types import SimpleNamespace
+    from skeleton.forge.game_build_queue import GameBuildFailed, _builder_deadline_s
+    body = {} if deadline is None else {"deadline_s": deadline}
+    with pytest.raises(GameBuildFailed, match="Invalid game build time budget"):
+        _builder_deadline_s(body, {}, SimpleNamespace(timeout_s=timeout))
+
+
+@pytest.mark.parametrize("change", ["missing", "revoked", "expired", "disabled", "foreign", "charter"])
+def test_project_dispatch_rechecks_session_owner_and_charter(tmp_path, monkeypatch, change):
+    from types import SimpleNamespace
+    from skeleton.app_services.container import AppServices
+    from skeleton.contracts.projects import ProjectBrief
+    from skeleton.forge.game_build_queue import handle_game_build
+    from skeleton.persistence.app_foundation.projects_v1 import ProjectsV1Store
+
+    def never_build(*args, **kwargs):
+        pytest.fail("a revoked or unauthorized project job must not run")
+
+    monkeypatch.setattr("skeleton.forge.game_builder.build_playable_game", never_build)
+    svc = AppServices.open(tmp_path)
+    try:
+        alice = svc.auth.register("alice@example.com", "long-password-1").user_id
+        session_id = svc.auth.login("alice@example.com", "long-password-1").principal.session_id
+        project, _ = ProjectsV1Store(svc.db).create(alice, "tenant", ProjectBrief(title="Adventure"))
+        if change == "missing":
+            session_id = ""
+        elif change == "revoked":
+            svc.auth.sessions.revoke(session_id)
+        elif change == "expired":
+            svc.auth.sessions.touch(session_id, time.time() - 1)
+        elif change == "disabled":
+            svc.auth.users.set_disabled(alice, True)
+        elif change == "foreign":
+            svc.auth.register("bob@example.com", "long-password-2")
+            session_id = svc.auth.login("bob@example.com", "long-password-2").principal.session_id
+        elif change == "charter":
+            monkeypatch.setattr("skeleton.kernel.governance.get_governance", lambda: SimpleNamespace(
+                decide=lambda *args: SimpleNamespace(permitted=False)))
+        svc.jobs.register_handler("game.build", handle_game_build)
+        job = svc.jobs.enqueue("game.build", {"options": {}, "project_build_authorized": True,
+                                               "project_build_session_id": session_id},
+                               actor_id=alice, tenant_id="tenant", project_id=project.project_id)
+        svc.jobs.run_once("worker")
+        assert svc.jobs.get_status(job.job_id).status == "failed"
+        assert svc.jobs.get_result(job.job_id).error["message"] == "GameBuildFailed"
+    finally:
+        svc.close()
+
+
+@pytest.mark.parametrize("body", [{"options": {}}, {"brief": "unbound direct build"}])
+def test_old_project_queue_entry_without_charter_admission_fails_closed(tmp_path, monkeypatch, body):
+    from skeleton.app_services.container import AppServices
+    from skeleton.contracts.projects import ProjectBrief
+    from skeleton.forge.game_build_queue import handle_game_build
+    from skeleton.persistence.app_foundation.projects_v1 import ProjectsV1Store
+
+    def never_build(*args, **kwargs):
+        pytest.fail("a legacy project entry without forge authorization must not run")
+
+    monkeypatch.setattr("skeleton.forge.game_builder.build_playable_game", never_build)
+    svc = AppServices.open(tmp_path)
+    try:
+        alice = svc.auth.register("alice@example.com", "long-password-1").user_id
+        project, _ = ProjectsV1Store(svc.db).create(alice, "tenant", ProjectBrief(title="Adventure"))
+        svc.jobs.register_handler("game.build", handle_game_build)
+        job = svc.jobs.enqueue("game.build", body, actor_id=alice, tenant_id="tenant",
+                               project_id=project.project_id)
+        svc.jobs.run_once("worker")
+        assert svc.jobs.get_status(job.job_id).status == "failed"
+        assert svc.jobs.get_result(job.job_id).error["message"] == "GameBuildFailed"
+    finally:
+        svc.close()
+
+
 def test_trailing_heartbeat_timeout_keeps_the_result(monkeypatch):
     from skeleton.forge.game_build_queue import JobTimeout, handle_game_build
 

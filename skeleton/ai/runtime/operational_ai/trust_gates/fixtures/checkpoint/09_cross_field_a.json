@@ -1,0 +1,16 @@
+{
+  "case": "09_cross_field_a",
+  "gate": "checkpoint",
+  "expect": "reject",
+  "reason": "Activation requires operator approval",
+  "payload": {
+    "model_id": "local-gguf",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "format": "gguf-v3",
+    "bytes": 5000,
+    "max_bytes": 100000000,
+    "step": 1,
+    "approved": false
+  }
+}
