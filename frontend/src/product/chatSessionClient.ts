@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
-import { API_BASE } from '../utils/apiBase';
+import { API_BASE, nativeBackendConfigurationIssue } from '../utils/apiBase';
 import api, { type ApiResult } from '../utils/apiClient';
 import { authHeaders, getAuthToken, resolveStorageTenantIdentity } from '../auth/gameforgeAuth';
 import { ChatClientError, chatApiError } from './chatErrors';
@@ -11,7 +11,6 @@ import { createConversation, projectCanonicalHistory, MAX_CONVERSATIONS, type Ca
 import type { ChatProgress, ChatResponse, WorkspaceStorage } from '../features/Jeeves/WorkspaceController';
 import { normalizeChatCooperation, reconcileChatCooperation, validateChatCooperationReceipts, validateChatCooperationSummary, type ChatCooperationSummary } from './chatCooperation';
 import { validateChatModel, type ChatModelRuntimeFacts } from './chatModelCatalog';
-import { nativeBackendConfigurationIssue } from '../utils/apiBase';
 
 export type ChatModel = { id: string; provider_id: string; model_id: string; label: string; available: boolean; selectable: boolean; active: boolean; fallback?: boolean; credential_free: boolean; context_window: number; max_output_tokens: number; default_output_tokens: number; model_family?: string; tokenizer?: string; limits_source?: string; activation?: Record<string, unknown> | null; capabilities: string[]; readiness: { code: string; message: string; action?: string | null } } & ChatModelRuntimeFacts;
 export type ChatReadiness = {
