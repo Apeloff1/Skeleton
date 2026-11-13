@@ -640,3 +640,32 @@ export async function bootstrap(load: () => Promise<LoadResult>, auth: AuthClien
   }
   return state;
 }
+
+
+/** Reconcile one edited Forge questionnaire into exactly its originating
+ * Studio project. ID and source revision must match; a concurrent edit or
+ * deleted project is never overwritten just because a bridge exists. */
+export function reconcileStudioReturn(
+  projects: readonly StudioProject[], projectId: string,
+  expectedUpdatedAt: string, questionnaire: QuestionnaireState,
+  at: string,
+): { status: 'applied' | 'conflict' | 'missing' | 'invalid'; projects: StudioProject[] } {
+  const snapshot = [...projects];
+  const index = snapshot.findIndex((p) => p.id === projectId);
+  if (index < 0) return { status: 'missing', projects: snapshot };
+  if (snapshot[index].updatedAt !== expectedUpdatedAt) {
+    return { status: 'conflict', projects: snapshot };
+  }
+  const draft = {
+    ...snapshot[index],
+    title: projectTitle(questionnaire.vision),
+    questionnaire,
+    updatedAt: at,
+  };
+  const vetted = sanitizeProjects([draft]);
+  if (vetted.corrupt || vetted.projects.length !== 1) {
+    return { status: 'invalid', projects: snapshot };
+  }
+  snapshot[index] = vetted.projects[0];
+  return { status: 'applied', projects: snapshot };
+}

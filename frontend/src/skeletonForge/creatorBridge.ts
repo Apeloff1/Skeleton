@@ -11,11 +11,14 @@ import { GENRE_CHOICES } from './genreCatalog';
 export const CREATOR_BRIDGE_SCHEMA = 'skeleton.creator.handoff.v1' as const;
 export const CREATOR_BRIDGE_TTL_MS = 20 * 60 * 1000;
 
-export type CreatorBridgeTarget = 'galaxy' | 'forge';
+export type CreatorBridgeTarget = 'galaxy' | 'forge' | 'studio';
 export interface CreatorBridgeDraft {
   schema: typeof CREATOR_BRIDGE_SCHEMA;
   target: CreatorBridgeTarget;
   createdMs: number;
+  /** Optional first-install Studio project origin, never a URL or account ID. */
+  studioProjectId: string | null;
+  studioProjectUpdatedAt: string | null;
   /** Retain the user's current place in the questionnaire. */
   step: QuestionnaireState['step'];
   vision: string;
@@ -80,6 +83,13 @@ export function parseCreatorBridge(
   const step: QuestionnaireState['step'] =
     typeof input.step === 'string' && STEPS.includes(input.step as QuestionnaireState['step'])
       ? input.step as QuestionnaireState['step'] : 'brief';
+  const studioProjectId = typeof input.studioProjectId === 'string'
+    && validId.test(input.studioProjectId) ? input.studioProjectId : null;
+  const studioProjectUpdatedAt = studioProjectId
+    && typeof input.studioProjectUpdatedAt === 'string'
+    && /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(input.studioProjectUpdatedAt)
+    && Number.isFinite(Date.parse(input.studioProjectUpdatedAt))
+      ? input.studioProjectUpdatedAt : null;
   const vision = cleanText(input.vision, 4000);
   const brief = cleanChoices(input.brief, 5, allowedBrief);
   if (brief.genre && !availableGenres.has(brief.genre)) delete brief.genre;
@@ -108,6 +118,7 @@ export function parseCreatorBridge(
     (rawQuest.length as number) >= 1 && (rawQuest.length as number) <= 8 ? rawQuest.length as number : 3;
   return {
     schema: CREATOR_BRIDGE_SCHEMA, target, createdMs: input.createdMs,
+    studioProjectId, studioProjectUpdatedAt,
     step, vision, brief, beats, instruments, galaxyGenre: genre,
     options: { archetype, target: originalTarget, era, generation },
     quest: { enabled: rawQuest?.enabled === true, length },
@@ -117,9 +128,14 @@ export function parseCreatorBridge(
   };
 }
 
-export function handoffFromForge(state: QuestionnaireState, now: number = Date.now()): CreatorBridgeDraft {
+export function handoffFromForge(
+  state: QuestionnaireState, now: number = Date.now(),
+  origin: CreatorBridgeDraft | null = null,
+): CreatorBridgeDraft {
   const raw = {
     schema: CREATOR_BRIDGE_SCHEMA, target: 'galaxy', createdMs: now,
+    studioProjectId: origin?.studioProjectId ?? null,
+    studioProjectUpdatedAt: origin?.studioProjectUpdatedAt ?? null,
     step: state.step, vision: state.vision, brief: state.brief, beats: state.beats,
     instruments: state.instruments, galaxyGenre: state.galaxyGenre,
     options: state.options, quest: state.quest,
@@ -167,6 +183,8 @@ export function handoffFromGalaxy(
     cleanText(selection.title, 160).trim() || previous?.vision || '';
   const raw = {
     schema: CREATOR_BRIDGE_SCHEMA, target: 'forge', createdMs: now,
+    studioProjectId: previous?.studioProjectId ?? null,
+    studioProjectUpdatedAt: previous?.studioProjectUpdatedAt ?? null,
     step: previous?.step ?? 'brief', vision, brief, beats: previous?.beats ?? {}, instruments: previous?.instruments ?? {},
     galaxyGenre: genre, options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
     quest: previous?.quest ?? { enabled: false, length: 3 },
@@ -193,4 +211,50 @@ export function forgeStateFromHandoff(raw: CreatorBridgeDraft, now: number = Dat
   // A valid handoff must not become a way to jump past a blocked vision
   // step. Preserve completed progress; reset only an unreachable step.
   return reachable(restored, restored.step) ? restored : { ...restored, step: 'vision' };
+}
+
+
+/** One-time, account-scoped import of an existing first-install project into
+ * the advanced Forge cockpit. Nothing is re-generated or uploaded. */
+export function handoffFromStudio(
+  state: QuestionnaireState, projectId: string, updatedAt: string,
+  now: number = Date.now(),
+): CreatorBridgeDraft {
+  const raw = handoffFromForge(state, now);
+  const accepted = parseCreatorBridge({
+    ...raw, target: 'forge',
+    studioProjectId: projectId, studioProjectUpdatedAt: updatedAt,
+  }, 'forge', now);
+  if (!accepted || !accepted.studioProjectId || !accepted.studioProjectUpdatedAt) {
+    throw new Error('Unrecognized source Studio project identity or revision');
+  }
+  return accepted;
+}
+
+/** Explicit return from the advanced cockpit into its original Studio project.
+ * Preserves origin across arbitrarily long editing after acceptance, but
+ * stamps a fresh short-lived transport envelope. */
+export function handoffToStudio(
+  state: QuestionnaireState, origin: CreatorBridgeDraft,
+  now: number = Date.now(),
+): CreatorBridgeDraft {
+  const admitted = parseCreatorBridge(origin, 'forge', origin.createdMs);
+  if (!admitted?.studioProjectId || !admitted.studioProjectUpdatedAt) {
+    throw new Error('This Forge editor was not opened from a Studio project');
+  }
+  const outbound = handoffFromForge(state, now, admitted);
+  const accepted = parseCreatorBridge({ ...outbound, target: 'studio' }, 'studio', now);
+  if (!accepted || !accepted.studioProjectId || !accepted.studioProjectUpdatedAt) {
+    throw new Error('Could not prepare Studio return without source custody');
+  }
+  return accepted;
+}
+
+/** The receiving first-install Studio only accepts a source-bound return. */
+export function studioStateFromHandoff(
+  raw: CreatorBridgeDraft, now: number = Date.now(),
+): QuestionnaireState | null {
+  const draft = parseCreatorBridge(raw, 'studio', now);
+  if (!draft?.studioProjectId || !draft.studioProjectUpdatedAt) return null;
+  return forgeStateFromHandoff({ ...draft, target: 'forge' }, now);
 }
