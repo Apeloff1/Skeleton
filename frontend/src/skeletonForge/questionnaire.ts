@@ -83,6 +83,8 @@ export interface QuestionnaireState {
   quest?: { enabled: boolean; length: number };
   /** Opt in to three existing executable Godot archetype sidecar scenes. */
   playable?: { enabled: boolean };
+  /** Optional Godot headless boot qualification. */
+  playtest?: 'off' | 'auto' | 'require';
 }
 
 export type QuestionnaireAction =
@@ -94,6 +96,7 @@ export type QuestionnaireAction =
   | { type: 'setGalaxyGenre'; genre: string | null }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'setPlayableEnabled'; value: boolean }
+  | { type: 'setPlaytestMode'; value: 'off' | 'auto' | 'require' }
   | { type: 'setQuestEnabled'; value: boolean }
   | { type: 'setQuestLength'; value: number }
   | { type: 'next' }
@@ -111,6 +114,7 @@ export const INITIAL_STATE: QuestionnaireState = {
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
   quest: { enabled: false, length: 3 },
   playable: { enabled: false },
+  playtest: 'off',
 };
 
 function toggle(map: Record<string, string>, key: string, value: string | null): Record<string, string> {
@@ -180,6 +184,8 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     }
     case 'setPlayableEnabled':
       return { ...state, playable: { enabled: action.value === true } };
+    case 'setPlaytestMode':
+      return { ...state, playtest: ['off', 'auto', 'require'].includes(action.value) ? action.value : 'off' };
     case 'setQuestEnabled':
       return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true } };
     case 'setQuestLength': {
@@ -263,6 +269,9 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   // JSON blueprint export cannot embed it.
   if (state.playable?.enabled && request.target === 'godot') {
     request.playable_content = true;
+  }
+  if (state.playtest && state.playtest !== 'off' && request.target === 'godot') {
+    request.playtest = state.playtest;
   }
   // Room quests are separate from the playable archetype sidecar scene.
   if (state.quest?.enabled && request.target === 'godot') {

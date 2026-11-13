@@ -303,6 +303,23 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           </View>
         ) : null}
       </View>
+      <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Godot headless qualification" testID="q-playtest-controls">
+        <Text style={st.q}>Godot headless playtest</Text>
+        <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; when a playable sidecar is selected, run its complete win/lose scene separately. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
+        <View style={st.chips}>
+          <Chip label="Off" selected={!state.playtest || state.playtest === 'off'}
+            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'off' })}
+            testID="q-playtest-off" />
+          <Chip label="Best effort" selected={state.playtest === 'auto'}
+            disabled={state.options.target !== 'godot'} color={C.blue}
+            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'auto' })}
+            testID="q-playtest-auto" />
+          <Chip label="Require both when present" selected={state.playtest === 'require'}
+            disabled={state.options.target !== 'godot'} color={C.green}
+            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'require' })}
+            testID="q-playtest-require" />
+        </View>
+      </View>
       <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Era override">
         <Text style={st.q}>Pin an era? <Text style={st.help}>(optional)</Text></Text>
         <View style={st.chips}>
@@ -410,6 +427,8 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}
       {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
+      {req.playtest ? <Row k="Headless playtest" v={req.playtest === 'require' ? 'Required: main-world boot and playable scene completion when selected' : 'Best effort: main-world and selected playable scene; unavailable means unverified'} /> : null}
+      {state.playtest && state.playtest !== 'off' && !req.playtest ? <Banner tone="warn" testID="q-playtest-not-exported">Headless Godot qualification is disabled for JSON blueprint export.</Banner> : null}
       {req.playable_content ? <Row k="Playable scene" v={`Godot ${['extraction', 'combat_loop', 'pipeline'].includes(req.archetype) ? req.archetype : 'extraction'} prototype · controllable sidecar scene, with a win/lose loop`} /> : null}
       {state.playable?.enabled && !req.playable_content ? <Banner tone="warn" testID="q-playable-not-exported">Playable sidecar scenes require Godot output; JSON blueprint export omits playable scenes.</Banner> : null}
       {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · Godot quest HUD and snapshot contract`} /> : null}

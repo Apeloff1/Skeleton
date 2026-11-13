@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -30,6 +30,7 @@ class RunRequest(BaseModel):
     t: float = 0.5
     generation: Optional[str] = None
     playable_content: bool = False
+    playtest: Optional[Literal["off", "auto", "require"]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
 
@@ -80,6 +81,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"playable_content": True} if req.playable_content else {}),
+            **({"playtest": req.playtest} if req.playtest and req.playtest != "off" else {}),
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
         )
     except Exception as exc:

@@ -115,6 +115,8 @@ export interface RunRequest {
   include_files?: boolean;
   /** Optional playable Godot archetype sidecar scene (three verified templates). */
   playable_content?: boolean;
+  /** Optional main-scene Godot boot, plus playable sidecar completion if present. */
+  playtest?: 'auto' | 'require';
   /** Optional native room-entry quest attached to the generated Godot project. */
   quest_content?: boolean;
   quest_length?: number;
@@ -175,6 +177,8 @@ export interface RunPayload {
   jeeves?: { next?: { text?: string; action?: string; priority?: number } | null; briefing?: string } | null;
   sim?: { passed?: boolean; primary_dps?: number } | null;
   build_plan?: BuildPlanPayload | null;
+  playtest?: { status?: string; passed?: boolean; verified?: boolean; errors?: string[] } | null;
+  playable_scene_playtest?: { status?: string; passed?: boolean; verified?: boolean; scene?: string; errors?: string[] } | null;
   operator_axes?: Record<string, number>;
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];
