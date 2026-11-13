@@ -80,3 +80,20 @@ def test_invalid_slice_names_rejected(slice_id):
             PackRegistry(PACKS), ["movement", "quest"], slice_id=slice_id,
             world=WORLD, policy=POLICY, seed=1,
         )
+
+
+def test_forged_proof_is_not_accepted_even_with_recomputed_outer_digest():
+    from skeleton.ai.game_builder.original_quest_slice import _digest
+    registry, doc = build()
+    forged = deepcopy(doc)
+    forged["proof"]["snapshot"] = {"forged": True}
+    forged["digest"] = _digest({k: v for k, v in forged.items() if k != "digest"})
+    assert not verify_original_slice(forged, registry)
+
+    forged = deepcopy(doc)
+    forged["world_quest"]["quest"]["steps"][0]["rewards"] = [{"kind": "xp", "amount": 999}]
+    forged["world_quest"]["digest"] = _digest({
+        k: v for k, v in forged["world_quest"].items() if k != "digest"
+    })
+    forged["digest"] = _digest({k: v for k, v in forged.items() if k != "digest"})
+    assert not verify_original_slice(forged, registry)

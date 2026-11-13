@@ -106,12 +106,37 @@ def verify_original_slice(
             return False
         if _digest({k: v for k, v in artifact.items() if k != "digest"}) != artifact["digest"]:
             return False
-        if not verify_slice(registry, artifact["mechanics"]):
+        mechanics = artifact["mechanics"]
+        if len(mechanics.get("packs", ())) > 64 or not verify_slice(registry, mechanics):
             return False
+        generated = artifact["world_quest"]
+        if generated.get("schema") != "ai.quest_synthesis.v1" or not generated.get("accepted"):
+            return False
+        if _digest({k: v for k, v in generated.items() if k != "digest"}) != generated.get("digest"):
+            return False
+        steps = generated["quest"]["steps"]
+        if not isinstance(steps, list) or not 1 <= len(steps) <= 128:
+            return False
+        expected = QuestDefinition.from_mapping({
+            "id": artifact["slice_id"] + ".quest",
+            "objectives": [{
+                "id": step["id"],
+                "requires": list(step.get("requires", ())),
+                "target": 1,
+                "rewards": list(step.get("rewards", ())),
+            } for step in steps],
+        })
         definition = QuestDefinition.from_mapping(artifact["quest_definition"])
+        if definition.to_mapping() != expected.to_mapping():
+            return False
         if definition.digest != artifact["quest_definition_digest"]:
             return False
-        return artifact["proof"]["status"] == "completed"
+        replayed = run_quest(definition, [{"advance": step["id"]} for step in steps])
+        return (replayed["status"] == "completed" and artifact["proof"] == {
+            "status": replayed["status"],
+            "rewards": replayed["rewards"],
+            "snapshot": replayed["snapshot"],
+        })
     except (KeyError, ValueError, TypeError, OverflowError):
         return False
 
