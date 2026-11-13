@@ -100,6 +100,7 @@ var _title: String = ""
 var _steps: Array = []
 var _next_step: int = 0
 var _earned: Dictionary = {}
+var _visits: Array[String] = []
 var _hud: Label
 
 func _ready() -> void:
@@ -167,6 +168,7 @@ func _on_room_entered(room_id: String) -> void:
 	var current: Dictionary = _steps[_next_step]
 	if str(current.get("location", "")) != room_id:
 		return
+	_visits.append(room_id)
 	_next_step += 1
 	_earned = _reward_until(_next_step)
 	objective_completed.emit(str(current.get("id", "")), room_id)
@@ -181,11 +183,12 @@ func snapshot() -> Dictionary:
 		"schema": SAVE_SCHEMA,
 		"source_sha256": SOURCE_SHA256,
 		"next_step": _next_step,
+		"visits": _visits.duplicate(),
 		"earned": _earned.duplicate(true),
 	}
 
 func restore_snapshot(save: Dictionary) -> bool:
-	if not _loaded or save.size() != 4:
+	if not _loaded or save.size() != 5:
 		return false
 	if save.get("schema") != SAVE_SCHEMA or save.get("source_sha256") != SOURCE_SHA256:
 		return false
@@ -194,10 +197,19 @@ func restore_snapshot(save: Dictionary) -> bool:
 		return false
 	if typeof(save.get("earned")) != TYPE_DICTIONARY:
 		return false
+	var visits: Variant = save.get("visits")
+	if typeof(visits) != TYPE_ARRAY or visits.size() != next:
+		return false
+	for i in range(next):
+		if typeof(visits[i]) != TYPE_STRING or visits[i] != str(_steps[i].get("location", "")):
+			return false
 	var expected: Dictionary = _reward_until(next)
 	if save.get("earned") != expected:
 		return false
 	_next_step = next
+	_visits.clear()
+	for visit in visits:
+		_visits.append(visit)
 	_earned = expected
 	_refresh_hud()
 	return true
@@ -206,6 +218,7 @@ func quest_status() -> Dictionary:
 	return {
 		"loaded": _loaded, "title": _title,
 		"next_step": _next_step, "total_steps": _steps.size(),
+		"visited_rooms": _visits.duplicate(),
 		"completed": _loaded and _next_step == _steps.size(),
 		"earned": _earned.duplicate(true),
 	}
@@ -224,9 +237,15 @@ def attach_native_quest(
         raise NativeQuestError("quest output conflicts with existing source")
     project = files.get("project.godot")
     world_text = files.get(ROOM_PATH)
-    if not isinstance(project, str) or project.count(INPUT_ENTRY) != 1:
+    if (not isinstance(project, str) or project.count(INPUT_ENTRY) != 1
+            or PROFILE_ENTRY in project or "QuestRuntime=" in project):
         raise NativeQuestError("unexpected project Godot autoload contract")
     world = _room_world(world_text)
+    event_source = files.get("scripts/autoloads/game_state.gd", "")
+    world_source = files.get("scripts/world/world_map.gd", "")
+    if ("EventBus.room_entered.emit(rid)" not in event_source
+            or "EventBus.room_entered.emit(rooms[0].id)" not in world_source):
+        raise NativeQuestError("Godot room-entry event contract is missing")
     # Stable across Python processes, deliberately derived from the exact
     # source room graph rather than from process-randomized hash().
     world_hash = _hash(world_text)
@@ -282,9 +301,25 @@ def verify_native_quest(files: Mapping[str, str]) -> bool:
             return False
         if validate_quest(doc["world_quest"]["quest"], world, _POLICY):
             return False
-        if not 1 <= len(doc["world_quest"]["quest"]["steps"]) <= 8:
+        steps = doc["world_quest"]["quest"]["steps"]
+        if type(steps) is not list or not 1 <= len(steps) <= 8:
+            return False
+        if raw != json.dumps(source, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n":
+            return False
+        # Hashes alone are not authenticity: rebuild the seeded composition
+        # from the *actual* emitted graph, then require exact equality.
+        expected = compose_verified_quest_slice(
+            _registry(), ["native.movement.v1", "native.quest.v1"],
+            slice_id="godot.room_quest.v1", world=world, policy=_POLICY,
+            seed=int(_hash(files[ROOM_PATH])[:16], 16),
+            quest_length=len(steps), quest_title="Explore the Forge World",
+        )
+        if expected != doc:
             return False
         if files["project.godot"].count(PROFILE_ENTRY) != 1:
+            return False
+        if ("EventBus.room_entered.emit(rid)" not in files.get("scripts/autoloads/game_state.gd", "")
+                or "EventBus.room_entered.emit(rooms[0].id)" not in files.get("scripts/world/world_map.gd", "")):
             return False
         return files[SCRIPT_PATH] == _GDSCRIPT.replace("__SHA256__", _hash(raw))
     except (KeyError, TypeError, ValueError, OverflowError, AttributeError, RecursionError):

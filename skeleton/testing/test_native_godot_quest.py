@@ -176,3 +176,58 @@ def test_api_rejects_invalid_quest_length(bad):
     from backend.routes.skeleton_gameforge import RunRequest
     with pytest.raises(ValidationError):
         RunRequest(quest_content=True, quest_length=bad)
+
+
+def test_verifier_reconstructs_exact_seeded_quest_not_merely_matching_checksums():
+    from skeleton.ai.game_builder.godot_quest_bridge import _POLICY, _registry, _room_world
+    from skeleton.ai.game_builder.original_quest_slice import compose_verified_quest_slice
+    files, _ = attach_native_quest(base(), length=4)
+    doc = json.loads(files[QUEST_PATH])
+    old_sha = hashlib.sha256(files[QUEST_PATH].encode("utf-8")).hexdigest()
+    forged = compose_verified_quest_slice(
+        _registry(), ["native.movement.v1", "native.quest.v1"],
+        slice_id="godot.room_quest.v1",
+        world=_room_world(files["data/rooms.json"]), policy=_POLICY,
+        seed=0, quest_length=4, quest_title="Explore the Forge World",
+    )
+    assert forged != doc["slice"]
+    doc["slice"] = forged
+    tampered = dict(files)
+    tampered[QUEST_PATH] = json.dumps(
+        doc, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ) + "\n"
+    new_sha = hashlib.sha256(tampered[QUEST_PATH].encode("utf-8")).hexdigest()
+    tampered[SCRIPT_PATH] = tampered[SCRIPT_PATH].replace(old_sha, new_sha)
+    assert not verify_native_quest(tampered)
+
+
+def test_optional_quest_autoload_conflict_is_rejected():
+    f = base()
+    f["project.godot"] = f["project.godot"].replace(
+        'InputBind="*res://scripts/autoloads/input_bind.gd"\n',
+        'InputBind="*res://scripts/autoloads/input_bind.gd"\n'
+        'QuestRuntime="*res://scripts/autoloads/untrusted.gd"\n',
+    )
+    with pytest.raises(NativeQuestError, match="autoload"):
+        attach_native_quest(f)
+
+
+def test_runtime_quest_requires_actual_room_event_contract():
+    generated = base()
+    generated["scripts/autoloads/game_state.gd"] = generated[
+        "scripts/autoloads/game_state.gd"
+    ].replace("EventBus.room_entered.emit(rid)", "pass")
+    with pytest.raises(NativeQuestError, match="room-entry"):
+        attach_native_quest(generated)
+
+
+def test_native_save_contains_a_replayable_ordered_room_visit_trail():
+    files, _ = attach_native_quest(base())
+    src = files[SCRIPT_PATH]
+    assert "var _visits: Array[String] = []" in src
+    assert "_visits.append(room_id)" in src
+    assert '"visits": _visits.duplicate()' in src
+    assert "visits.size() != next" in src
+    assert 'visits[i] != str(_steps[i].get("location", ""))' in src
+    # Native Godot must boot and test its own GDScript: text assertions alone
+    # are only a compatibility gate, not proof of native runtime execution.

@@ -58,3 +58,20 @@ Then run exact-head Merge Readiness, Backend Quality, App Foundation E2E,
 Godot native runtime boot, Windows native installer, offline model, malware,
 source mirror, dependency, workflow and security qualification. This branch
 is stacked on PR #5304 and must not be merged before that prerequisite.
+
+## Post-integration custody hardening
+
+Before accepting a native quest build, the verifier now regenerates its exact
+original-game quest using the source room-graph seed, current mechanic registry,
+same length and fixed quest title. A different quest cannot be substituted by
+simply recomputing the unkeyed source checksums and updating the GDScript
+checksum constant. The verifier also checks the actual GameState / WorldMap
+room-entered wiring and refuses an already-registered QuestRuntime autoload.
+
+The local Godot save snapshot records an ordered, source-bound list of
+successful visited quest rooms. Restore verifies this trace against the source
+steps, current progress and recomputed earned rewards before accepting it.
+This is **consistency verification**, not a cryptographic anti-cheat
+guarantee: a local user able to rewrite game files can also forge an
+untrusted offline save. Durable authenticated player progress remains a
+separate future integration.
