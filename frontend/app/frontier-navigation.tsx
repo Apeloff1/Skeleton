@@ -11,18 +11,12 @@ import {
 import {
   startForegroundGPS, type FrontierGPSSession, type FrontierPositionFix,
 } from '../src/product/frontierLiveGPS';
-import GameFrontierNavigationPanel from '../src/features/Jeeves/GameFrontierNavigationPanel';
-import GameFrontierSurveyedControlPanel from '../src/features/Jeeves/GameFrontierSurveyedControlPanel';
-import { useLocalSearchParams } from 'expo-router';
-import GameFrontierCockpitPanel from '../src/features/Jeeves/GameFrontierCockpitPanel';
 
 export default function FrontierNavigation() {
   const session = React.useRef<FrontierGPSSession | null>(null);
   const [position, setPosition] = React.useState<FrontierPositionFix | null>(null);
   const [status, setStatus] = React.useState('Not collecting device position');
   const [busy, setBusy] = React.useState(false);
-  const { project } = useLocalSearchParams<{ project?: string }>();
-  const projectId = typeof project === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(project) ? project : undefined;
 
   React.useEffect(() => () => { session.current?.stop(); session.current = null; }, []);
 
@@ -105,10 +99,6 @@ export default function FrontierNavigation() {
           survey engine compares those observations with GPS separately and
           reports uncertainty; it does not certify a legal boundary.
         </Text>
-        <GameFrontierNavigationPanel />
-        <GameFrontierSurveyedControlPanel />
-        {/* Additive editor review; optional GPS and surveyed controls remain intact. */}
-        <GameFrontierCockpitPanel projectId={projectId} />
       </ScrollView>
     </SafeAreaView>
   );

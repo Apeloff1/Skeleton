@@ -1,0 +1,52 @@
+name: Game Frontier recovered-source qualification
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/jeeves/game_frontier*.py'
+      - 'skeleton/ai/agents/jeeves/game_frontier*.py'
+      - 'skeleton/forge/game_frontier*.py'
+      - 'skeleton/ai/forge/game_frontier*.py'
+      - 'tests/test_game_frontier*.py'
+      - 'scripts/*game_frontier*.py'
+      - '.github/workflows/game-frontier-recovered-source-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontier-recovery-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontier-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify source mirror parity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          canonical = Path('skeleton/jeeves')
+          mirror = Path('skeleton/ai/agents/jeeves')
+          files = sorted(canonical.glob('game_frontier*.py'))
+          assert len(files) >= 59, len(files)
+          for file in files:
+              twin = mirror / file.name
+              assert twin.is_file(), str(twin)
+              assert file.read_bytes() == twin.read_bytes(), file.name
+          print(f'Exact byte mirror pairs: {len(files)}')
+          PY
+      - name: Compile original modules, operators and tests
+        run: |
+          python -m compileall -q skeleton/jeeves skeleton/ai/agents/jeeves skeleton/forge skeleton/ai/forge scripts tests
+      - name: Install hermetic focused-test runner
+        run: python -m pip install 'pytest>=8,<9'
+      - name: Focused game frontier regression
+        run: |
+          python -m pytest -q             tests/test_game_frontier_milestones_p0_p3.py             tests/test_game_frontier_advanced_physics.py             tests/test_game_frontier_virtual_navigation.py             tests/test_game_frontier_studio_quests.py             tests/test_game_frontier_receipt_journal.py             tests/test_game_frontier_native_session_vault.py
