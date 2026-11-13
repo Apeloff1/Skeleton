@@ -268,6 +268,28 @@
         "skeleton/intelligence/verification.py",
         "skeleton/intelligence/verifier.py"
       ]
+    },
+    {
+      "id": "offline-workspace-files",
+      "technology": "Existing operator-selected OfflineChatStore SQLite file and adjacent private immutable source archives",
+      "runtime_service": null,
+      "compose_file": null,
+      "volumes": [],
+      "durability": "operator-local persistent files; existing workspace authority, no additional database/service",
+      "production_role": "existing offline chat workspace plus additive local game-build records and digest-bound archives; prototype implementation candidate",
+      "network": "authenticated numeric-loopback application only",
+      "authentication": "existing strong bearer token and process/file owner",
+      "backup": "consistent SQLite online backup plus exact referenced immutable archive set and original private permissions",
+      "restore": "restore and verify SQLite first; expose only matching model/tokenizer records and exact archive identities; interrupted work fails without model rerun",
+      "migration": "additive offline_game_builds table in existing database; preserve prior chat/knowledge tables, identifiers and artifacts",
+      "evidence": [
+        "skeleton/app/offline_http.py",
+        "skeleton/ai/model_runtime/offline_chat.py",
+        "scripts/build_jeeves_game.py",
+        "skeleton/app/offline_game_builder.py",
+        "tests/test_offline_game_builder.py",
+        "tests/test_offline_game_builder_integration.py"
+      ]
     }
   ],
   "state_domains": [
@@ -1072,6 +1094,33 @@
         "skeleton/ai/webcrawler/dragon_practice_lab.py",
         "backend/core/dragon_reference_practice.py",
         "backend/core/dragon_runtime.py"
+      ]
+    },
+    {
+      "id": "offline-game-builds",
+      "owner_plane": "application-api",
+      "physical_store": "offline-workspace-files",
+      "logical_location": "existing offline workspace SQLite offline_game_builds table and digest-bound private source ZIPs",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "implementation-candidate",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "same-file SQLite request identity/stage/version/terminal CAS; atomic create-only archive publication with recorded expected hash",
+      "consistency": "unique model/tokenizer/request identity plus file-wide active slot; distinct held work lease fences peer startup/recovery; existing inference lease covers physical model drain; no automatic retry",
+      "retention": "operator-owned local history and artifacts; bounded admission; no silent eviction or conversation deletion",
+      "backup_restore": "consistent SQLite backup plus exact immutable archive set; no restore qualification inferred; missing/corrupt archives deny download",
+      "migration": "additive same-file table/indexes; existing chat schema and receipts preserved",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "machine/manifest.json",
+        "machine/ai_app_construction.json",
+        "scripts/build_jeeves_game.py",
+        "skeleton/app/offline_game_builder.py",
+        "scripts/qualify_jeeves_game_builder_browser.py"
       ]
     }
   ],

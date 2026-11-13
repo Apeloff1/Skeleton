@@ -38,6 +38,10 @@ on:
       - "scripts/build_jeeves_local_manifest.py"
       - "scripts/qualify_jeeves_live_local.py"
       - "scripts/qualify_jeeves_workspace_browser.py"
+      - "scripts/qualify_jeeves_game_builder_browser.py"
+      - "skeleton/app/offline_game_builder.py"
+      - "tests/test_offline_game_builder.py"
+      - "tests/test_offline_game_builder_integration.py"
       - "tests/test_jeeves_conversation_organization.py"
       - "tests/test_app_offline_http.py"
       - "scripts/check_provider_bootstrap.py"
@@ -115,7 +119,7 @@ jobs:
       - name: Verify Docker materialization source-boundary parsing
         run: python -m unittest discover -s tests -p 'test_docker_materialization_parser.py' -v
       - name: Compile first-install operator entrypoints
-        run: python -m compileall -q scripts/ai_chat_installed_smoke.py scripts/configure_ai_chat.py scripts/configure_ai_chat_hosted.py scripts/build_jeeves_local_manifest.py scripts/install_ai_chat.py scripts/qualify_jeeves_live_local.py skeleton/ai/jeeves_local_policy.py skeleton/app/local_ai.py skeleton/app/offline_knowledge.py skeleton/app/offline_grounding.py skeleton/app/jeeves_advisory.py skeleton/app/jeeves_media_advisory.py skeleton/app/jeeves_inference_circuit.py skeleton/app/jeeves_local_lease.py skeleton/ai/runtime/inference/lease_custody.py skeleton/ai/runtime/inference/llama_cpp.py skeleton/ai/runtime/inference/deployment.py skeleton/app/offline_http.py backend/routes/ai.py
+        run: python -m compileall -q scripts/ai_chat_installed_smoke.py scripts/configure_ai_chat.py scripts/configure_ai_chat_hosted.py scripts/build_jeeves_local_manifest.py scripts/install_ai_chat.py scripts/qualify_jeeves_live_local.py scripts/qualify_jeeves_game_builder_browser.py skeleton/app/offline_game_builder.py skeleton/ai/jeeves_local_policy.py skeleton/app/local_ai.py skeleton/app/offline_knowledge.py skeleton/app/offline_grounding.py skeleton/app/jeeves_advisory.py skeleton/app/jeeves_media_advisory.py skeleton/app/jeeves_inference_circuit.py skeleton/app/jeeves_local_lease.py skeleton/ai/runtime/inference/lease_custody.py skeleton/ai/runtime/inference/llama_cpp.py skeleton/ai/runtime/inference/deployment.py skeleton/app/offline_http.py backend/routes/ai.py
       - name: Verify local-only chat receipts, guard policy, provisioning and secret-safe legacy refusal
         env:
           PYTHONPATH: "."
@@ -145,6 +149,16 @@ jobs:
           skeleton/testing/test_game_build_contracts.py
           skeleton/testing/test_game_builder_golden.py
           skeleton/testing/test_game_studio_swarm.py
+      - name: Verify authenticated game-build HTTP, recovery and archive plumbing
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        # Controlled operation fixtures test auth/state/archive plumbing only.
+        # Actual operator GGUF/browser acceptance remains opt-in and separate.
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          tests/test_offline_game_builder.py
+          tests/test_offline_game_builder_integration.py
       - name: Verify authenticated backend-to-engine HTTP chat with durable local fixture
         env:
           PYTHONPATH: ".:backend"
@@ -179,6 +193,9 @@ jobs:
       - name: Verify guided game brief composition contract
         working-directory: frontend
         run: node --test scripts/test-game-builder-brief.cjs
+      - name: Verify Jeeves game-builder workspace controls
+        working-directory: frontend
+        run: node --test scripts/test-jeeves-game-builder.cjs
       - name: Typecheck complete frontend
         working-directory: frontend
         run: yarn typecheck
