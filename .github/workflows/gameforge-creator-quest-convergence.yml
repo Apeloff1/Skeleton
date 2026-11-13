@@ -9,6 +9,7 @@ on:
       - 'frontend/app/skeleton-forge.tsx'
       - 'frontend/src/features/GalaxyStudioFactory/draftCustody.ts'
       - 'frontend/src/features/GalaxyStudioFactory/galaxyDraftCodec.ts'
+      - 'frontend/src/features/GalaxyStudioFactory/genreRegistry.ts'
       - 'frontend/src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'
       - 'backend/routes/skeleton_gameforge.py'
       - 'skeleton/context/**'
@@ -82,6 +83,7 @@ jobs:
             scripts/skeleton-forge/creator-quest-convergence.test.cjs \
             scripts/skeleton-forge/creator-bridge.test.cjs \
             scripts/skeleton-forge/galaxy-draft-custody.test.cjs \
+            scripts/skeleton-forge/galaxy-genre-registry.test.cjs \
             scripts/skeleton-forge/storage-scope.test.cjs \
             scripts/skeleton-forge/instruments.test.cjs \
             scripts/skeleton-forge/native-quest.test.cjs
