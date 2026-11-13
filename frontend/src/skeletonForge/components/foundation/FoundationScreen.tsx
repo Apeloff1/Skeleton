@@ -15,7 +15,7 @@ import {
   type PersistSnapshot, type StudioProject,
 } from '../../foundation/model';
 import { handoffFromStudio, studioStateFromHandoff } from '../../creatorBridge';
-import { consumeCreatorBridge, storeCreatorBridge } from '../../creatorBridgeStorage';
+import { storeCreatorBridge, withCreatorBridge } from '../../creatorBridgeStorage';
 import { asyncStorageKv, hasLegacyStudioProjects, legacyReadOnlyKv } from '../../foundation/storageDevice';
 import { loadFoundation, saveFoundation } from '../../foundation/storage';
 import { composeSummaryOf, consoleFailures } from '../../cockpitScreen';
@@ -110,15 +110,19 @@ function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => vo
   const store = React.useMemo(() => asyncStorageKv(), []);
   const auth = React.useMemo(() => gameforgeAuthPort(), []);
   const load = React.useCallback(async () => {
+    const epoch = getAuthEpoch();
     const result = await loadFoundation(store);
     if (result.holdSaves) return result;
-    const returned = await consumeCreatorBridge('studio');
-    if (!returned) return result;
-    const restored = studioStateFromHandoff(returned);
-    if (!restored || !returned.studioProjectId || !returned.studioProjectUpdatedAt) {
-      throw new Error('Returned Forge draft is not source-bound to a Studio project');
-    }
-    try {
+    if (epoch !== getAuthEpoch()) throw new Error('Account changed while loading Studio projects');
+    // Consume only after the complete receiving-project save. A failed
+    // write keeps the original envelope for the original account, rather
+    // than trying to reissue private data into the next session's scope.
+    const transferred = await withCreatorBridge('studio', async (returned) => {
+      const restored = studioStateFromHandoff(returned);
+      if (!restored || !returned.studioProjectId || !returned.studioProjectUpdatedAt) {
+        throw new Error('Returned Forge draft is not source-bound to a Studio project');
+      }
+      if (epoch !== getAuthEpoch()) throw new Error('Account changed while applying Studio return');
       const at = new Date().toISOString();
       const reconciled = reconcileStudioReturn(
         result.projects, returned.studioProjectId,
@@ -131,17 +135,13 @@ function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => vo
         onboarded: result.onboarded, projects, prefs: result.prefs,
         projectsCorrupt: false, holdSaves: false,
       });
+      if (epoch !== getAuthEpoch()) throw new Error('Account changed while committing Studio return');
       setStudioReturnNotice(originalUpdated
         ? 'Advanced Forge edits were saved to the original Studio project.'
         : 'The original project changed or was deleted. Your Forge edits were preserved as a separate project copy.');
       return { ...result, projects };
-    } catch (error) {
-      // Failed validation, copy allocation or storage cannot silently consume
-      // the user's returning edited questionnaire. Reissue within this scope.
-      try { await storeCreatorBridge(returned); }
-      catch { /* device storage may be unavailable; retain the original failure */ }
-      throw error;
-    }
+    });
+    return transferred ?? result;
   }, [store]);
   const save = React.useCallback((snap: PersistSnapshot) => saveFoundation(store, snap), [store]);
   const openAdvancedCockpit = React.useCallback((project?: StudioProject) => {
