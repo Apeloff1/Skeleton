@@ -93,6 +93,24 @@ test('one account cannot consume another local creator handoff', async () => {
   assert.equal(kv.size, 0);
 });
 
+test('parallel readers in one runtime cannot double-consume a single verified handoff', async () => {
+  await bridgeStorage.storeCreatorBridge(H.handoffFromForge(Q.INITIAL_STATE));
+  const claims = await Promise.all(
+    Array.from({ length: 12 }, () => bridgeStorage.consumeCreatorBridge('galaxy')),
+  );
+  assert.equal(claims.filter(Boolean).length, 1);
+  assert.equal(kv.size, 0);
+});
+
+test('wrong-direction read preserves the one-time message for its intended receiver', async () => {
+  await bridgeStorage.storeCreatorBridge(H.handoffFromForge(Q.INITIAL_STATE));
+  assert.equal(await bridgeStorage.consumeCreatorBridge('forge'), null);
+  assert.equal(kv.size, 1);
+  const correct = await bridgeStorage.consumeCreatorBridge('galaxy');
+  assert.equal(correct?.target, 'galaxy');
+  assert.equal(kv.size, 0);
+});
+
 test('Galaxy advanced draft is isolated by bearer without a network check', async () => {
   await galaxyStorage.saveGalaxyDraft({
     schema: galaxyStorage.GALAXY_DRAFT_SCHEMA, savedMs: Date.now(),
