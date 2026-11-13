@@ -212,12 +212,23 @@ combined change. Preserve compatibility sources, native overlays, historical
 proposal schemas and deterministic generation. Rollback restores code and
 routing/policy choices; it must not silently delete user projects or saves.
 
+### Separate baseline source-identity bookkeeping
+
+After the new Forge/Evaluation mirrors pass parity and independent ownership,
+refresh the pre-existing source-object pins for `AIFT-INTELLIGENCE`,
+`AIFT-APPLICATION`, `AIFT-BUILD`, `AIFT-CREATOR`, and
+`AIFT-V2B-GAMEFORGE-KNOWLEDGE`. Their source objects already match `origin/main`;
+this is metadata reconciliation, not additional runtime integration. Preserve
+all owners, move tags, batch semantics and cutover/signoff states. Record it
+separately from the new runtime mirrors. Provider aliases retain their existing
+non-owning facades while their two source pins follow the canonical provider.
+
 ## L12 — Operator runbook
 
 Inspect the current command before supplying optional model-specific arguments:
 
 ```bash
-python -m skeleton game --help
+python scripts/build_jeeves_game.py --help
 ```
 
 The existing deterministic path can produce a local project and demand actual

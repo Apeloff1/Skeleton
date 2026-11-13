@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
+      "source_git_object_sha": "86f82e45cb1b6f23400dfc4dee731b829a050d92",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -98,7 +98,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/runtime/provider_runtime.py",
       "kind": "file",
-      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
+      "source_git_object_sha": "86f82e45cb1b6f23400dfc4dee731b829a050d92",
       "role": "Existing legacy runtime import alias for the canonical credential-bearing provider runtime; a non-owning compatibility facade.",
       "work_package_refs": [
         "WP-W05",
@@ -1077,7 +1077,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "ddfe76fc6ff811705d1e404bc120d2dc4bbb79b0",
+      "source_git_object_sha": "84a7532876597775c1ec6da6a27e421014902b37",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "604551f6ce80fe74cfbf93dc073e306d9aa14fa6",
+      "source_git_object_sha": "cc75b9774b939db791a922225432f6c88a28fd2a",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
