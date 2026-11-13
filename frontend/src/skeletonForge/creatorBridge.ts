@@ -34,7 +34,7 @@ const availableGenres = new Set(GENRE_CHOICES);
 const galaxyIds = new Set(GALAXY_CHOICES.map((x) => x.id));
 const axes = new Set<string>(DESIGN_AXES.map((x) => x.id));
 const validKey = /^[a-z][a-z0-9_-]{0,47}$/;
-const validId = /^[a-zA-Z][a-zA-Z0-9_.-]{0,79}$/;
+const validId = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$/;
 
 const record = (value: unknown): Record<string, unknown> | null =>
   value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
