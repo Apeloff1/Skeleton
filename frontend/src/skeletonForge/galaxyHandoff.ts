@@ -41,7 +41,7 @@ function plain(value: unknown): value is Record<string, unknown> {
 }
 function guard(value: unknown, budget: { count: number }, depth: number): void {
   if (++budget.count > MAX_FIELDS || depth > MAX_DEPTH) fail('configuration exceeds allowed complexity');
-  if (value === null || typeof value === 'boolean') return;
+  if (value === undefined || value === null || typeof value === 'boolean') return;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) fail('non-finite slider value');
     return;
@@ -52,7 +52,10 @@ function guard(value: unknown, budget: { count: number }, depth: number): void {
   }
   if (Array.isArray(value)) {
     if (value.length > 4_096) fail('array exceeds limit');
-    for (const entry of value) guard(entry, budget, depth + 1);
+    for (const entry of value) {
+      if (entry === undefined) fail('undefined array value');
+      guard(entry, budget, depth + 1);
+    }
     return;
   }
   if (!plain(value)) fail('non-JSON data is forbidden');
@@ -62,7 +65,7 @@ function guard(value: unknown, budget: { count: number }, depth: number): void {
     if (!/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/.test(key) || ['__proto__', 'constructor', 'prototype'].includes(key)) {
       fail('invalid configuration key');
     }
-    guard(entry, budget, depth + 1);
+    if (entry !== undefined) guard(entry, budget, depth + 1);
   }
 }
 
