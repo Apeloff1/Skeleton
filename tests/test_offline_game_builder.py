@@ -329,9 +329,11 @@ def test_retrying_close_after_drain_timeout_rechecks_worker_and_closes_authority
 
 def test_planning_stop_sends_one_cancellation_and_waits_for_cleanup(tmp_path, monkeypatch):
     cancelled = threading.Event()
+    planning_started = threading.Event()
     observed = []
     async def pending(*_args, **_kwargs):
         try:
+            planning_started.set()
             await asyncio.sleep(60)
         finally:
             # Physical model cleanup must remain awaitable after cancellation.
@@ -339,15 +341,23 @@ def test_planning_stop_sends_one_cancellation_and_waits_for_cleanup(tmp_path, mo
             await asyncio.sleep(0.15)
             observed.append("drained")
     monkeypatch.setattr(builder, "propose", pending)
-    timer = threading.Timer(0.03, cancelled.set)
-    timer.start()
+    def cancel_running_planner():
+        # Cancellation must exercise the running task's cleanup. A wall-clock
+        # timer may fire during cold imports before the planner ever starts.
+        planning_started.wait(timeout=5)
+        cancelled.set()
+    requester = threading.Thread(target=cancel_running_planner, daemon=True)
+    requester.start()
     try:
         with pytest.raises(builder.GameBuildRejected) as error:
             builder.run_local_game_build(Backend(), "A small platformer.", tmp_path / "project",
                 workspace_database=tmp_path / "chat.sqlite3", cancellation=cancelled)
         assert error.value.code == "build_interrupted"
     finally:
-        timer.join()
+        cancelled.set()
+        requester.join(timeout=5)
+    assert not requester.is_alive()
+    assert planning_started.is_set()
     assert observed == [1, "drained"]
 
 

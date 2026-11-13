@@ -457,7 +457,7 @@ JAVASCRIPT = r"""'use strict';
       build.interactive?.input_journey_verified === true && !!archive &&
       typeof archive.sha256 === 'string' && /^[a-f0-9]{64}$/.test(archive.sha256) &&
       Number.isSafeInteger(archive.bytes) && archive.bytes > 0 && archive.bytes <= 16777216 &&
-      Number.isSafeInteger(archive.file_count) && archive.file_count > 0 && archive.file_count <= 512;
+      Number.isSafeInteger(archive.file_count) && archive.file_count > 0 && archive.file_count <= 2048;
   }
   function renderForgeJob() {
     const job = state.forgeJob;

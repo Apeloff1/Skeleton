@@ -92,7 +92,7 @@ test('source download requires accepted matching model, successful compilation, 
     job({result: {...job().result, build: {ok: true, interactive: {native_boot_verified: true, input_journey_verified: false}}}}),
     job({result: {...job().result, build: {ok: false, interactive: {native_boot_verified: true, input_journey_verified: true}}}}),
     job({archive: {...job().archive, bytes: 16777217}}), job({archive: {...job().archive, sha256: 'bad'}}),
-    job({archive: {...job().archive, file_count: 0}})];
+    job({archive: {...job().archive, file_count: 0}}), job({archive: {...job().archive, file_count: 2049}})];
   for (const item of rejected) assert.equal(forgeArchiveReady(item, 'b'.repeat(64)), false);
   assert.equal(forgeArchiveReady(job(), 'd'.repeat(64)), false);
   assert.equal(forgeArchiveReady(null, 'b'.repeat(64)), false);
