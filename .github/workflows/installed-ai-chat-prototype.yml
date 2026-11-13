@@ -117,7 +117,7 @@ jobs:
         env:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py skeleton/testing/test_local_model_deployment.py tests/test_jeeves_advisory.py tests/test_jeeves_media_advisory.py tests/test_jeeves_live_local_advanced.py tests/test_jeeves_context_window.py tests/test_jeeves_document_scope.py tests/test_jeeves_inference_circuit.py tests/test_jeeves_durable_integrity.py tests/test_jeeves_local_lease.py tests/test_jeeves_conversation_organization.py tests/test_app_offline_http.py
+        run: python -m pytest -q --noconftest -p pytest_asyncio.plugin tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py skeleton/testing/test_local_model_deployment.py tests/test_jeeves_advisory.py tests/test_jeeves_media_advisory.py tests/test_jeeves_live_local_advanced.py tests/test_jeeves_context_window.py tests/test_jeeves_document_scope.py tests/test_jeeves_inference_circuit.py tests/test_jeeves_durable_integrity.py tests/test_jeeves_local_lease.py tests/test_jeeves_conversation_organization.py tests/test_app_offline_http.py
       - name: Verify typed local game design, playable output and bounded operator build contracts
         env:
           PYTHONPATH: "."
