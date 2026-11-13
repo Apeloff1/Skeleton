@@ -77,7 +77,13 @@ export function composeVision(vision: string, signal?: AbortSignal): Promise<Api
 }
 
 export function runForge(req: RunRequest, signal?: AbortSignal): Promise<ApiResult<RunPayload>> {
-  return api.post(`${SKELETON_API}/run`, { ...req, include_files: false }, { signal, timeoutMs: 180000, retries: 0 });
+  // Explicit native verification can boot both the generated world and a
+  // separate authored playable scene. The ordinary request keeps its original
+  // 3-minute bound; native proof has an independently bounded 8-minute cap.
+  const nativeProof = req.playtest === 'auto' || req.playtest === 'require';
+  return api.post(`${SKELETON_API}/run`, { ...req, include_files: false }, {
+    signal, timeoutMs: nativeProof ? 480000 : 180000, retries: 0,
+  });
 }
 
 export function sendCockpit(command: string, signal?: AbortSignal): Promise<ApiResult<CockpitResult>> {
