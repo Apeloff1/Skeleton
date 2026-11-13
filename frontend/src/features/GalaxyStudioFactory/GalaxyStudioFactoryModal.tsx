@@ -3362,6 +3362,17 @@ export default function GalaxyStudioFactoryModal
             <Text style={[s.gxBridgeText, { color: '#F59E0B' }]}>Build Hub</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={[s.gxBridgeBtn, { backgroundColor: '#10B98122', borderColor: '#10B981' }]}
+            onPress={() => { onClose(); router.push('/skeleton-forge?tab=build' as any); }}
+            accessibilityRole="button"
+            accessibilityLabel="Open the GameForge design cockpit"
+            activeOpacity={0.7}
+            testID="galaxy-open-skeleton-forge"
+          >
+            <Ionicons name="options-outline" size={14} color="#10B981" />
+            <Text style={[s.gxBridgeText, { color: '#10B981' }]}>GameForge Cockpit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[s.gxBridgeBtn, { backgroundColor: '#2563EB22', borderColor: '#2563EB' }]}
             onPress={() => { onClose(); router.push('/playground' as any); }}
             activeOpacity={0.7}

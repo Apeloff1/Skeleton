@@ -15,9 +15,10 @@ import ForgeCockpitView from './ForgeCockpitView';
 
 export interface ForgeCockpitScreenProps {
   initialTab?: CockpitTab | null;
+  onOpenGalaxyStudio?: () => void;
 }
 
-export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitScreenProps) {
+export default function ForgeCockpitScreen({ initialTab = null, onOpenGalaxyStudio }: ForgeCockpitScreenProps) {
   const [screen, dispatchScreen] = React.useReducer(cockpitScreenReducer, initialTab, initialScreenState);
   const [q, dispatchQ] = React.useReducer(questionnaireReducer, INITIAL_STATE);
   const catalog = useForgeCatalog();
@@ -67,6 +68,7 @@ export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitSc
         eras: catalog.eras,
         generations: catalog.generations,
         onForge: startRun,
+        onOpenGalaxyStudio,
         forging: run.phase === 'running',
         composeSummary: composeSummaryOf(compose.result),
         onViewPlan: hasPlan ? openPlan : undefined,

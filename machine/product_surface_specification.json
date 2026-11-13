@@ -6821,10 +6821,12 @@
       "runtime_ready_claim": false,
       "action_mode": "informational",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "5134d33b50f8d3407bdae44b9fe3b499097b69c1b7c9d9b58c3e455618ef5ab6",
+      "source_sha256": "bc6c4111c03dedfe3d43763d596ea3d6ef4577b02c4dafd4f2734cb60d9ab181",
       "interaction_count": 0,
       "backend_surfaces": [],
-      "navigation_targets": [],
+      "navigation_targets": [
+        "/galaxy"
+      ],
       "accessibility_signal_count": 0,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
