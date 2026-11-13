@@ -85,12 +85,12 @@ export const PLAYABLE_SLICES = [
  */
 export const PLAYABLE_TUNING_EFFECTS: Record<string, readonly string[]> = {
   extraction: ['Tempo → movement speed', 'Risk → heat pressure'],
-  combat_loop: ['Tempo → movement speed', 'Lethality → starting health'],
-  pipeline: ['Tempo → movement speed'],
-  puzzle: ['Tempo → movement speed'],
-  racing: ['Tempo → movement speed', 'Risk → checkpoint time limit'],
+  combat_loop: ['Tempo → movement speed', 'Lethality → starting health', 'Progression depth → combat waves'],
+  pipeline: ['Tempo → movement speed', 'Progression depth → shipment quota'],
+  puzzle: ['Tempo → movement speed', 'Mystery → switch hints'],
+  racing: ['Tempo → movement speed', 'Risk → checkpoint time limit', 'Progression depth → race laps'],
   survival: ['Tempo → movement speed', 'Scarcity → hydration drain'],
-  stealth: ['Tempo → movement speed', 'Risk → guard detection radius'],
+  stealth: ['Tempo → movement speed', 'Risk → guard detection radius', 'Mystery → guard-zone visibility'],
   crafting: ['Tempo → movement speed'],
 };
 

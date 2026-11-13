@@ -68,3 +68,25 @@ matches. A forged game script with newly calculated checksums is rejected.
 The invariant establishes known-source convergence only. It does not
 authenticate a repository owner, digitally sign binaries, prove hardware
 playability, or make offline saves resistant to local modifications.
+
+
+## Progression depth and mystery: game-visible mappings
+
+Historical **grind** (Progression depth) now adjusts the actual win
+condition of three playable genres: arena waves 2–4, race laps 2–4,
+and factory delivery quota 2–6. A mid-slider 0.5 retains the original
+3-wave, 3-lap or 4-shipment challenge. The generated GDScript constant
+is the runtime authority and the source receipt records the exact
+derived target.
+
+Historical **opacity** (Mystery) now controls actual gameplay hints:
+the puzzle no longer highlights the next active switch at high opacity,
+and stealth can conceal the radius of guard danger zones. The danger
+radius itself remains enforced—hiding the hint never disables detection.
+The native script receives a fixed typed Boolean; user-provided strings
+cannot become GDScript.
+
+These are purposefully small original-prototype effects, not a claim
+that social narrative systems or all 67 specialized genres have been
+fully implemented. Other unmapped axes are preserved and accounted for
+in the same source receipt.

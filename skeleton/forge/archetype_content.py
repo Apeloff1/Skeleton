@@ -311,11 +311,12 @@ var switches: Array[Vector2] = [
 	Vector2(-40, 150), Vector2(-180, -20)
 ]
 var next_switch: int = 0
+const SHOW_ACTIVE_SWITCH := true
 const USE_RADIUS := 18.0
 
 func _draw() -> void:
 	for index in range(switches.size()):
-		var shade := Color(0.20, 0.90, 0.58) if index == next_switch else Color(0.4, 0.4, 0.4)
+		var shade := Color(0.20, 0.90, 0.58) if SHOW_ACTIVE_SWITCH and index == next_switch else Color(0.4, 0.4, 0.4)
 		draw_circle(switches[index], 14.0, shade)
 		draw_arc(switches[index], USE_RADIUS, 0.0, TAU, 24, shade, 2.0)
 
@@ -332,7 +333,7 @@ func _tick(_delta: float) -> void:
 
 
 func _objective_text() -> String:
-	return "Switch %d/%d | Move into the bright ring and press Enter" % [next_switch, switches.size()]
+	return ("Switch %d/%d | Move into the bright ring and press Enter" % [next_switch, switches.size()]) if SHOW_ACTIVE_SWITCH else ("Switches remaining: %d | Discover the correct order" % (switches.size() - next_switch))
 '''
 
 _RACING = '''
@@ -426,11 +427,13 @@ var objectives: Array[Vector2] = [
 var exit_point := Vector2(-180, 50)
 var intel: int = 0
 const DETECTION_RADIUS := 64.0
+const SHOW_GUARD_ZONES := true
 const USE_RADIUS := 18.0
 
 func _draw() -> void:
 	for guard in patrols:
-		draw_circle(guard, DETECTION_RADIUS, Color(0.9, 0.22, 0.24, 0.16))
+		if SHOW_GUARD_ZONES:
+			draw_circle(guard, DETECTION_RADIUS, Color(0.9, 0.22, 0.24, 0.16))
 		draw_circle(guard, 9.0, Color(0.96, 0.26, 0.24))
 	for intel_point in objectives:
 		draw_circle(intel_point, 11.0, Color(0.25, 0.82, 0.98))

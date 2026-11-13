@@ -9,6 +9,8 @@ Supported direct effects:
   risk -> extraction heat, racing deadline, stealth detection radius
   scarcity -> survival hydration depletion
   lethality -> arena-combat starting health
+  grind -> racing lap count, arena waves, factory shipment quota
+  opacity -> puzzle switch hints and stealth danger-zone visibility
 
 Other axes remain in the canonical tensor and are explicitly identified as
 not yet connected to a native mini-game mechanic; they are never silently
@@ -127,6 +129,42 @@ def compile_playable_tuning(
         )
         effects["combat_loop.starting_hp"] = effective
         used.add("lethality")
+
+    if "grind" in axes:
+        # A bounded progression-depth axis changes the *real* win condition,
+        # not only its HUD copy. 0.5 is the original challenge length.
+        if name == "combat_loop":
+            waves = 2 + round(2 * axes["grind"])
+            loop = _replace_exact(loop, "const WAVES := 3", f"const WAVES := {waves}")
+            effects["combat_loop.waves"] = float(waves)
+            used.add("grind")
+        elif name == "racing":
+            laps = 2 + round(2 * axes["grind"])
+            loop = _replace_exact(loop, "const GOAL_LAPS := 3", f"const GOAL_LAPS := {laps}")
+            effects["racing.goal_laps"] = float(laps)
+            used.add("grind")
+        elif name == "pipeline":
+            quota = 2 + round(4 * axes["grind"])
+            loop = _replace_exact(loop, "const QUOTA := 4", f"const QUOTA := {quota}")
+            effects["pipeline.shipment_quota"] = float(quota)
+            used.add("grind")
+
+    if "opacity" in axes:
+        show_hints = axes["opacity"] < 0.67
+        if name == "puzzle":
+            loop = _replace_exact(
+                loop, "const SHOW_ACTIVE_SWITCH := true",
+                f"const SHOW_ACTIVE_SWITCH := {str(show_hints).lower()}",
+            )
+            effects["puzzle.active_switch_hint_visible"] = float(show_hints)
+            used.add("opacity")
+        elif name == "stealth":
+            loop = _replace_exact(
+                loop, "const SHOW_GUARD_ZONES := true",
+                f"const SHOW_GUARD_ZONES := {str(show_hints).lower()}",
+            )
+            effects["stealth.guard_zones_visible"] = float(show_hints)
+            used.add("opacity")
 
     return player, loop, {
         "schema": SCHEMA,

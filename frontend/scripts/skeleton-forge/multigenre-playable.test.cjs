@@ -163,8 +163,30 @@ test('creator explains exact authored cockpit effects for every supported mini-g
   }
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.racing, [
     'Tempo → movement speed', 'Risk → checkpoint time limit',
+    'Progression depth → race laps',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.survival, [
     'Tempo → movement speed', 'Scarcity → hydration drain',
+  ]);
+});
+
+
+test('creator discloses progression and mystery effects only where implemented', () => {
+  assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.puzzle, [
+    'Tempo → movement speed', 'Mystery → switch hints',
+  ]);
+  assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.stealth, [
+    'Tempo → movement speed', 'Risk → guard detection radius',
+    'Mystery → guard-zone visibility',
+  ]);
+  assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.pipeline, [
+    'Tempo → movement speed', 'Progression depth → shipment quota',
+  ]);
+  assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.combat_loop, [
+    'Tempo → movement speed', 'Lethality → starting health',
+    'Progression depth → combat waves',
+  ]);
+  assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.crafting, [
+    'Tempo → movement speed',
   ]);
 });

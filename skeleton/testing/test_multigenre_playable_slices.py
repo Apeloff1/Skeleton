@@ -538,3 +538,68 @@ def test_tuning_does_not_restore_unknown_static_player_member_access(mode):
     assert "player.autopilot_target" not in loop
     assert "player.autopilot" not in loop
     assert 'player.set("autopilot_target",' in loop
+
+
+
+@pytest.mark.parametrize("mode,source_key,expected", [
+    ("combat_loop", "combat_loop.waves", (2, 3, 4)),
+    ("racing", "racing.goal_laps", (2, 3, 4)),
+    ("pipeline", "pipeline.shipment_quota", (2, 4, 6)),
+])
+def test_progression_depth_changes_native_completion_quotas(mode, source_key, expected):
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    constant = {
+        "combat_loop": "WAVES",
+        "racing": "GOAL_LAPS",
+        "pipeline": "QUOTA",
+    }[mode]
+    original = archetype_files(mode)
+    for knob, count in zip((0, 0.5, 1), expected):
+        bundle = archetype_files(mode, tuning={"grind": knob})
+        loop = bundle[f"scripts/archetypes/{mode}/core_loop.gd"]
+        assert f"const {constant} := {count}" in loop
+        tuning = json.loads(bundle[SOURCE_PATH])
+        assert tuning["applied"][source_key] == float(count)
+        assert tuning["mapped_axes"] == ["grind"]
+        assert tuning["unmapped_axes"] == []
+        assert bundle == archetype_files(mode, tuning={"grind": knob})
+        valid, errors = check_ok(bundle)
+        assert valid, (mode, knob, errors)
+    assert SOURCE_PATH not in original
+
+
+@pytest.mark.parametrize("mode,flag,source_key", [
+    ("puzzle", "SHOW_ACTIVE_SWITCH", "puzzle.active_switch_hint_visible"),
+    ("stealth", "SHOW_GUARD_ZONES", "stealth.guard_zones_visible"),
+])
+def test_mystery_axis_changes_real_native_hint_visibility(mode, flag, source_key):
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    normal = archetype_files(mode)
+    for knob, expected in ((0, True), (0.65, True), (0.67, False), (1, False)):
+        generated = archetype_files(mode, tuning={"opacity": knob})
+        loop = generated[f"scripts/archetypes/{mode}/core_loop.gd"]
+        assert f"const {flag} := {str(expected).lower()}" in loop
+        receipt = json.loads(generated[SOURCE_PATH])
+        assert receipt["applied"][source_key] == float(expected)
+        assert receipt["mapped_axes"] == ["opacity"]
+        assert receipt["unmapped_axes"] == []
+        valid, issues = check_ok(generated)
+        assert valid, (mode, knob, issues)
+    assert "const SHOW_" in normal[f"scripts/archetypes/{mode}/core_loop.gd"]
+
+
+def test_extra_cockpit_axes_remain_auditable_not_silent_gameplay_claims():
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    for mode in SUPPORTED:
+        built = archetype_files(mode, tuning={
+            "opacity": 1, "grind": 1, "authorial": 0.6, "agency": 0.3,
+        })
+        receipt = json.loads(built[SOURCE_PATH])
+        mapped = set(receipt["mapped_axes"])
+        assert "authorial" not in mapped
+        assert "agency" not in mapped
+        assert receipt["unmapped_axes"] == sorted(
+            set(receipt["axes"]) - mapped
+        )
+        # The normal provenance verifier reconstructs every altered template.
+        assert receipt["mode"] == mode
