@@ -12,6 +12,19 @@ const MATRIX_FAMILIES = new Set([
   'mechanics', 'world', 'art', 'audio', 'tech', 'monetisation', 'qa', 'agent',
   'vector_db', 'plagiarism', 'rdbms', 'styles', 'mutation', 'unique_flair',
 ]);
+const STYLE_ENUMS: Record<string, readonly string[]> = {
+  animationStyle: ['subtle', 'smooth', 'punchy', 'cinematic'],
+  storylineStyle: ['heroic', 'tragedy', 'mystery', 'redemption', 'coming_of_age', 'comedy', 'cosmic_horror'],
+  gamePace: ['slow_burn', 'standard', 'action_packed', 'breakneck'],
+  difficultyCurve: ['gentle', 'steady', 'adaptive', 'punishing'],
+  perspective: ['first_person', 'third_person', 'isometric', 'top_down', 'side_scroll', 'vr'],
+  combatStyle: ['realtime', 'turn_based', 'action_rpg', 'rhythm', 'tactical', 'none'],
+  visualStyle: ['photoreal', 'cel_shaded', 'pixel_art', 'low_poly', 'voxel', 'hand_painted', 'anime'],
+  gameTone: ['heroic', 'dark', 'humorous', 'melancholic', 'epic', 'cozy', 'unsettling'],
+  progressionType: ['linear', 'open_world', 'metroidvania', 'roguelike', 'sandbox', 'hub_and_spoke'],
+  audioMood: ['orchestral', 'synthwave', 'ambient', 'chiptune', 'rock', 'folk', 'silent'],
+  locomotionStyle: ['basic', 'tactical', 'parkour', 'als', 'gunplay', 'melee'],
+};
 
 export interface GalaxyDraftSnapshot {
   schema: typeof GALAXY_DRAFT_SCHEMA;
@@ -120,7 +133,11 @@ export function normalizeGalaxyDraft(raw: unknown, now: number = Date.now()): Ga
   const styleChoices: Record<string, string | boolean> = {};
   for (const [key, value] of Object.entries(styles).slice(0, 20)) {
     if (!KEY_PATTERN.test(key) || ['constructor','prototype','__proto__'].includes(key)) continue;
-    if (typeof value === 'boolean' || typeof value === 'string' && value.length <= 80) styleChoices[key] = value;
+    if (key === 'cameraEffects') {
+      if (typeof value === 'boolean') styleChoices[key] = value;
+    } else if (typeof value === 'string' && STYLE_ENUMS[key]?.includes(value)) {
+      styleChoices[key] = value;
+    }
   }
   const narrative: GalaxyDraftSnapshot['narrative'] = {};
   const phaseSet = obj(v.narrative);
