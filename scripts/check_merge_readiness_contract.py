@@ -209,13 +209,13 @@ def main() -> int:
     # intentionally independent packages. Importing both under one pytest
     # invocation causes collection failures that mask real security results.
     security_step = re.search(
-        r"(?ms)^      - name: Verify tenant-bound binary custody, vault streaming and bounded SSRF\\n"
-        r"(?P<body>.*?)(?=^      - name: |\\Z)",
+        r"(?ms)^      - name: Verify tenant-bound binary custody, vault streaming and bounded SSRF\n"
+        r"(?P<body>.*?)(?=^      - name: |\Z)",
         quality_security,
     )
     require(security_step is not None, "bounded security regression step missing", failures)
     if security_step is not None:
-        backend_tests, separator, root_tests = security_step.group("body").partition("\\n          cd ..\\n")
+        backend_tests, separator, root_tests = security_step.group("body").partition("\n          cd ..\n")
         require(
             bool(separator)
             and "python -m pytest --noconftest -q" in root_tests
