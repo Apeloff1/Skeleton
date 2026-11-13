@@ -235,6 +235,10 @@ class _PrivateProjectRoute(PublicExceptionRoute):
         return handler
 
 
+# Historical imports retain the same protected route class, not a weaker APIRoute.
+_GuardedPrivateProjectRoute = _PrivateProjectRoute
+
+
 def project_router(*args, **kwargs):
     local_jobs = kwargs.pop("local_jobs", False)
     project_aliases = kwargs.pop("project_aliases", ())
