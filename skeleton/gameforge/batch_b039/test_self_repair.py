@@ -98,3 +98,51 @@ def test_negative_cost_rejected():
     with pytest.raises(ValueError):
         RepairLoop(evaluator, lambda a, d, r: Mutation("hp", {"hp": 20}, -5), lambda d: RouteChoice("m", "p"),
                    Budget(3, 10, 10), Clock(0.0)).run({"hp": 1})
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf"), True, "unbounded"])
+def test_invalid_nonfinite_budget_limits_are_denied(value):
+    with pytest.raises(ValueError):
+        Budget(1, value, 5)
+    with pytest.raises(ValueError):
+        Budget(1, 5, value)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf"), True, -1])
+def test_mutation_and_route_costs_fail_closed(value):
+    with pytest.raises(ValueError):
+        Mutation("hp", {"hp": 10}, value)
+    with pytest.raises(ValueError):
+        RouteChoice("m", "local", value)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf"), True, "invalid"])
+def test_evaluator_score_is_always_finite(value):
+    with pytest.raises(ValueError):
+        EvalResult(value)
+
+
+@pytest.mark.parametrize("value", [True, 1.5, -1, "1"])
+def test_mutation_count_is_nonnegative_integer(value):
+    with pytest.raises(ValueError):
+        Budget(value, 1, 1)
+
+
+def test_nonfinite_clock_rejected_before_repair():
+    with pytest.raises(ValueError, match="clock"):
+        loop(Budget(1, 10, 10), clock=lambda: float("nan")).run({"hp": 0})
+
+
+def test_rewinding_clock_rejected_without_spending_budget():
+    samples = iter((10.0, 9.0))
+    repair = loop(Budget(2, 10, 10), clock=lambda: next(samples))
+    with pytest.raises(ValueError, match="monotonically"):
+        repair.run({"hp": 0})
+
+
+def test_budgeted_repair_still_completes_with_exact_finite_cost():
+    outcome = loop(Budget(3, 100, 4.5)).run({"hp": 1})
+    assert outcome.status == "repaired"
+    assert outcome.steps == 3
+    assert outcome.cost_spent == pytest.approx(4.5)
+    assert outcome.artifact["hp"] >= 10
