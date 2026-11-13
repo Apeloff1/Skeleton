@@ -1539,6 +1539,13 @@ async def _prepare_new_chat_execution(
             },
         )
     inventory = await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
+    from skeleton.ai.jeeves_local_policy import (
+        JeevesLocalPolicyError, require_local_inventory,
+    )
+    try:
+        require_local_inventory(inventory["models"])
+    except JeevesLocalPolicyError:
+        raise HTTPException(status_code=503, detail="Jeeves local-only model inventory is not activated") from None
     try:
         selection = resolve_selection(inventory, provider_id=request.provider_id, model_id=request.model_id)
         selection = cooperation_context_selection(
@@ -1765,6 +1772,16 @@ async def ai_chat(
             status_code=422,
             detail="Client conversation_history is not authoritative; use thread_id",
         )
+
+    # Jeeves is the only first-party local model on a local-only deployment.
+    # Advisory multimodal context has no authority to choose a hosted model.
+    from skeleton.ai.jeeves_local_policy import (
+        JeevesLocalPolicyError, require_primary_selection,
+    )
+    try:
+        require_primary_selection(request.provider_id, request.model_id)
+    except JeevesLocalPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
 
     tenant_id, owner_id = _chat_identity(user)
     retrying_incomplete_turn = False
@@ -3796,7 +3813,16 @@ async def get_ai_models(user=Depends(require_role("viewer"))):
         client = EngineClient.from_env()
     except EngineClientError:
         client = None
-    return await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
+    catalog = await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
+    from skeleton.ai.jeeves_local_policy import (
+        JeevesLocalPolicyError, require_local_inventory,
+    )
+    try:
+        require_local_inventory(catalog["models"])
+    except JeevesLocalPolicyError:
+        from core.model_catalog import unavailable_catalog
+        return unavailable_catalog("local_configuration_invalid")
+    return catalog
 
 
 @router.get("/runtime-control")
@@ -3987,6 +4013,14 @@ async def chat_readiness(user=Depends(require_role("viewer"))):
     except EngineClientError:
         client = None
     models = await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
+    from skeleton.ai.jeeves_local_policy import (
+        JeevesLocalPolicyError, require_local_inventory,
+    )
+    try:
+        require_local_inventory(models["models"])
+    except JeevesLocalPolicyError:
+        from core.model_catalog import unavailable_catalog
+        models = unavailable_catalog("local_configuration_invalid")
     storage = {"available": False, "code": "conversation_storage_unavailable"}
     try:
         await asyncio.wait_for(chat_turn_authority.database.command("ping"), timeout=2)

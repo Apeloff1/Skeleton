@@ -236,10 +236,49 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
   const attached = accountDraftsReady ? files[threadId] || [] : [];
   const busy = ['submitting', 'streaming', 'reconnecting', 'cancelling'].includes(state.status);
   const loading = state.status === 'loading';
-  const selectedModel = state.models.find(model => model.id === state.selectedModelId);
-  const observedModel = readiness?.models.models.find(model => model.id === selectedModel?.id);
-  const modelReady = readiness?.available === true && !!selectedModel?.available && selectedModel.selectable
-    && observedModel?.available === true && observedModel.selectable;
+  // Readiness is observed independently of the controller's model catalog.
+  // When an operator activates a provider after installation, update the
+  // selectable inventory without silently changing a saved model preference.
+  // Never change the selected model for an admitted/pending canonical turn.
+  const currentCatalogKey = state.models.map(model =>
+    [model.id, model.available, model.selectable].join(':')).sort().join('|');
+  const observedCatalogKey = readiness?.available === true
+    ? readiness.models.models.map(model =>
+      [model.id, model.available, model.selectable].join(':')).sort().join('|')
+    : '';
+  const catalogSyncAttempt = useRef<{ controller: typeof controller; key: string } | null>(null);
+  useEffect(() => {
+    if (!observedCatalogKey || !state.ready || state.pending || busy || loading
+      || observedCatalogKey === currentCatalogKey) return;
+    if (catalogSyncAttempt.current?.controller === controller
+      && catalogSyncAttempt.current.key === observedCatalogKey) return;
+    catalogSyncAttempt.current = { controller, key: observedCatalogKey };
+    void controller.refreshModels();
+  }, [controller, currentCatalogKey, observedCatalogKey, busy, loading, state.pending, state.ready]);
+  const refreshChatConnection = useCallback(async () => {
+    // A pending canonical turn retains its selected model and engine epoch.
+    if (controller.getSnapshot().pending) {
+      await refreshReadiness();
+      return;
+    }
+    await Promise.all([controller.refreshModels(), refreshReadiness()]);
+  }, [controller, refreshReadiness]);
+  // A stale saved choice or an engine that advertises hosted/advisory
+  // generators must never become Jeeves. Never auto-rewrite an admitted turn
+  // to the local model; require the owner to select the actual local identity.
+  const jeevesModels = state.models.filter(model => model.provider_id === 'local'
+    && model.model_id === 'jeeves' && model.credential_free);
+  const localOnlyCatalog = state.models.length === 1 && jeevesModels.length === 1
+    && readiness?.models.models.length === 1
+    && readiness.models.models[0]?.provider_id === 'local'
+    && readiness.models.models[0]?.model_id === 'jeeves'
+    && readiness.models.models[0]?.credential_free === true;
+  const selectedModel = jeevesModels.find(model => model.id === state.selectedModelId);
+  const observedModel = readiness?.models.models.find(model => model.id === selectedModel?.id
+    && model.provider_id === 'local' && model.model_id === 'jeeves' && model.credential_free);
+  const modelReady = localOnlyCatalog && readiness?.available === true
+    && selectedModel?.active === true && selectedModel.available && selectedModel.selectable
+    && observedModel?.active === true && observedModel.available && observedModel.selectable;
   const observedOutputLimit = selectedModel && observedModel
     ? Math.min(selectedModel.max_output_tokens ?? 0, observedModel.max_output_tokens) : undefined;
   const answerTokenLimit = Math.min(outputTokens ?? selectedModel?.default_output_tokens ?? 1024, observedOutputLimit ?? 1024);
@@ -621,7 +660,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
           {state.activeThread && !narrow && <IconButton icon="ellipsis-horizontal" label="Conversation options" disabled={busy}
             onPress={() => { setManage({ thread: state.activeThread!, action: 'menu' }); setDialogError(null); }} />}
         </View>
-        <JeevesRuntimeStatus readiness={readiness} refresh={refreshReadiness} readinessError={readinessError?.message} observedAt={readinessObservedAt} />
+        <JeevesRuntimeStatus readiness={readiness} refresh={refreshChatConnection} readinessError={readinessError?.message} observedAt={readinessObservedAt} />
         <View style={s.companionToggle}><MiniButton icon="sparkles-outline" label={companionOpen ? 'Hide companion' : 'Show companion'} onPress={() => setCompanionOpen(open => !open)} /></View>
         </View>
         {companionOpen && <ScrollView style={[s.companionDock, { top: headerHeight + 8, bottom: composerHeight + 12 }, compact && s.companionDockCompact]} keyboardShouldPersistTaps="handled">
@@ -689,8 +728,8 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
           {state.activeThread?.state === 'archived' ? <View style={s.alert}><Text style={s.alertText}>Restore this conversation to continue chatting.</Text>
             <Button icon="arrow-undo-outline" label="Restore conversation" onPress={() => run(() => controller.archive(false))} /></View> : <>
             {!busy && !loading && !pending && !modelReady && <View style={s.alert}>
-              <Text accessibilityLiveRegion="polite" style={s.alertText}>{readinessError?.message || (readiness && !readiness.available ? chatReadinessMessage(readiness) : readiness?.models.readiness?.message || observedModel?.readiness.message) || 'A ready model and conversation storage are required. Your draft is preserved while you finish setup.'}</Text>
-              <View style={s.row}><MiniButton icon="refresh-outline" label="Check readiness & models" onPress={() => run(async () => { await Promise.all([refreshReadiness(), controller.refreshModels()]); })} /><MiniButton icon="settings-outline" label="Finish AI setup" onPress={() => router.push('/setup' as never)} /><MiniButton icon="hardware-chip-outline" label="Choose model" onPress={() => setModelsOpen(true)} /></View>
+              <Text accessibilityLiveRegion="polite" style={s.alertText}>{readinessError?.message || (readiness && !readiness.available ? chatReadinessMessage(readiness) : readiness?.available && !modelReady && state.models.some(model => model.available && model.selectable) ? 'The AI engine is ready, but the selected model is unavailable or belongs to a previous configuration. Choose a ready model explicitly; your draft and any saved turn are preserved.' : readiness?.models.readiness?.message || observedModel?.readiness.message) || 'A ready model and conversation storage are required. Your draft is preserved while you finish setup.'}</Text>
+              <View style={s.row}><MiniButton icon="refresh-outline" label="Check readiness & models" onPress={() => run(refreshChatConnection)} /><MiniButton icon="settings-outline" label="Finish AI setup" onPress={() => router.push('/setup' as never)} /><MiniButton icon="hardware-chip-outline" label="Choose model" onPress={() => setModelsOpen(true)} /></View>
             </View>}
             {!!uploadError && <View style={s.row}><Text style={[s.errorText, { flex: 1 }]} accessibilityRole="alert">{uploadError}</Text><IconButton icon="close-outline" label="Dismiss file error" onPress={() => setUploadError(null)} /></View>}
             <View style={[s.composer, focused && s.focusedComposer]}>
@@ -727,10 +766,10 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
             <ChatResponseReviewControl enabled={reviewResponse} change={setReviewResponse} disabled={busy || loading} available={reviewAvailable} answerTokenLimit={answerTokenLimit}
               policy={reviewPolicy} changePolicy={setReviewPolicy} models={readiness?.models.models ?? []} mainModel={observedModel}
               fieldError={reviewFieldError} changeFieldError={setReviewFieldError} issues={reviewIssues}
-              refreshModels={async () => { await Promise.all([controller.refreshModels(), refreshReadiness()]); }} />
+              refreshModels={refreshChatConnection} />
             <WorkflowTemplatePicker surface="chat" contextKey={workflowContextKey} disabled={!workflowDraftReady}
               unavailableReason={workflowUnavailableReason} onApply={applyWorkflowTemplate} />
-            <Text style={s.composerHint}>{pending && !busy ? pending.stopRequested ? 'Stop intent is saved. Check the same turn or explicitly retry Stop; Resume will not resubmit it.' : 'Check the saved turn, explicitly resume it, or open another conversation. Its original request stays unchanged.' : reviewResponse && !reviewAvailable ? 'Response review is unavailable. Refresh readiness or turn off review to continue.' : !reviewBudgetReady ? reviewFieldError || reviewIssues[0] || 'Review the response settings before sending.' : busy ? 'You can draft your next message while Jeeves replies.' : modelReady ? Platform.OS === 'web' ? 'Enter to send · Shift + Enter for a new line' : 'Check important information.' : 'Choose an available model to start chatting.'}</Text>
+            <Text style={s.composerHint}>{pending && !busy ? pending.stopRequested ? 'Stop intent is saved. Check the same turn or explicitly retry Stop; Resume will not resubmit it.' : 'Check the saved turn, explicitly resume it, or open another conversation. Its original request stays unchanged.' : reviewResponse && !reviewAvailable ? 'Response review is unavailable. Refresh readiness or turn off review to continue.' : !reviewBudgetReady ? reviewFieldError || reviewIssues[0] || 'Review the response settings before sending.' : busy ? 'You can draft your next message while Jeeves replies.' : modelReady ? Platform.OS === 'web' ? 'Enter to send · Shift + Enter for a new line' : 'Check important information.' : 'Configure the only local Jeeves model before starting chat.'}</Text>
           </>}
         </View></View>
       </View>
@@ -738,13 +777,14 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
     {compact && sidebarOpen && <Modal visible animationType="slide" onRequestClose={() => setSidebarOpen(false)}>
       <SafeAreaView style={s.root}>{sidebar}</SafeAreaView></Modal>}
     {modelsOpen && <Dialog title="Choose a model" close={() => setModelsOpen(false)}>
-      <Text style={s.dialogBody}>Choose the configured model for the next new turn. Resuming a saved turn preserves its original model and review settings. Listed capabilities describe the model; this conversation’s granted tools remain separate.</Text>
+      <Text style={s.dialogBody}>Jeeves permits exactly one local primary model. Multimodal inputs are advisory evidence only; remote providers, verifiers and other models cannot generate this chat. Resuming a saved turn preserves its original model identity.</Text>
       <ScrollView style={s.dialogScroll} contentContainerStyle={s.modelList} keyboardShouldPersistTaps="handled">
-        {!state.models.length && <Text style={s.dialogBody}>No models are available right now. Refresh to check again.</Text>}
-        {state.models.map(model => <TouchableOpacity key={model.id} accessibilityRole="button"
+        {!jeevesModels.length && <Text style={s.dialogBody}>The local Jeeves model is not available. Hosted and advisory models cannot answer this chat.</Text>}
+        {!localOnlyCatalog && state.models.length > 0 && <Text accessibilityRole="alert" style={s.dialogBody}>The engine model inventory is not exclusively local Jeeves. Chat is blocked until configuration is corrected.</Text>}
+        {jeevesModels.map(model => <TouchableOpacity key={model.id} accessibilityRole="button"
           accessibilityLabel={`${model.label}. ${model.selectable && model.available ? 'Ready' : model.readiness?.message || 'Unavailable'}`}
-          accessibilityState={{ selected: model.id === state.selectedModelId, disabled: !model.selectable || !model.available || busy }}
-          disabled={!model.selectable || !model.available || busy} style={[s.modelItem, model.id === state.selectedModelId && s.selectedModel]}
+          accessibilityState={{ selected: model.id === state.selectedModelId, disabled: !localOnlyCatalog || !model.active || !model.selectable || !model.available || busy }}
+          disabled={!localOnlyCatalog || !model.active || !model.selectable || !model.available || busy} style={[s.modelItem, model.id === state.selectedModelId && s.selectedModel]}
           onPress={() => { controller.selectModel(model.id); setOutputTokens(null); setModelsOpen(false); input.current?.focus(); }}>
           <View style={s.between}><Text style={s.modelName}>{model.label}</Text>
             <Text style={[s.badge, (!model.selectable || !model.available) && s.unavailableBadge]}>{model.selectable && model.available ? 'Ready' : 'Unavailable'}</Text>
@@ -754,7 +794,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
         </TouchableOpacity>)}
       </ScrollView>
       {selectedModel && <View style={{ gap: 8 }}><Text style={s.dialogBody}>Shared answer token budget · {answerTokenLimit.toLocaleString()}</Text><View style={[s.row, { flexWrap: 'wrap' }]}>{[128, 256, 512, 1024, 2048, 4096].filter(value => value <= (selectedModel.max_output_tokens ?? 0)).map(value => <MiniButton key={value} icon={answerTokenLimit === value ? 'checkmark-circle-outline' : 'ellipse-outline'} label={value.toLocaleString()} disabled={busy} onPress={() => setOutputTokens(value)} />)}</View></View>}
-      <Button icon="refresh-outline" label="Refresh models" disabled={busy} onPress={() => run(async () => { await Promise.all([controller.refreshModels(), refreshReadiness()]); })} />
+      <Button icon="refresh-outline" label="Refresh models" disabled={busy} onPress={() => run(refreshChatConnection)} />
     </Dialog>}
     {manage && <Dialog title={manage.action === 'rename' ? 'Rename conversation' : manage.action === 'delete' ? 'Delete conversation?' : manage.action === 'export' ? 'Export conversation' : 'Conversation options'} close={() => { if (!mutationBusy) setManage(null); }}>
       {manage.action === 'menu' ? <>

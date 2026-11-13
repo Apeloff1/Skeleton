@@ -11,6 +11,7 @@ import { createConversation, projectCanonicalHistory, MAX_CONVERSATIONS, type Ca
 import type { ChatProgress, ChatResponse, WorkspaceStorage } from '../features/Jeeves/WorkspaceController';
 import { normalizeChatCooperation, reconcileChatCooperation, validateChatCooperationReceipts, validateChatCooperationSummary, type ChatCooperationSummary } from './chatCooperation';
 import { validateChatModel, type ChatModelRuntimeFacts } from './chatModelCatalog';
+import { nativeBackendConfigurationIssue } from '../utils/apiBase';
 
 export type ChatModel = { id: string; provider_id: string; model_id: string; label: string; available: boolean; selectable: boolean; active: boolean; fallback?: boolean; credential_free: boolean; context_window: number; max_output_tokens: number; default_output_tokens: number; model_family?: string; tokenizer?: string; limits_source?: string; activation?: Record<string, unknown> | null; capabilities: string[]; readiness: { code: string; message: string; action?: string | null } } & ChatModelRuntimeFacts;
 export type ChatReadiness = {
@@ -62,6 +63,8 @@ function checkTurn(value: Turn, threadId: string, key: string): Turn {
   return value;
 }
 export async function getChatReadiness(signal?: AbortSignal): Promise<ChatReadiness> {
+  const nativeIssue = nativeBackendConfigurationIssue();
+  if (nativeIssue) throw new ChatClientError(nativeIssue, { kind: 'network', code: 'native_backend_unconfigured', retryable: false });
   const value = await read(api.get<ChatReadiness>(ROOT + '/readiness', opts(signal)), getAuthToken(), 'AI chat readiness could not be observed. Open Setup to check the services.');
   if (!value || value.schema_version !== 'backend.ai.chat-readiness.v1' || typeof value.available !== 'boolean' || typeof value.configured !== 'boolean' || !value.checks || !value.models || !Array.isArray(value.models.models) || value.models.models.length > 16 || !value.capabilities || !Array.isArray(value.actions)) invalid('The AI chat readiness response is invalid.');
   const seenModels = new Set<string>();
@@ -76,8 +79,36 @@ export async function getChatReadiness(signal?: AbortSignal): Promise<ChatReadin
 }
 export function chatReadinessMessage(value: ChatReadiness): string {
   if (value.available) return 'The conversation store, AI engine and a configured model are ready.';
-  const missing = Object.entries(value.checks).filter(([key, check]) => key !== 'crawler' && !check.available).map(([key]) => ({ conversation_storage: 'conversation storage', engine: 'AI engine', models: 'configured model' })[key] || key);
-  return missing.length ? `Waiting for ${missing.join(', ')}. Open Setup for the observed prerequisites.` : 'AI chat is not ready. Check the configured model and application services.';
+  const storage = value.checks.conversation_storage;
+  const engine = value.checks.engine;
+  const model = value.checks.models;
+  if (storage && !storage.available) {
+    return 'AI chat needs its durable conversation store and admission grants. Check Mongo and engine storage admission in Setup; your draft is preserved.';
+  }
+  if (engine && !engine.available) {
+    return 'The application cannot reach or authorize its AI engine. Check the installed API connection and engine service in Setup.';
+  }
+  if (model && !model.available) {
+    switch (model.code) {
+      case 'local_guard_unavailable':
+        return 'Local chat cannot activate: the trusted runtime guard is missing. Model downloads alone will not fix this. Complete the protected engine bootstrap; do not disable its guard.';
+      case 'local_guard_configuration_invalid':
+        return 'The protected local-model guard configuration is invalid. Ask the installation owner to repair the trusted bootstrap.';
+      case 'local_model_not_configured':
+        return 'No local chat model is installed or activated. Configure a verified local deployment or an approved hosted provider, then restart the AI engine.';
+      case 'provider_credentials_missing':
+        return 'Hosted AI is selected but server-side provider credentials are missing. Configure them on the host, never in this app.';
+      case 'local_artifact_invalid':
+      case 'local_catalog_invalid':
+      case 'local_configuration_invalid':
+        return 'The activated local model cannot be verified. Inspect its pinned manifest, runtime, filesystem access and exact model selection.';
+      case 'model_context_too_small':
+        return 'The model context budget is too small for chat. Configure a larger supported window or choose another ready model.';
+      default:
+        return 'No model is ready to answer. Inspect the engine model catalog and the first-install AI setup; health alone does not prove inference.';
+    }
+  }
+  return 'AI chat readiness has not been established. Refresh the model catalog and check Setup.';
 }
 export async function verifiedChatScope(): Promise<{ key: string; token: string }> {
   const initialToken = getAuthToken();
