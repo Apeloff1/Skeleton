@@ -62,6 +62,10 @@ def _edit(source: dict[str, Any], raw: Any) -> dict[str, Any]:
 
 
 def _seal(doc: dict[str, Any]) -> dict[str, Any]:
+    # Revisions carry the previous receipt. Never hash that stale receipt into
+    # the replacement digest: verification hashes exactly the payload without
+    # its top-level digest field.
+    doc.pop("digest", None)
     doc["digest"] = dig(doc)
     _bounded(doc)
     return doc

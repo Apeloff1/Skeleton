@@ -18,7 +18,7 @@ on:
       - "skeleton/testing/test_app_offline_mixed_game_library_continuity.py"
       - "skeleton/testing/dialogue_sessions_v1/__init__.py"
       - "skeleton/testing/questflows_v1/__init__.py"
-      - "skeleton/testing/test_local_ai_gguf_custody.py"
+      - "skeleton/testing/test_local_ai_model_loader_custody.py"
       - "machine/draft19_reconciliation.json"
       - "scripts/check_draft19_reconciliation.py"
       - "tests/test_draft19_reconciliation.py"
@@ -52,7 +52,7 @@ jobs:
           python-version: "3.11.16"
       - name: Compile changed sources
         run: |
-          python -m py_compile skeleton/local_ai/model_loader.py skeleton/testing/test_local_ai_gguf_custody.py
+          python -m py_compile skeleton/local_ai/model_loader.py skeleton/testing/test_local_ai_model_loader_custody.py
           python -m py_compile backend/core/lazy_registry.py
           python -m py_compile skeleton/app/offline_delivery_archive.py skeleton/testing/test_app_offline_delivery_archive.py
           python -m py_compile skeleton/testing/test_app_offline_archive_schema_parity.py skeleton/testing/test_repo_machine_inventory_budget.py
@@ -73,7 +73,7 @@ jobs:
           "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2"
           "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
       - name: Run GGUF custody and prior compatibility tests
-        run: python -m unittest skeleton.testing.test_local_ai_gguf_qualification skeleton.testing.test_local_ai_gguf_custody -v
+        run: python -m unittest skeleton.testing.test_local_ai_model_loader_custody -v
       - name: Validate literal deferred-import inventory and storage diagnostics
         env:
           PYTHONPATH: ".:backend:tests"
@@ -90,7 +90,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_app_offline_delivery_archive.py::test_deterministic_game_archive_and_independent_read_only_inspection
-          skeleton/testing/test_app_offline_delivery_archive.py::test_studio_archive_rejects_missing_or_forged_custody_source
+          skeleton/testing/test_app_offline_archive_schema_parity.py::test_resealed_source_archive_cannot_bypass_studio_custody
           skeleton/testing/test_app_offline_install_preflight.py::test_preflight_does_not_reserve_and_installer_rechecks
       - name: Qualify repository scanner finite-budget semantics
         run: python -m unittest discover -s tests -p 'test_repo_machine_budget_20261108.py' -v
@@ -102,7 +102,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/dialogue_sessions_v1/test_companions_rescue.py
-          skeleton/testing/questflows_v1/test_companions_rescue.py
+          skeleton/testing/questflows_v1/test_questflows_companions_rescue.py
       - name: Qualify signed and unsigned first-playable continuity
         env:
           PYTHONPATH: ".:backend:tests"

@@ -94,6 +94,46 @@ class NativeAnswerWorker:
 
 
 class SourceRepairAdmissionTests(unittest.TestCase):
+    def test_stdlib_toml_parser_accepts_reviewed_source_and_rejects_malformed_input(self):
+        # This is a Python 3.11+ runtime contract: TOML parsing must not
+        # require the unlisted, third-party tomli distribution.
+        import tomllib
+
+        from skeleton.ai.runtime.operational_ai.laptop_runtime import (
+            desktop_source_qualification as qualification,
+        )
+
+        self.assertIs(qualification.tomllib, tomllib)
+
+        def reviewed(text):
+            return patch.PatchEntry(
+                kind="new",
+                path="config/settings.toml",
+                original_text="",
+                replacement_text=text,
+                original_sha256=None,
+                replacement_sha256=sha256(text.encode("utf-8")).hexdigest(),
+            )
+
+        valid = qualification.qualify_source_file(
+            reviewed('[tool.jeeves]\nenabled = true\n')
+        )
+        self.assertEqual(valid.language, "toml")
+        self.assertEqual(valid.status, "parse-clean")
+        self.assertFalse(valid.issues)
+        self.assertIsNotNone(valid.parser_fingerprint)
+        self.assertEqual(valid.bytes_checked, len('[tool.jeeves]\nenabled = true\n'))
+
+        malformed = qualification.qualify_source_file(
+            reviewed('[tool.jeeves]\nenabled = true\nenabled = false\n')
+        )
+        self.assertEqual(malformed.language, "toml")
+        self.assertEqual(malformed.status, "syntax-held")
+        self.assertEqual(len(malformed.issues), 1)
+        self.assertEqual(malformed.issues[0].code, "toml-syntax")
+        self.assertIsNone(malformed.parser_fingerprint)
+        self.assertFalse(malformed.to_public()["parser_fingerprint"])
+
     def test_operator_selected_goal_and_finite_attempts_required(self):
         valid = repair.SourceRepairRequest(
             root="/private/project", goal="Make a useful source feature",

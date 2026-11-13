@@ -62,7 +62,7 @@ def test_tiny_search_budget_is_inconclusive_not_failed() -> None:
     ("report_digest", "0" * 64),
     ("release_qualified", True),
     ("holds", []),
-    ("ending_proofs", {}),
+    ("ending_proofs", {"won": {"phase": "won"}}),
     ("victory_route", {}),
 ])
 def test_tampered_report_is_never_trusted(field, change) -> None:
@@ -70,6 +70,7 @@ def test_tampered_report_is_never_trusted(field, change) -> None:
     report = accept_scene(world, max_states=1)
     forged = copy.deepcopy(report)
     forged[field] = change
+    assert forged != report, "tamper regression must alter actual evidence"
     with pytest.raises(SceneTravelError):
         verify_acceptance(forged)
 

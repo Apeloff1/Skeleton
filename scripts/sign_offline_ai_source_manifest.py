@@ -29,7 +29,7 @@ _NAME=re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z",re.ASCII)
 
 
 def _publish_private(output,raw):
-    if type(output) is not Path or not output.is_absolute():
+    if not isinstance(output, Path) or not output.is_absolute():
         refuse("source approval output must be absolute")
     if type(output.name) is not str or _NAME.fullmatch(output.name) is None:
         refuse("output must have a safe basename")

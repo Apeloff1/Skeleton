@@ -138,6 +138,10 @@ def replay(spec: Any, world: Any, trace: Any) -> dict[str, Any]:
     """Independent transition replay; never trusts a searcher's witness."""
     validate_spec(spec, world)
     choices = {item["id"]: item for item in world["choices"]}
+    # Canonical route solvers return immutable tuple witnesses. Only lists and
+    # tuples are accepted, and every choice is still individually validated.
+    if type(trace) is tuple:
+        trace = list(trace)
     steps = _list(trace, "trace", MAX_STEPS)
     if len(steps) > spec["max_steps"]:
         raise CanonError("route_trace_budget")

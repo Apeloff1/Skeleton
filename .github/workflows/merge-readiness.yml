@@ -277,11 +277,16 @@ jobs:
             tests/test_scim_tenant_custody_20261111.py \
             tests/test_scim_webhook_principal_20261111.py \
             tests/test_codeql_godot_quorum_errors_20261111.py \
-            ../tests/test_full_security_alert_inventory_20261111.py \
-            ../tests/test_codeql_lineage_contract_20261111.py \
-            tests/test_codeql_exception_boundary_20261111.py \
-            ../tests/test_codeql_all_151_source_contracts_20261111.py \
-            ../tests/test_codeql_stack_trace_custody_20261111.py
+            tests/test_codeql_exception_boundary_20261111.py
+      - name: Qualify complete CodeQL alert lineage and cross-package inventory
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m pytest --noconftest -q \
+            tests/test_full_security_alert_inventory_20261111.py \
+            tests/test_codeql_lineage_contract_20261111.py \
+            tests/test_codeql_all_151_source_contracts_20261111.py \
+            tests/test_codeql_stack_trace_custody_20261111.py
       - name: Verify native-secure sessions, telemetry custody and isolated WASM code execution
         run: >-
           node --test
