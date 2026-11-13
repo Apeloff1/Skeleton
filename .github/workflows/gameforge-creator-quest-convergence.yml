@@ -98,6 +98,8 @@ jobs:
             scripts/skeleton-forge/playable-scene-evidence.test.cjs \
             scripts/skeleton-forge/source-archive.test.cjs \
             scripts/skeleton-forge/run-session-isolation.test.cjs \
+            scripts/skeleton-forge/foundation.model.test.cjs \
+            scripts/skeleton-forge/foundation.screens.test.cjs \
             scripts/skeleton-forge/run.components.test.cjs \
             scripts/skeleton-forge/creator-bridge.test.cjs \
             scripts/skeleton-forge/galaxy-draft-custody.test.cjs \
