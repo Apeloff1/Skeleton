@@ -30,7 +30,7 @@ import Slider from '@react-native-community/slider';
 
 import { apiFetch } from '../../utils/apiController';
 import { safeFetch as boundedFetch } from '../../utils/apiClient';
-import { authHeaders, getAuthToken } from '../../auth/gameforgeAuth';
+import { authHeaders, getAuthEpoch, getAuthToken } from '../../auth/gameforgeAuth';
 
 // Palette + StyleSheet extracted into ./GalaxyStudioFactoryModal.styles
 // to keep this file under the AST/parser timeout threshold.
@@ -1471,7 +1471,7 @@ export default function GalaxyStudioFactoryModal
       // Save every editable input before leaving, including all 14 matrix
       // families, production parameters, genre fusion and extended sliders.
       await persistGalaxyDraft();
-      const handoffId = prepareGalaxyHandoff(makeGalaxyBuildPayload(selectedGenre));
+      const handoffId = prepareGalaxyHandoff(makeGalaxyBuildPayload(selectedGenre), Date.now(), getAuthEpoch());
       if (onSendToForge) {
         await onSendToForge({
           title: title.trim(), vision: gameVision, genreId: selectedGenre.id, handoffId,

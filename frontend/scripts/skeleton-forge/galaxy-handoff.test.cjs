@@ -37,7 +37,7 @@ test('Galaxy handoff exactly inventories every historical matrix', () => {
     assert.match(source, new RegExp('\\b' + field + ':\\s*[a-zA-Z]+Matrix'));
   }
   assert.match(source, /makeGalaxyBuildPayload\(selectedGenre\)/);
-  assert.match(source, /prepareGalaxyHandoff\(makeGalaxyBuildPayload\(selectedGenre\)\)/);
+  assert.match(source, /prepareGalaxyHandoff\(makeGalaxyBuildPayload\(selectedGenre\), Date\.now\(\), getAuthEpoch\(\)\)/);
   assert.match(source, /galaxy-send-full-design-to-gameforge/);
 });
 
@@ -105,4 +105,23 @@ test('Forge review shows authoritative full imported profile and explicit detach
   const opt = render(h(Flow, { state: { ...state, step: 'options' },
     dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {} }));
   assert.match(text(opt), /complete Galaxy questionnaire is attached/);
+});
+test('Galaxy full-profile handoff refuses account-epoch changes even with the original one-use URL', () => {
+  const ownerEpoch = 17;
+  const id = G.prepareGalaxyHandoff(payload(), 2000, ownerEpoch);
+  assert.equal(G.consumeGalaxyHandoff(id, 2001, ownerEpoch + 1), null,
+    'new account must not receive previous account draft');
+  assert.equal(G.consumeGalaxyHandoff(id, 2002, ownerEpoch), null,
+    'mismatched consumption must retire the hint');
+  const second = G.prepareGalaxyHandoff(payload({ title: 'Same owner' }), 2003, ownerEpoch);
+  assert.equal(G.consumeGalaxyHandoff(second, 2004, ownerEpoch).config.title, 'Same owner');
+  const legacyReader = G.prepareGalaxyHandoff(payload(), 2010, ownerEpoch);
+  assert.equal(G.consumeGalaxyHandoff(legacyReader, 2011), null,
+    'an unbound reader cannot bypass a bound profile');
+  const invalid = [NaN, Infinity, -1, 1.5, Number.MAX_SAFE_INTEGER + 1];
+  for (const epoch of invalid) assert.throws(() => G.prepareGalaxyHandoff(payload(), 2020, epoch));
+  const modal = fs.readFileSync(path.join(ROOT, 'src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'), 'utf8');
+  const cockpit = fs.readFileSync(path.join(ROOT, 'src/skeletonForge/components/ForgeCockpitScreen.tsx'), 'utf8');
+  assert.match(modal, /prepareGalaxyHandoff\(makeGalaxyBuildPayload\(selectedGenre\), Date\.now\(\), getAuthEpoch\(\)\)/);
+  assert.match(cockpit, /consumeGalaxyHandoff\(galaxyHandoffId, Date\.now\(\), getAuthEpoch\(\)\)/);
 });

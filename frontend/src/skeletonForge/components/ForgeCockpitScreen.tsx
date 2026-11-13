@@ -32,7 +32,7 @@ export default function ForgeCockpitScreen({
   const [handoffNotice, setHandoffNotice] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (!galaxyHandoffId) return;
-    const profile = consumeGalaxyHandoff(galaxyHandoffId);
+    const profile = consumeGalaxyHandoff(galaxyHandoffId, Date.now(), getAuthEpoch());
     if (!profile) {
       setHandoffNotice('Galaxy transfer expired or was already consumed. Return to Galaxy Studio to send the questionnaire again.');
       return;
