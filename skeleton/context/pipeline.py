@@ -289,10 +289,10 @@ def _commit(ctx: Dict[str, Any], stage: str, operator: str, system: str, extra: 
 
 def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
     vision = ctx.get("vision") or ""
-    _commit(ctx, "ingest", vision, "ingested", {
-        "chars": len(vision),
-        "galaxy_profile_sha256": (ctx.get("galaxy_receipt") or {}).get("sha256"),
-    })
+    details = {"chars": len(vision)}
+    if ctx.get("galaxy_receipt"):
+        details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
+    _commit(ctx, "ingest", vision, "ingested", details)
     return {"ingested": True, "chars": len(vision)}
 
 
@@ -519,13 +519,15 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
             root, files, overwrite=bool(ctx.get("overwrite")),
             meta={"era": ctx.get("era"), "dps": ctx.get("primary_dps")},
         )
-    _commit(ctx, "emit", ctx["era"], f"{len(files)} files", {
+    details = {
         "file_count": len(files),
         "root": None if not project else project["root"],
         "check": "ok",
         "playtest": None if played is None else played.get("status"),
-        "galaxy_profile_sha256": (ctx.get("galaxy_receipt") or {}).get("sha256"),
-    })
+    }
+    if ctx.get("galaxy_receipt"):
+        details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
+    _commit(ctx, "emit", ctx["era"], f"{len(files)} files", details)
     return {"emitted": True, "project": project, "check_ok": True, "playtest": played}
 
 
