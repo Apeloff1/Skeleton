@@ -84,6 +84,31 @@ test('explicit Forge → Galaxy → Forge handoff retains authored axes, beats a
   assert.match(request.vision, /Specialized genre:/);
 });
 
+test('full questionnaire progress survives passive close and explicit return without skipping blocked steps', () => {
+  const filled = make(
+    { type: 'setVision', vision: 'An original narrative strategy game' },
+    { type: 'setBrief', facet: 'genre', value: 'strategy' },
+    { type: 'setBeat', beat: 'pace', value: 'unhurried' },
+    { type: 'goto', step: 'review' },
+  );
+  assert.equal(filled.step, 'review');
+  const toGalaxy = H.handoffFromForge(filled, 1700000000000);
+  assert.equal(toGalaxy.step, 'review');
+  const toForge = H.handoffFromGalaxy(
+    { title: '', vision: '', genreId: null }, toGalaxy, 1700000000001,
+  );
+  assert.equal(toForge.step, 'review');
+  const returned = H.forgeStateFromHandoff(toForge, 1700000000002);
+  assert.equal(returned.step, 'review');
+  assert.equal(returned.brief.genre, 'strategy');
+  assert.equal(returned.beats.pace, 'unhurried');
+
+  const forged = { ...toForge, step: 'review', vision: '', brief: {}, beats: {} };
+  const fenced = H.forgeStateFromHandoff(forged, 1700000000002);
+  assert.equal(fenced.step, 'vision');
+  assert.equal(H.parseCreatorBridge({ ...toForge, step: 'not-a-step' }, 'forge', 1700000000002).step, 'brief');
+});
+
 test('Galaxy direct navigation populates only compatible Forge vocabulary', () => {
   const draft = H.handoffFromGalaxy({
     title: 'Harbor colony',
