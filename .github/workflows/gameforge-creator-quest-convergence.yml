@@ -61,6 +61,7 @@ jobs:
         run: |
           node --test \
             scripts/skeleton-forge/creator-quest-convergence.test.cjs \
+            scripts/skeleton-forge/creator-bridge.test.cjs \
             scripts/skeleton-forge/instruments.test.cjs \
             scripts/skeleton-forge/native-quest.test.cjs
       - name: Typecheck complete frontend
