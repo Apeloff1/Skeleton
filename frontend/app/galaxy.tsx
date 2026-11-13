@@ -12,6 +12,7 @@
  *  pops back to wherever the user came from.
  */
 import React from 'react';
+import { getAuthEpoch, subscribeAuthChanges } from '../src/auth/gameforgeAuth';
 import { View, StyleSheet, Text } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
@@ -27,10 +28,19 @@ export default function GalaxyRoute() {
   const [incoming, setIncoming] = React.useState<CreatorBridgeDraft | null>(null);
   const [savedGalaxy, setSavedGalaxy] = React.useState<GalaxyDraftSnapshot | null>(null);
   const [ready, setReady] = React.useState(false);
+  const [authEpoch, setAuthEpoch] = React.useState(() => getAuthEpoch());
+  const [loadedAuthEpoch, setLoadedAuthEpoch] = React.useState<number | null>(null);
   const [handoffError, setHandoffError] = React.useState<string | null>(null);
+
+  React.useEffect(() => subscribeAuthChanges(() => setAuthEpoch(getAuthEpoch())), []);
 
   React.useEffect(() => {
     let mounted = true;
+    setReady(false);
+    setLoadedAuthEpoch(null);
+    setIncoming(null);
+    setSavedGalaxy(null);
+    setHandoffError(null);
     void Promise.all([
       consumeCreatorBridge('galaxy').catch(() => null),
       loadGalaxyDraft().catch(() => null),
@@ -38,9 +48,14 @@ export default function GalaxyRoute() {
       if (!mounted) return;
       setIncoming(draft);
       setSavedGalaxy(saved);
-    }).finally(() => { if (mounted) setReady(true); });
+    }).finally(() => {
+      if (mounted && getAuthEpoch() === authEpoch) {
+        setLoadedAuthEpoch(authEpoch);
+        setReady(true);
+      }
+    });
     return () => { mounted = false; };
-  }, []);
+  }, [authEpoch]);
 
   const continueInForge = React.useCallback(async (selection: GalaxyBridgeSelection): Promise<void> => {
     try {
@@ -72,7 +87,7 @@ export default function GalaxyRoute() {
   return (
     <View style={styles.root} testID="galaxy-studio-route">
       {handoffError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24' }}>{handoffError}</Text> : null}
-      {ready ? (
+      {ready && loadedAuthEpoch === authEpoch ? (
         <LazyMount><GalaxyStudioFactoryModal visible={true} onClose={close}
           initialForgeDraft={incoming} initialGalaxyDraft={savedGalaxy}
           handoffError={handoffError} onSendToForge={continueInForge} /></LazyMount>

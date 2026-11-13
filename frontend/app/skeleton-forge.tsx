@@ -4,6 +4,7 @@
  * Deep link a tab with ?tab=build|compose|plan|run|eras|console.
  */
 import React from 'react';
+import { getAuthEpoch, subscribeAuthChanges } from '../src/auth/gameforgeAuth';
 import { SafeAreaView, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import ForgeCockpitScreen from '../src/skeletonForge/components/ForgeCockpitScreen';
@@ -20,11 +21,20 @@ export default function SkeletonForgeRoute() {
   const [incoming, setIncoming] = React.useState<CreatorBridgeDraft | null>(null);
   const [savedGalaxy, setSavedGalaxy] = React.useState<GalaxyDraftSnapshot | null>(null);
   const [ready, setReady] = React.useState(false);
+  const [authEpoch, setAuthEpoch] = React.useState(() => getAuthEpoch());
+  const [loadedAuthEpoch, setLoadedAuthEpoch] = React.useState<number | null>(null);
   const handoffInFlight = React.useRef(false);
   const [handoffError, setHandoffError] = React.useState<string | null>(null);
 
+  React.useEffect(() => subscribeAuthChanges(() => setAuthEpoch(getAuthEpoch())), []);
+
   React.useEffect(() => {
     let mounted = true;
+    setReady(false);
+    setLoadedAuthEpoch(null);
+    setIncoming(null);
+    setSavedGalaxy(null);
+    setHandoffError(null);
     void Promise.all([
       consumeCreatorBridge('forge').catch(() => null),
       loadGalaxyDraft().catch(() => null),
@@ -32,9 +42,14 @@ export default function SkeletonForgeRoute() {
       if (!mounted) return;
       setIncoming(draft);
       setSavedGalaxy(galaxyDraft);
-    }).finally(() => { if (mounted) setReady(true); });
+    }).finally(() => {
+      if (mounted && getAuthEpoch() === authEpoch) {
+        setLoadedAuthEpoch(authEpoch);
+        setReady(true);
+      }
+    });
     return () => { mounted = false; };
-  }, []);
+  }, [authEpoch]);
 
   const openGalaxy = React.useCallback((draft: QuestionnaireState) => {
     if (handoffInFlight.current) return;
@@ -59,7 +74,7 @@ export default function SkeletonForgeRoute() {
           Galaxy draft preserved on this device: {Object.keys(savedGalaxy.matrices).length} advanced matrix families and {Object.keys(savedGalaxy.extraParams).length} extra sliders. Reopen Galaxy Studio to edit them.
         </Text>
       ) : null}
-      {ready ? (
+      {ready && loadedAuthEpoch === authEpoch ? (
         <ForgeCockpitScreen
           initialTab={parseTabParam(params.tab)}
           initialQuestionnaire={incoming ? forgeStateFromHandoff(incoming) : null}
