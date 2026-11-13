@@ -54,6 +54,7 @@ export interface ShellPorts {
     startedAt: number | null;
     finishedAt: number | null;
     ownerId: string | null;
+    request?: RunRequest | null;
     onStart: (projectId: string, req: RunRequest) => void;
     onCancel: () => void;
     onExport?: () => void;
@@ -154,6 +155,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
     dispatch({
       type: 'recordRun',
       projectId: owner,
+      request: ports.run.request ?? undefined,
       snapshot: {
         phase: ports.run.phase,
         error: ports.run.error,
@@ -163,7 +165,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
         payload: ports.run.payload,
       },
     });
-  }, [ports.run.phase, ports.run.finishedAt, ports.run.ownerId, ports.run.error, ports.run.startedAt, ports.run.payload]);
+  }, [ports.run.phase, ports.run.finishedAt, ports.run.ownerId, ports.run.error, ports.run.startedAt, ports.run.payload, ports.run.request]);
 
   const a11y = resolveA11y(state.prefs, ports.platform);
   const other = state.projects.find((project) => project.id === ports.run.ownerId) ?? null;

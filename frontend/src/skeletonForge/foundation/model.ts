@@ -6,7 +6,7 @@ import { INITIAL_STATE, buildRunRequest, questionnaireReducer, type Questionnair
 import { sparseInstrumentPayload } from '../instruments';
 import { mappedBriefGenre } from '../galaxyGenres';
 import { summarizeRun } from '../run';
-import type { RunPayload } from '../types';
+import type { RunPayload, RunRequest } from '../types';
 
 export const SCREENS = ['boot', 'onboarding', 'sign-in', 'dashboard', 'brief', 'build', 'account', 'settings'] as const;
 export type Screen = typeof SCREENS[number];
@@ -118,7 +118,7 @@ export type FoundationAction =
   | { type: 'back' }
   | { type: 'signedOut' }
   | { type: 'setPrefs'; prefs: StudioPrefs }
-  | { type: 'recordRun'; projectId: string; snapshot: RunSnapshot }
+  | { type: 'recordRun'; projectId: string; snapshot: RunSnapshot; request?: RunRequest }
   | { type: 'importLegacy'; projects: StudioProject[] }
   | { type: 'persistError'; error: string | null };
 
@@ -367,7 +367,7 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
     case 'setPrefs':
       return { ...state, prefs: sanitizePrefs(action.prefs) };
     case 'recordRun':
-      return applyRecordRun(state, action.projectId, action.snapshot);
+      return applyRecordRun(state, action.projectId, action.snapshot, action.request);
     case 'importLegacy': {
       if (!canEnter(state) || state.holdSaves) return state;
       const existing = new Set(state.projects.map((project) => project.id));
@@ -385,12 +385,22 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
   }
 }
 
-export function applyRecordRun(state: FoundationState, projectId: string, snapshot: RunSnapshot): FoundationState {
+export function applyRecordRun(
+  state: FoundationState, projectId: string, snapshot: RunSnapshot,
+  request?: RunRequest,
+): FoundationState {
   const current = state.projects.find((project) => project.id === projectId);
   if (!current) return state;
   const updatedAt = snapshot.finishedAt != null ? new Date(snapshot.finishedAt).toISOString() : current.updatedAt;
+  // The user can edit design axes or return from the advanced cockpit while
+  // native generation is still running. Completion proves the *submitted*
+  // configuration, not a newer, unsent questionnaire. Never falsely clear
+  // the Needs rebuild flag when source input and completed run differ.
+  const differsFromFinishedRun = request !== undefined
+    && JSON.stringify(buildRunRequest(current.questionnaire)) !== JSON.stringify(request);
   return replaceProject(state, {
-    ...current, lastRun: persistedRunSnapshot(snapshot), lastRunOutdated: false, updatedAt,
+    ...current, lastRun: persistedRunSnapshot(snapshot),
+    lastRunOutdated: differsFromFinishedRun || false, updatedAt,
   });
 }
 

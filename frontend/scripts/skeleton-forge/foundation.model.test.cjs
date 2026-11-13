@@ -569,3 +569,32 @@ test('advanced Forge return marks its original build stale without replacing aut
   assert.equal(result.projects[0].lastRun.payload.run.run_id, 'original');
   assert.equal(m.projectStatus(result.projects[0], null, 'idle'), 'Needs rebuild');
 });
+
+test('completion cannot mark a concurrently edited game as matching the generated build', () => {
+  let original = m.freshQuestionnaire();
+  original = Q.questionnaireReducer(original, { type: 'setVision', vision: 'A local original strategy game' });
+  const submitted = Q.buildRunRequest(original);
+  const previous = {
+    phase: 'done', error: null, succeeded: true, startedAt: 100, finishedAt: 200,
+    payload: { succeeded: true, run: { run_id: 'run-after-edit', succeeded: true, stages: [] } },
+  };
+  const saved = project('p-inflight', { questionnaire: original });
+  let state = base({ activeId: saved.id, projects: [saved] });
+  state = m.foundationReducer(state, {
+    type: 'questionnaire', action: { type: 'setAxis', axis: 'risk', value: 0.92 }, at: AT,
+  });
+  assert.equal(state.projects[0].lastRunOutdated, false);
+  const finished = m.foundationReducer(state, {
+    type: 'recordRun', projectId: saved.id, snapshot: previous, request: submitted,
+  });
+  assert.equal(finished.projects[0].lastRunOutdated, true);
+  assert.equal(finished.projects[0].lastRun.payload.run.run_id, 'run-after-edit');
+  assert.equal(m.projectStatus(finished.projects[0], null, 'idle'), 'Needs rebuild');
+  const latest = Q.buildRunRequest(finished.projects[0].questionnaire);
+  const refreshed = m.foundationReducer(finished, {
+    type: 'recordRun', projectId: saved.id, snapshot: previous, request: latest,
+  });
+  assert.equal(refreshed.projects[0].lastRunOutdated, false);
+  assert.equal(m.projectStatus(refreshed.projects[0], null, 'idle'), 'Built');
+});
+

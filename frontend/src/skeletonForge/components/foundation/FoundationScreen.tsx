@@ -200,6 +200,7 @@ function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => vo
           startedAt: run.startedAt,
           finishedAt: run.finishedAt,
           ownerId,
+          request: run.request,
           onStart: startForge,
           onCancel: run.cancel,
           onExport: exportGodot,
