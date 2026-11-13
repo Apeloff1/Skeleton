@@ -147,7 +147,7 @@ func _finish(ok: bool, reason: String) -> void:
 \telse:
 \t\tprint("{failed} ", ARCHETYPE, " ", reason)
 \t\tloop_failed.emit(ARCHETYPE, reason)
-\tif player.autopilot:
+\tif bool(player.get("autopilot")):
 \t\tget_tree().quit(0 if ok else 1)
 
 
@@ -186,14 +186,14 @@ func _tick(delta: float) -> void:
 \t\t_finish(false, "heat critical")
 \t\treturn
 \tif loot.size() > 0:
-\t\tplayer.autopilot_target = loot[0]
+\t\tplayer.set("autopilot_target", loot[0])
 \t\tif player.global_position.distance_to(loot[0]) <= PICKUP_RADIUS:
-\t\t\tif player.autopilot or Input.is_action_just_pressed("ui_accept"):
+\t\t\tif bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
 \t\t\t\tloot.remove_at(0)
 \t\t\t\tcarried += 1
 \t\t\t\tqueue_redraw()
 \telse:
-\t\tplayer.autopilot_target = extract_point
+\t\tplayer.set("autopilot_target", extract_point)
 \t\tif player.global_position.distance_to(extract_point) <= PICKUP_RADIUS:
 \t\t\t_finish(true, "extracted loot=%d heat=%d" % [carried, int(heat)])
 
@@ -232,7 +232,7 @@ func _tick(_delta: float) -> void:
 \t\t\treturn
 \t\t_spawn_wave()
 \tvar target: Dictionary = enemies[0]
-\tplayer.autopilot_target = target["pos"]
+\tplayer.set("autopilot_target", target["pos"])
 \tfor enemy in enemies:
 \t\tenemy["pos"] = enemy["pos"].move_toward(player.global_position, 0.5)
 \t\tif enemy["pos"].distance_to(player.global_position) < 8.0 and frames % 30 == 0:
@@ -241,7 +241,7 @@ func _tick(_delta: float) -> void:
 \t\t_finish(false, "player down")
 \t\treturn
 \tif target["pos"].distance_to(player.global_position) <= ATTACK_RANGE and frames % 6 == 0:
-\t\tif not (player.autopilot or Input.is_action_pressed("ui_accept")):
+\t\tif not (bool(player.get("autopilot")) or Input.is_action_pressed("ui_accept")):
 \t\t\treturn
 \t\ttarget["hp"] -= ATTACK_DAMAGE
 \t\tif target["hp"] <= 0:
@@ -275,14 +275,14 @@ func _draw() -> void:
 func _tick(delta: float) -> void:
 \tmatch stage:
 \t\t"to_source":
-\t\t\tplayer.autopilot_target = source
+\t\t\tplayer.set("autopilot_target", source)
 \t\t\tif player.global_position.distance_to(source) <= RADIUS:
-\t\t\t\tif player.autopilot or Input.is_action_just_pressed("ui_accept"):
+\t\t\t\tif bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
 \t\t\t\t\tstage = "to_refinery"
 \t\t"to_refinery":
-\t\t\tplayer.autopilot_target = refinery
+\t\t\tplayer.set("autopilot_target", refinery)
 \t\t\tif player.global_position.distance_to(refinery) <= RADIUS:
-\t\t\t\tif player.autopilot or Input.is_action_just_pressed("ui_accept"):
+\t\t\t\tif bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
 \t\t\t\t\tstage = "refining"
 \t\t\t\t\trefine_timer = 0.25
 \t\t"refining":
@@ -290,9 +290,9 @@ func _tick(delta: float) -> void:
 \t\t\tif refine_timer <= 0.0:
 \t\t\t\tstage = "to_depot"
 \t\t"to_depot":
-\t\t\tplayer.autopilot_target = depot
+\t\t\tplayer.set("autopilot_target", depot)
 \t\t\tif player.global_position.distance_to(depot) <= RADIUS:
-\t\t\t\tif player.autopilot or Input.is_action_just_pressed("ui_accept"):
+\t\t\t\tif bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
 \t\t\t\t\tshipped += 1
 \t\t\t\t\tstage = "to_source"
 \tif shipped >= QUOTA:
@@ -324,9 +324,9 @@ func _tick(_delta: float) -> void:
 		_finish(true, "switches=%d" % next_switch)
 		return
 	var target: Vector2 = switches[next_switch]
-	player.autopilot_target = target
+	player.set("autopilot_target", target)
 	if player.global_position.distance_to(target) <= USE_RADIUS:
-		if player.autopilot or Input.is_action_just_pressed("ui_accept"):
+		if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
 			next_switch += 1
 			queue_redraw()
 
@@ -360,7 +360,7 @@ func _tick(delta: float) -> void:
 	if elapsed >= TIME_LIMIT:
 		_finish(false, "checkpoint time limit")
 		return
-	player.autopilot_target = course[waypoint]
+	player.set("autopilot_target", course[waypoint])
 	if player.global_position.distance_to(course[waypoint]) <= LAP_RADIUS:
 		waypoint += 1
 		if waypoint >= course.size():
@@ -397,15 +397,15 @@ func _tick(delta: float) -> void:
 		_finish(false, "dehydrated")
 		return
 	if supplies.size() > 0:
-		player.autopilot_target = supplies[0]
+		player.set("autopilot_target", supplies[0])
 		if player.global_position.distance_to(supplies[0]) <= PICKUP_RADIUS:
-			if player.autopilot or Input.is_action_just_pressed("ui_accept"):
+			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
 				supplies.remove_at(0)
 				collected += 1
 				hydration = min(100.0, hydration + 12.0)
 				queue_redraw()
 	else:
-		player.autopilot_target = shelter
+		player.set("autopilot_target", shelter)
 		if player.global_position.distance_to(shelter) <= PICKUP_RADIUS:
 			_finish(true, "supplies=%d hydration=%d" % [collected, int(hydration)])
 
@@ -442,14 +442,14 @@ func _tick(_delta: float) -> void:
 			_finish(false, "spotted by patrol")
 			return
 	if objectives.size() > 0:
-		player.autopilot_target = objectives[0]
+		player.set("autopilot_target", objectives[0])
 		if player.global_position.distance_to(objectives[0]) <= USE_RADIUS:
-			if player.autopilot or Input.is_action_just_pressed("ui_accept"):
+			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
 				objectives.remove_at(0)
 				intel += 1
 				queue_redraw()
 	else:
-		player.autopilot_target = exit_point
+		player.set("autopilot_target", exit_point)
 		if player.global_position.distance_to(exit_point) <= USE_RADIUS:
 			_finish(true, "intel=%d undetected" % intel)
 
@@ -477,21 +477,21 @@ func _draw() -> void:
 
 func _tick(_delta: float) -> void:
 	if materials.size() > 0:
-		player.autopilot_target = materials[0]
+		player.set("autopilot_target", materials[0])
 		if player.global_position.distance_to(materials[0]) <= USE_RADIUS:
-			if player.autopilot or Input.is_action_just_pressed("ui_accept"):
+			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
 				materials.remove_at(0)
 				collected += 1
 				queue_redraw()
 	elif not crafted:
-		player.autopilot_target = workshop
+		player.set("autopilot_target", workshop)
 		if player.global_position.distance_to(workshop) <= USE_RADIUS:
-			if player.autopilot or Input.is_action_just_pressed("ui_accept"):
+			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
 				crafted = collected == 3
 				if not crafted:
 					_finish(false, "missing crafting materials")
 	else:
-		player.autopilot_target = delivery
+		player.set("autopilot_target", delivery)
 		if player.global_position.distance_to(delivery) <= USE_RADIUS:
 			_finish(true, "crafted item delivered from %d materials" % collected)
 

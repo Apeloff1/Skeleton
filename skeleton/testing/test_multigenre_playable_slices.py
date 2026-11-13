@@ -506,3 +506,35 @@ def test_tuning_receipt_and_launcher_cannot_be_rebound_to_other_prototype(monkey
     altered[receipt["launcher"]] += "\n# actor-swapped"
     assert not verify_playable_source(altered, receipt)
     assert not verify_playable_source(files, {"schema": "skeleton.gameforge.playable_source.v1"})
+
+
+
+@pytest.mark.parametrize("mode", SUPPORTED)
+def test_godot_static_controller_type_keeps_dynamic_custom_fields_explicit(mode):
+    """Player is statically CharacterBody2D, but autoplay is a subclass field.
+
+    Godot must not statically resolve those custom fields on the base class.
+    Access through Object.set/get preserves a typed movement/collision API.
+    """
+    emitted = archetype_files(mode)
+    controller = emitted[f"scripts/archetypes/{mode}/player_controller.gd"]
+    loop = emitted[f"scripts/archetypes/{mode}/core_loop.gd"]
+    assert "extends CharacterBody2D" in controller
+    assert "var autopilot: bool = false" in controller
+    assert "var autopilot_target: Vector2" in controller
+    assert "@onready var player: CharacterBody2D = $Player" in loop
+    assert 'player.set("autopilot_target",' in loop
+    assert "player.autopilot_target" not in loop
+    assert "player.autopilot" not in loop
+    assert 'bool(player.get("autopilot"))' in loop or mode == "racing"
+    valid, issues = check_ok(emitted)
+    assert valid, (mode, issues)
+
+
+@pytest.mark.parametrize("mode", SUPPORTED)
+def test_tuning_does_not_restore_unknown_static_player_member_access(mode):
+    emitted = archetype_files(mode, tuning={"tempo": 0.87})
+    loop = emitted[f"scripts/archetypes/{mode}/core_loop.gd"]
+    assert "player.autopilot_target" not in loop
+    assert "player.autopilot" not in loop
+    assert 'player.set("autopilot_target",' in loop
