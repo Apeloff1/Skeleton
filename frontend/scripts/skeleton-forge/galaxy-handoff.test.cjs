@@ -69,7 +69,9 @@ test('client profile rejects nonfinite, untrusted, oversized or incomplete data'
   assert.throws(() => G.normaliseGalaxyProfile(payload({ juice: Infinity })));
   assert.throws(() => G.normaliseGalaxyProfile(payload({ extra_params: { x: NaN } })));
   assert.throws(() => G.normaliseGalaxyProfile(payload({ game_vision: 'z'.repeat(12_001) })));
-  assert.throws(() => G.normaliseGalaxyProfile(payload({ styles_matrix: null })));
+  const missingMatrix = payload();
+  missingMatrix.styles_matrix = null;
+  assert.throws(() => G.normaliseGalaxyProfile(missingMatrix));
   assert.throws(() => G.normaliseGalaxyProfile(payload({ extra_params: { constructor: 3 } })));
   assert.throws(() => G.normaliseGalaxyProfile(payload({ narrative_phases: { prelude: [undefined] } })));
 });

@@ -43,7 +43,7 @@ function guard(value: unknown, budget: { count: number }, depth: number): void {
   if (++budget.count > MAX_FIELDS || depth > MAX_DEPTH) fail('configuration exceeds allowed complexity');
   if (value === undefined || value === null || typeof value === 'boolean') return;
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) fail('non-finite slider value');
+    if (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER) fail('non-finite or unsafe number');
     return;
   }
   if (typeof value === 'string') {
@@ -74,6 +74,16 @@ export function normaliseGalaxyProfile(payload: unknown): GalaxyProfile {
       || payload.title.length > 120 || typeof payload.genre !== 'string'
       || !payload.genre || payload.genre.length > 128) fail('missing game title or genre');
   for (const field of MATRIX_FIELDS) if (!plain(payload[field])) fail('missing ' + field);
+  for (const field of [...MATRIX_FIELDS, 'narrative_phases']) {
+    const phases = payload[field];
+    if (!plain(phases) || Object.keys(phases).length > 512) fail('matrix phases exceed limit');
+    for (const axes of Object.values(phases)) {
+      if (!plain(axes) || Object.keys(axes).length > 128 ||
+        Object.values(axes).some((v) => typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1000)) {
+        fail('invalid matrix axis value');
+      }
+    }
+  }
   if (!plain(payload.narrative_phases) || !plain(payload.extra_params) || !plain(payload.style_params)) {
     fail('missing narrative, extended or style controls');
   }

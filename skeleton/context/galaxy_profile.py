@@ -36,8 +36,10 @@ def _walk(value: Any, depth: int, count: list[int]) -> None:
     if value is None or type(value) is bool:
         return
     if type(value) in (int, float):
-        if not math.isfinite(value):
-            raise ValueError("non-finite Galaxy slider")
+        if (type(value) is int and value.bit_length() > 53) or (
+            type(value) is float and not math.isfinite(value)
+        ):
+            raise ValueError("non-finite or unsafe Galaxy number")
         return
     if type(value) is str:
         if len(value) > 12_000:
@@ -75,6 +77,17 @@ def normalise_galaxy_profile(raw: Optional[Mapping[str, Any]]) -> Optional[dict[
         raise ValueError("Galaxy profile requires a bounded title and genre")
     if any(type(config.get(field)) is not dict for field in MATRIX_FIELDS):
         raise ValueError("missing a Galaxy production matrix")
+    for field in (*MATRIX_FIELDS, "narrative_phases"):
+        phases = config[field]
+        if len(phases) > 512:
+            raise ValueError("too many Galaxy matrix phases")
+        for values in phases.values():
+            if type(values) is not dict or len(values) > 128 or any(
+                type(value) not in (int, float) or not math.isfinite(value)
+                or not 0 <= value <= 1000
+                for value in values.values()
+            ):
+                raise ValueError("invalid Galaxy matrix axis value")
     if any(type(config.get(field)) is not dict for field in ("narrative_phases", "extra_params", "style_params")):
         raise ValueError("missing Galaxy narrative, extended or style controls")
     _walk(raw, 0, [0])

@@ -108,3 +108,53 @@ def test_no_mutable_alias_is_returned():
     result = normalise_galaxy_profile(raw)
     raw["config"]["mechanics_matrix"]["kickoff"]["count"] = 123
     assert result["config"]["mechanics_matrix"]["kickoff"]["count"] == 9
+
+
+def test_axes_must_be_in_range_and_phase_shapes_must_be_real():
+    p = sample()
+    p["config"]["art_matrix"]["kickoff"]["count"] = -1
+    with pytest.raises(ValueError, match="axis"):
+        normalise_galaxy_profile(p)
+    p = sample()
+    p["config"]["art_matrix"]["kickoff"]["count"] = 1001
+    with pytest.raises(ValueError, match="axis"):
+        normalise_galaxy_profile(p)
+    p = sample()
+    p["config"]["art_matrix"]["kickoff"] = []
+    with pytest.raises(ValueError, match="axis"):
+        normalise_galaxy_profile(p)
+
+
+def test_live_emit_stage_carries_canonical_design_profile_without_code_change(monkeypatch):
+    from skeleton.context import pipeline
+    import skeleton.forge.gdscript_check as check
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(check, "check_ok", lambda files: (True, []))
+    original = {"project.godot": "config_version=5\n"}
+    p = normalise_galaxy_profile(sample())
+    ctx = {"era": "extraction_now", "target": "godot",
+           "files": dict(original), "galaxy_profile": p,
+           "playtest_mode": "off", "project_root": None}
+    result = pipeline._stage_emit(ctx)
+    assert result["emitted"] is True
+    assert ctx["file_count"] == 2
+    assert ctx["files"]["project.godot"] == original["project.godot"]
+    assert json.loads(ctx["files"][ARTIFACT_PATH]) == p
+    assert source_manifest(ctx["files"])["file_count"] == 2
+
+
+def test_run_route_forwards_full_galaxy_profile_as_one_isolated_build_input(monkeypatch):
+    from backend.routes.skeleton_gameforge import RunRequest, run
+    from skeleton.context.pipeline import GameForgeRun
+    seen = {}
+    class Stub:
+        def execute(self, vision, **options):
+            seen["vision"] = vision
+            seen["options"] = options
+            return {"files": {"project.godot": "config_version=5\n"}, "succeeded": True}
+    monkeypatch.setattr(GameForgeRun, "live", lambda: Stub())
+    out = run(RunRequest(vision="A new original racing game", galaxy_profile=sample()))
+    assert seen["vision"] == "A new original racing game"
+    assert seen["options"]["galaxy_profile"] == sample()
+    assert out["file_names"] == ["project.godot"]
+    assert "files" not in out
