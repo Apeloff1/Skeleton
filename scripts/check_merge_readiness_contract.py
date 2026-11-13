@@ -205,6 +205,34 @@ def main() -> int:
         failures,
     )
 
+    # Backend's tests/__init__.py and repository-root tests/__init__.py are
+    # intentionally independent packages. Importing both under one pytest
+    # invocation causes collection failures that mask real security results.
+    security_step = re.search(
+        r"(?ms)^      - name: Verify tenant-bound binary custody, vault streaming and bounded SSRF\n"
+        r"(?P<body>.*?)(?=^      - name: |\Z)",
+        quality_security,
+    )
+    require(security_step is not None, "bounded security regression step missing", failures)
+    if security_step is not None:
+        backend_tests, separator, root_tests = security_step.group("body").partition("\n          cd ..\n")
+        require(
+            bool(separator)
+            and "python -m pytest --noconftest -q" in root_tests
+            and "../tests/" not in backend_tests
+            and all(
+                name in root_tests
+                for name in (
+                    "tests/test_full_security_alert_inventory_20261111.py",
+                    "tests/test_codeql_lineage_contract_20261111.py",
+                    "tests/test_codeql_all_151_source_contracts_20261111.py",
+                    "tests/test_codeql_stack_trace_custody_20261111.py",
+                )
+            ),
+            "root CodeQL/security regressions must run separately without namespace collisions",
+            failures,
+        )
+
     pr_automation = job_block(text, "pr_automation")
     require(bool(pr_automation), "PR automation validation job missing", failures)
     require("name: PR Automation Tests" in pr_automation, "stable PR Automation Tests job name missing", failures)
