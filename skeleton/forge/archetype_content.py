@@ -29,10 +29,67 @@ _CONTROLLER = '''extends CharacterBody2D
 @export var speed: float = {speed}
 var autopilot: bool = false
 var autopilot_target: Vector2 = Vector2.ZERO
+var _touch_controls: Array[Button] = []
 
 
 func _ready() -> void:
 \tautopilot = DisplayServer.get_name() == "headless" or OS.get_cmdline_user_args().has("--autoplay")
+\tif not autopilot and DisplayServer.is_touchscreen_available():
+\t\t_install_touch_controls()
+
+
+func _install_touch_controls() -> void:
+\tvar layer := CanvasLayer.new()
+\tlayer.layer = 8
+\tadd_child(layer)
+\tvar panel := Control.new()
+\tpanel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+\tpanel.mouse_filter = Control.MOUSE_FILTER_PASS
+\tlayer.add_child(panel)
+\t_touch_controls.append(_make_touch_button(panel, "UP", "ui_up"))
+\t_touch_controls.append(_make_touch_button(panel, "LEFT", "ui_left"))
+\t_touch_controls.append(_make_touch_button(panel, "DOWN", "ui_down"))
+\t_touch_controls.append(_make_touch_button(panel, "RIGHT", "ui_right"))
+\t_touch_controls.append(_make_touch_button(panel, "USE", "ui_accept"))
+\t_layout_touch_controls()
+\tget_viewport().size_changed.connect(_layout_touch_controls)
+
+
+func _make_touch_button(panel: Control, title: String, action: String) -> Button:
+\tvar button := Button.new()
+\tbutton.text = title
+\tbutton.focus_mode = Control.FOCUS_NONE
+\tbutton.custom_minimum_size = Vector2(64, 64)
+\tbutton.size = Vector2(64, 64)
+\tbutton.modulate = Color(1.0, 1.0, 1.0, 0.75)
+\tbutton.button_down.connect(_set_touch_action.bind(action, true))
+\tbutton.button_up.connect(_set_touch_action.bind(action, false))
+\tpanel.add_child(button)
+\treturn button
+
+
+func _layout_touch_controls() -> void:
+\tif _touch_controls.size() != 5:
+\t\treturn
+\tvar viewport_size := get_viewport().get_visible_rect().size
+\tvar bottom := maxf(165.0, viewport_size.y - 86.0)
+\t_touch_controls[0].position = Vector2(90, bottom - 72.0)
+\t_touch_controls[1].position = Vector2(22, bottom)
+\t_touch_controls[2].position = Vector2(90, bottom)
+\t_touch_controls[3].position = Vector2(158, bottom)
+\t_touch_controls[4].position = Vector2(maxf(250.0, viewport_size.x - 94.0), bottom)
+
+
+func _set_touch_action(action: String, pressed: bool) -> void:
+\tif pressed:
+\t\tInput.action_press(action)
+\telse:
+\t\tInput.action_release(action)
+
+
+func _exit_tree() -> void:
+\tfor action in ["ui_up", "ui_left", "ui_down", "ui_right", "ui_accept"]:
+\t\tInput.action_release(action)
 
 
 func _draw() -> void:
