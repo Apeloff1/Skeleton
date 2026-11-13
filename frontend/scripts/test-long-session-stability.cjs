@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -19,9 +20,16 @@ function loadTS(filename, mocks = {}) {
   });
   assert.equal((output.diagnostics || []).length, 0, filename + ' syntax');
   const mod = { exports: {} };
-  new Function('require', 'module', 'exports', output.outputText)(
+  compileFunction(output.outputText, ['require', 'module', 'exports'])(
     id => {
-      if (id === './requestRecoveryPolicy') return loadTS('utils/requestRecoveryPolicy.ts');
+      if (id === './apiClient') return {
+        subscribeApiSessionChanges: () => () => {},
+        prepareApiRequest: async (_url, headers = {}, signal = new AbortController().signal) => ({
+          headers, signal, epoch: 0, cacheNamespace: 'anonymous-test-session', authenticated: false,
+          current: () => !signal.aborted, dispose() {},
+        }),
+      };
+      if (id === './requestRecoveryPolicy') return loadTS('src/utils/requestRecoveryPolicy.ts');
       assert.ok(Object.hasOwn(mocks, id), filename + ': unexpected import ' + id);
       return mocks[id];
     }, mod, mod.exports,
@@ -72,7 +80,7 @@ function reactHarness() {
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
 test('thermal worker survives a synchronously throwing callback and releases capacity', async t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   await assert.rejects(guard.queue.enqueue('bad', () => {
@@ -88,7 +96,7 @@ test('thermal worker survives a synchronously throwing callback and releases cap
 });
 
 test('cooldown cancels an already-dequeued staggered request before side effects', async t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   let calls = 0;
@@ -99,7 +107,7 @@ test('cooldown cancels an already-dequeued staggered request before side effects
 });
 
 test('thermal background throttling survives battery updates, refresh and cooldown', t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   guard.setAppBackground(true);
@@ -125,7 +133,7 @@ test('power listeners use current battery observations without nested updates an
     addBatteryStateListener: fn => { handlers.charging = fn; return { remove() { removals++; } }; },
   };
   let appUnsub = false;
-  const { usePowerAwareness } = loadTS('hooks/usePowerAwareness.ts', {
+  const { usePowerAwareness } = loadTS('src/hooks/usePowerAwareness.ts', {
     react: h.react,
     'react-native': { AppState: { addEventListener: () => ({ remove() { appUnsub = true; } }) } },
     'expo-battery': battery,
@@ -160,7 +168,7 @@ test('unmount during power initialization never attaches late listeners', async 
     addBatteryLevelListener: () => { registrations++; return { remove() {} }; },
     addBatteryStateListener: () => { registrations++; return { remove() {} }; },
   };
-  const { usePowerAwareness } = loadTS('hooks/usePowerAwareness.ts', {
+  const { usePowerAwareness } = loadTS('src/hooks/usePowerAwareness.ts', {
     react: h.react,
     'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } },
     'expo-battery': battery,
@@ -178,7 +186,7 @@ test('stability recovery is single-flight, bounded and clean on unmount', async 
   const h = reactHarness();
   let alerts = 0;
   let removed = false;
-  const { useStability } = loadTS('hooks/useStability.ts', {
+  const { useStability } = loadTS('src/hooks/useStability.ts', {
     react: h.react,
     'react-native': { Alert: { alert() { alerts++; } } },
     '@react-native-community/netinfo': { addEventListener: () => () => { removed = true; } },
@@ -210,7 +218,7 @@ test('stability recovery is single-flight, bounded and clean on unmount', async 
 test('stability recovery refuses future-dated or malformed storage receipts', async () => {
   const h = reactHarness();
   let raw = JSON.stringify({ timestamp: Date.now() + 90_000, data: 'invalid' });
-  const { useStability } = loadTS('hooks/useStability.ts', {
+  const { useStability } = loadTS('src/hooks/useStability.ts', {
     react: h.react,
     'react-native': { Alert: { alert() {} } },
     '@react-native-community/netinfo': { addEventListener: () => () => {} },
@@ -231,7 +239,7 @@ test('stability recovery refuses future-dated or malformed storage receipts', as
 
 test('failed deduplicated GET does not leak an unhandled rejection', async () => {
   const storage = { getItem: async () => null, setItem: async () => {} };
-  const net = loadTS('utils/resilientNet.ts', {
+  const net = loadTS('src/utils/resilientNet.ts', {
     '@react-native-async-storage/async-storage': storage,
     './apiBase': { API_BASE: 'https://backend.test', API_FALLBACK_BASE: '' },
   });
@@ -254,7 +262,7 @@ test('failed deduplicated GET does not leak an unhandled rejection', async () =>
 });
 
 test('circuit reset cannot let an old request delete its replacement', async () => {
-  const net = loadTS('utils/resilientNet.ts', {
+  const net = loadTS('src/utils/resilientNet.ts', {
     '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => {} },
     './apiBase': { API_BASE: 'https://backend.test', API_FALLBACK_BASE: '' },
   });
@@ -264,13 +272,16 @@ test('circuit reset cannot let an old request delete its replacement', async () 
   const reply = id => ({ ok: true, status: 200, text: async () => JSON.stringify({ id }) });
   try {
     const first = net.resilientFetch('/same-key', { retries: 1, cacheTtlMs: 0, persist: false });
+    await settle(); // Account initialization precedes request admission.
     net.resetCircuit();
     const second = net.resilientFetch('/same-key', { retries: 1, cacheTtlMs: 0, persist: false });
+    await settle();
     assert.equal(resolvers.length, 2);
     resolvers[0](reply('first'));
     await first;
     await settle();
     const third = net.resilientFetch('/same-key', { retries: 1, cacheTtlMs: 0, persist: false });
+    await settle();
     assert.equal(resolvers.length, 2, 'the second request should still be coalesced');
     resolvers[1](reply('second'));
     assert.deepEqual((await second).data, { id: 'second' });
@@ -282,7 +293,7 @@ test('circuit reset cannot let an old request delete its replacement', async () 
 });
 
 test('heartbeat stop/restart fences in-flight probes and their timers', async () => {
-  const net = loadTS('utils/resilientNet.ts', {
+  const net = loadTS('src/utils/resilientNet.ts', {
     '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => {} },
     './apiBase': { API_BASE: 'https://backend.test', API_FALLBACK_BASE: '' },
   });
@@ -322,7 +333,7 @@ test('heartbeat stop/restart fences in-flight probes and their timers', async ()
 });
 
 test('thermal queue coalesces active work and maintains a finite pending queue', async t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   let executions = 0;
@@ -341,7 +352,7 @@ test('thermal queue coalesces active work and maintains a finite pending queue',
 });
 
 test('activity events are bounded even under sustained input bursts', t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   for (let i = 0; i < 7000; i++) guard.recordActivity();
@@ -361,7 +372,7 @@ test('storage hydration completes before chapter writes and never drops concurre
       : Promise.resolve(null),
     setItem: async (key, value) => { persisted.push({ key, value }); },
   };
-  const { useStorage } = loadTS('hooks/useStorage.ts', {
+  const { useStorage } = loadTS('src/hooks/useStorage.ts', {
     react: h.react,
     '@react-native-async-storage/async-storage': storage,
     '../constants/config': { STORAGE_KEYS },
@@ -396,7 +407,7 @@ test('storage save failures do not poison the serialized write queue', async () 
     getItem: async () => null,
     setItem: async () => { if (++writes === 1) throw new Error('disk full'); },
   };
-  const { useStorage } = loadTS('hooks/useStorage.ts', {
+  const { useStorage } = loadTS('src/hooks/useStorage.ts', {
     react: h.react,
     '@react-native-async-storage/async-storage': storage,
     '../constants/config': {
@@ -429,7 +440,7 @@ test('interaction tasks reject on unmount and throwing callbacks reject their pr
     PixelRatio: { get: () => 2, getFontScale: () => 1, roundToNearestPixel: n => n },
     Platform: { OS: 'android' },
   };
-  const { useMobileOptimization } = loadTS('hooks/useMobileOptimization.ts', {
+  const { useMobileOptimization } = loadTS('src/hooks/useMobileOptimization.ts', {
     react: h.react, 'react-native': metrics,
   });
   const hook = useMobileOptimization();
@@ -451,7 +462,7 @@ test('a late session-start response cannot replace a newer session', async () =>
     updateProgress: async () => ({ progress_updated: true, xp_earned: 0, new_achievements: [] }),
     logAIInteraction: async () => ({ logged: true }),
   };
-  const { useSessionTracker } = loadTS('hooks/useSessionTracker.ts', {
+  const { useSessionTracker } = loadTS('src/hooks/useSessionTracker.ts', {
     react: h.react, '../services/synergy': { synergyService: service },
   });
   const hook = useSessionTracker('person');
@@ -485,7 +496,7 @@ test('ending a session waits for pending progress then sends final progress once
     }),
     logAIInteraction: async () => ({ logged: true }),
   };
-  const { useSessionTracker } = loadTS('hooks/useSessionTracker.ts', {
+  const { useSessionTracker } = loadTS('src/hooks/useSessionTracker.ts', {
     react: h.react, '../services/synergy': { synergyService: service },
   });
   const hook = useSessionTracker('person');
@@ -510,7 +521,7 @@ test('ending a session waits for pending progress then sends final progress once
 });
 
 test('mutation requests have one attempt on one host even when retry options are high', async () => {
-  const net = loadTS('utils/resilientNet.ts', {
+  const net = loadTS('src/utils/resilientNet.ts', {
     '@react-native-async-storage/async-storage': {
       getItem: async () => null, setItem: async () => {},
     },
@@ -532,7 +543,7 @@ test('mutation requests have one attempt on one host even when retry options are
 });
 
 test('authenticated read requests are not shared across credentials or cached', async () => {
-  const net = loadTS('utils/resilientNet.ts', {
+  const net = loadTS('src/utils/resilientNet.ts', {
     '@react-native-async-storage/async-storage': {
       getItem: async () => null, setItem: async () => {},
     },
@@ -565,7 +576,7 @@ test('authenticated read requests are not shared across credentials or cached', 
 });
 
 test('oversized declared responses fail before reading or parsing', async () => {
-  const net = loadTS('utils/resilientNet.ts', {
+  const net = loadTS('src/utils/resilientNet.ts', {
     '@react-native-async-storage/async-storage': {
       getItem: async () => null, setItem: async () => {},
     },
@@ -590,7 +601,7 @@ test('oversized declared responses fail before reading or parsing', async () => 
 });
 
 test('aborted requests never initiate network activity', async () => {
-  const net = loadTS('utils/resilientNet.ts', {
+  const net = loadTS('src/utils/resilientNet.ts', {
     '@react-native-async-storage/async-storage': {
       getItem: async () => null, setItem: async () => {},
     },
@@ -613,7 +624,7 @@ test('aborted requests never initiate network activity', async () => {
 });
 
 test('scoped heartbeats stop after the last subscriber but preserve an explicit owner', () => {
-  const net = loadTS('utils/resilientNet.ts', {
+  const net = loadTS('src/utils/resilientNet.ts', {
     '@react-native-async-storage/async-storage': {
       getItem: async () => null, setItem: async () => {},
     },
@@ -667,7 +678,7 @@ test('push registration after unmount never sets state or retains native listene
     setNotificationChannelAsync: async () => {},
     AndroidImportance: { MAX: 5 },
   };
-  const { usePushNotifications } = loadTS('hooks/usePushNotifications.ts', {
+  const { usePushNotifications } = loadTS('src/hooks/usePushNotifications.ts', {
     react: h.react,
     'react-native': { Platform: { OS: 'ios' } },
     'expo-device': { isDevice: true },
@@ -697,7 +708,7 @@ test('rescheduling one reminder never cancels unrelated notifications', async ()
     scheduleNotificationAsync: async () => 'new-owned-id',
     cancelScheduledNotificationAsync: async id => { cancelIds.push(id); },
   };
-  const { scheduleDailyReminder } = loadTS('hooks/usePushNotifications.ts', {
+  const { scheduleDailyReminder } = loadTS('src/hooks/usePushNotifications.ts', {
     react: reactHarness().react,
     'react-native': { Platform: { OS: 'web' } },
     'expo-device': { isDevice: false },
@@ -714,7 +725,7 @@ test('rescheduling one reminder never cancels unrelated notifications', async ()
 });
 
 test('safe GET can retry a transient response without replaying mutations', async () => {
-  const net = loadTS('utils/resilientNet.ts', {
+  const net = loadTS('src/utils/resilientNet.ts', {
     '@react-native-async-storage/async-storage': {
       getItem: async () => null, setItem: async () => {},
     },
@@ -754,7 +765,7 @@ test('session progress coalesces many unsent snapshots into the newest value', a
     }),
     logAIInteraction: async () => ({ logged: true }),
   };
-  const { useSessionTracker } = loadTS('hooks/useSessionTracker.ts', {
+  const { useSessionTracker } = loadTS('src/hooks/useSessionTracker.ts', {
     react: h.react, '../services/synergy': { synergyService: service },
   });
   const hook = useSessionTracker('person');
@@ -794,7 +805,7 @@ test('session progress coalesces many unsent snapshots into the newest value', a
 });
 
 test('Synergy service aborts stuck session network I/O within its finite budget', async () => {
-  const { synergyService } = loadTS('services/synergy.ts', {
+  const { synergyService } = loadTS('src/services/synergy.ts', {
     '../utils/apiBase': { API_BASE: 'https://backend.test' },
   });
   const previousFetch = global.fetch;

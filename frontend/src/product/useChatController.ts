@@ -30,7 +30,7 @@ export function useChatController(options: ChatControllerOptions = {}) {
     void controller.initialize();
     const reconnect = () => {
       const current = controller.getSnapshot();
-      if (current.pending?.accepted && current.status === 'error') void controller.retry().catch(() => {});
+      if (current.pending && current.status === 'error') void controller.reconnect().catch(() => {});
     };
     const appStateSubscription = AppState.addEventListener('change', state => { if (state === 'active') reconnect(); });
     if (Platform.OS === 'web' && typeof window !== 'undefined') window.addEventListener('online', reconnect);

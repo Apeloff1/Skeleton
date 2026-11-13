@@ -1,0 +1,134 @@
+{
+  "operator_owned_scratch_source": true,
+  "source_bytes_before": 20,
+  "source_bytes_after": 20,
+  "initial": {
+    "schema": "skeleton.ai.jeeves_appwide_action_receipt.v1",
+    "action": "source.inspect",
+    "catalog_digest": "d8e98ebfe70a59552b4c82275ab646e5f132f2fe6c8f84634e17d83328ca0364",
+    "canonical_catalog_digest": "777fa6428b3447c6d1dd8a84bbf618298a378ab9f9bb4206920eb8a3889236a2",
+    "catalog_pin_requested": true,
+    "effect": "read",
+    "input_digest": "4bf083d1d2cbd64bb048f1b80bfda2cecc39bc78f47a3c8a6017216267f9b27c",
+    "inventory_digest": "ad35b9e6983aa9836bc846db6401d75a7c0605d2b60d8586ee202a6d5faa63f7",
+    "result": {
+      "schema": "skeleton.ai.jeeves_source_inspection.v1",
+      "path": "draft.py",
+      "content": "title = 'Lantern A'\n",
+      "sha256": "6818bfce8953aa53639a191cd863b3a2fd9cf311a78a5f3fff7ff30a98c65ec1",
+      "inventory_snapshot": "ad35b9e6983aa9836bc846db6401d75a7c0605d2b60d8586ee202a6d5faa63f7",
+      "inventory_is_content_attestation": false,
+      "read_only": true
+    },
+    "read_only_or_review_only": true,
+    "unregistered_execution_denied": true,
+    "operator_authorized": false,
+    "digest": "4cc3bb5cba170034419c707c4dccd725ad706118e7d082e8ae88b34df5657572"
+  },
+  "review_only_proposal": {
+    "schema": "skeleton.ai.jeeves_appwide_action_receipt.v1",
+    "action": "source.propose",
+    "catalog_digest": "d8e98ebfe70a59552b4c82275ab646e5f132f2fe6c8f84634e17d83328ca0364",
+    "canonical_catalog_digest": "777fa6428b3447c6d1dd8a84bbf618298a378ab9f9bb4206920eb8a3889236a2",
+    "catalog_pin_requested": true,
+    "effect": "proposal",
+    "input_digest": "946486ed85c7c5471ec093d79e565786bda4e7e0ee5b527e082e5e979c4a337f",
+    "inventory_digest": "ad35b9e6983aa9836bc846db6401d75a7c0605d2b60d8586ee202a6d5faa63f7",
+    "result": {
+      "schema": "skeleton.ai.jeeves_appwide_code_change_proposal.v1",
+      "path": "draft.py",
+      "expected_sha256": "6818bfce8953aa53639a191cd863b3a2fd9cf311a78a5f3fff7ff30a98c65ec1",
+      "proposed_sha256": "eed8f15af89ec370d892bb1a55d24ec5ac0faa60c18079406d3d13fcef5a642d",
+      "reason": "Operator-owned scratch authoring revision for source-freshness observation.",
+      "diff": "--- a/draft.py\n+++ b/draft.py\n@@ -1 +1 @@\n-title = 'Lantern A'\n+title = 'Lantern B'\n",
+      "inventory_snapshot": "ad35b9e6983aa9836bc846db6401d75a7c0605d2b60d8586ee202a6d5faa63f7",
+      "approval_required": true,
+      "committed": false,
+      "source_mutated": false,
+      "automatic_self_update": false,
+      "security_and_regression_review_required": true,
+      "digest": "0fbb73938fcdf8e1eb925d6002c8263ed8cf64ee0f2076e3578ac8e4fa7e5a52"
+    },
+    "read_only_or_review_only": true,
+    "unregistered_execution_denied": true,
+    "operator_authorized": true,
+    "digest": "22a667748397718e99c24c427dd605f1f37bf1512f4de96537c980103e7a4af7"
+  },
+  "source_read_before_rescan": {
+    "outcome": "refused",
+    "reason": "source identity changed since inventory scan"
+  },
+  "inventory_before": {
+    "schema": "skeleton.ai.jeeves_appwide_inventory.v1",
+    "scanned_regular_files": 1,
+    "classified_files": 1,
+    "readable_files": 1,
+    "restricted_files": 0,
+    "skipped_paths": 0,
+    "blocked_reasons": {},
+    "domains": {
+      "general": 1
+    },
+    "root_counts": {
+      "draft.py": 1
+    },
+    "snapshot_digest": "ad35b9e6983aa9836bc846db6401d75a7c0605d2b60d8586ee202a6d5faa63f7",
+    "snapshot_identity_kind": "local_metadata_and_file_freshness_fence",
+    "snapshot_is_full_content_digest": false,
+    "visible_regular_files_discoverable": true,
+    "excluded_and_unreadable_paths_are_not_executable": true,
+    "all_files_executable": false,
+    "all_features_working": false,
+    "source_edits_require_review": true,
+    "model_self_modification_allowed": false
+  },
+  "inventory_after": {
+    "schema": "skeleton.ai.jeeves_appwide_inventory.v1",
+    "scanned_regular_files": 1,
+    "classified_files": 1,
+    "readable_files": 1,
+    "restricted_files": 0,
+    "skipped_paths": 0,
+    "blocked_reasons": {},
+    "domains": {
+      "general": 1
+    },
+    "root_counts": {
+      "draft.py": 1
+    },
+    "snapshot_digest": "f36a7a02890510912c9d2e0551ef82817e9a3db2ae7630d02255fe1fbb8b5199",
+    "snapshot_identity_kind": "local_metadata_and_file_freshness_fence",
+    "snapshot_is_full_content_digest": false,
+    "visible_regular_files_discoverable": true,
+    "excluded_and_unreadable_paths_are_not_executable": true,
+    "all_files_executable": false,
+    "all_features_working": false,
+    "source_edits_require_review": true,
+    "model_self_modification_allowed": false
+  },
+  "refreshed": {
+    "schema": "skeleton.ai.jeeves_appwide_action_receipt.v1",
+    "action": "source.inspect",
+    "catalog_digest": "d8e98ebfe70a59552b4c82275ab646e5f132f2fe6c8f84634e17d83328ca0364",
+    "canonical_catalog_digest": "777fa6428b3447c6d1dd8a84bbf618298a378ab9f9bb4206920eb8a3889236a2",
+    "catalog_pin_requested": false,
+    "effect": "read",
+    "input_digest": "4bf083d1d2cbd64bb048f1b80bfda2cecc39bc78f47a3c8a6017216267f9b27c",
+    "inventory_digest": "f36a7a02890510912c9d2e0551ef82817e9a3db2ae7630d02255fe1fbb8b5199",
+    "result": {
+      "schema": "skeleton.ai.jeeves_source_inspection.v1",
+      "path": "draft.py",
+      "content": "title = 'Lantern B'\n",
+      "sha256": "eed8f15af89ec370d892bb1a55d24ec5ac0faa60c18079406d3d13fcef5a642d",
+      "inventory_snapshot": "f36a7a02890510912c9d2e0551ef82817e9a3db2ae7630d02255fe1fbb8b5199",
+      "inventory_is_content_attestation": false,
+      "read_only": true
+    },
+    "read_only_or_review_only": true,
+    "unregistered_execution_denied": true,
+    "operator_authorized": false,
+    "digest": "768b55fe32ef225f190de47caa59e82eeefd1e54e032644d8c713f03d74fd77a"
+  },
+  "automated_test_suite": false,
+  "automatic_source_edit_or_model_promotion": false
+}

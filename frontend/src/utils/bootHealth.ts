@@ -6,7 +6,7 @@
  * tighter per-attempt timeout for startup paths where backend availability is
  * useful telemetry, but must not delay the first interactive screen.
  */
-import { API_BASE } from '../../utils/apiBase';
+import { API_BASE } from './apiBase';
 
 const BACKEND = API_BASE;
 

@@ -354,7 +354,9 @@ These modules declare routers that `create_app()` does not include. Do not call 
 
 - `skeleton/api/omnifabric_routes.py` (prefix `skeleton.kernel.omnifabric.doctrine.ROUTE_PREFIX`)
 - `skeleton/api/cortex_routes.py`
-- `skeleton/api/gameforge_routes.py` (`/gameforge/intake`, `/gameforge/run`; the mounted versions are in `routes.py`)
+- `skeleton/api/gameforge_routes.py` (`/gameforge/intake`, `/gameforge/run`; the mounted versions are in `routes.py`). #4119 owns this module and delegates `/gameforge/run` to `build_playable_game`.
+
+Projects `POST /api/v1/projects` arrives with #4097 and is documented in [architecture/contracts/projects.md](../architecture/contracts/projects.md). The dev harness mounts `command_routes` beside the main router and leaves this sidecar unmounted.
 
 ## Out of scope
 

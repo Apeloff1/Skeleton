@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_naval_navigation_copper_mesa",
+  "genre": "naval_navigation",
+  "biome": "copper_mesa",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_naval_navigation_copper_mesa:restore",
+  "objective": "reconnect isolated trading ports",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "dry ravines",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near abandoned observatory",
+        "Seek a witness of dust squalls"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "abandoned observatory",
+      "entry": "survey_complete",
+      "actions": [
+        "navigate",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to solar mirrors",
+        "Establish an independent path around a blockade fleet"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "abandoned observatory",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of abandoned observatory",
+        "Construct a low-resource alternative using solar mirrors"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden dust squalls interrupts transfer",
+    "The a blockade fleet suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "solar mirrors",
+    "unlimited_rewards": false
+  }
+}

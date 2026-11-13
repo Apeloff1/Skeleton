@@ -10,9 +10,9 @@ import api from '../src/utils/apiClient';
 import { authHeaders, checkMe } from '../src/auth/gameforgeAuth';
 import { validProjectId } from '../src/product/worldWorkspace';
 import { STORY_KINDS, prepareStoryEvent, storyIndexPath, type StoryDraft } from '../src/product/storyContinuity';
-import { HANDOFF_KEY } from '../features/Jeeves/workbench/types';
-import { makeStoryRecallHandoff } from '../features/Jeeves/storyContext';
-import { Action, Section, palette, styles } from '../features/Jeeves/workbench/ui';
+import { HANDOFF_KEY } from '../src/features/Jeeves/workbench/types';
+import { makeStoryRecallHandoff } from '../src/features/Jeeves/storyContext';
+import { Action, Section, palette, styles } from '../src/features/Jeeves/workbench/ui';
 
 type StoryEvent = {
   event_id: string; branch_id: string; act: number; scene: number; beat: number;

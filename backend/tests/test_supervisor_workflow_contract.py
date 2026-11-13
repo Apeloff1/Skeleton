@@ -197,7 +197,7 @@ def test_supervisor_workflow_uses_pinned_reviewed_actions() -> None:
     ) in source
     assert (
         "actions/setup-python@"
-        "5fda3b95a4ea91299a34e894583c3862153e4b97"
+        "6d4fd22b20465ccc0f7354476588e8df7c9ca0e0"
     ) in source
     assert "@main" not in source
     assert "@master" not in source

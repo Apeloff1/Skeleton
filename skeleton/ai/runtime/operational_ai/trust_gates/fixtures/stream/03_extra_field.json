@@ -1,0 +1,24 @@
+{
+  "case": "03_extra_field",
+  "gate": "stream",
+  "expect": "reject",
+  "reason": "Unknown properties may not be silently accepted",
+  "payload": {
+    "request_id": "r_001",
+    "chunks": [
+      {
+        "index": 0,
+        "text": "Hi"
+      },
+      {
+        "index": 1,
+        "text": "."
+      }
+    ],
+    "max_bytes": 1024,
+    "terminal": "stop",
+    "generated_tokens": 2,
+    "token_ceiling": 128,
+    "untrusted_override": "allow"
+  }
+}

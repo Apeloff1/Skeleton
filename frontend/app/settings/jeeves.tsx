@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSettings, getJeevesSystemPrefix, JEEVES_DNA_GROUPS } from '../../state/settingsStore';
-import { Section, SwitchRow, SliderRow, TextRow, ChoiceRow, ActionButton } from '../../features/Settings/components';
-import DnaCockpit from '../../features/Settings/DnaCockpit';
-import { actionSheet } from '../../components/ActionSheet';
-import { toast } from '../../components/Toast';
+import { useSettings, getJeevesSystemPrefix, JEEVES_DNA_GROUPS } from '../../src/state/settingsStore';
+import { Section, SwitchRow, SliderRow, TextRow, ChoiceRow, ActionButton } from '../../src/features/Settings/components';
+import DnaCockpit from '../../src/features/Settings/DnaCockpit';
+import { actionSheet } from '../../src/components/ActionSheet';
+import { toast } from '../../src/components/AppToast';
 
 export default function JeevesSettings() {
   const router = useRouter();

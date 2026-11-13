@@ -8,8 +8,8 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
-import theme from '../../theme/tokens';
-import { SKIN_BY_ID, DEFAULT_SKIN, type Skin } from '../../theme/skins';
+import theme from '../theme/tokens';
+import { SKIN_BY_ID, DEFAULT_SKIN, type Skin } from '../theme/skins';
 
 const KEY = 'app_skin_v1';
 const BASE = { ...(theme as any).colors };

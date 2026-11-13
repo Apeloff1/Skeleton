@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSettings } from '../../state/settingsStore';
-import { Metronome } from '../../components/Metronome';
+import { useSettings } from '../../src/state/settingsStore';
+import { Metronome } from '../../src/components/Metronome';
 
 export default function CodingSettings() {
   const router = useRouter();

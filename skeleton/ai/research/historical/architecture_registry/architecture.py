@@ -300,6 +300,8 @@ API_ROUTES: List[Dict[str, Any]] = [
     {"method": "POST", "path": "/api/v1/context/command", "protected": False, "description": "Apply cockpit command"},
     {"method": "POST", "path": "/api/v1/gameforge/run", "protected": True, "description": "Run GameForge generation"},
     {"method": "POST", "path": "/api/v1/gameforge/intake", "protected": True, "description": "GameForge intake questionnaire"},
+    {"method": "POST", "path": "/api/v1/game/build", "protected": True, "description": "Accept a playable Godot build and return 202"},
+    {"method": "GET", "path": "/api/v1/game/build/{execution_id}", "protected": True, "description": "Poll a playable Godot build"},
     {"method": "POST", "path": "/api/v1/swarm/submit", "protected": True, "description": "Submit swarm task"},
     {"method": "GET", "path": "/api/v1/auth/github", "protected": False, "description": "GitHub auth status"},
     {"method": "GET", "path": "/api/v1/auth/github/start", "protected": False, "description": "Start GitHub OAuth"},

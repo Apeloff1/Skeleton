@@ -50,7 +50,58 @@ HTML = r"""<!doctype html>
       <input id="knowledge-query" type="search" autocomplete="off"
              placeholder="A topic, symbol, API or exact phrase">
       <button id="knowledge-search" class="secondary">Search offline references</button>
+      <label class="hint" for="reference-grant"><input id="reference-grant" type="checkbox"> Grant this reference read</label>
+      <button id="reference-read" class="secondary">Read with a governed receipt</button>
+      <button id="reference-job" class="secondary">Run bounded reference job</button>
+      <label for="reference-draft-title">Approved reference title</label>
+      <input id="reference-draft-title" type="text" maxlength="200" autocomplete="off">
+      <label for="reference-draft">Approved reference text</label>
+      <textarea id="reference-draft" rows="3" maxlength="65536"></textarea>
+      <label class="hint" for="reference-approve"><input id="reference-approve" type="checkbox"> Approve this exact reference write</label>
+      <button id="reference-prepare" class="secondary">Prepare approved write</button>
+      <button id="reference-confirm" class="secondary">Confirm write</button>
+      <button id="reference-rollback" class="secondary">Roll back last write</button>
       <div id="knowledge-hits" class="knowledge-hits" aria-live="polite"></div>
+    </section>
+    <section class="knowledge-section" aria-label="Local hardware resource monitor">
+      <div class="heading"><span>Hardware &amp; memory fabric</span>
+        <button id="resource-refresh" class="small" type="button" disabled>Refresh</button>
+      </div>
+      <p class="hint">Private device telemetry. GPU and shared memory remain
+      backend-owned; unknown hardware capacity is never assumed available.</p>
+      <pre id="resource-monitor" aria-live="polite">Connect to inspect your device.</pre>
+      <label for="resource-bytes" class="hint">Estimated source bytes</label>
+      <input id="resource-bytes" type="number" min="0" step="1" value="10000000">
+      <label for="resource-streams" class="hint">Requested concurrent read streams</label>
+      <input id="resource-streams" type="number" min="1" step="1" value="4">
+      <button id="resource-plan" class="secondary" disabled>Calculate adaptive plan</button>
+      <pre id="resource-plan-result">No workload planned.</pre>
+      <details><summary>Long-form virtual memory (Mac M-series / local)</summary>
+        <p class="hint">Spool selected, trusted local text files as compressed,
+        verified disk pages without loading the whole file into RAM.
+        This does not enlarge the model's trained context window.</p>
+        <label for="longform-root">Selected local directory (absolute path)</label>
+        <input id="longform-root" type="text" autocomplete="off" spellcheck="false">
+        <label for="longform-relative">Filename relative to selected directory</label>
+        <input id="longform-relative" type="text" autocomplete="off" spellcheck="false">
+        <label for="longform-grant"><input id="longform-grant" type="checkbox">
+          I approve this exact private disk-backed import</label>
+        <button id="longform-ingest" class="secondary" disabled>Stage long-form source</button>
+        <label for="longform-import-id">Import receipt ID (copy to recover after disconnect)</label>
+        <input id="longform-import-id" type="text" autocomplete="off" spellcheck="false">
+        <button id="longform-import-restore" class="secondary" disabled>Recover committed import</button>
+        <label for="longform-search">Search staged long-form pages</label>
+        <input id="longform-search" type="search" autocomplete="off">
+        <button id="longform-query" class="secondary" disabled>Retrieve verified passages</button>
+        <pre id="longform-status" aria-live="polite">No staged source.</pre>
+        <div class="heading"><span>Resumable long-form work</span></div>
+        <label for="longform-work-id">Work ID (copy to resume after restart)</label>
+        <input id="longform-work-id" type="text" autocomplete="off" spellcheck="false">
+        <button id="longform-work-start" class="secondary" disabled>Begin durable work</button>
+        <button id="longform-work-resume" class="secondary" disabled>Restore cursor</button>
+        <button id="longform-work-next" class="secondary" disabled>Read and commit next page</button>
+        <pre id="longform-work-status" aria-live="polite">No active work cursor.</pre>
+      </details>
     </section>
     <div class="sidebar-footer">
       <button id="fork" class="secondary">Fork conversation</button>
@@ -105,17 +156,20 @@ HTML = r"""<!doctype html>
 
 
 CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#ebeef8;background:#0d0f17}button,input,textarea{font:inherit}button{cursor:pointer;border:1px solid #333b55;border-radius:9px;padding:9px 12px;color:#eff1ff;background:#202638;transition:background .15s}button:hover{background:#303a57}button:disabled{opacity:.38;cursor:default}.primary{border-color:#6379dc;background:#495dc1}.primary:hover{background:#6479dc}.secondary{background:#191e2d}.danger{color:#ffbfc1;background:#322127;border-color:#63343f}.shell{display:grid;grid-template-columns:300px 1fr;min-height:100vh}.sidebar{display:flex;flex-direction:column;background:#131823;border-right:1px solid #30374b;padding:21px 17px;min-height:100vh}.brand{display:flex;align-items:center;gap:11px;margin-bottom:28px}.brand-mark{display:grid;place-items:center;width:44px;height:44px;color:#b7c8ff;font-size:28px;border:1px solid #4d5e85;border-radius:14px;background:#202d48}.brand strong{display:block;font-size:20px;letter-spacing:.3px}.brand small{display:block;font-size:11px;color:#9faec9;letter-spacing:.6px}.connect{border-radius:12px;padding:13px;background:#1b2233;border:1px solid #303d5a}.connect label,.composer label{font-size:12px;font-weight:650;color:#c8d0e6}.connect input{width:100%;margin:9px 0;padding:11px 10px;color:#f6f7fb;background:#101521;border:1px solid #35425c;border-radius:8px}.inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.inline button{flex:1}.hint,.minor{font-size:12px;color:#a4b1ce;line-height:1.5}.heading{display:flex;justify-content:space-between;align-items:center;margin-top:27px;margin-bottom:11px;font-size:12px;color:#aebdd9;text-transform:uppercase;letter-spacing:1px}.small{padding:5px 8px;text-transform:none;letter-spacing:0}.sessions{display:flex;flex-direction:column;gap:5px;overflow-y:auto;flex:1;min-height:100px;max-height:50vh}.session{width:100%;text-align:left;white-space:normal;padding:11px 9px;background:transparent;border-color:transparent;font-size:13px;overflow-wrap:anywhere}.session.active{background:#2a3654;border-color:#596b93}.session small{display:block;margin-top:4px;color:#9daacc;font-size:11px}.sidebar-footer{display:grid;gap:7px;padding-top:13px;border-top:1px solid #343d50}.import-label{display:block;padding:9px 12px;border:1px solid #343d50;border-radius:9px;background:#1b2231;text-align:center;cursor:pointer}.sidebar-footer input[type=file]{width:100%;font-size:10px;color:#a3b4d2;max-width:100%}.main{min-width:0;display:flex;flex-direction:column;min-height:100vh}.topbar{display:flex;justify-content:space-between;align-items:center;padding:24px 35px;border-bottom:1px solid #222b3c}.topbar h1{font-size:17px;margin:0;font-weight:650}.topbar p{font-size:12px;color:#a5b1ca;margin:5px 0 0}.indicator{font-size:10px;letter-spacing:1px;border:1px solid #46506c;background:#1c2638;padding:7px 11px;border-radius:25px;color:#9aabd2}.intro{margin:auto;max-width:520px;text-align:center;padding:40px}.intro .glow{font-size:48px;color:#9fafff}.intro h2{font-size:29px;letter-spacing:-1px;margin:10px}.intro p{color:#b5c0d9;line-height:1.6}.messages{width:100%;max-width:900px;margin:0 auto;flex:1;min-height:0;overflow-y:auto;padding:30px 28px;display:flex;flex-direction:column;gap:16px}.message{padding:16px 18px;border:1px solid #2f3952;border-radius:14px;max-width:90%;overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.55;font-size:14px}.message.user{background:#24314a;align-self:flex-end;border-color:#405882}.message.assistant{background:#171e2c;align-self:flex-start}.message header{font-weight:700;color:#bacafa;font-size:11px;margin-bottom:8px;letter-spacing:.6px}.composer{width:calc(100% - 50px);max-width:870px;margin:0 auto;padding:15px;border-radius:15px;border:1px solid #35435e;background:#191f2e}.composer textarea{width:100%;resize:vertical;background:#0e1522;color:#f0f2fa;border:1px solid #35405b;border-radius:9px;margin-top:7px;padding:12px;min-height:68px}.composer .bottom{justify-content:space-between;margin-top:9px}.bottom button{flex:0}.bottom label{display:flex;gap:8px;align-items:center}.bottom input{width:64px;padding:5px;color:#fff;background:#0e1522;border:1px solid #35405b;border-radius:6px}.bottom span{color:#abb8d2;font-size:11px}.status{padding:13px 30px;min-height:42px;text-align:center;color:#abb7cc;font-size:12px}@media(max-width:720px){.shell{grid-template-columns:1fr}.sidebar{min-height:0;padding:13px}.brand{margin-bottom:13px}.sidebar-footer{display:flex;flex-wrap:wrap}.sidebar-footer button,.sidebar-footer label{flex:1}.sessions{max-height:140px}.topbar{padding:14px}.intro{padding:16px}.messages{padding:14px}.composer{width:calc(100% - 20px);margin:10px}.bottom span{display:none}}
-.knowledge-section{border-top:1px solid #333b50;margin-top:12px;padding-top:8px;display:grid;gap:7px;font-size:12px;max-height:35vh;overflow:auto}
-.knowledge-section label{color:#c2cbe2}.knowledge-section input[type=search]{width:100%;border:1px solid #35425c;border-radius:8px;padding:9px;background:#101521;color:#fff}.knowledge-section input[type=file]{width:100%;max-width:100%;font-size:10px;color:#a3b4d2}
+.knowledge-section{border-top:1px solid #333b50;margin-top:12px;padding-top:8px;display:grid;gap:7px;font-size:12px;max-height:48vh;overflow:auto}
+.knowledge-section label{color:#c2cbe2}.knowledge-section input[type=search],.knowledge-section input[type=text],.knowledge-section textarea{width:100%;border:1px solid #35425c;border-radius:8px;padding:9px;background:#101521;color:#fff}.knowledge-section input[type=file]{width:100%;max-width:100%;font-size:10px;color:#a3b4d2}.knowledge-section textarea{min-height:64px;resize:vertical}
 .knowledge-documents,.knowledge-hits{display:grid;gap:7px}.knowledge-record,.knowledge-hit{border:1px solid #34415d;border-radius:8px;padding:8px;background:#1c2638;overflow-wrap:anywhere}
 .knowledge-record{display:flex;align-items:center;justify-content:space-between;gap:4px}.knowledge-record button{flex-shrink:0;font-size:10px;padding:5px}.knowledge-hit strong{display:block;color:#b4c8ff}.knowledge-hit p{white-space:pre-wrap;color:#e0e8f8;max-height:190px;overflow:auto}.knowledge-hit small{color:#a7bcdb;overflow-wrap:anywhere}
 
 .source-custody-label{display:block;margin-top:12px;color:#adc2e8;font-size:10px;font-weight:700}
+.faithfulness{display:block;margin-top:8px;font-size:11px;font-weight:700}
+.faithfulness.supported{color:#b7e3c2}.faithfulness.qualified{color:#f0d48a}
+.faithfulness.abstain,.faithfulness.contested{color:#ffc1c4}
 .source-custody-item{white-space:pre-wrap;font-size:11px;margin-top:7px;color:#d0d9ed;background:#1e2d42;border:1px solid #344a68;border-radius:7px;padding:9px;max-height:180px;overflow:auto}
 [hidden]{display:none!important}.turn-progress{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#1c2943;border-bottom:1px solid #35466b;padding:12px 24px;font-size:12px}.turn-progress #turn-label{flex:1}.transcript-tools{display:flex;gap:8px;justify-content:center;margin:8px}.message-actions{display:flex;gap:7px;margin-top:12px;white-space:normal}.instructions{margin:12px 0;color:#b8c9e9;font-size:12px}.instructions textarea{width:100%;margin-top:9px;color:#eff2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:8px}.sidebar input[type=search]{min-width:0;flex:1;width:100%;color:#eef2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:9px}.reference-name{text-align:left;padding:4px;border:0;background:transparent;font-size:11px;overflow-wrap:anywhere}.session small:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}dialog{width:min(850px,94vw);max-height:86vh;overflow:auto;background:#131d2d;color:#ebf1ff;border:1px solid #526a95;border-radius:14px;padding:22px}dialog::backdrop{background:#000a}dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;background:#0b1321;padding:15px;border-radius:9px}dialog .hint{overflow-wrap:anywhere}:focus-visible{outline:2px solid #a1c1ff;outline-offset:3px}
 
 .shell{height:100vh;height:100dvh;overflow:hidden}.sidebar{min-height:0;height:100%;overflow-y:auto}.main{height:100%;min-height:0}.messages{overscroll-behavior:contain}.intro{flex-shrink:1;overflow:auto}.mobile-only,.sidebar-scrim{display:none}.bottom input[type=checkbox]{width:auto}.turn-progress #turn-elapsed{font-variant-numeric:tabular-nums}.knowledge-record .reference-name{min-width:0;flex-shrink:1;flex:1}.brand #sidebar-close{margin-left:auto}
-@media(max-width:720px){.shell{display:block;min-height:0}.sidebar{display:none}.main{height:100%}.topbar{flex-wrap:wrap;gap:8px}.topbar>div:first-of-type{flex:1;min-width:150px}.topbar h1{font-size:15px}.topbar p{overflow-wrap:anywhere}.mobile-only{display:inline-block}.library-open .sidebar{display:flex;position:fixed;top:0;bottom:0;left:0;width:min(350px,90vw);z-index:20;min-height:0;max-height:100dvh;overflow-y:auto;box-shadow:10px 0 40px #0007}.library-open .sidebar-scrim{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:19;background:#0009;border:0;border-radius:0}.sidebar .sessions{flex:none;max-height:25vh}.sidebar .knowledge-section{flex:none;max-height:35vh}.sidebar .sidebar-footer{display:grid}.composer{flex-shrink:0;margin:0 auto;padding:10px}.composer textarea{min-height:50px;max-height:24vh}.composer .bottom{gap:6px}.turn-progress{padding:8px 12px}.status{padding:9px 12px}.messages{padding:12px;gap:10px}.message{max-width:97%}.intro h2{font-size:23px}.intro .glow{font-size:30px}.intro .minor{font-size:11px}.intro{padding:12px}.transcript-tools{margin:5px}}
+@media(max-width:720px){.shell{display:block;min-height:0}.sidebar{display:none}.main{height:100%}.topbar{flex-wrap:wrap;gap:8px}.topbar>div:first-of-type{flex:1;min-width:150px}.topbar h1{font-size:15px}.topbar p{overflow-wrap:anywhere}.mobile-only{display:inline-block}.library-open .sidebar{display:flex;position:fixed;top:0;bottom:0;left:0;width:min(350px,90vw);z-index:20;min-height:0;max-height:100dvh;overflow-y:auto;box-shadow:10px 0 40px #0007}.library-open .sidebar-scrim{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:19;background:#0009;border:0;border-radius:0}.sidebar .sessions{flex:none;max-height:25vh}.sidebar .knowledge-section{flex:none;max-height:48vh}.sidebar .sidebar-footer{display:grid}.composer{flex-shrink:0;margin:0 auto;padding:10px}.composer textarea{min-height:50px;max-height:24vh}.composer .bottom{gap:6px}.turn-progress{padding:8px 12px}.status{padding:9px 12px}.messages{padding:12px;gap:10px}.message{max-width:97%}.intro h2{font-size:23px}.intro .glow{font-size:30px}.intro .minor{font-size:11px}.intro{padding:12px}.transcript-tools{margin:5px}}
 
 """
 
@@ -126,12 +180,45 @@ JAVASCRIPT = r"""'use strict';
   const bytes = value => new TextEncoder().encode(value).byteLength;
   const state = {
     token: '', connected: false, busy: false, epoch: 0,
-    session: '', revision: 0, messages: [], evidence: [], audits: [],
+    session: '', revision: 0, messages: [], evidence: [], audits: [], faithfulness: [],
     sessions: [], cursor: null, query: '', drafts: new Map(),
     pending: null, turn: null, timer: null, polling: false,
+    writePending: null, writeRequest: '',
     pollStarted: 0, pollErrors: 0, health: null, reference: null,
-    network: new AbortController(),
+    network: new AbortController(), resourceTimer: null, longformSourceId: null,
+    longformWork: null, longformPendingRequest: null,
+    longformImportPending: null,
   };
+  async function refreshResources() {
+    if (!state.connected || !state.token) return;
+    try {
+      const view = await api('GET', '/v1/resources');
+      const h = view.hardware || {};
+      const gib = value => typeof value === 'number' ? (value / 1073741824).toFixed(2) + ' GiB' : 'unknown';
+      const vram = view.gpus && view.gpus.length ? view.gpus.map(d =>
+        d.device + ': ' + (d.vendor === 'apple'
+          ? 'Metal unified · recommended set ' + gib(d.recommended_working_set_bytes)
+            + ' · currently allocated ' + gib(d.current_allocated_bytes)
+          : gib(d.dedicated_free_bytes) + ' VRAM free' +
+            (d.shared_free_bytes === null ? ' · shared unknown' :
+              ' · ' + gib(d.shared_free_bytes) + ' host-shared (not additive)'))
+      ).join('\n') : 'GPU telemetry unavailable — no VRAM allocation assumed';
+      const c = view.controller || {};
+      const throughput = typeof c.smoothed_read_bytes_per_second === 'number' ?
+        (c.smoothed_read_bytes_per_second / 1048576).toFixed(2) + ' MiB/s' : 'not calibrated';
+      get('resource-monitor').textContent =
+        'RAM ' + gib(h.available_ram_bytes) + ' / ' + gib(h.total_ram_bytes) +
+        '\nSwap/pagefile ' + gib(h.free_swap_bytes) + ' / ' + gib(h.total_swap_bytes) +
+        '\nLocal disk ' + gib(h.free_disk_bytes) + ' / ' + gib(h.total_disk_bytes) +
+        '\nCPU load ' + (h.cpu_load_ratio ?? 'unknown') +
+        ' · worker budget ' + (c.adaptive_stream_budget ?? '?') +
+        '\nMemory pressure ' + ((c.predictive_pressure ?? 0) * 100).toFixed(1) + '%' +
+        '\n' + vram + '\nRead throughput: ' + throughput +
+        '\nStaging: read-only host mmap / SQLite spill';
+    } catch (error) {
+      if (state.connected) get('resource-monitor').textContent = 'Resource telemetry unavailable.';
+    }
+  }
   const terminal = turn => !!turn && ['complete', 'failed', 'cancelled'].includes(turn.state);
   const unresolved = () => !!state.turn && !terminal(state.turn);
   const status = value => { get('status').textContent = value; };
@@ -148,9 +235,13 @@ JAVASCRIPT = r"""'use strict';
     ['new', 'fork', 'delete', 'import', 'system-prompt', 'session-search', 'sessions-more'].forEach(id => {
       get(id).disabled = locked || working;
     });
-    ['knowledge-file', 'knowledge-search', 'knowledge-query'].forEach(id => {
+    ['knowledge-file', 'knowledge-search', 'knowledge-query', 'reference-read', 'reference-grant',
+      'reference-job', 'reference-draft-title', 'reference-draft', 'reference-approve',
+      'reference-prepare'].forEach(id => {
       get(id).disabled = locked || state.busy;
     });
+    get('reference-confirm').disabled = locked || state.busy || !state.writePending;
+    get('reference-rollback').disabled = locked || state.busy || !state.writeRequest;
     ['export', 'export-text', 'copy-transcript', 'refresh-session'].forEach(id => {
       get(id).disabled = locked || state.busy || !state.session;
     });
@@ -158,6 +249,14 @@ JAVASCRIPT = r"""'use strict';
     get('send').disabled = locked || working || !state.session;
     get('connect').disabled = state.busy || state.connected;
     get('disconnect').disabled = !state.connected && !state.token;
+    get('resource-refresh').disabled = locked;
+    get('resource-plan').disabled = locked;
+    get('longform-ingest').disabled = locked || state.busy;
+    get('longform-import-restore').disabled = locked || state.busy;
+    get('longform-query').disabled = locked || state.busy || !state.longformSourceId;
+    get('longform-work-start').disabled = locked || state.busy || !state.longformSourceId;
+    get('longform-work-resume').disabled = locked || state.busy;
+    get('longform-work-next').disabled = locked || state.busy || !state.longformWork;
     const progress = !!state.turn;
     get('turn-progress').hidden = !progress;
     get('cancel-turn').disabled = !unresolved() || state.turn?.cancel_requested || locked;
@@ -184,16 +283,32 @@ JAVASCRIPT = r"""'use strict';
     state.timer = null;
   }
   function lock() {
+    if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
+    state.resourceTimer = null;
+    get('resource-monitor').textContent = 'Connect to inspect your device.';
+    get('resource-plan-result').textContent = 'No workload planned.';
+    get('longform-status').textContent = 'No staged source.';
+    get('longform-work-status').textContent = 'No active work cursor.';
+    get('longform-work-id').value = '';
+    state.longformSourceId = null;
+    state.longformWork = null;
+    state.longformPendingRequest = null;
+    state.longformImportPending = null;
+    get('longform-import-id').value = '';
     const hadWork = unresolved();
     stopPolling();
     state.epoch++;
     state.network.abort();
     state.network = new AbortController();
     Object.assign(state, {token: '', connected: false, busy: false, session: '', revision: 0,
-      messages: [], evidence: [], audits: [], sessions: [], cursor: null, query: '',
-      pending: null, turn: null, polling: false, reference: null, health: null});
+      messages: [], evidence: [], audits: [], faithfulness: [], sessions: [], cursor: null, query: '',
+      pending: null, turn: null, polling: false, reference: null, health: null,
+      writePending: null, writeRequest: ''});
     state.drafts.clear();
-    ['secret', 'prompt', 'system-prompt', 'session-query', 'knowledge-query', 'import', 'knowledge-file'].forEach(id => {get(id).value = '';});
+    ['secret', 'prompt', 'system-prompt', 'session-query', 'knowledge-query', 'import', 'knowledge-file',
+      'reference-draft-title', 'reference-draft'].forEach(id => {get(id).value = '';});
+    get('reference-grant').checked = false;
+    get('reference-approve').checked = false;
     ['sessions', 'messages', 'knowledge-documents', 'knowledge-hits'].forEach(id => get(id).replaceChildren());
     get('reference-text').textContent = '';
     get('reference-dialog').close();
@@ -215,7 +330,10 @@ JAVASCRIPT = r"""'use strict';
     const timeout = new AbortController();
     const cancel = () => timeout.abort();
     network.signal.addEventListener('abort', cancel, {once: true});
-    const timer = setTimeout(cancel, 15000);
+    // Long file ingestion may stream for hours. Abort only on an explicit
+    // workspace lock; the durable import ID allows post-disconnect recovery.
+    const timer = path === '/v1/resources/longform/ingest' ? null :
+      setTimeout(cancel, 15000);
     let response;
     try {
       response = await fetch(path, {
@@ -234,7 +352,7 @@ JAVASCRIPT = r"""'use strict';
       if (error.name === 'AbortError') throw new Error('The connection timed out. The server may still be working.');
       throw error;
     } finally {
-      clearTimeout(timer);
+      if (timer !== null) clearTimeout(timer);
       network.signal.removeEventListener('abort', cancel);
     }
   }
@@ -267,9 +385,15 @@ JAVASCRIPT = r"""'use strict';
     state.messages.forEach(message => {
       lines.push('## ' + (message.role === 'user' ? 'You' : message.role === 'system' ? 'Instructions' : 'Local model'), '', message.content, '');
       if (message.role === 'assistant') {
-        const evidence = state.evidence[turn++];
+        const evidence = state.evidence[turn];
+        const faith = state.faithfulness[turn++];
+        if (faith) {
+          lines.push('### Grounded publication', '', faith.published_text, '',
+            'Faithfulness: ' + faith.disposition, 'Deterministic atom check, not semantic verification.', '');
+          if (faith.published_text !== message.content) lines.push('### Unverified model draft', '', message.content, '');
+        }
         if (evidence?.citations?.length) {
-          lines.push('### Supplied evidence (not factual verification)', '');
+          lines.push('### Supplied evidence', '');
           if (state.audits[turn - 1]) lines.push('Citation ID audit: ' + state.audits[turn - 1].status, '');
           evidence.citations.forEach(source => lines.push(source.title + ' — ' + source.citation, '', source.passage, ''));
         }
@@ -285,12 +409,14 @@ JAVASCRIPT = r"""'use strict';
       const card = document.createElement('article');
       card.className = 'message ' + (message.role === 'user' ? 'user' : 'assistant');
       const header = document.createElement('header');
-      header.textContent = message.role === 'user' ? 'YOU' : message.role === 'system' ? 'CONVERSATION INSTRUCTIONS' : 'LOCAL MODEL';
-      const content = document.createElement('div'); content.textContent = message.content;
+      const faith = message.role === 'assistant' ? state.faithfulness[completed] : null;
+      const visible = faith?.published_text || message.content;
+      header.textContent = message.role === 'user' ? 'YOU' : message.role === 'system' ? 'CONVERSATION INSTRUCTIONS' : (faith && visible !== message.content ? 'GROUNDED ANSWER' : 'LOCAL MODEL');
+      const content = document.createElement('div'); content.textContent = visible;
       card.append(header, content);
       const actions = document.createElement('div'); actions.className = 'message-actions';
       const copyButton = document.createElement('button'); copyButton.className = 'small'; copyButton.textContent = 'Copy';
-      copyButton.addEventListener('click', () => void copy(message.content)); actions.append(copyButton);
+      copyButton.addEventListener('click', () => void copy(visible)); actions.append(copyButton);
       if (message.role === 'assistant') {
         const index = completed++;
         const fork = document.createElement('button'); fork.className = 'small';
@@ -304,9 +430,22 @@ JAVASCRIPT = r"""'use strict';
         actions.append(fork);
         const supplied = state.evidence[index];
         const audit = state.audits[index];
+        const verdict = state.faithfulness[index];
+        if (verdict) {
+          const badge = document.createElement('small');
+          badge.className = 'faithfulness ' + verdict.disposition;
+          badge.textContent = 'Grounded publication: ' + verdict.disposition + ' · deterministic atom check, not semantic verification';
+          card.append(badge);
+          if (verdict.published_text !== message.content) {
+            const draft = document.createElement('details'); draft.className = 'source-custody-item';
+            const heading = document.createElement('summary'); heading.textContent = 'Unverified model draft';
+            const body = document.createElement('p'); body.textContent = message.content;
+            draft.append(heading, body); card.append(draft);
+          }
+        }
         if (supplied?.citations?.length) {
           const label = document.createElement('small'); label.className = 'source-custody-label';
-          label.textContent = 'Sources supplied to model; factual accuracy not verified' +
+          label.textContent = 'Sources supplied to the model' +
             (audit ? ' · citation IDs: ' + audit.status : '');
           card.append(label);
           supplied.citations.forEach(source => {
@@ -355,6 +494,7 @@ JAVASCRIPT = r"""'use strict';
     if (current !== id) {state.turn = null; state.pending = null; stopPolling();}
     state.session = result.session_id; state.revision = result.revision;
     state.messages = result.messages; state.evidence = result.evidence || []; state.audits = result.citation_audits || [];
+    state.faithfulness = result.faithfulness_audits || [];
     if (current !== id) get('prompt').value = state.drafts.get(id) || '';
     get('revision').textContent = result.revision + ' saved turns';
     showMessages(); await loadSessions(); updateControls();
@@ -490,6 +630,9 @@ JAVASCRIPT = r"""'use strict';
     get('budget').value = String(state.health.default_output_tokens);
     get('budget').max = String(state.health.max_output_tokens);
     await loadSessions(); await loadDocuments();
+    await refreshResources();
+    if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
+    state.resourceTimer = setInterval(refreshResources, 10000);
     if (state.health.active_turn) {
       const activeTurn = state.health.active_turn;
       await selectSession(activeTurn.session_id);
@@ -498,6 +641,121 @@ JAVASCRIPT = r"""'use strict';
     } else status('Connected locally. Choose a conversation or create a new one.');
   }));
   get('disconnect').addEventListener('click', lock);
+  get('resource-refresh').addEventListener('click', refreshResources);
+  get('resource-plan').addEventListener('click', () => run(async () => {
+    const source_bytes = Number(get('resource-bytes').value);
+    const desired_streams = Number(get('resource-streams').value);
+    if (!Number.isSafeInteger(source_bytes) || source_bytes < 0 ||
+        !Number.isSafeInteger(desired_streams) || desired_streams < 1) {
+      throw new Error('Select nonnegative source bytes and positive read streams.');
+    }
+    const plan = await api('POST', '/v1/resources/plan',
+                           {source_bytes, desired_streams});
+    get('resource-plan-result').textContent =
+      'Placement ' + plan.residency + '\nStreams ' + plan.stream_count +
+      '\nChunk bytes ' + plan.transfer_chunk_bytes +
+      '\nRead-only staging ' + (plan.readonly_staging ? 'recommended' : 'optional') +
+      '\nGPU transfer: backend qualification required';
+  }));
+  get('longform-ingest').addEventListener('click', () => run(async () => {
+    if (!get('longform-grant').checked) throw new Error('Approve this source first.');
+    const root = get('longform-root').value.trim();
+    const relative_path = get('longform-relative').value.trim();
+    if (!root || !relative_path) throw new Error('Choose the selected root and filename.');
+    let pending = state.longformImportPending;
+    if (pending && (pending.root !== root || pending.relative_path !== relative_path)) {
+      throw new Error('Recover the previous import ID before selecting a different source.');
+    }
+    if (!pending) {
+      const request_id = Array.from(crypto.getRandomValues(new Uint8Array(24)),
+        n => n.toString(16).padStart(2, '0')).join('');
+      pending = {root, relative_path, request_id};
+      state.longformImportPending = pending;
+    }
+    get('longform-import-id').value = pending.request_id;
+    get('longform-status').textContent = 'Private import running or awaiting recovery…';
+    const receipt = await api('POST', '/v1/resources/longform/ingest',
+      {...pending, approved: true});
+    state.longformImportPending = null;
+    state.longformSourceId = receipt.source_id;
+    get('longform-grant').checked = false;
+    get('longform-status').textContent =
+      'Private archive verified: ' + receipt.source_sha256.slice(0, 20) +
+      '…\nBytes: ' + receipt.source_bytes +
+      '\nPages: ' + receipt.page_count +
+      '\nDisk payload: ' + receipt.stored_payload_bytes;
+    updateControls();
+  }));
+  get('longform-import-restore').addEventListener('click', () => run(async () => {
+    const source_id = get('longform-import-id').value.trim();
+    if (!/^[0-9a-f]{48}$/.test(source_id)) throw new Error('Enter an exact import ID.');
+    const receipt = await api('POST', '/v1/resources/longform/source-status', {source_id});
+    state.longformSourceId = receipt.source_id;
+    state.longformImportPending = null;
+    get('longform-status').textContent =
+      'Committed source recovered: ' + receipt.source_sha256.slice(0, 20) +
+      '…\nBytes: ' + receipt.source_bytes + '\nPages: ' + receipt.page_count;
+    updateControls();
+  }));
+  get('longform-query').addEventListener('click', () => run(async () => {
+    if (!state.longformSourceId) throw new Error('Stage a source before searching.');
+    const query = get('longform-search').value.trim();
+    if (!query) throw new Error('Enter a query.');
+    const evidence = await api('POST', '/v1/resources/longform/search',
+      {source_id: state.longformSourceId, query, limit: 3});
+    get('longform-status').textContent =
+      'Verified ' + evidence.source_sha256.slice(0, 20) +
+      '…\n' + evidence.hits.map(h =>
+        'Page ' + h.page + ': ' + h.text.slice(0, 400)
+      ).join('\n\n');
+  }));
+  function displayLongformWork(work) {
+    const progress = work.next_page + ' / ' + work.total_pages + ' pages';
+    get('longform-work-id').value = work.work_id;
+    get('longform-work-status').textContent =
+      'Saved progress: ' + progress + '\nRevision: ' + work.revision +
+      (work.complete ? '\nComplete.' : '\nReady for next page.');
+    state.longformWork = work;
+    updateControls();
+  }
+  get('longform-work-start').addEventListener('click', () => run(async () => {
+    if (!state.longformSourceId) throw new Error('Stage a source first.');
+    const work = await api('POST', '/v1/resources/longform/work-start',
+      {source_id: state.longformSourceId, approved: true});
+    state.longformPendingRequest = null;
+    displayLongformWork(work);
+  }));
+  get('longform-work-resume').addEventListener('click', () => run(async () => {
+    const work_id = get('longform-work-id').value.trim();
+    if (!/^[0-9a-f]{48}$/.test(work_id)) throw new Error('Enter the exact work ID.');
+    const work = await api('POST', '/v1/resources/longform/work-status', {work_id});
+    state.longformPendingRequest = null;
+    state.longformSourceId = work.source_id;
+    displayLongformWork(work);
+  }));
+  get('longform-work-next').addEventListener('click', () => run(async () => {
+    const work = state.longformWork;
+    if (!work) throw new Error('Restore or begin a work cursor.');
+    // Preserve request identity on uncertain delivery. Reusing the same
+    // work/revision/pages replays the already committed delivery exactly.
+    const request = state.longformPendingRequest || {
+      work_id: work.work_id, expected_revision: work.revision,
+      request_id: Array.from(crypto.getRandomValues(new Uint8Array(24)),
+        n => n.toString(16).padStart(2, '0')).join(''), pages: 1,
+    };
+    state.longformPendingRequest = request;
+    const result = await api('POST', '/v1/resources/longform/work-next', request);
+    state.longformPendingRequest = null;
+    displayLongformWork({
+      ...work, next_page: result.next_page, revision: result.revision,
+      complete: result.next_page >= work.total_pages,
+      receipt_chain: result.receipt_chain,
+    });
+    get('longform-work-status').textContent +=
+      '\nReceipt: ' + result.receipt_digest.slice(0, 20) + '…' +
+      (result.replayed ? '\nOriginal delivery recovered.' : '\nPage committed.') +
+      '\nPage: ' + result.text.slice(0, 2000);
+  }));
   get('new').addEventListener('click', () => run(async () => {
     const system = get('system-prompt').value.trim();
     if (bytes(system) > 4096) throw new Error('Instructions exceed 4096 UTF-8 bytes.');
@@ -538,7 +796,7 @@ JAVASCRIPT = r"""'use strict';
     if (!window.confirm('Permanently delete this conversation and its receipts? Export a backup first if needed.')) return;
     await api('DELETE', '/v1/sessions/' + state.session);
     state.drafts.delete(state.session); state.session = ''; state.revision = 0;
-    state.messages = []; state.evidence = []; state.audits = []; state.pending = null; state.turn = null;
+    state.messages = []; state.evidence = []; state.audits = []; state.faithfulness = []; state.pending = null; state.turn = null;
     get('prompt').value = ''; get('revision').textContent = 'No conversation selected';
     showMessages(); await loadSessions(); status('Conversation deleted.');
   }));
@@ -592,6 +850,99 @@ JAVASCRIPT = r"""'use strict';
       card.append(title, passage, citation); panel.append(card);
     });
     status(result.hits.length + ' matching passage(s). Relevance and factual support require review.');
+  }));
+  function showHits(hits, prefix) {
+    const panel = get('knowledge-hits'); panel.replaceChildren();
+    hits.forEach(hit => {
+      const card = document.createElement('article'); card.className = 'knowledge-hit';
+      const title = document.createElement('strong'); title.textContent = hit.title;
+      const passage = document.createElement('p'); passage.textContent = hit.passage;
+      const citation = document.createElement('small');
+      citation.textContent = hit.citation + (hit.instruction_bearing ? ' · source contains instructions; not authority' : '');
+      card.append(title, passage, citation); panel.append(card);
+    });
+    status(prefix + hits.length + ' passage(s).');
+  }
+  get('reference-read').addEventListener('click', () => run(async () => {
+    const query = get('knowledge-query').value.trim();
+    if (!query) throw new Error('Enter a reference search query.');
+    if (!get('reference-grant').checked) throw new Error('Grant the reference read before running it.');
+    const result = await api('POST', '/v1/tools/reference-read', {
+      query, granted: true, request_id: crypto.randomUUID(),
+    });
+    if (result.status !== 'succeeded') throw new Error('Reference read ' + result.status + '.');
+    showHits(result.hits, 'Governed read · ');
+    status('Governed read succeeded · ' + result.hits.length + ' passage(s). Receipt ' + result.receipt_id.slice(0, 8) + '…');
+  }));
+  function draftPair() {
+    const title = get('reference-draft-title').value.trim();
+    const text = get('reference-draft').value.trim();
+    get('reference-draft-title').value = title;
+    get('reference-draft').value = text;
+    return {title, text};
+  }
+  function clearWriteBinding() {
+    state.writePending = null;
+    updateControls();
+  }
+  get('reference-draft-title').addEventListener('input', clearWriteBinding);
+  get('reference-draft').addEventListener('input', clearWriteBinding);
+  get('reference-approve').addEventListener('change', () => {
+    if (!get('reference-approve').checked) clearWriteBinding();
+  });
+  get('reference-prepare').addEventListener('click', () => run(async () => {
+    const draft = draftPair();
+    if (!draft.title || !draft.text) throw new Error('Enter the reference title and text.');
+    if (!get('reference-approve').checked) throw new Error('Approve the reference write before preparing it.');
+    const request_id = crypto.randomUUID();
+    const waiting = await api('POST', '/v1/tools/reference-write', {
+      title: draft.title, text: draft.text, request_id, approved: true,
+    });
+    if (waiting.written || waiting.error_code !== 'approval_required' || !waiting.expected_approval_ref) {
+      throw new Error('Reference write did not stop for approval.');
+    }
+    state.writePending = {request_id, title: draft.title, text: draft.text, approval_ref: waiting.expected_approval_ref};
+    status('Approval is bound to this title and text. Confirm to write it.');
+  }));
+  get('reference-confirm').addEventListener('click', () => run(async () => {
+    const pending = state.writePending;
+    const draft = draftPair();
+    if (!pending) throw new Error('Prepare the approved write first.');
+    if (draft.title !== pending.title || draft.text !== pending.text) {
+      state.writePending = null;
+      throw new Error('The title or text changed. Prepare the write again.');
+    }
+    const result = await api('POST', '/v1/tools/reference-write', {
+      title: pending.title, text: pending.text, request_id: pending.request_id,
+      approved: true, approval_ref: pending.approval_ref,
+    });
+    if (!result.written) throw new Error('Reference write ' + (result.error_code || result.status) + '.');
+    state.writeRequest = result.request_id;
+    state.writePending = null;
+    await loadDocuments();
+    status('Approved write stored. Receipt ' + result.receipt_id.slice(0, 8) + '…');
+  }));
+  get('reference-rollback').addEventListener('click', () => run(async () => {
+    if (!state.writeRequest) throw new Error('No approved write is available to roll back.');
+    if (!get('reference-approve').checked) throw new Error('Approve the rollback before removing the document.');
+    const result = await api('POST', '/v1/tools/reference-write/rollback', {
+      request_id: state.writeRequest, approved: true,
+    });
+    if (!result.rolled_back) throw new Error('Rollback did not remove the document.');
+    state.writeRequest = '';
+    await loadDocuments();
+    status('Rolled back document ' + result.document_id + '.');
+  }));
+  get('reference-job').addEventListener('click', () => run(async () => {
+    const goal = get('knowledge-query').value.trim();
+    if (!goal) throw new Error('Enter a reference search query.');
+    if (!get('reference-grant').checked) throw new Error('Grant the reference read before running the job.');
+    const result = await api('POST', '/v1/agents/reference-job', {
+      goal, request_id: crypto.randomUUID(), granted: true, allow_writes: false,
+    });
+    if (result.status !== 'completed' || !result.read) throw new Error('Reference job ' + result.status + '.');
+    showHits(result.read.hits, 'Bounded job · ');
+    status('Bounded job completed in ' + result.steps + ' step(s). Writes stayed off.');
   }));
   get('knowledge-query').addEventListener('keydown', event => {if (event.key === 'Enter') {event.preventDefault(); get('knowledge-search').click();}});
   get('reference-close').addEventListener('click', () => {get('reference-dialog').close(); state.reference = null; get('reference-text').textContent = '';});

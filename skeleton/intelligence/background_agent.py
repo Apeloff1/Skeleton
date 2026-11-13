@@ -2,8 +2,9 @@
 
 This is the control loop for assistant.background_agent: a goal, a planner,
 and an executor. The loop enforces the step budget and the child fan-out
-before any tool is called. Writes stay off unless the run was opened with
-approval. An illegal plan does not reach the executor.
+before any tool is called. Writes, including the local reference write, stay
+off unless the run was opened with approval. An illegal plan does not reach
+the executor.
 """
 
 from __future__ import annotations
@@ -16,8 +17,16 @@ class AgentError(ValueError):
     """The agent was constructed or planned incorrectly."""
 
 
-READ_TOOLS = frozenset({"network.search", "repository.query"})
-WRITE_TOOLS = frozenset({"sandbox.compile", "artifact.package"})
+READ_TOOLS = frozenset({
+    "network.search",
+    "repository.query",
+    "local.reference.read",
+})
+WRITE_TOOLS = frozenset({
+    "sandbox.compile",
+    "artifact.package",
+    "local.reference.write",
+})
 
 
 @dataclass(frozen=True)

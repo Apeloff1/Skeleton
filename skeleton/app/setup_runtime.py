@@ -6,10 +6,14 @@ idempotent and never returns secret values in receipts or logs.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import secrets
 import stat
+from hashlib import sha256
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -108,6 +112,166 @@ def _replace_env_value(text: str, key: str, value: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+
+_MAX_ENV_BYTES = 256 * 1024
+
+
+@contextmanager
+def _setup_process_lock(root: Path, *, timeout: float = 10.0):
+    """Serialize secret bootstrap across independent installer/GUI processes.
+
+    The lock is a stable, non-secret file, never removed on release. Replacing
+    the lock pathname would split coordination, so reject symlinks and verify
+    the opened file still names the same inode. The installation root must be
+    operator-owned; this is not a defense against hostile directory renames.
+    """
+    if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or not 0 < timeout <= 30:
+        raise ValueError("setup lock timeout must be within (0, 30] seconds")
+    lock_path = root / ".skeleton-setup.lock"
+    if lock_path.is_symlink():
+        raise ValueError("setup lock must not be a symbolic link")
+    flags = (os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
+    descriptor = os.open(lock_path, flags, 0o600)
+    acquired = False
+    try:
+        opened = os.fstat(descriptor)
+        named = os.lstat(lock_path)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or not stat.S_ISREG(named.st_mode)
+            or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+            or (os.name != "nt" and opened.st_nlink != 1)
+        ):
+            raise ValueError("setup lock must be a stable regular file")
+        if os.name != "nt":
+            os.fchmod(descriptor, 0o600)
+            import fcntl
+        else:
+            import msvcrt
+            # Windows byte-range locking needs a persistent byte to lock.
+            if opened.st_size == 0:
+                os.write(descriptor, bytes([0]))
+                os.fsync(descriptor)
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                if os.name == "nt":
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+                else:
+                    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except OSError as exc:
+                if exc.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                    raise
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("another setup process holds the bootstrap lock") from None
+                time.sleep(0.05)
+        # Reject a lock-path swap that occurred while waiting.
+        named = os.lstat(lock_path)
+        if (
+            not stat.S_ISREG(named.st_mode)
+            or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+        ):
+            raise ValueError("setup lock identity changed during admission")
+        yield
+    finally:
+        if acquired:
+            if os.name == "nt":
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
+
+
+def _read_existing_env(path: Path, *, label: str = "runtime .env", private: bool = False) -> tuple[str, bool]:
+    """Bound secret-bearing input before reading; never block on a FIFO.
+
+    O_NONBLOCK is essential: opening a FIFO read-only normally hangs before
+    fstat can reject it. Refuse hardlinks to avoid reusing externally aliased
+    secret-bearing files during installer bootstrap.
+    """
+    if path.is_symlink():
+        raise ValueError(f"{label} must not be a symbolic link")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    descriptor = os.open(path, flags)
+    with os.fdopen(descriptor, "rb") as handle:
+        opened = os.fstat(handle.fileno())
+        named = os.lstat(path)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or not stat.S_ISREG(named.st_mode)
+            or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+            or (os.name != "nt" and opened.st_nlink != 1)
+        ):
+            raise ValueError(f"{label} must be a stable, unaliased regular file")
+        if opened.st_size > _MAX_ENV_BYTES:
+            raise ValueError(f"{label} exceeds the 256 KiB input limit")
+        repaired_permissions = False
+        if private and os.name != "nt" and stat.S_IMODE(opened.st_mode) != 0o600:
+            # Tighten the existing single-link inode through the validated fd;
+            # never chmod a pathname that may have been swapped after lstat.
+            os.fchmod(handle.fileno(), 0o600)
+            repaired_permissions = True
+        raw = handle.read(_MAX_ENV_BYTES + 1)
+        # A concurrent rename during read must not be accepted as the
+        # configuration epoch that was originally admitted.
+        current = os.lstat(path)
+        if (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino) or not stat.S_ISREG(current.st_mode):
+            raise ValueError(f"{label} identity changed during read")
+    if len(raw) > _MAX_ENV_BYTES:
+        raise ValueError("runtime .env exceeds the 256 KiB input limit")
+    return raw.decode("utf-8"), repaired_permissions
+
+
+
+def runtime_source_fingerprint(root: Path) -> str:
+    """Return a redacted identity for the exact bounded runtime source bytes.
+
+    Bind the private bytes to their file and installation-root identities.
+    Content-only hashes would admit replacement by a new same-byte inode.
+    This is an observation fence rather than a lock on an external writer;
+    neither raw secrets nor source names are exposed in the result.
+    """
+    try:
+        root = Path(root)
+        source = root / ".env"
+        root_before = os.lstat(root)
+        file_before = os.lstat(source)
+        if (not stat.S_ISDIR(root_before.st_mode)
+                or not stat.S_ISREG(file_before.st_mode)):
+            raise ValueError("invalid runtime source identity")
+        raw, _ = _read_existing_env(
+            source, label="runtime .env", private=False
+        )
+        root_after = os.lstat(root)
+        file_after = os.lstat(source)
+        if (not stat.S_ISDIR(root_after.st_mode)
+                or not stat.S_ISREG(file_after.st_mode)
+                or (root_before.st_dev, root_before.st_ino) !=
+                   (root_after.st_dev, root_after.st_ino)
+                or (file_before.st_dev, file_before.st_ino) !=
+                   (file_after.st_dev, file_after.st_ino)
+                or (file_before.st_size, file_before.st_mtime_ns,
+                    file_before.st_ctime_ns) !=
+                   (file_after.st_size, file_after.st_mtime_ns,
+                    file_after.st_ctime_ns)):
+            raise ValueError("runtime source identity changed during admission")
+        identity = {
+            "root": (root_after.st_dev, root_after.st_ino),
+            "file": (file_after.st_dev, file_after.st_ino,
+                     file_after.st_size, file_after.st_mtime_ns,
+                     file_after.st_ctime_ns),
+            "content_sha256": sha256(raw.encode("utf-8")).hexdigest(),
+        }
+        return sha256(json.dumps(identity, sort_keys=True,
+                                 separators=(",", ":")).encode("ascii")).hexdigest()
+    except (OSError, ValueError, TypeError, UnicodeError):
+        raise ValueError("runtime configuration source cannot be safely admitted") from None
+
+
 def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
@@ -129,13 +293,39 @@ def _atomic_write(path: Path, text: str) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
-        try:
-            path.chmod(0o600)
-        except OSError:
-            pass
+        # NamedTemporaryFile is private from creation; never publish a
+        # permissive intermediate file, including on interrupted writes.
+        if os.name != "nt":
+            directory = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def _operator_admin_values(email: str, password: str) -> tuple[str, str]:
+    """Validate existing explicit seed values without changing their authority."""
+
+    email = email.strip().lower()
+    if (
+        len(email) > 254
+        or email.count("@") != 1
+        or any(char.isspace() or ord(char) < 32 for char in email)
+        or not all(email.split("@"))
+    ):
+        raise ValueError("operator admin email must be a valid non-empty email address")
+    if (
+        len(password) < 16
+        or len(password.encode("utf-8")) > 72
+        or any(ord(char) < 32 or ord(char) == 127 for char in password)
+    ):
+        raise ValueError(
+            "admin password must contain at least 16 characters, at most 72 UTF-8 bytes and no control characters"
+        )
+    return email, password
 
 
 def _operator_admin(email: str | None, password_file: Path | None) -> tuple[str, str] | None:
@@ -153,14 +343,34 @@ def _operator_admin(email: str | None, password_file: Path | None) -> tuple[str,
         or not all(email.split("@"))
     ):
         raise ValueError("operator admin email must be a valid non-empty email address")
-    descriptor = os.open(Path(password_file).expanduser(), os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    password_path = Path(password_file).expanduser()
+    # O_NOFOLLOW is not universal. Bind the opened secret to its pathname
+    # before reading, rejecting links and swaps even on platforms without it.
+    if password_path.is_symlink():
+        raise ValueError("admin password input must not be a symbolic link")
+    descriptor = os.open(
+        password_path,
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+    )
     with os.fdopen(descriptor, "rb") as handle:
         info = os.fstat(handle.fileno())
-        if not stat.S_ISREG(info.st_mode) or info.st_size > 4096:
-            raise ValueError("admin password input must be a regular file of at most 4096 bytes")
+        named = os.lstat(password_path)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or not stat.S_ISREG(named.st_mode)
+            or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+            or info.st_size > 4096
+            or (os.name != "nt" and info.st_nlink != 1)
+        ):
+            raise ValueError("admin password input must be a stable single-link regular file of at most 4096 bytes")
         if os.name != "nt" and info.st_mode & 0o077:
             raise ValueError("admin password file must be private; run chmod 600 on that file")
         raw = handle.read(4097)
+        # A pathname replacement after admission must never authorize a
+        # password from an orphaned descriptor as the current operator input.
+        current = os.lstat(password_path)
+        if not stat.S_ISREG(current.st_mode) or (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
+            raise ValueError("admin password input identity changed during read")
     if len(raw) > 4096:
         raise ValueError("admin password file exceeds 4096 bytes")
     try:
@@ -171,15 +381,7 @@ def _operator_admin(email: str | None, password_file: Path | None) -> tuple[str,
         password = password[:-2]
     elif password.endswith("\n"):
         password = password[:-1]
-    if (
-        len(password) < 16
-        or len(password.encode("utf-8")) > 72
-        or any(ord(char) < 32 or ord(char) == 127 for char in password)
-    ):
-        raise ValueError(
-            "admin password must contain at least 16 characters, at most 72 UTF-8 bytes and no control characters"
-        )
-    return email, password
+    return _operator_admin_values(email, password)
 
 
 def _prepare_model_directory(root: Path, values: dict[str, str]) -> bool:
@@ -192,20 +394,35 @@ def _prepare_model_directory(root: Path, values: dict[str, str]) -> bool:
     path = Path(raw).expanduser()
     if not path.is_absolute():
         path = root / path
-    if path.is_symlink():
+    # Never chmod an existing model mount: it may contain operator-private
+    # weights or metadata. The previous unconditional chmod(0o755) silently
+    # widened a pre-existing 0700 directory to world-readable on POSIX.
+    try:
+        before = path.lstat()
+    except FileNotFoundError:
+        before = None
+    if before is not None and not stat.S_ISDIR(before.st_mode):
         raise ValueError("SKELETON_LOCAL_MODEL_DIR must name a real directory, not a symbolic link")
     created = False
+    if before is None:
+        try:
+            path.mkdir(parents=True, mode=0o755, exist_ok=False)
+            created = True
+        except FileExistsError:
+            # Another process may have created the path; verify it below.
+            pass
+        except OSError:
+            raise ValueError(
+                "Cannot prepare SKELETON_LOCAL_MODEL_DIR; choose an operator-owned directory and check parent permissions"
+            ) from None
     try:
-        path.mkdir(parents=True, mode=0o755)
-        path.chmod(0o755)
-        created = True
-    except FileExistsError:
-        if not path.is_dir():
-            raise ValueError("SKELETON_LOCAL_MODEL_DIR exists but is not a directory") from None
+        after = path.lstat()
     except OSError:
-        raise ValueError(
-            "Cannot prepare SKELETON_LOCAL_MODEL_DIR; choose an operator-owned directory and check parent permissions"
-        ) from None
+        raise ValueError("SKELETON_LOCAL_MODEL_DIR disappeared during setup") from None
+    if not stat.S_ISDIR(after.st_mode):
+        raise ValueError("SKELETON_LOCAL_MODEL_DIR must name a real directory, not a symbolic link")
+    if before is not None and (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+        raise ValueError("SKELETON_LOCAL_MODEL_DIR identity changed during setup")
     try:
         empty = next(path.iterdir(), None) is None
     except OSError:
@@ -217,7 +434,7 @@ def _prepare_model_directory(root: Path, values: dict[str, str]) -> bool:
     return created
 
 
-def ensure_runtime_environment(
+def _ensure_runtime_environment_locked(
     root: Path | None = None,
     *,
     rotate_secrets: bool = False,
@@ -230,13 +447,20 @@ def ensure_runtime_environment(
     operator_admin = _operator_admin(admin_email, admin_password_file)
     env_path = root / ".env"
     example_path = root / ".env.example"
+    if env_path.is_symlink():
+        raise ValueError("runtime .env must not be a symbolic link")
     created = not env_path.exists()
     warnings: list[str] = []
+    repaired_permissions = False
 
     if env_path.exists():
-        text = env_path.read_text(encoding="utf-8")
-    elif example_path.is_file():
-        text = example_path.read_text(encoding="utf-8")
+        text, repaired_permissions = _read_existing_env(env_path, private=True)
+        if repaired_permissions:
+            warnings.append("existing runtime .env permissions tightened to owner-only")
+    elif example_path.exists() or example_path.is_symlink():
+        # A hostile or accidentally replaced template must not bypass bounded
+        # input admission or smuggle external file content into a new .env.
+        text, _ = _read_existing_env(example_path, label="runtime .env.example")
     else:
         text = (
             "# Generated by Skeleton application setup\n"
@@ -299,7 +523,7 @@ def ensure_runtime_environment(
     # Keep its signing identity stable too, without sharing signing material
     # between the two existing authentication surfaces.
     gameforge_secret = values.get("GAMEFORGE_JWT_SECRET", "")
-    if rotate_secrets or _is_placeholder(gameforge_secret) or not 32 <= len(gameforge_secret) <= 4096:
+    if _is_placeholder(gameforge_secret) or not 32 <= len(gameforge_secret) <= 4096:
         gameforge_secret = secrets.token_hex(32)
         text = _replace_env_value(text, "GAMEFORGE_JWT_SECRET", gameforge_secret)
         values["GAMEFORGE_JWT_SECRET"] = gameforge_secret
@@ -394,18 +618,24 @@ def ensure_runtime_environment(
         text = _replace_env_value(text, "AI_PROVIDER", provider)
         values["AI_PROVIDER"] = provider
         configured.append("AI_PROVIDER")
-    if values["AI_PROVIDER"].strip().lower() == "local" and not any(
-        values.get(key, "").strip() for key in ("AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH")
-    ):
-        warnings.append(
-            "AI is unavailable until a trained local model is configured; application services can still start"
-        )
+    if values["AI_PROVIDER"].strip().lower() == "local":
+        local_configurations = sum(bool(values.get(key, "").strip()) for key in (
+            "AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH", "AI_LOCAL_MODEL_CATALOG_PATH",
+        ))
+        if local_configurations == 0:
+            warnings.append(
+                "AI is unavailable until a local artifact, deployment or model catalog is configured; application services can still start"
+            )
+        elif local_configurations > 1:
+            warnings.append(
+                "Local AI configuration conflicts: choose exactly one of AI_LOCAL_MODEL_PATH, AI_LOCAL_DEPLOYMENT_PATH or AI_LOCAL_MODEL_CATALOG_PATH; existing operator values were preserved"
+            )
 
     if _prepare_model_directory(root, values):
         warnings.append("Local AI mount directory prepared; no model files acquired or provider activated")
 
-    changed = created or bool(configured)
-    if changed:
+    changed = created or bool(configured) or repaired_permissions
+    if created or configured:
         _atomic_write(env_path, text)
 
     return SetupResult(
@@ -416,3 +646,21 @@ def ensure_runtime_environment(
         preserved_keys=tuple(dict.fromkeys(preserved)),
         warnings=tuple(warnings),
     )
+
+
+def ensure_runtime_environment(
+    root: Path | None = None,
+    *,
+    rotate_secrets: bool = False,
+    admin_email: str | None = None,
+    admin_password_file: Path | None = None,
+) -> SetupResult:
+    """Cross-process, fail-closed runtime bootstrap with stable secret custody."""
+    root = (root or find_repo_root()).resolve()
+    with _setup_process_lock(root):
+        return _ensure_runtime_environment_locked(
+            root,
+            rotate_secrets=rotate_secrets,
+            admin_email=admin_email,
+            admin_password_file=admin_password_file,
+        )

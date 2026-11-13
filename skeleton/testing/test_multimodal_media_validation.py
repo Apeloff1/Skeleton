@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import builtins
+import sys
 import hashlib
 import io
 import random
@@ -88,7 +88,7 @@ def test_real_decoded_image_binds_source_and_exact_pixels(format, mime):
     assert asset.sanitized_metadata["width"] == 3
     assert "system_prompt" not in asset.sanitized_metadata
     assert asset.instruction_trusted is False
-    assert verify_verified_asset(asset, payload).digest == asset.digest
+    assert verify_verified_asset(asset, payload).content_digest == asset.content_digest
     assert intake.verify_verified_asset(asset, payload) == asset
     assert (
         intake.sanitize_verified(
@@ -160,6 +160,32 @@ def test_metadata_conflicts_and_invalid_values_publish_no_asset(metadata):
     intake = MultimodalIntake()
     with pytest.raises(MultimodalSanitizationError):
         _admit(_image(), metadata=metadata, intake=intake)
+    assert intake._assets == {}
+
+
+def test_verified_wave_accepts_matching_decoder_evidence_and_rejects_giant_claims():
+    payload = _audio()
+    metadata = {
+        "channels": 1, "sample_rate": 8000, "sample_rate_hz": 8000,
+        "sample_width_bits": 16, "sample_width_bytes": 2,
+        "frame_count": 800, "sample_count": 800,
+        "duration_ms": 100.0, "duration_seconds": 0.1,
+    }
+    _, asset = _admit(payload, modality=Modality.AUDIO, mime="audio/wav", metadata=metadata)
+    assert asset.validation.sample_count == 800
+    assert asset.sanitized_metadata["sample_rate_hz"] == 8000
+    for claim in ({"frame_count": 10 ** 1000}, {"channels": True}):
+        intake = MultimodalIntake()
+        with pytest.raises(MultimodalSanitizationError, match="conflicts"):
+            _admit(payload, modality=Modality.AUDIO, mime="audio/wav",
+                   metadata=claim, intake=intake)
+        assert intake._assets == {}
+
+
+def test_image_rejects_unrelated_audio_decoder_claim_without_publishing():
+    intake = MultimodalIntake()
+    with pytest.raises(MultimodalSanitizationError, match="conflicts"):
+        _admit(_image(), metadata={"sample_rate": 8000}, intake=intake)
     assert intake._assets == {}
 
 
@@ -289,27 +315,25 @@ def test_invalid_or_expanded_limits_cannot_grant_decoder_authority(value):
 
 
 def test_missing_or_permissive_optional_image_decoder_fails_closed(monkeypatch):
+    payload = _image()  # Build before simulating missing Pillow; image creation needs Pillow too.
     monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", True)
     with pytest.raises(MultimodalSanitizationError, match="truncated"):
-        _admit(_image())
+        _admit(payload)
     monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", False)
-    original_import = builtins.__import__
-
-    def unavailable(name, *args, **kwargs):
-        if name == "PIL":
-            raise ImportError("optional decoder unavailable")
-        return original_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", unavailable)
-    with pytest.raises(MultimodalSanitizationError, match="Pillow"):
-        _admit(_image())
+    # A None sentinel triggers Python's normal ModuleNotFoundError path
+    # without replacing the interpreter's global import primitive.
+    # Existing Pillow objects used to create the sample remain intact.
+    with monkeypatch.context() as missing:
+        missing.setitem(sys.modules, "PIL", None)
+        with pytest.raises(MultimodalSanitizationError, match="Pillow"):
+            _admit(payload)
 
 
 def test_constructed_or_mutated_receipts_cannot_bypass_payload_verification():
     payload = _image()
     intake, asset = _admit(payload)
     forged = replace(asset, validation=replace(asset.validation, decoded_digest="0" * 64))
-    with pytest.raises(MultimodalSanitizationError, match="drift"):
+    with pytest.raises(MultimodalSanitizationError, match="differs from issued evidence"):
         verify_verified_asset(forged, payload)
     object.__setattr__(asset.validation.limits, "max_pixels", 10**12)
     with pytest.raises(MultimodalSanitizationError, match="max_pixels"):

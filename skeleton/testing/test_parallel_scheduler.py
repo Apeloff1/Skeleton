@@ -120,18 +120,18 @@ def test_capacity_and_parallelism_bound_each_wave() -> None:
         _graph(),
         resources=_resources(),
         capacity=ResourceCapacity(
-            cpu_units=2,
+            cpu_units=3,
             memory_mib=1024,
             io_units=4,
-            weight=4,
+            weight=5,
         ),
         max_parallel=1,
     )
 
     assert all(len(wave.targets) == 1 for wave in plan.waves)
-    assert all(wave.used.cpu_units <= 2 for wave in plan.waves)
+    assert all(wave.used.cpu_units <= 3 for wave in plan.waves)
     assert all(wave.used.memory_mib <= 1024 for wave in plan.waves)
-    assert all(wave.used.weight <= 4 for wave in plan.waves)
+    assert all(wave.used.weight <= 5 for wave in plan.waves)
 
 
 def test_impossible_target_request_fails_closed() -> None:
@@ -329,7 +329,7 @@ def test_forged_plan_fails_closed_before_evidence_processing() -> None:
 
     with pytest.raises(
         ParallelSchedulerError,
-        match="selected targets do not match scheduled targets",
+        match="plan selected target is absent from graph",
     ):
         aggregate_build_evidence(forged, [], graph=_graph())
 

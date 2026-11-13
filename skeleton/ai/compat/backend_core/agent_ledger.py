@@ -22,12 +22,13 @@ import time
 import random
 from typing import Any
 
-from core.databases import get_sync_db
+from core.databases import lazy_sync_collection
 
-_db = get_sync_db()
-_ledger = _db["agent_ledgers"]
-_ledger.create_index([("agent_code", 1), ("timestamp", -1)])
-_ledger.create_index([("build_id", 1)])
+_ledger = lazy_sync_collection(
+    "agent_ledgers",
+    ([("agent_code", 1), ("timestamp", -1)], {}),
+    ([("build_id", 1)], {}),
+)
 
 LEDGER_SOFT_CAP = int(os.environ.get("AGENT_LEDGER_CAP", "20000"))
 

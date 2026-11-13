@@ -1,0 +1,56 @@
+"""Ports (driven side). Adapters: ``sqlite_store``, ``memory_store``, ``transport``."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Mapping, Protocol, Sequence
+
+from .models import Attempt, Delivery, Event, WebhookSubscription
+
+
+class SubscriptionRepository(Protocol):
+    def insert(self, sub: WebhookSubscription) -> None: ...
+    def get(self, tenant_id: str, webhook_id: str) -> WebhookSubscription | None: ...
+    def update(self, sub: WebhookSubscription, expected_version: int) -> bool: ...
+    def count_active(self, tenant_id: str) -> int: ...
+    def list_page(self, tenant_id: str, limit: int,
+                  after: tuple[float, str] | None) -> list[WebhookSubscription]: ...
+    def matching(self, tenant_id: str, event_type: str) -> list[WebhookSubscription]: ...
+
+
+class SecretRepository(Protocol):
+    def put(self, secret_id: str, tenant_id: str, secret: bytes, created_at: float) -> None: ...
+    def get(self, tenant_id: str, secret_id: str) -> bytes | None: ...
+
+
+class EventRepository(Protocol):
+    def insert_if_new(self, event: Event) -> Event:
+        """Insert, or return the existing event with the same (tenant, dedupe_key)."""
+    def get(self, tenant_id: str, event_id: str) -> Event | None: ...
+
+
+class DeliveryRepository(Protocol):
+    def insert_many(self, deliveries: Sequence[Delivery]) -> None: ...
+    def get(self, tenant_id: str, delivery_id: str) -> Delivery | None: ...
+    def claim_due(self, now: float, lease_seconds: float, limit: int) -> list[Delivery]: ...
+    def complete(self, delivery: Delivery, attempt: Attempt) -> bool: ...
+    def list_page(self, tenant_id: str, webhook_id: str, limit: int,
+                  after: tuple[float, str] | None, status: str | None) -> list[Delivery]: ...
+    def attempts(self, delivery_id: str) -> list[Attempt]: ...
+    def exists_for(self, webhook_id: str, event_id: str) -> bool: ...
+
+
+@dataclass(frozen=True)
+class TransportResult:
+    status_code: int | None
+    error: str = ""
+    duration_ms: float = 0.0
+
+
+class Transport(Protocol):
+    def post(self, url: str, body: bytes, headers: Mapping[str, str],
+             timeout: float) -> TransportResult: ...
+
+
+class UrlPolicy(Protocol):
+    def check(self, url: str) -> str:
+        """Return a normalised URL or raise ValueError."""

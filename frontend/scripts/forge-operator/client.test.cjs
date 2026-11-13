@@ -24,7 +24,7 @@ stubModule(path.join(ROOT, 'src/utils/apiClient.ts'), {
     post: async () => ({ ok: true, status: 200, data: {}, error: null, rid: null }),
   },
 });
-stubModule(path.join(ROOT, 'utils/apiBase.ts'), {
+stubModule(path.join(ROOT, 'src/utils/apiBase.ts'), {
   __esModule: true,
   API_BASE: 'http://app.test',
   SKELETON_API_BASE: 'http://engine.test',

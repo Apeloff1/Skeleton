@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_settlement_survival_neon_undercity",
+  "title": "Neon Undercity: Settlement Survival",
+  "subtitle": "An original settlement survival brief in Neon Undercity; prototype maps are not full genre implementations.",
+  "seed": 202610301758,
+  "width": 21,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "arcade",
+  "starting_health": 6
+}

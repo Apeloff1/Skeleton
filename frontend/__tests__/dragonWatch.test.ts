@@ -1,4 +1,4 @@
-import {watchPose,type WatchSignal} from '../features/Jeeves/companion/dragonWatch';
+import {watchPose,type WatchSignal} from '../src/features/Jeeves/companion/dragonWatch';
 describe('dragon watch-along animation choreography',()=>{
  const signal=(kind:WatchSignal['kind']):WatchSignal=>({kind,positionMs:5000,durationMs:10000});
  it('maps play to cozy viewing',()=>{const pose=watchPose(signal('play'));expect(pose.snuggle).toBe(true);expect(pose.popcorn).toBe(true);expect(pose.progress).toBe(.5)});

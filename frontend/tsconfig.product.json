@@ -5,7 +5,7 @@
     "app/product.tsx",
     "app/capability.tsx",
     "app/operation.tsx",
-    "components/LaunchCascade.tsx",
+    "src/components/LaunchCascade.tsx",
     "expo-env.d.ts"
   ],
   "exclude": [
@@ -13,6 +13,6 @@
     "app/forge.tsx",
     "app/menu.tsx",
     "app/playable.tsx",
-    "features/**"
+    "src/features/**"
   ]
 }

@@ -1,58 +1,202 @@
-# Jeeves — Whole-Application Capability Atlas & Governed Runtime
+# Jeeves application capability atlas and local workbench
 
-**Date:** 2026-10-13 (Europe/Oslo). **Status:** production work in draft PR #3718; no automatic merging or weight-promotion authority. Source `skeleton/ai/game_builder/jeeves_app_runtime.py` is the registered local capability dispatcher.
+The local workbench exposes installed source families and a fixed set of typed
+adapters. Use it to inspect capabilities, preview original mechanics, compile
+bounded source previews and prepare reviewed edits. The assembled product's AI
+chat, crawler, build jobs and training controls are covered in the
+[studio operator guide](ai/STUDIO_CRAWLER_BUILDER_TRAINING.md); start a new
+installation with the [first-install guide](ai/FIRST_INSTALL_AI_AND_CRAWLER.md).
 
-## Verified app source discovery (branch scan)
+The workbench is a separate existing loopback interface. Its local adapters do
+not call a model or inherit the assembled application's provider credentials.
+A discovered module is metadata until an explicit adapter supports its operation.
 
-The scan enumerated **155 direct entries under `skeleton/`**, **109 under `skeleton/ai/`**, **151 game-builder modules**, **226 crawler/Dragon entries**, **120 Jeeves entries**, **47 AI-forge entries**, **33 additional core-forge entries**, **57 AI training entries**, **54 model-runtime entries**, **24 AI assistant entries**, **74 organism entries**, and **17 AI-learning entries**. Several of these are overlapping or aliases; these counts **are not** a count of working game features. The exact installed atlas is loaded from the app's own package tree, not invented from a marketing list. A bounded recursive family scan pages deeper modules, while refusing symlinks, dotdirs and sensitive filenames.
+## Open an operator-owned workspace
 
-Scanned application families include:
+From the checkout root, after installing the application dependencies:
 
-- **Original game authoring and production:** typed system editor catalog (at least 40), advanced deterministic genre engines, world/scene/character/NPC editors, game project file trees, chapter/cinematic/story director, screen/combat/physics/survival engines, Godot/browser packaging, original asset/legality and release assurance.
-- **Forges and producers:** `skeleton/ai/forge` original game forge, dual-rival forge, verified repair loop, `skeleton/forge` universal component blueprint, typed port/wire validation, era/hardware plans, Godot materialization and structured mirror verification.
-- **Crawler and companion:** `skeleton/ai/webcrawler` Dragon articles, video, RSS/idle queues, consent-bound collectors, citation and claim provenance, research strategies, source truth gates, adversarial reviewers, original game knowledge distillation and companion animation. Not every source adapter is executable through local Jeeves yet.
-- **Jeeves/AI runtime:** `skeleton/jeeves` capabilities, learning/evidence/memory, forecasting and historical modes, game-engine subsystem, assistant chat/attachments/streaming, provider-runtime policy, model-serving/tokenization/weights, agent scheduling and runtime.
-- **Training and model improvement:** `skeleton/ai/learning`, `skeleton/ai/training`, model promotion/rollback, candidate/shadow weights, heldout evaluations, source rights, contaminated data rejection, user-approved learning review and model deployment protection.
-- **Application infrastructure:** `skeleton/organism`, `hoag`, `creator`, `masterplan`, `automation`, `security`, `vault`, `shells`, `speech`, `video`, `vision`, `audio`, `providers`, `repo_machine`, `network`, `native`, `assets`, `app`, `tools`, `knowledge`, and `release`.
+```bash
+python -m skeleton.ai.game_builder.game_workspace_cli init \
+  --root /absolute/private/jeeves-workspace --trusted-local-operator
+python -m skeleton.ai.game_builder.game_workspace_cli create \
+  --root /absolute/private/jeeves-workspace --project original_studio \
+  --genre rpg --trusted-local-operator
+python -m skeleton.ai.game_builder.game_workspace_cli serve \
+  --root /absolute/private/jeeves-workspace --port 0 --open-browser
+```
 
-The root-level scan also identified 48 repository-root entries and non-`skeleton/` application families: `frontend/` (37 direct entries, including React/React Native app, components, features, hooks, services and app state), `backend/` (29 direct entries, including routes, gameforge, services and data), `apps/jeeves/`, `packaging/windows/`, `java-accelerators/`, `satellites/` (Rust/gameforge/cockpit), `machine/` (201 direct machine-readable indexes), `volume_forge/`, `core/` and `tests/`. These are now cataloged by the same atlas as metadata-only families. A missing root in a consumer partial installation is reported `present:false`, not assumed working.
+`init` requires a new directory beneath an existing real parent. `create` makes
+an empty original project and selects it; it does not deliver a finished game.
+For an existing workspace, use `select` instead of creating another project.
+The server prints its actual `127.0.0.1` URL. Keep its session capability private;
+the server refuses a public bind and cross-origin editing. Stop it with Ctrl-C.
 
-The full module inventory is available live from `app_atlas(family=...)` or bounded `atlas.deep`. Source discovery is **read-only metadata** and never gives Jeeves a Python import/runtime/shell capability.
+Select the active **current** project before using project actions. Previous
+and demo sources remain references until forked through their existing workflow.
 
-## Actual executable Jeeves adapters (initial safe vertical slice)
+## Discover the installed application
 
-The tool IDs in `ACTION_DEFS` are the **only** paths the new dispatcher can execute. The registry exposes metadata for each, whether it runs a pure simulation, reads a bounded source, plans work, or creates a human-review proposal. Current adapters include live app taxonomy, real editor catalog/field schemas, every editor's typed source and preview, guarded exact-file source proposal creation, workspace/source listing, canonical system assembly, game prompt/router, supervised Jeeves chapter director and chat, existing `ToolFabric` contract introspection and bounded planning, Universal Forge component graph validation with type/port/cycle checking, Dragon companion state-machine rehearsal, crawler worker discovery and evidence-driven improvement candidate planning.
+The **Whole-App Capability Cockpit** lists installed families and canonical
+actions. **Complete application capabilities** provides a separate whole-checkout
+inventory and appwide adapter selector. The two selectors have separate state.
 
-Important boundaries: the `studio_execution_plane.execute_local_tool_plan` **already implements** a separate set of replayable game actions, but this PR intentionally does **not** route arbitrary model actions directly to it; a future explicit adapter must bind a real typed `GameBuildIntent`, operator permit, cost budget, mirror/evaluation evidence and an exact destination/approval policy. Similarly, rendering Godot exports, receiving arbitrary network research, changing actual neural weights, publishing apps, provider-key access and branch merges remain separate protected systems.
+Frontend families resolve to the current source tree:
 
-**The user-interface integration** adds the Whole-App Capability Cockpit to the same local Game Studio, with live app-family browsing, typed operation selection, JSON argument editing and direct *stage current editor* action. Staging creates a review proposal; it does not approve/commit a file or change weights.
+| Atlas family | Installed source path |
+| --- | --- |
+| `frontend_features` | `frontend/src/features` |
+| `frontend_components` | `frontend/src/components` |
+| `frontend_services` | `frontend/src/services` |
+| `frontend_state` | `frontend/src/state` |
 
-## Admission, performance and security
+These are source directories, not browser URLs or arbitrary execution targets.
+The atlas also describes backend, Forge, crawler/Dragon, Jeeves, learning,
+packaging and other installed families. A partial installation can report a
+family as absent. Files and directories found through discovery do not become
+callable tools.
 
-- Only a locally selected active project may call the dispatcher. A session-scoped same-origin token protects the HTTP endpoints.
-- Every request has a registered operation ID with bounded typed arguments; there is no arbitrary `importlib`, `eval`, shell, filesystem root, URL or provider invocation.
-- Registered operations return a result plus a content digest and explicit `model_weights_changed: false`. Each file-edit proposal is checked against an exact original source SHA and runs native editor validation. A separate human-confirmed commit is mandatory.
-- App metadata walks use an explicit family root, constrained depth, pagination and source extensions; no executable module is loaded as a result of discovery. No private credentials or internal code are returned by the taxonomy. Source content reads are restricted to explicitly reviewed current-project subtrees and size capped.
-- Improvement candidates are research/artifact proposals, never self-authorizing promotion. They require heldout benchmarks, adversarial mirror, security and rights, performance budget, rollback replay and operator gate under the separately governed model lifecycle. A model cannot claim improvement by supplying its own positive verdict.
-- Keep CPU costs bounded: editor specs are validated by the existing central editor registry; source pages and previews have finite limits; no additional background worker or recurring in-memory graph copies are created.
+Each registered action describes its effect, required/optional parameters,
+operator confirmation requirement and relevant runtime dependencies. A source
+file count or adapter count does not establish working feature coverage.
+Read the live catalog rather than treating historical counts as installation
+requirements.
 
-## Materially incomplete next milestones (no false claims)
+## Run a bounded operation
 
-1. **Native engine execution:** typed approved adapters to execute the complete game build, engine preview, asset render, packaging and editor composition with genuine replay receipts, not only configuration previews.
-2. **Crawler/source control:** consent-authenticated, SSRF-resilient network adapters for articles, videos and RSS ingestion under Dragon's existing queue/rights/truth gates; source provenance must gate any weight contribution.
-3. **Learning:** verified shadow → sandbox → approved weight/adapter training → hyperweight deployment through canonical learning and model-serving promotions, frozen holdouts and rollback; never self-modify unchecked code in place.
-4. **Every UI director:** explicit adapter for each editor/service the inventory discovers; build generated typed schema bindings and parity tests, excluding secrets/security-administration scopes. This requires integration and tests per subsystem, not granting arbitrary reflection permissions.
-5. **Production chat/voice:** connect actual governed model inference to these typed actions, with user-visible approval and plan/response receipts. Chat orchestration alone cannot author a finished game.
-6. **End-to-end release:** cinematic generated media QA, adversarial game playtest, rights clearance, platform portability and full installer/release gates.
+1. Refresh the relevant cockpit or scan the whole application.
+2. Select an action and inspect its required fields. Common previews receive an
+   editable example; other actions need the displayed typed arguments.
+3. For an action requiring confirmation, deliberately check the confirmation
+   box, then invoke it. The box resets when the selection changes, after a
+   refresh and after a successful confirmed operation.
+4. Inspect the receipt's actual result and source identities. A staged proposal
+   still requires the existing separate source review and commit operation.
 
-**Completion reporting must distinguish:** located modules; registered adapters; executable local implementation; tested adapter; user-reviewed source mutation; and final released functionality. A source module named `dragon_video_worker` is not evidence that video crawling actually ran.
+The session token authenticates access to this local interface. The confirmation
+box records intent for the selected operation; a request boolean or a catalog
+hash cannot create privileges. Requests must still satisfy the active-project,
+typed-argument, operator and original-owner checks.
 
-## Second milestone in this workpass: real game execution and all-project-editor source editing
+Common canonical operations include:
 
-The `game.compile.original` action invokes the **actual canonical original-world compiler** with a bounded, project-bound `GameBuildIntent`. The result contains a compiled browser-game digest, an executable winning-replay proof, original world identity and a content-addressed receipt. `game.compile.native` additionally renders browser+Godot 4 **source** in memory (it does not launch or sign the engine or installer). `game.mirror.review` explicitly requests the existing 64-attempt adversarial game mirror and reports its proof digest; none writes to disk or publishes a product. These actions require operator authorization, no more than three 25×25 original levels, and finite CPU budgets.
+| Action | Actual result |
+| --- | --- |
+| `studio.editor.preview` | Validate typed settings and run the existing deterministic preview |
+| `studio.editor.stage` | Prepare an exact-source editor proposal for later human review |
+| `studio.source.propose` | Stage one permitted current-project source edit with its expected SHA |
+| `forge.graph` | Validate bounded component, port, wire and cycle constraints |
+| `game.compile.original` | Compile a bounded original browser source preview with a winning replay |
+| `game.compile.native` | Render browser and Godot source from the same verified original world |
+| `game.mirror.review` | Run the existing bounded original-game replay/mirror and return its receipt |
+| `game.console.source.stage.artwork` | Stage generated native source incorporating concrete original sprite pixels |
+| `system.triad` | Exercise bounded gameplay, assets, music and reference integrity through deterministic role adapters |
 
-The `studio.source.propose` action can stage a targeted source edit in **any current-project-owned** supported editor/director/forge/story/NPC/world/engine/cinematic/asset/almanac/notes directory. The caller must supply an exact current SHA-256 for optimistic concurrency and a concrete review reason. A source proposal is stored for later human review; the separate original Studio approval boundary still owns commit authority, schema validation, stale-base rejection and append-only story constraints. This does **not** authorize writing or replacing `skeleton/` application Python modules, model checkpoints or private engine internals.
+Browser/Godot source generation does not establish that Godot or a native
+executable ran. The native-art action does not invoke a toolchain or emulator.
+For actual governed compiler jobs, previews and package exports, use the
+[assembled studio workflow](ai/STUDIO_CRAWLER_BUILDER_TRAINING.md).
 
-The `atlas.deep` operation recursively discovers installed submodules within a named bounded family, including nested crawlers, learning components and Jeeves internals, without executing their imports or reading source files. All discovered entries are explicitly marked **non-executable** until an audited handler is installed.
+## Keep requests coherent with the catalog
 
-**Coverage distinction:** This represents a meaningful working slice of Jeeves app operation and universal-editor staging, not complete operational integration of hundreds of app-specific services. Missing runtime adapters are documented, not silently treated as completed milestones.
+`app_atlas()` and `/api/jeeves-app-atlas` return a `catalog_digest`. The canonical
+request body may pin it with `expected_catalog_digest`; the cockpit does this
+automatically. `compose_app_request()` freezes the selected project, registered
+action, bounded arguments, argument digest and catalog identity without executing
+anything or granting authority. Dispatch returns that `request_digest` alongside
+the result and catalog digest.
+
+The catalog hashes listed adapter/domain-source files and includes the typed
+action, tool and editor contracts. It does not attest every transitive dependency,
+the loaded interpreter, standard library, model readiness or the entire deployed
+app. A changed catalog is refused before dispatch; changes to listed owners
+during an operation prevent publication of a matching successful receipt.
+
+Arguments use finite JSON with at most 16 top-level fields, 16 nested levels,
+16,384 value nodes and 256,000 canonical JSON bytes. Individual actions impose
+further constraints. Duplicate JSON keys, nonfinite values and excessive nesting
+are refused. Keep model-generated arguments as untrusted data and allow the host
+to validate them.
+
+If a request reports a stale catalog, refresh the cockpit, recheck the current
+action and arguments, and confirm again where required. For source conflicts,
+reopen the affected source and review the diff against its new SHA. Do not remove
+source checks or replay a previous confirmation to force an action through.
+
+The appwide API has a separate catalog digest and inventory snapshot. Its exact
+envelopes and rescan recovery are documented in the
+[whole-repository inventory guide](JEEVES_WHOLE_REPO_INVENTORY_AND_GOVERNED_ACTIONS.md).
+
+## Stage native artwork and audio source
+
+The canonical `game.console.source.stage.artwork` action accepts eleven base
+fields plus `artist_tiles`, with optional `animation_fps` and `music_density`:
+a complete request can therefore contain **14 action fields**, within the
+16-field envelope. Its `project`, action ID and confirmation belong to the
+outer request, not to `args`.
+
+| Fields | Meaning |
+| --- | --- |
+| `intent`, `target`, `source_platform` | Bounded original game intent and registered target/design basis |
+| `rights_evidence_sha256`, `creative_identity` | Authorship-document reference and original identity statements; not independent rights clearance |
+| `style`, `contrast`, `animation_frames` | Typed original art controls |
+| `source_file`, `expected_sha256`, `reason` | Exact target entrypoint, current source identity and concrete review rationale |
+| `artist_tiles` | Six actual 8×8 indexed sprites: six arrays of 64 integer values in `0..3` |
+| `animation_fps`, `music_density` | Optional bounded controls consumed by the applicable native source integration |
+
+Supported exact entrypoints are `main.asm` for `nintendo_game_boy` and
+`nintendo_game_boy_color`, `main.s` for `nintendo_famicom`, `game.asm` for
+`sega_master_system`, and `game.c` for `sega_game_gear`. Target-specific animation
+and audio evidence must be read from the actual result; accepting controls does
+not prove every target plays them. The generated source is staged through the
+existing optimistic-SHA proposal owner. It remains uncommitted until separately
+reviewed, and makes no emulator or physical-hardware claim.
+
+## Understand triad and model readiness
+
+`system.triad` binds Jeeves, Dragon and adversarial **deterministic local
+adapters** for a bounded original maze, procedural assets, music and reference
+partition integrity. It records zero model calls, no independent model review,
+no weight changes and no automatic knowledge promotion. Role names do not
+establish independent AI judgment or a measured improvement in game quality.
+
+The operation requires these optional installed reference-pack files:
+
+- `data/game_building/manifest.json`
+- `data/game_building/pareto/game_design_pareto_corpus.txt.gz`
+- `data/game_building/math_physics/game_math_physics_corpus.txt.gz`
+
+The [reference-pack guide](../data/game_building/README.md) describes their
+provenance. The catalog reports metadata availability; execution separately
+verifies compressed and decoded digests, byte/row limits and held-out partition
+integrity. Generated reference rows are neither measured gameplay nor model
+training permission.
+
+The default production image source allowlists exclude these optional packs.
+A healthy chat/backend installation can therefore have an unavailable triad
+reference dependency. An operator must supply the expected files and matching
+manifest through the installation's explicit data configuration before invoking
+it. Refresh after changing availability. Do not replace a missing pack with
+unverified content or interpret a model installation as satisfying this gate.
+Actual chat inference uses the separately configured canonical engine boundary;
+see [AI activation](ai/FIRST_INSTALL_AI_AND_CRAWLER.md).
+
+## Recorded operation and limits
+
+The [18 October operator record](ai/evidence/enterprise-2026-10-18/studio/qualification-summary.json)
+binds the five changed workbench owners to exact byte hashes, using source base
+`f511c704ec07816697a9df34c5fc622c02565b21`. Its observed catalog digest is
+`777fa6428b3447c6d1dd8a84bbf618298a378ab9f9bb4206920eb8a3889236a2`.
+These identify that recorded operation, not all later source revisions.
+
+That run observed **29 canonical actions**, **36 appwide adapters**, 46 listed
+catalog source owners and 16 listed triad source owners. Chromium exercised cold
+workbench loading, confirmation, actual source compilation, appwide Forge
+forwarding, replay/mirror review and the triad with zero page errors. HTTP
+operations also observed stale-catalog/confirmation/JSON-budget refusal and a
+complete 14-field native-art proposal. No proposal was committed, no native
+compiler/emulator ran, and no model call or automated test suite was run for
+this workbench qualification. The owned temporary server was stopped afterward.
+
+This is bounded operator evidence. Universal console support, full-app execution
+coverage, transformer improvement, subjective game quality and enterprise
+qualification remain separate claims requiring their own evidence.

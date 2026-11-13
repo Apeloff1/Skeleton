@@ -24,14 +24,17 @@ from core.collection_agents import build_manifest as coll_manifest, find_relevan
 from core.compressed_vault import sample_shard, get_shard_entry
 from core import agent_ledger as ledger
 from core import whisper_network as whispers
-from core.databases import get_sync_db
+from core.databases import lazy_sync_collection
 
-_db = get_sync_db()
-_platoon_logs = _db["platoon_logs"]
-_platoon_logs.create_index([("build_id", 1), ("phase_id", 1), ("created_at", -1)])
-_participation = _db["participation_tracker"]
-_participation.create_index([("build_id", 1)])
-_participation.create_index([("build_id", 1), ("agent_code", 1)], unique=True)
+_platoon_logs = lazy_sync_collection(
+    "platoon_logs",
+    ([("build_id", 1), ("phase_id", 1), ("created_at", -1)], {}),
+)
+_participation = lazy_sync_collection(
+    "participation_tracker",
+    ([("build_id", 1)], {}),
+    ([("build_id", 1), ("agent_code", 1)], {"unique": True}),
+)
 
 MOVES_PLATOON = ["scouts", "pins", "rigs", "tests", "ships", "signs-off", "hands-off"]
 

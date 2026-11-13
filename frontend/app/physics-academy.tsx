@@ -1,2 +1,2 @@
-import { makeLazyModalRoute } from '../components/SafeModalRoute';
-export default makeLazyModalRoute(() => import('../features/PhysicsAcademy/PhysicsAcademyModal'), 'PhysicsAcademyRoute', 'PhysicsAcademyModal');
+import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+export default makeLazyModalRoute(() => import('../src/features/PhysicsAcademy/PhysicsAcademyModal'), 'PhysicsAcademyRoute', 'PhysicsAcademyModal');

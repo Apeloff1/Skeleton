@@ -1,10 +1,10 @@
 # Skeleton AI Application Construction Manual
 
-Architecture tag: `arch-map/v3.6`
+Architecture tag: `arch-map/v3.7`
 
 Machine contract: `machine/ai_app_construction.json`
 
-Construction version: `3.6.0`
+Construction version: `3.7.0`
 
 Architecture contract: `machine/architecture.json`
 
@@ -24,7 +24,14 @@ Before an AI coding agent, human contributor, runtime provider adapter, automati
 2. `machine/architecture.json`
 3. `machine/ai_app_construction.json`
 4. `machine/capability_interfaces.json`
-5. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
+5. `machine/state_topology.json`
+6. `machine/ai_runtime_schemas.json`
+7. `machine/ai_capabilities.json`
+8. `machine/ai_implementation_handoff.json`
+9. `machine/ai_closure_evidence.json`
+10. `machine/enterprise_ai_superiority.json`
+11. `machine/enterprise_ai_implementation_notes_index.json`
+12. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
 
 Do not infer architecture from branch names, historical files, or provider-specific conventions when these contracts answer the question. An undeclared runtime provider, runtime service, top-level runtime root, capability plane, or ownership boundary is rejected until the contracts are updated and validated.
 
@@ -66,7 +73,7 @@ The runtime service topology stays intentionally small. Complex AI behavior belo
 | Product shell | `frontend/` | Only human-interface root |
 | Application API | `backend/` | Product/business routes and control plane |
 | Engine runtime/API | `skeleton/` | AI engine, orchestration, memory, retrieval, agents |
-| Runtime model provider boundary | `backend/core/ai_provider.py` | Provider-neutral contract and concrete adapters |
+| Runtime model provider boundary | `skeleton/provider_runtime.py` | Canonical credential-bearing provider activation; `backend/core/ai_provider.py` is compatibility-only |
 | Model routing | `skeleton/frontier/model_routing.py` | Canonical capability/privacy/cost/quality routing; backend router is compatibility/composition |
 | Native acceleration | `skeleton/native/` | Optional, fallback-safe |
 | JVM acceleration | `java-accelerators/` | Optional, fallback-safe |
@@ -3609,3 +3616,52 @@ away from the canonical AI plane merely to satisfy an operational target.
 The final production promotion is evidence-only and requires current runtime
 proof. The architectural plan can be complete while `production_claim` remains
 false.
+
+### Runtime operator and learning continuation
+
+The October 2026 construction continuation adds full bounded policy editing,
+retained numeric dataset export, exact maintenance circuit reset, crawler
+source-use revisions and studio source-refresh/serial continuation. The declared
+contract is
+`machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.runtime_completion_pass.operator_and_learning_continuation`;
+typed runtime records live in `machine/ai_runtime_schemas.json`. The pure shared
+field catalog is `skeleton/contracts/runtime_optimization.py`, mirrored through
+the existing contracts mapping. It owns no policy state.
+
+Existing engine SQLite and crawler/studio Mongo authorities remain unchanged.
+Canonical owners validate merged policies, enforce finite grants, pin source and
+failure identities and preserve exact opaque learning export bytes. Fresh CPU
+deltas and platform memory readings support admission; unavailable measurements
+stay unknown. Immutable per-request native input preparation avoids repeated
+tokenization without creating a cross-request token cache. See
+[first-install operations](ai/FIRST_INSTALL_AI_AND_CRAWLER.md) and
+[studio refinement](ai/STUDIO_MEASURED_QUALITY.md) for the explicit controls.
+Source compilation and metadata synchronization grant no model promotion or
+enterprise acceptance.
+
+The subsequent studio foundation pass is declared under
+`cognitive_runtime_blueprint.adaptive_runtime_optimization.studio_foundation_pass`.
+It shares pure bounded draft templates across existing forms and adds local
+execution, learner and maintenance observations without creating another runtime
+owner or store. Its critical-gap hardening rejects ambiguous engine envelopes,
+foreign or contradictory terminal results, corrupt predictor recovery and malformed
+acknowledgements. Existing Galaxy build paths retain partial work and physical
+custody instead of inferring success from a clock. The operator guide is
+[AI workflow foundations and recovery](ai/AI_FOUNDATIONS_AND_RECOVERY.md).
+These consistency rules are not Byzantine quorum consensus or independent proof
+of generated-content correctness.
+
+The operational continuation is declared under
+`cognitive_runtime_blueprint.adaptive_runtime_optimization.operational_gap_continuation`.
+It keeps local preparation off the async event loop under existing physical
+admission, closes actual serving owners before releasing execution custody,
+preserves exact failed lifecycle leases and teardown dependencies, and fences
+Mongo chat preparation recovery against concurrent writers. Dragon storage
+receipts bind the exact write and uncertain dispatch retains custody. Artifact
+jobs share the existing build slot, bounded vault emission and atomic publication;
+manifest repair cannot race append or replace a newer manifest with stale
+compressed metadata. Readiness separates public infrastructure, authenticated
+capability checks, role eligibility and unobserved model state. Public observation
+does not grant execution or certify model quality. This continuation adds no
+service, provider boundary, durable store or model promotion authority; source
+compilation under the user's no-tests instruction is not closure evidence.

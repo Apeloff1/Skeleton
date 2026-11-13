@@ -1,5 +1,5 @@
-import {compileWatchCues,cuesAtPlayback,type TimedObservation} from '../features/Jeeves/companion/dragonWatchCues';
-import {DEFAULT_VIDEO_PRIVACY,validateVideoPrivacy,mayProcessVideoModality} from '../features/Jeeves/companion/dragonVideoPrivacy';
+import {compileWatchCues,cuesAtPlayback,type TimedObservation} from '../src/features/Jeeves/companion/dragonWatchCues';
+import {DEFAULT_VIDEO_PRIVACY,validateVideoPrivacy,mayProcessVideoModality} from '../src/features/Jeeves/companion/dragonVideoPrivacy';
 describe('dragon video knowledge safety',()=>{
  const observation=(id:string,startMs:number,modality:TimedObservation['modality']='caption'):TimedObservation=>({
   id,startMs,endMs:startMs+1000,modality,text:'A useful, timestamped observation',

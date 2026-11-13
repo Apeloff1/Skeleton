@@ -112,6 +112,18 @@ def test_exact_sdk_pins_and_rights(tmp_path):
         validate_sources(path)
 
 
+def test_admitted_document_rejects_key_material(tmp_path):
+    path, _, sdk = _sources(tmp_path)
+    header = "-----BEGIN " + "PRIVATE KEY-----"
+    raw = ("Notes.\n" + header + "\n").encode()
+    (sdk / "README.md").write_bytes(raw)
+    source = json.loads(path.read_text())
+    source["sdks"][0]["documents"][0]["sha256"] = sha256(raw).hexdigest()
+    _write(path, source)
+    with pytest.raises(SDKStudyError, match="prohibited secret"):
+        validate_sources(path)
+
+
 def test_unreviewed_sdk_inventory_never_trainable(tmp_path):
     path, digest, _ = _sources(tmp_path, admitted=False)
     receipt, entries = validate_sources(path)

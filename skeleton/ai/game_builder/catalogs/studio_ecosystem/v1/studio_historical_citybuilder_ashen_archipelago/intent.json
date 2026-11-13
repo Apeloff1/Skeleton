@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_ashen_archipelago",
+  "title": "Ashen Archipelago: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010317045,
+  "width": 23,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "ocean",
+  "starting_health": 3
+}

@@ -20,10 +20,11 @@ for the same head SHA:
 | Lane (check name) | Job id | Covers |
 | --- | --- | --- |
 | Quarantine Policy | `quarantine_policy` | merge-readiness contract, required-check policy, flaky-test quarantine registry |
-| Unit | `unit` | canonical unit runner and the complete canonical domain suite |
+| Unit | `unit` | canonical compile, and — when CI/CD change scope includes Python — `tests/run_unit.py` plus the complete `skeleton/testing` suite |
 | Integration Smoke | `integration_smoke` | backend import against live MongoDB and the cross-subsystem integration matrix |
-| Lint Type Security | `quality_security` | backend Ruff, canonical lint/type/high-confidence security gates, full-history Gitleaks secret scan |
+| Lint Type Security | `quality_security` | high-confidence security gates and full-history Gitleaks. Backend Ruff and frontend lint/typecheck stay with CI/CD when that lane runs them |
 | PR Automation Tests | `pr_automation` | auto-merge and runner-v2 privileged contracts, repository machine contracts, filesystem/tool transaction boundaries |
+| CI/CD | `ci` | reusable `.github/workflows/ci.yml` (restored in #4104): Frontend lint/typecheck/`test:*`/stability suites/`export:web`, Backend Lint, Backend Test, Backend Import Smoke, Skeleton GameForge, Java/Assembly accelerators, Jeeves School Reasoning, Cockpit Smoke, Docker Build (build-only). Per-lane checks appear as `CI/CD / <job>`; lanes whose inputs a PR does not touch are skipped (skip counts as success). |
 
 A failed, cancelled, or skipped lane makes `Merge Readiness` fail. Repository
 rules therefore need exactly one stable required-check name while the per-lane
@@ -87,3 +88,14 @@ scripts/configure_main_protection.sh --verify    # admin-only: verify
 Do not replace the deterministic summary with a changing list of individual job
 names. Renaming the workflow, job, or a lane is a policy change: update
 `.github/ci/required-checks.json` and the protection configuration together.
+
+
+## Operational enforcement gap — 2026-10-28
+
+At main `6cdd2bb5e7b5f186671790b1ea63cf1dded8c020`, live GitHub branch metadata reported `protected=false` and no enforced required checks. A successful workflow or committed required-check policy is **not** equivalent to branch protection. The owner-side `scripts/configure_main_protection.sh --apply` and `--verify` commands require an administrative GitHub CLI credential and must both complete before release certification. The automatic reconciliation lane rejects merge mutations if `main` is unprotected or protection cannot be read. Manual/direct pushes are not protected until GitHub branch protection is enabled. Review `docs/security/SECURITY_STATUS.md` for the current operational and production qualification blockers.
+
+## Tagged release publication guard
+
+`scripts/release_governance_verdict.py --repo Apeloff1/Skeleton --sha <exact-40-character-main-sha> --branch main` is a read-only, fail-closed publication preflight, exercised by the tag image publication and reproducible-release jobs. It verifies current branch head identity, GitHub branch protection with the expected Merge Readiness app binding, and successful exact-head **main push** runs for `Merge Readiness`, `Malware Gate` and `Secret scanning`. Triggered path-scoped main checks (Workflow Input Security, Backend Quality, Repository Hygiene Gate and App Foundation E2E) are negative evidence if failing or incomplete, but an absent path-scoped check is not falsely counted as a pass. PR-only Dependency Review and Artifact Policy must be handled via their matching PR evidence. The source gate cannot certify external KMS, writer-custody or disaster-recovery qualification.
+
+The release preflight also reads exact-head GitHub check-run publisher metadata with `checks: read` permissions. If the branch metadata lists only required-context names rather than their pinned app IDs, `Merge Readiness` must additionally have a successful exact-head check run published by GitHub Actions (app id 15368). A failed or truncated check-run inventory is never interpreted as permission to publish.

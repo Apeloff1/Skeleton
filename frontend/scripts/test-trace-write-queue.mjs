@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { LatestSnapshotWriter } from '../utils/LatestSnapshotWriter.ts';
+import { LatestSnapshotWriter } from '../src/utils/LatestSnapshotWriter.ts';
 
 function deferred() {
   let resolve;

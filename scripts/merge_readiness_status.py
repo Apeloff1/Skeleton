@@ -123,18 +123,37 @@ def classify_run(
         if run.get("name") == name
         and (app_id is None or (run.get("app") or {}).get("id") == app_id)
     ]
+    reusable_children = False
+    if not matching:
+        reusable_children = True
+        # A lane that calls a reusable workflow (e.g. ``CI/CD`` -> ci.yml, #4104)
+        # publishes no run of its own, only ``"<lane> / <job>"`` children.
+        prefix = f"{name} / "
+        matching = [
+            run
+            for run in runs
+            if str(run.get("name") or "").startswith(prefix)
+            and (app_id is None or (run.get("app") or {}).get("id") == app_id)
+        ]
     if not matching:
         return CheckState(name, "missing", "no check run for this head SHA")
-    # Take the newest attempt per check suite, then let the worst suite win so
-    # an unrelated workflow job with the same name can never mask a failure.
+    # Take the newest attempt per check suite (and child job), then let the
+    # worst win so an unrelated job with the same name can never mask a failure.
     per_suite: dict[Any, dict[str, Any]] = {}
     for run in matching:
-        suite = (run.get("check_suite") or {}).get("id")
+        suite = ((run.get("check_suite") or {}).get("id"), run.get("name"))
         if suite not in per_suite or _run_sort_key(run) > _run_sort_key(
             per_suite[suite]
         ):
             per_suite[suite] = run
-    states = [_classify_one(name, run) for run in per_suite.values()]
+    states = [
+        _classify_one(name, run)
+        if not reusable_children or run.get("conclusion") != "skipped"
+        # Change-scoped reusable children skip when a PR does not touch their
+        # inputs; GitHub reports the calling lane as success in that case.
+        else CheckState(name, "success", "skipped (out of change scope)", run.get("html_url"))
+        for run in per_suite.values()
+    ]
     return max(states, key=lambda item: _SEVERITY[item.state])
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+from dataclasses import replace
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import httpx
@@ -246,6 +247,23 @@ class _Registry:
 
     def require_active(self):
         return self._provider
+
+    def require_for_context(self, context_policy):
+        """Match the production selection API for this single-provider harness.
+
+        An explicit provider switch is not supported by the fixture and must
+        never fall back silently to the injected provider.
+        """
+        if context_policy.get("provider_selection"):
+            raise AssertionError("the test registry cannot select an alternate provider")
+        return self.require_active()
+
+    def runtime_serving_engines(self):
+        # The harness injects a hosted deterministic fake, not a local engine.
+        return ()
+
+    def runtime_serving_routes(self):
+        return ()
 
 
 def _text_response(text: str, *, response_id: str) -> ProviderResponse:
@@ -565,7 +583,12 @@ async def test_coordinator_lease_integrity_fault_poisoning_is_fail_closed(
 
     snapshot = coordinator.supervision_snapshot()
     assert snapshot["faulted"] is True
-    assert snapshot["active_lease_count"] == 0
+    # The externally removed lease is no longer active in the lifecycle, but
+    # the coordinator MUST retain unresolved custody until a verified release.
+    # Discarding this identity would hide a supervision integrity failure.
+    assert lifecycle.inflight_work == 0
+    assert snapshot["active_lease_count"] == 1
+    assert snapshot["active_lease_ids"] == ("engine-execution:fault-test",)
     assert snapshot["supervision_faults"]
 
     command = _command(
@@ -670,10 +693,16 @@ async def test_cross_service_golden_journey_preserves_receipt_lineage(
                 ),
             ]
 
-        async def generate(self, _request):
+        async def generate(self, request):
             if not self.responses:
                 raise AssertionError("unexpected extra provider turn")
-            return self.responses.pop(0)
+            return replace(
+                self.responses.pop(0),
+                context_id=request.context_id,
+                context_digest=request.context_digest,
+                context_source_snapshot=request.context_source_snapshot,
+                context_compiler_version=request.context_compiler_version,
+            )
 
     tools = AsyncToolRuntime()
 

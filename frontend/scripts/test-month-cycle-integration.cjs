@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -11,28 +12,28 @@ function load(file, mocks = {}) {
       esModuleInterop: true }, reportDiagnostics: true });
   assert.equal(output.diagnostics.length, 0, file);
   const mod = { exports: {} };
-  new Function('require', 'module', 'exports', output.outputText)(id => {
+  compileFunction(output.outputText, ['require', 'module', 'exports'])(id => {
     assert.ok(Object.hasOwn(mocks, id), file + ': unexpected import ' + id);
     return mocks[id];
   }, mod, mod.exports);
   return mod.exports;
 }
-const ledgerModule = load('services/monthCycleLedger.ts');
+const ledgerModule = load('src/services/monthCycleLedger.ts');
 const { MonthCycleLedger } = ledgerModule;
-const recoveryModule = load('services/monthCycleRecovery.ts', {
+const recoveryModule = load('src/services/monthCycleRecovery.ts', {
   './monthCycleLedger': ledgerModule,
 });
 const lifecycle = load('src/product/buildJobLifecycle.ts');
-const { buildCycleWorker } = load('services/monthCycleBuildAdapter.ts', {
-  '../src/product/buildJobLifecycle': lifecycle,
+const { buildCycleWorker } = load('src/services/monthCycleBuildAdapter.ts', {
+  '../product/buildJobLifecycle': lifecycle,
 });
-const studioModule = load('services/monthCycleStudioAdapter.ts', {
-  '../src/product/gameStudioAgentClient': { getStudioGoal: async () => {
+const studioModule = load('src/services/monthCycleStudioAdapter.ts', {
+  '../product/gameStudioAgentClient': { getStudioGoal: async () => {
     throw new Error('use injected fake');
   } },
 });
-const reducer = load('services/operationStreamReducer.ts');
-const { OperationBrowserSession } = load('services/operationStreamSession.ts', {
+const reducer = load('src/services/operationStreamReducer.ts');
+const { OperationBrowserSession } = load('src/services/operationStreamSession.ts', {
   './operationStreamReducer.ts': reducer,
 });
 function storage() {

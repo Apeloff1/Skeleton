@@ -81,6 +81,28 @@ export interface GenerationRow {
   [k: string]: unknown;
 }
 
+/**
+ * `BuildPlan.to_dict` from skeleton/jeeves/builder.py. Every field is
+ * optional: older servers omit keys, and the plan viewer must tolerate that.
+ */
+export interface BuildPlanPayload {
+  era?: string;
+  seed?: string;
+  tensor_fp?: string;
+  oracle_index?: number;
+  oracle_text?: string;
+  briefing?: string;
+  room_bias?: string;
+  spawn_weapon?: boolean;
+  extract_late?: boolean;
+  enemy_mix?: Record<string, number>;
+  recipes?: string[];
+  notes?: string[];
+  adapt?: string;
+  slack?: number;
+  authored?: string;
+}
+
 export interface RunRequest {
   vision: string;
   era?: string | null;
@@ -143,7 +165,7 @@ export interface RunPayload {
   };
   jeeves?: { next?: { text?: string; action?: string; priority?: number } | null; briefing?: string } | null;
   sim?: { passed?: boolean; primary_dps?: number } | null;
-  build_plan?: { seed?: string; briefing?: string; room_bias?: string; enemy_mix?: Record<string, number> } | null;
+  build_plan?: BuildPlanPayload | null;
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];
   [k: string]: unknown;

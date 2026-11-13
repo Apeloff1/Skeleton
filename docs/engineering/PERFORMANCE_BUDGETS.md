@@ -24,6 +24,20 @@ No number on this page was measured for this document. Where main records no mea
 | Body `/api/v1/engine/media/images/edit` | 70 MiB | `server.py` `_gate_body_limits` | — |
 | Readiness | traffic rejected until engine recovery completes | `kernel/runtime_supervision.py` `RuntimeAdmissionMiddleware` | — |
 
+### Frontend HTTP response and retry bounds (`frontend/utils/requestRecoveryPolicy.ts`)
+
+Client-side caps applied by `frontend/src/utils/apiClient.ts` and `frontend/utils/resilientNet.ts` (added in #4085).
+
+| Limit | Value | Enforced by | Override |
+|-------|-------|-------------|----------|
+| JSON response size (default) | 8 MiB | `boundedResponseChars` fallback | per-request `maxResponseChars` |
+| JSON response size (hard ceiling) | 64 MiB | `boundedResponseChars` clamp | none (requests above are clamped) |
+| JSON response size (floor) | 1 KiB | `boundedResponseChars` clamp | — |
+| Request timeout (default / min / max) | 12 s / 250 ms / 30 s | `boundedTimeoutMs`, `MIN_TIMEOUT_MS`, `MAX_TIMEOUT_MS` | per-request timeout |
+| Retries (safe methods, max) | 3 | `MAX_RETRIES`; mutations retry only with verified server dedupe | per-request retries |
+
+Drift check: `tests/test_performance_budgets_frontend_http.py` fails if these values change in code without this table.
+
 ### Operator probes
 
 | Probe | Value | Where |

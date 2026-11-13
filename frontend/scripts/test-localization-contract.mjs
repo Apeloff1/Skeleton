@@ -196,8 +196,8 @@ test('root layout installs LocaleProvider above global hosts', () => {
 
 test('critical startup and recovery surfaces resolve catalog keys', () => {
   const entry = source('app/index.tsx');
-  const cascade = source('components/LaunchCascade.tsx');
-  const boot = source('components/BootLauncher.tsx');
+  const cascade = source('src/components/LaunchCascade.tsx');
+  const boot = source('src/components/BootLauncher.tsx');
 
   assert.match(entry, /t\('status\.startup_check'\)/);
   assert.match(cascade, /t\('recovery\.safe_mode'\)/);
@@ -208,8 +208,8 @@ test('critical startup and recovery surfaces resolve catalog keys', () => {
 });
 
 test('global prompt, notification and connectivity surfaces use i18n', () => {
-  const sheet = source('components/ActionSheet.tsx');
-  const toast = source('components/Toast.tsx');
+  const sheet = source('src/components/ActionSheet.tsx');
+  const toast = source('src/components/AppToast.tsx');
   const connectivity = source('src/components/StabilityBanner.tsx');
 
   assert.match(sheet, /t\('prompt\.cancel'\)/);

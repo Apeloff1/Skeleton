@@ -1,10 +1,11 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const ts = require('typescript');
 const fs = require('node:fs');
 const path = require('node:path');
-const source = fs.readFileSync(path.join(__dirname, '../utils/useNetworkStatus.ts'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '../src/utils/useNetworkStatus.ts'), 'utf8');
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   reportDiagnostics: true,
@@ -30,11 +31,11 @@ function hookFixture() {
   global.setTimeout = (fn, ms) => { const id = ++next; timers.set(id, { fn, ms }); return id; };
   global.clearTimeout = id => { timers.delete(id); };
   const mod = { exports: {} };
-  new Function('require','module','exports',compiled.outputText)(id => {
+  compileFunction(compiled.outputText, ['require', 'module', 'exports'])(id => {
     if (id === 'react') return react;
     if (id === 'react-native') return native;
     if (id === './apiBase') return { API_BASE: 'https://backend.test' };
-    if (id === '../components/Toast') return { toast: { warn() {}, info() {} } };
+    if (id === '../components/AppToast') return { toast: { warn() {}, info() {} } };
     throw new Error('Optional integration not installed');
   },mod,mod.exports);
   mod.exports.useNetworkStatus();

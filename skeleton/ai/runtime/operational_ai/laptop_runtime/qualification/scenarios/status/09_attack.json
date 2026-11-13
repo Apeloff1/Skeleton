@@ -1,0 +1,14 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "09_attack",
+  "domain": "status",
+  "expected": "reject",
+  "payload": {
+    "seed": 42
+  },
+  "reason": "Refuse adversarial status variant 9",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational status contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

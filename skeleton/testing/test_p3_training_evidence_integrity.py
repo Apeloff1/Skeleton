@@ -70,20 +70,28 @@ def test_run_retry_rejects_conflicting_inputs(change):
 def test_run_retry_snapshot_cannot_be_mutated_by_returned_or_original_mapping():
     plane, spec, inputs, run = _fixture()
     original_digest = run.receipt.digest
-    run.receipt.metrics["documents"] = 999.0
-    run.artifact.payload["model_id"] = "poisoned"
+    with pytest.raises(TypeError):
+        run.receipt.metrics["documents"] = 999.0
+    with pytest.raises(TypeError):
+        run.artifact.payload["model_id"] = "poisoned"
+    # Even bypassing frozen-field assignment on a returned object cannot change
+    # the control plane's privately retained run or an exact replay.
+    object.__setattr__(run.receipt, "metrics", {"documents": 999.0})
+    object.__setattr__(run.artifact, "payload", {"model_id": "poisoned"})
     replay = plane.run(spec, **inputs)
     assert replay.receipt.digest == original_digest
     assert replay.artifact.load_reference_model().model_id == spec.model_id
-    spec.hyperparameters["order"] = 3
+    with pytest.raises(TypeError):
+        spec.hyperparameters["order"] = 3
+    changed_spec = replace(spec, hyperparameters={"order": 3})
     with pytest.raises(TrainingControlError, match="bound to different"):
-        plane.run(spec, **inputs)
+        plane.run(changed_spec, **inputs)
 
 
 def test_prepopulated_dependency_registry_cannot_rebind_prior_run_to_changed_spec():
     plane, spec, inputs, _ = _fixture()
     other = LocalTrainingControlPlane(registry=plane.registry)
-    with pytest.raises(TrainingControlError, match="receipt identity differs"):
+    with pytest.raises(TrainingControlError, match="already bound to a different spec"):
         other.run(replace(spec, seed=999), **inputs)
 
 

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/merge-readiness.yml"
 PYTHON_VERSION = "3.11.16"
 NODE_VERSION = "24.20.0"
-RUFF_VERSION = "0.9.10"
+RUFF_VERSION = "0.17.2"
 GITLEAKS_PIN = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"
 REQUIRED_NEEDS = (
     "quarantine_policy",
@@ -18,6 +18,7 @@ REQUIRED_NEEDS = (
     "integration_smoke",
     "quality_security",
     "pr_automation",
+    "ci",
 )
 PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_pr_automation.py",
@@ -32,8 +33,8 @@ PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_runner_v2_engine.py",
     "tests/test_required_checks_policy.py",
 )
-CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.ref }}"
-CANCEL_POLICY = "cancel-in-progress: true"
+CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
+CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
 READINESS_GUARD = (
     "if: ${{ !cancelled() && (github.event_name != 'pull_request' || "
     "(!github.event.pull_request.draft && github.event.action != 'converted_to_draft' "
@@ -81,24 +82,24 @@ def main() -> int:
     require(len(mongo_specs) == 1, "canonical PyMongo version must be exactly pinned", failures)
     if len(mongo_specs) == 1:
         require(
-            text.count('"' + mongo_specs[0] + '"') == 2,
-            "both Merge Readiness Python dependency installs must use canonical PyMongo pin",
+            text.count('"' + mongo_specs[0] + '"') == 3,
+            "all three Merge Readiness Python dependency installs must use canonical PyMongo pin",
             failures,
         )
     require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
     require(
         CONCURRENCY_GROUP in text,
-        "merge-readiness must deduplicate PRs and supersede stale main runs",
+        "merge-readiness must isolate each PR and preserve per-SHA main evidence",
         failures,
     )
     require(
         CANCEL_POLICY in text,
-        "superseded PR and main readiness runs must be cancellable",
+        "unconditional merge-readiness cancellation can erase canonical main verification evidence",
         failures,
     )
     require(
-        "github.event.pull_request.number || github.sha" not in text,
-        "SHA-scoped main readiness causes unbounded redundant runs",
+        "cancel-in-progress: true" not in text,
+        "unconditional merge-readiness cancellation can erase canonical main verification evidence",
         failures,
     )
     require(
@@ -112,8 +113,8 @@ def main() -> int:
         failures,
     )
     require(
-        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 5,
-        "all five Python setup sites must consume PYTHON_VERSION",
+        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 6,
+        "all six Python setup sites must consume PYTHON_VERSION",
         failures,
     )
     require(
@@ -154,9 +155,31 @@ def main() -> int:
         "legacy canonical unit runner must remain enabled",
         failures,
     )
+    # A successful stable Unit check is impossible unless every canonical domain
+    # shard passed. Never silently reduce test discovery or change check identity.
+    domain_suite = job_block(text, "domain_suite")
+    require(bool(domain_suite), "canonical domain suite shard job missing", failures)
+    require("needs: domain_suite" in unit, "Unit must depend on every domain shard", failures)
+    require("fail-fast: false" in domain_suite, "domain shards must retain all failure evidence", failures)
     require(
-        "python -m pytest -q --noconftest -p pytest_asyncio.plugin skeleton/testing --tb=short" in normalized_unit,
-        "unit gate must run the complete canonical domain suite with the explicit asyncio plugin",
+        "shard: [0, 1, 2, 3, 4, 5, 6, 7]" in domain_suite,
+        "canonical domain shard matrix must cover all eight partitions",
+        failures,
+    )
+    require(
+        "python scripts/run_domain_suite_shard.py --index ${{ matrix.shard }} --count 8" in domain_suite,
+        "canonical domain shard runner must execute every static matrix partition",
+        failures,
+    )
+    require(
+        'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in domain_suite
+        and 'PYTHONPATH: ".:backend"' in domain_suite,
+        "domain suite must preserve explicit plugin and import isolation",
+        failures,
+    )
+    require(
+        (ROOT / "scripts/run_domain_suite_shard.py").is_file(),
+        "canonical domain shard runner missing",
         failures,
     )
     require(

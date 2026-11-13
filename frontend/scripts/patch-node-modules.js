@@ -13,6 +13,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -195,12 +196,6 @@ function patchHttpCacheSemanticsMaxStale() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version === '4.3.0') {
-    // 4.3.0 is the reviewed patched line resolved by the frozen lockfile.
-    // Do not rewrite patched upstream code; keep future version drift fail-closed.
-    skipped++;
-    return;
-  }
   // 4.3.0 includes the upstream Vary wildcard/prototype hardening, but the
   // max-stale branch still has the same reviewed shape as 4.2.0. Keep this
   // allow-list exact so future package drift still fails closed before patching.
@@ -220,19 +215,158 @@ function patchHttpCacheSemanticsMaxStale() {
   );
 }
 
+function patchQueryStringDecoderInterop() {
+  const queryDir = path.join(ROOT, 'node_modules/query-string');
+  const decoderDir = path.join(ROOT, 'node_modules/decode-uri-component');
+  const queryMetadata = path.join(queryDir, 'package.json');
+  if (!fs.existsSync(queryMetadata)) return;
+  const queryFile = path.join(queryDir, 'index.js');
+  const decoderMetadata = path.join(decoderDir, 'package.json');
+  const decoderFile = path.join(decoderDir, 'index.js');
+  for (const dir of [queryDir, decoderDir]) {
+    if (!fs.lstatSync(dir).isDirectory()) {
+      throw new Error('[patch-node-modules] query decoder directory is unsafe');
+    }
+  }
+  for (const file of [queryMetadata, decoderMetadata, queryFile, decoderFile]) {
+    if (!fs.lstatSync(file).isFile()) {
+      throw new Error('[patch-node-modules] query decoder file is unsafe');
+    }
+  }
+  const queryPackage = JSON.parse(fs.readFileSync(queryMetadata, 'utf8'));
+  const decoderPackage = JSON.parse(fs.readFileSync(decoderMetadata, 'utf8'));
+  if (queryPackage.name !== 'query-string' || queryPackage.version !== '7.1.3'
+      || decoderPackage.name !== 'decode-uri-component' || decoderPackage.version !== '0.5.1'
+      || decoderPackage.type !== 'module'
+      || require.resolve('decode-uri-component', { paths: [queryDir] }) !== decoderFile) {
+    throw new Error('[patch-node-modules] query-string decoder binding requires compatibility review');
+  }
+  const hash = source => crypto.createHash('sha256').update(source).digest('hex');
+  // Both sources are bound to the published package bytes. query-string 7.1.3
+  // expects a callable CommonJS value while decode-uri-component 0.5.1 exports
+  // an ESM default function, so make that boundary explicit and fail on drift.
+  if (hash(fs.readFileSync(decoderFile)) !== '6a86ac891edf15c5efa0841ebb31935e3669d58b98318b57d7b08a4530317cb0') {
+    throw new Error('[patch-node-modules] query decoder source changed; review required');
+  }
+  const source = fs.readFileSync(queryFile, 'utf8');
+  const digest = hash(source);
+  const before = "const decodeComponent = require('decode-uri-component');";
+  const after = "const decodeComponent = require('decode-uri-component').default; // skeleton decoder ESM interop";
+  if (digest === 'caa3f2c8b45dfe1e91db22ae10743af68de8d96f26515132bb52485ec0f037fa') {
+    const output = source.replace(before, after);
+    if (hash(output) !== 'cc172b6a0e8251f5efef27feb6550e37f8a87c4efa1dd72a92a611c55ab90215') {
+      throw new Error('[patch-node-modules] query-string decoder patch postcondition failed');
+    }
+    fs.writeFileSync(queryFile, output, 'utf8');
+    patched++;
+    console.log('[patch-node-modules] ✓ query-string ESM decoder interoperability');
+  } else if (digest === 'cc172b6a0e8251f5efef27feb6550e37f8a87c4efa1dd72a92a611c55ab90215') {
+    skipped++;
+  } else {
+    throw new Error('[patch-node-modules] query-string source changed; review required');
+  }
+  const query = require(queryFile);
+  const normal = query.parse('screen=studio&name=Jeeves%20Dragon');
+  const malformed = query.parse('label=%E0%A4%A');
+  if (normal.screen !== 'studio' || normal.name !== 'Jeeves Dragon'
+      || malformed.label !== '%E0%A4%A') {
+    throw new Error('[patch-node-modules] query-string route decoding verification failed');
+  }
+}
+
+function patchDeepmergePrototypePoisoning() {
+  const pkgPath = path.join(ROOT, 'node_modules/deepmerge/package.json');
+  if (!fs.existsSync(pkgPath)) return;
+  for (const dir of [path.dirname(pkgPath), path.join(path.dirname(pkgPath), 'dist')]) {
+    if (!fs.lstatSync(dir).isDirectory()) {
+      throw new Error('[patch-node-modules] deepmerge package directory is unsafe');
+    }
+  }
+  const version = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '');
+  if (!new Set(['4.3.1', '4.3.2']).has(version)) {
+    throw new Error(`[patch-node-modules] deepmerge ${version} requires security patch review`);
+  }
+  if (version === '4.3.2') {
+    const metadata = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    if (metadata.skeleton?.upstreamVersion !== '4.3.1'
+        || metadata.skeleton?.advisory !== 'GHSA-gcqx-w48m-w2h4'
+        || metadata.skeleton?.hardened !== true) {
+      throw new Error('[patch-node-modules] hardened deepmerge provenance is missing');
+    }
+  }
+  const expoMetadata = path.join(ROOT, 'node_modules/@expo/config/package.json');
+  if (fs.existsSync(expoMetadata)) {
+    const expoDeepmerge = require.resolve('deepmerge/package.json', { paths: [path.dirname(expoMetadata)] });
+    if (fs.realpathSync(expoDeepmerge) !== fs.realpathSync(pkgPath)) {
+      throw new Error('[patch-node-modules] Expo resolves an unreviewed deepmerge copy');
+    }
+  }
+
+  // GHSA-gcqx-w48m-w2h4: copying an own __proto__ key into the ordinary
+  // destination object invokes its prototype setter. Guard both the target
+  // copy and source merge in each published distribution. Validate every file
+  // before writing so an unfamiliar or partially modified package fails closed.
+  const rels = ['node_modules/deepmerge/index.js', 'node_modules/deepmerge/dist/cjs.js',
+    'node_modules/deepmerge/dist/umd.js'];
+  const plan = rels.map(rel => {
+    const abs = path.join(ROOT, rel);
+    if (!fs.existsSync(abs) || !fs.lstatSync(abs).isFile()) {
+      throw new Error(`[patch-node-modules] security target missing or unsafe: ${rel}`);
+    }
+    const source = fs.readFileSync(abs, 'utf8');
+    const target = /^([ \t]*)getKeys\(target\)\.forEach\(function\(key\) \{\r?\n/gm;
+    const input = /^([ \t]*)getKeys\(source\)\.forEach\(function\(key\) \{\r?\n/gm;
+    const guard = "if (key === '__proto__') throw new Error('[deepmerge] unsafe __proto__ key'); // skeleton GHSA-gcqx-w48m-w2h4";
+    const guardCount = source.split(guard).length - 1;
+    const targetMatches = [...source.matchAll(target)];
+    const inputMatches = [...source.matchAll(input)];
+    const writes = [...source.matchAll(/\bdestination\[key\]\s*=/g)];
+    if (targetMatches.length !== 1 || inputMatches.length !== 1 || writes.length !== 3) {
+      throw new Error(`[patch-node-modules] deepmerge target changed shape; review required: ${rel}`);
+    }
+    const follows = match => source.slice(match.index + match[0].length).startsWith(match[1] + '\t' + guard);
+    const targetGuarded = follows(targetMatches[0]);
+    const inputGuarded = follows(inputMatches[0]);
+    if (guardCount !== (targetGuarded ? 1 : 0) + (inputGuarded ? 1 : 0) || targetGuarded !== inputGuarded) {
+      throw new Error(`[patch-node-modules] deepmerge mixed prototype-guard state: ${rel}`);
+    }
+    if (targetGuarded) return { abs, rel, source, output: source };
+    const addGuard = (match, indent) => match + indent + '\t' + guard + '\n';
+    return { abs, rel, source, output: source.replace(target, addGuard).replace(input, addGuard) };
+  });
+  for (const item of plan) {
+    if (item.source === item.output) { skipped++; continue; }
+    fs.writeFileSync(item.abs, item.output, 'utf8');
+    patched++;
+    console.log(`[patch-node-modules] ✓ security ${item.rel}`);
+  }
+}
+
 function patchNodeForgeNestedDigestAlgorithm() {
   const pkgPath = path.join(ROOT, 'node_modules/node-forge/package.json');
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version !== '1.4.0') {
+  // Reviewed exact published versions. The 1.4.2 RSA parser still validates
+  // the outer DigestInfo count without validating nested DigestAlgorithm arity.
+  // Never silently trust a version bump as proof of this security fix.
+  if (!new Set(['1.4.0', '1.4.2']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
   }
 
-  // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: node-forge 1.4.0 checks the
-  // outer DigestInfo element count but not the nested DigestAlgorithm count.
-  // This is the upstream #1152 fix shape, applied fail-closed until a patched
-  // npm release exists.
+  // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: preserve the exact reviewed
+  // nested-count patch for both vulnerable upstream parser shapes.
+  // patchSecurityFile rejects unrecognized source before any security bypass.
+  // Reject ambiguous mixed sources: a stray hardened marker must not hide
+  // another original vulnerable conditional behind the idempotence shortcut.
+  const rsaSource = fs.readFileSync(
+    path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
+  const unpatchedDigestInfo = /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/;
+  const nestedArityCheck = /obj\.value\[0\]\.value\.length !==/;
+  if (unpatchedDigestInfo.test(rsaSource) && nestedArityCheck.test(rsaSource)) {
+    throw new Error('[patch-node-modules] node-forge mixed DigestInfo patch states');
+  }
+
   patchSecurityFile(
     'node_modules/node-forge/lib/rsa.js',
     /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/,
@@ -244,6 +378,66 @@ function patchNodeForgeNestedDigestAlgorithm() {
   );
 }
 
+function patchSprintfFormatBounds() {
+  const pkgPath = path.join(ROOT, 'node_modules/sprintf-js/package.json');
+  if (!fs.existsSync(pkgPath)) return;
+  const version = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '');
+  if (version !== '1.0.3') {
+    throw new Error(`[patch-node-modules] sprintf-js ${version} requires security patch review`);
+  }
+
+  // CVE-2026-97058 / GHSA-hp3w-g68c-fv3c has no patched npm release.
+  // Cap numeric precision before native Number formatting can throw for an
+  // otherwise valid format string. Cap width before invoking argument functions
+  // or the width-dependent Array(...).join allocation. Ordinary argparse help
+  // formatting remains inside the numeric 100 / width 16 KiB limits. General
+  // precision has a minimum of 1; exponential/fixed precision may be zero.
+  const rel = 'node_modules/sprintf-js/src/sprintf.js';
+  const target = path.join(ROOT, rel);
+  const source = fs.readFileSync(target, 'utf8');
+  const before = 'match = parse_tree[i] // convenience purposes only';
+  const after = `${before}
+                match = match.slice(0)
+                if (match[6] !== undefined) {
+                    if (!/^\\d+$/.test(match[6])) {
+                        throw new RangeError('[sprintf] invalid format width')
+                    }
+                    match[6] = String(Math.min(16384, Number(match[6])))
+                }
+                if (/^[efg]$/.test(match[8]) && match[7] !== undefined) {
+                    if (!/^\\d+$/.test(match[7])) {
+                        throw new RangeError('[sprintf] invalid numeric precision')
+                    }
+                    match[7] = String(Math.min(100, Math.max(match[8] === 'g' ? 1 : 0, Number(match[7]))))
+                }`;
+  const digest = value => crypto.createHash('sha256').update(value, 'utf8').digest('hex');
+  const hardenedDigest = 'b84000c68153570c8cdc4e0f62b8f96327ec34a1e7665cdf06d3cd3ca0770821';
+  const sourceDigest = digest(source);
+  if (sourceDigest === hardenedDigest) {
+    skipped++;
+    return;
+  }
+  const pristineDigest = '9904b0d448280bfdfcb0329bdac995883033597727404f9c058d051d9174b7c7';
+  const previousDigest = '06e1ea7943ecf8d5cc342d816240156476d11effe844f6fd6504c266b2d70a1b';
+  if (sourceDigest !== pristineDigest && sourceDigest !== previousDigest) {
+    throw new Error('[patch-node-modules] sprintf-js security source changed; review required');
+  }
+  // Upgrade only the exact earlier local patch; the resulting full source must
+  // still match the final digest. All other source variants fail closed.
+  const hardened = sourceDigest === previousDigest
+    ? source.replace(
+      'match[7] = String(Math.min(100, Number(match[7])))',
+      "match[7] = String(Math.min(100, Math.max(match[8] === 'g' ? 1 : 0, Number(match[7]))))",
+    )
+    : source.replace(before, after);
+  if (hardened === source || digest(hardened) !== hardenedDigest) {
+    throw new Error('[patch-node-modules] failed to harden sprintf-js formatting bounds');
+  }
+  fs.writeFileSync(target, hardened, 'utf8');
+  patched++;
+  console.log(`[patch-node-modules] ✓ security ${rel}`);
+}
+
 function patchWorkletsStaticRendering() {
   const pkgPath = path.join(ROOT, 'node_modules/react-native-worklets/package.json');
   if (!fs.existsSync(pkgPath)) {
@@ -252,25 +446,27 @@ function patchWorkletsStaticRendering() {
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
 
-  // Expo 54 / Reanimated 4.1.x currently resolves worklets 0.5.1. The app
-  // entry installs the RAF fallback before Expo Router loads, so this version
+  // Expo 54 / Reanimated 4.1.x resolves worklets 0.5.1 and Expo 55 /
+  // Reanimated 4.2.x resolves worklets 0.7.4. The app entry installs the RAF
+  // fallback before Expo Router loads, and 0.7.4 also includes its own
+  // mockedRequestAnimationFrame fallback, so these reviewed versions
   // does not require a node_modules rewrite. Keep this exact-version and
   // entry-contract check fail-closed: any dependency drift still requires
   // explicit review.
-  if (version === '0.5.1') {
+  if (new Set(['0.5.1', '0.7.4']).has(version)) {
     const entryPath = path.join(ROOT, 'index.js');
     if (!fs.existsSync(entryPath)) {
-      throw new Error('[patch-node-modules] worklets 0.5.1 requires the static-render entry shim');
+      throw new Error(`[patch-node-modules] worklets ${version} requires the static-render entry shim`);
     }
     const entry = fs.readFileSync(entryPath, 'utf8');
     if (
       !entry.includes("typeof globalThis.requestAnimationFrame !== 'function'") ||
       !entry.includes("typeof globalThis.cancelAnimationFrame !== 'function'")
     ) {
-      throw new Error('[patch-node-modules] worklets 0.5.1 static-render entry shim drifted');
+      throw new Error(`[patch-node-modules] worklets ${version} static-render entry shim drifted`);
     }
     skipped++;
-    console.log('[patch-node-modules] ✓ static-render protected by frontend/index.js (worklets 0.5.1)');
+    console.log(`[patch-node-modules] ✓ static-render protected by frontend/index.js (worklets ${version})`);
     return;
   }
 
@@ -317,7 +513,7 @@ function patchReactNativeRnGetPolyfillsExport() {
 
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version !== '0.81.5') {
+  if (!new Set(['0.81.5', '0.83.10']).has(version)) {
     throw new Error(
       `[patch-node-modules] react-native ${version} requires rn-get-polyfills export review`,
     );
@@ -335,6 +531,15 @@ function patchReactNativeRnGetPolyfillsExport() {
 
   const exportKey = './rn-get-polyfills';
   const expectedTarget = './rn-get-polyfills.js';
+  // React Native 0.83 exposes this file through its reviewed conditional
+  // wildcard export. Resolve it through Node as an end-to-end contract check.
+  if (version === '0.83.10' && pkg.exports['./*']) {
+    if (require.resolve('react-native/rn-get-polyfills', { paths: [ROOT] }) !== targetPath) {
+      throw new Error('[patch-node-modules] React Native wildcard polyfills export did not resolve');
+    }
+    skipped++;
+    return;
+  }
   if (Object.prototype.hasOwnProperty.call(pkg.exports, exportKey)) {
     if (pkg.exports[exportKey] !== expectedTarget) {
       throw new Error('[patch-node-modules] React Native rn-get-polyfills export changed shape');
@@ -353,16 +558,34 @@ function patchExpoStaticIndexPath() {
   const pkgPath = path.join(ROOT, 'node_modules/@expo/cli/package.json');
   if (!fs.existsSync(pkgPath)) return;
   const version = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version;
-  if (version !== '54.0.27') throw new Error(`[patch-node-modules] Expo CLI ${version} requires static path review`);
+  // SDK 54 and the reviewed SDK 55 CLI retain the same guarded static-index
+  // path. Future releases still require an explicit source review.
+  if (!new Set(['54.0.27', '54.0.28', '55.0.37']).has(version)) {
+    throw new Error(`[patch-node-modules] Expo CLI ${version} requires static path review`);
+  }
   const target = path.join(ROOT, 'node_modules/@expo/cli/build/src/export/exportStaticAsync.js');
   const source = fs.readFileSync(target, 'utf8');
   // The upstream optional-slash regex strips "index" from "story-index",
   // rendering /story- into story-index.html and breaking root hydration.
   const before = "pathname: filePathLocation.replace(/(\\/?index)?$/, '')";
   const after = "pathname: filePathLocation === 'index' ? '' : filePathLocation.replace(/\\/index$/, '')";
-  if (source.includes(after)) { skipped++; return; }
-  if (!source.includes(before)) throw new Error('[patch-node-modules] Expo static path target changed shape; review required');
-  fs.writeFileSync(target, source.replace(before, after), 'utf8');
+  if (source.includes(after)) {
+    // A mixed or duplicated result is not an idempotent hardened source.
+    // Refuse partial rewrites rather than leaving an unsafe route behind.
+    if (source.includes(before) || source.split(after).length !== 2) {
+      throw new Error('[patch-node-modules] Expo static path contains ambiguous mixed patch states');
+    }
+    skipped++;
+    return;
+  }
+  if (source.split(before).length !== 2) {
+    throw new Error('[patch-node-modules] Expo static path target changed shape; review required');
+  }
+  const hardened = source.replace(before, after);
+  if (!hardened.includes(after) || hardened.includes(before)) {
+    throw new Error('[patch-node-modules] Expo static path patch postcondition failed');
+  }
+  fs.writeFileSync(target, hardened, 'utf8');
   patched++;
   console.log('[patch-node-modules] ✓ Expo static index path segment');
 }
@@ -370,7 +593,10 @@ function patchExpoStaticIndexPath() {
 patchImageSizeDoS();
 patchBracesDepthDoS();
 patchHttpCacheSemanticsMaxStale();
+patchQueryStringDecoderInterop();
+patchDeepmergePrototypePoisoning();
 patchNodeForgeNestedDigestAlgorithm();
+patchSprintfFormatBounds();
 patchWorkletsStaticRendering();
 patchReactNativeRnGetPolyfillsExport();
 patchExpoStaticIndexPath();

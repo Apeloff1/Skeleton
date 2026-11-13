@@ -170,6 +170,43 @@ class QualityDebtLedger:
         self.ceiling = new_ceiling
         self.protected_ceiling = new_protected
 
+    def adaptive_ratchet(
+        self,
+        *,
+        round_index: int = 0,
+        clean_streak: int = 0,
+        target_floor: int = 0,
+    ) -> dict[str, int]:
+        """Adaptively tighten quality-debt ceilings based on debt resolution & streak.
+
+        Guarantees monotonic non-increasing ceilings and never tightens below
+        the current unresolved debt score or ``target_floor`` unless explicitly
+        above it.
+        """
+        if round_index < 0:
+            raise ValueError("round_index must be non-negative")
+        floor = max(0, int(target_floor), self.total_score)
+        streak = max(0, int(clean_streak))
+        step = 1 + (streak // 2) + (1 if round_index >= 5 else 0)
+        proposed_ceiling = min(self.ceiling, max(floor, self.ceiling - step))
+        proposed_protected = min(
+            self.protected_ceiling,
+            max(self.protected_score, self.protected_ceiling - max(1, step)),
+        )
+        before_ceiling = self.ceiling
+        before_protected = self.protected_ceiling
+        self.ratchet(
+            ceiling=proposed_ceiling,
+            protected_ceiling=proposed_protected,
+        )
+        return {
+            "before_ceiling": before_ceiling,
+            "after_ceiling": self.ceiling,
+            "before_protected_ceiling": before_protected,
+            "after_protected_ceiling": self.protected_ceiling,
+            "tightened_by": before_ceiling - self.ceiling,
+        }
+
     def snapshot(self) -> dict[str, object]:
         rows = [
             {

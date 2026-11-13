@@ -419,6 +419,8 @@
       "evidence": [
         "skeleton/intelligence/orchestrator.py",
         "skeleton/intelligence/pipeline_orchestrator.py",
+        "skeleton/intelligence/background_agent.py",
+        "skeleton/app/offline_background_job.py",
         "skeleton/agents"
       ],
       "required_interfaces": [
@@ -436,7 +438,10 @@
         "ResumeToken",
         "ChildExecutionRequest",
         "child join policy",
-        "interactive steering command"
+        "interactive steering command",
+        "sealed engine GET/PATCH runtime-control: versioned host serving/maintenance policy, scoped numeric learning status, actor/tenant echo, persisted expected-version CAS",
+        "bounded admin learner checkpoint export/import/reset/last-healthy restore under exact tenant/model/state+policy CAS with canonical audit receipts; exact named local model cooperation and per-model serving controls",
+        "Admin runtime-control full policy catalog, bounded retained numeric dataset export and exact generation/failure/source-pinned maintenance circuit reset under existing sealed service/tenant boundary"
       ],
       "construction": [
         "make steps idempotent",
@@ -465,7 +470,7 @@
         "child budget/authority/depth tests",
         "interactive interrupt/replace tests"
       ],
-      "failure_mode": "checkpoint and stop safely"
+      "failure_mode": "checkpoint and stop safely; runtime-control rejects invalid bounds422, authority403, stale version409 and unavailable503; automatic command replay forbidden"
     },
     {
       "id": "reasoning-verification",
@@ -480,7 +485,8 @@
         "skeleton/intelligence/verifier.py",
         "skeleton/intelligence/verification.py",
         "skeleton/intelligence/uncertainty.py",
-        "skeleton/intelligence/plan_verifier.py"
+        "skeleton/intelligence/plan_verifier.py",
+        "skeleton/intelligence/grounded_journey.py"
       ],
       "required_interfaces": [
         "verdict",
@@ -534,7 +540,9 @@
         "backend/services/tool_registry.py",
         "skeleton/api/admit_write.py",
         "skeleton/skills/manifest.py",
-        "skeleton/skills/registry.py"
+        "skeleton/skills/registry.py",
+        "skeleton/app/offline_reference_read.py",
+        "skeleton/app/offline_reference_write.py"
       ],
       "required_interfaces": [
         "tool manifest",
@@ -956,7 +964,7 @@
       "evidence": [
         "frontend/app/product.tsx",
         "frontend/src/product",
-        "frontend/utils/apiBase.ts",
+        "frontend/src/utils/apiBase.ts",
         "machine/ai_game_learning.json",
         "machine/ai_first_install_product.json"
       ],
@@ -1761,7 +1769,10 @@
       ],
       "optional_configuration": [
         "AI_LOCAL_MODEL_CACHE_SIZE",
-        "AI_LOCAL_MODEL_SEED"
+        "AI_LOCAL_MODEL_SEED",
+        "AI_LOCAL_MODEL_MAX_CONCURRENCY",
+        "AI_LOCAL_MODEL_MAX_QUEUE_SIZE",
+        "AI_LOCAL_MODEL_MAX_BATCH_SIZE"
       ],
       "capabilities": [
         "text-generation"
@@ -1769,7 +1780,31 @@
       "undeclared_capability_policy": "deny",
       "network_policy": "none; local artifact execution only",
       "execution_owner": "skeleton/provider_runtime.py",
-      "activation_rule": "local artifact identity must validate before activation; hosted fallback is not implicit"
+      "activation_rule": "local artifact identity must validate before activation; hosted fallback is not implicit",
+      "protocol_capability_policy": {
+        "text-generation": "all admitted local models",
+        "structured-output": "only model backends declaring and implementing the structured response protocol",
+        "tool-calling": "only model backends declaring and implementing governed tool proposal protocol; tools never imply execution authority",
+        "unknown_or_text_only_backend": "deny unsupported protocol before inference"
+      },
+      "capacity_policy": {
+        "default_concurrency": 1,
+        "concurrency_bounds": [
+          1,
+          32
+        ],
+        "default_queue_size": 256,
+        "queue_size_bounds": [
+          0,
+          65536
+        ],
+        "default_batch_size": 256,
+        "batch_size_bounds": [
+          1,
+          4096
+        ],
+        "queue_and_batch": "bounded admission, actual active/queued/completed counters; cancellation reaches supported local execution; no implicit GPU throughput claim"
+      }
     }
   ],
   "gap_policy": {
@@ -3919,8 +3954,8 @@
           "skeleton/vault/data_lifecycle.py",
           "skeleton/api/engine_service.py",
           "skeleton/testing/test_engine_execution_service.py",
-          "frontend/features/Jeeves/WorkspaceController.ts",
-          "frontend/features/Jeeves/workspace.ts",
+          "frontend/src/features/Jeeves/WorkspaceController.ts",
+          "frontend/src/features/Jeeves/workspace.ts",
           "frontend/scripts/test-jeeves-workspace.cjs",
           "scripts/verify_jeeves_conversation_cutover.py"
         ]
@@ -4628,7 +4663,8 @@
       "a side effect is never retried without idempotency or an explicit compensation policy",
       "committed operation state is authoritative; transport streams are projections",
       "terminal completion occurs only after final result and required receipts are durably bound",
-      "loop limits are monotonic and cannot be reset by a model response"
+      "loop limits are monotonic and cannot be reset by a model response",
+      "optional cooperative response stages and semantic verification draw from the same original monotonic operation budget and the same durable execution/checkpoint authority"
     ]
   },
   "cognitive_runtime_blueprint": {
@@ -5224,7 +5260,382 @@
       "skeleton/testing/test_engine_execution_coordinator.py restart/recovery engine coordination regressions",
       "scripts/verify_cognitive_execution_closure.py independent source/mirror/dependency verifier",
       ".github/workflows/cognitive-execution-closure.yml exact-head closure gate"
-    ]
+    ],
+    "cooperative_response_policy": {
+      "schema_version": "skeleton.ai.cooperation.v1",
+      "state": "opt-in-bounded",
+      "canonical_owner": "skeleton/intelligence/execution_runtime.py",
+      "policy_owner": "skeleton/intelligence/cooperation.py",
+      "source_of_truth": "existing execution checkpoint and AgentTurn ledger",
+      "modes": [
+        "absent: existing single-candidate/model-tool behavior",
+        "plan -> draft -> (critique -> refine) for 1..3 declared rounds",
+        "optional 2..3 sequential draft candidates -> shared critique/refine rounds, under the same original resource grant"
+      ],
+      "request_field": "AIExecutionRequest.context_policy.cooperation",
+      "fields": {
+        "review_rounds": "integer1..3",
+        "draft_count": "optional integer1..3; omitted or 1 retains the legacy canonical policy and stage identities; 2..3 emits draft:1..N using the configured draft role",
+        "max_stage_output_tokens": "integer64..4096; actual allocation cannot exceed remaining shared operation budget",
+        "roles": "optional plan/draft/critique/refine exact provider_id+model_id selections, resolved and pinned before execution"
+      },
+      "rules": [
+        "Every stage uses the canonical ProviderRequest and a real durable AgentTurn; role labels are not independent review evidence.",
+        "One original brief, context digest and source snapshot remain pinned; generated stage artifacts stay untrusted task material.",
+        "Sibling drafts receive the original brief, history and plan without earlier candidate content. Initial critique/refinement can compare all bounded candidates; subsequent rounds review the latest refinement. Draft candidates are sequential and do not certify diversity, independence or superior quality.",
+        "Multiple-draft progress includes the immutable draft_count and exact stage receipt prefix. The total is 1 + draft_count + 2 * review_rounds; increasing candidates never replenishes an admitted operation's shared resource grant.",
+        "No tools or external effects in this opt-in response pipeline; final structured schema applies only to final refinement.",
+        "Provider identities for explicit role selections are pinned in initial execution binding; a missing or changed role/model fails closed.",
+        "All stages and semantic verification share original monotonic token, cost, attempt and deadline ceilings. Unknown usage is recorded and charged conservatively, never treated as zero.",
+        "Only the final candidate passes the existing canonical verification/finalization boundary. Intermediate critiques never grant publication, source rights, training consent or model promotion.",
+        "Recovery resumes from committed phase cursor; completed provider turns and observable artifact digests are never regenerated merely on replay."
+      ],
+      "verification": "source-bound stage/usage receipts, legacy checkpoint compatibility, sibling content isolation, strict progress projection, bounded canonical execution regressions and static architecture checks; trained-model and deployment qualification require separately recorded exact-source evidence",
+      "rollback": "omit cooperation for new requests; existing in-flight cooperative checkpoints require the same pinned implementation/route rather than silent downgrade",
+      "input_accounting": "One aggregate input budget covers every dispatch; context_policy.provider_input_limit separately caps each selected provider context. Compiler reserves artifact/control headroom and all stage actual usage shares the parent reservation ledger.",
+      "semantic_verification": "Canonical SemanticVerificationRuntime uses parent-bound request/response/resolver callbacks: inherited tenant, classification, purpose, operation/execution/context/source/compiler identity, monotonic deadline, finite remaining token/cost/attempt/model-turn grant. Charge actual response before verdict parsing, including invalid replies. Missing or overlapping generator/verifier identities fail closed; no critique becomes independent proof.",
+      "semantic_recovery": "Same canonical execution checkpoint stores immutable claim identity and bounded typed semantic responses atomically with resource settlement. Exact claim/request/receipt/source-bound responses are parsed again without provider redispatch or double charging; unresolved dispatched reservations remain uncertain and may not dispatch implicitly on recovery.",
+      "cost_unknown": "Unknown usage retains finite reservations; estimated token counts never replenish grants. Hosted unknown-cost requests require positive allocated cost shares within the original grant; local routes explicitly permit documented zero cost. Conservative accounting is not a vendor billing guarantee."
+    },
+    "checkpoint_admission_recovery": {
+      "owner": "existing engine coordinator and SQLite execution repository",
+      "state": "namespace/execution-bound retry timestamp in the same execution database; terminal result commits remove the deferral atomically",
+      "rules": [
+        "Transient admission failure preserves retained checkpoints and staged outputs, and never bypasses normal authorization, metering or provider identity checks.",
+        "Startup scans passive waiters across bounded keyset pages; maintenance revisits due explicit deferrals and cancellations, without repeatedly polling unchanged passive waiters.",
+        "Retry markers survive restart, back off provider/admission outages, and clear only after successful recovery observation or terminal completion. A failed persistence attempt requests another bounded waiter sweep without rewinding an active page scan."
+      ],
+      "limitation": "This does not provide a terminal admission-completion outbox; committed-result completion reconciliation remains separately required."
+    },
+    "terminal_failure_projection": "New non-success results persist bounded usage.error_code. Existing immutable results may project a bounded cause only from usage.error_code or an exactly matching stream-terminal:<own execution>:<own non-success status>:<cause> receipt; never rewrite old results or infer errors from generated text.",
+    "provider_compatibility_identity": {
+      "owner": "skeleton/provider_runtime.py",
+      "legacy_alias": "skeleton/ai/runtime/provider_runtime.py",
+      "policy": "Non-owning re-export of canonical public classes/functions with attribute lookup delegation for existing private imports. No copied SDK, credentials, registry state, network implementation or alternate provider class identity. Existing skeleton/ai/providers/runtime.py facade remains non-owning."
+    },
+    "adaptive_runtime_optimization": {
+      "authority": "existing engine coordinator, provider registry and execution repository; no new service/provider/store",
+      "owners": {
+        "control": "skeleton/intelligence/runtime_control.py",
+        "inference": "skeleton/ai/runtime/inference/adaptive_serving.py",
+        "learning": "skeleton/intelligence/runtime_learning.py",
+        "maintenance": "skeleton/jeeves/ai/studio_maintenance.py",
+        "ratchet": "skeleton/learning/mirror_room"
+      },
+      "interfaces": {
+        "engine": "GET/PATCH /api/v1/engine/runtime-control",
+        "application": "GET/PATCH /api/ai/runtime-control",
+        "schema_version": "skeleton.ai.runtime_control.v1",
+        "identity": "authenticated actor_id and tenant_id echoed; GET scoped learning; PATCH application administrator plus trusted engine service principal",
+        "policy": "global host-serving and maintenance controls, tenant-scoped learning; expected_version CAS"
+      },
+      "invariants": [
+        "adaptive effective capacity never exceeds configured operator capacity and is excluded from activation identity",
+        "explicit model selections, original budgets, privacy, verification and ratchet floors remain authoritative",
+        "no implicit remote offload, provider fallback, network work, model-weight promotion or self-certification",
+        "same-database terminal outcome ledger is idempotent and numeric-only; bounded MLP/Adam/replay records source/model provenance and quarantines invalid state",
+        "maintenance is owned by existing engine coordinator lifespan and existing idle effect ledger; fresh telemetry, bounded cooperative work, foreground preemption",
+        "ratchet predictor only selects TRAIN candidates; independent measured campaign and promotion receipts retain authority",
+        "operator UI uses authenticated API and admin-only versioned writes; observatory remains read-only",
+        "additional idle predictor replay requires explicit maintenance.augmentation_enabled; it never fine-tunes transformer weights or calls a provider",
+        "operator policy mutations append a bounded-content immutable versioned control receipt in the same execution database transaction; tenant-scoped projections never expose another tenant actor metadata"
+      ],
+      "studio_quality_adaptation": {
+        "owner": "skeleton/learning/mirror_room/adaptation.py",
+        "application_ingress": [
+          "backend/core/game_studio_agent.py",
+          "backend/routes/game_studio_agent.py"
+        ],
+        "policy": "explicit opt-in quality_gate.adaptive_ranking within existing scoped studio goal authorization",
+        "state": "bounded numeric outcome ranker/checkpoint in existing goal row through existing CAS/storage admission; no new store",
+        "observations": "matched real baseline/current source reviews with exact project/baseline/protocol/reviewer provenance; operational observations, never synthetic TRAIN/validation receipts or creative quality certification",
+        "authority": "bounded edit advice only; existing source-current review, restoration, consent, export and independent promotion gates remain unchanged",
+        "operator_surface": [
+          "frontend/src/features/Jeeves/StudioGoalQualityPanel.tsx",
+          "frontend/src/product/gameStudioAgentClient.ts"
+        ]
+      },
+      "runtime_completion_pass": {
+        "catalog_owner": "skeleton/ai/runtime/inference/catalog.py",
+        "catalog_configuration": "AI_LOCAL_MODEL_CATALOG_PATH explicit bounded digest-pinned local catalog, mutually exclusive with single artifact/deployment; existing ProviderRegistry exact provider/model identity, explicit primary and optional independent verifier; no implicit download or hosted fallback",
+        "admission": "existing local serving owner adds trusted tenant fairness separate from cache/operation/preemption identities; static operator ceilings and physical worker custody remain authoritative; host/per-route cache-action epochs persist in existing policy to reconcile every worker without losing intervening commands",
+        "learner_lifecycle": {
+          "owner": "skeleton/persistence/execution_repository.py",
+          "helper": "skeleton/intelligence/runtime_learning.py",
+          "interfaces": [
+            "GET /api/ai/runtime-control/learning/partitions/{partition_id}/checkpoint",
+            "POST /api/ai/runtime-control/learning/partitions/{partition_id}/checkpoint",
+            "equivalent sealed /api/v1/engine/runtime-control/learning/partitions/{partition_id}/checkpoint"
+          ],
+          "authority": "administrator plus engine service grant; tenant/model-bound finite checkpoint, exact state version CAS and same-transaction global policy version/audit receipt; no provider model promotion or output-quality claim",
+          "model": "prequential operational residual/drift/novelty confidence, bounded replay/last-healthy optimizer rollback and cold-start after import/reset",
+          "wire": "export/import opaque canonical checkpoint_json at most 256 KiB UTF-8 to preserve Python numeric digest input across browser JSON; parsed previews confer no authority; object checkpoint remains service-compatible"
+        },
+        "studio_numeric_memory": {
+          "owner": "backend/core/game_studio_agent.py with canonical mirror_room numeric ranker",
+          "policy": "quality_gate.numeric_memory_policy=goal_only|reuse_compatible|reset default goal_only; cross-goal reuse requires both donor and recipient explicitly opted into compatible reuse",
+          "authority": "same scoped tenant/principal/project/baseline/protocol/reviewer/feature/floor identities; existing sealed goal records/CAS/storage only; no unconsented review training",
+          "operator_surfaces": [
+            "StudioGoalQualityPanel.tsx",
+            "GameStudioAssistantPanel.tsx",
+            "gameStudioAgentClient.ts"
+          ]
+        },
+        "maintenance": "same-database durable host/scope ownership leases with fencing, cooperative heartbeat, positive physical-drain proof before stale-owner replay; expiry alone never proves a worker stopped; unknown remote ownership stays blocked; learner replay effects deduplicate the stable continuation_id and commit the optimizer mutation with its result receipt in the same execution SQLite transaction",
+        "boundaries": "no new service/store/provider boundary or automatic production-weight training; all learned controls remain subordinate to exact selections, grants, source pins, independent validation and promotion floors",
+        "working_order_continuation": {
+          "owners": [
+            "skeleton/provider_runtime.py",
+            "skeleton/api/engine_runtime.py",
+            "skeleton/intelligence/runtime_control.py",
+            "skeleton/persistence/execution_repository.py",
+            "skeleton/jeeves/ai/studio_maintenance.py",
+            "scripts/configure_ai_chat.py"
+          ],
+          "installation": "Existing stdlib configuration helper accepts mutually exclusive artifact, deployment and catalog inputs; prepares explicit portable readonly Compose bindings and derived container manifests without modifying original operator artifacts, downloading weights or invoking inference. Existing explicit seed-admin bootstrap can be configured by paired admin-email/password-file flags; no first-registrant elevation. New private configurations include required master/seal keys, preserve existing persistent keys on intentional replacement and include assistant.runtime.control only in the existing scoped backend service grant.",
+          "inference": "Existing GGUF backend reads bounded actual metadata, clamps trained context, accounts per-process weight/KV/scratch estimates, and propagates trusted tenant/deadline/work-class scopes through bounded batch scheduling. Existing provider owner remains the only activation and dispatch boundary.",
+          "learning_retention": {
+            "owner": "skeleton/persistence/execution_repository.py",
+            "storage": "Existing engine execution SQLite only; additive feedback markers on ai_execution_result bind exact outcome, checkpoint version, tenant/scope/partition/model/source and training status without changing immutable result_json/result_digest. Bounded derived-row retention reconstructs pruned observations from exact canonical records and preserves totals and deduplication. Same-DB ai_execution_learning_retention_state scopes bounded live-row/cursor/overflow counters; legacy reconciliation scans cap+1 rows and omits extra derived JSON while canonical feedback/training still commits. Maintenance payloads and fresh advice preserve runtime_learning_scope_id; queue dedupe includes that scope, and extra idle replay consumes only deferred replay credits granted by new canonical observations.",
+            "policy": {
+              "retained_outcomes": {
+                "default": 10000,
+                "minimum": 128,
+                "maximum": 100000
+              },
+              "outcome_max_age_days": {
+                "default": 90,
+                "minimum": 1,
+                "maximum": 3650
+              },
+              "maintenance_receipt_retention": {
+                "default": 2048,
+                "minimum": 16,
+                "maximum": 100000
+              }
+            }
+          },
+          "idle_recovery": "Existing maintenance controller adds fair recovery scanning, paired task/lease fence recovery, bounded completed-continuation projections in same database and proven-drain operational-row cleanup. Completed physical work may be reused only with exact continuation/handler/source/fence bindings and a fresh admitted assignment; it does not fabricate compliance, promotion or evaluation evidence. The same-store jeeves_idle_maintenance_chunk projection reserves before callback, caches bounded exact completed result values and retains pending postcommit acknowledgement; default maximum_chunk_results=1024 and maximum_ack_retries_per_tick=4. Host callbacks never execute while the idle executor persistence lock is held.",
+          "maintenance_ack": "Optional host completion acknowledgement runs only after verified durable chunk/cursor/effect receipt commit, binds task continuation and exact handler/result/completion receipt digests, and permits acknowledged predictor receipt payload compaction to a small permanent replay tombstone. Acknowledgement failure never regresses committed cursor or repeats optimizer work.",
+          "operator_projection": "Existing authenticated model inventory, chat readiness and runtime controls report exact model identities, current unavailable codes, durable dependency availability and bounded learning/maintenance retention; account changes and stale observations confer no authority. Optional serving_state separates live draining/active/queued/effective capacity from immutable activation; drained routes are unavailable for new product selections, and configured semantic-verifier metadata reports actual registry facts only.",
+          "authority": "Implementation and source compilation only; file existence, metadata reconciliation and build success confer no enterprise qualification or model promotion.",
+          "execution_recovery": "Existing engine coordinator recovers nonterminal submissions in bounded indexed keyset pages and at most 32 simultaneous recovery drivers; existing operation admission and provider budgets stay authoritative. A periodic bounded recovery pass resumes orphaned durable work without replaying provider side effects beyond canonical checkpoint/turn rules. Driver setup failures reach canonical terminalization rather than silently abandoning accepted commands. Exactly one coordinator owns a persistent execution database at a time using a nonblocking operating-system file lock over the existing database inode, held through physical task drain. Startup and periodic recovery never race a live peer coordinator. This is process coordination, not another durable store or a provider dispatch/replay grant; existing unresolved-dispatch uncertainty rules remain unchanged. In-memory repositories are connection-local. Same-store ai_execution_coordinator_identity pins one canonical engine namespace per physical file across restart, rejecting incompatible reuse before model activation; generic standalone repository namespace support is unchanged. OS custody pins the acquiring PID to reject forked copies, and Windows locking reserves a non-data byte beyond SQLite maximum EOF without extending the file.",
+          "studio_recovery": "Existing studio goal owner reconciles issued child receipts even after dispatch/model budgets are exhausted. Existing retry interface accepts explicit restore_incumbent only under original restoration/edit/run policy, remaining action allowance, current-source editor CAS and a sealed host decision receipt; it uses no fabricated model receipt or extra budget.",
+          "maintenance_retry": {
+            "interfaces": [
+              "POST /api/ai/runtime-control/maintenance/tasks/{task_id}/retry",
+              "equivalent sealed /api/v1/engine/runtime-control/maintenance/tasks/{task_id}/retry"
+            ],
+            "owner": "Existing StudioMaintenanceController.retry_failed under RuntimeOptimizationControl host composition",
+            "authority": "Authenticated administrator plus existing engine service runtime-control grant; exact tenant-derived scope, task/source/attempt guards, terminal failed state, unchanged handler and released/proven-drained custody. Preserve continuation and attempts, reset queue failures/backoff only, re-enter normal admission and append existing maintenance event. No extra provider/model/action grant or automatic command replay."
+          }
+        },
+        "operator_and_learning_continuation": {
+          "shared_policy_contract": "skeleton/contracts/runtime_optimization.py pure bounded field metadata/validation; same existing serving, learning and maintenance owners validate merged policies before atomic runtime-control CAS. GET runtime-control adds policy_controls for actual editable bounds/scopes and local route operator ceilings; no new policy authority.",
+          "dataset_export": {
+            "owner": "skeleton/persistence/execution_repository.py",
+            "interfaces": [
+              "GET /api/ai/runtime-control/learning/dataset",
+              "equivalent sealed /api/v1/engine/runtime-control/learning/dataset"
+            ],
+            "authority": "Admin plus existing engine runtime-control service grant, authenticated tenant/scope, optional partition and include_untrained filter; canonical retained numeric diagnostics only. Default128/max256 rows, fixed highwater/keyset cursor <=6KiB binds all filters, <=256 metadata-only canonical provenance checks. Opaque canonical dataset_json <=1MiB with <=3MiB escaped transport; explicit per-page provenance/digests and retention-gap limitations, no full-history/immutable snapshot claim. No prompts, model responses, tool payloads or provider credentials.",
+            "policy_markers": "Additive ai_execution_result learning_policy_version and learning_policy_digest bind actual terminal-transaction policy; legacy marker values stay explicitly unknown."
+          },
+          "maintenance_circuit_reset": {
+            "owner": "skeleton/jeeves/ai/studio_maintenance.py",
+            "interface": "POST /api/ai/runtime-control/maintenance/circuits/{kind}/reset and sealed engine equivalent",
+            "authority": "Admin plus engine runtime-control grant; tenant-derived scope, exact kind/generation/failure/source checks in existing circuit row transaction. Deny held/running custody. Clears breaker counters/cooldown only; original task backoff/retry/enabled policy and continuation remain unchanged. Additive failure/source/generation metadata in same SQLite circuit rows; old unbound rows cannot be manually reset."
+          },
+          "crawler_source_use": {
+            "owner": "backend/core/dragon_crawler.py with existing Dragon practice adapter",
+            "interface": "POST /api/dragon-academy/crawler/sessions/{id}/sources/{source_id}/use",
+            "storage": "Existing Mongo session source_use_policies <=64 entries: enabled/max_age_seconds60..86400/version/changed_at. Exact expected version plus session CAS and command idempotency; same existing roles/ownership, owner can withdraw but only editor/admin restore/change use.",
+            "authority": "All source reads/search/context/export and assert_context enforce current use/freshness; new crawler_reference.v2 binds policy version; v1 admissible only unchanged default. Session erasure removes map. No implicit recrawl, rights/consent upgrade or review/model promotion."
+          },
+          "studio_continuation": {
+            "owner": "backend/core/game_studio_agent.py",
+            "interfaces": [
+              "Existing goal advance adds max_planner_decisions1..4 and wait_for_work_seconds0..10",
+              "POST existing scoped goal source-refresh with expected goal/project/tree identities and idempotency"
+            ],
+            "authority": "Original total model/job/action/wall grants stay authoritative; serial decisions rebuild source-current context from real editor/child receipts. Explicit source re-pin only with no unresolved work, preserve baseline/history/grants/consent and withhold structurally incompatible numeric advice. Bounded round feedback derives actual matched baseline/candidate review+edit receipts, including rejected/restored candidates, without invented quality scores."
+          },
+          "inference_preparation": "Existing local/native owners add immutable per-request LocalPreparedInput plus prepare_input/validate_prepared_input/infer_prepared: exact request/model/runtime/profile/tokenizer/source/issuer/trusted-scope bindings; reused count/estimate/token sequence, no cross-request cache or new store. Resource telemetry uses fresh CPU deltas and actual platform/cgroup/process memory; missing signals remain unknown.",
+          "qualification": "Build/source compilation only. Existing ownership, review floors, consent, grants and enterprise qualification state are unchanged."
+        }
+      },
+      "studio_foundation_pass": {
+        "status": "implementation_candidate",
+        "workflow_templates": {
+          "contract_owner": "skeleton/contracts/ai_workflows.py",
+          "interface": "GET /api/ai/workflow-templates; authenticated actor/tenant-bound wrapper around a pure bounded catalog",
+          "consumer_surfaces": [
+            "chat composers",
+            "game studio goal form",
+            "Dragon capture form"
+          ],
+          "authority": "Draft form settings only, explicit apply, no execution or durable state. Whitelisted finite per-surface budgets and digests. Templates never fill content/credentials/URLs/consent/edit grants, alter live goals, enable automation or imply runtime readiness. Existing owners validate actual submitted commands.",
+          "wire": {
+            "catalog_schema": "skeleton.ai.workflow_catalog.v1",
+            "template_schema": "skeleton.ai.workflow_template.v1",
+            "wrapper_schema": "skeleton.ai.workflow_templates.v1",
+            "max_catalog_bytes": 65536,
+            "max_templates": 16,
+            "surfaces": [
+              "chat",
+              "studio",
+              "crawler"
+            ],
+            "template_fields": [
+              "schema_version",
+              "template_id",
+              "revision",
+              "surface",
+              "title",
+              "description",
+              "settings",
+              "requirements",
+              "scope",
+              "execution_authorized",
+              "template_digest"
+            ]
+          }
+        },
+        "inference_execution_contract": {
+          "owner": "skeleton/ai/runtime/inference/local.py with existing native owners",
+          "schema": "skeleton.local_inference.execution_contract.v1",
+          "projection": "existing adapter status and engine snapshot only",
+          "authority": "Side-effect-free activated identity/protocol/accounting/generation/static capacity metadata, deterministic digest and shared finite input-budget validator. No tokenizer execution, credential/provider activation, new cache/store or capability promotion."
+        },
+        "learning_explanations": {
+          "owners": [
+            "skeleton/intelligence/runtime_learning.py",
+            "skeleton/persistence/execution_repository.py"
+          ],
+          "schema": "skeleton.runtime.learning.explanation.v1",
+          "projection": "optional partition.reference_explanation and actual request recommendation.explanation, never a nested replacement of the existing readiness string",
+          "authority": "Bounded analytic local sensitivity of the existing 12->16->8->3 operational MLP; top4 input contributions per output, validated retained numeric replay reference when ready, current state/policy/sample/predictor digests. State latest source pin is not falsely attributed to older replay samples. No causal/creative/correctness explanation or model training. Unknown/stale/not-ready evidence withholds learned explanations."
+        },
+        "maintenance_inspection": {
+          "owner": "skeleton/jeeves/ai/studio_maintenance.py",
+          "projection": "existing scoped snapshot adds handler_registry, queue_summary and per-returned-task scheduling",
+          "authority": "Bounded existing same-DB reads only, actual registered handler versions/retry/ack availability, at most100 task projections and known bounded kind/state counts. Scheduling explains observed blockers against persisted host logical clock; execution_authority none and host_admission_required true. No readiness grant, reservation, handler code/path disclosure, new store or mutation from inspection."
+        },
+        "storage": "Existing canonical stores and authorities only. Templates/explanations/contracts are derived ephemeral data. No new runtime service/provider boundary.",
+        "validation": "Source compilation only under user no-tests instruction; no closure/signoff/promotion changes.",
+        "critical_gap_hardening": {
+          "engine_transport": {
+            "owner": "backend/core/engine_client.py",
+            "contract": "Bound streamed response bytes before allocation of the whole payload, finite duplicate-free UTF-8 JSON, bounded nesting/node count, absolute request deadline, identity content encoding only; preserve existing authenticated one-shot methods and error classes. No new provider/network authority."
+          },
+          "local_stream_consistency": {
+            "owners": [
+              "skeleton/ai/runtime/inference/local.py",
+              "skeleton/ai/runtime/inference/native_runtime.py",
+              "skeleton/ai/runtime/inference/native_transformer.py"
+            ],
+            "contract": "Validate shared activated input/output budgets, bounded native event order, actual streamed token IDs vs terminal result and replay request/model/config/output identities before cache/result publication. Consistency checks do not establish model correctness or independent verification."
+          },
+          "learning_integrity": "Only integrity-verified persisted predictor payloads may salvage embedded checkpoints; numeric checkpoint replay admission checks canonical feedback/request/result scope and digests rather than trusting retained diagnostic JSON alone.",
+          "chat_recovery": "Strict persisted turn/event schema and scalar identity checks; renewed Mongo lease must remain future-valid on database clock within the same CAS.",
+          "maintenance_ack": "Void hook success remains compatible; non-None host acknowledgement must be bounded finite mapping with explicit acknowledged true before pending receipt retirement.",
+          "operator_forms": "Draft templates remain explicit and bounded; submit paths recheck fresh account, role, consent/rights and original owner readiness instead of relying solely on disabled buttons.",
+          "qualification": "Fault consistency and source compilation only, no claim of Byzantine quorum consensus, independent model correctness or production qualification.",
+          "maintenance_drain_proofs": "Existing bounded drain proof collection executes host callbacks/process probes outside SQLite/state locks; exact identity/heartbeat/physical-count CAS persists positive drained facts. Locked claim/retry paths consume only durable/self-drain proofs. Unknown or expired ownership remains blocked; no new authority.",
+          "galaxy_build_backpressure": {
+            "owners": [
+              "backend/core/build_watchdog.py",
+              "backend/routes/galaxy_studio.py",
+              "backend/routes/galaxy_studio_resilience.py",
+              "backend/routes/galaxy_studio_watchdog.py"
+            ],
+            "contract": "Existing Galaxy build owner must preserve partial artifacts and report actual failure/stop when deadlines or durable artifact writes fail; timeout/heartbeat/client clock cannot fabricate completed phases. Retain live task handles and do not start overlapping workers based only on stale heartbeats. Stop further floor submissions on storage pressure, avoid unbounded RAM fallback and keep blocking resource checks off the async event loop. No new store/service or artifact deletion authority."
+          }
+        }
+      },
+      "operational_gap_continuation": {
+        "status": "implementation_candidate",
+        "scope": "Close source-observed operational defects in existing app startup, local inference, conversation recovery, Dragon capture and artifact build lifecycles; preserve all existing owners and explicit execution authority.",
+        "local_inference": {
+          "owners": [
+            "skeleton/ai/runtime/inference",
+            "skeleton/api/engine_runtime.py",
+            "skeleton/provider_runtime.py",
+            "skeleton/api/server.py"
+          ],
+          "contract": "Identity/token preparation and generation share existing fair physical-worker admission, original provider token ceilings, deadlines and cancellation/drain custody. Cache/coalescing must not bypass caller budgets. Readiness reflects activated and drained state; no new provider or model activation grant. Existing coordinator shutdown closes deduplicated serving engines and awaits physical drain before releasing persistent execution custody; shared scheduler facades cannot independently close a shared engine. Existing ProviderRegistry serving-engine enumeration includes an explicitly configured verification-only local adapter and deduplicates shared engine identities; provider construction/credentials remain unchanged. AppState retains coordinator/repository/host handles if physical shutdown is not established; a failed closer cannot release database or host custody."
+        },
+        "conversation": {
+          "owners": [
+            "backend/core/chat_turns.py",
+            "backend/core/engine_client.py",
+            "frontend/src/product/chatController.ts",
+            "frontend/src/product/useChatController.ts",
+            "frontend/src/features/Jeeves"
+          ],
+          "contract": "Reconnect observes canonical accepted work without implicit resubmission. Ambiguous submission, user cancellation, persisted identities and thread/account changes preserve the exact operation and grants. Local drafts/attachments remain distinct from canonical conversation state; user-visible files must be actually scoped content. Mongo authority pins primary reads, database-clock ownership and exact preparation digest/lease filters. Preparation recovery cannot delete future sequence intents or reset malformed fencing counters. Disconnect cleanup tasks are deduplicated and strictly bounded."
+        },
+        "maintenance": {
+          "owners": [
+            "skeleton/intelligence/runtime_control.py",
+            "skeleton/jeeves/ai/studio_maintenance.py"
+          ],
+          "contract": "Coordinate foreground admission edges with initial maintenance publication under existing activity ownership. Reuse the exact foreground execution database path. Bound callback/receipt serialization before allocation of the whole document; preserve finite canonical JSON and existing physical drain/ack semantics. Newly registered host owners remain initializing until an actual synchronization/heartbeat publishes live foreground presence; failed tasks behind unverified completed chunks retain their existing retry targets."
+        },
+        "dragon_capture": {
+          "owners": [
+            "backend/core/dragon_crawler.py",
+            "backend/core/dragon_runtime.py"
+          ],
+          "contract": "Storage admission receipts must bind tenant, capability, resource and write identity. Pre-dispatch failures settle exact durable claims/credits; cancellation cannot release custody while native work remains. Never infer physical drain solely from lease expiry or accept foreign account receipts. Blocking existing Dragon SQLite transactions execute off the async event loop with their existing bounded locks/timeouts, while scope/source rechecks remain at publication boundaries."
+        },
+        "artifact_jobs": {
+          "owners": [
+            "backend/routes/galaxy_studio.py",
+            "backend/routes/galaxy_studio_files.py",
+            "backend/routes/galaxy_studio_vault.py",
+            "backend/routes/galaxy_studio_watchdog.py",
+            "backend/routes/galaxy_studio_resilience.py",
+            "backend/services/binary_builder.py",
+            "backend/routes/galaxy_studio_vault_admin.py",
+            "frontend/src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx",
+            "backend/core/build_vault.py"
+          ],
+          "contract": "Existing expansion, packaging and APK paths share tracked physical custody/admission and bounded durable artifact emission. Stream vault rows in existing worker; never load the entire vault on the event loop. Terminal progress follows actual persisted output. Atomic packaging avoids partial target publication. Existing explicit deployment gates remain; no new remote execution or artifact deletion authority. Explicit existing vault pruning reserves the same physical artifact slot and cannot delete while a tracked build/package/expansion reads or writes the vault. Existing deletion permission and operator action remain unchanged; no automatic prune introduced. Existing Galaxy action client does not replay unverified mutations, retains absolute body deadlines, and fences packaging/expansion observations by build and visibility. Cancelled, stopping and ambiguous remote-submission outcomes never show success. Existing jobs tray observes the authoritative operation and provides explicit stop while physical work drains. Existing vault manifest repair and append serialize under the same per-build owner, zstd decoder contexts are not shared concurrently, and incomplete new shards/manifests are not published as completed artifacts. Keep the existing physical vault/layout and explicit deletion authority; no separate storage service or background repair queue. Manifest reads prefer newer published JSON over swept compressed metadata; append never reuses an existing complete shard index after interrupted metadata publication. File counts and limited path lists reflect unique current indexed paths rather than physical historical records.",
+          "metadata": "Existing build record may retain one bounded _artifact_job with kind/status/error/stop/timestamps; no separate ledger. Main build completion and later artifact-operation completion are independent. Existing execution projection may add operation/operation_status while aggregate worker/drain/stop metadata reflects current retained custody. Existing expansion/APK poll fields remain authoritative for those jobs; compatibility stop route stops the actual current operation without fabricating main phases."
+        },
+        "installation_readiness": {
+          "owners": [
+            "backend/routes/app_runtime.py",
+            "skeleton/app/health.py",
+            "skeleton/app/first_install.py",
+            "frontend/src/product/appReadinessClient.ts",
+            "frontend/src/product/appHealthClient.ts",
+            "frontend/src/features/Setup/AppSetupWorkspace.tsx",
+            "backend/routes/gameforge_auth.py",
+            "frontend/src/product/appBootstrapClient.ts",
+            "frontend/src/utils/apiClient.ts",
+            "frontend/src/auth/gameforgeAuth.ts"
+          ],
+          "contract": "Bound health transport and redirects, validate actual service identity, isolate failed capability observations and prevent stale account readiness from appearing current. First-install commands must match the production assembly and distinguish infrastructure, model readiness and scoped operator permissions. Public inspection grants no execution or authentication authority. New account inserts explicitly bind the existing default tenant, matching canonical chat and default attester grants; existing users and historical crawler scopes are preserved. Bounded single-flight per-app health observations retain original observation time and do not create repeated worker threads. Existing frontend transport bounds streamed response buffering when available and preserves bounded native text fallback/deadlines. Bootstrap/status metadata is validated before directing readiness calls; public health cannot mistake arbitrary HTML for a service. Readiness observes the existing auth epoch and invalidates immediately on account changes; epoch notifications convey no bearer values or additional authority. Public caching excludes credential-bearing or queried requests and binds eligible entries to their actual endpoint."
+        },
+        "validation": "User requests building without tests: source compilation and narrow static checks only; do not run application/model/crawler/build workloads, advance closure evidence or claim runtime/enterprise qualification.",
+        "storage_and_authority": "No new durable store, service, provider boundary, capability owner, model promotion or grant. Existing mirror/facade ownership rules remain."
+      },
+      "consumer_installation_verification": {
+        "status": "implementation_candidate",
+        "session_date": "2026-10-23",
+        "report": "docs/ai/CONSUMER_READINESS_2026-10-23.md",
+        "authorization": "The operator explicitly requested installation, all tests, live user workflows and repairs; prior source-only/no-tests observations remain historical.",
+        "scope": [
+          "Fresh authenticated production Compose installation using existing Mongo/engine/backend/frontend owners and persistent volumes",
+          "Existing provider governance/admission/accounting and context compilation; bounded native artifact reads and physical queue custody",
+          "Existing Galaxy role/owner authorization, explicit artifact file limits and persistent build vault; no additional authority or store",
+          "Actual local-model chat/replay, reviewed response stages, scoped crawler capture, studio editing/training/play/export and restart observations"
+        ],
+        "qualification_rule": "Implementation and bounded successful workflows do not establish a clean full-suite result, patched dependency gate, arbitrary console support, transformer quality or enterprise certification. Keep unmet release gates explicit."
+      }
+    }
   },
   "conversation_runtime_contract": {
     "owner_plane": "application-api",
@@ -9834,6 +10245,60 @@
     "production_promotion_authorized": false,
     "masterplan_completion_authorized": false,
     "runtime_selection_contract": "machine/ai_chat_runtime_selection.json",
+    "private_model_route_admission": {
+      "status": "implementation_candidate",
+      "catalog": "backend/core/route_policy_catalog.py",
+      "catalog_version": "2026-10-25.v4",
+      "existing_domain": "studio",
+      "authenticated_prefixes": [
+        "/api/playable", "/api/pipeline", "/api/graph", "/api/groupchat",
+        "/api/snowball", "/api/wins", "/api/camera", "/api/physics",
+        "/api/quality-control", "/api/assets/genesis", "/api/photoreal",
+        "/api/imagine", "/api/churn", "/api/agent-memory", "/api/memory-engine",
+        "/api/jeeves-core/memory", "/api/jeeves-core/co-coding", "/api/ai-logs"
+      ],
+      "authority": "Existing authenticated account/tenant and canonical source guards precede confidential model transfer. Worldforge and orchestrator retain their existing confidential-capable domains. No new provider, service, store or capability owner; no change to the INTERNAL legacy fallback or public/governance ceilings.",
+      "failure": "A canonical model denial cannot become a provider fallback or empty structural repair. Unconfirmed execution retains the exact request key and nonterminal job custody; successful artifacts retain canonical engine execution/context/provider receipt references.",
+      "feature_output_budget": "Playable HTML generation/structural repair/refinement requests at most 2048 output tokens; source-bound literal runtime-repair proposals request at most 1024 and the judge requests 256. Existing canonical catalog/context/operation/phase/physical limits remain authoritative. No global model limit increase.",
+      "playable_raw_response_custody": {
+        "owner": "backend/routes/playable.py:get_playable_raw",
+        "authority": "Existing authenticated account, tenant and source access checks remain authoritative. Generated HTML is untrusted even when a private owner can read it.",
+        "transport": "Direct raw HTML responses use an opaque-origin CSP sandbox with scripts and pointer lock, deny in-document network requests, forms, frames and app-origin access, reject embedding, and carry private no-store, nosniff and no-referrer headers. Top-level navigation remains subject to browser sandbox behavior. Existing authenticated bounded fetch and separately sandboxed preview remain supported.",
+        "quality": "Structural scores and model opinions are advisory; no HTML parsing, client assertion or model verdict establishes runtime qualification. Preview remains available to the owner for explicit observation."
+      },
+      "playable_marketplace_release_custody": {
+        "owner": "backend/routes/marketplace.py:create_listing,checkout",
+        "state": "unavailable",
+        "reason": "The generated HTML surface lacks a trusted source-bound browser qualification owner and the current playable access model is owner-scoped rather than buyer-entitled.",
+        "admission": "Reject new marketplace listings and new checkout sessions with a stable actionable 503 before database mutation or payment-provider dispatch, regardless of stored model scores or historical release flags. Existing listing reads, payment status and webhook handlers remain unchanged under their existing authority; external webhook delivery is not qualified.",
+        "reenablement": "Declare and verify a source-bound runtime qualification owner, buyer entitlement and delivery authority, and race-safe lifecycle checks before allowing new sales; model verdicts and structural scores are not release evidence."
+      },
+      "runtime_repair_literal_patch": {
+        "status": "implementation_candidate",
+        "owner": "backend/routes/playable_repair.py",
+        "value_and_apply_owner": "skeleton/automation/build_edits.py:TextEdit,FileEditPlan,apply_edit_plan",
+        "adapter": "backend/core/playable_literal_patch.py",
+        "instruction_policy": "backend.playable.runtime-repair@2",
+        "internal_response": {
+          "schema_version": 1,
+          "source_sha256": "optional echo only; if supplied it must equal the server-bound lowercase SHA-256 of exact current owned UTF-8 HTML; source selection and authority always come from the server snapshot",
+          "edits": "1..8 objects with exactly find and replace strings; find is a unique nonempty literal in the immutable source, replacement may be empty"
+        },
+        "limits": {"source_utf8_bytes": 65536, "candidate_utf8_bytes": 65536, "response_utf8_bytes": 32768, "edits": 8, "find_utf8_bytes": 4096, "replacement_utf8_bytes": 4096, "aggregate_edit_utf8_bytes": 16384, "model_output_tokens": 1024, "model_turns": 1, "repair_trail_entries": 64},
+        "authority": "The public authenticated repair error body is unchanged. Model output is inert proposal data, not executable JavaScript, shell commands, paths or storage authority. Reuse canonical exact-anchor values/apply engine under stricter feature limits; no new runtime, provider, service or store. The existing scoped Mongo playable owner reauthorizes current account/source before publication.",
+        "publication": "The server pins the owned source SHA before model dispatch and checks the same immutable source/version at scoped compare-and-set publication; the model need not reproduce a digest. Reject any supplied digest echo that differs. Require unique anchors including overlapping occurrences, pairwise nonoverlapping original-source ranges and all-or-none application. Sanitize and require complete HTML. Source, version, UTF-8 bytes, source digest, review invalidation and repair trail with canonical execution/context/provider receipt lineage publish atomically.",
+        "failure": "Malformed/oversized JSON, unknown fields, duplicate keys, source mismatch, invalid/ambiguous/overlapping edits, unchanged output, incomplete candidate, revoked access or source/version conflict preserve the old artifact. Unknown provider execution retains existing job/request custody. Existing EngineChat/EngineTextRequest may lower the existing four-turn budget using a strict integer 1..4; the unchanged default four is omitted from identity material for old replay compatibility. Literal repair uses one turn plus the existing canonical JSON-schema interface, preventing an invalid structured response from authorizing another provider turn. No full-document fallback, extra automatic model call, JavaScript execution or bypass of canonical model/context/physical limits.",
+        "acceptance": "Bounded parser/apply negatives plus actual scoped worker/model-response/CAS regressions, foreign/revoked/concurrent-source denials, unchanged old source on every failure, pinned canonical receipt lineage and actual installed repair/browser proof; source tests alone do not grant runtime or shipping qualification."
+      },
+      "acceptance": "Real route privacy middleware plus EngineChat and EngineText bridge tests, authenticated/foreign/public negatives, and installed original-game generation are required. Source changes alone confer no quality or enterprise grade."
+    },
+    "chroma_lifecycle_custody": {
+      "status": "implementation_candidate",
+      "owner": "skeleton/app/assembly.py:compose_command",
+      "full_profile": "Current optional Chroma full-profile startup is refused before setup or Compose mutation because the pinned image writes /data outside the configured named volume. Read-only planning and the default application profile remain available.",
+      "teardown": "App-owned down and Windows launcher Stop use Compose stop with every declared profile. App-owned Compose dispatch forces COMPOSE_REMOVE_ORPHANS=0 after environment overrides. This stops known services without removing containers, writable layers, volumes, images or orphans; it applies across Windows and Unix without inspecting Docker process output.",
+      "recovery": "Preserve and separately back up existing Chroma container /data and legacy volume; do not retarget or merge them automatically. Direct Docker and Compose operations remain outside this app-owned safety boundary. Full profile requires a qualified durable mount and explicit migration before re-enablement."
+    },
     "local_model_provisioning_contract": "machine/ai_local_model_provisioning.json",
     "session_evidence": "machine/ai_first_install_session_evidence_2026-10-15.json",
     "operator_guide": "docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md",
@@ -9856,6 +10321,35 @@
       ],
       "authority": "Existing CORE_DB workspace/crawler authority and existing Dragon knowledge/practice SQLite owners only. No new runtime root, provider, physical database authority or automatic promotion.",
       "operator_guide": "docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md",
+      "game_studio_goal_continuation": {
+        "status": "implementation_candidate",
+        "contract": "machine/ai_game_studio_continuation.json",
+        "review_contract": "machine/ai_game_studio_review.json",
+        "goal_schema": "skeleton.game.studio_goal.v2",
+        "decision_schema": "skeleton.game.studio_decision.v2",
+        "quality_policy_schema": "skeleton.game.studio_quality_policy.v1",
+        "quality_progress_schema": "skeleton.game.studio_quality_progress.v1",
+        "owner": "backend/core/game_studio_agent.py",
+        "state_authority": "Existing CORE_DB game_learning_revisions scoped studio_agent_goal journal and existing workspace jobs; no new store, provider, runtime root or promotion authority",
+        "planner_schema_capacity": "Build the exact typed response schema before fitting new planner prompts. For the initial projection, existing scoped catalog selection, declared active/fallback llama.cpp routes, and exact scoped cooperation-role selections use the canonical native renderer's conservative maximum over its declared profiles and raw framing, including the visible schema, with the unchanged context safety margin. Project optional observations only; preserve every granted operation and persist exactly the schema measured. An irreducible oversized prompt/schema fails with the existing typed capacity error before a model call or pending publication. Existing pending requests and idempotency identities remain unchanged. Cooperative stage prompts can grow as artifacts are generated; initial preflight does not certify their capacity, and the canonical native runtime continues to enforce its limit at each dispatch. Hosted/reference-only routes retain their existing estimation behavior; unknown custom native profile capacity is not certified.",
+        "bounds": {
+          "steps": 16,
+          "model_calls": 16,
+          "default_model_calls": 4,
+          "jobs": 8,
+          "default_jobs": 2,
+          "authorization_seconds": 3600,
+          "max_refinement_rounds": 4,
+          "quality_follow_up_actions": 0
+        },
+        "measured_quality": "Opt-in original run requires simulation and review, immutable operator-selected numerical criteria, actual pinned pre-edit reference, host-frozen seed/episode/capture/controller protocol, and fresh exact-current-source simulation/review before packaging or export. Model-produced text cannot satisfy a missing owner fact. Ordinary goals and historical frozen intent/keys remain unchanged.",
+        "source_revision_comparison": "Explicit matched original-successor comparison only: stable environment action/observation/reward contract, workload, controller protocol, seed and actual reviewer/runtime implementation. Default same-source/frozen-policy comparison remains strict. Source revisions, bounded returns and frame findings never certify subjective quality or general superiority.",
+        "historical_reference_authority": "Only genuine admitted completed scoped review jobs may supply historical observations or restoration references. Frozen file/input/result identities, live source rights, teacher consent, policy identity and external-origin revision/epoch checks remain required; no arbitrary historical source endpoint or execution authority.",
+        "restoration": "Existing world editor accepts exactly one of changes, typed edits or restore_review_job_id. Quality host chooses its exact pinned incumbent after rejection; immutable world identity/origins must match. Canonical emission and complete path/content-tree checks preserve source bytes, including absence of optional fields, while project/file revisions increase monotonically. Restoration consumes existing finite grants and stops at owner cancellation/expiry boundaries.",
+        "foreground_continuation": "Product may issue serial version-fenced advances only while foreground/visible, within existing grants and current owner continuation hints; actual child terminal state and pending canonical planner identity determine the next join. No automatic authorization renewal, failed-attempt replacement, retry escalation or background scheduler.",
+        "operator_guide": "docs/ai/STUDIO_MEASURED_QUALITY.md",
+        "qualification": "Implementation candidate. Static validation and separately recorded bounded actual operations do not establish enterprise qualification, target-OS execution, universal consoles or model-weight learning. User no-tests instruction remains authoritative."
+      },
       "session_evidence": "machine/ai_studio_enablement_session_evidence_2026-10-15.json",
       "validation": "Static construction/provider/mirror/source checks, actual bounded crawler/review/build/train/application operations and a fresh frontend production export. User no-tests instruction remains authoritative.",
       "automated_tests_authorized": false,

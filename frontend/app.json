@@ -24,7 +24,8 @@
         ],
         "NSMicrophoneUsageDescription": "Used by voice commands and audio dictation.",
         "NSCameraUsageDescription": "Used by code/QR scanning helpers.",
-        "NSPhotoLibraryUsageDescription": "Used to import images into your projects."
+        "NSPhotoLibraryUsageDescription": "Used to import images into your projects.",
+        "NSLocationWhenInUseUsageDescription": "Used only while the app is open, after you tap to start Frontier live GPS, to place you on the game map. Location is not stored, uploaded or used in the background."
       }
     },
     "android": {
@@ -41,7 +42,12 @@
         "POST_NOTIFICATIONS",
         "SCHEDULE_EXACT_ALARM",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "blockedPermissions": [
+        "ACCESS_BACKGROUND_LOCATION"
       ]
     },
     "androidStatusBar": {
@@ -62,6 +68,15 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#000000"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Used only while the app is open, after you tap to start Frontier live GPS, to place you on the game map. Location is not stored, uploaded or used in the background.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
         }
       ],
       "expo-audio",

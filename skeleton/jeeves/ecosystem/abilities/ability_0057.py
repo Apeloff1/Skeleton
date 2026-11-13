@@ -1,0 +1,13 @@
+"""Ability 0057.
+"""
+from __future__ import annotations
+
+ABILITY = "ability_0057"
+
+def cost() -> int:
+    return 5 + (57 % 20)
+
+def apply(caster: str, target: str) -> dict:
+    if not caster or not target:
+        return {"ok": False, "reason": "missing_actor"}
+    return {"ok": True, "ability": ABILITY, "caster": caster, "target": target, "power": 10 + (57 % 15)}

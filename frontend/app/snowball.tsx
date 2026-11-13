@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /snowball — ☃️ Snowball Build (manual, stage-by-stage).
  *
@@ -504,13 +504,13 @@ export default function Snowball() {
               Each is a 7-segment pipeline whose segments pass through the
               Query→Acquire→Refine gate chain (runs right after the quality gate). */}
         <Text style={{ color: '#8a96b2', fontSize: 12, fontWeight: '800', marginTop: 6, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>🚦 Pre-Build Gates — Query · Acquire · Refine</Text>
-        {[
+        {([
           ['refine', '🔧', 'Refine', 'Structural correctness — 7 segments', '#16241c', '#2f5a3f', '#43d39e'],
           ['polish', '✨', 'Polish', 'Feel & presentation — 7 segments', '#241f10', '#5a4a1f', '#f4c95d'],
           ['quality-control', '🛡️', 'Quality Control', 'Ship-readiness audit — 7 segments', '#1a1424', '#4a2f6e', '#c79bff'],
-        ].map(([route, icon, title, sub, bg, bd, fg]) => (
+        ] as const).map(([route, icon, title, sub, bg, bd, fg]) => (
           <TouchableOpacity key={route} testID={`snow-gate-${route}`} activeOpacity={0.9}
-            onPress={() => router.push(`/${route}?build=${encodeURIComponent(gameId)}`)}
+            onPress={() => router.push({ pathname: `/${route}`, params: { build: gameId } })}
             style={[s.toolsCta, { backgroundColor: bg, borderColor: bd }]}>
             <Text style={s.toolsCtaIcon}>{icon}</Text>
             <View style={{ flex: 1 }}>

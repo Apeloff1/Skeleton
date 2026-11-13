@@ -6,7 +6,7 @@ native build. Source generation requires a separately admitted resource lane.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Iterator
 import os
@@ -55,12 +55,23 @@ def _knowledge_path() -> Path:
 
 @contextmanager
 def _delivery() -> Iterator[DragonDelivery]:
+    """Open knowledge storage without misclassifying failures in the caller.
+
+    Exception handling must cover only acquiring the reviewed-knowledge
+    connection. The caller may use a separate native-practice SQLite database,
+    whose errors must be handled by that plane rather than relabeled as a
+    reviewed-knowledge outage.
+    """
     path = _knowledge_path()
-    try:
-        with ReviewedKnowledgeStore(path) as library:
-            yield DragonDelivery(DragonAlmanacs(library))
-    except (sqlite3.DatabaseError, OSError):
-        raise HTTPException(status_code=503, detail="Dragon knowledge storage unavailable") from None
+    with ExitStack() as stack:
+        try:
+            library = stack.enter_context(ReviewedKnowledgeStore(path))
+        except (sqlite3.DatabaseError, OSError):
+            raise HTTPException(
+                status_code=503,
+                detail="Dragon knowledge storage unavailable",
+            ) from None
+        yield DragonDelivery(DragonAlmanacs(library))
 
 
 def _private(response: Response) -> None:

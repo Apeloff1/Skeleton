@@ -5,8 +5,12 @@ plus an async fetcher. Results can be folded back into Jeeves' trainable brain.
 """
 from __future__ import annotations
 
+import asyncio
+import ipaddress
 import json
+import math
 import re
+import socket
 from typing import Any, Optional
 from urllib.parse import quote, urlencode, urlsplit
 
@@ -99,8 +103,12 @@ def _validate_catalog_url(api: dict, url: str) -> None:
         raise ValueError("API URL must use HTTPS")
     if not configured.hostname or actual.hostname != configured.hostname:
         raise ValueError("API URL host is not part of the trusted catalog")
-    if actual.username or actual.password:
+    if actual.username or actual.password or configured.username or configured.password:
         raise ValueError("API URL credentials are not allowed")
+    if configured.port not in (None, 443) or actual.port not in (None, 443):
+        raise ValueError("Catalog API must use the default HTTPS port")
+    if actual.fragment or "\\" in actual.path:
+        raise ValueError("Catalog API URL is not a plain request target")
 
 
 def _catalog_request_parts(api: dict, url: str) -> tuple[str, str]:
@@ -116,6 +124,35 @@ def _catalog_request_parts(api: dict, url: str) -> tuple[str, str]:
     path = "/" + (actual.path or "").lstrip("/")
     target = path + (f"?{actual.query}" if actual.query else "")
     return origin, target
+
+
+def _pin_public_origin(hostname: str) -> str:
+    """Bind the actual connection to one validated public IP, not another DNS lookup.
+
+    All records must be global: DNS answers mixing private and public targets
+    are rejected instead of selecting a convenient public record. The caller
+    retains hostname-based TLS verification with `sni_hostname`.
+    """
+    try:
+        addresses = socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise ValueError("Catalog API host resolution failed") from exc
+    if not addresses:
+        raise ValueError("Catalog API host has no DNS addresses")
+    if len(addresses) > 32:
+        raise ValueError("Catalog API host has too many DNS addresses")
+    public: set[str] = set()
+    for answer in addresses:
+        try:
+            ip = ipaddress.ip_address(answer[4][0])
+        except (IndexError, ValueError, TypeError) as exc:
+            raise ValueError("Catalog API DNS answer is malformed") from exc
+        if not ip.is_global:
+            raise ValueError("Catalog API host has a non-public DNS address")
+        public.add(ip.compressed)
+    selected = sorted(public, key=lambda value: (ipaddress.ip_address(value).version, value))[0]
+    ip = ipaddress.ip_address(selected)
+    return f"https://[{ip.compressed}]" if ip.version == 6 else f"https://{ip.compressed}"
 
 
 async def _read_bounded_body(response) -> bytes:
@@ -141,17 +178,49 @@ async def fetch(api_key: str, params: dict) -> dict:
     api = FREE_APIS.get(api_key)
     if not api:
         return {"ok": False, "error": f"unknown api '{api_key}'", "available": sorted(FREE_APIS.keys())}
-    url = _build_url(api, params or {})
+    url = api["url"]
     try:
+        # Bound caller-controlled query material before quoting, DNS lookup,
+        # transport allocation or stringification of arbitrary Python objects.
+        if params is None:
+            params = {}
+        if not isinstance(params, dict) or len(params) > 16:
+            raise ValueError("Catalog API parameters are invalid")
+        safe_params = {}
+        for key, value in params.items():
+            if type(key) is not str or not 1 <= len(key) <= 64:
+                raise ValueError("Catalog API parameter name is invalid")
+            if type(value) not in (str, int, float):
+                raise ValueError("Catalog API parameter type is invalid")
+            if type(value) is float and not math.isfinite(value):
+                raise ValueError("Catalog API parameter must be finite")
+            encoded_value = str(value)
+            if len(encoded_value) > 512:
+                raise ValueError("Catalog API parameter exceeds size limit")
+            safe_params[key] = encoded_value
+        url = _build_url(api, safe_params)
+        if len(url) > 8192:
+            raise ValueError("Catalog API URL exceeds size limit")
         base_url, request_target = _catalog_request_parts(api, url)
+        hostname = urlsplit(base_url).hostname
+        if hostname is None:
+            raise ValueError("Catalog API origin has no hostname")
+        # Validate DNS once, then connect to that exact global address. The
+        # virtual Host header and SNI preserve the catalog's TLS identity.
+        # DNS resolution may block for seconds. It must not occupy the ASGI
+        # event loop or bypass a bounded admission timeout.
+        pinned_url = await asyncio.wait_for(
+            asyncio.to_thread(_pin_public_origin, hostname), timeout=5.0
+        )
         import httpx
         async with httpx.AsyncClient(
-            base_url=base_url,
+            base_url=pinned_url,
             timeout=10,
             follow_redirects=False,
-            headers=_HEADERS,
+            trust_env=False,
+            headers={**_HEADERS, "Host": hostname},
         ) as c:
-            async with c.stream("GET", request_target) as r:
+            async with c.stream("GET", request_target, extensions={"sni_hostname": hostname}) as r:
                 raw = await _read_bounded_body(r)
                 ct = r.headers.get("content-type", "")
                 status = r.status_code
@@ -168,7 +237,16 @@ async def fetch(api_key: str, params: dict) -> dict:
 
 # ── heuristic API picker for on-demand knowledge acquisition ──────────────────
 def pick_api(query: str) -> tuple[str, dict]:
+    """Select from the fixed public API catalog using bounded request text.
+
+    The query may originate in an untrusted room message. Bound it before
+    allocating normalized text or matching any heuristic regex.
+    """
+    if type(query) is not str or not 1 <= len(query) <= 512:
+        raise ValueError("knowledge query must be bounded text")
     q = query.lower().strip()
+    if not q:
+        raise ValueError("knowledge query must not be blank")
     m = re.search(r"(?:define|meaning of|definition of)\s+(.+)", q)
     if m:
         return "dictionary", {"q": m.group(1).split()[0]}

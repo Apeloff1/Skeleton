@@ -707,7 +707,33 @@ async def edit_world(scope, project_id, body):
         current = await world(scope, project_id)
         if current["spec_digest"] != body["expected_spec_digest"]:
             raise GameLearningError("successor_world_conflict", "Successor world changed; reload it.", 409)
-        spec = _edited_world(current["spec"], body)
+        if body.get("restore_review_job_id") is not None:
+            from core import game_studio_review as reviews
+
+            if body.get("changes") is not None or body.get("edits") is not None:
+                raise GameLearningError(
+                    "world_restore_payload", "Select one exact reference restoration.", 422
+                )
+            reference = await reviews._load_review(
+                scope, project_id, body["restore_review_job_id"], historical=True
+            )
+            files = {item["path"]: item["content"] for item in reference["input"]["files"]}
+            if "game/successor/spec.json" not in files:
+                raise GameLearningError(
+                    "world_restore_reference", "The actual review has no original successor world.", 422
+                )
+            spec = json.loads(files["game/successor/spec.json"])
+            editable = {"title", "world", "mechanics", "palette", "camera", "fidelity"}
+            if {key: value for key, value in spec.items() if key not in editable} != {
+                key: value for key, value in current["spec"].items() if key not in editable
+            }:
+                raise GameLearningError(
+                    "world_restore_identity",
+                    "A reference restore cannot change world identity or source origins.",
+                    409,
+                )
+        else:
+            spec = _edited_world(current["spec"], body)
         # Canonical emission validates every nested bound and regenerates
         # browser/native bytes from this exact original world, never caller code.
         emitted = emit_successor_project(spec)

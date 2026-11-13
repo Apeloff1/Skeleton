@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_amber_highlands",
+  "title": "Amber Highlands: The Maker Commons",
+  "subtitle": "Original the maker commons design in Amber Highlands; only the grid preview compiles today.",
+  "seed": 203010313070,
+  "width": 27,
+  "height": 17,
+  "levels": 6,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 12,
+  "theme": "forest",
+  "starting_health": 6
+}

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   boundedRetries, boundedTimeoutMs, boundedResponseChars, retryableHttpStatus, retryDelayMs,
-} from '../utils/requestRecoveryPolicy.ts';
+} from '../src/utils/requestRecoveryPolicy.ts';
 
 test('safe GET can retry within a finite budget', () => {
   assert.equal(boundedRetries(undefined, 'GET', false), 2);

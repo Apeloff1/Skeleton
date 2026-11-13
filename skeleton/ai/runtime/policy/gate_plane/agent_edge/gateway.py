@@ -418,13 +418,41 @@ def build_agent_gateway_router(gateway: AgentGateway, *, prefix: str = DEFAULT_P
     return router
 
 
-def create_agent_gateway_app(gateway: AgentGateway, *, prefix: str = "", title: str = "Skeleton Agent Edge") -> Any:
-    """Standalone ASGI app (no lifespan hooks) suitable for ``app.mount(...)``."""
+def create_agent_gateway_app(
+    gateway: AgentGateway,
+    *,
+    prefix: str = "",
+    title: str = "Skeleton Agent Edge",
+    gate_installer: Optional[Callable[[Any], Any]] = None,
+) -> Any:
+    """Deprecated standalone ASGI app for the edge (no lifespan hooks).
+
+    ``create_app`` is the only HTTP entry (TD ruling, #3622 follow-up). Use
+    :func:`skeleton.api.agent_edge_mount.install_agent_edge` on the app built
+    by ``create_app`` (or ``register_agent_gateway`` before ``create_app``),
+    which puts these routes behind ``install_gate`` (HeaderBound, RequestSeal,
+    WriteAdmit, BodyBound, WORM, Auth, PolicyGate).
+
+    This wrapper stays only for existing callers. Pass ``gate_installer`` (for
+    example :func:`skeleton.api.agent_edge_mount.gate_standalone_agent_edge`)
+    to route its auth through ``install_gate``. ``skeleton.gate_plane`` cannot
+    import ``skeleton.api`` (architecture boundary), so the gate is injected.
+    """
+    import warnings
+
+    warnings.warn(
+        "create_agent_gateway_app is deprecated: create_app is the only HTTP entry. "
+        "Use skeleton.api.agent_edge_mount.install_agent_edge(app, gateway) on create_app().",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     from fastapi import FastAPI
 
     app = FastAPI(title=title, docs_url=None, redoc_url=None, openapi_url=None)
     app.include_router(build_agent_gateway_router(gateway, prefix=prefix))
     app.state.agent_gateway = gateway
+    if gate_installer is not None:
+        gate_installer(app)
     return app
 
 

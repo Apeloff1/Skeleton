@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from .contracts import (
     HardExample,
@@ -17,6 +17,7 @@ from .contracts import (
     ScenarioSplit,
     _digest,
     _finite,
+    _sha256,
 )
 
 
@@ -27,6 +28,7 @@ class CurriculumPolicy:
     base_weight_boost: float = 1.0
     max_hard_difficulty: float = 8.0
     interleave_primary_tags: bool = True
+    learning_progress_boost: float = 1.0
 
     def __post_init__(self) -> None:
         for field in (
@@ -34,6 +36,7 @@ class CurriculumPolicy:
             "tag_rarity_boost",
             "base_weight_boost",
             "max_hard_difficulty",
+            "learning_progress_boost",
         ):
             object.__setattr__(
                 self,
@@ -52,6 +55,7 @@ class CurriculumPolicy:
                 "base_weight_boost": self.base_weight_boost,
                 "max_hard_difficulty": self.max_hard_difficulty,
                 "interleave_primary_tags": self.interleave_primary_tags,
+                "learning_progress_boost": self.learning_progress_boost,
             }
         )
 
@@ -64,6 +68,7 @@ class CurriculumItem:
     hard_difficulty: float
     rarity_score: float
     primary_tag: str
+    learned_priority: float = 0.0
 
     @property
     def digest(self) -> str:
@@ -75,6 +80,7 @@ class CurriculumItem:
                 "hard_difficulty": self.hard_difficulty,
                 "rarity_score": self.rarity_score,
                 "primary_tag": self.primary_tag,
+                "learned_priority": self.learned_priority,
             }
         )
 
@@ -132,6 +138,7 @@ def build_curriculum(
     hard_examples: Iterable[HardExample] = (),
     *,
     policy: CurriculumPolicy | None = None,
+    learned_priorities: Mapping[str, float] | None = None,
 ) -> CurriculumPlan:
     actual = policy or CurriculumPolicy()
     train = tuple(scenarios)
@@ -153,6 +160,15 @@ def build_curriculum(
     hard_by_id = {item.scenario_id: item for item in hard}
     if set(hard_by_id) - set(ids):
         raise MirrorRoomError("hard example does not belong to training curriculum")
+    for item in hard:
+        scenario = next(row for row in train if row.scenario_id == item.scenario_id)
+        if item.scenario_digest != scenario.digest:
+            raise MirrorRoomError("hard-example identity differs from TRAIN scenario content")
+    if learned_priorities is not None and not isinstance(learned_priorities, Mapping):
+        raise MirrorRoomError("learned curriculum priorities must be a TRAIN digest mapping")
+    learned = {_sha256("learned TRAIN scenario digest", key): _finite("learned curriculum priority", value, minimum=0.0) for key, value in (learned_priorities or {}).items()}
+    if set(learned) - {item.digest for item in train} or any(value > 4.0 for value in learned.values()):
+        raise MirrorRoomError("learned curriculum priorities exceed fixed TRAIN context or bounds")
 
     tag_counts: Counter[str] = Counter(_primary_tag(item) for item in train)
     rows: list[tuple[MirrorScenario, CurriculumItem]] = []
@@ -169,6 +185,7 @@ def build_curriculum(
             scenario.weight * actual.base_weight_boost
             + hard_difficulty * actual.hard_example_boost
             + rarity * actual.tag_rarity_boost
+            + learned.get(scenario.digest, 0.0) * actual.learning_progress_boost
         )
         rows.append(
             (
@@ -180,6 +197,7 @@ def build_curriculum(
                     hard_difficulty=hard_difficulty,
                     rarity_score=rarity,
                     primary_tag=tag,
+                    learned_priority=learned.get(scenario.digest, 0.0),
                 ),
             )
         )

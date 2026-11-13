@@ -7,7 +7,7 @@
  */
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { safeGetItem, safeSetItem, pruneExpired } from '../../utils/safeStorage';
+import { safeGetItem, safeSetItem, pruneExpired } from '../utils/safeStorage';
 import api from '../utils/apiClient';
 import { getAppBootstrap, getAppRuntimeStatus } from '../product/appBootstrapClient';
 import { loadFlags } from '../feature-flags/flagsClient';

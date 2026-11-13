@@ -4,11 +4,14 @@ canonical governed product-control seam.
 """
 from __future__ import annotations
 
+from routes.playable_access import _GuardedPrivateProjectRoute, project_router, scoped_database
+from routes import gameforge_auth as auth
+
 from dataclasses import asdict
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.http_errors import internal_http_error, public_http_error
@@ -29,8 +32,14 @@ from core.execution_receipts import ReceiptIntegrityError
 from core.product_control_runtime import get_product_control_plane as _control_plane
 from core.product_operations import OperationExecutionError, OperationRejected
 
-router = APIRouter(prefix="/api/admin/ops", tags=["ops"])
+router = project_router(
+    prefix="/api/admin/ops",
+    tags=["ops"],
+    dependencies=[Depends(auth.require_role("admin"))],
+    route_class=_GuardedPrivateProjectRoute,
+)
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 _COLLECTIONS = ["playables", "playable_jobs", "marketplace_listings", "marketplace_purchases",
                 "payment_transactions", "tournaments", "tournament_rewards", "liveops_progress"]
 
@@ -43,6 +52,19 @@ def _authorized(token: str) -> bool:
 def _require_ops(token: str) -> None:
     if not _authorized(token):
         raise HTTPException(status_code=403, detail="unauthorized")
+
+
+def _ops_credential(
+    x_ops_token: str = Header(default="", alias="X-Ops-Token", max_length=512),
+    legacy_token: str = Query(default="", alias="token", max_length=512, deprecated=True),
+) -> str:
+    """Reject URL credentials: request lines, proxies and analytics retain them."""
+    if legacy_token:
+        raise HTTPException(
+            status_code=400,
+            detail="operator credentials must use the X-Ops-Token header",
+        )
+    return x_ops_token
 
 
 class RuleInput(BaseModel):
@@ -81,8 +103,8 @@ class DeploymentExecuteInput(BaseModel):
 
 
 @router.get("/overview")
-async def overview(token: str = Query("")):
-    if not _authorized(token): return {"error": "unauthorized"}
+async def overview(token: str = Depends(_ops_credential)):
+    _require_ops(token)
     counts = {}
     for c in _COLLECTIONS:
         try: counts[c] = await _db[c].estimated_document_count()
@@ -109,8 +131,8 @@ async def overview(token: str = Query("")):
 
 
 @router.get("/metrics")
-async def metrics(token: str = Query("")):
-    if not _authorized(token): return {"error": "unauthorized"}
+async def metrics(token: str = Depends(_ops_credential)):
+    _require_ops(token)
     games = await _db.playables.estimated_document_count()
     failed = await _db.playables.count_documents({"status": "failed"})
     ready = await _db.playables.count_documents({"status": "ready"})
@@ -133,27 +155,27 @@ async def metrics(token: str = Query("")):
 
 
 @router.get("/product-control/status")
-async def product_control_status(token: str = Query("")):
+async def product_control_status(token: str = Depends(_ops_credential)):
     _require_ops(token); return _control_plane().status()
 
 
 @router.get("/product-control/assurance")
-async def product_control_assurance(token: str = Query("")):
+async def product_control_assurance(token: str = Depends(_ops_credential)):
     _require_ops(token); return _control_plane().assurance_report()
 
 
 @router.get("/product-control/deployment-preflight")
-async def product_control_deployment_preflight(max_attempts: int = Query(3, ge=1, le=10), token: str = Query("")):
+async def product_control_deployment_preflight(max_attempts: int = Query(3, ge=1, le=10), token: str = Depends(_ops_credential)):
     _require_ops(token); return control_plane_preflight_dict(_control_plane(), max_attempts=max_attempts)
 
 
 @router.get("/product-control/deployments")
-async def product_control_deployments(token: str = Query("")):
+async def product_control_deployments(token: str = Depends(_ops_credential)):
     _require_ops(token); return _control_plane().deployments.status()
 
 
 @router.get("/product-control/deployments/checkpoints")
-async def product_control_deployment_checkpoints(limit: int = Query(50, ge=1, le=500), token: str = Query("")):
+async def product_control_deployment_checkpoints(limit: int = Query(50, ge=1, le=500), token: str = Depends(_ops_credential)):
     _require_ops(token)
     try:
         gateway = _control_plane().deployments
@@ -170,7 +192,7 @@ async def product_control_deployment_checkpoints(limit: int = Query(50, ge=1, le
 
 
 @router.get("/product-control/deployments/checkpoints/{sequence}")
-async def product_control_deployment_checkpoint(sequence: int, token: str = Query("")):
+async def product_control_deployment_checkpoint(sequence: int, token: str = Depends(_ops_credential)):
     _require_ops(token)
     if sequence < 1:
         raise HTTPException(status_code=400, detail="checkpoint sequence must be positive")
@@ -185,7 +207,7 @@ async def product_control_deployment_checkpoint(sequence: int, token: str = Quer
 
 
 @router.get("/product-control/deployments/checkpoints/{sequence}/proof")
-async def product_control_deployment_checkpoint_proof(sequence: int, token: str = Query("")):
+async def product_control_deployment_checkpoint_proof(sequence: int, token: str = Depends(_ops_credential)):
     _require_ops(token)
     try:
         gateway = _control_plane().deployments
@@ -209,7 +231,7 @@ async def product_control_deployment_checkpoint_proof(sequence: int, token: str 
 @router.get("/product-control/deployments/proof/{authorization_id}")
 async def product_control_deployment_proof(authorization_id: str,
                                              checkpoint_sequence: int | None = Query(default=None, ge=1),
-                                             token: str = Query("")):
+                                             token: str = Depends(_ops_credential)):
     _require_ops(token)
     try:
         gateway = _control_plane().deployments
@@ -253,7 +275,7 @@ async def product_control_deployment_proof(authorization_id: str,
 
 
 @router.post("/product-control/deployments/prepare")
-async def product_control_prepare_deployment(body: DeploymentPrepareInput, token: str = Query("")):
+async def product_control_prepare_deployment(body: DeploymentPrepareInput, token: str = Depends(_ops_credential)):
     _require_ops(token)
     try:
         prepared = _control_plane().deployments.prepare(
@@ -265,7 +287,7 @@ async def product_control_prepare_deployment(body: DeploymentPrepareInput, token
 
 
 @router.post("/product-control/deployments/execute")
-async def product_control_execute_deployment(body: DeploymentExecuteInput, token: str = Query("")):
+async def product_control_execute_deployment(body: DeploymentExecuteInput, token: str = Depends(_ops_credential)):
     _require_ops(token)
     try:
         execution = _control_plane().deployments.execute(
@@ -279,7 +301,7 @@ async def product_control_execute_deployment(body: DeploymentExecuteInput, token
 @router.get("/product-control/deployments/current")
 async def product_control_current_release(target: str = Query(min_length=1, max_length=256),
                                           environment: str = Query(min_length=1, max_length=64),
-                                          token: str = Query("")):
+                                          token: str = Depends(_ops_credential)):
     _require_ops(token)
     try:
         release = _control_plane().deployments.releases.current(target=target, environment=environment)
@@ -289,29 +311,29 @@ async def product_control_current_release(target: str = Query(min_length=1, max_
 
 
 @router.get("/product-control/pending")
-async def product_control_pending(token: str = Query("")):
+async def product_control_pending(token: str = Depends(_ops_credential)):
     _require_ops(token); pending = _control_plane().pending(); return {"count": len(pending), "operations": pending}
 
 
 @router.get("/product-control/ledger")
-async def product_control_ledger(token: str = Query("")):
+async def product_control_ledger(token: str = Depends(_ops_credential)):
     _require_ops(token); ledger = _control_plane().execution_ledger(); return {"count": len(ledger), "operations": ledger}
 
 
 @router.get("/product-control/audit")
-async def product_control_audit(limit: int = Query(50, ge=0, le=500), token: str = Query("")):
+async def product_control_audit(limit: int = Query(50, ge=0, le=500), token: str = Depends(_ops_credential)):
     _require_ops(token); return {"entries": _control_plane().audit_history(limit=limit)}
 
 
 @router.get("/product-control/receipts")
-async def product_control_receipts(limit: int = Query(50, ge=0, le=500), token: str = Query("")):
+async def product_control_receipts(limit: int = Query(50, ge=0, le=500), token: str = Depends(_ops_credential)):
     _require_ops(token)
     try: return {"receipts": _control_plane().receipt_history(limit=limit)}
     except ReceiptIntegrityError as exc: raise internal_http_error("receipt_integrity_error", exc) from None
 
 
 @router.get("/product-control/receipt/{operation_id}")
-async def product_control_receipt(operation_id: str, token: str = Query("")):
+async def product_control_receipt(operation_id: str, token: str = Depends(_ops_credential)):
     _require_ops(token)
     try: receipt = _control_plane().receipt(operation_id)
     except (ReceiptIntegrityError, ValueError) as exc: raise HTTPException(status_code=400, detail="invalid operations request") from exc
@@ -320,7 +342,7 @@ async def product_control_receipt(operation_id: str, token: str = Query("")):
 
 
 @router.get("/product-control/receipt/{operation_id}/result")
-async def product_control_receipt_result(operation_id: str, token: str = Query("")):
+async def product_control_receipt_result(operation_id: str, token: str = Depends(_ops_credential)):
     _require_ops(token)
     try: return _control_plane().receipt_result(operation_id)
     except ValueError as exc: raise HTTPException(status_code=400, detail="invalid operations request") from exc
@@ -331,14 +353,14 @@ async def product_control_receipt_result(operation_id: str, token: str = Query("
 
 
 @router.get("/product-control/operation/{operation_id}/lifecycle")
-async def product_control_operation_lifecycle(operation_id: str, token: str = Query("")):
+async def product_control_operation_lifecycle(operation_id: str, token: str = Depends(_ops_credential)):
     _require_ops(token)
     try: return _control_plane().operation_lifecycle(operation_id)
     except (ValueError, ReceiptIntegrityError) as exc: raise HTTPException(status_code=400, detail="invalid operations request") from exc
 
 
 @router.post("/product-control/execute/{seq}")
-async def product_control_execute(seq: int, token: str = Query("")):
+async def product_control_execute(seq: int, token: str = Depends(_ops_credential)):
     _require_ops(token)
     if seq < 0: raise HTTPException(status_code=400, detail="sequence cannot be negative")
     try: confirmed = await _control_plane().execute_registered(seq)
@@ -347,12 +369,12 @@ async def product_control_execute(seq: int, token: str = Query("")):
 
 
 @router.post("/product-control/execute-pending")
-async def product_control_execute_pending(limit: int = Query(32, ge=0, le=256), token: str = Query("")):
+async def product_control_execute_pending(limit: int = Query(32, ge=0, le=256), token: str = Depends(_ops_credential)):
     _require_ops(token); return await _control_plane().dispatch_pending(limit=limit)
 
 
 @router.post("/product-control/policy/ratify")
-async def product_control_ratify(body: RatifyInput, token: str = Query("")):
+async def product_control_ratify(body: RatifyInput, token: str = Depends(_ops_credential)):
     _require_ops(token)
     try: charter = _control_plane().ratify(body.domain, [Rule(r.id, r.action, r.min_weight, r.requires_quorum) for r in body.rules])
     except ValueError as exc: raise HTTPException(status_code=400, detail="invalid operations request") from exc
@@ -360,7 +382,7 @@ async def product_control_ratify(body: RatifyInput, token: str = Query("")):
 
 
 @router.post("/product-control/admit")
-async def product_control_admit(body: AdmitInput, token: str = Query("")):
+async def product_control_admit(body: AdmitInput, token: str = Depends(_ops_credential)):
     _require_ops(token)
     try:
         admitted = _control_plane().admit(capability_id=body.capability_id, domain=body.domain, action=body.action,

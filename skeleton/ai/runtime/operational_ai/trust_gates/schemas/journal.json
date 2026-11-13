@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "fields": {
+    "stream": {
+      "type": "text",
+      "max_bytes": 96,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    },
+    "sequence": {
+      "type": "int",
+      "min": 1,
+      "max": 100000000
+    },
+    "prev_sha": {
+      "type": "text",
+      "max_bytes": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event_sha": {
+      "type": "text",
+      "max_bytes": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": "text",
+      "max_bytes": 96,
+      "pattern": "^[a-z][a-z0-9_.-]*$"
+    },
+    "payload_sha": {
+      "type": "text",
+      "max_bytes": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "epoch": {
+      "type": "int",
+      "min": 1,
+      "max": 1000000
+    }
+  }
+}

@@ -5,12 +5,13 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-from fastapi import APIRouter
+from core.public_exception_route import PublicExceptionRoute
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-router = APIRouter(prefix="/intelligence", tags=["Code Intelligence"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/intelligence", tags=["Code Intelligence"])
 
 from core.engine_chat import EngineChat, UserMessage
 from core.engine_text import EngineTextError
@@ -106,7 +107,7 @@ async def call_llm(
     prompt: str,
 ) -> str:
     if not LLM_AVAILABLE:
-        return "LLM not available"
+        raise HTTPException(status_code=503, detail="AI engine is unavailable")
     try:
         policy = InstructionPolicy(
             policy_id=policy_id,
@@ -117,11 +118,11 @@ async def call_llm(
             instruction_policy=policy,
             actor_id="code-intelligence",
             capability="assistant.compat",
-        ).with_model("openai", "gpt-4o")
+        )
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
-    except EngineTextError:
-        return "llm_request_failed"
+    except EngineTextError as exc:
+        raise HTTPException(status_code=502, detail="AI analysis could not be completed") from exc
 
 # ============================================================================
 # 1. SEMANTIC CODE SEARCH

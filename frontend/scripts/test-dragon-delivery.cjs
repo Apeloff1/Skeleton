@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');const ts=require('typescript');
-const root=path.resolve(__dirname,'../features/Jeeves/companion');
+const root=path.resolve(__dirname,'../src/features/Jeeves/companion');
 const output=ts.transpileModule(fs.readFileSync(path.join(root,'dragonDelivery.ts'),'utf8'),{
  compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});
 const mod={exports:{}};vm.runInNewContext(output.outputText,{module:mod,exports:mod.exports});

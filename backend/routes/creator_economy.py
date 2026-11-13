@@ -11,18 +11,22 @@ there is no true Stripe Connect payout or recurring subscription here. Instead:
 """
 from __future__ import annotations
 
+from routes.playable_access import project_router, scoped_database, reauthorize_project_context
+
 import os
 import uuid
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
-from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest, paid_amount_matches
 
-router = APIRouter(prefix="/api", tags=["creator-economy"])
+router = project_router(prefix="/api", tags=["creator-economy"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
 
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "") or None
@@ -274,8 +278,22 @@ class PremiumCheckoutBody(BaseModel):
     origin_url: str = Field("", max_length=2000)
 
 
+def _premium_release_ready() -> bool:
+    """Premium requires a durable, independently qualified delivery authority."""
+    return False
+
+
 @router.post("/premium/checkout")
 async def premium_checkout(body: PremiumCheckoutBody, request: Request):
+    # Existing entitlement reads and settlement remain available, but a new
+    # charge cannot be offered until durable entitlement delivery is qualified.
+    # The legacy path creates the external session before persisting its local
+    # transaction and relies on a scoped webhook that Stripe cannot authenticate.
+    if not _premium_release_ready():
+        return JSONResponse(status_code=503, content={
+            "error": "Premium checkout is unavailable until payment and entitlement delivery can be verified.",
+            "code": "premium_release_unavailable",
+        })
     if not STRIPE_API_KEY:
         return {"error": "payments not configured"}
     plan = body.plan if body.plan in PREMIUM_PLANS else "monthly"
@@ -301,21 +319,40 @@ async def premium_checkout(body: PremiumCheckoutBody, request: Request):
 
 @router.get("/premium/status/session/{session_id}")
 async def premium_session_status(session_id: str, request: Request):
+    await reauthorize_project_context(mutate=True)
     txn = await _db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     if not txn:
         return {"error": "unknown session"}
+    meta = txn.get("metadata")
+    if (not isinstance(meta, dict) or meta.get("source") != "premium"
+            or meta.get("plan") not in PREMIUM_PLANS
+            or meta.get("days") != str(PREMIUM_PLANS[meta["plan"]]["days"])
+            or not isinstance(meta.get("visitor_id"), str)
+            or not meta["visitor_id"] or meta["visitor_id"] != txn.get("buyer_id")):
+        return JSONResponse(status_code=409, content={"error": "payment_source_mismatch"})
     sc = _checkout(str(request.base_url))
     try:
         status = await sc.get_checkout_status(session_id)
     except Exception:
         return {"error": "stripe_error", "payment_status": txn.get("payment_status")}
-    await _db.payment_transactions.update_one(
-        {"session_id": session_id},
-        {"$set": {"status": status.status, "payment_status": status.payment_status, "updated_at": _now()}})
     granted = False
+    if status.payment_status == "paid":
+        if not paid_amount_matches(txn, status.amount_total, status.currency):
+            return JSONResponse(status_code=409, content={"error": "payment_details_mismatch"})
+        try:
+            await _db.payment_transactions.update_one(
+                {"session_id": session_id, "amount": txn["amount"], "currency": txn["currency"],
+                 "metadata": txn["metadata"], "buyer_id": txn["buyer_id"]},
+                {"$set": {"status": status.status, "payment_status": "paid", "updated_at": _now()}})
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            return JSONResponse(status_code=409, content={"error": "payment_details_mismatch"})
+    else:
+        await _db.payment_transactions.update_one(
+            {"session_id": session_id}, {"$set": {"status": status.status, "updated_at": _now()}})
     if status.payment_status == "paid" and not txn.get("processed"):
-        meta = txn.get("metadata", {})
-        days = int(meta.get("days", 30))
+        days = int(meta["days"])
         expires = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
         await _db.premium_entitlements.update_one(
             {"session_id": session_id},

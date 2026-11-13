@@ -40,7 +40,7 @@ class ResilienceFortress:
     PATTERNS = {
         "sql_injection": re.compile(r"(\b(union|select|insert|delete|drop|exec|script)\b)", re.IGNORECASE),
         "path_traversal": re.compile(r"\.\./|\.\.\\|%2e%2e%2f"),
-        "command_injection": re.compile(r"[;&|`]\s*\b(cat|ls|rm|chmod|wget|curl|bash|sh|python)\b"),
+        "command_injection": re.compile(r"[;&|`]\s*\b(cat|ls|rm|chmod|bash|sh|python|wget|curl)\b"),
         "xss": re.compile(r"<script|javascript:|on\w+\s*=", re.IGNORECASE),
     }
 

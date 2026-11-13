@@ -17,8 +17,8 @@
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
-import { bootGuard, traceStep, traceStepSync } from '../utils/bootTracer';
-import LaunchCascade from '../components/LaunchCascade';
+import { bootGuard, traceStep, traceStepSync } from '../src/utils/bootTracer';
+import LaunchCascade from '../src/components/LaunchCascade';
 import { accessibleStatusProps } from '../src/accessibility/runtime';
 import { useI18n } from '../src/i18n';
 

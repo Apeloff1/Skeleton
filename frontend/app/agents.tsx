@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /agents — Multi-Agent Systems
  * GET /api/agents/systems • POST /api/agents/run/{system_id}
@@ -10,11 +10,12 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouteHistory } from '../utils/routeHistory';
-import { shareResult, copyToClipboard } from '../utils/shareResult';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
-import Skeleton from '../components/UI/Skeleton';
-import RetryBanner from '../components/UI/RetryBanner';
+import { useRouteHistory } from '../src/utils/routeHistory';
+import { shareResult, copyToClipboard } from '../src/utils/shareResult';
+import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
+import Skeleton from '../src/components/UI/Skeleton';
+import RetryBanner from '../src/components/UI/RetryBanner';
+import { apiFetch } from '../src/utils/apiController';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -35,10 +36,12 @@ export default function AgentsScreen() {
     setBootLoading(true);
     setBootError(null);
     Promise.all([
-      fetch(`${BACKEND}/api/agents/systems`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
-      fetch(`${BACKEND}/api/agents/roles`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+      apiFetch(`${BACKEND}/api/agents/systems`).then(r => { if (!r.ok) throw new Error(`Systems HTTP ${r.status}`); return r.json(); }),
+      apiFetch(`${BACKEND}/api/agents/roles`).then(r => { if (!r.ok) throw new Error(`Roles HTTP ${r.status}`); return r.json(); }),
     ]).then(([sys, rl]) => {
-      const sysMap = sys?.systems || {};
+      if (!sys?.systems || typeof sys.systems !== 'object' || Array.isArray(sys.systems) || Object.keys(sys.systems).length > 64) throw new Error('Agent system catalog is malformed.');
+      if (!rl?.roles || typeof rl.roles !== 'object' || Array.isArray(rl.roles) || Object.keys(rl.roles).length > 256) throw new Error('Agent role catalog is malformed.');
+      const sysMap = sys.systems;
       setSystems(sysMap);
       setRoles(rl?.roles || {});
       const first = Object.keys(sysMap)[0];
@@ -55,15 +58,16 @@ export default function AgentsScreen() {
     if (!systemId) return;
     setBusy(true); setErr(''); setResult(null);
     try {
-      const r = await fetch(`${BACKEND}/api/agents/run/${systemId}`, {
+      const r = await apiFetch(`${BACKEND}/api/agents/run/${encodeURIComponent(systemId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ task, context: '' }),
       });
-      const j = await r.json();
+      let j: any;
+      try { j = await r.json(); } catch { throw new Error('Agent execution returned an invalid response.'); }
+      if (!r.ok || j?.success === false || j?.error || !Array.isArray(j?.steps)) throw new Error(String(j?.detail || j?.error || `Agent execution failed (HTTP ${r.status}).`).slice(0, 200));
       setResult(j);
-      if (j?.error) setErr(String(j.error).slice(0, 200));
-      else {
+      {
         const stepCount = Array.isArray(j.steps) ? j.steps.length : 0;
         await history.push({
           label: `${systems[systemId]?.name || systemId} · ${stepCount} steps`,
@@ -169,6 +173,7 @@ export default function AgentsScreen() {
             placeholder="Describe the task for the agent swarm…"
             placeholderTextColor="#475569"
             textAlignVertical="top"
+            maxLength={10000}
           />
 
           <TouchableOpacity

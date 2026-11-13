@@ -5,13 +5,13 @@ import {ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TouchableOpac
 import StudioLoginGate from '../src/auth/StudioLoginGate';
 import api from '../src/utils/apiClient';
 import {authHeaders, getAuthToken} from '../src/auth/gameforgeAuth';
-import {API_BASE} from '../utils/apiBase';
-import DragonDeliveryWorkbench from '../features/Jeeves/companion/DragonDeliveryWorkbench';
+import {API_BASE} from '../src/utils/apiBase';
+import DragonDeliveryWorkbench from '../src/features/Jeeves/companion/DragonDeliveryWorkbench';
 import {
   type NativeAttempt, type NativeTarget,
   normalizeNativeAttempts, normalizeNativeTargets, titleCaseId,
-} from '../features/Jeeves/companion/dragonNativeTargets';
-import {saveNativeSourceZip} from '../features/Jeeves/companion/saveNativeSourceZip';
+} from '../src/features/Jeeves/companion/dragonNativeTargets';
+import {saveNativeSourceZip} from '../src/features/Jeeves/companion/saveNativeSourceZip';
 
 const API = (API_BASE || '').replace(/\/$/, '');
 const MAX_SOURCE_ZIP_BYTES = 250_000;

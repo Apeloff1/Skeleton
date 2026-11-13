@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /apk-inspector — Deep introspection of the most recent APKs.
  *
@@ -22,10 +22,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../theme/tokens';
-import { useModalLogger } from '../utils/modalLogger';
-import { toast } from '../components/Toast';
-import { useFeatureFlag } from '../utils/featureFlags';
+import theme from '../src/theme/tokens';
+import { useModalLogger } from '../src/utils/modalLogger';
+import { toast } from '../src/components/AppToast';
+import { useFeatureFlag } from '../src/utils/featureFlags';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const { breathing, palette, radii } = theme;
@@ -142,27 +142,6 @@ export default function ApkInspector() {
     }
   }, []);
 
-  const generateDemoApk = useCallback(async () => {
-    setError('');
-    setRebuilding(true);
-    try {
-      const tag = `quickbuild_${Date.now().toString(36)}`;
-      const r = await fetch(`${BACKEND}/api/binary/rebuild/${tag}`, { method: 'POST' });
-      const j = await r.json();
-      if (!r.ok) {
-        setError(j.detail || `Generate failed (HTTP ${r.status})`);
-      } else {
-        setBuildId(tag);
-        await loadList();
-        await loadInspection();
-      }
-    } catch (e: any) {
-      setError(`Generate failed: ${e?.message}`);
-    } finally {
-      setRebuilding(false);
-    }
-  }, [loadInspection, loadList]);
-
   const rebuild = useCallback(async () => {
     setRebuilding(true); setError('');
     log.action('rebuild_started', { build_id: buildId });
@@ -170,8 +149,9 @@ export default function ApkInspector() {
     try {
       const r = await fetch(`${BACKEND}/api/binary/rebuild/${encodeURIComponent(buildId.trim())}`, { method: 'POST' });
       const j = await r.json();
-      if (!r.ok) {
-        setError(j.detail || `Rebuild failed (HTTP ${r.status})`);
+      if (!r.ok || !j.rebuilt) {
+        const detail = j.detail || j.errors?.join('\n') || `Rebuild failed (HTTP ${r.status})`;
+        setError(detail);
         log.error(new Error(`rebuild HTTP ${r.status}`), { build_id: buildId, body: j });
       } else {
         await loadInspection();
@@ -332,19 +312,14 @@ export default function ApkInspector() {
               <Ionicons name="archive-outline" size={36} color={palette.ink[600]} />
               <Text style={styles.emptyText}>No APKs yet</Text>
               <Text style={styles.emptyHelp}>
-                Generate a quick demo APK to verify the pipeline end-to-end.
+                Create a game build in Galaxy Studio, then package and inspect its persisted source here.
               </Text>
               <TouchableOpacity
                 style={[styles.btn, styles.btnPrimary, { marginTop: 12, paddingHorizontal: 18 }]}
-                onPress={generateDemoApk}
-                disabled={rebuilding}
+                onPress={() => router.push('/galaxy')}
               >
-                {rebuilding ? <ActivityIndicator color="#fff" /> : (
-                  <>
-                    <Ionicons name="add-circle" size={18} color="#fff" />
-                    <Text style={styles.btnText}>Generate demo APK</Text>
-                  </>
-                )}
+                <Ionicons name="planet" size={18} color="#fff" />
+                <Text style={styles.btnText}>Open Galaxy Studio</Text>
               </TouchableOpacity>
             </View>
           )}

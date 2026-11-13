@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /playground — Full Code Playground IDE.
  *
@@ -12,11 +12,11 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouteHistory } from '../utils/routeHistory';
-import { shareResult, copyToClipboard } from '../utils/shareResult';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
-import { useAutosave } from '../utils/useAutosave';
-import { withScreenGuard } from '../components/withScreenGuard';
+import { useRouteHistory } from '../src/utils/routeHistory';
+import { shareResult, copyToClipboard } from '../src/utils/shareResult';
+import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
+import { useAutosave } from '../src/utils/useAutosave';
+import { withScreenGuard } from '../src/components/withScreenGuard';
 
 const BACKEND = CANONICAL_API_BASE || '';
 const USER_ID = 'default_user';

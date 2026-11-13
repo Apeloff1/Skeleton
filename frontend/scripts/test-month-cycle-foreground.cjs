@@ -1,10 +1,11 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const ts = require('typescript');
 const fs = require('node:fs');
 const path = require('node:path');
-const code = fs.readFileSync(path.join(__dirname, '../services/monthCycleForeground.ts'), 'utf8');
+const code = fs.readFileSync(path.join(__dirname, '../src/services/monthCycleForeground.ts'), 'utf8');
 const output = ts.transpileModule(code, {
   fileName: 'monthCycleForeground.ts', compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
@@ -13,7 +14,7 @@ const output = ts.transpileModule(code, {
 });
 assert.equal(output.diagnostics.length, 0);
 const mod = { exports: {} };
-new Function('require','module','exports',output.outputText)(id => {
+compileFunction(output.outputText, ['require', 'module', 'exports'])(id => {
   if (id === './monthCycleRecovery') return {};
   throw new Error('Unexpected dependency: '+id);
 },mod,mod.exports);

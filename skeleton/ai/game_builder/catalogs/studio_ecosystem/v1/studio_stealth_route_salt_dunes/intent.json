@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stealth_route_salt_dunes",
+  "title": "Salt Dunes: Stealth Route",
+  "subtitle": "An original stealth route brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610300376,
+  "width": 25,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "desert",
+  "starting_health": 3
+}

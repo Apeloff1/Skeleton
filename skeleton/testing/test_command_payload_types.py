@@ -103,16 +103,17 @@ def test_memory_command_rejects_coerced_top_k() -> None:
 
 def test_run_command_rejects_coerced_repair_flag() -> None:
     service = build_runtime_command_service(_State())
-    ok = service.execute("run", {"answers": {}, "repair": True})
+    # JSON-spec assertions must select JSON explicitly; omitted target runs Godot.
+    ok = service.execute("run", {"answers": {}, "target": "json", "repair": True})
     assert ok.ok is True
     assert ok.data["game"]["repair"] is True
 
-    defaulted = service.execute("run", {"answers": {}})
+    defaulted = service.execute("run", {"answers": {}, "target": "json"})
     assert defaulted.ok is True
     assert defaulted.data["game"]["repair"] is False
 
     for repair in (1, "false", "true", None):
-        result = service.execute("run", {"answers": {}, "repair": repair})
+        result = service.execute("run", {"answers": {}, "target": "json", "repair": repair})
         assert result.ok is False
         assert result.to_payload()["error"]["code"] == "invalid_argument"
 
@@ -210,17 +211,27 @@ def test_http_ingest_and_include_files_reject_coerced_types() -> None:
 
     class _Forge:
         def execute(self, *args, **kwargs):
-            return {"files": {"a.gd": "x"}}
+            return {"succeeded": True, "files": {"a.gd": "x"}, "sim": {"passed": True}}
 
     class _GameState:
         gameforge = _Forge()
 
-    kept = asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {"include_files": True}, _GameState()))
-    assert "files" in kept
-    stripped = asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {}, _GameState()))
+    # The HTTP adapter requires a nonempty brief. Select the lightweight JSON
+    # target so this regression checks response projection, not Godot proving.
+    request = type("R", (), {"headers": {}})()
+    payload = {"vision": "A tiny playable arena", "target": "json"}
+    kept = asyncio.run(routes.gameforge_run(request, {**payload, "include_files": True}, _GameState()))
+    assert kept["files"] == {"a.gd": "x"}
+    stripped = asyncio.run(routes.gameforge_run(request, payload, _GameState()))
     assert "files" not in stripped
-    with pytest.raises(HTTPException):
-        asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {"include_files": "false"}, _GameState()))
+
+    with pytest.raises(HTTPException) as missing_brief:
+        asyncio.run(routes.gameforge_run(request, {"target": "json"}, _GameState()))
+    assert missing_brief.value.status_code == 422
+
+    with pytest.raises(HTTPException) as coerced_files:
+        asyncio.run(routes.gameforge_run(request, {**payload, "include_files": "false"}, _GameState()))
+    assert coerced_files.value.status_code == 422
 
 
 def test_require_mapping_rejects_string_and_array_stand_ins() -> None:
@@ -259,7 +270,7 @@ def test_memory_and_run_commands_reject_coerced_objects() -> None:
         assert result.ok is False
         assert result.to_payload()["error"]["code"] == "invalid_argument"
 
-    answers = service.execute("run", {"answers": {"seed": 1}})
+    answers = service.execute("run", {"answers": {"seed": 1}, "target": "json"})
     assert answers.ok is True
     for payload in ({"answers": []}, {"answers": "nope"}):
         result = service.execute("run", payload)

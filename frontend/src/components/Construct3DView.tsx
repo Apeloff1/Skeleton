@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import { View, PanResponder, StyleSheet, Text, TouchableOpacity, AppState } from 'react-native';
 import { GLView } from 'expo-gl';
-import { onMemoryPressure, effectiveLimits, reportFrameTime } from '../../utils/memoryGuard';
+import { onMemoryPressure, effectiveLimits, reportFrameTime } from '../utils/memoryGuard';
 import { Renderer } from 'expo-three';
 import { Ionicons } from '@expo/vector-icons';
 import * as THREE from 'three';

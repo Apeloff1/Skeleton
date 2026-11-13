@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /media-studio — Jeeves in-game Media Studio.
  * Generates REAL in-game images (main character, cast, promos, landscapes) and
@@ -28,7 +28,7 @@ const VIDEO_TYPES = [
 
 function VideoPlayerCard({ url }: { url: string }) {
   const player = useVideoPlayer(url, (p) => { p.loop = true; });
-  return <VideoView style={st.video} player={player} allowsFullscreen contentFit="contain" />;
+  return <VideoView style={st.video} player={player} fullscreenOptions={{ enable: true }} contentFit="contain" />;
 }
 
 export default function MediaStudio() {

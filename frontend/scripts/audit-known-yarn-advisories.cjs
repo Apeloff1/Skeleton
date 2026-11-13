@@ -1,8 +1,9 @@
 'use strict';
 
 /** Scoped, offline Yarn v1 security custody; does not suppress Dependabot.
- * Advisory snapshot: 2026-10-16. Default fails while an affected unpatched
- * dependency remains. Use --report-only to generate non-acceptance evidence.
+ * Advisory snapshot: 2026-11-02. This is a scoped lockfile observation, not a
+ * complete dependency audit or production release certification. Default
+ * fails for affected or unreviewed versions. Use --report-only for evidence.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -10,19 +11,35 @@ const path = require('node:path');
 const PATCHES = Object.freeze({
   'image-size': { fixed: { 2: '2.0.3' }, advisory: 'GHSA-5p2g-fcmc-qvqq / GHSA-w3rx-r6r6-pgpr' },
   'brace-expansion': { fixed: { 1: '1.1.21', 2: '2.1.7', 3: '3.0.9', 5: '5.0.12' }, advisory: 'GHSA-q2hr-2g5m-vwhr' },
-  'decode-uri-component': { fixed: { 0: '0.5.0' }, advisory: 'GHSA-vcc3-ghjq-m6fr' },
-  'http-cache-semantics': { fixed: { 4: '4.2.1' }, advisory: 'GHSA-ch52-4w7c-c8xp' },
+  'decode-uri-component': { fixed: { 0: '0.5.1' }, severity: 'high', advisory: 'GHSA-vcc3-ghjq-m6fr / GHSA-qr28-fpjm-wq7f' },
+  'undici': { fixed: { 6: '6.29.1', 7: '7.30.1', 8: '8.12.2' }, advisory: 'GHSA-xjj6-f33q-929c / GHSA-2m5v-pch6-74hx / GHSA-qrxm-fqhp-jwvm' },
+  'zod': { fixed: { 4: '4.6.6' }, severity: 'high', advisory: 'GHSA-mrhx-c7xc-m3w5' },
 });
-const UNPATCHED = Object.freeze({
-  braces: { affectedUpTo: '3.0.3', advisory: 'GHSA-vfj7-8cjw-p6xm' },
-  'node-forge': { affectedUpTo: '1.4.0', advisory: 'GHSA-86w9-cpqp-85rv' },
+// Range policies distinguish published fixed releases from exact versions that
+// were independently reviewed outside an affected range. The latter are NOT a
+// claim that upstream published a fix. Future versions remain blocked pending
+// fresh advisory review.
+const RANGES = Object.freeze({
+  'follow-redirects': { affectedFrom: '1.16.0', affectedUpTo: '1.16.1', fixed: { 1: '1.16.2' }, reviewedOutside: [], severity: 'high', advisory: 'GHSA-mrwp-f3q8-3g9p' },
+  'glob': { affectedFrom: '9.0.0', affectedUpTo: '14.0.1', fixed: { 14: '14.0.2' }, reviewedOutside: ['7.2.3'], severity: 'moderate', advisory: 'GHSA-3g3m-2fjr-6pw4' },
+  'minimatch': { affectedFrom: '7.0.0', affectedUpTo: '11.0.0', fixed: { 11: '11.0.1' }, reviewedOutside: ['3.1.5'], severity: 'moderate', advisory: 'GHSA-g3hv-75wg-m249' },
+  'http-cache-semantics': { affectedUpTo: '4.2.0', reviewedOutside: ['4.3.0'], advisory: 'GHSA-ch52-4w7c-c8xp' },
+  'node-forge': { affectedUpTo: '1.4.0', reviewedOutside: ['1.4.2'], advisory: 'GHSA-86w9-cpqp-85rv' },
+  'deepmerge': { affectedFrom: '4.2.0', affectedUpTo: '4.3.1', reviewedOutside: ['4.3.2'], severity: 'low', advisory: 'GHSA-gcqx-w48m-w2h4' },
 });
-const TRACKED = Object.freeze([...Object.keys(PATCHES), ...Object.keys(UNPATCHED)]);
+// GHSA-vfj7-8cjw-p6xm was officially withdrawn on 2026-10-23. This status
+// applies only to that advisory and does not dismiss other braces findings.
+const WITHDRAWN = Object.freeze({
+  braces: { advisory: 'GHSA-vfj7-8cjw-p6xm', withdrawnAt: '2026-10-23T12:53:02Z' },
+});
+const TRACKED = Object.freeze([...Object.keys(PATCHES), ...Object.keys(RANGES), ...Object.keys(WITHDRAWN)]);
 
 function versionParts(value) {
   if (typeof value !== 'string' || !/^\d+\.\d+\.\d+$/.test(value))
     throw new Error('unparseable pinned package version');
-  return value.split('.').map(Number);
+  const parts = value.split('.').map(Number);
+  if (parts.some(part => !Number.isSafeInteger(part))) throw new Error('unparseable pinned package version');
+  return parts;
 }
 function compareVersions(a, b) {
   const x = versionParts(a), y = versionParts(b);
@@ -94,17 +111,30 @@ function auditLock(source) {
   for (const name of TRACKED) {
     const matches = byName.get(name) || [];
     if (!matches.length) {
-      findings.push({ name, status: 'not_in_lock', advisory: (PATCHES[name] || UNPATCHED[name]).advisory,
+      findings.push({ name, status: 'not_in_lock', advisory: (PATCHES[name] || RANGES[name] || WITHDRAWN[name]).advisory,
         parents: [], versions: [] });
       continue;
     }
     const versions = [...new Set(matches.map(x => x.version))].sort();
     const directParents = [...(parents.get(name) || [])].sort();
-    const policy = PATCHES[name] || UNPATCHED[name];
+    const policy = PATCHES[name] || RANGES[name] || WITHDRAWN[name];
     let status = 'patched_in_lock';
-    if (UNPATCHED[name]) {
-      status = versions.every(v => compareVersions(v, policy.affectedUpTo) <= 0)
-        ? 'unpatched_affected' : 'requires_advisory_reverification';
+    if (WITHDRAWN[name]) {
+      versions.forEach(versionParts); // Invalid pins still fail closed.
+      status = 'advisory_withdrawn';
+    } else if (RANGES[name]) {
+      const states = versions.map(v => {
+        if ((!policy.affectedFrom || compareVersions(v, policy.affectedFrom) >= 0)
+            && compareVersions(v, policy.affectedUpTo) <= 0) return 'unpatched_affected';
+        const fixed = policy.fixed?.[versionParts(v)[0]];
+        if (fixed && compareVersions(v, fixed) >= 0) return 'patched_in_lock';
+        return policy.reviewedOutside.includes(v)
+          ? 'outside_published_range' : 'requires_advisory_reverification';
+      });
+      status = states.includes('unpatched_affected') ? 'unpatched_affected'
+        : states.includes('requires_advisory_reverification') ? 'requires_advisory_reverification'
+          : states.every(s => s === 'patched_in_lock') ? 'patched_in_lock'
+            : 'outside_published_range';
     } else {
       status = versions.every(v => {
         const major = versionParts(v)[0];
@@ -112,13 +142,14 @@ function auditLock(source) {
         return fixed && compareVersions(v, fixed) >= 0;
       }) ? 'patched_in_lock' : 'patch_required';
     }
-    findings.push({ name, status, advisory: policy.advisory, versions, parents: directParents });
+    findings.push({ name, status, advisory: policy.advisory, versions, parents: directParents,
+      ...(policy.severity ? { severity: policy.severity } : {}) });
   }
-  const outstanding = findings.filter(x => !['patched_in_lock', 'not_in_lock'].includes(x.status));
+  const outstanding = findings.filter(x => !['patched_in_lock', 'not_in_lock', 'advisory_withdrawn', 'outside_published_range'].includes(x.status));
   return {
     schema: 'skeleton.frontend.yarn.security-custody.v1',
-    advisory_snapshot: '2026-10-16',
-    scope: 'six historically reported packages only; not complete Dependabot or production bundle inventory',
+    advisory_snapshot: '2026-11-02',
+    scope: 'twelve explicitly tracked packages and listed advisories only; not complete Dependabot, live audit, production bundle inventory, or release certification',
     lockfile_entries: entries.length,
     findings, outstanding: outstanding.map(x => x.name),
     release_accepted: outstanding.length === 0,

@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /agentCodex — Frontend browser for all 28 agent-knowledge collections.
  *
@@ -17,7 +17,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Activity
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { apiFetch } from '../utils/apiController';
+import { apiFetch } from '../src/utils/apiController';
 
 const API_URL = CANONICAL_API_BASE || '';
 

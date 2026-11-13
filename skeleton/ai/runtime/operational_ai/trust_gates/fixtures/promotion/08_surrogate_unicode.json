@@ -1,0 +1,25 @@
+{
+  "case": "08_surrogate_unicode",
+  "gate": "promotion",
+  "expect": "reject",
+  "reason": "Surrogate Unicode cannot be canonical evidence",
+  "payload": {
+    "head_sha": "\ud800",
+    "checks": {
+      "Merge Readiness": "success",
+      "Backend Quality": "success",
+      "App Foundation E2E": "success",
+      "Workflow Input Security": "success",
+      "Sealed Context Guard": "success",
+      "Artifact Policy": "success",
+      "Malware Gate": "success",
+      "Repository Hygiene": "success",
+      "Secret Scanning": "success",
+      "Dependency Review": "success"
+    },
+    "independent_review": true,
+    "real_model_e2e": true,
+    "model_rights": true,
+    "installation": true
+  }
+}

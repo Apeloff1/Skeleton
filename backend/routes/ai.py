@@ -19,7 +19,7 @@ import time
 from typing import Any, Dict, List, Literal, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -36,10 +36,14 @@ from core.chat_sessions import (
     initialize_chat_runtime,
     inherit_history_dependencies,
     assert_current_dependencies,
+    cooperation_result_projection,
+    cooperation_progress_projection,
 )
 from core.model_catalog import (
     ModelSelectionError,
     context_budget_for_selection,
+    cooperation_context_selection,
+    cooperation_context_budget,
     estimate_context_tokens,
     model_catalog,
     resolve_selection,
@@ -48,10 +52,13 @@ from core.chat_turn_lifecycle import ChatTurnLifecycle
 from core.chat_turns import chat_turn_authority
 from core.conversations import ConversationStorageUnavailable, conversation_authority
 from core.engine_client import (
+    EngineAuthorizationError,
     EngineClient,
     EngineClientError,
+    EngineConflictError,
     EngineExecutionFailed,
     EngineNotFoundError,
+    EngineRequestRejectedError,
     EngineUnavailableError,
     command_from_context,
 )
@@ -64,7 +71,7 @@ from skeleton.contracts.context import (
     ContextTrust,
 )
 from skeleton.contracts.conversation import ConversationAuthorType, ConversationMessage
-from skeleton.context.compiler import ContextCompiler
+from skeleton.context.compiler import ContextCompiler, ContextCompilationError
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.context.sources import artifact_segment, conversation_message_segment
 from skeleton.ai.assistant.live_evidence import bind_provider_receipt_set
@@ -336,6 +343,10 @@ class AIChatRequest(BaseModel):
     attachment_refs: tuple[str, ...] = Field(default=(), max_length=4)
     memory_references: list[AIChatMemoryReference] = Field(default_factory=list, max_length=8)
     crawler_context: AIChatCrawlerContext | None = None
+    cooperation: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional finite engine-owned plan, draft, critique and refinement policy.",
+    )
     response_mode: Literal["wait", "deferred"] = Field(
         default="wait",
         description=(
@@ -348,6 +359,10 @@ class AIChatRequest(BaseModel):
     def selected_pair(self):
         if (self.provider_id is None) != (self.model_id is None):
             raise ValueError("select both provider_id and model_id or use automatic routing")
+        if self.cooperation is not None:
+            from skeleton.intelligence.cooperation import normalize_cooperation_policy
+
+            self.cooperation = normalize_cooperation_policy(self.cooperation)
         return self
 
 
@@ -355,6 +370,140 @@ class AIChatResumeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     idempotency_key: str = Field(min_length=1, max_length=1024)
     response_mode: Literal["deferred", "wait"] = "deferred"
+
+
+class AIRuntimePolicyPatch(BaseModel):
+    """Finite operator patch; omitted fields preserve canonical engine policy."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def require_change(self):
+        if not self.model_fields_set or any(
+            getattr(self, name) is None for name in self.model_fields_set
+        ):
+            raise ValueError("runtime policy patches require a non-null policy change")
+        return self
+
+
+class AIRuntimeServingPatch(AIRuntimePolicyPatch):
+    enabled: bool | None = None
+    min_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
+    max_effective_concurrency: int | None = Field(default=None, ge=1, le=32)
+    target_latency_ms: float | None = Field(default=None, ge=100, le=600000)
+    cooldown_seconds: float | None = Field(default=None, ge=0.5, le=300)
+    recovery_samples: int | None = Field(default=None, ge=2, le=128)
+    max_queue_wait_seconds: float | None = Field(default=None, ge=0.05, le=3600)
+    background_max_concurrency: int | None = Field(default=None, ge=0, le=32)
+    cache_max_bytes: int | None = Field(default=None, ge=0, le=1073741824)
+    cache_ttl_seconds: float | None = Field(default=None, ge=0, le=86400)
+    memory_high_watermark: float | None = Field(default=None, ge=0.5, le=0.99)
+    memory_low_watermark: float | None = Field(default=None, ge=0.1, le=0.95)
+    max_active_per_tenant: int | None = Field(default=None, ge=1, le=32)
+    max_queued_per_tenant: int | None = Field(default=None, ge=0, le=65536)
+    background_starvation_seconds: float | None = Field(default=None, ge=0.1, le=3600)
+    memory_shed_watermark: float | None = Field(default=None, ge=0.5, le=1)
+
+
+class AIRuntimeLearningPatch(AIRuntimePolicyPatch):
+    enabled: bool | None = None
+    min_samples: int | None = Field(default=None, ge=4, le=10000)
+    replay_capacity: int | None = Field(default=None, ge=8, le=256)
+    replay_steps: int | None = Field(default=None, ge=0, le=3)
+    learning_rate: float | None = Field(default=None, ge=1e-05, le=0.05)
+    gradient_clip: float | None = Field(default=None, ge=0.01, le=5)
+    max_effort_rounds: int | None = Field(default=None, ge=1, le=3)
+    target_latency_seconds: float | None = Field(default=None, ge=0.1, le=86400)
+    pressure_threshold: float | None = Field(default=None, ge=0.1, le=1)
+    uncertainty_ceiling: float | None = Field(default=None, ge=0.05, le=0.75)
+    partition_limit: int | None = Field(default=None, ge=1, le=128)
+    retained_outcomes: int | None = Field(default=None, ge=128, le=100000)
+    outcome_max_age_days: int | None = Field(default=None, ge=1, le=3650)
+    maintenance_receipt_retention: int | None = Field(default=None, ge=16, le=100000)
+
+
+class AIRuntimeMaintenancePatch(AIRuntimePolicyPatch):
+    enabled: bool | None = None
+    augmentation_enabled: bool | None = None
+    maximum_tasks_per_tick: int | None = Field(default=None, ge=1, le=8)
+    maximum_queue: int | None = Field(default=None, ge=1, le=8192)
+    maximum_scope_queue: int | None = Field(default=None, ge=1, le=8192)
+    maximum_retained_tasks: int | None = Field(default=None, ge=1, le=8192)
+    maximum_chunk_wall_ms: int | None = Field(default=None, ge=1, le=5000)
+    maximum_chunk_cpu_ms: int | None = Field(default=None, ge=1, le=5000)
+    maximum_chunk_polls: int | None = Field(default=None, ge=4, le=65536)
+    maximum_memory_drop_ppm: int | None = Field(default=None, ge=0, le=1000000)
+    maximum_consecutive_failures: int | None = Field(default=None, ge=1, le=32)
+    initial_backoff_ms: int | None = Field(default=None, ge=1, le=300000)
+    maximum_backoff_ms: int | None = Field(default=None, ge=1, le=86400000)
+    preemption_backoff_ms: int | None = Field(default=None, ge=1, le=300000)
+    circuit_failure_threshold: int | None = Field(default=None, ge=1, le=32)
+    circuit_cooldown_ms: int | None = Field(default=None, ge=1, le=86400000)
+    interrupted_lease_grace_ms: int | None = Field(default=None, ge=1000, le=300000)
+    priority_aging_ms: int | None = Field(default=None, ge=1000, le=86400000)
+    maximum_admission_wait_ms: int | None = Field(default=None, ge=1000, le=3600000)
+    clock_jump_tolerance_ms: int | None = Field(default=None, ge=100, le=60000)
+    maximum_owner_heartbeat_ms: int | None = Field(default=None, ge=10000, le=300000)
+    maximum_chunk_results: int | None = Field(default=None, ge=1, le=16384)
+    maximum_ack_retries_per_tick: int | None = Field(default=None, ge=1, le=16)
+
+
+class AIRuntimeControlUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    expected_version: int = Field(ge=1, le=2**63 - 1)
+    serving: AIRuntimeServingPatch | None = None
+    learning: AIRuntimeLearningPatch | None = None
+    maintenance: AIRuntimeMaintenancePatch | None = None
+    action: Literal["trim_cache", "clear_cache", "drain", "resume"] | None = None
+    serving_route_id: str | None = Field(default=None, min_length=1, max_length=384)
+
+    @model_validator(mode="after")
+    def require_change(self):
+        changes = self.model_fields_set - {"expected_version", "serving_route_id"}
+        if not changes or any(getattr(self, name) is None for name in changes):
+            raise ValueError("runtime control updates require a non-null policy change or action")
+        return self
+
+
+class AIRuntimeMaintenanceRetry(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    source_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    expected_attempts: int = Field(ge=0, le=1_000_000)
+
+
+class AIRuntimeMaintenanceCircuitReset(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    expected_generation: int = Field(ge=1, le=8_999_999_999_999_999)
+    expected_failure_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    source_digest: str = Field(pattern="^[0-9a-f]{64}$")
+
+
+class AIRuntimeLearningCheckpointUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    action: Literal["import", "reset", "restore_last_healthy"]
+    expected_policy_version: int = Field(ge=1, le=2**63 - 1)
+    expected_state_version: int = Field(ge=1, le=2**63 - 1)
+    model_selection_digest: str = Field(pattern="^[0-9a-f]{64}$")
+    checkpoint: dict[str, Any] | None = None
+    checkpoint_json: str | None = Field(default=None, max_length=256 * 1024)
+
+    @model_validator(mode="after")
+    def validate_checkpoint(self):
+        count = int(self.checkpoint is not None) + int(self.checkpoint_json is not None)
+        if count != (1 if self.action == "import" else 0):
+            raise ValueError("import requires exactly one checkpoint representation; other actions accept neither")
+        if self.checkpoint_json is not None and len(self.checkpoint_json.encode("utf-8")) > 256 * 1024:
+            raise ValueError("checkpoint exceeds the 256 KiB limit")
+        if self.checkpoint is not None:
+            try:
+                encoded = json.dumps(self.checkpoint, allow_nan=False, ensure_ascii=False, separators=(",", ":")).encode()
+            except (TypeError, ValueError, RecursionError) as exc:
+                raise ValueError("checkpoint must be finite JSON") from exc
+            if len(encoded) > 256 * 1024:
+                raise ValueError("checkpoint exceeds the 256 KiB limit")
+        return self
 
 
 class AIChatCancelRequest(BaseModel):
@@ -429,7 +578,14 @@ def _chat_request_digest(request: AIChatRequest) -> str:
         "context_sha256": context_digest,
         "memory_policy": memory_policy,
     }
-    for name in ("provider_id", "model_id", "max_output_tokens", "temperature", "crawler_context"):
+    for name in (
+        "provider_id",
+        "model_id",
+        "max_output_tokens",
+        "temperature",
+        "crawler_context",
+        "cooperation",
+    ):
         value = getattr(request, name)
         if value is not None:
             payload[name] = value.model_dump(mode="json") if isinstance(value, BaseModel) else value
@@ -450,7 +606,7 @@ def _chat_request_digest(request: AIChatRequest) -> str:
 def _chat_request_digest_candidates(request: AIChatRequest) -> set[str]:
     """Recognize main-issued and earlier current-issued immutable request hashes."""
     candidates = {_chat_request_digest(request)}
-    if not request.memory_references and request.crawler_context is None:
+    if not request.memory_references and request.crawler_context is None and request.cooperation is None:
         payload = {
             "schema_version": "backend.ai.chat-request.v1",
             "message": request.message,
@@ -476,6 +632,31 @@ def _chat_request_digest_candidates(request: AIChatRequest) -> set[str]:
                 ).encode()
             ).hexdigest()
         )
+        # The original v1 request identity omitted optional execution selectors
+        # altogether. Only accept that exact historical form when no extra
+        # semantics are supplied; otherwise it could alias distinct requests.
+        if (
+            not request.attachment_refs
+            and request.provider_id is None
+            and request.model_id is None
+            and request.max_output_tokens is None
+            and request.temperature is None
+        ):
+            original_payload = {
+                "schema_version": "backend.ai.chat-request.v1",
+                "message": request.message,
+                "idempotency_key": request.idempotency_key,
+                "context_sha256": payload["context_sha256"],
+                "memory_policy": payload["memory_policy"],
+            }
+            candidates.add(
+                hashlib.sha256(
+                    json.dumps(
+                        original_payload, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest()
+            )
     return candidates
 
 
@@ -498,6 +679,17 @@ def _chat_identity(user: dict) -> tuple[str, str]:
 def _chat_error(exc: Exception) -> HTTPException:
     if isinstance(exc, HTTPException):
         return exc
+    if isinstance(exc, ModelSelectionError):
+        return HTTPException(status_code=exc.status_code, detail=exc.readiness)
+    if isinstance(exc, ContextCompilationError):
+        return HTTPException(
+            status_code=422,
+            detail={
+                "code": "chat_context_unavailable",
+                "message": "The current message and sources cannot fit or satisfy the selected model context policy.",
+                "action": "Choose fewer sources, shorten the message or select a larger model context.",
+            },
+        )
     if isinstance(exc, ConversationNotFound):
         return HTTPException(status_code=404, detail="Conversation not found")
     if isinstance(exc, ConversationConflict):
@@ -581,6 +773,107 @@ async def _release_chat_turn_execution(lease) -> None:
         )
 
 
+async def _replayed_cooperation(*, thread, user_message, assistant_message, tenant_id, owner_id, policy=None):
+    """Read the canonical result projection without coupling transcript reads to uptime."""
+
+    try:
+        if policy is None:
+            _metadata, command = await read_prepared(
+                authority=conversation_authority,
+                thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
+            )
+            if command is None:
+                return None
+            policy = command.execution_request.context_policy.get("cooperation")
+        if policy is None:
+            return None
+        client = EngineClient.from_env()
+        if client is None:
+            return None
+        operation_id, execution_id = _chat_turn_ids(thread.thread_id, user_message.message_id)
+        result = await asyncio.wait_for(
+            client.terminal_result_if_available(
+                execution_id=execution_id,
+                actor_id=owner_id,
+                tenant_id=tenant_id,
+                trace_id="chat:" + operation_id,
+            ),
+            timeout=2,
+        )
+        if (
+            result is None
+            or result.operation_id != operation_id
+            or result.execution_id != execution_id
+            or result.final_output != assistant_message.content
+            or result.provider_receipts != assistant_message.provider_receipt_refs
+        ):
+            return None
+        return cooperation_result_projection(
+            result,
+            policy=policy,
+            source_snapshot=assistant_message.context_source_snapshot,
+            expected_brief_digest=hashlib.sha256(user_message.content.strip().encode("utf-8")).hexdigest(),
+        )
+    except Exception:
+        # This is an optional public progress projection. The canonical
+        # conversation/result references remain readable during engine loss.
+        logger.warning("chat cooperation projection unavailable thread=%s", thread.thread_id)
+        return None
+
+
+async def _terminal_chat_evidence(
+    *, thread, user_message, tenant_id, owner_id, terminal_state, command=None, status=None
+):
+    """Recover optional public terminal evidence from its original engine only."""
+
+    empty = {"cooperation": None, "engine_provider_receipts": [], "failure_code": None}
+
+    async def project():
+        nonlocal command, status
+        operation_id, execution_id = _chat_turn_ids(thread.thread_id, user_message.message_id)
+        if status is None:
+            client = EngineClient.from_env()
+            if client is None:
+                return empty
+            status = await client.status(
+                execution_id, actor_id=owner_id, tenant_id=tenant_id, trace_id="chat:" + operation_id
+            )
+        if (
+            status.get("operation_id") != operation_id
+            or status.get("execution_id") != execution_id
+            or not (
+                status.get("execution_state") == terminal_state
+                or (
+                    terminal_state == "failed"
+                    and status.get("execution_state") == "completed"
+                    and status.get("result_status") == "degraded"
+                )
+            )
+        ):
+            return empty
+        code = status.get("failure_code")
+        if not isinstance(code, str) or re.fullmatch(r"[a-z0-9_]{1,128}", code) is None:
+            code = None
+        if command is None:
+            _metadata, command = await read_prepared(
+                authority=conversation_authority,
+                thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
+            )
+        cooperation = cooperation_progress_projection(status, command=command)
+        return {
+            "cooperation": cooperation,
+            "engine_provider_receipts": [] if cooperation is None else list(status["provider_receipts"]),
+            "failure_code": code,
+        }
+
+    try:
+        return await asyncio.wait_for(project(), timeout=2)
+    except Exception:
+        # Historical terminal conversations stay readable during engine loss.
+        logger.warning("chat terminal evidence unavailable thread=%s", thread.thread_id)
+        return empty
+
+
 def _compile_chat_context(
     *,
     thread,
@@ -596,6 +889,7 @@ def _compile_chat_context(
     budget: ContextBudget | None = None,
     attachment_segments: tuple[ContextSegment, ...] = (),
     dragon_segments: tuple[ContextSegment, ...] = (),
+    cooperation: dict[str, Any] | None = None,
 ) -> ContextEnvelope:
     """Compile the one authoritative immutable context snapshot for a chat turn."""
 
@@ -661,21 +955,23 @@ def _compile_chat_context(
             )
             for segment in segments
         ]
+    prepared_budget = dragon_context_budget(
+        budget
+        if budget is not None
+        else (
+            CHAT_CONTEXT_BUDGET
+            if selection is None
+            else context_budget_for_selection(selection, output_tokens=output_tokens)
+        )
+    )
+    prepared_budget = cooperation_context_budget(prepared_budget, cooperation)
     return ContextCompiler().compile(
         operation_id=operation_id,
         execution_id=execution_id,
         turn_id=user_message.message_id,
         tenant_id=tenant_id,
         purpose=purpose,
-        budget=dragon_context_budget(
-            budget
-            if budget is not None
-            else (
-                CHAT_CONTEXT_BUDGET
-                if selection is None
-                else context_budget_for_selection(selection, output_tokens=output_tokens)
-            )
-        ),
+        budget=prepared_budget,
         segments=segments,
         tools_enabled=False,
         compiled_at=user_message.created_at,
@@ -702,6 +998,65 @@ def _engine_chat_error(exc: EngineClientError) -> HTTPException:
     if isinstance(exc, EngineExecutionFailed):
         return HTTPException(status_code=502, detail="AI execution failed")
     return HTTPException(status_code=502, detail="AI engine request failed")
+
+
+def _runtime_control_engine() -> EngineClient:
+    try:
+        engine = EngineClient.from_env()
+    except EngineClientError as exc:
+        raise EngineUnavailableError("runtime control engine configuration is unavailable") from exc
+    if engine is None:
+        raise EngineUnavailableError("runtime control engine is not configured")
+    return engine
+
+
+def _runtime_control_error(exc: EngineClientError) -> HTTPException:
+    """Keep control failures actionable without exposing engine or provider data."""
+
+    if isinstance(exc, EngineConflictError):
+        return HTTPException(
+            status_code=409,
+            detail={
+                "code": "runtime_control_conflict",
+                "message": "Runtime policy changed before this update was applied.",
+                "action": "Refresh runtime controls and reapply the change using the current policy version.",
+            },
+        )
+    if isinstance(exc, EngineAuthorizationError):
+        return HTTPException(
+            status_code=403,
+            detail={
+                "code": "runtime_control_forbidden",
+                "message": "The engine denied runtime control for this identity and tenant.",
+                "action": "Ask an administrator to check the engine service grant for this tenant.",
+            },
+        )
+    if isinstance(exc, EngineRequestRejectedError):
+        return HTTPException(
+            status_code=422,
+            detail={
+                "code": "runtime_control_policy_rejected",
+                "message": "The engine rejected this change under its configured runtime policy.",
+                "action": "Refresh runtime controls and use values within the reported operator capacity.",
+            },
+        )
+    if isinstance(exc, (EngineUnavailableError, EngineNotFoundError)):
+        return HTTPException(
+            status_code=503,
+            detail={
+                "code": "runtime_control_unavailable",
+                "message": "The configured engine runtime control service is unavailable.",
+                "action": "Start or update the configured Skeleton engine, then refresh runtime controls.",
+            },
+        )
+    return HTTPException(
+        status_code=502,
+        detail={
+            "code": "runtime_control_protocol_error",
+            "message": "The engine returned an incompatible runtime control response.",
+            "action": "Update the application and engine together, then refresh runtime controls.",
+        },
+    )
 
 
 def _engine_configured() -> bool:
@@ -1186,6 +1541,9 @@ async def _prepare_new_chat_execution(
     inventory = await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
     try:
         selection = resolve_selection(inventory, provider_id=request.provider_id, model_id=request.model_id)
+        selection = cooperation_context_selection(
+            inventory, selection, request.cooperation, output_tokens=request.max_output_tokens
+        )
         if request.temperature is not None and not selection["supports_temperature"]:
             raise ModelSelectionError("model_temperature_unsupported")
         context_budget_for_selection(selection, output_tokens=request.max_output_tokens)
@@ -1271,6 +1629,7 @@ async def _prepare_new_chat_execution(
         extra_segments=extra,
         selection=selection,
         output_tokens=request.max_output_tokens,
+        cooperation=request.cooperation,
     )
     selected = {(segment.segment_id, segment.content_digest) for segment in context.selected_segments}
     if any((segment.segment_id, segment.content_digest) not in selected for segment in attachment_segments):
@@ -1296,6 +1655,7 @@ async def _prepare_new_chat_execution(
         ]
     dependencies = await inherit_history_dependencies(
         dependencies,
+        authority=conversation_authority,
         thread=thread,
         transcript=transcript,
         selected_segments=context.selected_segments,
@@ -1323,6 +1683,7 @@ async def _prepare_new_chat_execution(
         provider_id=selection["selection_provider_id"],
         model_id=selection["selection_model_id"],
         temperature=request.temperature,
+        cooperation=request.cooperation,
         context_seed_refs=(
             "conversation:" + thread.thread_id,
             "conversation-message:" + message.message_id,
@@ -1335,8 +1696,61 @@ async def _prepare_new_chat_execution(
     metadata = prepare_metadata(
         command, request_digest=_chat_request_digest(request), dependencies=dependencies
     )
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     return message, metadata
+
+
+async def _user_request_refs_for_replay(
+    authority: Any,
+    user_message: Any,
+    *,
+    thread_id: str,
+    tenant_id: str,
+    owner_id: str,
+) -> tuple[str, ...]:
+    """Read server-persisted replay identity without fabricating missing evidence.
+
+    Mongo conversation authority stores request refs separately to bind immutable
+    execution metadata, whereas the SQLite reference repository and some
+    compatible authority implementations persist them on the user message.
+    Prefer the authoritative lookup whenever it is available. Never fall back
+    after that lookup raises, because a storage error must fail closed.
+    """
+    lookup = getattr(authority, "user_request_refs", None)
+    if lookup is not None:
+        return tuple(
+            await lookup(
+                thread_id,
+                user_message.message_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+        )
+    return tuple(getattr(user_message, "attachment_refs", ()) or ())
+
+
+def _chat_context_attachment_refs(
+    request: AIChatRequest,
+    request_digest: str,
+    *,
+    include_prepared: bool,
+) -> tuple[str, ...]:
+    """Build immutable source evidence before any durable chat admission.
+
+    The request identity is always bound, ephemeral context gets a separate
+    digest, and preparation provenance is explicit. Existing turns still load
+    their original server-owned references instead of rebuilding them.
+    """
+    refs: list[str] = []
+    if request.context:
+        refs.append(
+            "ephemeral-context-sha256:" + hashlib.sha256(request.context.encode("utf-8")).hexdigest()
+        )
+    refs.append("chat-request-sha256:" + request_digest)
+    if include_prepared:
+        refs.append("chat-prepared-execution:v1")
+    refs.extend(request.attachment_refs)
+    return tuple(refs)
 
 
 @router.post("/chat", dependencies=[Depends(dragon_foreground)])
@@ -1375,8 +1789,12 @@ async def ai_chat(
         existing_refs = ()
         edited_unbound = False
         if existing_turn_user is not None:
-            existing_refs = await conversation_authority.user_request_refs(
-                request.thread_id, existing_turn_user.message_id, tenant_id=tenant_id, owner_id=owner_id
+            existing_refs = await _user_request_refs_for_replay(
+                conversation_authority,
+                existing_turn_user,
+                thread_id=request.thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
             )
             identities = [
                 ref.removeprefix("chat-request-sha256:")
@@ -1391,15 +1809,15 @@ async def ai_chat(
                         "the original chat key is bound to different request semantics"
                     )
                 request_digest = matches.pop()
-        context_refs: list[str] = []
-        if request.context:
-            context_refs.append(
-                "ephemeral-context-sha256:" + hashlib.sha256(request.context.encode("utf-8")).hexdigest()
-            )
-        context_refs.append("chat-request-sha256:" + request_digest)
-        if existing_turn_user is None or edited_unbound or "chat-prepared-execution:v1" in existing_refs:
-            context_refs.append("chat-prepared-execution:v1")
-        context_attachment_refs = tuple((*context_refs, *request.attachment_refs))
+        context_attachment_refs = _chat_context_attachment_refs(
+            request,
+            request_digest,
+            include_prepared=(
+                existing_turn_user is None
+                or edited_unbound
+                or "chat-prepared-execution:v1" in existing_refs
+            ),
+        )
         if existing_turn_user is not None and not edited_unbound:
             context_attachment_refs = existing_refs
 
@@ -1413,6 +1831,27 @@ async def ai_chat(
         else:
             parent_message_id = existing_transcript[-1].message_id if existing_transcript else None
         if existing_turn_user is None:
+            # No canonical user append or repository mutation should be attempted
+            # when the required engine is absent. A new turn is not replayable
+            # without a durable engine execution command.
+            try:
+                preflight_client = EngineClient.from_env()
+            except EngineClientError as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "engine_configuration_invalid",
+                        "message": "The AI engine configuration is unavailable.",
+                    },
+                ) from exc
+            if preflight_client is None:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "engine_unavailable",
+                        "message": "Connect the AI engine before sending a message.",
+                    },
+                )
             initial_thread = await conversation_authority.get_thread(
                 request.thread_id, tenant_id=tenant_id, owner_id=owner_id
             )
@@ -1514,6 +1953,14 @@ async def ai_chat(
             "provider_request_id": None,
             "engine_provider_receipts": list(existing_assistant.provider_receipt_refs),
             "engine_runtime_provider": _engine_runtime_provider(existing_assistant.provider_receipt_refs),
+            "cooperation": await _replayed_cooperation(
+                thread=thread,
+                user_message=user_message,
+                assistant_message=existing_assistant,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                policy=request.cooperation,
+            ),
             "latency_ms": 0.0,
             "replayed": True,
             "operation_id": existing_assistant.operation_id,
@@ -1526,6 +1973,7 @@ async def ai_chat(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread,
         user_message=user_message,
         tenant_id=tenant_id,
@@ -1534,8 +1982,19 @@ async def ai_chat(
     )
     if prepared_command is None:
         # Validate an existing legacy binding, but never synthesize a replacement
-        # for the old USER-before-command crash window.
-        await conversation_authority.user_engine_command(
+        # for the old USER-before-command crash window. Reference authorities
+        # without a legacy command store must fail closed, not crash with
+        # AttributeError or silently start a second engine execution.
+        legacy_command_reader = getattr(conversation_authority, "user_engine_command", None)
+        if not callable(legacy_command_reader):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "legacy_command_not_admitted",
+                    "message": "The exact original legacy command is unavailable; it cannot be reconstructed or replaced.",
+                },
+            )
+        await legacy_command_reader(
             thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
         )
         try:
@@ -1564,7 +2023,8 @@ async def ai_chat(
     if prepared_command is not None:
         require_writable_tip(thread, transcript, user_message)
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+            authority=conversation_authority,
         )
         if retrying_incomplete_turn:
             return await resume_ai_chat_turn(
@@ -1721,6 +2181,7 @@ async def ai_chat(
     response_acceptance = None
     if engine_client is not None:
         engine_started = time.monotonic()
+        command = prepared_command
         try:
             engine_result = None
             if retrying_incomplete_turn and request.response_mode == "wait":
@@ -1741,7 +2202,8 @@ async def ai_chat(
                 if prepared_command is not None:
                     command = prepared_command
                     await assert_current_dependencies(
-                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+                        authority=conversation_authority,
                     )
                     if command_expired(command):
                         raise HTTPException(
@@ -1909,6 +2371,14 @@ async def ai_chat(
                     execution_id,
                 )
             await _release_chat_turn_execution(turn_lease)
+            terminal_evidence = await _terminal_chat_evidence(
+                thread=thread,
+                user_message=user_message,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                terminal_state=("cancelled" if exc.status == "cancelled" else "failed"),
+                command=command,
+            )
             return {
                 "success": False,
                 "response": "The AI execution could not be safely completed. Retry the request.",
@@ -1917,6 +2387,8 @@ async def ai_chat(
                 "model": "engine-routed",
                 "error": "AI execution failed",
                 "error_code": exc.failure_code or "engine_execution_failed",
+                **terminal_evidence,
+                "failure_code": exc.failure_code or terminal_evidence["failure_code"],
                 "operation_id": operation_id,
                 "turn_state": (None if chat_turn is None else chat_turn.snapshot.state.value),
                 "engine_execution_id": execution_id,
@@ -1969,6 +2441,20 @@ async def ai_chat(
                 "context": context_envelope.binding_dict(),
                 "timestamp": _utcnow(),
             }
+        try:
+            cooperation = cooperation_result_projection(
+                engine_result,
+                policy=request.cooperation,
+                source_snapshot=context_envelope.source_snapshot,
+                expected_brief_digest=(
+                    hashlib.sha256(request.message.strip().encode("utf-8")).hexdigest()
+                    if prepared_command is None
+                    else prepared_command.execution_request.context_policy.get("cooperation_brief_digest")
+                ),
+            )
+        except EngineClientError as exc:
+            await _release_chat_turn_execution(turn_lease)
+            raise HTTPException(status_code=502, detail="AI review evidence could not be verified") from exc
         result = {
             "success": True,
             "response": engine_result.final_output,
@@ -1984,6 +2470,7 @@ async def ai_chat(
             "engine_tool_receipts": list(getattr(engine_result, "tool_receipts", ())),
             "engine_memory_refs": list(getattr(engine_result, "memory_refs", ())),
             "engine_artifact_refs": list(getattr(engine_result, "artifact_refs", ())),
+            "cooperation": cooperation,
         }
     elif memory_write_intent is not None:
         await _release_chat_turn_execution(turn_lease)
@@ -2111,7 +2598,8 @@ async def ai_chat(
     if prepared_metadata is not None:
         try:
             await assert_current_dependencies(
-                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+                authority=conversation_authority,
             )
         except BaseException:
             await _release_chat_turn_execution(turn_lease)
@@ -2222,6 +2710,7 @@ async def ai_chat(
         "engine_tool_receipts": result.get("engine_tool_receipts", []),
         "engine_memory_refs": result.get("engine_memory_refs", []),
         "engine_artifact_refs": result.get("engine_artifact_refs", []),
+        "cooperation": result.get("cooperation"),
         "response_acceptance_receipt": (
             None if response_acceptance is None else response_acceptance.artifact_ref
         ),
@@ -2311,6 +2800,13 @@ async def get_ai_chat_turn(
             "engine_memory_refs": list(assistant_message.memory_refs),
             "engine_evidence_refs": list(assistant_message.citation_refs),
             "engine_artifact_refs": list(assistant_message.artifact_refs),
+            "cooperation": await _replayed_cooperation(
+                thread=thread,
+                user_message=user_message,
+                assistant_message=assistant_message,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            ),
             "thread": thread.as_dict(),
             "user_message": user_message.as_dict(),
             "assistant_message": assistant_message.as_dict(),
@@ -2341,11 +2837,19 @@ async def get_ai_chat_turn(
                 )
             except Exception as exc:
                 raise _chat_error(exc) from exc
+        terminal_evidence = await _terminal_chat_evidence(
+            thread=thread,
+            user_message=user_message,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            terminal_state=state,
+        )
         return {
             "success": False,
             "accepted": True,
             "terminal": True,
             "state": state,
+            **terminal_evidence,
             "response": None,
             "ai_generated": False,
             "provider": "skeleton-engine",
@@ -2360,6 +2864,7 @@ async def get_ai_chat_turn(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if prepared_command is not None and chat_turn is None:
@@ -2412,12 +2917,17 @@ async def get_ai_chat_turn(
                 )
         execution_state = str(engine_status.get("execution_state") or "unknown")
         if execution_state not in {"completed", "failed", "cancelled"}:
+            pending_cooperation = cooperation_progress_projection(engine_status, command=prepared_command)
             return {
                 "success": True,
                 "accepted": True,
                 "terminal": False,
                 "state": execution_state,
                 "cancellation_requested": bool(engine_status.get("cancellation_requested")),
+                "cooperation": pending_cooperation,
+                "engine_provider_receipts": (
+                    [] if pending_cooperation is None else list(engine_status["provider_receipts"])
+                ),
                 "response": None,
                 "ai_generated": False,
                 "provider": "skeleton-engine",
@@ -2510,12 +3020,22 @@ async def get_ai_chat_turn(
                     failure_code=exc.failure_code,
                 )
             await _release_chat_turn_execution(poll_lease)
+            terminal_evidence = await _terminal_chat_evidence(
+                thread=latest_thread,
+                user_message=user_message,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                terminal_state=("cancelled" if exc.status == "cancelled" else "failed"),
+                command=prepared_command,
+                status=engine_status,
+            )
             return {
                 "success": False,
                 "accepted": True,
                 "terminal": True,
                 "state": ("cancelled" if exc.status == "cancelled" else "failed"),
-                "failure_code": exc.failure_code,
+                **terminal_evidence,
+                "failure_code": exc.failure_code or terminal_evidence["failure_code"],
                 "response": None,
                 "ai_generated": False,
                 "provider": "skeleton-engine",
@@ -2589,7 +3109,8 @@ async def get_ai_chat_turn(
                 },
             )
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+            authority=conversation_authority,
         )
     try:
         _validate_chat_handoff_binding(
@@ -2599,6 +3120,20 @@ async def get_ai_chat_turn(
             user_message=user_message,
             operation_id=operation_id,
             execution_id=execution_id,
+        )
+        deferred_cooperation = cooperation_result_projection(
+            engine_result,
+            policy=(
+                None
+                if prepared_command is None
+                else prepared_command.execution_request.context_policy.get("cooperation")
+            ),
+            source_snapshot=binding.source_snapshot,
+            expected_brief_digest=(
+                None
+                if prepared_command is None
+                else prepared_command.execution_request.context_policy.get("cooperation_brief_digest")
+            ),
         )
     except EngineClientError as exc:
         raise HTTPException(
@@ -2839,6 +3374,7 @@ async def get_ai_chat_turn(
         "engine_tool_receipts": list(engine_result.tool_receipts),
         "engine_memory_refs": list(engine_result.memory_refs),
         "engine_artifact_refs": list(engine_result.artifact_refs),
+        "cooperation": deferred_cooperation,
         "response_acceptance_receipt": (deferred_response_acceptance.artifact_ref),
         "thread": committed_thread.as_dict(),
         "user_message": user_message.as_dict(),
@@ -2945,6 +3481,10 @@ async def get_ai_chat_turn_events(
         "engine_execution_id": execution_id,
         "turn_state": turn.snapshot.state.value,
         "terminal": turn.snapshot.terminal,
+        # Operation terminality and delivery completeness are different. A
+        # bounded page may stop before the immutable terminal event.
+        "has_more": page.cursor.last_seen_sequence < turn.snapshot.next_sequence - 1,
+        "journal_next_sequence": turn.snapshot.next_sequence,
         "events": [event.as_dict() for event in page.events],
         "cursor": page.cursor.as_dict(),
         "page_digest": page.digest,
@@ -2954,7 +3494,7 @@ async def get_ai_chat_turn_events(
     if request is None or "text/event-stream" not in request.headers.get("accept", "").lower():
         return result
     final = None
-    if page.terminal and turn.snapshot.terminal:
+    if turn.snapshot.terminal and not result["has_more"]:
         final = await get_ai_chat_turn(thread_id, idempotency_key=idempotency_key, user=user)
 
     async def frames():
@@ -2963,7 +3503,9 @@ async def get_ai_chat_turn_events(
             data = json.dumps(
                 record, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
             )
-            yield f"id: {event.sequence}\nevent: engine.{event.kind}\ndata: {data}\n\n"
+            yield (
+                f"id: {event.sequence}:{event.event_digest}\n" f"event: engine.{event.kind}\ndata: {data}\n\n"
+            )
         if final is not None and final.get("terminal") is True:
             data = json.dumps(
                 final, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False, default=str
@@ -3073,6 +3615,7 @@ async def cancel_ai_chat_turn(
         }
 
     metadata, prepared_command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if metadata is not None:
@@ -3233,7 +3776,17 @@ async def cancel_ai_chat_turn(
     }
 
 
-_CHAT_STREAMS: set[str] = set()
+_CHAT_STREAMS: dict[str, tuple[str, str]] = {}
+
+
+def _chat_stream_capacity(scope: tuple[str, str]) -> bool:
+    """Bound per-process observers fairly without owning durable executions."""
+
+    return (
+        len(_CHAT_STREAMS) < 32
+        and sum(value == scope for value in _CHAT_STREAMS.values()) < 4
+        and sum(value[0] == scope[0] for value in _CHAT_STREAMS.values()) < 16
+    )
 
 
 @router.get("/models")
@@ -3244,6 +3797,186 @@ async def get_ai_models(user=Depends(require_role("viewer"))):
     except EngineClientError:
         client = None
     return await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
+
+
+@router.get("/runtime-control")
+async def get_ai_runtime_control(
+    response: Response,
+    learning_offset: int = Query(default=0, ge=0, le=127),
+    user=Depends(require_role("viewer")),
+):
+    """Observe the canonical runtime in the authenticated caller's tenant scope."""
+
+    tenant_id, actor_id = _chat_identity(user)
+    try:
+        state = await _runtime_control_engine().runtime_control(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            learning_offset=learning_offset,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return state
+
+
+@router.patch("/runtime-control")
+async def configure_ai_runtime_control(
+    update: AIRuntimeControlUpdate,
+    response: Response,
+    user=Depends(require_role("admin")),
+):
+    """Apply one administrator-controlled CAS update through the engine owner."""
+
+    tenant_id, actor_id = _chat_identity(user)
+    changes = update.model_dump(mode="json", exclude_unset=True, exclude_none=True)
+    try:
+        state = await _runtime_control_engine().configure_runtime_control(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            **changes,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return state
+
+
+@router.post("/runtime-control/maintenance/tasks/{task_id}/retry")
+async def retry_ai_runtime_maintenance(
+    task_id: str, update: AIRuntimeMaintenanceRetry, response: Response,
+    user=Depends(require_role("admin")),
+):
+    """Queue an exact failed maintenance task without changing runtime grants."""
+    tenant_id, actor_id = _chat_identity(user)
+    if re.fullmatch(r"[0-9a-f]{64}", task_id) is None:
+        raise HTTPException(status_code=422, detail="Maintenance task identity is invalid", headers={"Cache-Control": "no-store"})
+    try:
+        result = await _runtime_control_engine().retry_runtime_maintenance(
+            actor_id=actor_id, tenant_id=tenant_id, task_id=task_id,
+            source_digest=update.source_digest, expected_attempts=update.expected_attempts,
+        )
+    except EngineClientError as exc:
+        error = _runtime_control_error(exc)
+        if isinstance(exc, EngineConflictError):
+            error.detail = {
+                "code": "runtime_control_conflict",
+                "message": "Maintenance task source, attempt count, or state changed before retry admission.",
+                "action": "Refresh runtime maintenance tasks and retry the exact retained failed task.",
+            }
+        error.headers = {**(error.headers or {}), "Cache-Control": "no-store"}
+        raise error from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.get("/runtime-control/learning/partitions/{partition_id}/checkpoint")
+async def export_ai_learning_checkpoint(
+    partition_id: str, response: Response,
+    expected_state_version: int | None = Query(default=None, ge=1, le=2**63 - 1),
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
+        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
+    try:
+        result = await _runtime_control_engine().export_runtime_learning_checkpoint(
+            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
+            expected_state_version=expected_state_version,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.get("/runtime-control/learning/dataset")
+async def export_ai_learning_dataset(
+    response: Response,
+    limit: int = Query(default=128, ge=1, le=256),
+    cursor: str | None = Query(default=None, min_length=1, max_length=6144),
+    partition_id: str | None = Query(default=None, pattern="^[0-9a-f]{64}$"),
+    include_untrained: bool = Query(default=False),
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    try:
+        result = await _runtime_control_engine().export_runtime_learning_dataset(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            limit=limit,
+            cursor=cursor,
+            partition_id=partition_id,
+            include_untrained=include_untrained,
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.post("/runtime-control/maintenance/circuits/{kind}/reset")
+async def reset_ai_runtime_maintenance_circuit(
+    kind: str,
+    update: AIRuntimeMaintenanceCircuitReset,
+    response: Response,
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    try:
+        result = await _runtime_control_engine().reset_runtime_maintenance_circuit(
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            kind=kind,
+            **update.model_dump(mode="json"),
+        )
+    except EngineClientError as exc:
+        error = _runtime_control_error(exc)
+        if isinstance(exc, (EngineConflictError, EngineRequestRejectedError)) and isinstance(
+            error.detail, dict
+        ):
+            error.detail = {
+                **error.detail,
+                "message": "The circuit's failure, generation or physical custody changed.",
+                "action": "Refresh maintenance circuits and review the current failure before resetting.",
+            }
+        raise error from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.post("/runtime-control/learning/partitions/{partition_id}/checkpoint")
+async def configure_ai_learning_checkpoint(
+    partition_id: str, update: AIRuntimeLearningCheckpointUpdate, response: Response,
+    user=Depends(require_role("admin")),
+):
+    tenant_id, actor_id = _chat_identity(user)
+    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
+        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
+    try:
+        result = await _runtime_control_engine().configure_runtime_learning_checkpoint(
+            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
+            **update.model_dump(mode="json", exclude_unset=True),
+        )
+    except EngineClientError as exc:
+        raise _runtime_control_error(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.get("/workflow-templates")
+async def workflow_templates(response: Response, user=Depends(require_role("viewer"))):
+    """Expose scoped draft settings without granting execution authority."""
+    from skeleton.contracts.ai_workflows import workflow_template_catalog
+
+    tenant_id, actor_id = _chat_identity(user)
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "schema_version": "skeleton.ai.workflow_templates.v1",
+        "actor_id": actor_id,
+        "tenant_id": tenant_id,
+        "catalog": workflow_template_catalog(),
+    }
 
 
 @router.get("/chat/readiness")
@@ -3312,6 +4045,7 @@ async def chat_readiness(user=Depends(require_role("viewer"))):
             "explicit_model_selection": True,
             "explicit_memory_context": True,
             "crawler_context": True,
+            "cooperative_review": True,
         },
         "actions": actions,
     }
@@ -3389,6 +4123,7 @@ async def resume_ai_chat_turn(
         raise HTTPException(status_code=404, detail="Chat turn not found")
     require_writable_tip(thread, transcript, message)
     metadata, command = await read_prepared(
+        authority=conversation_authority,
         thread=thread, user_message=message, tenant_id=tenant_id, owner_id=owner_id
     )
     if command is None:
@@ -3413,7 +4148,7 @@ async def resume_ai_chat_turn(
             "server_resume_available": False,
             "cancellation_requested": True,
         }
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     if command_expired(command):
         raise HTTPException(
             status_code=409,
@@ -3461,7 +4196,7 @@ async def resume_ai_chat_turn(
             await conversation_authority.active_transcript(thread_id, tenant_id=tenant_id, owner_id=owner_id),
             message,
         )
-        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
         await chat_turn_lifecycle.advance(
             turn,
             TurnState.MODEL_RUNNING,
@@ -3532,6 +4267,7 @@ async def stream_ai_chat_turn(
     user=Depends(require_role("viewer")),
 ):
     """Replay immutable real chat transitions; disconnect never cancels execution."""
+    stream_scope = _chat_identity(user)
     header_cursor = request.headers.get("last-event-id")
     if header_cursor:
         try:
@@ -3552,7 +4288,7 @@ async def stream_ai_chat_turn(
     await get_ai_chat_turn_events(
         thread_id, idempotency_key, after_sequence, last_event_digest, 100, user=user
     )
-    if len(_CHAT_STREAMS) >= 32:
+    if not _chat_stream_capacity(stream_scope):
         raise HTTPException(
             status_code=429,
             detail={
@@ -3574,14 +4310,15 @@ async def stream_ai_chat_turn(
         )
 
     async def generate():
-        if len(_CHAT_STREAMS) >= 32:
+        if not _chat_stream_capacity(stream_scope):
             yield frame(
                 "chat.error",
                 {"code": "chat_stream_capacity", "message": "Too many active chat streams; retry shortly."},
             )
             return
-        _CHAT_STREAMS.add(stream_id)
+        _CHAT_STREAMS[stream_id] = stream_scope
         sequence, event_digest = after_sequence, last_event_digest
+        progress_digest = None
         started = time.monotonic()
         last_heartbeat = started
         try:
@@ -3589,13 +4326,31 @@ async def stream_ai_chat_turn(
                 # StreamingResponse owns the single ASGI disconnect listener.
                 # A second receive consumer conflicts with body-replay middleware.
                 status = await get_ai_chat_turn(thread_id, idempotency_key, user=user)
+                progress = status.get("cooperation")
+                if progress is not None:
+                    current_progress_digest = hashlib.sha256(
+                        json.dumps(progress, sort_keys=True, separators=(",", ":"), allow_nan=False).encode(
+                            "utf-8"
+                        )
+                    ).hexdigest()
+                    if current_progress_digest != progress_digest:
+                        progress_digest = current_progress_digest
+                        yield frame(
+                            "chat.progress",
+                            {
+                                "operation_id": status["operation_id"],
+                                "engine_execution_id": status["engine_execution_id"],
+                                "cooperation": progress,
+                                "engine_provider_receipts": status.get("engine_provider_receipts", []),
+                            },
+                        )
                 page = await get_ai_chat_turn_events(
                     thread_id, idempotency_key, sequence, event_digest, 100, user=user
                 )
                 for event in page["events"]:
                     sequence, event_digest = event["sequence"], event["event_digest"]
                     yield frame("chat.event", event, str(sequence) + ":" + event_digest)
-                if status.get("terminal"):
+                if status.get("terminal") and not page["has_more"]:
                     yield frame(
                         "chat.final", {**status, "thread_id": thread_id, "idempotency_key": idempotency_key}
                     )
@@ -3633,7 +4388,7 @@ async def stream_ai_chat_turn(
                 },
             )
         finally:
-            _CHAT_STREAMS.discard(stream_id)
+            _CHAT_STREAMS.pop(stream_id, None)
 
     return StreamingResponse(
         generate(),
@@ -3701,7 +4456,7 @@ async def get_ai_providers() -> Dict[str, Any]:
                 row["artifact"] = allowed
         public_providers.append(row)
 
-    return {
+    result = {
         "providers": public_providers,
         "active": runtime["active"],
         "engine": "skeleton-engine",
@@ -3709,6 +4464,16 @@ async def get_ai_providers() -> Dict[str, Any]:
         "configured": True,
         "availability_observed": True,
     }
+    # A small allowlist lets the host doctor distinguish a broken guard from
+    # missing weights without exposing arbitrary engine error text or paths.
+    active = [row for row in runtime["providers"] if row.get("active") is True]
+    if (runtime["available"] is False and runtime["active"] == "local" and len(active) == 1
+            and active[0].get("id") == "local" and active[0].get("available") is False
+            and active[0].get("architecture_acknowledged") is True):
+        code = active[0].get("readiness_code")
+        if isinstance(code, str) and code in {"local_guard_unavailable", "local_guard_configuration_invalid"}:
+            result["active_readiness_code"] = code
+    return result
 
 
 @router.post("/quick-actions")

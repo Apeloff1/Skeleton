@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /jeeves-audio-test — P2 Jeeves TTS audio diagnostics route.
  *
@@ -19,12 +19,13 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  jeevesSpeak, jeevesCatchphrase, jeevesStop, type JeevesContext,
-} from '../features/Academy/jeevesTts';
+  jeevesSpeak, jeevesStop, type JeevesContext,
+} from '../src/features/Academy/jeevesTts';
 import {
   ttsSpeak, ttsAvailableVoices, pickPreferredVoice, ttsIsSpeaking,
-} from '../features/Academy/tts';
-import { useSettings } from '../state/settingsStore';
+} from '../src/features/Academy/tts';
+import { useSettings } from '../src/state/settingsStore';
+import { apiFetch } from '../src/utils/apiController';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -62,33 +63,52 @@ export default function JeevesAudioTestScreen() {
   const [voiceProbeResult, setVoiceProbeResult] = useState<string>('');
   const [withCatchphrase, setWithCatchphrase] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  const loadDiagnostics = async (signal?: AbortSignal) => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const [mannerismResponse, catchphraseResponse, availableVoices] = await Promise.all([
+        apiFetch(`${BACKEND}/api/jeeves/persona/vocal_mannerisms`, { signal, retry: true }),
+        apiFetch(`${BACKEND}/api/jeeves/persona/catchphrases`, { signal, retry: true }),
+        ttsAvailableVoices(),
+      ]);
+      if (!mannerismResponse.ok) throw new Error(`Persona mannerisms unavailable (HTTP ${mannerismResponse.status})`);
+      if (!catchphraseResponse.ok) throw new Error(`Persona catchphrases unavailable (HTTP ${catchphraseResponse.status})`);
+      const [mannerismValue, catchphraseValue] = await Promise.all([mannerismResponse.json(), catchphraseResponse.json()]);
+      if (!mannerismValue || typeof mannerismValue !== 'object' || Array.isArray(mannerismValue)) throw new Error('Persona mannerisms returned an invalid response.');
+      if (!catchphraseValue || typeof catchphraseValue !== 'object' || Array.isArray(catchphraseValue)) throw new Error('Persona catchphrases returned an invalid response.');
+      const nextMannerisms: Record<string, Mannerism> = {};
+      const nextCatchphrases: Record<string, string> = {};
+      for (const item of CONTEXTS) {
+        const raw = (mannerismValue as Record<string, any>)[item.ctx];
+        if (raw && Number.isFinite(raw.speed) && raw.speed >= 0.25 && raw.speed <= 4 &&
+            typeof raw.pitch_hint === 'string' && typeof raw.emoji === 'string' && typeof raw.voice === 'string') {
+          nextMannerisms[item.ctx] = { speed: raw.speed, pitch_hint: raw.pitch_hint.slice(0, 80), emoji: raw.emoji.slice(0, 16), voice: raw.voice.slice(0, 80) };
+        }
+        const phrases = (catchphraseValue as Record<string, unknown>)[item.ctx];
+        if (Array.isArray(phrases)) {
+          const phrase = phrases.find(value => typeof value === 'string' && value.trim().length > 0 && value.length <= 500);
+          if (typeof phrase === 'string') nextCatchphrases[item.ctx] = phrase;
+        }
+      }
+      if (!Object.keys(nextMannerisms).length) throw new Error('No valid Jeeves vocal mannerisms were returned.');
+      setMannerisms(nextMannerisms);
+      setCatchphrases(nextCatchphrases);
+      setVoices(Array.isArray(availableVoices) ? availableVoices.slice(0, 512) : []);
+    } catch (cause: any) {
+      if (cause?.name !== 'AbortError') setLoadError(cause?.message || 'Jeeves audio diagnostics could not be loaded.');
+      setMannerisms({}); setCatchphrases({}); setVoices([]);
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      // 1. Load mannerism map
-      try {
-        const r = await fetch(`${BACKEND}/api/jeeves/persona/vocal_mannerisms`);
-        const j = await r.json();
-        if (j && typeof j === 'object') setMannerisms(j);
-      } catch {}
-      // 2. Prefetch one catchphrase per ctx
-      const out: Record<string, string> = {};
-      for (const c of CONTEXTS) {
-        try {
-          const cp = await jeevesCatchphrase(c.ctx);
-          out[c.ctx] = cp;
-        } catch { out[c.ctx] = ''; }
-      }
-      setCatchphrases(out);
-      // 3. Voices list (mobile only really)
-      try {
-        const v = await ttsAvailableVoices();
-        setVoices(v || []);
-      } catch {}
-      setLoading(false);
-    })();
-    return () => { jeevesStop(); };
+    const controller = new AbortController();
+    void loadDiagnostics(controller.signal);
+    return () => { controller.abort(); jeevesStop(); };
   }, []);
 
   const play = async (ctx: JeevesContext, sample: string) => {
@@ -99,7 +119,8 @@ export default function JeevesAudioTestScreen() {
         prependCatchphrase: withCatchphrase,
         onComplete: () => setBusyCtx(null),
       });
-    } catch {
+    } catch (cause: any) {
+      setVoiceProbeResult(`✗ ${cause?.message || 'Speech playback failed'}`);
       setBusyCtx(null);
     }
     setTimeout(() => { if (!ttsIsSpeaking()) setBusyCtx(null); }, sample.length * 80 + 4000);
@@ -187,6 +208,13 @@ export default function JeevesAudioTestScreen() {
 
         {loading ? (
           <View style={s.loading}><ActivityIndicator color="#A78BFA" /><Text style={s.loadingText}>Loading persona DB…</Text></View>
+        ) : loadError ? (
+          <View style={s.settingsCard}>
+            <Text accessibilityRole="alert" style={[s.probeResult, { color: '#FCA5A5' }]}>{loadError}</Text>
+            <TouchableOpacity accessibilityRole="button" onPress={() => void loadDiagnostics()} style={[s.probeBtn, { backgroundColor: '#8B5CF6', alignSelf: 'flex-start' }]}>
+              <Ionicons name="refresh" size={14} color="#fff" /><Text style={s.probeText}>Retry diagnostics</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           CONTEXTS.map(c => {
             const m = mannerisms[c.ctx];

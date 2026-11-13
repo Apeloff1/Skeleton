@@ -18441,7 +18441,7 @@
       "version": "1.0.0",
       "owner_plane": "orchestration",
       "enabled": true,
-      "implementation_state": "planned_target",
+      "implementation_state": "partial",
       "risk_class": "high",
       "required_planes": [
         "application-api",
@@ -18466,6 +18466,38 @@
       "degraded_behavior": {
         "missing_required_dependency": "unavailable",
         "provider_outage": "pause_or_fail_per_job_policy"
+      },
+      "source": "machine/ai_capabilities.json"
+    },
+    {
+      "capability_id": "game.native_delivery",
+      "version": "1.0.0",
+      "owner_plane": "application-api",
+      "enabled": true,
+      "implementation_state": "present_source_delivery_partial_native_release",
+      "risk_class": "medium",
+      "required_planes": [
+        "application-api",
+        "identity",
+        "retrieval",
+        "memory",
+        "artifact-files",
+        "cost-capacity",
+        "governance"
+      ],
+      "readiness_requirements": [
+        "authenticated tenant-bound owner",
+        "current signed Wiki and separate Hoag approvals for two independent supporting source groups",
+        "matching consented practice lesson",
+        "supported target/style emitter",
+        "shared resource scheduler and owner retained artifact budget",
+        "durable reviewed knowledge and native practice SQLite stores"
+      ],
+      "degraded_behavior": {
+        "knowledge_unavailable": "browse_or_generation_unavailable",
+        "unapproved_or_stale_sources": "brief_blocked",
+        "resource_pressure": "defer_without_artifact",
+        "compiler_missing": "source_only_no_binary_claim"
       },
       "source": "machine/ai_capabilities.json"
     }

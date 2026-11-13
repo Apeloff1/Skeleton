@@ -24,11 +24,19 @@ class TraceabilitySpineTests(unittest.TestCase):
         self.assertEqual(result["status"], "valid")
         self.assertEqual(result["requirement_count"], 963)
         self.assertEqual(result["classified_volume_count"], 421)
-        self.assertEqual(result["runtime_capability_count"], 9)
+        self.assertEqual(result["runtime_capability_count"], 10)
         self.assertEqual(result["nfr_count"], 37)
-        self.assertEqual(result["behavior_count"], 32)
+        self.assertEqual(result["behavior_count"], 37)
         self.assertEqual(result["state_machine_count"], 2)
-        self.assertEqual(result["state_domain_count"], 21)
+        self.assertEqual(result["state_domain_count"], 27)
+        catalogue = json.loads(
+            (ROOT / "machine/state_machine_catalogue.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(catalogue.get("unbound_state_domain_candidates", []), [])
+        self.assertIn(
+            "dragon-conversation-micro-projection",
+            [entry["domain_id"] for entry in catalogue["state_domain_refs"]],
+        )
         self.assertEqual(result["interface_count"], 86)
         self.assertEqual(result["schema_count"], 40)
         self.assertEqual(result["compatibility_interface_count"], 86)

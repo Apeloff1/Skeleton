@@ -1,59 +1,45 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+import hashlib
 from uuid import uuid4
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
-
-def test_chat_binds_ephemeral_context_digest_into_user_idempotency(monkeypatch):
-    import routes.gameforge_auth as auth
+def test_chat_binds_ephemeral_context_digest_into_user_idempotency():
+    """Inspect real admission references, not a pre-engine legacy mock append."""
     import routes.ai as ai
 
-    monkeypatch.setattr(auth, "_enforced", lambda: False)
-    captured = {}
-
-    async def active_transcript(*_args, **_kwargs):
-        return ()
-
-    async def append_user_message(thread_id, **kwargs):
-        captured.update(kwargs)
-        raise RuntimeError("stop after append identity capture")
-
-    monkeypatch.setattr(
-        ai,
-        "conversation_authority",
-        SimpleNamespace(
-            active_transcript=active_transcript,
-            append_user_message=append_user_message,
-        ),
+    request = ai.AIChatRequest(
+        message="question",
+        thread_id=str(uuid4()),
+        idempotency_key="stable-key",
+        expected_thread_version=1,
+        context="same ephemeral code",
     )
-    app = FastAPI()
-    app.include_router(ai.router)
-    with TestClient(app) as client:
-        response = client.post(
-            "/ai/chat",
-            json={
-                "message": "question",
-                "thread_id": str(uuid4()),
-                "idempotency_key": "stable-key",
-                "expected_thread_version": 1,
-                "context": "same ephemeral code",
-            },
-        )
+    digest = ai._chat_request_digest(request)
+    refs = ai._chat_context_attachment_refs(request, digest, include_prepared=True)
+    expected_context = hashlib.sha256(b"same ephemeral code").hexdigest()
 
-    assert response.status_code == 500
-    refs = captured["attachment_refs"]
-    assert len(refs) == 2
-    assert refs[0].startswith("ephemeral-context-sha256:")
-    assert len(refs[0].split(":", 1)[1]) == 64
-    assert refs[1].startswith("chat-request-sha256:")
-    assert len(refs[1].split(":", 1)[1]) == 64
+    assert refs == (
+        "ephemeral-context-sha256:" + expected_context,
+        "chat-request-sha256:" + digest,
+        "chat-prepared-execution:v1",
+    )
+    assert ai._chat_request_identity_ref(request) == refs[1]
+    changed = request.model_copy(update={"context": "different ephemeral code"})
+    assert ai._chat_request_digest(changed) != digest
+    assert ai._chat_context_attachment_refs(
+        changed, ai._chat_request_digest(changed), include_prepared=True
+    ) != refs
+
+    # For legacy stored turns, the prepared-execution marker is not fabricated.
+    assert ai._chat_context_attachment_refs(
+        request, digest, include_prepared=False
+    ) == refs[:2]
 
 
 
 def test_chat_request_identity_binds_context_and_memory_policy_but_not_thread_version():
+
     import routes.ai as ai
 
     base = ai.AIChatRequest(

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_aerial_traversal_cloud_canopy",
+  "title": "Cloud Canopy: Aerial Traversal",
+  "subtitle": "An original aerial traversal brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610302629,
+  "width": 19,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "forest",
+  "starting_health": 5
+}

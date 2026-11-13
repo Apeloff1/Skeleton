@@ -13,6 +13,7 @@ from enum import StrEnum
 import hashlib
 import json
 import re
+import unicodedata
 from typing import Any, Iterable, Sequence
 
 
@@ -20,6 +21,55 @@ _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _REF_RE = re.compile(r"^[A-Za-z0-9._/-]{1,255}$")
 _CONTEXT_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,160}$")
 _LABEL_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,100}$")
+
+# A PR author's explicit merge prohibition is authoritative even if an
+# automated label is absent and implicit owner opt-in is otherwise enabled.
+_EXPLICIT_MERGE_HOLD_RE = re.compile(
+    r"(?<![a-z])(?:"
+    r"do[\s_–—-]+not[\s_–—-]+(?:auto[\s_–—-]*)?merge"
+    r"|never[\s_–—-]+(?:auto[\s_–—-]*)?merge"
+    r"|no[\s_–—-]+(?:auto[\s_–—-]*|squash\s*/\s*)?merge"
+    r"|review[\s_–—-]*only"
+    r"|merge[\s_–—-]+(?:held|hold|blocked|prohibited|disabled|forbidden|embargoed)"
+    r"|(?:hold|block|prohibit|deny)[\s_–—-]+(?:auto[\s_–—-]*)?merge"
+    r"|not[\s_–—-]+(?:ready[\s_–—-]+for[\s_–—-]+merge|for[\s_–—-]+merge)"
+    r"|(?:do[\s_–—-]+not|never)[\s_–—-]+(?:squash|land)"
+    r"|not[\s_–—-]+(?:merge[\s_–—-]*approved|approved[\s_–—-]+for[\s_–—-]+merge)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def has_explicit_merge_hold(title: object, body: object) -> bool:
+    """Reject explicit review/merge holds without trusting labels or authorship.
+
+    Missing descriptions are permitted; malformed or oversized GitHub text is
+    conservatively held. Never use body wording to grant merge permission.
+    """
+    for value in (title, body):
+        if value is None:
+            continue
+        if type(value) is not str or len(value) > 131072:
+            return True
+        # GitHub's author-supplied Markdown is attacker-controlled. Count
+        # transport bytes, not only code points, before any normalization.
+        try:
+            if len(value.encode("utf-8", errors="strict")) > 131072:
+                return True
+        except UnicodeError:
+            return True
+        # Invisible joiners and controls can separate a textual veto while
+        # rendering indistinguishably. Any such text remains review-held.
+        if any(unicodedata.category(ch) == "Cf" or
+               (unicodedata.category(ch) == "Cc" and ch not in "\n\r\t")
+               for ch in value):
+            return True
+        normalized = unicodedata.normalize("NFKC", value)
+        if len(normalized) > 131072:
+            return True
+        if _EXPLICIT_MERGE_HOLD_RE.search(normalized):
+            return True
+    return False
 
 
 def canonical_json(value: Any) -> str:
@@ -283,9 +333,12 @@ class CandidateSnapshot:
     parent_pr: int | None = None
     sensitive_paths: tuple[str, ...] = ()
     risk_tier: RiskTier = RiskTier.MEDIUM
+    explicit_merge_hold: bool = False
     captured_at: str = field(default_factory=lambda: utc_now().isoformat())
 
     def __post_init__(self) -> None:
+        if type(self.explicit_merge_hold) is not bool:
+            raise ValueError("explicit merge hold must be an exact boolean")
         if self.unresolved_threads is not None and self.unresolved_threads < 0:
             raise ValueError("unresolved thread count must be non-negative")
         for label in self.labels:
@@ -538,6 +591,7 @@ __all__ = [
     "WorkflowEvidence",
     "canonical_json",
     "fingerprint",
+    "has_explicit_merge_hold",
     "immutable_identity_equal",
     "labels_normalized",
     "parse_timestamp",

@@ -20,9 +20,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { api } from '../utils/apiController';
-import theme from '../theme/tokens';
-import { Screen, AppHeader } from '../components/UI';
+import { api } from '../src/utils/apiController';
+import theme from '../src/theme/tokens';
+import { Screen, AppHeader } from '../src/components/UI';
 
 interface WeekContent {
   week: number;

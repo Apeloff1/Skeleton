@@ -71,12 +71,14 @@ def _validated_review(review):
     return value
 
 
-def compare_executed_reviews(baseline, candidate):
+def compare_executed_reviews(baseline, candidate, *, mode="same_source"):
     """Compare two issued observations; application callers must verify authority.
 
     A paired, bounded observation can expose a regression. It cannot establish
     that a game, policy or renderer is generally better from a single episode.
     """
+    if mode not in {"same_source", "source_revision"}:
+        raise GameLearningError("paired review comparison mode is undeclared")
     baseline, candidate = _validated_review(baseline), _validated_review(candidate)
     old, new = baseline.get("source_identity", {}), candidate.get("source_identity", {})
     reasons = []
@@ -91,6 +93,27 @@ def compare_executed_reviews(baseline, candidate):
         "seed",
         "review_protocol",
     )
+    if mode == "source_revision":
+        # Source revisions deliberately change their environment digest. They
+        # may only be paired under a separately issued original-runtime
+        # workload contract; removing arbitrary digests is never sufficient.
+        required = (
+            "project_id",
+            "reviewer_implementation_digest",
+            "seed",
+            "review_protocol",
+            "policy_digest",
+            "authoring_comparison",
+        )
+        for identity in (old, new):
+            contract = identity.get("authoring_comparison")
+            if (
+                not isinstance(contract, dict)
+                or contract.get("schema_version") != "skeleton.game.studio_authoring_comparison.v1"
+                or contract.get("kind") != "successor"
+                or identity.get("controller") not in {"explicit_actions", "registered_action_cycle"}
+            ):
+                reasons.append("unsupported_source_revision_workload")
     for key in required:
         if key not in old or key not in new:
             reasons.append("missing_" + key)
@@ -193,6 +216,7 @@ def compare_executed_reviews(baseline, candidate):
     regressions = [item["metric"] for item in measurements if item["bounded_regression_observed"]]
     result = {
         "schema_version": "skeleton.game.studio_review_comparison.v1",
+        "mode": mode,
         "status": "inconclusive" if reasons else "paired_observation",
         "comparability_failures": reasons,
         "baseline_review_digest": baseline["review_digest"],
@@ -200,12 +224,24 @@ def compare_executed_reviews(baseline, candidate):
         "baseline_observation_digest": _observation_digest(baseline),
         "candidate_observation_digest": _observation_digest(candidate),
         "comparison_kind": (
-            "frozen_policy_comparison"
-            if old.get("policy_digest") != new.get("policy_digest")
-            else "same_controller_repeat"
+            "source_revision_comparison"
+            if mode == "source_revision"
+            else (
+                "frozen_policy_comparison"
+                if old.get("policy_digest") != new.get("policy_digest")
+                else "same_controller_repeat"
+            )
         ),
         "baseline_policy_digest": old.get("policy_digest"),
         "candidate_policy_digest": new.get("policy_digest"),
+        "baseline_source_identity": {
+            key: old.get(key)
+            for key in ("project_version", "input_digest", "tree_digest", "environment_request_digest")
+        },
+        "candidate_source_identity": {
+            key: new.get(key)
+            for key in ("project_version", "input_digest", "tree_digest", "environment_request_digest")
+        },
         "measurements": measurements,
         "semantic_comparison_available": semantics_available,
         "observed_regressions": regressions,
@@ -221,6 +257,7 @@ def compare_executed_reviews(baseline, candidate):
             "Task reward has only the admitted environment meaning; it is not a subjective game quality score.",
             "Frame counts and held controls require inspection; termination, collisions or intentional scenes can explain them.",
             "Offline timings are excluded from regression gates because this observer does not isolate machine load.",
+            "Source-revision comparisons measure the same admitted workload against edited content; easier authored objectives do not establish a better game.",
         ],
     }
     result["comparison_digest"] = _digest(result)
@@ -322,6 +359,10 @@ def review_implementation_digest() -> str:
         here / "game_console_graph.py",
         here / "game_console_simulation.py",
         here / "game_successor.py",
+        here / "game_successor_runtime.py",
+        here / "game_successor_world.py",
+        here / "game_learning_parallel.py",
+        here / "game_learning_runtime.py",
         here / "game_emulator_host.py",
         Path(dragon_temporal_segmentation.__file__),
     ]
@@ -829,6 +870,17 @@ def review_project_sequence(
                 "actions_digest": None if actions is None else _digest(list(actions)),
             },
         }
+        if request.kind == "successor" and policy is None:
+            environment_contract = environment.spec.as_dict()
+            environment_contract.pop("environment_digest")
+            workload = request.as_dict()
+            workload.pop("tree")
+            identity["authoring_comparison"] = {
+                "schema_version": "skeleton.game.studio_authoring_comparison.v1",
+                "kind": "successor",
+                "workload_digest": _digest(workload),
+                "environment_contract": environment_contract,
+            }
         result = analyze_frame_sequence(rows, source_identity=identity)
         semantics = analyze_executed_semantics(
             request,

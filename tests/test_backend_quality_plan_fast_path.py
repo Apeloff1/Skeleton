@@ -33,8 +33,6 @@ def test_plan_only_lane_runs_only_masterplan_validation() -> None:
 def test_heavy_backend_quality_steps_remain_full_scope_only() -> None:
     text = _workflow()
     heavy_steps = (
-        "Ruff lint",
-        "Syntax check (full backend)",
         "Canonical local/CI quality parity gate",
         "Canonical architecture boundary gate",
         "Provider runtime boundary gate",
@@ -45,3 +43,5 @@ def test_heavy_backend_quality_steps_remain_full_scope_only() -> None:
     for name in heavy_steps:
         marker = f"- name: {name}\n        if: steps.scope.outputs.full == 'true'"
         assert marker in text, name
+    assert "ruff check . --output-format=github" not in text
+    assert "CI/CD Backend Lint" in text

@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -14,7 +15,7 @@ function loadTS(file, mocks = {}) {
   });
   assert.equal(output.diagnostics.length, 0, file + ' syntax');
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', output.outputText)(
+  compileFunction(output.outputText, ['require', 'module', 'exports'])(
     id => {
       assert.ok(Object.hasOwn(mocks, id), file + ': missing mock ' + id);
       return mocks[id];
@@ -70,7 +71,7 @@ function mockNetwork(m, opts = {}) {
   return { fetcher, calls };
 }
 function service(storage) {
-  return loadTS('services/offlineCache.ts', {
+  return loadTS('src/services/offlineCache.ts', {
     '../utils/apiBase': { API_BASE: 'https://academy.test' },
     '@react-native-async-storage/async-storage': storage,
   });

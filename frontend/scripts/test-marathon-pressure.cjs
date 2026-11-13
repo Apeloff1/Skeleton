@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('node:vm');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -17,9 +18,16 @@ function loadTS(filename, mocks = {}) {
   });
   assert.equal((output.diagnostics || []).length, 0, filename + ' syntax');
   const mod = { exports: {} };
-  new Function('require', 'module', 'exports', output.outputText)(
+  compileFunction(output.outputText, ['require', 'module', 'exports'])(
     id => {
-      if (id === './requestRecoveryPolicy') return loadTS('utils/requestRecoveryPolicy.ts');
+      if (id === './apiClient') return {
+        subscribeApiSessionChanges: () => () => {},
+        prepareApiRequest: async (_url, headers = {}, signal = new AbortController().signal) => ({
+          headers, signal, epoch: 0, cacheNamespace: 'anonymous-test-session', authenticated: false,
+          current: () => !signal.aborted, dispose() {},
+        }),
+      };
+      if (id === './requestRecoveryPolicy') return loadTS('src/utils/requestRecoveryPolicy.ts');
       assert.ok(Object.hasOwn(mocks, id), filename + ' unexpected import ' + id);
       return mocks[id];
     },
@@ -29,7 +37,7 @@ function loadTS(filename, mocks = {}) {
 }
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function net(storage = null, urls = ['https://primary.test', 'https://backup.test']) {
-  return loadTS('utils/resilientNet.ts', {
+  return loadTS('src/utils/resilientNet.ts', {
     '@react-native-async-storage/async-storage': storage || {
       getItem: async () => null, setItem: async () => {},
     },
@@ -46,7 +54,7 @@ function reply(data, options = {}) {
 }
 
 test('duplicate mutation keys execute separately by default', async t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   let effects = 0;
@@ -57,7 +65,7 @@ test('duplicate mutation keys execute separately by default', async t => {
 });
 
 test('explicit read-only coalescing shares a single in-flight request', async t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   let effects = 0;
@@ -71,7 +79,7 @@ test('explicit read-only coalescing shares a single in-flight request', async t 
 });
 
 test('thermal cache enforces entry budget and refuses invalid TTL values', t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   guard.cache.set('oversized', 'x'.repeat(150 * 1024), 60_000);
@@ -88,7 +96,7 @@ test('thermal cache enforces entry budget and refuses invalid TTL values', t => 
 });
 
 test('thermal observers cannot crash peer listeners and guard destroy prevents new tasks', async () => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   let notifications = 0;
   guard.subscribe(() => { throw new Error('bad consumer'); });
@@ -102,7 +110,7 @@ test('thermal observers cannot crash peer listeners and guard destroy prevents n
 });
 
 test('thermal activity pressure recomputes during a sustained event burst', t => {
-  const { ThermalGuard } = loadTS('utils/thermalGuard.ts');
+  const { ThermalGuard } = loadTS('src/utils/thermalGuard.ts');
   const guard = new ThermalGuard();
   t.after(() => guard.destroy());
   const original = Date.now;
@@ -164,6 +172,7 @@ test('raw and decoded responses are never coalesced into a mismatched type', asy
   try {
     const json = client.rget('/same', { cacheTtlMs: 0, retries: 0 });
     const raw = client.rget('/same', { cacheTtlMs: 0, retries: 0, rawText: true });
+    await settle(); // Account initialization precedes request admission.
     assert.equal(count, 2);
     resolveFirst(reply('{"ok":true}'));
     resolveSecond(reply('{"ok":true}'));
@@ -187,6 +196,7 @@ test('different response budgets do not share an in-flight promise', async () =>
   try {
     const strict = client.rget('/large', { cacheTtlMs: 0, retries: 0, maxResponseChars: 1024 });
     const large = client.rget('/large', { cacheTtlMs: 0, retries: 0, maxResponseChars: 4096 });
+    await settle(); // Account initialization precedes request admission.
     assert.equal(count, 2);
     resolvers[0](reply('x'.repeat(2000)));
     resolvers[1](reply('x'.repeat(2000)));
@@ -299,6 +309,7 @@ test('old requests never repopulate cache after an explicit reset', async () => 
   global.fetch = () => new Promise(resolve => { resolveNetwork = resolve; });
   try {
     const old = client.rget('/stale', { retries: 0 });
+    await settle(); // Reset an admitted request, not pending auth initialization.
     client.resetCircuit();
     resolveNetwork(reply({ old: true }));
     await old;

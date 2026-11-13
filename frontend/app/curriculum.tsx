@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 /**
  * /curriculum — Unified Curriculum Hub
  * -------------------------------------------------------------------
@@ -63,13 +63,19 @@ export default function CurriculumScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState('');
   const [progress, setProgress] = useState<Record<string, number>>({});
+  const [progressWarning, setProgressWarning] = useState('');
   const [query, setQuery] = useState('');
 
   const fetchIndex = useCallback(async () => {
     setErr('');
+    setProgressWarning('');
     try {
       const r = await fetch(`${BACKEND}/api/curriculum/unified-index`);
+      if (!r.ok) throw new Error(`Curriculum service returned HTTP ${r.status}`);
       const j = await r.json();
+      if (!j || !Array.isArray(j.classes) || !Array.isArray(j.reading_tracks)) {
+        throw new Error('Curriculum service returned an invalid index');
+      }
       setData(j);
       // After we have the class list, fire off progress fetches in parallel
       const classes: ClassRow[] = j?.classes || [];
@@ -77,17 +83,19 @@ export default function CurriculumScreen() {
         classes.map(async (c) => {
           try {
             const pr = await fetch(`${BACKEND}/api/class-progress/class/${encodeURIComponent(c.id)}?user_id=default_user`);
+            if (!pr.ok) return [c.id, null] as [string, number | null];
             const pj = await pr.json();
             return [c.id, pj?.completion_count || 0] as [string, number];
           } catch {
-            return [c.id, 0] as [string, number];
+            return [c.id, null] as [string, number | null];
           }
         })
       );
       const out: Record<string, number> = {};
       results.forEach((res) => {
-        if (res.status === 'fulfilled' && res.value) out[res.value[0]] = res.value[1];
+        if (res.status === 'fulfilled' && res.value && res.value[1] !== null) out[res.value[0]] = res.value[1];
       });
+      if (Object.keys(out).length !== classes.length) setProgressWarning('Some class progress could not be loaded. Curriculum content remains available.');
       setProgress(out);
     } catch (e: any) {
       setErr(String(e?.message || e).slice(0, 120));
@@ -172,6 +180,12 @@ export default function CurriculumScreen() {
             <Text style={styles.errText}>{err}</Text>
           </View>
         ) : null}
+        {progressWarning ? (
+          <View style={styles.errBox}>
+            <Ionicons name="information-circle-outline" size={16} color="#fbbf24" />
+            <Text style={styles.errText}>{progressWarning}</Text>
+          </View>
+        ) : null}
 
         {/* Classes section */}
         <Text style={styles.sectionTitle}>
@@ -209,9 +223,9 @@ export default function CurriculumScreen() {
               {c.linked_reading && c.linked_reading.length > 0 && (
                 <View style={styles.readingBlock}>
                   <Text style={styles.readingTitle}>📖 Linked reading</Text>
-                  {c.linked_reading.map(lr => (
+                  {c.linked_reading.map((lr, index) => (
                     <TouchableOpacity
-                      key={lr.track_id || lr.title || Math.random().toString()}
+                      key={`${c.id}:${lr.track_id || lr.title || 'reading'}:${index}`}
                       style={styles.readingRow}
                       onPress={() => openReading(lr.track_id, c.id)}
                       activeOpacity={0.7}

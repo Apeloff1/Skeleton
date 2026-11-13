@@ -14,6 +14,15 @@ import re
 import sys
 from pathlib import Path
 
+try:
+    from scripts.check_product_vertical_readiness import validate as validate_vertical_readiness
+except ModuleNotFoundError:  # direct ``python scripts/check_app_assembly.py`` execution
+    from check_product_vertical_readiness import validate as validate_vertical_readiness
+try:
+    from scripts.check_product_surface_specification import validate as validate_surface_specification
+except ModuleNotFoundError:  # direct ``python scripts/check_app_assembly.py`` execution
+    from check_product_surface_specification import validate as validate_surface_specification
+
 ROOT = Path(__file__).resolve().parents[1]
 FAILURES: list[str] = []
 CHECKS = 0
@@ -254,7 +263,7 @@ def audit_no_competing_root_launchers() -> None:
 
 def audit_endpoint_boundary() -> None:
     allowed = {
-        (ROOT / "frontend/utils/apiBase.ts").resolve(),
+        (ROOT / "frontend/src/utils/apiBase.ts").resolve(),
         (ROOT / "frontend/app.config.js").resolve(),
     }
     forbidden = (
@@ -281,9 +290,9 @@ def audit_endpoint_boundary() -> None:
         for token in forbidden:
             if token in text:
                 relative = path.relative_to(ROOT).as_posix()
-                FAILURES.append(f"{relative} bypasses frontend/utils/apiBase.ts with {token!r}")
+                FAILURES.append(f"{relative} bypasses frontend/src/utils/apiBase.ts with {token!r}")
 
-    resolver = read("frontend/utils/apiBase.ts")
+    resolver = read("frontend/src/utils/apiBase.ts")
     check("export const API_BASE" in resolver, "canonical backend endpoint export missing")
     check(
         "export const SKELETON_API_BASE" in resolver,
@@ -459,7 +468,7 @@ def audit_compose_modes() -> None:
         "frontend build target must be assembly-selectable",
     )
     check(
-        '"${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
+        '${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
         "frontend container port must be assembly-selectable",
     )
     check(
@@ -484,6 +493,17 @@ def audit_compose_modes() -> None:
         "SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}" in base,
         "backend internal Skeleton endpoint default drift",
     )
+    check(
+        "CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-3000},"
+        "http://127.0.0.1:${FRONTEND_PORT:-3000}}" in base,
+        "backend browser CORS default must follow the published frontend port",
+    )
+    env_template = read(".env.example")
+    check(
+        "\nCORS_ORIGINS=\n" in env_template,
+        "first-install env template must defer browser origin to Compose port selection",
+    )
+
 
     skeleton_block = (
         base.split("  skeleton:", 1)[1].split("\n  backend:", 1)[0]
@@ -550,12 +570,9 @@ def audit_compose_modes() -> None:
         else ""
     )
     check(
-        "backend:\n        condition: service_healthy" in frontend_block,
-        "frontend must wait for healthy backend",
-    )
-    check(
-        "skeleton:\n        condition: service_healthy" in frontend_block,
-        "frontend must wait for healthy Skeleton engine",
+        "depends_on:" not in frontend_block
+        and "First-run setup and diagnostics must start independently" in frontend_block,
+        "frontend first-run shell must start independently while protected APIs fail closed",
     )
 
 
@@ -588,9 +605,14 @@ def audit_production_ingress() -> None:
         if not isinstance(prefix, str) or not prefix.startswith("/") or not isinstance(port, int):
             continue
         location = f"location ^~ {prefix.rstrip('/')}/ {{"
-        upstream = f"proxy_pass http://{name}:{port};"
+        upstream_name = "application_backend" if name == "backend" else "application_engine"
+        upstream = f"proxy_pass http://{upstream_name};"
         check(location in nginx, f"production ingress missing manifest route: {location}")
         check(upstream in nginx, f"production ingress upstream drift: {upstream}")
+        check(
+            f"server {name}:{port} resolve;" in nginx,
+            f"production ingress service address drift: {name}:{port}",
+        )
         if isinstance(health_path, str) and health_path:
             check(
                 prefix == "/" or health_path.startswith(prefix.rstrip("/") + "/"),
@@ -623,8 +645,8 @@ def audit_production_ingress() -> None:
 
 
 def audit_launcher_convergence() -> None:
-    launch = read("frontend/components/LaunchCascade.tsx")
-    boot = read("frontend/components/BootLauncher.tsx")
+    launch = read("frontend/src/components/LaunchCascade.tsx")
+    boot = read("frontend/src/components/BootLauncher.tsx")
     stages = read("frontend/src/boot/stages.ts")
     welcome = read("frontend/app/welcome.tsx")
     safe_mode = read("frontend/app/safe-mode.tsx")
@@ -853,13 +875,21 @@ def audit_public_app_bootstrap_contract() -> None:
         "aggregate app readiness route must use manifest contract",
     )
     check("public_bootstrap_payload()" in route, "app bootstrap route bypasses canonical payload builder")
-    check("asyncio.to_thread(_probe_engine" in route, "aggregate app status does not isolate engine probe")
+    check(
+        "async def _probe_engine" in route
+        and "async with asyncio.timeout(timeout_s)" in route
+        and "async with client.stream(" in route,
+        "aggregate app status does not use a bounded asynchronous engine probe",
+    )
     check('"identity mismatch"' in route, "aggregate app status does not validate engine identity")
-    check("identity.get(key) == value" in route, "engine identity verification is incomplete")
+    check("candidate.get(key) != value" in route, "engine identity verification is incomplete")
     check("async def _probe_mongo" in route, "aggregate app status state probe missing")
     check('core_db.command("ping")' in route, "aggregate app status does not verify durable state")
     check("asyncio.gather(" in route, "aggregate app status probes are not concurrent")
-    check("public_readiness()" in route, "aggregate app status omits product readiness")
+    check(
+        "await asyncio.to_thread(public_readiness)" in route,
+        "aggregate app status must observe product readiness outside the event loop",
+    )
     check('"product": product_readiness' in route, "aggregate app status product summary missing")
     check("SKELETON_INTERNAL_URL" in route, "aggregate app status internal engine endpoint missing")
     check('("routes.app_runtime",' in registry, "public app runtime router is not registered")
@@ -954,7 +984,7 @@ def audit_product_control_contract() -> None:
         "product control client root drift",
     )
     check(
-        'router = APIRouter(prefix="/api/admin/ops"' in ops,
+        re.search(r'router\s*=\s*project_router\s*\(\s*prefix\s*=\s*["\']/api/admin/ops["\']', ops) is not None,
         "backend ops prefix drift",
     )
     check('("routes.ops",' in registry, "backend ops router is not registered")
@@ -976,7 +1006,7 @@ def audit_product_control_contract() -> None:
 
 
 def audit_product_route_registry() -> None:
-    registry_text = read("frontend/utils/routeRegistry.ts")
+    registry_text = read("frontend/src/utils/routeRegistry.ts")
     catalog = read("frontend/src/product/productCatalog.ts")
     registered = set(re.findall(r"path:\s*'([^']+)'", registry_text))
 
@@ -992,7 +1022,51 @@ def audit_product_route_registry() -> None:
         )
 
 
+def audit_product_vertical_readiness() -> None:
+    """Make the S-grade vertical contract part of the canonical assembly gate."""
+    errors, report = validate_vertical_readiness(ROOT)
+    check(not errors, "product vertical readiness contract failed: " + "; ".join(errors[:8]))
+    check(report.get("target_grade") == "S", "product vertical readiness target drift")
+    check(report.get("vertical_count") == 7, "canonical product vertical count drift")
+    check(report.get("operation_count") == 21, "canonical governed operation count drift")
+    check(report.get("contract_qualified") is True, "product vertical contract is not qualified")
+
+
+def audit_product_surface_specification() -> None:
+    """Keep every exposed route and Hub modal inside the canonical contract."""
+    errors = validate_surface_specification(ROOT)
+    check(not errors, "product surface specification failed: " + "; ".join(errors[:8]))
+
+
+def audit_preinstall_docker_sources() -> None:
+    """Fail closed when the installable image sources are not in source custody."""
+    from skeleton.app.install_source_contracts import build_source_errors
+
+    defects = build_source_errors(ROOT)
+    check(
+        not defects,
+        ("pre-first-install Docker source admission failed: " + "; ".join(defects[:4])
+         if defects else "pre-first-install Docker source admission passed"),
+    )
+    try:
+        manifest = json.loads(read("skeleton/app/manifest.json"))
+        required = manifest["required_paths"]
+        if not isinstance(required, list):
+            raise ValueError("required_paths must be a list")
+    except (ValueError, KeyError, TypeError):
+        check(False, "first-install required-path manifest is unreadable or invalid")
+        return
+    for path in (
+        "Dockerfile.dockerignore",
+        "backend/Dockerfile.dockerignore",
+        "frontend/.dockerignore",
+        "skeleton/app/install_source_contracts.py",
+    ):
+        check(path in required, f"installed assembly omits required Docker input: {path}")
+
+
 def main() -> int:
+    audit_preinstall_docker_sources()
     audit_manifest()
     audit_topology_alignment()
     audit_backend_public_identity()
@@ -1007,6 +1081,8 @@ def main() -> int:
     audit_public_product_readiness_contract()
     audit_product_control_contract()
     audit_product_route_registry()
+    audit_product_vertical_readiness()
+    audit_product_surface_specification()
 
     if FAILURES:
         print(f"App assembly audit failed: {len(FAILURES)} issue(s)", file=sys.stderr)

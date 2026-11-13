@@ -1,7 +1,9 @@
 # Lean CI, build and email-noise policy
 
-The active repository contains 16 GitHub Actions workflow YAML files. Additional
-definitions were moved to .github/workflows-archive and are intentionally inactive.
+Automatic GitHub Actions workflows stay inside a 20-file cap. Signed master-plan
+evidence workflows may also live under .github/workflows when their only trigger
+is workflow_dispatch. Specialized qualifications in .github/workflows-archive
+stay inactive.
 
 ## Trigger architecture
 - Merge Readiness: PR-only smoke check (no duplicate main push).

@@ -232,10 +232,29 @@ def _shadow_provider_runtime_imports(path: Path) -> list[str]:
 
 
 def _network_transport_imports(path: Path) -> list[str]:
+    try:
+        metadata = path.stat()
+    except OSError:
+        return []
+    # Same metadata-keyed compact summary as imports and credential markers:
+    # repeated inventory/isolation passes over the ~40,000-module tree must not
+    # re-parse every file because the bounded AST cache has evicted it.
+    return list(
+        _cached_network_transport_imports(
+            str(path.resolve()), int(metadata.st_mtime_ns), int(metadata.st_size)
+        )
+    )
+
+
+@lru_cache(maxsize=65_536)
+def _cached_network_transport_imports(
+    path_text: str, mtime_ns: int, size: int
+) -> tuple[str, ...]:
+    """Cache compact network-transport import findings, never the module tree."""
     hits: list[str] = []
-    tree = _python_tree(path)
+    tree = _cached_python_tree(path_text, mtime_ns, size)
     if tree is None:
-        return hits
+        return ()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -252,7 +271,7 @@ def _network_transport_imports(path: Path) -> list[str]:
                 module.startswith(root + ".") for root in _NETWORK_TRANSPORT_ROOTS
             ):
                 hits.append(module)
-    return hits
+    return tuple(hits)
 
 
 def _credential_environment_reads(path: Path) -> list[str]:

@@ -431,6 +431,11 @@ def evaluate_candidate(
             risk=classification.risk,
         )
 
+    # PR title/body review-only prohibitions cannot be overridden by owner
+    # implicit opt-in, an automerge label, or a successful sibling workflow.
+    if snapshot.explicit_merge_hold:
+        return _hold(snapshot, policy, ("explicit_pr_text_merge_hold",), risk=classification.risk)
+
     labels = _labels(snapshot)
     if labels.intersection(policy.opt_out_labels):
         return _hold(snapshot, policy, ("explicit_automerge_opt_out",), risk=classification.risk)

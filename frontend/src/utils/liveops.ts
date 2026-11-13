@@ -6,7 +6,7 @@
  *    the client only names the action. Failures are swallowed silently.
  */
 import api from './apiClient';
-import { safeGetItem, safeSetItem } from '../../utils/safeStorage';
+import { safeGetItem, safeSetItem } from './safeStorage';
 
 const VISITOR_KEY = 'mkt_visitor_id';
 

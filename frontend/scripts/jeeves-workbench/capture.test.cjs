@@ -3,7 +3,7 @@ const { assert, load, harness, memoryStorage, assertValid } = require('./helpers
 const { captureMessage, captureInput } = load('capture');
 const { WorkbenchStore } = load('WorkbenchStore');
 const { WORKBENCH_KEY } = load('types');
-const W = require('../../features/Jeeves/workspace.ts');
+const W = require('../../src/features/Jeeves/workspace.ts');
 
 function input(projectId, patch = {}) {
   return {

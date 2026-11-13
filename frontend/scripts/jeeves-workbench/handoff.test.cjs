@@ -3,8 +3,8 @@ const { assert, load, linkedFixture, memoryStorage, deferred, tick } = require('
 const { consumeHandoff } = load('handoff');
 const { makeHandoff, defaultContextSelection } = load('context');
 const { HANDOFF_KEY } = load('types');
-const { WorkspaceController } = require('../../features/Jeeves/WorkspaceController.ts');
-const W = require('../../features/Jeeves/workspace.ts');
+const { WorkspaceController } = require('../../src/features/Jeeves/WorkspaceController.ts');
+const W = require('../../src/features/Jeeves/workspace.ts');
 
 function pendingDraft() {
   const { h, project } = linkedFixture();

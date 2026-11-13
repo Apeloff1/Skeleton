@@ -148,7 +148,7 @@ def test_verifier_model_program_requires_independent_evidence() -> None:
     curriculum = program.evaluate_stage(stage, episode_ids=(episode.episode_id,))
     candidate = VerifierCandidate(
         candidate_id="verifier-candidate-1",
-        model_digest=_sha("model"),
+        model_digest=_sha("policy"),
         training_receipt_digest=_sha("training-receipt"),
         benchmark_refs=("benchmark:heldout-v1",),
         intended_claims=("claim:tool-output-validity",),
@@ -163,12 +163,13 @@ def test_verifier_model_program_requires_independent_evidence() -> None:
             curriculum_decision_refs=(curriculum.decision_digest,),
         )
 
-    decision = program.evaluate_verifier_candidate(
-        candidate,
-        verifier_id="independent-verifier-v1",
-        trainer_id="trainer-v1",
-        evaluation_refs=("eval:a", "eval:b"),
-        curriculum_decision_refs=(curriculum.decision_digest,),
-    )
-    assert decision.passed is True
-    assert decision.candidate_digest == candidate.digest
+    # An independent verifier is necessary, not sufficient: invented evaluation
+    # references are never equivalent to executable, authenticated receipts.
+    with pytest.raises(LearningProgramError, match="unknown executable evaluation receipt"):
+        program.evaluate_verifier_candidate(
+            candidate,
+            verifier_id="independent-verifier-v1",
+            trainer_id="trainer-v1",
+            evaluation_refs=("eval:a", "eval:b"),
+            curriculum_decision_refs=(curriculum.decision_digest,),
+        )

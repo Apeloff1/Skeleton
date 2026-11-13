@@ -133,11 +133,12 @@ class WorldRequest(WriteRequest):
     expected_spec_digest: str = Field(pattern="^[a-f0-9]{64}$")
     changes: dict[str, Any] | None = Field(default=None, min_length=1, max_length=8)
     edits: list[WorldEdit] | None = Field(default=None, min_length=1, max_length=64)
+    restore_review_job_id: str | None = Field(default=None, min_length=1, max_length=128)
 
     @model_validator(mode="after")
     def authoring_payload(self):
-        if (self.changes is None) == (self.edits is None):
-            raise ValueError("provide complete changes or bounded typed edits")
+        if sum(value is not None for value in (self.changes, self.edits, self.restore_review_job_id)) != 1:
+            raise ValueError("provide complete changes, bounded typed edits, or one actual reference review")
         return self
 
     def admitted_request(self):

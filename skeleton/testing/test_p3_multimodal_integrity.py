@@ -150,7 +150,10 @@ def test_retrieval_rejects_corrupt_source_and_derived_projection(reader, corrupt
     elif corruption == "source":
         corpus.store._objects[record.asset_digest] = b"replacement source"
     elif corruption == "metadata":
-        corpus.intake._assets[record.record_id].sanitized_metadata["filename"] = "forged.txt"
+        asset = corpus.intake._assets[record.record_id]
+        corpus.intake._assets[record.record_id] = replace(
+            asset, sanitized_metadata={**asset.sanitized_metadata, "filename": "forged.txt"}
+        )
     else:
         corpus._text[record.record_id] = "quarterly revenue"
         corpus._records[record.record_id] = replace(record, text_projection=None)
