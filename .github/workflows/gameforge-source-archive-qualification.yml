@@ -65,6 +65,11 @@ jobs:
       - name: Install from frozen manifest
         working-directory: frontend
         run: yarn install --frozen-lockfile --ignore-scripts --non-interactive
+      - name: Apply reviewed third-party patches and verify security postconditions
+        working-directory: frontend
+        run: |
+          node scripts/patch-node-modules.js
+          node scripts/verify-no-release-npm-security.js
       - name: Archive, privacy and eight-scene frontend tests
         working-directory: frontend
         run: node --test scripts/skeleton-forge/source-archive.test.cjs scripts/skeleton-forge/run-session-isolation.test.cjs scripts/skeleton-forge/native-scene-qualification.test.cjs
