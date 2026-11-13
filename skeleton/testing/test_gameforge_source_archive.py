@@ -10,6 +10,7 @@ from copy import deepcopy
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from backend.routes.skeleton_gameforge import RunRequest, run
 from skeleton.context.pipeline import GameForgeRun
@@ -38,6 +39,32 @@ def fixture(files: dict[str, str] | None = None, *, succeeded: bool = True) -> d
         "succeeded": succeeded, "files": files,
         "source_manifest": source_manifest(files),
     }
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"vision": "x" * 4001},
+    {"answers": {f"facet_{i}": "creative" for i in range(65)}},
+    {"blend": ["extraction", "pipeline", "combat_loop", "unexpected"]},
+    {"t": -0.1},
+    {"t": 1.1},
+    {"t": float("nan")},
+    {"t": float("inf")},
+])
+def test_http_request_admission_rejects_unbounded_inputs_before_generation(kwargs):
+    with pytest.raises(ValidationError):
+        RunRequest(**kwargs)
+
+
+def test_bounded_http_request_retains_normal_original_game_input():
+    req = RunRequest(
+        vision="A small deterministic game about original exploration",
+        answers={"genre": "rpg", "pace": "considered"},
+        blend=["extraction", "pipeline"],
+        t=0.4,
+    )
+    assert req.vision.startswith("A small deterministic")
+    assert req.answers["genre"] == "rpg"
+    assert req.t == 0.4
 
 
 def test_default_http_run_removes_source_bodies_without_changing_run_request(monkeypatch):
