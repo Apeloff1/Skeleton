@@ -15,7 +15,7 @@ function make(...actions) {
   return actions.reduce(Q.questionnaireReducer, Q.INITIAL_STATE);
 }
 
-test('all 69 historical Galaxy fallback genres have a valid 158-choice GameForge counterpart', () => {
+test('all distinct historical Galaxy fallback genres map into 158-choice GameForge', () => {
   const tokens = new Set(GENRE_CHOICES);
   const ids = GALAXY_OFFLINE_CHOICES.map(x => x.id);
   assert.equal(ids.length, 69);
