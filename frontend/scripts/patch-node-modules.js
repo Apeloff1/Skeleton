@@ -350,8 +350,36 @@ function patchNodeForgeNestedDigestAlgorithm() {
   // Reviewed exact published versions. The 1.4.2 RSA parser still validates
   // the outer DigestInfo count without validating nested DigestAlgorithm arity.
   // Never silently trust a version bump as proof of this security fix.
-  if (!new Set(['1.4.0', '1.4.2']).has(version)) {
+  if (!new Set(['1.4.0', '1.4.2', '1.4.3']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
+  }
+  // 1.4.3 replaces permissive nested ASN.1 with canonical DER DigestInfo
+  // re-encoding and byte comparison. Never splice the earlier arity patch
+  // into this different upstream RSA parser. Instead require the exact
+  // v1.4.3 Git-tagged upstream source and run the separate forged-signature
+  // negative regression against the actual installed library.
+  if (version === '1.4.3') {
+    const source = fs.readFileSync(path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'));
+    const gitBlobSha = crypto.createHash('sha1')
+      .update('blob ' + source.length + '\0')
+      .update(source).digest('hex');
+    if (gitBlobSha !== '65f6e8469d8a7695f4438722577230136f9dd425') {
+      throw new Error('[patch-node-modules] node-forge 1.4.3 RSA source differs from reviewed upstream');
+    }
+    const rsa = source.toString('utf8');
+    const expected = [
+      'var _encodeDigestInfo = function(oid, digest, withParameters)',
+      'var withParameters = _encodeDigestInfo(oid, capture.digest, true);',
+      '_encodeDigestInfo(oid, capture.digest, false);',
+      'd.substring(0, withParameters.length) !== withParameters',
+      'd.substring(0, withoutParameters.length) !== withoutParameters',
+    ];
+    if (expected.some(needle => rsa.split(needle).length !== 2)) {
+      throw new Error('[patch-node-modules] node-forge 1.4.3 canonical DER guard changed');
+    }
+    skipped++;
+    console.log('[patch-node-modules] ✓ reviewed node-forge 1.4.3 canonical DER RSA guard');
+    return;
   }
 
   // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: preserve the exact reviewed
