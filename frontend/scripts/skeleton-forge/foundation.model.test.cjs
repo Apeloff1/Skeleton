@@ -465,3 +465,28 @@ test('a changed Studio project gets a separate copy, never a silent overwrite', 
   assert.notEqual(repeated.project.id, returned.project.id);
 });
 
+
+test('a failed supporting save cannot partially publish a newer authored project', async () => {
+  const data = storage.memoryKv();
+  let fails = true;
+  const seen = [];
+  const store = {
+    getItem: key => data.getItem(key),
+    async setItem(key, value) {
+      seen.push(key);
+      if (key === storage.KEYS.prefs && fails) {
+        fails = false;
+        throw new Error('Preferences disk write failed');
+      }
+      await data.setItem(key, value);
+    },
+  };
+  const current = base({ projects: [project('first')] });
+  await assert.rejects(storage.saveFoundation(store, m.persistSnapshot(current)), /disk write/);
+  assert.equal(data.dump()[storage.KEYS.projects], undefined);
+  await storage.saveFoundation(store, m.persistSnapshot(base({ projects: [project('latest')] })));
+  assert.equal((await storage.loadFoundation(data)).projects[0].id, 'latest');
+  assert.deepEqual(seen.slice(-3), [
+    storage.KEYS.prefs, storage.KEYS.onboarded, storage.KEYS.projects,
+  ]);
+});

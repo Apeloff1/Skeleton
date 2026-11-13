@@ -215,3 +215,21 @@ test('first-install Studio unmounts old local projects when the signed-in accoun
   assert.match(src, /legacyReadOnlyKv\(\)/);
   assert.match(src, /hasLegacyStudioProjects\(\)/);
 });
+
+test('explicit Studio return is one-time, direction-checked and isolated across local accounts', async () => {
+  const origin = H.handoffFromStudio(
+    Q.INITIAL_STATE, 'p_recovered', '2026-11-13T16:00:00.000Z',
+  );
+  const returning = H.handoffToStudio(Q.INITIAL_STATE, origin);
+  await bridgeStorage.storeCreatorBridge(returning);
+  assert.equal(await bridgeStorage.consumeCreatorBridge('forge'), null);
+  bearer = 'bob-offline-bearer';
+  epoch++;
+  assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
+  bearer = 'alice-offline-bearer';
+  epoch++;
+  const restored = await bridgeStorage.consumeCreatorBridge('studio');
+  assert.equal(restored.studioProjectId, 'p_recovered');
+  assert.equal(restored.studioProjectUpdatedAt, '2026-11-13T16:00:00.000Z');
+  assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
+});
