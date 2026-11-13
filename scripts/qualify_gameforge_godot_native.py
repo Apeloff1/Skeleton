@@ -1,8 +1,10 @@
 """Actual-engine acceptance of original GameForge Godot 2D playable loops.
 
-The corresponding Actions job supplies an official SHA-256-pinned Godot
-archive. Do not call this a device, display, GPU, input-latency, installer
-or release-provenance qualification: the checks run HEADLESS on Linux.
+The operator supplies the Godot archive and an independently established
+SHA-256 digest. This harness verifies archive bytes AND that the launched
+executable is an exact archive member; the digest's official origin is NOT
+verified in this tool. Do not call this device, display, GPU, input-latency,
+installer or release-provenance qualification: it runs HEADLESS on Linux.
 
 Six *independent* projects are emitted and replayed: 3 baseline slices and
 3 bounded mechanically tuned slices. A run passes only after a real Godot
