@@ -117,3 +117,59 @@ jobs:
             scripts/skeleton-forge/native-quest.test.cjs
       - name: Typecheck complete frontend
         run: yarn typecheck
+
+  # Independent Linux native-engine evidence, never a device/release pass.
+  creator-godot-native:
+    needs: creator-native-python
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact native source head
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Install declared native source prerequisites
+        run: python -m pip install -e . 'PyYAML>=6,<7'
+      - name: Acquire official Godot 4.6 Linux ZIP by pinned release digest
+        env:
+          GODOT_ARCHIVE_SHA256: 6bcc59dfd1d670e918c77eae06e82b9dc5699de13d353dc3a4b3b6b307b6dc06
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl --fail --location --show-error --silent --retry 3 --retry-delay 3 --connect-timeout 20 --max-time 240 --proto '=https' --proto-redir '=https' --tlsv1.2 --output 'Godot_v4.6-stable_linux.x86_64.zip' 'https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip'
+          printf '%s  %s\n' "$GODOT_ARCHIVE_SHA256" 'Godot_v4.6-stable_linux.x86_64.zip' | sha256sum --check --
+          python - <<'PY'
+          import os
+          import shutil
+          import stat
+          import zipfile
+          from pathlib import Path
+          archive = Path(os.environ["RUNNER_TEMP"]) / "Godot_v4.6-stable_linux.x86_64.zip"
+          expected = "Godot_v4.6-stable_linux.x86_64"
+          target = Path(os.environ['RUNNER_TEMP']) / 'gameforge-godot-native'
+          with zipfile.ZipFile(archive) as zf:
+              choices = [m for m in zf.infolist() if not m.is_dir() and Path(m.filename).name == expected]
+              if len(choices) != 1 or choices[0].file_size > 400 * 1024 * 1024:
+                  raise SystemExit('official Godot executable member missing or unbounded')
+              if (choices[0].external_attr >> 16) & 0o170000 == stat.S_IFLNK:
+                  raise SystemExit('official Godot executable cannot be a symlink')
+              with zf.open(choices[0]) as src, target.open('xb') as out:
+                  shutil.copyfileobj(src, out, length=1024 * 1024)
+          target.chmod(0o700)
+          PY
+      - name: Import and complete six native baseline and tuned gameplay scenarios
+        env:
+          GODOT_ARCHIVE_SHA256: 6bcc59dfd1d670e918c77eae06e82b9dc5699de13d353dc3a4b3b6b307b6dc06
+        run: |
+          set -euo pipefail
+          python scripts/qualify_gameforge_godot_native.py \
+            --godot "$RUNNER_TEMP/gameforge-godot-native" \
+            --archive "$RUNNER_TEMP/Godot_v4.6-stable_linux.x86_64.zip" \
+            --archive-sha256 "$GODOT_ARCHIVE_SHA256"
