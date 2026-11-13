@@ -13,6 +13,9 @@ import math
 from typing import Any, Dict, Mapping, Optional
 
 from skeleton.context.cockpit import Cockpit
+from skeleton.context.galaxy_profile import (
+    attach_galaxy_profile, galaxy_profile_receipt, normalise_galaxy_profile,
+)
 from skeleton.context.dodeca import Dodecahedron
 from skeleton.context.oracle import Magic8Ball
 from skeleton.context.tensor import AXES, ContextTensor, detect_era
@@ -83,6 +86,7 @@ class GameForgeRun:
                 repair_mode: str = "apply",
                 operator_tensor: Optional[ContextTensor] = None,
                 operator_axes: Optional[Mapping[str, float]] = None,
+                galaxy_profile: Optional[Mapping[str, Any]] = None,
                 playable_content: bool = False) -> Dict[str, Any]:
         """Run the ten-stage pipeline.
 
@@ -102,6 +106,8 @@ class GameForgeRun:
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
         axis_overrides = normalise_operator_axes(operator_axes)
+        complete_galaxy_profile = normalise_galaxy_profile(galaxy_profile)
+        galaxy_receipt = galaxy_profile_receipt(complete_galaxy_profile) if complete_galaxy_profile else None
         cockpit = self.cockpit
         # Freeze operator intent before stage execution. Implicit cockpit
         # blending applies only when neither an explicit era nor questionnaire
@@ -170,6 +176,8 @@ class GameForgeRun:
             ),
             "operator_tensor": operator_tensor,
             "operator_axes": axis_overrides,
+            "galaxy_profile": complete_galaxy_profile,
+            "galaxy_receipt": galaxy_receipt,
             "repair": True,
             "max_rounds": 3,
             "playtest_mode": playtest_mode,
@@ -242,6 +250,8 @@ class GameForgeRun:
         }
         if axis_overrides:
             payload["operator_axes"] = axis_overrides
+        if galaxy_receipt:
+            payload["galaxy_profile"] = galaxy_receipt
         self.bus.emit("gameforge.run.finished", {
             "succeeded": run.succeeded,
             "era": payload["era"],
@@ -273,7 +283,10 @@ def _commit(ctx: Dict[str, Any], stage: str, operator: str, system: str, extra: 
 
 def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
     vision = ctx.get("vision") or ""
-    _commit(ctx, "ingest", vision, "ingested", {"chars": len(vision)})
+    _commit(ctx, "ingest", vision, "ingested", {
+        "chars": len(vision),
+        "galaxy_profile_sha256": (ctx.get("galaxy_receipt") or {}).get("sha256"),
+    })
     return {"ingested": True, "chars": len(vision)}
 
 
@@ -473,6 +486,10 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ctx["files"] = files
         ctx["file_count"] = len(files)
         ctx["playable_archetype"] = requested if requested in content_archetypes() else "extraction"
+    if ctx.get("galaxy_profile") is not None:
+        files = attach_galaxy_profile(files, ctx["galaxy_profile"])
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
     source_manifest(files)
@@ -501,6 +518,7 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "root": None if not project else project["root"],
         "check": "ok",
         "playtest": None if played is None else played.get("status"),
+        "galaxy_profile_sha256": (ctx.get("galaxy_receipt") or {}).get("sha256"),
     })
     return {"emitted": True, "project": project, "check_ok": True, "playtest": played}
 

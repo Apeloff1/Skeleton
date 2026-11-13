@@ -45,6 +45,7 @@ import { shareResult } from '../../utils/shareResult';
 import { classifyBuildJob } from '../../product/buildJobLifecycle';
 
 import { FALLBACK_GENRES } from './fallbackGenres';
+import { prepareGalaxyHandoff } from '../../skeletonForge/galaxyHandoff';
 const BACKEND = CANONICAL_API_BASE;
 
 interface Props { visible: boolean; onClose: () => void; }
@@ -1310,36 +1311,19 @@ export default function GalaxyStudioFactoryModal
     } finally { buildControlBusyRef.current = false; if (visibleRef.current) setResumeLoading(false); }
   }, [buildId, addLog, safeFetch, startPolling]);
 
-  // ═══ BUILD — creates server build, then starts client clock with REAL id ═══
-  const startBuild = async () => {
-    if (!visibleRef.current || loading || buildControlBusyRef.current || !title.trim() || !selectedGenre) return;
-    buildControlBusyRef.current = true;
-    stopPolling();
-    const epoch = pollEpochRef.current;
-    const current = () => visibleRef.current && pollEpochRef.current === epoch;
-    setStep('building'); setLoading(true);
-    setBuildLog([]); progressAnim.setValue(0); lastPhaseRef.current = 0;
-
-    // ★ Reset circuit breaker before a user-initiated start so stale 502s
-    //   from earlier pod-restart noise don't block the very request we
-    //   just initiated. This is the fix for "build doesn't start / 502".
-    try { resetCircuit(); } catch {}
-
-    addLog(`Initializing "${title.trim()}"...`);
-    addLog(`Genre: ${selectedGenre.name} • 100 phases in 10 batches`);
-
-    // ═══ Build payload once — same idempotency key across all retries so
-    //     the server will dedupe if a retry races with a slow success. ═══
-    const createPayload: any = {
-      title: title.trim(), genre: selectedGenre.id, subgenre: selectedSubgenre || undefined,
+  // One authoritative snapshot builder: Galaxy's existing create endpoint and
+  // the explicit GameForge handoff receive identical creative controls.
+  // Do not fork the 14 matrix / narrative / style payload definitions.
+  const makeGalaxyBuildPayload = (chosenGenre: Genre): Record<string, unknown> => ({
+      title: title.trim(), genre: chosenGenre.id, subgenre: selectedSubgenre || undefined,
       // ═══ Multi-genre fusion — send lists alongside primary for backward compat ═══
       genres: multiGenreMode && extraGenreIds.length > 0
-        ? [selectedGenre.id, ...extraGenreIds]
+        ? [chosenGenre.id, ...extraGenreIds]
         : undefined,
       subgenres: multiGenreMode && extraSubgenreIds.length > 0
         ? [selectedSubgenre || '', ...extraSubgenreIds].filter(Boolean)
         : undefined,
-      description: `A ${selectedGenre.name}${multiGenreMode && extraGenreIds.length ? ' fusion' : ''} game: ${title}`,
+      description: `A ${chosenGenre.name}${multiGenreMode && extraGenreIds.length ? ' fusion' : ''} game: ${title}`,
       game_vision: gameVision.trim(), system_architecture: systemArch.trim(),
       world_laws: worldLaws.trim(), agent_instructions: agentInstructions.trim(),
       scale: scaleCommand.trim(),
@@ -1374,7 +1358,45 @@ export default function GalaxyStudioFactoryModal
       styles_matrix: stylesMatrix,
       mutation_matrix: mutationMatrix,
       unique_flair_matrix: uniqueFlairMatrix,
-    };
+    });
+
+  const sendToGameForge = () => {
+    if (loading || step !== 'pick' || !title.trim() || !selectedGenre) {
+      setStatusMsg('Choose a game title and genre before transferring the questionnaire.');
+      return;
+    }
+    try {
+      // Same-runtime, one-use local handoff; no project values in the route URL.
+      const handoff = prepareGalaxyHandoff(makeGalaxyBuildPayload(selectedGenre));
+      onClose();
+      router.push({ pathname: '/skeleton-forge', params: { tab: 'build', handoff } } as any);
+    } catch (error) {
+      setStatusMsg(error instanceof Error ? error.message : 'Could not transfer the questionnaire.');
+    }
+  };
+
+  // ═══ BUILD — creates server build, then starts client clock with REAL id ═══
+  const startBuild = async () => {
+    if (!visibleRef.current || loading || buildControlBusyRef.current || !title.trim() || !selectedGenre) return;
+    buildControlBusyRef.current = true;
+    stopPolling();
+    const epoch = pollEpochRef.current;
+    const current = () => visibleRef.current && pollEpochRef.current === epoch;
+    setStep('building'); setLoading(true);
+    setBuildLog([]); progressAnim.setValue(0); lastPhaseRef.current = 0;
+
+    // ★ Reset circuit breaker before a user-initiated start so stale 502s
+    //   from earlier pod-restart noise don't block the very request we
+    //   just initiated. This is the fix for "build doesn't start / 502".
+    try { resetCircuit(); } catch {}
+
+    addLog(`Initializing "${title.trim()}"...`);
+    addLog(`Genre: ${selectedGenre.name} • 100 phases in 10 batches`);
+
+    // ═══ Build payload once — same idempotency key across all retries so
+    //     the server will dedupe if a retry races with a slow success. ═══
+    const createPayload: any = makeGalaxyBuildPayload(selectedGenre);
+
     // Build-wide stable idempotency key so server-side dedupe works across retries
     const buildIdem = `gs-create-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -1842,6 +1864,29 @@ export default function GalaxyStudioFactoryModal
         ) : <Text style={s.pickPrompt}>Select a genre below</Text>}
 
         <TextInput testID="galaxy-studio-title-input" style={s.titleInput} placeholder="Game title (e.g. Shadow Realm)" placeholderTextColor={T.textMuted} value={title} onChangeText={setTitle} maxLength={60} />
+
+        <TouchableOpacity
+          testID="galaxy-send-full-design-to-gameforge"
+          onPress={sendToGameForge}
+          disabled={loading || !title.trim() || !selectedGenre}
+          accessibilityRole="button"
+          accessibilityLabel="Transfer all Galaxy design matrices and controls into GameForge"
+          accessibilityState={{ disabled: loading || !title.trim() || !selectedGenre }}
+          style={{ marginTop: 8, marginBottom: 12, padding: 12, borderRadius: 12,
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            borderWidth: 1, borderColor: T.gold,
+            backgroundColor: title.trim() && selectedGenre ? T.surfaceAlt : T.border }}
+        >
+          <Ionicons name="options-outline" size={19} color={T.gold} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: T.text, fontWeight: '800', fontSize: 13 }}>
+              Continue full questionnaire in GameForge
+            </Text>
+            <Text style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>
+              Transfers the entire 14-matrix, narrative, style and production configuration to the local build cockpit.
+            </Text>
+          </View>
+        </TouchableOpacity>
 
         
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>

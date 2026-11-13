@@ -11,12 +11,13 @@ import { parseTabParam } from '../src/skeletonForge/cockpitScreen';
 import { C } from '../src/skeletonForge/components/theme';
 
 export default function SkeletonForgeRoute() {
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; handoff?: string }>();
   const router = useRouter();
   return (
     <SafeAreaView style={st.root}>
       <ForgeCockpitScreen
         initialTab={parseTabParam(params.tab)}
+        galaxyHandoffId={typeof params.handoff === 'string' ? params.handoff : null}
         onOpenGalaxyStudio={() => router.push('/galaxy' as any)}
       />
     </SafeAreaView>
