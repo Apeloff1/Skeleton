@@ -40,7 +40,7 @@ jobs:
         with:
           python-version: "3.11.16"
       - name: Install bounded test prerequisites
-        run: python -m pip install --disable-pip-version-check "pytest==8.4.2" "fastapi>=0.115,<0.165" "pydantic>=2.10,<3"
+        run: python -m pip install --disable-pip-version-check -e . "pytest==8.4.2"
       - name: Source export contracts (no real native executable)
         env:
           PYTHONPATH: ".:backend"
