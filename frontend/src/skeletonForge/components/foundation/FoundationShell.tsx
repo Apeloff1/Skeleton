@@ -50,6 +50,9 @@ export interface ShellPorts {
     ownerId: string | null;
     onStart: (projectId: string, req: RunRequest) => void;
     onCancel: () => void;
+    onExport?: () => void;
+    exportBusy?: boolean;
+    exportError?: string | null;
   };
   now: number;
   console: {
@@ -338,6 +341,10 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
         now={ports.now}
         onCancel={visible.live && visible.phase === 'running' ? ports.run.onCancel : undefined}
         onRetry={visible.phase === 'done' || visible.phase === 'error' ? () => startForge(active, buildRunRequest(active.questionnaire)) : undefined}
+        onExport={visible.live && visible.phase === 'done' && visible.payload?.source_export?.status === 'ready'
+          ? ports.run.onExport : undefined}
+        exportBusy={ports.run.exportBusy}
+        exportError={ports.run.exportError}
         guidance={guidance}
         onGuidance={onGuidance}
         consoleBusy={ports.console.busy}

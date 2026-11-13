@@ -4,6 +4,9 @@
  * cockpit, not a second poller.
  */
 import React from 'react';
+import { getAuthEpoch, subscribeAuthChanges } from '../../../auth/gameforgeAuth';
+import { shareGodotSourceArchive } from '../../shareSourceArchive';
+import type { RunRequest } from '../../types';
 import { AccessibilityInfo, PixelRatio, Platform } from 'react-native';
 import { gameforgeAuthPort } from '../../foundation/authPort';
 import type { A11yPlatformSnapshot } from '../../foundation/a11y';
@@ -42,6 +45,47 @@ export default function FoundationScreen({ onSetup, onOpenCockpit }: { onSetup: 
   const now = useNow(run.phase === 'running');
   const platform = usePlatformA11y();
   const [ownerId, setOwnerId] = React.useState<string | null>(null);
+  const runOwnerEpoch = React.useRef<number | null>(null);
+  const runGeneration = React.useRef(0);
+  const exportLock = React.useRef(false);
+  const [exportBusy, setExportBusy] = React.useState(false);
+  const [exportError, setExportError] = React.useState<string | null>(null);
+  React.useEffect(() => subscribeAuthChanges(() => {
+    runGeneration.current += 1;
+    setOwnerId(null);
+    setExportError(null);
+  }), []);
+  const startForge = React.useCallback((projectId: string, request: RunRequest) => {
+    runOwnerEpoch.current = getAuthEpoch();
+    runGeneration.current += 1;
+    setOwnerId(projectId);
+    setExportError(null);
+    void run.start(request);
+  }, [run.start]);
+  const exportGodot = React.useCallback(() => {
+    if (exportLock.current || !ownerId || run.phase !== 'done'
+      || run.payload?.succeeded !== true || run.payload.source_export?.status !== 'ready') return;
+    const epoch = runOwnerEpoch.current;
+    const generation = runGeneration.current;
+    if (epoch === null || epoch !== getAuthEpoch()) {
+      setExportError('Account changed since this game was generated; forge again before exporting.');
+      return;
+    }
+    exportLock.current = true;
+    setExportBusy(true);
+    setExportError(null);
+    void shareGodotSourceArchive(run.payload, () =>
+      epoch === getAuthEpoch() && generation === runGeneration.current
+    ).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : '';
+      setExportError(message.startsWith('Godot') || message.startsWith('Device') || message.startsWith('Source')
+        ? message.slice(0, 180)
+        : 'The source ZIP could not be shared on this device.');
+    }).finally(() => {
+      exportLock.current = false;
+      setExportBusy(false);
+    });
+  }, [ownerId, run.phase, run.payload]);
   const store = React.useMemo(() => asyncStorageKv(), []);
   const auth = React.useMemo(() => gameforgeAuthPort(), []);
   const load = React.useCallback(() => loadFoundation(store), [store]);
@@ -71,8 +115,11 @@ export default function FoundationScreen({ onSetup, onOpenCockpit }: { onSetup: 
           startedAt: run.startedAt,
           finishedAt: run.finishedAt,
           ownerId,
-          onStart: (projectId, req) => { setOwnerId(projectId); void run.start(req); },
+          onStart: startForge,
           onCancel: run.cancel,
+          onExport: exportGodot,
+          exportBusy,
+          exportError,
         },
         now,
         console: {
