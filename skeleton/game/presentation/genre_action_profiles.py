@@ -74,6 +74,12 @@ def _movement() -> list[Binding]:
         _bind("move", "keyboard:key.d"),
         _bind("move", "gamepad:stick.left.x", deadzone=0.15),
         _bind("move", "gamepad:stick.left.y", axis="y", deadzone=0.15),
+        # Native/replay compatibility: discrete D-pad routes can enter the
+        # canonical input router; raw analog sticks require a separate adapter.
+        _bind("move", "gamepad:button.dpad_up", axis="y"),
+        _bind("move", "gamepad:button.dpad_down", scale=-1, axis="y"),
+        _bind("move", "gamepad:button.dpad_left", scale=-1),
+        _bind("move", "gamepad:button.dpad_right"),
         _bind("move", "touch:swipe.x"),
         _bind("move", "touch:swipe.y", axis="y"),
     ]
