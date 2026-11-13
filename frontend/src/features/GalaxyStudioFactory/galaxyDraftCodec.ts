@@ -67,7 +67,7 @@ export interface GalaxyDraftSnapshot {
 const obj = (x: unknown): Record<string, unknown> | null =>
   x !== null && typeof x === 'object' && !Array.isArray(x) ? x as Record<string, unknown> : null;
 const clip = (x: unknown, limit: number): string => typeof x === 'string' ? x.slice(0, limit) : '';
-const validId = (x: unknown): x is string => typeof x === 'string' && KEY_PATTERN.test(x);
+const validId = (x: unknown): x is string => typeof x === 'string' && KEY_PATTERN.test(x) && !['constructor', 'prototype', '__proto__'].includes(x);
 const num = (x: unknown, lo: number, hi: number, fallback: number): number =>
   typeof x === 'number' && Number.isFinite(x) && x >= lo && x <= hi ? x : fallback;
 
