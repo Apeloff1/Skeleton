@@ -214,8 +214,4 @@ def attach_genre(files: Mapping[str, str], spec: Mapping[str, Any], content: Map
     out[DESIGN_SPEC_PATH] = _dump(dict(spec))
     out[CONTENT_PATH] = _dump(dict(content))
     out[CORE_LOOP_PATH] = CORE_LOOP_GD
-    # The autoload above remains a content-table proof. Live controls, physics,
-    # combat and completion belong to the separately attached visible scene.
-    from skeleton.forge.playable_runtime import attach_playable
-
-    return attach_playable(out, spec)
+    return out

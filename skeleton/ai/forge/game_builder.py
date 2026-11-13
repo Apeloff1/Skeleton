@@ -24,9 +24,7 @@ import time
 from typing import Any, Callable, Mapping, Optional, Protocol, Sequence
 
 from skeleton.forge.game_content import CONTENT_SCHEMA, generate_content
-from skeleton.forge.game_design_spec import (
-    SCHEMA_VERSION, compile_brief, gameplay_constraints, validate_gameplay,
-)
+from skeleton.forge.game_design_spec import SCHEMA_VERSION, compile_brief
 from skeleton.forge.genre_project import (
     CORE_LOOP_PATH,
     attach_genre,
@@ -68,13 +66,12 @@ RESULT_FIELDS = (
     "qa",
     "deadline_s",
     "structured_brief",
-    "interactive",
 )
 STUBBED = (
     "authored sprites, meshes, and audio",
-    "human playtesting and cross-device performance qualification",
+    "input-driven play beyond the headless core-loop proof",
     "multiplayer, persistence past the economy ledger, and store packaging",
-    "general model design/code quality; bounded proposals retain deterministic compiler authority",
+    "provider model proposals; the deterministic compiler is the commit authority",
     "vehicle dynamics past one kinematic integration proof",
 )
 
@@ -426,18 +423,6 @@ def _apply_planner(
             enriched.pop("production", None)
     else:
         return committed
-    if "gameplay" in proposed:
-        try:
-            enriched["gameplay"] = validate_gameplay(
-                proposed["gameplay"], genre=str(committed["genre"]),
-            )
-            if any(enriched["gameplay"][key] != value for key, value in
-                   gameplay_constraints(str(committed["brief"])).items()):
-                return committed
-        except ValueError:
-            # A model can propose bounded gameplay data, never executable
-            # source or a partially admitted configuration.
-            return committed
     return _seal_spec(enriched)
 
 
@@ -608,7 +593,6 @@ def _blank_result(**overrides: Any) -> dict[str, Any]:
         "project_id": None,
         "deadline_s": DEFAULT_DEADLINE_S,
         "structured_brief": None,
-        "interactive": None,
     }
     body.update(overrides)
     return body
@@ -923,15 +907,6 @@ def build_playable_game(
     if _expired(deadline_at):
         return halt(pipeline=pipeline, spec=spec, content=content, proved=proved, files=proved_files, qa_report=qa_report)
     _progress(on_progress, 1.0, "complete" if ok else "failed")
-    from skeleton.forge.playable_runtime import RUNTIME_PATH, runtime_manifest
-    interactive = None
-    if RUNTIME_PATH in proved_files:
-        interactive = {
-            **runtime_manifest(spec),
-            "available": True,
-            "native_boot_verified": bool((proved.get("playtest") or {}).get("passed")),
-            "input_journey_verified": False,
-        }
     body = _blank_result(
         ok=ok,
         spec=spec,
@@ -952,7 +927,6 @@ def build_playable_game(
         project=written,
         file_names=sorted(proved_files),
         files=proved_files,
-        interactive=interactive,
         _operator=dict(pipeline),
         **identity,
     )

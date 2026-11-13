@@ -30,6 +30,27 @@ export function fetchGenreControls(genre: string, signal?: AbortSignal): Promise
   });
 }
 
+/** Seven-stage historical planning is preview-only: no project files are written. */
+export interface ConductorPreviewResult {
+  ok: boolean;
+  mode: string;
+  completed: string[];
+  artifacts: string[];
+  artifact_count: number;
+  byte_total: number;
+  manifest?: unknown;
+}
+
+export function previewHistoricalConductor(
+  request: { title: string; pitch: string; genre: string; pillars: string[] },
+  signal?: AbortSignal,
+): Promise<ApiResult<ConductorPreviewResult>> {
+  return api.post(`${SKELETON_API}/conductor/preview`, {
+    ...request, era: 'HOUSE_ERA', target: 'bundle',
+    target_minutes: 15, budget_bytes: 1000000, regions: 5,
+  }, { signal, timeoutMs: 15000, retries: 0 });
+}
+
 export function composeVision(vision: string, signal?: AbortSignal): Promise<ApiResult<ComposeResult>> {
   return api.post(`${SKELETON_API}/compose`, { vision: vision.slice(0, 4000) }, { signal, timeoutMs: 12000, retries: 0 });
 }

@@ -132,6 +132,55 @@ def gameforge_control_genre(genre: str) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail="unknown creator genre") from exc
 
 
+class HistoricalConductorPreviewRequest(BaseModel):
+    """Bounded archival seven-stage preview; does not mutate current GameForge."""
+    title: str = Field(min_length=1, max_length=120)
+    pitch: str = Field(min_length=1, max_length=4000)
+    genre: str = Field(min_length=1, max_length=48)
+    pillars: list[str] = Field(default_factory=lambda: ["gameplay"])
+    era: str = Field(default="HOUSE_ERA", max_length=32)
+    target_minutes: int = Field(default=15, ge=1, le=600)
+    target: str = Field(default="bundle", max_length=16)
+    budget_bytes: int = Field(default=1_000_000, ge=1024, le=1_000_000)
+    regions: int = Field(default=5, ge=1, le=20)
+
+
+@router.post("/conductor/preview")
+def historical_conductor_preview(req: HistoricalConductorPreviewRequest) -> Dict[str, Any]:
+    """Restored archived #807 seven-step planning; return only bounded receipts.
+
+    No file writes, project overwrites or native game readiness claims.
+    """
+    from skeleton.gameforge import ConductorConfig, GameForgeConductor
+    from skeleton.gameforge.plans import GENRES
+    from skeleton.gameforge.eras import BUILTIN_ERAS
+    if req.genre not in GENRES:
+        raise HTTPException(status_code=422, detail="unsupported historical conductor genre")
+    if req.era not in BUILTIN_ERAS:
+        raise HTTPException(status_code=422, detail="unsupported historical conductor era")
+    if req.target not in {"web", "desktop", "bundle"}:
+        raise HTTPException(status_code=422, detail="unsupported historical conductor export target")
+    if not 1 <= len(req.pillars) <= 5 or any(
+        not isinstance(pillar, str) or not 1 <= len(pillar) <= 100 for pillar in req.pillars
+    ):
+        raise HTTPException(status_code=422, detail="pillars must contain one to five short strings")
+    result = GameForgeConductor(config=ConductorConfig(
+        budget_bytes=req.budget_bytes, regions=req.regions, target=req.target
+    )).run({
+        "title": req.title, "pitch": req.pitch, "genre": req.genre,
+        "pillars": req.pillars, "target_minutes": req.target_minutes, "era": req.era,
+    })
+    if not result.ok:
+        raise HTTPException(status_code=422, detail=result.error.to_dict() if result.error else "preview rejected")
+    return {
+        **result.to_dict(),
+        "mode": "historical_7_stage_preview",
+        "artifacts": sorted(result.artifacts),
+        "artifact_count": len(result.artifacts),
+        "byte_total": sum(len(data) for data in result.artifacts.values()),
+    }
+
+
 class ComposeRequest(BaseModel):
     vision: str = Field(default="", max_length=4000)
 

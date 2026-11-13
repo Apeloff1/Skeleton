@@ -16,7 +16,6 @@ from typing import Any, Mapping
 from skeleton.forge.pipelines.animation import AnimationPipeline
 from skeleton.forge.pipelines.dialogue import DialogueEdge, DialogueNode, DialogueTree, DialogueWalker
 from skeleton.forge.pipelines.game_logic import GameLogicPipeline
-from skeleton.forge.game_design_spec import gameplay_for_spec
 
 CONTENT_SCHEMA = "skeleton.game_content_bundle.v1"
 
@@ -63,33 +62,15 @@ def _levels(files: Mapping[str, str], limit: int) -> list[dict[str, str]]:
     return levels
 
 
-def _encounters(count: int, gameplay: Mapping[str, Any]) -> list[dict[str, int | str]]:
+def _encounters(count: int) -> list[dict[str, int | str]]:
     rows: list[dict[str, int | str]] = []
-    difficulty = gameplay["difficulty"]
-    style = gameplay["encounter_style"]
-    base_hp = {"easy": 8, "normal": 12, "hard": 16}[difficulty]
-    base_hp += {"swarm": -2, "patrol": 0, "ranged": 2}[style]
-    enemy_damage = {"easy": 0, "normal": 1, "hard": 2}[difficulty]
-    base_reward = {"easy": 8, "normal": 10, "hard": 14}[difficulty]
-    base_reward += {"swarm": 1, "patrol": 0, "ranged": 2}[style]
-    roles = {
-        "swarm": ("skirmisher", "flanker", "overseer"),
-        "patrol": ("sentry", "scout", "captain"),
-        "ranged": ("archer", "spotter", "artillerist"),
-    }[style]
     for index in range(count):
         rows.append({
             "id": f"e{index}",
-            # Progression changes executable combat/economy values, not just
-            # design notes. Even hard/large/ranged stays winnable under the
-            # deterministic core-loop oracle (100 HP, six damage per hit).
-            "hp": base_hp + index,
+            "hp": 12,
             "player_damage": 6,
-            "enemy_damage": enemy_damage,
-            "loot": base_reward + 3 * index,
-            "style": style,
-            "role": roles[index % len(roles)],
-            "reward_tier": 1 + index // 2,
+            "enemy_damage": 1,
+            "loot": 10,
         })
     return rows
 
@@ -323,14 +304,8 @@ def generate_content(spec: Mapping[str, Any], files: Mapping[str, str] | None = 
         raise ValueError("spec_id must be a sha256 hex digest")
     description = str(spec.get("brief") or spec.get("fantasy") or genre)
     seed = _seed(spec_id)
-    gameplay = gameplay_for_spec(spec)
-    encounters = _encounters(_SCOPE_ENCOUNTERS[scope], gameplay)
-    gaps = _SCOPE_PLATFORMS[scope]
-    if gameplay["difficulty"] == "easy":
-        gaps = tuple(min(2, gap) for gap in gaps)
-    elif gameplay["difficulty"] == "hard":
-        gaps = tuple(min(4, gap + 1) for gap in gaps)
-    platforms, goal_x, jump_reach = _platforms(gaps)
+    encounters = _encounters(_SCOPE_ENCOUNTERS[scope])
+    platforms, goal_x, jump_reach = _platforms(_SCOPE_PLATFORMS[scope])
     economy = _economy(seed, encounters, currency="salvage" if genre == "top_down_shooter" else "gold")
     narrative, longform = _longform(spec, scope)
     bundle = {
@@ -338,7 +313,6 @@ def generate_content(spec: Mapping[str, Any], files: Mapping[str, str] | None = 
         "spec_id": spec_id,
         "genre": genre,
         "scope": scope,
-        "gameplay": gameplay,
         "player_hp": 100,
         "jump_reach": jump_reach,
         "goal_x": goal_x,
