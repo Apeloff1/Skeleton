@@ -12,7 +12,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { gridMove, readKey, rovingTabIndex, tabIndexProp, useRovingIndex, webKeyProps, type KeyEventLike } from '../a11y';
 import { featureMeta, humanize } from '../graph';
 import type { RunPhase } from '../hooks';
-import { formatElapsed, formatScore, pendingStages, summarizeRun, type StageView } from '../run';
+import { formatElapsed, formatScore, pendingStages, playableSceneView, summarizeRun, type StageView } from '../run';
 import type { RunPayload } from '../types';
 import { Banner, Button, Card, Meter, SectionTitle, StatusPill } from './primitives';
 import { C, TONE_COLOR, TONE_GLYPH } from './theme';
@@ -46,6 +46,7 @@ export interface ForgeRunPanelProps {
 export default function ForgeRunPanel({ phase, payload, error, startedAt, finishedAt, now = Date.now(), onCancel, onRetry, onViewEra, onViewPlan, reduceMotion = false, testID }: ForgeRunPanelProps) {
   const elapsed = startedAt != null ? (finishedAt ?? now) - startedAt : 0;
   const sum = React.useMemo(() => summarizeRun(payload), [payload]);
+  const playableEvidence = React.useMemo(() => playableSceneView(payload), [payload]);
 
   if (phase === 'idle') {
     return (
@@ -103,6 +104,8 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Fact k="Primary DPS" v={sum.primaryDps === null ? '—' : String(sum.primaryDps)} />
               <Fact k="Simulation" v={sum.simPassed === null ? '—' : sum.simPassed ? 'passed' : 'failed'} />
               <Fact k="Ledger" v={sum.ledgerValid === null ? '—' : sum.ledgerValid ? 'valid' : 'INVALID'} />
+              {payload.forge?.playable_archetype ? <Fact k="Playable scene" v={payload.forge.playable_archetype} /> : null}
+              {payload.native_quest?.steps ? <Fact k="Native quest" v={String(payload.native_quest.steps) + ' room objectives' + (payload.native_quest.sealed ? ' · source sealed' : ' · unsealed')} /> : null}
               {sum.generation ? <Fact k="Hardware" v={humanize(sum.generation)} /> : null}
             </View>
             {sum.composedFeatures.length ? (
@@ -143,6 +146,20 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Text style={st.cardTitle}>Playtest</Text>
               <StatusPill tone={sum.playtest.tone} label={sum.playtest.label} />
             </View>
+            {playableEvidence ? (
+              <View testID="run-playable-scene-qualification">
+                <View style={[st.head, { marginTop: 10 }]}>
+                  <Text style={st.cardTitle}>Independent playable scene</Text>
+                  <StatusPill tone={playableEvidence.tone} label={playableEvidence.label} testID="run-playable-scene-status" />
+                </View>
+                {payload.playable_scene_playtest?.scene ? <Text style={st.small}>Source scene: {payload.playable_scene_playtest.scene}</Text> : null}
+                {payload.playable_scene_playtest?.errors?.length ? (
+                  <Text style={[st.small, { color: C.red }]} testID="run-playable-scene-errors">
+                    {payload.playable_scene_playtest.errors.slice(0, 3).join('; ')}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
           </Card>
 
           {sum.advice || sum.briefing ? (
