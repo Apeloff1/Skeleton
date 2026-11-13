@@ -44,7 +44,7 @@ import { jeevesSpeak } from '../Academy/jeevesTts';
 import { shareResult } from '../../utils/shareResult';
 import { classifyBuildJob } from '../../product/buildJobLifecycle';
 
-import { FALLBACK_GENRES } from './fallbackGenres';
+import { mergeGalaxyGenreCatalog } from './genreRegistry';
 import { prepareGalaxyHandoff } from '../../skeletonForge/galaxyHandoff';
 const BACKEND = CANONICAL_API_BASE;
 
@@ -386,7 +386,7 @@ export default function GalaxyStudioFactoryModal
   }, []);
   // Prime with baked-in fallback so the picker ALWAYS renders 52 genres,
   // network or not. The network fetch below overwrites on success.
-  const [genres, setGenres] = useState<Genre[]>(FALLBACK_GENRES as any);
+  const [genres, setGenres] = useState<Genre[]>(mergeGalaxyGenreCatalog(null) as Genre[]);
   const [manifest, setManifest] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -868,12 +868,12 @@ export default function GalaxyStudioFactoryModal
         staleMaxMs: 30 * 24 * 60 * 60_000, // serve up to 30 d stale
       });
       if (data && Array.isArray(data.genres) && data.genres.length > 0) {
-        setGenres(data.genres);
+        setGenres(mergeGalaxyGenreCatalog(data) as Genre[]);
         return;
       }
     } catch {}
     // Guarantee the fallback is always present
-    setGenres(prev => (prev && prev.length > 0 ? prev : (FALLBACK_GENRES as any)));
+    setGenres(prev => mergeGalaxyGenreCatalog({ genres: prev }) as Genre[]);
   };
 
   const addLog = useCallback((msg: string) => {

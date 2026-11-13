@@ -76,6 +76,11 @@ for _group in GENRE_GROUPS:
     for _genre, _era in _group["genres"]:
         GENRE_FAMILY.setdefault(_genre, _GROUP_CONTROL_FAMILY[_group["id"]])
 
+# Distinct historical specialties repaired after the original 67-genre
+# offline catalog was sealed. Do not re-label them as finished game engines.
+RECOVERED_GALAXY_GENRE_FAMILY = {"beat_em_up": "platformer", "shoot_em_up": "shooter"}
+GENRE_FAMILY.update(RECOVERED_GALAXY_GENRE_FAMILY)
+
 FAMILIES = frozenset({"adventure", "rpg", "strategy", "sandbox", "platformer", "shooter", "puzzle", "racing"})
 
 
@@ -187,6 +192,7 @@ def genre_control_profile(genre: str) -> dict[str, object]:
             ("galaxy", genre in GALAXY_GENRE_FAMILY),
             ("gameforge", genre in QUESTIONNAIRE_GENRE_FAMILY),
             ("gameforge-extended", genre in GENRE_ERA_VOTES),
+            ("galaxy-recovered", genre in RECOVERED_GALAXY_GENRE_FAMILY),
         ) if present]),
         "actions": [
             {"id": a.action_id, "kind": a.kind, "context": a.context}

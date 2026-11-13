@@ -84,9 +84,9 @@ test('the legacy full Galaxy matrix questionnaire is reachable from Forge option
 });
 
 
-test('the original 67-genre catalog feeds canonical Forge run semantics', () => {
+test('the 69-entry archived-plus-recovered catalog feeds canonical Forge run semantics', () => {
   const G = load('src/skeletonForge/galaxyGenres.ts');
-  assert.equal(G.GALAXY_CHOICES.length, 67);
+  assert.equal(G.GALAXY_CHOICES.length, 69);
   assert.deepEqual(new Set(Object.keys(G.GALAXY_TO_FORGE_BRIEF)), new Set(G.GALAXY_CHOICES.map((g) => g.id)));
   const known = Q.BRIEF_FACETS.find((f) => f.id === 'genre').options;
   for (const item of G.GALAXY_CHOICES) {
@@ -115,7 +115,7 @@ test('63+ genre options are discoverable within the existing five-step Forge', (
   const html = render(h(Flow, {
     state, dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {},
   }));
-  assert.match(text(html), /all 67 Galaxy genres/);
+  assert.match(text(html), /all 69 Galaxy genres/);
   assert.match(html, /data-testid="q-galaxy-genres-toggle"/);
 });
 

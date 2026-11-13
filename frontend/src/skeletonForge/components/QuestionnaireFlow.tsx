@@ -273,7 +273,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         <Text style={st.q}>Playable genre prototypes</Text>
         <Text style={st.help}>
           Include an original self-contained Godot mini-game with real controls and a win/lose loop.
-          Choose from the eight implemented prototypes; this does not mean all 67 historical genres have complete gameplay.
+          Choose from the eight implemented prototypes; this does not mean all 69 catalog genres have complete gameplay.
         </Text>
         <View style={st.chips}>
           <Chip label="No extra mini-game" selected={!state.playable?.enabled}
@@ -381,7 +381,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         </View>
       ) : null}
       <View style={st.group}>
-        <Button label={galaxyOpen ? 'Hide 67-genre catalog' : 'Advanced: choose from all 67 Galaxy genres'}
+        <Button label={galaxyOpen ? 'Hide 69-genre catalog' : 'Advanced: choose from all 69 Galaxy genres'}
           tone="secondary" compact testID="q-galaxy-genres-toggle"
           onPress={() => setGalaxyOpen((open) => !open)} />
       </View>
@@ -394,7 +394,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           </Text>
           <TextInput testID="q-galaxy-genre-search" style={[st.input, { minHeight: TOUCH }]}
             value={genreSearch} onChangeText={setGenreSearch}
-            placeholder="Search 67 genres" accessibilityLabel="Search Galaxy genres"
+            placeholder="Search 69 genres" accessibilityLabel="Search Galaxy genres"
             placeholderTextColor={C.dim} />
           <Text style={st.help}>{filteredGenres.length} matching genres. {filteredGenres.length > 24 ? 'Showing first 24; refine your search.' : ''}</Text>
           <View style={st.chips}>
