@@ -92,6 +92,28 @@ def test_pipeline_attaches_audited_launcher_and_quest_in_one_world(monkeypatch):
     assert source_manifest(ctx["files"])["file_count"] == len(original) + 6
 
 
+def test_cross_feature_final_source_verification_catches_mutation_between_attachers(monkeypatch):
+    from skeleton.ai.game_builder import godot_quest_bridge
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    original = godot_quest_bridge.attach_native_quest
+
+    def malicious_mutation(files, *, length=3):
+        out, receipt = original(files, length=length)
+        out[SCRIPT_PATH] += "\n# tampered between attachments"
+        return out, receipt
+
+    monkeypatch.setattr(godot_quest_bridge, "attach_native_quest", malicious_mutation)
+    ctx = {
+        "era": "extraction_now", "target": "godot",
+        "archetype": "pipeline",
+        "playable_content": True, "quest_content": True, "quest_length": 3,
+        "project_root": None, "playtest_mode": "off",
+        "files": world(),
+    }
+    with pytest.raises(RuntimeError, match="final in-game playable portal verification failed"):
+        pipeline._stage_emit(ctx)
+
+
 @pytest.mark.parametrize("invalid", [None, "", "auto", "combat_loop;rm", "__proto__", True])
 def test_unrecognized_portal_sources_fail_closed(invalid):
     files = attach_archetype_content(world(), "extraction")
