@@ -35,6 +35,22 @@ test('all 69 historical Galaxy fallback genres have a valid 158-choice GameForge
   assert.equal(Galaxy.mappedBriefGenre('shoot_em_up'), 'shoot-em-up');
 });
 
+test('backend-fetched Galaxy-only genres map into the expanded 158-choice brief without false specialty', () => {
+  const draft = H.handoffFromGalaxy({
+    title: 'A needle-jump platformer',
+    vision: 'Precision movement through shrinking rooms',
+    genreId: 'precision_platformer',
+  }, null, 1700000000000);
+  assert.equal(draft.brief.genre, 'precision-platformer');
+  assert.equal(draft.galaxyGenre, null);
+  const state = H.forgeStateFromHandoff(draft, 1700000000001);
+  assert.equal(Q.buildRunRequest(state).answers.genre, 'precision-platformer');
+  assert.doesNotMatch(Q.buildRunRequest(state).vision, /Specialized genre:/);
+  assert.throws(() => H.handoffFromGalaxy({
+    title: 'An unknown genre', vision: '', genreId: 'unknown_private_genre',
+  }, null, 1700000000000), /no compatible GameForge mapping/);
+});
+
 test('explicit Forge → Galaxy → Forge handoff retains authored axes, beats and native quest', () => {
   const initial = make(
     { type: 'setVision', vision: 'An original multiplayer racing adventure' },
