@@ -72,6 +72,8 @@ export interface QuestionnaireState {
   brief: Record<string, string>;
   beats: Record<string, string>;
   options: ForgeOptions;
+  /** Explicit opt-in native Godot room-entry quest prototype. */
+  quest?: { enabled: boolean; length: number };
 }
 
 export type QuestionnaireAction =
@@ -79,6 +81,8 @@ export type QuestionnaireAction =
   | { type: 'setBrief'; facet: string; value: string | null }
   | { type: 'setBeat'; beat: string; value: string | null }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
+  | { type: 'setQuestEnabled'; value: boolean }
+  | { type: 'setQuestLength'; value: number }
   | { type: 'next' }
   | { type: 'back' }
   | { type: 'goto'; step: Step }
@@ -90,6 +94,7 @@ export const INITIAL_STATE: QuestionnaireState = {
   brief: {},
   beats: {},
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
+  quest: { enabled: false, length: 3 },
 };
 
 function toggle(map: Record<string, string>, key: string, value: string | null): Record<string, string> {
@@ -132,6 +137,12 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       return { ...state, brief: toggle(state.brief, action.facet, action.value) };
     case 'setBeat':
       return { ...state, beats: toggle(state.beats, action.beat, action.value) };
+    case 'setQuestEnabled':
+      return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true } };
+    case 'setQuestLength': {
+      if (!Number.isInteger(action.value) || action.value < 1 || action.value > 8) return state;
+      return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, length: action.value } };
+    }
     case 'setOption': {
       const value = action.value === '' ? null : action.value;
       if (action.key === 'archetype' || action.key === 'target') {
@@ -194,7 +205,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   // exists in both); a beat answer wins because beats are authoritative.
   for (const [k, v] of Object.entries(state.brief)) answers[k] = v;
   for (const [k, v] of Object.entries(state.beats)) answers[k] = v;
-  return {
+  const request: RunRequest = {
     vision: state.vision.trim().slice(0, VISION_MAX),
     era: state.options.era,
     archetype: state.options.archetype || 'auto',
@@ -202,6 +213,13 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
     generation: state.options.generation,
     answers,
   };
+  // Never change legacy request bytes for callers that did not opt in.
+  // Quest gameplay exists only in the native Godot project, not JSON export.
+  if (state.quest?.enabled && request.target === 'godot') {
+    request.quest_content = true;
+    request.quest_length = Math.max(1, Math.min(8, state.quest.length));
+  }
+  return request;
 }
 
 /** Collisions where a beat answer shadows a brief facet of the same id. */
