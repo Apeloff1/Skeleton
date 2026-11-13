@@ -33,6 +33,7 @@ from skeleton.eval.game_builder_quality import (
 
 SOURCE_FILES = (
     "skeleton/eval/game_builder_quality.py",
+    "skeleton/eval/game_builder_reference_pack.py",
     "scripts/evaluate_jeeves_game_builder_quality.py",
     "tests/test_game_builder_quality.py",
     "skeleton/app/local_ai.py",
@@ -100,6 +101,57 @@ def response_text(result, *, structured: bool) -> tuple[str, str]:
     if result.structured_output is not None or not isinstance(result.text, str):
         raise GameQualityError("plain execution did not return model text")
     return result.text, "native-text"
+
+
+def task_prompt(task, reference_pack=None) -> str:
+    """Append optional source evidence to the user turn, never instructions."""
+    if reference_pack is None:
+        return task.prompt
+    context = reference_pack.context_for_category(task.category)
+    if not isinstance(context, str):
+        raise GameQualityError("reference context must be text")
+    if not context:
+        return task.prompt
+    try:
+        size = len(context.encode("utf-8", errors="strict"))
+    except UnicodeError:
+        raise GameQualityError("reference context must be valid UTF-8") from None
+    if size > 2200:
+        raise GameQualityError("reference context exceeds the frozen 2200-byte allowance")
+    return task.prompt + "\n\n" + context
+
+
+def prepare_requests(tasks, args, model, reference_pack=None):
+    """Preflight the full selected campaign before the first native dispatch.
+
+    The existing model owns exact rendering and conservative token accounting;
+    the canonical budget validator owns admission. No context is truncated.
+    """
+    from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInputBudget
+
+    budget = LocalInputBudget.from_limits(model.generation_limits())
+    prepared = {}
+    for task in tasks:
+        prompt = task_prompt(task, reference_pack)
+        request = LocalInferenceRequest(
+            prompt=prompt, instructions=INSTRUCTIONS,
+            max_output_tokens=args.output_tokens, seed=args.seed,
+            temperature=0.0, tool_choice="none",
+            structured_output_schema=output_schema(task) if args.structured_output else None,
+        )
+        upper_bound = model.count_input_tokens(request)
+        budget.validate_request(request, upper_bound)
+        prepared[task.task_id] = (request, {
+            "input_tokens_upper_bound": upper_bound,
+            "max_output_tokens": args.output_tokens,
+            "context_window": budget.context_window,
+            "max_total_tokens": budget.max_total_tokens,
+            "prompt_utf8_bytes": len(prompt.encode("utf-8")),
+            "reference_context_applied": prompt != task.prompt,
+            "reference_context_bytes": (len(reference_pack.context_for_category(task.category).encode("utf-8"))
+                                        if reference_pack is not None else 0),
+        })
+    return prepared
 
 
 def create_json(path: Path, value: dict[str, object]) -> None:
@@ -175,10 +227,16 @@ async def evaluate(args: argparse.Namespace) -> dict[str, object]:
     # never activate a runtime or inspect a user's model files.
     from skeleton.app.local_ai import load_gguf_deployment
     from skeleton.app.jeeves_local_lease import LocalInferenceLease
-    from skeleton.ai.runtime.inference.local import LocalInferenceEngine, LocalInferenceRequest
+    from skeleton.ai.runtime.inference.local import LocalInferenceEngine
 
     tasks = select_tasks(limit=args.limit,
                          task_ids=tuple(args.task_ids.split(",")) if args.task_ids else None)
+    reference_pack = None
+    if args.reference_pack is not None:
+        from skeleton.eval.game_builder_reference_pack import load_reference_pack
+        reference_pack = load_reference_pack(args.reference_pack, scope="code_debugging")
+    reference_metadata = (json.loads(canonical_bytes(reference_pack.to_wire()))
+                          if reference_pack is not None else None)
     if not 64 <= args.output_tokens <= 256:
         raise GameQualityError("output tokens must be in [64, 256]")
     if not 1 <= args.task_seconds <= 600 or not args.task_seconds <= args.total_seconds <= 14400:
@@ -200,6 +258,7 @@ async def evaluate(args: argparse.Namespace) -> dict[str, object]:
         if model.model_id != "jeeves":
             raise GameQualityError("the operator's admitted Jeeves identity is required")
         model.check_readiness()
+        prepared = prepare_requests(tasks, args, model, reference_pack)
         source = source_identity()
         manifest_path = Path(args.manifest).expanduser().resolve(strict=True)
         config = json.loads(canonical_bytes(asdict(model.config)))
@@ -233,15 +292,29 @@ async def evaluate(args: argparse.Namespace) -> dict[str, object]:
             "network_sandbox_attested": False,
             "generated_code_executed": False,
         }
+        if reference_pack is not None:
+            identity["reference_pack"] = reference_metadata
+            identity["request_context_admission"] = {task_id: entry[1] for task_id, entry in prepared.items()}
+            identity["request_policy_sha256"] = digest({
+                "base_request_policy_sha256": identity["request_policy_sha256"],
+                "reference_pack": reference_metadata,
+                "request_context_admission": identity["request_context_admission"],
+            })
         manifest_file = output / "run.json"
         if args.resume:
             if read_json(manifest_file) != identity:
                 raise GameQualityError("resume source/model/config/taskset/environment identity differs")
             if read_json(output / "taskset.json") != json.loads(canonical_bytes(taskset_manifest())):
                 raise GameQualityError("saved taskset differs from the fixed workload")
+            if reference_pack is not None and read_json(output / "reference-pack.json") != {
+                    "metadata": reference_metadata, "context_text": reference_pack.context_text}:
+                raise GameQualityError("retained reference pack changed")
         else:
             create_json(manifest_file, identity)
             create_json(output / "taskset.json", taskset_manifest())
+            if reference_pack is not None:
+                create_json(output / "reference-pack.json", {
+                    "metadata": reference_metadata, "context_text": reference_pack.context_text})
         snapshot_source(output, source, resume=args.resume)
         rows = load_completed(output, identity, tuple(task.task_id for task in tasks))
         invocation_started = time.monotonic()
@@ -256,12 +329,7 @@ async def evaluate(args: argparse.Namespace) -> dict[str, object]:
                 if time.monotonic() >= deadline:
                     stop_reason = "total_deadline_reached"
                     break
-                request = LocalInferenceRequest(
-                    prompt=task.prompt, instructions=INSTRUCTIONS,
-                    max_output_tokens=args.output_tokens, seed=args.seed,
-                    temperature=0.0, tool_choice="none",
-                    structured_output_schema=output_schema(task) if args.structured_output else None,
-                )
+                request, context_admission = prepared[task.task_id]
                 started = time.monotonic()
                 task_deadline = min(deadline, started + args.task_seconds)
                 error_code = None
@@ -292,6 +360,7 @@ async def evaluate(args: argparse.Namespace) -> dict[str, object]:
                     "request_sha256": request.digest, "result": scored,
                     "error_code": error_code,
                     "response_representation": representation,
+                    "context_admission": context_admission,
                     "local_execution_receipt_sha256": (
                         result.execution_receipt_digest if result is not None else None),
                     "input_tokens": result.input_tokens if result is not None else None,
@@ -342,6 +411,8 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--seed", type=int, default=17)
     result.add_argument("--structured-output", action="store_true",
                         help="Explicit candidate: existing native JSON-schema decoding; fixed tasks/scorer unchanged")
+    result.add_argument("--reference-pack", choices=("godot46",), default=None,
+                        help="Optional development grounding: bounded untrusted Godot source context in code/debugging user turns")
     return result
 
 

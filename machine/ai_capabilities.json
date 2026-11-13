@@ -660,7 +660,18 @@
         "tests/test_forge_gameplay_design.py",
         "tests/test_forge_interactive_runtime.py"
       ],
-      "release_boundary": "Local prototype capability. Model output is data, never host paths or executable source. Public diagnostic scores do not establish general model quality or release readiness."
+      "release_boundary": "Local prototype capability. Model output is data, never host paths or executable source. Public diagnostic scores do not establish general model quality or release readiness.",
+      "workspace_adapter": {
+        "owner": "skeleton/app/offline_game_builder.py",
+        "routes": [
+          "POST /v1/game-builds",
+          "GET /v1/game-builds",
+          "GET /v1/game-builds/{request_id}",
+          "GET /v1/game-builds/{request_id}/archive"
+        ],
+        "authority": "application composition of existing engine/compiler capability; no provider or source-write authority from model output",
+        "release_boundary": "local source ZIP only after accepted design and native input proof; no executable packaging, production publishing or quality promotion"
+      }
     }
   ],
   "invariants": [

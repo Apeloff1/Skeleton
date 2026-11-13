@@ -418,3 +418,155 @@ engineering conclusion: native schema decoding improved observed output-contract
 compliance, while both small local model configurations retain material
 game-code and reasoning failures that need grounded assistance and independent
 gameplay/code acceptance.
+
+## Optional Godot source-reference development experiment
+
+`--reference-pack godot46` explicitly adds a frozen, locally rendered reference
+pack from the existing evaluation owner. The default has no reference context:
+all original task prompts and system instructions remain unchanged. A grounded
+full-suite invocation is:
+
+```sh
+.venv/bin/python scripts/evaluate_jeeves_game_builder_quality.py \
+  --manifest /absolute/path/to/jeeves.json \
+  --output-dir /absolute/path/to/new-private-grounded-suite \
+  --structured-output --reference-pack godot46 \
+  --output-tokens 192 --task-seconds 120 --total-seconds 1800
+```
+
+The first pack contains eight agent-written summaries of primary Godot 4.6 API
+documentation and two explicitly labelled derived implementation patterns. It
+covers velocity/motion, physics processing, floor contact, vectors, Area2D,
+signals, one-time effects, and terminal-state handling. Source URLs and the
+distinction between documented API behavior and derived patterns remain in
+metadata. These notes are **untrusted source data**, not system policy,
+permissions, verified generated code, human signoff, or a model-promotion record.
+
+Selection uses only the `gdscript` and `debugging` categories under the explicit
+`code_debugging` scope. The same complete reference text is appended to the
+**user prompt** for all eight selected tasks; the other sixteen prompts remain
+unchanged. The pack does not import the taskset/scorer, inspect task IDs, contain
+per-task answer keys, or change the fixed tasks, expected assertions, aliases,
+or scoring implementation. The model's existing instructions continue to treat
+supplied documents as untrusted task data.
+
+The frozen pack metadata records ID/version, Godot version, review date, scope,
+selected categories, source URLs, facts/source kinds, rendered context, maximum
+context allowance, byte count, and digest. The runner adds that metadata and a
+per-request context-admission map to `run.json`, binds them into request-policy
+identity, and retains `reference-pack.json` plus the reference module's actual
+source bytes in `source-snapshot/`. The actual expanded user prompt is bound by
+each native request digest; the taskset's original task-prompt digest remains
+unchanged and must not be mistaken for the expanded inference prompt.
+
+Before the first native dispatch, the runner prepares **every selected request**
+and uses the loaded model's exact rendering/conservative input counter with the
+canonical `LocalInputBudget` validator. Input plus output must fit the declared
+context budget. Reference text is limited to 2200 UTF-8 bytes; it is never
+silently shortened, character-trimmed, or selected to fit a failing individual
+task. An oversized pack or campaign is rejected before model generation. Any
+pack reduction must be reviewed, assigned its changed digest, and frozen before
+a new campaign begins. Resume checks the pack metadata, rendered text, source,
+request-policy identity, and all existing source/model/configuration bindings.
+
+Focused qualification now includes 34 runner/scorer/artifact tests and 14
+reference-pack contract tests. Integration checks demonstrate category-only
+selection, unchanged default prompts/instructions, user-context placement,
+request-digest changes, metadata round-trip identity, strict whole-campaign
+budget admission, and Unicode byte bounds without truncation. A read-only
+preflight on the actual 0.6B deployment admitted all 24 requests: eight had
+reference context, and the largest conservative input-plus-192-output bound was
+2600 against a 4096 context limit.
+
+The final pack used for this phase has 1309 UTF-8 context bytes and canonical
+digest `cd88d2c65b1413157cf4c9fb78bd83e61f8c9d77600f2aa03ac00a763306bf72`.
+The taskset remains
+`ddb5b43ba5aa5c14fc0598f32264dd94e58d0fa0b6f7035901468b5779c28ff1`; the
+scorer module bytes remain
+`26e11aed1857a44b0928098d8b650e9f1467768c49340b3c07cd78b6cbaf49c0`.
+
+This is **post-diagnostic development grounding**: the reference material and
+scope were chosen after observing failures on this public taskset. A changed
+result can inform implementation work, but cannot establish untouched-holdout
+generalization, training improvement, independent language/code quality,
+competitive superiority, or a general-purpose impressive game builder. All
+earlier raw artifacts and their exact source snapshots remain intact. The
+existing frozen-scorer caveats continue to apply.
+
+### Grounded campaign result: no net strict-score gain
+
+The complete grounded run is retained at
+`/workspace/artifacts/jeeves-game-quality-grounded`, including the frozen pack,
+source snapshots, all per-task responses/receipts, `summary-24.json`, and a
+create-only `comparison-to-structured.json` audit. All 24 responses completed,
+none reported truncation or deadline, the measured source identity remained
+unchanged, and all strict context preflights passed. A same-source resume
+revalidated all pack/response/source identities and returned the identical final
+summary without another model generation. Across the four complete
+campaigns there are now **96 real diagnostic responses**, plus the separately
+retained resource-held attempt with no model output.
+
+| Measurement | 0.6B structured without reference | 0.6B structured with reference |
+| --- | --- | --- |
+| Requested JSON shape | 24/24 | 24/24 |
+| Requirement assertions | 19/21 | 19/21 |
+| Correctness assertions | 19/28 | 19/28 |
+| Strict task passes | 15/24 | 15/24 |
+| Requirement tasks | 2/4 | 2/4 |
+| Constraint tasks | 2/3 | 2/3 |
+| Structured-design tasks | 3/4 | 3/4 |
+| GDScript-text tasks | 2/4 | 2/4 |
+| Debugging tasks | 1/4 | 1/4 |
+| Grounding tasks | 3/3 | 3/3 |
+| Iteration tasks | 2/2 | 2/2 |
+
+The audit confirms matching model/runtime/configuration, seed, budgets, taskset,
+scorer identity and scorer module bytes. Source HEAD changed between phases,
+and runner/test/reference sources changed deliberately; the recorded
+`local_ai.py`, native inference engine, and llama.cpp adapter bytes are identical
+between the ungrounded and grounded runs. All sixteen control responses outside
+the selected categories are identical as retained canonical structured values.
+
+Five selected responses changed (`gb12`, `gb14`, `gb15`, `gb16`, `gb17`), with one
+strict pass gained and one lost:
+
+- **Improved `gb15`:** `is_on_floor` / `move_and_slide` replaced `is_on_floor` /
+  `move`, matching the requested Godot 4 methods.
+- **Regressed `gb12`:** the previously correct `direction * speed` became
+  `velocity.x * speed`; the no-velocity-argument answer remained correct.
+- **Still failed `gb14`:** `area.body_entered.connect(handler)` copied the
+  generic reference form without binding the requested `_on_body_entered`
+  method. A valid generic API example is not a completed task-specific edit.
+- **Still failed `gb16`/`gb17`:** the guard stayed `frame_count` and its timing
+  value became `screen_width`; the vector method became `velocity`. Those
+  values do not satisfy the task choices or normalization API.
+- `gb13` gravity integration and `gb18` timer reset remained correct. `gb19`
+  remained health 1/no death; this reference pack did not solve the arithmetic
+  and terminal-state task.
+
+Observed total time was 96.628 seconds, median 3.872 seconds, maximum 5.297
+seconds. These remain descriptive, uncontrolled timings; no speed, tail,
+resource-efficiency, or performance-improvement claim is made.
+
+| Grounded evidence | Bound value |
+| --- | --- |
+| Source HEAD plus retained working-tree snapshots | `0cc6283f5b8c081e4f372d9c6970f703d646bbda` plus the run source map |
+| Reference module SHA-256 | `76b5f3e3b42ae28a7569e3a52820f816010946a6029fad9dd898923a38dbb971` |
+| Reference pack canonical digest | `cd88d2c65b1413157cf4c9fb78bd83e61f8c9d77600f2aa03ac00a763306bf72` |
+| Run identity SHA-256 | `4648819a6d1e1b08ffa3bb2eb73e7541034ed3bd12ace93a9760e5ae887de1f7` |
+| Final result-chain SHA-256 | `4ee886da3b3944fcb8aa13cd3868b882c083376dee867133af0633b481ca0e23` |
+
+The best observed strict task count remains 15/24, shared by the 0.6B structured
+configuration with and without this reference pack; the separate 1.5B coding
+configuration scored 13/24. This pack produced no net gain on the fixed
+diagnostic. The primary model and default inference behavior remain unchanged;
+there is no automatic promotion or general model ranking. The paired regression,
+known scorer limitations, and all adverse outputs remain in the record. Further
+grounding or product changes require separately recorded development experiments
+and independent task/code/gameplay acceptance before claiming broader quality.
+
+After measurement, constructor hardening copied caller-supplied fact/source-URL
+lists into owned tuples and validated their record types. The default context
+remains exactly 1309 bytes with the same canonical pack digest. Original measured
+source snapshots remain intact; the new constructor behavior was tested without
+another model campaign and is not represented as newly measured model quality.

@@ -10392,11 +10392,11 @@
     "instruction_policy": {
       "policy_id": "policy://game.forge_design/local-data-proposal@1",
       "version": "1.0.0",
-      "content_ref": "scripts/build_jeeves_game.py#SYSTEM",
+      "content_ref": "skeleton/app/offline_game_builder.py#SYSTEM",
       "activation": "operator-only prototype; no automatic production policy promotion"
     },
     "production_router": "existing capsec-gated ModelPlanner and ExecutingModelRouter remain authoritative",
-    "operator_composition": "explicit local artifact loader -> existing local inference -> strict plan parser/guard -> existing Forge build -> native proof -> create-only project",
+    "operator_composition": "explicit admitted local backend -> existing local inference -> strict plan parser/guard -> existing Forge build -> native proof -> create-only project; shared application operation used by CLI and authenticated local workspace",
     "gameplay_contract": {
       "difficulty": [
         "easy",
@@ -10420,16 +10420,33 @@
         "ranged"
       ]
     },
-    "evaluation": "24 public diagnostic tasks; plain and structured modes bind distinct configurations; no score-based self-promotion",
+    "evaluation": "24 fixed public diagnostic tasks; plain, structured and optional category-scoped Godot 4.6 reference-pack modes bind distinct configurations; all requests preflight existing input/output budgets; no score-based self-promotion",
     "acceptance": [
       "strict whole-proposal and explicit-label preservation",
       "legacy spec compatibility",
       "actual native input win/pause/restart and negative loss/recovery",
       "guided brief review never starts generation",
       "model cancellation drains before releasing OS lease",
-      "deadline cannot publish the final operator output"
+      "deadline cannot publish the final operator output",
+      "authenticated browser build, durable status and exact source ZIP download",
+      "same request identity replays without inference; changed request conflicts",
+      "peer startup preserves live work; orphaned work never automatically reruns model",
+      "artifact corruption or scope mismatch denies recovery/download"
     ],
     "runbook": "docs/plan/JEEVES_GAME_BUILDER_DELIVERY_2026_11_12.md",
-    "qualification": "source/native/input/render/model quality and release are separate evidence states"
+    "qualification": "source/native/input/render/model quality and release are separate evidence states",
+    "local_workspace_adapter": {
+      "owner": "skeleton/app/offline_game_builder.py",
+      "routes": [
+        "POST /v1/game-builds",
+        "GET /v1/game-builds",
+        "GET /v1/game-builds/{request_id}",
+        "GET /v1/game-builds/{request_id}/archive"
+      ],
+      "service": "existing authenticated loopback OfflineHTTPApplication only",
+      "state": "machine/state_topology.json#offline-game-builds",
+      "artifact_publication": "private stage -> expected ZIP identity persisted -> atomic create-only publication -> terminal CAS; interrupted work never reruns inference",
+      "rollback": "remove optional UI/route adapter; preserve SQLite records and original ZIPs; existing chat and CLI authorities remain available"
+    }
   }
 }
