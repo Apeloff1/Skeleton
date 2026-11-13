@@ -18,11 +18,11 @@ GIT_BOOTSTRAP_MINIMUM = "2.40"
 BOOTSTRAP_COMMAND = "mise run bootstrap"
 RUFF_CI_VERSION = "0.17.2"
 RUFF_DEV_REQUIREMENT = "ruff>=0.17.2,<0.18"
-EXPO_SDK_VERSION = "~54.0.35"
-REACT_VERSION = "19.1.0"
-REACT_NATIVE_VERSION = "0.81.5"
-REACT_NATIVE_REANIMATED_VERSION = "~4.1.1"
-REACT_NATIVE_WORKLETS_VERSION = "0.5.1"
+EXPO_SDK_VERSION = "~55.0.32"
+REACT_VERSION = "19.2.0"
+REACT_NATIVE_VERSION = "0.83.10"
+REACT_NATIVE_REANIMATED_VERSION = "4.2.1"
+REACT_NATIVE_WORKLETS_VERSION = "0.7.4"
 
 PROCESS_TESTS = (
     "test_process_safety_gate.py",
@@ -405,7 +405,7 @@ def main() -> int:
     }
     require(
         actual_frontend_matrix == expected_frontend_matrix,
-        "Expo SDK 54 dependency matrix drifted: "
+        "Expo SDK 55 dependency matrix drifted: "
         f"expected {expected_frontend_matrix!r}, got {actual_frontend_matrix!r}",
         failures,
     )
@@ -462,9 +462,20 @@ def main() -> int:
         "CI frontend must consume the canonical pinned Node version",
         failures,
     )
+    # Expo's direct Yarn wrapper can hang after exporting dist. The reviewed
+    # supervisor invokes the same pinned Expo CLI, verifies non-stale HTML,
+    # bounds the export and reaps the process; it is strictly stronger than
+    # a bare `yarn export:web` command. Preserve that actual CI authority.
     require_all(
         ci,
-        ("yarn lint:ci", "yarn typecheck", "yarn export:web"),
+        (
+            "yarn lint:ci",
+            "yarn typecheck",
+            "node --test scripts/test-guarded-expo-export.cjs",
+            "node scripts/guarded-expo-export.cjs",
+            "test -s dist/index.html",
+            "test -s dist/setup.html || test -s dist/setup/index.html",
+        ),
         "CI frontend scripts drifted",
         failures,
     )
@@ -491,14 +502,14 @@ def main() -> int:
         ci.count("actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0") == 1
         and ci.count("actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0") == 8
         and ci.count("actions/setup-python@") == 8
-        and ci.count("astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2") == 3
+        and ci.count("astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3") == 3
         and ci.count("astral-sh/setup-uv@") == 3,
         "CI Node/uv action SHA identities must match verified upstream release pins",
         failures,
     )
     require(
-        pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.2") == 3,
-        "CI must use exactly three immutable setup-uv v10.3.2 sites backed by the repository uv pin",
+        pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.3") == 3,
+        "CI must use exactly three immutable setup-uv v10.3.3 sites backed by the repository uv pin",
         failures,
     )
     ruff_command = f'uvx --from "ruff=={RUFF_CI_VERSION}" ruff check . --output-format=github'

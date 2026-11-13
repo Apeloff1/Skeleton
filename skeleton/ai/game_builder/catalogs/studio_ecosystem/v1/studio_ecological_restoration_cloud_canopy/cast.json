@@ -1,0 +1,57 @@
+{
+  "project_id": "studio_ecological_restoration_cloud_canopy",
+  "genre": "ecological_restoration",
+  "biome": "cloud_canopy",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "protagonist": {
+    "id": "hero",
+    "name": "Noa Alto",
+    "role": "field ecologist",
+    "skill": "resource stewardship",
+    "goal": "rebuild the broken food web",
+    "fear": "Failing the communities cut off by severe canopy winds",
+    "arc": "Moves from solitary problem solving to accountable stewardship"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Yun Orin",
+      "role": "local witness",
+      "knows": "The original operating records of the suspended library",
+      "condition": "Willing to testify when evidence is preserved"
+    },
+    {
+      "id": "rival",
+      "name": "Daro Sen",
+      "role": "contested resource steward",
+      "wants": "Exclusive rights to aerial roots",
+      "condition": "May cooperate if losses are openly accounted for"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "priority": "safe equitable access",
+      "reputation": 0
+    },
+    {
+      "id": "extractors",
+      "priority": "control of aerial roots",
+      "reputation": 0
+    }
+  ],
+  "social_effects": [
+    {
+      "choice": "publish_records",
+      "residents": 2,
+      "extractors": -1
+    },
+    {
+      "choice": "private_treaty",
+      "residents": -2,
+      "extractors": 2
+    }
+  ],
+  "authorship": "original_design_proposal"
+}

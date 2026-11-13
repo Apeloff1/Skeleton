@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_glacial_fjord",
+  "title": "Glacial Fjord: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010315535,
+  "width": 21,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 4,
+  "theme": "ocean",
+  "starting_health": 3
+}

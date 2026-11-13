@@ -126,11 +126,11 @@ def test_workflow_has_no_manual_recovery_trigger():
     assert "workflow_dispatch:" not in _workflow_text()
 
 
-def test_active_policy_disables_review_gates():
+def test_active_policy_enforces_independent_review_gates():
     reconcile = _line_block(_workflow_text(), "reconcile:")
-    assert 'AUTOMERGE_REQUIRED_APPROVALS: "0"' in reconcile
-    assert 'AUTOMERGE_REQUIRE_RESOLVED_THREADS: "false"' in reconcile
-    assert 'AUTOMERGE_REQUIRE_NO_CHANGES_REQUESTED: "false"' in reconcile
+    assert 'AUTOMERGE_REQUIRED_APPROVALS: "1"' in reconcile
+    assert 'AUTOMERGE_REQUIRE_RESOLVED_THREADS: "true"' in reconcile
+    assert 'AUTOMERGE_REQUIRE_NO_CHANGES_REQUESTED: "true"' in reconcile
 
 
 def test_periodic_schedule_is_optional():
@@ -393,3 +393,92 @@ def test_cli_reconciliation_checks_live_branch_protection_before_mutation() -> N
     assert denial in source
     assert "if policy.mode is not MergeMode.OBSERVE:" in source
     assert source.index(guard) < source.index("report = reconcile(")
+
+
+def test_preflight_denial_receipt_is_published_before_protection_check() -> None:
+    reconcile = _line_block(_workflow_text(), "reconcile:")
+    preflight = reconcile.index(
+        "python scripts/automerge_preflight_receipt.py --state protection-unverified"
+    )
+    guard = reconcile.index('protected="$(gh api')
+    denied = reconcile.index(
+        "python scripts/automerge_preflight_receipt.py --state protection-disabled"
+    )
+    reconciliation = reconcile.index(
+        "python scripts/automerge_preflight_receipt.py --state reconciliation-incomplete"
+    )
+    cli = reconcile.index("python -m skeleton.pr_automation.automerge_cli")
+    assert preflight < guard < denied < reconciliation < cli
+    assert "if-no-files-found: error" in reconcile
+
+
+def test_bounded_root_squash_batch_revalidates_every_mutation() -> None:
+    """Higher throughput must not bypass the live target, review or stack fences."""
+    reconcile = _line_block(_workflow_text(), "reconcile:")
+    assert 'AUTOMERGE_MODE: "direct"' in reconcile
+    assert 'AUTOMERGE_MERGE_METHOD: "squash"' in reconcile
+    assert 'AUTOMERGE_MAX_MERGES: "8"' in reconcile
+    assert 'AUTOMERGE_MAX_STACK_MERGES: "1"' in reconcile
+    assert 'AUTOMERGE_STOP_AFTER_STACK_MUTATION: "true"' in reconcile
+    assert 'AUTOMERGE_REQUIRED_APPROVALS: "1"' in reconcile
+    assert 'AUTOMERGE_REQUIRE_RESOLVED_THREADS: "true"' in reconcile
+    assert 'AUTOMERGE_REQUIRE_NO_CHANGES_REQUESTED: "true"' in reconcile
+    assert 'if [[ "$protected" != "true" ]]; then' in reconcile
+
+    engine = (PACKAGE / "automerge_engine.py").read_text(encoding="utf-8")
+    assert "iteration = build_iteration(client, policy, now=now)" in engine
+    assert "_revalidate_selection(" in engine
+    assert "expected_default_head=iteration.base_head" in engine
+    assert "if config.stop_after_stack_mutation:" in engine
+    assert "final_head = client.branch_head(policy.default_branch)" in engine
+
+
+def test_review_gate_downgrades_are_rejected_by_static_checker() -> None:
+    text = _workflow_text()
+    downgraded = text.replace(
+        'AUTOMERGE_REQUIRED_APPROVALS: "1"',
+        'AUTOMERGE_REQUIRED_APPROVALS: "0"',
+    ).replace(
+        'AUTOMERGE_REQUIRE_RESOLVED_THREADS: "true"',
+        'AUTOMERGE_REQUIRE_RESOLVED_THREADS: "false"',
+    )
+    assert "review-enforcement" in {
+        finding.code for finding in _workflow_findings(downgraded)
+    }
+
+
+def test_preflight_evidence_records_denials_without_secrets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+    from scripts.automerge_preflight_receipt import main as write_receipt
+
+    report = tmp_path / ".automerge" / "report.json"
+    monkeypatch.setenv("AUTOMERGE_REPORT_PATH", str(report))
+    monkeypatch.setenv("GITHUB_REPOSITORY", "Apeloff1/Skeleton")
+    monkeypatch.setenv("AUTOMERGE_DEFAULT_BRANCH", "main")
+    monkeypatch.setenv("GITHUB_RUN_ID", "41603645357")
+    monkeypatch.setenv("GH_TOKEN", "DO_NOT_DISCLOSE_SENTINEL")
+    for state in (
+        "protection-unverified",
+        "protection-disabled",
+        "reconciliation-incomplete",
+    ):
+        assert write_receipt(["--state", state]) == 0
+        payload = json.loads(report.read_text(encoding="utf-8"))
+        assert payload["schema"] == "skeleton.automerge.preflight.v1"
+        assert payload["stage"] == state
+        assert payload["decision"] == "not_certified"
+        assert payload["repository"] == "Apeloff1/Skeleton"
+        assert payload["run_id"] == "41603645357"
+        assert "DO_NOT_DISCLOSE_SENTINEL" not in report.read_text(encoding="utf-8")
+
+
+def test_preflight_rejects_unknown_stage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from scripts.automerge_preflight_receipt import main as write_receipt
+
+    report = tmp_path / "report.json"
+    monkeypatch.setenv("AUTOMERGE_REPORT_PATH", str(report))
+    with pytest.raises(SystemExit):
+        write_receipt(["--state", "merge-approved"])
+    assert not report.exists()

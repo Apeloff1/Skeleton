@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/decode_stall.schema.json",
+  "title": "runtime.decode_stall observation contract",
+  "description": "Detect stalled decoding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decode_token_gap_ms",
+        "decode_queue_depth"
+      ],
+      "properties": {
+        "decode_token_gap_ms": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1200,
+          "description": "Upper bound for decode_token_gap_ms"
+        },
+        "decode_queue_depth": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 64,
+          "description": "Upper bound for decode_queue_depth"
+        }
+      }
+    }
+  }
+}

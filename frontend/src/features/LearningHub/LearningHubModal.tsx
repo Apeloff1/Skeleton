@@ -250,9 +250,12 @@ export const LearningHubModal: React.FC<LearningHubModalProps> = ({
   const [modes, setModes] = useState<LearningMode[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [selectedMode, setSelectedMode] = useState('guided');
-  const [, setSelectedDomain] = useState<LearningDomain | null>(null);
+  const [selectedDomain, setSelectedDomain] = useState<LearningDomain | null>(null);
+  const [selectedLayer, setSelectedLayer] = useState<LearningLayer | null>(null);
+  const [error, setError] = useState('');
 
   const loadData = useCallback(async () => {
+    setError('');
     try {
       const [domainsRes, layersRes, modesRes, statsRes] = await Promise.all([
         apiFetch(`${API_BASE}/api/learning-engine/domains`),
@@ -261,24 +264,18 @@ export const LearningHubModal: React.FC<LearningHubModalProps> = ({
         apiFetch(`${API_BASE}/api/learning-engine/stats`),
       ]);
 
-      if (domainsRes.ok) {
-        const data = await domainsRes.json();
-        setDomains(data.domains || []);
-      }
-      if (layersRes.ok) {
-        const data = await layersRes.json();
-        setLayers(data.layers || []);
-      }
-      if (modesRes.ok) {
-        const data = await modesRes.json();
-        setModes(data.modes || []);
-      }
-      if (statsRes.ok) {
-        const data = await statsRes.json();
-        setStats(data);
-      }
+      if (![domainsRes, layersRes, modesRes, statsRes].every(response => response.ok)) throw new Error('One or more learning services are unavailable.');
+      const [domainData, layerData, modeData, statsData] = await Promise.all([
+        domainsRes.json(), layersRes.json(), modesRes.json(), statsRes.json(),
+      ]);
+      if (!Array.isArray(domainData.domains) || !Array.isArray(layerData.layers) || !Array.isArray(modeData.modes)) throw new Error('The learning service returned invalid data.');
+      setDomains(domainData.domains);
+      setLayers(layerData.layers);
+      setModes(modeData.modes);
+      setStats(statsData);
     } catch (error) {
       console.error('Failed to load learning data:', error);
+      setError(error instanceof Error ? error.message : 'Learning data could not be loaded.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -316,6 +313,14 @@ export const LearningHubModal: React.FC<LearningHubModalProps> = ({
                 onPress={() => setSelectedDomain(domain)}
               />
             ))}
+            {selectedDomain && (
+              <View style={[styles.infoBox, { backgroundColor: colors.primary + '10' }]}>
+                <Ionicons name="map" size={20} color={colors.primary} />
+                <Text style={[styles.infoText, { color: colors.text }]}>
+                  Selected {selectedDomain.name}. Prerequisites: {selectedDomain.prerequisites?.length ? selectedDomain.prerequisites.join(', ') : 'none'}.
+                </Text>
+              </View>
+            )}
           </View>
         );
       case 'layers':
@@ -333,10 +338,19 @@ export const LearningHubModal: React.FC<LearningHubModalProps> = ({
                   key={layer.id}
                   layer={layer}
                   colors={colors}
-                  onPress={() => {}}
+                  isSelected={selectedLayer?.id === layer.id}
+                  onPress={() => setSelectedLayer(layer)}
                 />
               ))}
             </View>
+            {selectedLayer && (
+              <View style={[styles.infoBox, { backgroundColor: selectedLayer.color + '10' }]}>
+                <Ionicons name={selectedLayer.icon as any} size={20} color={selectedLayer.color} />
+                <Text style={[styles.infoText, { color: colors.text }]}>
+                  {selectedLayer.description} Best for: {selectedLayer.best_for.join(', ')}.
+                </Text>
+              </View>
+            )}
             <View style={[styles.infoBox, { backgroundColor: colors.primary + '10' }]}>
               <Ionicons name="information-circle" size={20} color={colors.primary} />
               <Text style={[styles.infoText, { color: colors.text }]}>
@@ -420,6 +434,13 @@ export const LearningHubModal: React.FC<LearningHubModalProps> = ({
             </View>
           ) : (
             <>
+              {!!error && (
+                <View style={[styles.infoBox, { backgroundColor: '#EF444415' }]}>
+                  <Ionicons name="warning" size={20} color="#EF4444" />
+                  <Text style={[styles.infoText, { color: colors.text }]}>{error}</Text>
+                  <TouchableOpacity onPress={loadData}><Text style={{ color: colors.primary, fontWeight: '700' }}>Retry</Text></TouchableOpacity>
+                </View>
+              )}
               {/* Stats Overview */}
               {stats && <StatsOverview stats={stats} colors={colors} />}
 

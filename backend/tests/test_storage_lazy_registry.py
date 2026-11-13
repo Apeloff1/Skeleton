@@ -84,7 +84,95 @@ def test_literal_loader_inventory_matches_declared_repository_modules():
     assert set(lazy_registry._LOADERS) == expected
 
 
+def test_public_exception_route_literal_loader_uses_reviewed_import(monkeypatch):
+    """A newly added redaction route stays in the explicit lazy allowlist."""
+    name = "core.public_exception_route"
+    assert "public_exception_route" in lazy_registry.module_names()
+    assert name in lazy_registry._LOADERS
+    sentinel = object()
+    calls = []
+
+    def recorded_import(module_name):
+        calls.append(module_name)
+        return sentinel
+
+    monkeypatch.setattr(lazy_registry.importlib, "import_module", recorded_import)
+    assert lazy_registry._LOADERS[name]() is sentinel
+    assert calls == [name]
+
+
 def test_registry_has_no_runtime_selected_python_imports():
     from pathlib import Path
     from scripts.check_dynamic_import_safety import violations
     assert violations(Path(lazy_registry.__file__)) == []
+
+
+def test_flagged_wrapper_uses_only_reviewed_seed_loaders(monkeypatch):
+    """A recursive size inventory must not authorize new import targets."""
+    from core import unbulk
+
+    known = next(name for name in lazy_registry._LOADERS if name.startswith("seeds."))
+
+    class HostilePath(str):
+        def replace(self, *_args, **_kwargs):
+            raise AssertionError("untrusted inventory path method executed")
+
+    monkeypatch.setattr(lazy_registry, "_noncore_proxies", {})
+
+    def inventory(top=25):
+        assert top == 10_000
+        return {"biggest": [
+            {"module": "seeds/deep/unregistered.py", "lazy_eligible": True},
+            {"module": "routes/foreign.py", "lazy_eligible": True},
+            {"module": HostilePath("seeds/hostile.py"), "lazy_eligible": True},
+            {"module": object(), "lazy_eligible": True},
+            {"module": known.replace(".", "/") + ".py", "lazy_eligible": True},
+            {"module": "seeds/not_flagged.py", "lazy_eligible": False},
+        ]}
+
+    monkeypatch.setattr(unbulk, "module_inventory", inventory)
+    before = set(sys.modules)
+    wrapped = lazy_registry.wrap_flagged()
+    assert set(wrapped) == {known}
+    assert wrapped[known] is lazy_registry._noncore_proxies[known]
+    assert set(sys.modules) == before
+
+
+def test_storage_wrap_survives_unregistered_nested_seed_inventory(storage_client, monkeypatch):
+    """The public endpoint stays usable while nested seeds remain deferred."""
+    from core import unbulk
+
+    original_inventory = unbulk.module_inventory
+
+    def inventory(top=25):
+        result = original_inventory(top=top)
+        result["biggest"].insert(
+            0, {"module": "seeds/deep/unregistered.py", "lazy_eligible": True}
+        )
+        return result
+
+    monkeypatch.setattr(unbulk, "module_inventory", inventory)
+    before = {name for name in sys.modules if name.startswith("seeds.")}
+    response = storage_client.post("/api/storage/lazy/wrap")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["wrapped_core"] > 0
+    assert payload["wrapped_noncore"] > 0
+    assert "seeds.deep.unregistered" not in lazy_registry._noncore_proxies
+    assert {name for name in sys.modules if name.startswith("seeds.")} == before
+
+
+def test_lazy_import_rejects_str_subclass_without_hashing():
+    """Reject hostile names before invoking dictionary hash/equality hooks."""
+
+    class HostileModuleName(str):
+        def __hash__(self):
+            raise AssertionError("untrusted name hashed")
+
+        def __eq__(self, other):
+            raise AssertionError("untrusted name compared")
+
+    before = set(sys.modules)
+    with pytest.raises(ValueError, match="not registered"):
+        lazy_registry.lazy_import(HostileModuleName("core.public_exception_route"))
+    assert set(sys.modules) == before

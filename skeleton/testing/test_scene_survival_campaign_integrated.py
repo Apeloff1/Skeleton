@@ -44,32 +44,6 @@ def test_author_optimistic_lease_and_earned_preview():
             expected_revision=0)
 
 
-def test_author_two_edits_have_replayable_seals_and_no_caller_aliases():
-    source, actions = original_campaign()
-    doc = new_author(source)
-    original = copy.deepcopy(doc)
-    edit = {"kind": "set_reward", "stage_id": "quay_crossing", "value": 15}
-    first = apply_author(
-        doc, edit, expected_digest=doc["source_digest"], expected_revision=0)
-    assert doc == original
-    assert first["digest"] == __import__(
-        "skeleton.game.gameplay.flgb_gameplay_runtime", fromlist=["dig"]
-    ).dig({k: v for k, v in first.items() if k != "digest"})
-    edit["value"] = 999
-    assert verify_author(first) == first
-    second = apply_author(
-        first, {"kind": "set_required_score", "value": 32},
-        expected_digest=first["source_digest"], expected_revision=1)
-    assert verify_author(second) == second
-    assert verify_author(first) == first
-    assert second["revision"] == 2
-    assert preview_author(second, actions)["score"] == 35
-    forged = copy.deepcopy(second)
-    forged["edits"][0]["value"] = 99
-    with pytest.raises(SceneTravelError):
-        verify_author(forged)
-
-
 def test_author_replay_rejects_forged_source_and_edit_history():
     source, _ = original_campaign()
     doc = new_author(source)

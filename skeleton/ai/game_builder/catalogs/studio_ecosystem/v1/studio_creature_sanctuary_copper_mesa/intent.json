@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_copper_mesa",
+  "title": "Copper Mesa: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010313534,
+  "width": 19,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 10,
+  "theme": "desert",
+  "starting_health": 6
+}

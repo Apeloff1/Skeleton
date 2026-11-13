@@ -10,6 +10,7 @@ import hmac
 import os
 from pathlib import Path
 import re
+from typing import Mapping
 
 from .contracts import canonical_digest
 from .dual_runtime_verify import (
@@ -33,6 +34,7 @@ class ReceiptInspectionError(ValueError):
 
 def inspect_verified_receipt(
     receipt_path: str | Path, *, expected_sha256: str, authorized: bool,
+    expected_source: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Read a bounded nofollow JSON receipt against a separately held digest."""
     if authorized is not True:
@@ -73,6 +75,33 @@ def inspect_verified_receipt(
                         recorded_digest, canonical_digest(body),
                     )):
                 raise ReceiptInspectionError("recorded receipt digest differs")
+        # A historical receipt cannot be paired with an unrelated live game.
+        # Compare the complete canonical source/replay identity, not only a
+        # project name or a digest selected from the untrusted receipt itself.
+        if expected_source is not None:
+            if kind != "skeleton.game_builder.dual_runtime_verification.v1":
+                raise ReceiptInspectionError("receipt is not a single-game replay")
+            if type(expected_source) is not dict:
+                raise ReceiptInspectionError("canonical live source proof required")
+            identity_fields = (
+                "schema", "project_id", "manifest_sha256", "world_digest",
+                "replay_digest", "verified_files", "verified_bytes",
+                "replayed_actions", "offline_gameplay_reexecuted",
+                "godot_executed", "rights_certified", "release_certified",
+            )
+            for field in identity_fields:
+                if field not in expected_source or field not in payload:
+                    raise ReceiptInspectionError("incomplete source/receipt identity")
+                expected = expected_source[field]
+                actual = payload[field]
+                if type(actual) is not type(expected):
+                    raise ReceiptInspectionError("source/receipt identity type mismatch")
+                if type(expected) is str:
+                    matches = hmac.compare_digest(actual, expected)
+                else:
+                    matches = actual == expected
+                if not matches:
+                    raise ReceiptInspectionError("receipt belongs to different source")
         # A second pinned descriptor read rejects concurrent rewrites after
         # the first pass. This is an integrity check, not a replay of the game.
         if _read(parent_fd, path.name, _MAX_RECEIPT_BYTES) != raw:
@@ -84,6 +113,7 @@ def inspect_verified_receipt(
             "receipt_sha256": expected_sha256,
             "recorded_receipt_digest": recorded_digest,
             "receipt_integrity_verified": True,
+            "source_binding_verified": expected_source is not None,
             "gameplay_reexecuted_now": False,
             "native_hardware_tested": False,
             "release_certified": False,

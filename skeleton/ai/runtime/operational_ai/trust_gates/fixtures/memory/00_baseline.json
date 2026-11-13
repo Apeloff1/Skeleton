@@ -1,0 +1,15 @@
+{
+  "case": "00_baseline",
+  "gate": "memory",
+  "expect": "accept",
+  "reason": "Canonical explicitly bounded source record",
+  "payload": {
+    "tenant": "local",
+    "source_tenant": "local",
+    "source_id": "note_001",
+    "approved": true,
+    "revision": 1,
+    "expires_at": 2000000,
+    "now": 1000000
+  }
+}

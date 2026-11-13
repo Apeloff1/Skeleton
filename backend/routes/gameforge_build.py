@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from routes import gameforge_auth as auth
-from routes.playable_access import _PrivateProjectRoute, _available
+from routes.playable_access import _GuardedPrivateProjectRoute, _available
 
 from core.exec_guard import code_execution_enabled, execution_disabled_response
 from core.gameforge_artifact_builder import (
@@ -38,7 +38,7 @@ from core.gameforge_artifact_builder import (
 )
 
 router = APIRouter(prefix="/api/gameforge/build", tags=["gameforge-build"],
-                   dependencies=[Depends(auth.require_authenticated_identity)], route_class=_PrivateProjectRoute)
+                   dependencies=[Depends(auth.require_authenticated_identity)], route_class=_GuardedPrivateProjectRoute)
 
 
 def _viewer(user=Depends(auth.get_current_user)):

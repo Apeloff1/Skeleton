@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import Field
 
 from core import game_console_studio as studio
-from routes.game_learning import Request, WriteRequest, _call, _scope
+from routes.game_learning import Request, WriteRequest, _call, _scope, _write_scope
 from routes.gameforge_auth import get_current_user
 
 router = APIRouter(prefix="/game-console-studio", tags=["Console studio"])
@@ -33,7 +33,7 @@ async def get_profiles(user=Depends(get_current_user)):
 
 @router.post("/projects")
 async def create_project(body: CreateConsoleProject, user=Depends(get_current_user)):
-    return await _call(studio.create(_scope(user), body.model_dump()))
+    return await _call(studio.create(_write_scope(user), body.model_dump()))
 
 
 @router.get("/projects/{project_id}/document")
@@ -43,7 +43,7 @@ async def get_document(project_id: str, user=Depends(get_current_user)):
 
 @router.patch("/projects/{project_id}/document")
 async def edit_document(project_id: str, body: EditConsoleProject, user=Depends(get_current_user)):
-    return await _call(studio.edit(_scope(user), project_id, body.model_dump()))
+    return await _call(studio.edit(_write_scope(user), project_id, body.model_dump()))
 
 
 @router.get("/projects/{project_id}/handoff")

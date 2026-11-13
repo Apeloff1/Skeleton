@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_narrative_mystery_echo_caverns",
+  "genre": "narrative_mystery",
+  "biome": "echo_caverns",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_narrative_mystery_echo_caverns:restore",
+  "objective": "reconstruct an erased civic record",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "ringing stone halls",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near underground listening post",
+        "Seek a witness of unstable resonance"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "underground listening post",
+      "entry": "survey_complete",
+      "actions": [
+        "investigate",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to acoustic reflectors",
+        "Establish an independent path around a record-forging council"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "underground listening post",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of underground listening post",
+        "Construct a low-resource alternative using acoustic reflectors"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden unstable resonance interrupts transfer",
+    "The a record-forging council suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "acoustic reflectors",
+    "unlimited_rewards": false
+  }
+}

@@ -230,3 +230,105 @@ def test_discovery_rejects_symlinked_python_files(tmp_path: Path) -> None:
 
     with pytest.raises(scanner.DynamicImportScanError, match="source symlink encountered"):
         list(scanner.python_files(root))
+
+
+@pytest.mark.parametrize(
+    "primitive,bootstrap,loader",
+    [
+        ("importlib.import_module", "import importlib\n", "importlib.import_module"),
+        ("__import__", "", "__import__"),
+    ],
+)
+def test_rejects_long_reverse_order_alias_chain(
+    tmp_path: Path, primitive: str, bootstrap: str, loader: str,
+) -> None:
+    # Reverse declaration order needs >6 closure rounds; a fixed iteration
+    # ceiling previously let runtime-selected imports escape the gate.
+    aliases = "\n".join(f"loader_{i} = loader_{i + 1}" for i in range(20))
+    source = bootstrap + aliases + f"\nloader_20 = {loader}\nmodule = loader_0(chosen)\n"
+    assert _unsafe(_scan(tmp_path, source), primitive)
+
+
+def test_rejects_long_reverse_order_module_alias_chain(tmp_path: Path) -> None:
+    aliases = "\n".join(f"module_{i} = module_{i + 1}" for i in range(20))
+    source = (
+        "import importlib as original\n"
+        + aliases
+        + "\nmodule_20 = original\nresult = module_0.import_module(chosen)\n"
+    )
+    assert _unsafe(_scan(tmp_path, source), "importlib.import_module")
+
+
+def test_deep_literal_alias_remains_allowed(tmp_path: Path) -> None:
+    aliases = "\n".join(f"loader_{i} = loader_{i + 1}" for i in range(20))
+    source = (
+        "import importlib\n"
+        + aliases
+        + '\nloader_20 = importlib.import_module\nresult = loader_0("json")\n'
+    )
+    assert _scan(tmp_path, source) == []
+
+
+def test_conflicting_import_alias_bindings_fail_closed(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import importlib\n"
+        "loader = importlib.import_module\n"
+        "loader = __import__\n"
+        "result = loader(selected)\n",
+    )
+    assert len(findings) == 1
+    assert "alias propagation did not converge" in findings[0]
+
+
+def test_unrelated_alias_cycle_terminates_without_false_positive(tmp_path: Path) -> None:
+    source = (
+        "import importlib\n"
+        "left = right\n"
+        "right = left\n"
+        'result = importlib.import_module("json")\n'
+    )
+    assert _scan(tmp_path, source) == []
+
+
+@pytest.mark.parametrize(
+    "module_import,method,primitive",
+    [
+        ("import importlib as module", "import_module", "importlib.import_module"),
+        ("import builtins as module", "__import__", "__import__"),
+    ],
+)
+def test_rebound_module_alias_cannot_hide_callable(
+    tmp_path: Path, module_import: str, method: str, primitive: str,
+) -> None:
+    # The module alias is later rebound to the import callable. A further
+    # alias must retain callable provenance even if the same name was a module.
+    source = (
+        f"{module_import}\n"
+        f"load = module.{method}\n"
+        "module = load\n"
+        "forwarded = module\n"
+        "result = forwarded(chosen)\n"
+    )
+    assert _unsafe(_scan(tmp_path, source), primitive)
+
+
+@pytest.mark.parametrize(
+    "bootstrap,primitive",
+    [
+        (
+            "import importlib as shared\n"
+            "from importlib import import_module as shared\n",
+            "importlib.import_module",
+        ),
+        (
+            "import builtins as shared\n"
+            "from builtins import __import__ as shared\n",
+            "__import__",
+        ),
+    ],
+)
+def test_import_binding_collision_preserves_callable_provenance(
+    tmp_path: Path, bootstrap: str, primitive: str,
+) -> None:
+    assert _unsafe(_scan(tmp_path, bootstrap + "forwarded = shared\nforwarded(chosen)\n"), primitive)

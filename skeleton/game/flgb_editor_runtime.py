@@ -153,16 +153,22 @@ class SceneGraph:
         if len(roots)!=1: raise GameProjectError("scene graph requires exactly one root")
         for node in nodes:
             if node.parent_id is not None and node.parent_id not in by_id: raise GameProjectError("orphan scene node")
+        # Parent chains can be as deep as MAX_NODES; recursion would crash
+        # with RecursionError on otherwise valid imported worlds.
         state={}
-        def visit(node_id:str)->None:
-            mark=state.get(node_id,0)
-            if mark==1: raise GameProjectError("scene graph cycle")
-            if mark==2: return
-            state[node_id]=1
-            parent=by_id[node_id].parent_id
-            if parent is not None: visit(parent)
-            state[node_id]=2
-        for node_id in by_id: visit(node_id)
+        for node_id in by_id:
+            if state.get(node_id)==2:
+                continue
+            chain=[]
+            cursor=node_id
+            while cursor is not None and state.get(cursor)!=2:
+                if state.get(cursor)==1:
+                    raise GameProjectError("scene graph cycle")
+                state[cursor]=1
+                chain.append(cursor)
+                cursor=by_id[cursor].parent_id
+            for visited in chain:
+                state[visited]=2
         entity_ids=[n.entity_id for n in nodes if n.entity_id is not None]
         if len(set(entity_ids))!=len(entity_ids): raise GameProjectError("entity attached to multiple scene nodes")
         self.nodes=tuple(sorted(nodes,key=lambda n:(n.order,n.node_id)))
@@ -231,18 +237,25 @@ class PrefabSpec:
 def validate_prefabs(prefabs:Sequence[PrefabSpec])->tuple[PrefabSpec,...]:
     by_id={p.prefab_id:p for p in prefabs}
     if len(by_id)!=len(prefabs): raise GameProjectError("duplicate prefab identity")
-    state={}
-    def visit(pid:str)->None:
-        mark=state.get(pid,0)
-        if mark==1: raise GameProjectError("prefab inheritance cycle")
-        if mark==2:return
-        state[pid]=1
-        parent=by_id[pid].parent_prefab_id
-        if parent is not None:
-            if parent not in by_id: raise GameProjectError("unknown prefab parent")
-            visit(parent)
-        state[pid]=2
-    for pid in by_id: visit(pid)
+    # A valid prefab chain can exceed Python's recursion limit. Walk parent
+    # links iteratively, preserving cycle and missing-parent rejection.
+    state:dict[str,int]={}
+    for prefab_id in by_id:
+        if state.get(prefab_id)==2:
+            continue
+        chain:list[str]=[]
+        cursor:str|None=prefab_id
+        while cursor is not None and state.get(cursor)!=2:
+            if state.get(cursor)==1:
+                raise GameProjectError("prefab inheritance cycle")
+            state[cursor]=1
+            chain.append(cursor)
+            parent=by_id[cursor].parent_prefab_id
+            if parent is not None and parent not in by_id:
+                raise GameProjectError("unknown prefab parent")
+            cursor=parent
+        for visited in chain:
+            state[visited]=2
     return tuple(sorted(prefabs,key=lambda p:p.prefab_id))
 
 @dataclass(frozen=True)

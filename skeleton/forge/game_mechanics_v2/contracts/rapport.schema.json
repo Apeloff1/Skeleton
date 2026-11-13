@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rapport event",
+  "description": "Deterministic social mechanic command with bounded nonnegative amount and logical tick.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "action",
+    "amount",
+    "tick"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "gain",
+        "spend",
+        "recover",
+        "decay",
+        "observe"
+      ]
+    },
+    "amount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 140
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "$comment": "rapport capacity 140; nominal gain 5, loss 5; supports replay-safe receipt identity."
+}

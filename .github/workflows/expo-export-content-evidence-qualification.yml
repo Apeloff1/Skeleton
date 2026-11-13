@@ -1,0 +1,47 @@
+name: Expo Export Content Evidence Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - '.github/workflows/expo-export-content-evidence-qualification.yml'
+      - 'frontend/scripts/guarded-expo-export.cjs'
+      - 'frontend/scripts/test-guarded-expo-export.cjs'
+      - 'frontend/Dockerfile'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: expo-export-evidence-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  export_content_evidence:
+    name: Bounded content hash and exporter process custody
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify exact head
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up pinned Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Verify Docker uses guarded exporter and its tests
+        run: |
+          node -e "const fs=require('fs');const d=fs.readFileSync('frontend/Dockerfile','utf8');if(!d.includes('node --test scripts/test-guarded-expo-export.cjs')||!d.includes('node scripts/guarded-expo-export.cjs'))process.exit(1)"
+      - name: Validate JS syntax and adversarial evidence contracts
+        run: |
+          node --check frontend/scripts/guarded-expo-export.cjs
+          node --check frontend/scripts/test-guarded-expo-export.cjs
+          node --test frontend/scripts/test-guarded-expo-export.cjs

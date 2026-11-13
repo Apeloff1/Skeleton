@@ -1,0 +1,17 @@
+{
+  "case": "07_wrong_last_type",
+  "gate": "memory",
+  "expect": "reject",
+  "reason": "Typed values are not arbitrary objects",
+  "payload": {
+    "tenant": "local",
+    "source_tenant": "local",
+    "source_id": "note_001",
+    "approved": true,
+    "revision": 1,
+    "expires_at": 2000000,
+    "now": {
+      "untrusted": true
+    }
+  }
+}

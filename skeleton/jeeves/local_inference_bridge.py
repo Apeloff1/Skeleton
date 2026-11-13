@@ -1,15 +1,19 @@
+"""Legacy Jeeves local inference compatibility bridge.
+
+This module does not own a model loader or provider runtime. It must not
+fabricate a successful model response; callers must use the canonical
+skeleton.provider_runtime boundary for guarded inference.
 """
-Jeeves Local Inference Bridge - host CAS, receipts, full authorization.
-"""
-from skeleton.cortex.local_model_adapter import bootstrap
-import hashlib
 
 class Bridge:
-    def __init__(self):
-        self.adapter = bootstrap()
+    """Fail-closed compatibility surface for obsolete direct dispatch."""
+
     def dispatch(self, cmd: dict, cas: str) -> dict:
-        if len(cas) < 16:
+        if not isinstance(cas, str) or len(cas) < 16:
             raise PermissionError("CAS required")
-        result = "local_inference_complete"
-        receipt = {"digest": hashlib.sha256(result.encode()).hexdigest(), "cas": cas}
-        return {"result": result, "receipt": receipt}
+        if not isinstance(cmd, dict):
+            raise TypeError("command must be a mapping")
+        raise RuntimeError(
+            "LOCAL_INFERENCE_NOT_BOUND: use guarded skeleton.provider_runtime; "
+            "legacy Jeeves bridge has no verified model or tokenizer"
+        )

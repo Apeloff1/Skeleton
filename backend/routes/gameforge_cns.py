@@ -18,11 +18,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/gameforge", tags=["gameforge-cns"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/gameforge", tags=["gameforge-cns"])
 
 _MOUNTED: list[str] = []
 _FAILED: dict[str, str] = {}

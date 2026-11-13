@@ -1,0 +1,14 @@
+{
+  "case": "02_missing_field",
+  "gate": "path",
+  "expect": "reject",
+  "reason": "Missing authority field cannot default to allowance",
+  "payload": {
+    "root_id": "installation",
+    "entry_type": "model",
+    "bytes": 1000,
+    "byte_limit": 100000000,
+    "suffix": ".gguf",
+    "immutable": true
+  }
+}

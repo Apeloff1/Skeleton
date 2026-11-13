@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_aerial_traversal_salt_dunes",
+  "title": "Salt Dunes: Aerial Traversal",
+  "subtitle": "An original aerial traversal brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610302680,
+  "width": 25,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 6,
+  "theme": "desert",
+  "starting_health": 4
+}

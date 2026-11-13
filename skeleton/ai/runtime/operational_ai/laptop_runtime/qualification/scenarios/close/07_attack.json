@@ -1,0 +1,12 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "07_attack",
+  "domain": "close",
+  "expected": "reject",
+  "payload": true,
+  "reason": "Refuse adversarial close variant 7",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational close contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

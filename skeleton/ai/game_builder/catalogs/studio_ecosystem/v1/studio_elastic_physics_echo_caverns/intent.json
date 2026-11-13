@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_echo_caverns",
+  "title": "Echo Caverns: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010316544,
+  "width": 19,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 9,
+  "theme": "arcade",
+  "starting_health": 6
+}

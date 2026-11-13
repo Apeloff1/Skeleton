@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_misty_breakwater",
+  "title": "Misty Breakwater: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Misty Breakwater; only the grid preview compiles today.",
+  "seed": 203010315942,
+  "width": 23,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 14,
+  "theme": "ocean",
+  "starting_health": 6
+}
