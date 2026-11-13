@@ -41,6 +41,58 @@ export async function storeCreatorBridge(draft: CreatorBridgeDraft): Promise<voi
   });
 }
 
+/**
+ * Transactional Studio return: verify the source-bound draft and persist the
+ * receiving Studio project before acknowledging/removing the handoff.
+ *
+ * The caller's commit must be scoped to the same account epoch. If the
+ * project save, validation or auth fence fails, the old owner's handoff
+ * remains in its original namespace; it is never reissued to the newly
+ * signed-in account. A second consumer in this JS runtime cannot claim the
+ * same envelope while the callback is in progress.
+ */
+export async function withCreatorBridge<T>(
+  target: CreatorBridgeTarget,
+  commit: (draft: CreatorBridgeDraft) => Promise<T>,
+): Promise<T | null> {
+  const scope = await creatorStorageScope(KEY);
+  return serializeKey(scope.key, async () => {
+    if (!scope.stillCurrent()) throw new Error('Account changed before Studio handoff read');
+    const raw = await AsyncStorage.getItem(scope.key);
+    if (!scope.stillCurrent()) throw new Error('Account changed during Studio handoff read');
+    if (!raw) return null;
+    if (raw.length > 16_384) {
+      await AsyncStorage.removeItem(scope.key);
+      return null;
+    }
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw); }
+    catch { await AsyncStorage.removeItem(scope.key); return null; }
+    const envelope = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown> : null;
+    if (!envelope || envelope.schema !== CREATOR_BRIDGE_SCHEMA) {
+      await AsyncStorage.removeItem(scope.key);
+      return null;
+    }
+    if (envelope.target !== target) return null;
+    const draft = parseCreatorBridge(parsed, target);
+    if (!draft) {
+      await AsyncStorage.removeItem(scope.key);
+      return null;
+    }
+    // The callback must either complete the receiving-project write, or
+    // fail without consuming this one-time private handoff.
+    const applied = await commit(draft);
+    if (!scope.stillCurrent()) throw new Error('Account changed before Studio handoff acknowledgement');
+    const current = await AsyncStorage.getItem(scope.key);
+    if (!scope.stillCurrent()) throw new Error('Account changed while acknowledging Studio handoff');
+    if (current !== raw) throw new Error('Studio handoff changed during publication');
+    await AsyncStorage.removeItem(scope.key);
+    if (!scope.stillCurrent()) throw new Error('Account changed after Studio handoff acknowledgement');
+    return applied;
+  });
+}
+
 export async function consumeCreatorBridge(target: CreatorBridgeTarget): Promise<CreatorBridgeDraft | null> {
   const scope = await creatorStorageScope(KEY);
   return serializeKey(scope.key, async () => {
