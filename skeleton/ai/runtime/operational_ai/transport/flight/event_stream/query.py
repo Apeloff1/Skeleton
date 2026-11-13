@@ -26,7 +26,7 @@ def parse_path(target:str)->StreamQuery:
     if len(parts)!=5 or parts[:3]!=['','v2','jobs'] or parts[4]!='events':
         raise StreamError('unknown event stream route')
     job=identifier(parts[3])
-    try:items=parse_qsl(split.query,keep_blank_values=True,strict_parsing=True,max_num_fields=3)
+    try:items=parse_qsl(split.query,keep_blank_values=True,strict_parsing=bool(split.query),max_num_fields=3)
     except ValueError as exc:raise StreamError('invalid event stream query') from exc
     values={}
     for k,v in items:

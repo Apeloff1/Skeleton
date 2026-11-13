@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_command_luminous_marsh",
+  "title": "Luminous Marsh: The Citizen Fleet",
+  "subtitle": "Original the citizen fleet design in Luminous Marsh; only the grid preview compiles today.",
+  "seed": 203010313154,
+  "width": 25,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 3,
+  "theme": "forest",
+  "starting_health": 4
+}

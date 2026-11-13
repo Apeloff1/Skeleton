@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_misty_breakwater",
+  "title": "Misty Breakwater: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Misty Breakwater; only the grid preview compiles today.",
+  "seed": 203010317906,
+  "width": 23,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 6,
+  "theme": "ocean",
+  "starting_health": 6
+}

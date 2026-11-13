@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional, List
 
 from fastapi import FastAPI
+from core.http_errors import install_public_error_handlers
 from gameforge.api.security_middleware import ZaibatsuSecurityMiddleware
 from gameforge.enterprise.zaibatsu_security import SECURITY
 from gameforge.enterprise.zaibatsu_appwide import install_appwide_zaibatsu, appwide_status
@@ -37,6 +38,7 @@ from gameforge.api.security_api import router as security_router
 from gameforge.enterprise.queue import WORK_QUEUE
 
 app = FastAPI(title="GameForge", version=__version__)
+install_public_error_handlers(app)
 app.add_middleware(ZaibatsuSecurityMiddleware)
 _ZAIBATSU_INSTALL = install_appwide_zaibatsu()
 app.include_router(diaries_router)

@@ -1,12 +1,13 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from gameforge.enterprise.auth import Principal, get_principal
 from gameforge.exocortex.core import Exocortex
 
-router = APIRouter(prefix="/exocortex", tags=["exocortex"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/exocortex", tags=["exocortex"])
 _X: Dict[str, Exocortex] = {}
 
 

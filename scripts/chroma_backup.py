@@ -12,6 +12,7 @@ import argparse
 import ctypes
 import errno
 import hashlib
+from itertools import islice
 import json
 import os
 import stat
@@ -23,6 +24,7 @@ from pathlib import Path
 SCHEMA = "skeleton.chroma.legacy-backup.v1"
 CONTAINER = "tutolage-chroma"
 MAX_FILES = 100_000
+MAX_TREE_ENTRIES = 200_000
 MAX_BYTES = 100 * 1024 ** 3
 MAX_MANIFEST_BYTES = 32 * 1024 ** 2
 
@@ -120,33 +122,75 @@ def _publish_no_replace(source: Path, destination: Path) -> None:
 
 
 def _manifest_files(root: Path, *, exclude_root_manifest: bool = False) -> list[dict]:
+    """Bound the full tree before sorting, then hash stable regular descriptors."""
+    paths = list(islice(root.rglob("*"), MAX_TREE_ENTRIES + 1))
+    if len(paths) > MAX_TREE_ENTRIES:
+        raise BackupRejected("Chroma backup exceeds tree entry admission budget")
     entries: list[dict] = []
     count = total = 0
-    for path in sorted(root.rglob("*")):
-        mode = path.lstat().st_mode
-        if stat.S_ISLNK(mode) or not (stat.S_ISDIR(mode) or stat.S_ISREG(mode)):
+    # A generated manifest must fit the same bounded read contract as
+    # verify_backup(). Account for each JSON entry before accumulating it.
+    manifest_entry_bytes = 0
+    for path in sorted(paths):
+        before_path = path.lstat()
+        if stat.S_ISLNK(before_path.st_mode) or not (
+                stat.S_ISDIR(before_path.st_mode) or stat.S_ISREG(before_path.st_mode)):
             raise BackupRejected("backed-up Chroma contains a link or special file")
-        if stat.S_ISDIR(mode):
+        if stat.S_ISDIR(before_path.st_mode):
             continue
         if exclude_root_manifest and path == root / "manifest.json":
             continue
         count += 1
         if count > MAX_FILES:
             raise BackupRejected("Chroma backup exceeds file admission budget")
+        if before_path.st_size > MAX_BYTES - total:
+            raise BackupRejected("Chroma backup exceeds byte admission budget")
+        if not hasattr(os, "O_NOFOLLOW"):
+            raise BackupRejected("no-follow file opening is unavailable")
+        try:
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0))
+        except OSError as exc:
+            raise BackupRejected("Chroma file changed before descriptor opening") from exc
         digest = hashlib.sha256()
         size = 0
-        with path.open("rb") as stream:
+        with os.fdopen(fd, "rb") as stream:
+            before = os.fstat(stream.fileno())
+            if not stat.S_ISREG(before.st_mode) or (
+                    before.st_dev, before.st_ino, before.st_size,
+                    before.st_mtime_ns, before.st_ctime_ns
+            ) != (
+                    before_path.st_dev, before_path.st_ino, before_path.st_size,
+                    before_path.st_mtime_ns, before_path.st_ctime_ns
+            ):
+                raise BackupRejected("Chroma file identity changed before read")
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                 size += len(chunk)
                 total += len(chunk)
-                if total > MAX_BYTES:
+                if size > before.st_size or total > MAX_BYTES:
                     raise BackupRejected("Chroma backup exceeds byte admission budget")
                 digest.update(chunk)
-        entries.append({
+            after = os.fstat(stream.fileno())
+            if size != before.st_size or (
+                    before.st_dev, before.st_ino, before.st_size,
+                    before.st_mtime_ns, before.st_ctime_ns
+            ) != (
+                    after.st_dev, after.st_ino, after.st_size,
+                    after.st_mtime_ns, after.st_ctime_ns
+            ):
+                raise BackupRejected("Chroma file changed during descriptor read")
+        entry = {
             "path": path.relative_to(root).as_posix(),
             "bytes": size,
             "sha256": digest.hexdigest(),
-        })
+        }
+        manifest_entry_bytes += len(json.dumps(
+            entry, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("ascii")) + 2
+        # Reserve space for the fixed schema/container metadata and formatting.
+        # The final exact serialized bound is checked before publication too.
+        if manifest_entry_bytes > MAX_MANIFEST_BYTES - 4096:
+            raise BackupRejected("Chroma manifest byte admission budget exceeded")
+        entries.append(entry)
     return entries
 
 
@@ -197,14 +241,38 @@ def backup_legacy_chroma(output: Path, *, container: str = CONTAINER) -> dict:
             "migration_complete": False,
             "release_accepted": False,
         }
-        (staging / "manifest.json").write_text(
-            json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8",
-        )
+        manifest_payload = (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        if len(manifest_payload) > MAX_MANIFEST_BYTES:
+            raise BackupRejected("Chroma manifest byte admission budget exceeded")
+        (staging / "manifest.json").write_bytes(manifest_payload)
         # Rename only after both copies, the second inspect and content hashes.
         # Keep evidence private; Docker cp may restore broad file permissions.
         _publish_no_replace(staging, output)
         output.chmod(0o700)
         return manifest
+
+
+def _read_manifest_bounded(path: Path) -> bytes:
+    """Open the manifest leaf without following symlinks or blocking on FIFOs."""
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise BackupRejected("no-follow manifest opening is unavailable")
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0))
+    except OSError as exc:
+        raise BackupRejected("backup manifest cannot be safely opened") from exc
+    with os.fdopen(fd, "rb") as stream:
+        before = os.fstat(stream.fileno())
+        if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_MANIFEST_BYTES:
+            raise BackupRejected("backup manifest is not a bounded regular file")
+        raw = stream.read(MAX_MANIFEST_BYTES + 1)
+        after = os.fstat(stream.fileno())
+        if (len(raw) != before.st_size or len(raw) > MAX_MANIFEST_BYTES
+                or (before.st_dev, before.st_ino, before.st_size,
+                    before.st_mtime_ns, before.st_ctime_ns)
+                != (after.st_dev, after.st_ino, after.st_size,
+                    after.st_mtime_ns, after.st_ctime_ns)):
+            raise BackupRejected("backup manifest changed during descriptor read")
+    return raw
 
 
 def verify_backup(backup: Path) -> dict:
@@ -218,10 +286,6 @@ def verify_backup(backup: Path) -> dict:
     if any(path.is_symlink() for path in (root, *root.parents)) or not root.is_dir():
         raise BackupRejected("backup must be an existing directory without symlink parents")
     manifest_path = root / "manifest.json"
-    if manifest_path.is_symlink() or not manifest_path.is_file():
-        raise BackupRejected("backup manifest is missing or unsafe")
-    if manifest_path.stat().st_size > MAX_MANIFEST_BYTES:
-        raise BackupRejected("backup manifest exceeds admission budget")
     def unique_object(pairs):
         value = {}
         for key, item in pairs:
@@ -230,7 +294,8 @@ def verify_backup(backup: Path) -> dict:
             value[key] = item
         return value
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
+        manifest = json.loads(_read_manifest_bounded(manifest_path).decode("utf-8"),
+                              object_pairs_hook=unique_object)
     except (OSError, ValueError, UnicodeError) as exc:
         raise BackupRejected("backup manifest cannot be read") from exc
     if (not isinstance(manifest, dict) or manifest.get("schema") != SCHEMA

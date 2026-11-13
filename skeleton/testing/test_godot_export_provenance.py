@@ -119,14 +119,14 @@ def test_verify_refuses_parent_traversal_and_symlinked_artifacts(built, tmp_path
     root, out = built
     real = out / "gfd_fixture.x86_64"
     m = provenance.build(root, "4.7.2", "SHIP", {"Linux": real})
-    forged = replace(m.artifacts[0], path="../outside.bin")
-    m.artifacts = [forged]
-    assert any("unsafe artifact path" in p for p in provenance.verify(m, root))
+    # Invalid manifests now fail at construction before any filesystem access.
+    with pytest.raises(ValueError, match="unsafe artifact path"):
+        replace(m.artifacts[0], path="../outside.bin")
     outside = tmp_path / "outside.bin"
     outside.write_bytes(real.read_bytes())
     linked = out / "linked.bin"
     linked.symlink_to(outside)
-    m.artifacts = [replace(forged, path="build/linux/linked.bin")]
+    m.artifacts = [replace(m.artifacts[0], path="build/linux/linked.bin")]
     assert any("symlink artifact path" in p for p in provenance.verify(m, root))
     with pytest.raises(ValueError, match="symlink"):
         provenance.build(root, "4.7.2", "SHIP", {"Linux": linked})

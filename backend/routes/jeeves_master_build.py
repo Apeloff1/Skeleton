@@ -13,6 +13,7 @@
 ║  Jeeves is the focal orchestrator. No shortcuts. Systematically perfect.       ║
 ╚══════════════════════════════════════════════════════════════════════════════════╝
 """
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
@@ -32,7 +33,7 @@ import tempfile
 import subprocess
 import shutil
 
-router = APIRouter(prefix="/api/jeeves-master", tags=["jeeves-master-build"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/jeeves-master", tags=["jeeves-master-build"])
 
 # ═══════════════════════════════════════════════════════════════════════
 # AGENT MANIFEST — Every agent system in the platform
@@ -119,7 +120,7 @@ async def _save_build(build):
         await _db.jeeves_builds.update_one({"build_id": build["build_id"]}, {"$set": build_copy}, upsert=True)
         if vee: build_copy["vee"] = vee
     except Exception as e:
-        print(f"[JEEVES _save_build] WARN: {e}")
+        print(f"[JEEVES _save_build] WARN: {type(e).__name__}")
 
 async def _load_build(build_id: str):
     if build_id in _builds:
@@ -131,7 +132,7 @@ async def _load_build(build_id: str):
             _builds[build_id] = doc
             return doc
     except Exception as e:
-        print(f"[JEEVES _load_build] WARN: {e}")
+        print(f"[JEEVES _load_build] WARN: {type(e).__name__}")
     return None
 
 

@@ -1,88 +1,102 @@
-"""Positive, negative, and retry regression tests for actual Godot export custody."""
+"""Current-API regressions adapted from historical Godot export-custody coverage.
+
+The binary signature here is a fixture, NOT native Godot/export release proof.
+"""
 from __future__ import annotations
 
-import hashlib
+from hashlib import sha256
+from pathlib import Path
 import tempfile
 import unittest
-from pathlib import Path
 
-from skeleton.godot_export.artifact_custody import export_with_evidence
+from skeleton.godot_export.artifact_custody import (
+    ExportCustodyError, export_and_inspect, inspect_export,
+)
 from skeleton.godot_export.runner import GodotRunner, RunResult
 
 
-class ExportCustodyTests(unittest.TestCase):
+PE_FIXTURE = b"MZ\x90\x00" + b"fixture-original-game-data"
+
+
+class CurrentExportCustodyTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        self.target = self.root / "game.pck"
+        self.target = self.root / "game.exe"
         self.calls = []
 
-    def runner(self, code=0, data=b"original game data"):
+    def runner(self, code=0, data=PE_FIXTURE):
         def execute(argv, cwd, timeout):
-            self.calls.append((argv, cwd, timeout))
-            if code == 0:
+            self.calls.append((tuple(argv), cwd, timeout))
+            if code == 0 and data is not None:
                 self.target.write_bytes(data)
-            return RunResult(code, "Godot result", tuple(argv))
-        return GodotRunner("godot", execute)
+            return RunResult(code, "fixture engine result", tuple(argv))
+        return GodotRunner("godot", exec_fn=execute)
 
-    def test_export_produces_hash_of_real_bytes(self):
-        result = export_with_evidence(self.runner(), self.root, "Windows", self.target)
-        self.assertTrue(result.verified)
-        self.assertEqual(result.sha256, hashlib.sha256(b"original game data").hexdigest())
-        self.assertEqual(result.size, len(b"original game data"))
+    def test_real_bytes_not_process_exit_determine_digest(self):
+        evidence = export_and_inspect(
+            self.runner(), self.root, "Windows Desktop", self.target, "windows"
+        )
+        self.assertEqual(evidence.sha256, sha256(PE_FIXTURE).hexdigest())
+        self.assertEqual(evidence.size, len(PE_FIXTURE))
+        self.assertEqual(evidence.platform, "windows")
         self.assertIn("--export-release", self.calls[0][0])
 
-    def test_engine_failure_not_certified(self):
-        result = export_with_evidence(self.runner(code=1), self.root, "Windows", self.target)
-        self.assertEqual(result.failure, "engine_export_failed")
+    def test_engine_failure_is_never_custody_proof(self):
+        with self.assertRaisesRegex(ExportCustodyError, "godot-export-failed"):
+            export_and_inspect(
+                self.runner(code=1), self.root, "Windows Desktop", self.target, "windows"
+            )
 
-    def test_empty_artifact_rejected(self):
-        result = export_with_evidence(self.runner(data=b""), self.root, "Windows", self.target)
-        self.assertEqual(result.failure, "invalid_artifact")
+    def test_empty_and_wrong_signature_are_rejected(self):
+        for data in (b"", b"invalid-executable"):
+            with self.subTest(data=data):
+                self.target.unlink(missing_ok=True)
+                with self.assertRaises(ExportCustodyError):
+                    export_and_inspect(
+                        self.runner(data=data), self.root, "Windows Desktop", self.target, "windows"
+                    )
 
-    def test_oversize_artifact_rejected(self):
-        result = export_with_evidence(self.runner(), self.root, "Windows", self.target, max_bytes=3)
-        self.assertEqual(result.failure, "invalid_artifact")
-
-    def test_existing_artifact_not_overwritten(self):
+    def test_existing_artifact_is_never_overwritten_or_executed(self):
         self.target.write_bytes(b"previous")
-        result = export_with_evidence(self.runner(), self.root, "Windows", self.target)
-        self.assertEqual(result.failure, "artifact_already_exists")
+        with self.assertRaisesRegex(ExportCustodyError, "output-already-exists"):
+            export_and_inspect(
+                self.runner(), self.root, "Windows Desktop", self.target, "windows"
+            )
         self.assertEqual(self.target.read_bytes(), b"previous")
         self.assertEqual(self.calls, [])
 
-    def test_symlink_destination_rejected(self):
+    def test_symlink_destination_is_rejected_before_export(self):
         other = self.root / "other"
         other.write_bytes(b"preserve")
         self.target.symlink_to(other)
-        result = export_with_evidence(self.runner(), self.root, "Windows", self.target)
-        self.assertFalse(result.verified)
+        with self.assertRaisesRegex(ExportCustodyError, "output-already-exists"):
+            export_and_inspect(
+                self.runner(), self.root, "Windows Desktop", self.target, "windows"
+            )
         self.assertEqual(other.read_bytes(), b"preserve")
-        self.assertFalse(self.calls)
+        self.assertEqual(self.calls, [])
 
-    def test_outside_project_rejected(self):
-        with tempfile.TemporaryDirectory() as external:
-            result = export_with_evidence(self.runner(), self.root, "Windows", Path(external) / "out.pck")
-        self.assertEqual(result.failure, "unsafe_artifact_path")
-        self.assertFalse(self.calls)
+    def test_failed_export_can_retry_in_clean_private_workspace(self):
+        with self.assertRaises(ExportCustodyError):
+            export_and_inspect(
+                self.runner(code=1), self.root, "Windows Desktop", self.target, "windows"
+            )
+        self.assertFalse(self.target.exists())
+        evidence = export_and_inspect(
+            self.runner(), self.root, "Windows Desktop", self.target, "windows"
+        )
+        self.assertEqual(evidence.size, len(PE_FIXTURE))
 
-    def test_boolean_budget_rejected(self):
-        result = export_with_evidence(self.runner(), self.root, "Windows", self.target, max_bytes=True)
-        self.assertEqual(result.failure, "invalid_size_budget")
-        self.assertFalse(self.calls)
-
-    def test_failed_export_can_retry_after_cleanup(self):
-        first = export_with_evidence(self.runner(code=1), self.root, "Windows", self.target)
-        second = export_with_evidence(self.runner(), self.root, "Windows", self.target)
-        self.assertFalse(first.verified)
-        self.assertTrue(second.verified)
-
-    def test_missing_output_after_success_rejected(self):
-        def no_output(argv, cwd, timeout):
-            return RunResult(0, "success")
-        result = export_with_evidence(GodotRunner("godot", no_output), self.root, "Windows", self.target)
-        self.assertEqual(result.failure, "artifact_unreadable")
+    def test_inspection_rejects_outside_root_and_unsupported_platform(self):
+        self.target.write_bytes(PE_FIXTURE)
+        ok = RunResult(0, "fixture")
+        with tempfile.TemporaryDirectory() as elsewhere:
+            with self.assertRaises(ExportCustodyError):
+                inspect_export(self.target, "windows", root=Path(elsewhere), result=ok)
+        with self.assertRaisesRegex(ExportCustodyError, "unsupported-platform"):
+            inspect_export(self.target, "unknown", root=self.root, result=ok)
 
 
 if __name__ == "__main__":

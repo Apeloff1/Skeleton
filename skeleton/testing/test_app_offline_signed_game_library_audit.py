@@ -14,6 +14,9 @@ from skeleton.app.offline_signed_game_library_audit import (
 )
 from skeleton.testing.test_app_offline_policy_chain_delivery import chain_delivery
 from skeleton.testing.test_app_offline_policy_signed_delivery import delivered
+from skeleton.testing.test_app_offline_policy_signed_delivery import policy_migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX custody")
 
@@ -123,13 +126,14 @@ def test_unauthorized_batch_never_reads(chain_delivery, monkeypatch):
 def test_malformed_and_oversized_signed_entries_rejected(chain_delivery):
     entry = _entry(chain_delivery)
     for raw in ("null", "[]", '{"archive":"x","archive":"y"}',
-                "{" + "x" * 8200 + "}")
+                "{" + "x" * 8200 + "}"):
         with pytest.raises((ValueError, TypeError)):
             parse_signed_game_entry(raw)
 
 
 def test_repeated_policy_path_and_malformed_epoch_chain_denied(chain_delivery):
     payload = asdict(_entry(chain_delivery))
+    payload["policies"] = list(payload["policies"])
     payload["policies"][1] = payload["policies"][0]
     with pytest.raises(SignedGameLibraryAuditError, match="duplicate"):
         audit_signed_game_library(

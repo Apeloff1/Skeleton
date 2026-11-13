@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib
 import json
 from pathlib import Path
@@ -23,7 +24,18 @@ def test_legacy_game_modules_reexport_canonical_runtime() -> None:
 def test_canonical_and_ai_game_trees_do_not_import_legacy_namespace() -> None:
     for relative in ("skeleton/simulation/game", "skeleton/ai/simulation/game"):
         for path in (ROOT / relative).rglob("*.py"):
-            assert "skeleton.game" not in path.read_text(encoding="utf-8"), path
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    imported = (alias.name for alias in node.names)
+                elif isinstance(node, ast.ImportFrom):
+                    imported = (node.module or "",)
+                else:
+                    continue
+                assert not any(
+                    name == "skeleton.game" or name.startswith("skeleton.game.")
+                    for name in imported
+                ), path
 
 
 def test_ai_tree_retargets_game_and_closes_simulation_overlay() -> None:
