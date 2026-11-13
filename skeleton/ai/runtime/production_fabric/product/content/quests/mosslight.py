@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for mosslight."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('mosslight_arrival', (), (), ('arrival_record',)), Quest('mosslight_source', ('mosslight_arrival',), ('arrival_record',), ('source_proof',)), Quest('mosslight_witness', ('mosslight_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('mosslight_reconcile', ('mosslight_source', 'mosslight_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('mosslight_crossing', ('mosslight_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('mosslight_conclusion', ('mosslight_crossing',), ('crossing_pass',), ('ending_unlocked',)))

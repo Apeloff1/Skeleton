@@ -1,0 +1,32 @@
+{
+  "schema": "skeleton.game.harbor.contracts.v1",
+  "source_id": "lantern-quay",
+  "orders": [
+    {
+      "id": "beacon_supply",
+      "ending": "signal",
+      "deadline": 24,
+      "rules": {
+        "min_gathers": 3,
+        "min_crafts": 2,
+        "min_trades": 0,
+        "max_waits": 0,
+        "min_coins": 0,
+        "min_reputation": 3
+      }
+    },
+    {
+      "id": "shelter_relief",
+      "ending": "shelter",
+      "deadline": 25,
+      "rules": {
+        "min_gathers": 3,
+        "min_crafts": 2,
+        "min_trades": 0,
+        "max_waits": 1,
+        "min_coins": 0,
+        "min_reputation": 2
+      }
+    }
+  ]
+}

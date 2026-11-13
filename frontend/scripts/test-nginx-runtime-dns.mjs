@@ -57,7 +57,8 @@ test('production ingress starts without upstream DNS and recovers after service 
       assert.equal(response.headers.get(key), value, key);
     }
   }
-  function startResponder(service, revision) {
+  function startResponder(service, revision, status = 200) {
+    assert.ok([200, 503].includes(status), 'mock upstream status must be explicitly permitted');
     const name = `${network}-${service}-${revision}`;
     const config = join(scratch, `${service}-${revision}.conf`);
     writeFileSync(config, `pid /run/nginx.pid;
@@ -67,7 +68,7 @@ http {
   server {
     listen 8001;
     default_type application/json;
-    return 200 '{"service":"${service}","revision":"${revision}","uri":"$request_uri","host":"$http_host","protocol":"$server_protocol","forwardedProto":"$http_x_forwarded_proto"}';
+    return ${status} '{"service":"${service}","revision":"${revision}","uri":"$request_uri","host":"$http_host","protocol":"$server_protocol","forwardedProto":"$http_x_forwarded_proto"}';
   }
 }
 `);
@@ -131,7 +132,7 @@ http {
       const setup = await request('/setup');
       assert.equal(setup.status, 200);
       assertHeaders(setup);
-      assert.equal(setup.headers.get('cache-control'), 'no-cache');
+      assert.equal(setup.headers.get('cache-control'), 'no-store');
       assert.match(await setup.text(), /<!doctype html>/i);
       for (const path of ['/api/dns-probe?phase=missing', '/api/v1/models?phase=missing']) {
         const response = await request(path);
@@ -140,6 +141,30 @@ http {
         await response.text();
       }
     });
+
+    // DNS can resolve successfully while protected services fail their own
+    // readiness checks. Static setup must stay usable without promoting either
+    // API response to success, including after a failed guarded engine boot.
+    const unhealthyBackend = startResponder('backend', 'unhealthy', 503);
+    const unhealthyEngine = startResponder('skeleton', 'unhealthy', 503);
+    await t.test('resolved but unhealthy backend and engine preserve setup and fail closed', async () => {
+      for (const path of ['/api/health?phase=unhealthy', '/api/v1/models?phase=unhealthy']) {
+        await eventually(async () => {
+          const response = await request(path);
+          assert.equal(response.status, 503, path);
+          assertHeaders(response);
+          await response.text();
+        }, `upstream unavailable: ${path}`);
+      }
+      const setup = await request('/setup');
+      assert.equal(setup.status, 200);
+      assertHeaders(setup);
+      assert.equal(setup.headers.get('cache-control'), 'no-store');
+      assert.match(await setup.text(), /<!doctype html>/i);
+      const frontendState = JSON.parse(docker('inspect', '--format', '{"running":{{.State.Running}},"restarts":{{.RestartCount}}}', frontend));
+      assert.deepEqual(frontendState, { running: true, restarts: 0 });
+    });
+    docker('rm', '-f', unhealthyBackend, unhealthyEngine);
 
     const backend = startResponder('backend', 'first');
     startResponder('skeleton', 'first');

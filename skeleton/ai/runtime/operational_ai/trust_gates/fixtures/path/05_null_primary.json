@@ -1,0 +1,15 @@
+{
+  "case": "05_null_primary",
+  "gate": "path",
+  "expect": "reject",
+  "reason": "Null identity denied",
+  "payload": {
+    "relative_path": null,
+    "root_id": "installation",
+    "entry_type": "model",
+    "bytes": 1000,
+    "byte_limit": 100000000,
+    "suffix": ".gguf",
+    "immutable": true
+  }
+}

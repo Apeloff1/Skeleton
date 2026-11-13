@@ -188,6 +188,17 @@ class SQLiteExecutionRepository:
                     UNIQUE(namespace, operation_id, execution_id)
                 );
 
+                CREATE TABLE IF NOT EXISTS ai_execution_admission_deferral (
+                    namespace TEXT NOT NULL,
+                    execution_id TEXT NOT NULL,
+                    retry_after TEXT NOT NULL,
+                    PRIMARY KEY(namespace, execution_id),
+                    FOREIGN KEY(namespace, execution_id)
+                        REFERENCES ai_execution_state(namespace, execution_id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_admission_retry_due
+                ON ai_execution_admission_deferral(namespace, retry_after, execution_id);
+
                 CREATE INDEX IF NOT EXISTS idx_ai_execution_recoverable_keyset
                 ON ai_execution_state(namespace, updated_at, execution_id)
                 WHERE state NOT IN ('completed', 'failed', 'cancelled');
@@ -1625,9 +1636,12 @@ class SQLiteExecutionRepository:
         *,
         expected_execution_version: int,
         now: datetime | None = None,
+        require_no_staged_intent: bool = False,
     ) -> AIExecution:
         if not isinstance(result, AIExecutionResult):
             raise TypeError("result must be AIExecutionResult")
+        if type(require_no_staged_intent) is not bool:
+            raise TypeError("require_no_staged_intent must be a boolean")
         instant = _utc(now or result.completed_at)
         terminal_state = {
             "completed": ExecutionState.COMPLETED,
@@ -1654,8 +1668,18 @@ class SQLiteExecutionRepository:
                         """,
                         (self.namespace, result.execution_id),
                     )
+                    self._connection.execute(
+                        "DELETE FROM ai_execution_admission_deferral WHERE namespace=? AND execution_id=?",
+                        (self.namespace, result.execution_id),
+                    )
                     self._connection.execute("COMMIT")
                     return current
+                if require_no_staged_intent and self._connection.execute(
+                    "SELECT 1 FROM ai_execution_finalization_intent "
+                    "WHERE namespace = ? AND execution_id = ?",
+                    (self.namespace, result.execution_id),
+                ).fetchone() is not None:
+                    raise ExecutionRepositoryConflict("staged finalization intent must be preserved")
                 if current.version != expected_execution_version:
                     raise ExecutionRepositoryConflict("execution version changed before finalization")
 
@@ -1771,6 +1795,10 @@ class SQLiteExecutionRepository:
                     DELETE FROM ai_execution_finalization_intent
                     WHERE namespace = ? AND execution_id = ?
                     """,
+                    (self.namespace, result.execution_id),
+                )
+                self._connection.execute(
+                    "DELETE FROM ai_execution_admission_deferral WHERE namespace=? AND execution_id=?",
                     (self.namespace, result.execution_id),
                 )
                 self._connection.execute("COMMIT")
@@ -3914,13 +3942,46 @@ class SQLiteExecutionRepository:
                 self._connection.execute("ROLLBACK")
                 raise
 
+    def defer_checkpoint_admission(self, execution_id: str, *, now: datetime | None = None) -> bool:
+        """Durably retry checkpointed work after a bounded admission backoff."""
+        retry_after = (_utc(now) + timedelta(seconds=30)).isoformat()
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                current = self.get(execution_id)
+                staged = self._connection.execute(
+                    "SELECT 1 FROM ai_execution_finalization_intent WHERE namespace=? AND execution_id=?",
+                    (self.namespace, execution_id),
+                ).fetchone()
+                if current.terminal or (current.checkpoint_version < 1 and staged is None):
+                    self._connection.execute("COMMIT")
+                    return False
+                self._connection.execute(
+                    "INSERT INTO ai_execution_admission_deferral(namespace, execution_id, retry_after) "
+                    "VALUES (?, ?, ?) ON CONFLICT(namespace, execution_id) DO UPDATE SET retry_after=excluded.retry_after",
+                    (self.namespace, execution_id, retry_after),
+                )
+                self._connection.execute("COMMIT")
+                return True
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def clear_checkpoint_admission_deferral(self, execution_id: str) -> None:
+        with self._lock:
+            self._connection.execute(
+                "DELETE FROM ai_execution_admission_deferral WHERE namespace=? AND execution_id=?",
+                (self.namespace, execution_id),
+            )
+
     def recoverable_page(
         self, *, limit: int = 32, after_updated_at: datetime | None = None,
-        after_execution_id: str | None = None, include_waiting: bool = True,
+        after_execution_id: str | None = None, include_waiting: bool = True, now: datetime | None = None,
     ) -> tuple[AIExecution, ...]:
         """Keyset page of unfinished executions; never loads the entire backlog.
 
-        ``include_waiting=False`` excludes passive user/authority waiters.
+        ``include_waiting=False`` excludes passive user/authority waiters except
+        explicitly deferred admission retries whose backoff has elapsed.
         A waiter with cancellation requested remains actionable and is included
         so recovery can durably finish its cancellation after a worker crash.
         """
@@ -3930,22 +3991,57 @@ class SQLiteExecutionRepository:
             raise ExecutionRepositoryError("include_waiting must be boolean")
         if (after_updated_at is None) != (after_execution_id is None):
             raise ExecutionRepositoryError("recovery cursor requires timestamp and execution identity together")
-        condition = "state NOT IN ('completed', 'failed', 'cancelled')" if include_waiting else (
+        condition = (
             "state NOT IN ('completed', 'failed', 'cancelled') "
-            "AND (state NOT IN ('waiting_for_user', 'waiting_for_tool_authority') OR cancellation_requested = 1)"
+            "AND (cancellation_requested = 1 OR NOT EXISTS ("
+            "SELECT 1 FROM ai_execution_admission_deferral d WHERE d.namespace=ai_execution_state.namespace "
+            "AND d.execution_id=ai_execution_state.execution_id AND d.retry_after > ?))"
         )
-        parameters: list[Any] = [self.namespace]
+        instant = _utc(now).isoformat()
+        parameters: list[Any] = [self.namespace, instant]
+        if not include_waiting:
+            condition += (
+                " AND (state NOT IN ('waiting_for_user', 'waiting_for_tool_authority') OR cancellation_requested = 1)"
+            )
+        cursor_parameters: list[Any] = []
         if after_updated_at is not None:
             if not isinstance(after_execution_id, str) or not 1 <= len(after_execution_id) <= 192:
                 raise ExecutionRepositoryError("recovery execution cursor is invalid")
             condition += " AND (updated_at, execution_id) > (?, ?)"
-            parameters.extend((_utc(after_updated_at).isoformat(), after_execution_id))
+            cursor_parameters = [_utc(after_updated_at).isoformat(), after_execution_id]
+            parameters.extend(cursor_parameters)
         parameters.append(limit)
+        query = (
+            "SELECT * FROM ai_execution_state WHERE namespace = ? AND " + condition
+            + " ORDER BY updated_at, execution_id LIMIT ?"
+        )
+        if not include_waiting:
+            # Keep ordinary recovery on its partial actionable index. A broad
+            # OR for deferred waiters would instead scan every passive waiter
+            # on every idle maintenance tick. The second disjoint candidate
+            # set starts from the indexed retry ledger, never from waiters.
+            deferred = (
+                "SELECT s.* FROM ai_execution_admission_deferral d "
+                "INDEXED BY idx_ai_execution_admission_retry_due "
+                "CROSS JOIN ai_execution_state s "
+                "ON s.namespace=d.namespace AND s.execution_id=d.execution_id "
+                "WHERE d.namespace=? AND d.retry_after<=? "
+                "AND s.state IN ('waiting_for_user', 'waiting_for_tool_authority') "
+                "AND s.cancellation_requested=0"
+            )
+            parameters.extend((self.namespace, instant))
+            if cursor_parameters:
+                deferred += " AND (s.updated_at, s.execution_id) > (?, ?)"
+                parameters.extend(cursor_parameters)
+            deferred += " ORDER BY s.updated_at, s.execution_id LIMIT ?"
+            parameters.extend((limit, limit))
+            query = (
+                "WITH actionable AS (" + query + "), deferred AS (" + deferred + ") "
+                "SELECT * FROM actionable UNION ALL SELECT * FROM deferred "
+                "ORDER BY updated_at, execution_id LIMIT ?"
+            )
         with self._lock:
-            rows = self._connection.execute(
-                "SELECT * FROM ai_execution_state WHERE namespace = ? AND " + condition
-                + " ORDER BY updated_at, execution_id LIMIT ?", parameters,
-            ).fetchall()
+            rows = self._connection.execute(query, parameters).fetchall()
             return tuple(self._execution_from_row(row) for row in rows)
 
     def recoverable(self) -> tuple[AIExecution, ...]:

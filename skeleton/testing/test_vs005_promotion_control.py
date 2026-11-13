@@ -517,6 +517,7 @@ def test_rollback_must_bind_exact_promotion_decision_digest() -> None:
 
 
 def test_rollback_requires_fourth_independent_verifier() -> None:
+    ledger = PromotionLedger()
     selected = candidate()
     evaluation_value, canary_value, decision = verified_promotion(selected)
     ledger.record_decision(
@@ -639,13 +640,15 @@ def test_promotion_ledger_decision_is_idempotent_but_not_rebindable() -> None:
         canary=canary_value,
     ) == decision
 
+    # An internally inconsistent decision fails evidence verification first,
+    # before any prior ledger binding is consulted.
     altered = replace(
         decision,
         evaluation_digest=S("different-evaluation"),
     )
     with pytest.raises(
         ImprovementError,
-        match="already bound to another decision",
+        match="decision does not match supplied evaluation/canary evidence",
     ):
         ledger.record_decision(
             selected,
@@ -653,6 +656,37 @@ def test_promotion_ledger_decision_is_idempotent_but_not_rebindable() -> None:
             evaluation=evaluation_value,
             canary=canary_value,
         )
+
+    # A second, independently evidence-valid decision using the same
+    # candidate-bound ID must still fail the immutable ledger binding.
+    alternate_evaluation = evaluation(
+        selected,
+        evidence_digest=S("alternate-evaluation"),
+    )
+    alternate_decision = promote_with_canary(
+        selected,
+        alternate_evaluation,
+        "ACTOR.VERIFIER",
+        canary_value,
+    )
+    assert alternate_decision != decision
+    assert alternate_decision.decision_id == decision.decision_id
+    with pytest.raises(
+        ImprovementError,
+        match="decision id is already bound to another decision",
+    ):
+        ledger.record_decision(
+            selected,
+            alternate_decision,
+            evaluation=alternate_evaluation,
+            canary=canary_value,
+        )
+    assert ledger.record_decision(
+        selected,
+        decision,
+        evaluation=evaluation_value,
+        canary=canary_value,
+    ) == decision
 
 
 def test_promotion_ledger_rejects_wrong_decision_id() -> None:
@@ -735,7 +769,13 @@ def test_promotion_ledger_rollback_rebinding_fails_closed() -> None:
 def test_promotion_ledger_rejects_nonindependent_rollback_verifier() -> None:
     ledger = PromotionLedger()
     selected = candidate()
-    decision = promoted_decision(selected)
+    evaluation_value, canary_value, decision = verified_promotion(selected)
+    ledger.record_decision(
+        selected,
+        decision,
+        evaluation=evaluation_value,
+        canary=canary_value,
+    )
     for verifier in (
         selected.builder_id,
         decision.verifier_id,

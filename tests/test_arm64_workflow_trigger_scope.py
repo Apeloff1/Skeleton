@@ -2,18 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = ROOT / ".github" / "workflows-archive" / "arm64.yml"
-
-pytestmark = pytest.mark.skip(
-    reason=(
-        "arm64.yml was archived by ace886be and is now dispatch-only; its "
-        "push/pull_request trigger scope no longer exists to assert."
-    )
-)
+WORKFLOW = ROOT / ".github" / "workflows" / "arm64.yml"
 
 
 def test_arm64_trigger_excludes_backend_test_only_changes_but_keeps_skeleton_tests() -> None:

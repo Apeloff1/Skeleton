@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for ravelport."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('ravelport_arrival', (), (), ('arrival_record',)), Quest('ravelport_source', ('ravelport_arrival',), ('arrival_record',), ('source_proof',)), Quest('ravelport_witness', ('ravelport_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('ravelport_reconcile', ('ravelport_source', 'ravelport_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('ravelport_crossing', ('ravelport_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('ravelport_conclusion', ('ravelport_crossing',), ('crossing_pass',), ('ending_unlocked',)))

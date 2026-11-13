@@ -43,12 +43,17 @@ def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
     try:
         p = Path(preferred)
         p.mkdir(parents=True, exist_ok=True)
-        t = p / ".w_probe"
-        t.write_text("ok"); t.unlink(missing_ok=True)
+        with tempfile.NamedTemporaryFile(prefix=".health-probe-", dir=p) as probe:
+            probe.write(b"ok")
+            probe.flush()
         return p
-    except Exception:
+    except OSError:
+        _log.warning("Configured build vault unavailable; using temporary fallback")
         fp = Path(fallback)
         fp.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(prefix=".health-probe-", dir=fp) as probe:
+            probe.write(b"ok")
+            probe.flush()
         return fp
 
 
@@ -69,10 +74,10 @@ def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
 # eviction). Compression keeps space cost low (~10:1, ~190 MB per 31k-file
 # build). If disk pressure becomes a problem we can add TTL cleanup or
 # move shards to S3. NEVER ship /tmp default again.
-BUILDS_ROOT = _resolve_writable_dir(
-    os.environ.get("GALAXY_BUILDS_VAULT_DIR", "/app/data/builds_vault"),
-    "/tmp/galaxy_builds_vault",
-)
+_PREFERRED_BUILDS_ROOT = os.environ.get("GALAXY_BUILDS_VAULT_DIR", "/app/data/builds_vault")
+BUILDS_ROOT = _resolve_writable_dir(_PREFERRED_BUILDS_ROOT, "/tmp/galaxy_builds_vault")
+# Fallback remains available for diagnostics, but cannot certify durable builds.
+BUILDS_VAULT_FALLBACK = BUILDS_ROOT.resolve() != Path(_PREFERRED_BUILDS_ROOT).resolve()
 
 _ZLEVEL = int(os.environ.get("GALAXY_BUILDS_ZSTD_LEVEL", "10"))  # balance speed vs ratio
 # One compressor per thread — zstd ctxs aren't thread-safe.
@@ -83,6 +88,13 @@ _LOCKS: dict[str, threading.RLock] = {}
 _LOCKS_GUARD = threading.Lock()
 _MAX_BUILD_ID_LENGTH = 128
 _MAX_ARCHIVE_MEMBER_LENGTH = 4096
+# A pending snapshot may be an arbitrary iterable, including a nonterminating
+# generator. Bound *elements consumed*, not just unique keys, so repeated
+# values cannot evade the memory/CPU admission limit. Preserve million-file
+# Galaxy builds while refusing unbounded caller-controlled iteration.
+_MAX_PENDING_PATHS = 1_000_000
+# Total pending key bytes must stay finite even at the million-file ceiling.
+_MAX_PENDING_PATH_BYTES = 128 * 1024 * 1024
 
 
 def _validate_build_id(build_id: str) -> str:
@@ -404,12 +416,32 @@ def append_files(build_id: str, files: dict) -> dict:
 
 def get_file_count(build_id: str, *, pending_paths: Iterable[str] = ()) -> int:
     """Count unique live paths, including an optional bounded pending snapshot."""
+    # Validate each caller-provided path *before* hashing or equality checks.
+    # set(pending_paths) first would execute a hostile object's __hash__/__eq__
+    # even when that object is not a permitted path. Preserve deduplication
+    # and the immutable on-disk manifest's authoritative live-file count.
+    pending: set[str] = set()
+    total_path_bytes = 0
+    for index, path in enumerate(pending_paths):
+        # Check before hashing: an endless generator of duplicate paths must
+        # never consume unlimited CPU even though the set stays at size one.
+        if index >= _MAX_PENDING_PATHS:
+            raise ValueError("pending vault path snapshot exceeds admission")
+        if type(path) is not str:
+            raise ValueError("pending vault paths must be strings")
+        # Do not encode arbitrarily long caller strings before size admission.
+        # Even a finite million-element snapshot must have bounded total keys.
+        if len(path) > _MAX_ARCHIVE_MEMBER_LENGTH:
+            raise ValueError("pending vault path exceeds admission")
+        encoded_length = len(path.encode("utf-8", "strict"))
+        total_path_bytes += encoded_length
+        if (total_path_bytes > _MAX_PENDING_PATH_BYTES
+                or encoded_length > _MAX_ARCHIVE_MEMBER_LENGTH):
+            raise ValueError("pending vault path bytes exceed admission")
+        pending.add(path)
     with _lock_for(build_id):
         manifest = _read_manifest(build_id)
         index = manifest["path_index"]
-        pending = set(pending_paths)
-        if any(not isinstance(path, str) for path in pending):
-            raise ValueError("pending vault paths must be strings")
         return len(index) + sum(path not in index for path in pending)
 
 

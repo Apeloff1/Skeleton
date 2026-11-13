@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_neon_undercity",
+  "title": "Neon Undercity: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010317943,
+  "width": 25,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 8,
+  "theme": "arcade",
+  "starting_health": 3
+}

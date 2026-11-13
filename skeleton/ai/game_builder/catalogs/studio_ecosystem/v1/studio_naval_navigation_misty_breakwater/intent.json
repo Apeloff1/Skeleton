@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_naval_navigation_misty_breakwater",
+  "title": "Misty Breakwater: Naval Navigation",
+  "subtitle": "An original naval navigation brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610301997,
+  "width": 19,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "ocean",
+  "starting_health": 6
+}

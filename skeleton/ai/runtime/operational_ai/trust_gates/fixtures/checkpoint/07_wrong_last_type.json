@@ -1,0 +1,18 @@
+{
+  "case": "07_wrong_last_type",
+  "gate": "checkpoint",
+  "expect": "reject",
+  "reason": "Typed values are not arbitrary objects",
+  "payload": {
+    "model_id": "local-gguf",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "format": "gguf-v3",
+    "bytes": 5000,
+    "max_bytes": 100000000,
+    "step": 1,
+    "approved": {
+      "untrusted": true
+    }
+  }
+}

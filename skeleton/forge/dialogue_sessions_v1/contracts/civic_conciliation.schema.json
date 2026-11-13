@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "civic_conciliation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "choice",
+    "expected_version",
+    "evidence"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "choice": {
+      "enum": [
+        "greet",
+        "ask",
+        "explain",
+        "negotiate",
+        "reconcile",
+        "close",
+        "withdraw"
+      ]
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "evidence": {
+      "type": "string",
+      "maxLength": 128
+    }
+  }
+}

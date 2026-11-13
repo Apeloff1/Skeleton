@@ -78,10 +78,7 @@
       "public_url": "http://localhost:3000",
       "health_path": "/",
       "container_port": 3000,
-      "depends_on": [
-        "backend",
-        "skeleton"
-      ],
+      "depends_on": [],
       "canonical": true,
       "ingress_prefix": "/"
     },
@@ -92,7 +89,7 @@
       "kind": "fastapi",
       "entrypoint": "server:app",
       "public_url": "http://localhost:8001",
-      "health_path": "/api/health",
+      "health_path": "/api/health/ready",
       "container_port": 8001,
       "depends_on": [
         "mongo",
@@ -146,6 +143,9 @@
     "docker-compose.yml",
     "docker-compose.hot.yml",
     "Dockerfile",
+    "Dockerfile.dockerignore",
+    "backend/Dockerfile.dockerignore",
+    "frontend/.dockerignore",
     "backend/server.py",
     "backend/Dockerfile",
     "frontend/package.json",
@@ -168,6 +168,7 @@
     "skeleton/testing/test_app_compose_parity.py",
     "skeleton/testing/test_app_runtime_contract.py",
     "skeleton/app/preloader.py",
+    "skeleton/app/install_source_contracts.py",
     "skeleton/app/setup_runtime.py",
     "skeleton/app/installer.py",
     "skeleton/app/first_install.py",

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_stealth_route_misty_breakwater",
+  "title": "Misty Breakwater: Stealth Route",
+  "subtitle": "An original stealth route brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610300461,
+  "width": 19,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 9,
+  "theme": "ocean",
+  "starting_health": 4
+}

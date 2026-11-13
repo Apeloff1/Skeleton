@@ -1,0 +1,68 @@
+name: Discourse Job Identity and E2E Source Qualification
+
+on:
+  pull_request:
+    branches:
+      - main
+      - fix/ci-native-proof-preflight-20261111-r01
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - '.github/workflows/discourse-job-identity-qualification.yml'
+      - 'frontend/src/features/discourse/discourseJob.ts'
+      - 'frontend/scripts/test-discourse-async-jobs.mjs'
+      - 'tests/test_app_foundation_e2e_build_isolation.py'
+      - 'frontend/scripts/guarded-expo-export.cjs'
+      - 'frontend/scripts/test-guarded-expo-export.cjs'
+      - 'frontend/Dockerfile'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: discourse-identity-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  discourse_receipt_identity:
+    name: Exact-head Discourse admission and observation regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact immutable PR source without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify exact source SHA
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up pinned Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Execute bounded Discourse transport and adversarial receipt suite
+        run: node --experimental-strip-types --test frontend/scripts/test-discourse-async-jobs.mjs
+
+  e2e_build_source:
+    name: Exact-head E2E build and guarded Expo source regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact immutable PR source without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify exact source SHA
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up pinned Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11.16'
+      - name: Execute stage isolation and exporter fail-closed contracts
+        run: python -m unittest discover -s tests -p test_app_foundation_e2e_build_isolation.py -v

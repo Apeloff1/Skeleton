@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_celestial_navigation_copper_mesa",
+  "title": "Copper Mesa: The Ephemeris Voyage",
+  "subtitle": "Original the ephemeris voyage design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010315498,
+  "width": 19,
+  "height": 21,
+  "levels": 6,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 14,
+  "theme": "desert",
+  "starting_health": 6
+}

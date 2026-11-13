@@ -5269,29 +5269,43 @@
       "source_of_truth": "existing execution checkpoint and AgentTurn ledger",
       "modes": [
         "absent: existing single-candidate/model-tool behavior",
-        "plan -> draft -> (critique -> refine) for 1..3 declared rounds"
+        "plan -> draft -> (critique -> refine) for 1..3 declared rounds",
+        "optional 2..3 sequential draft candidates -> shared critique/refine rounds, under the same original resource grant"
       ],
       "request_field": "AIExecutionRequest.context_policy.cooperation",
       "fields": {
         "review_rounds": "integer1..3",
+        "draft_count": "optional integer1..3; omitted or 1 retains the legacy canonical policy and stage identities; 2..3 emits draft:1..N using the configured draft role",
         "max_stage_output_tokens": "integer64..4096; actual allocation cannot exceed remaining shared operation budget",
         "roles": "optional plan/draft/critique/refine exact provider_id+model_id selections, resolved and pinned before execution"
       },
       "rules": [
         "Every stage uses the canonical ProviderRequest and a real durable AgentTurn; role labels are not independent review evidence.",
         "One original brief, context digest and source snapshot remain pinned; generated stage artifacts stay untrusted task material.",
+        "Sibling drafts receive the original brief, history and plan without earlier candidate content. Initial critique/refinement can compare all bounded candidates; subsequent rounds review the latest refinement. Draft candidates are sequential and do not certify diversity, independence or superior quality.",
+        "Multiple-draft progress includes the immutable draft_count and exact stage receipt prefix. The total is 1 + draft_count + 2 * review_rounds; increasing candidates never replenishes an admitted operation's shared resource grant.",
         "No tools or external effects in this opt-in response pipeline; final structured schema applies only to final refinement.",
         "Provider identities for explicit role selections are pinned in initial execution binding; a missing or changed role/model fails closed.",
         "All stages and semantic verification share original monotonic token, cost, attempt and deadline ceilings. Unknown usage is recorded and charged conservatively, never treated as zero.",
         "Only the final candidate passes the existing canonical verification/finalization boundary. Intermediate critiques never grant publication, source rights, training consent or model promotion.",
         "Recovery resumes from committed phase cursor; completed provider turns and observable artifact digests are never regenerated merely on replay."
       ],
-      "verification": "direct real trained-model canonical executions, source-bound stage/usage receipts, static architecture checks; local automated suites withheld per current operator instruction",
+      "verification": "source-bound stage/usage receipts, legacy checkpoint compatibility, sibling content isolation, strict progress projection, bounded canonical execution regressions and static architecture checks; trained-model and deployment qualification require separately recorded exact-source evidence",
       "rollback": "omit cooperation for new requests; existing in-flight cooperative checkpoints require the same pinned implementation/route rather than silent downgrade",
       "input_accounting": "One aggregate input budget covers every dispatch; context_policy.provider_input_limit separately caps each selected provider context. Compiler reserves artifact/control headroom and all stage actual usage shares the parent reservation ledger.",
       "semantic_verification": "Canonical SemanticVerificationRuntime uses parent-bound request/response/resolver callbacks: inherited tenant, classification, purpose, operation/execution/context/source/compiler identity, monotonic deadline, finite remaining token/cost/attempt/model-turn grant. Charge actual response before verdict parsing, including invalid replies. Missing or overlapping generator/verifier identities fail closed; no critique becomes independent proof.",
       "semantic_recovery": "Same canonical execution checkpoint stores immutable claim identity and bounded typed semantic responses atomically with resource settlement. Exact claim/request/receipt/source-bound responses are parsed again without provider redispatch or double charging; unresolved dispatched reservations remain uncertain and may not dispatch implicitly on recovery.",
       "cost_unknown": "Unknown usage retains finite reservations; estimated token counts never replenish grants. Hosted unknown-cost requests require positive allocated cost shares within the original grant; local routes explicitly permit documented zero cost. Conservative accounting is not a vendor billing guarantee."
+    },
+    "checkpoint_admission_recovery": {
+      "owner": "existing engine coordinator and SQLite execution repository",
+      "state": "namespace/execution-bound retry timestamp in the same execution database; terminal result commits remove the deferral atomically",
+      "rules": [
+        "Transient admission failure preserves retained checkpoints and staged outputs, and never bypasses normal authorization, metering or provider identity checks.",
+        "Startup scans passive waiters across bounded keyset pages; maintenance revisits due explicit deferrals and cancellations, without repeatedly polling unchanged passive waiters.",
+        "Retry markers survive restart, back off provider/admission outages, and clear only after successful recovery observation or terminal completion. A failed persistence attempt requests another bounded waiter sweep without rewinding an active page scan."
+      ],
+      "limitation": "This does not provide a terminal admission-completion outbox; committed-result completion reconciliation remains separately required."
     },
     "terminal_failure_projection": "New non-success results persist bounded usage.error_code. Existing immutable results may project a bounded cause only from usage.error_code or an exactly matching stream-terminal:<own execution>:<own non-success status>:<cause> receipt; never rewrite old results or infer errors from generated text.",
     "provider_compatibility_identity": {
