@@ -97,6 +97,8 @@ class GameForgeRun:
         from skeleton.forge.playtest import normalise_mode
         from skeleton.forge.repair import REPAIR_MODES
         playtest_mode = normalise_mode(playtest)
+        if playtest_mode != "off" and target != "godot":
+            raise ValueError("headless Godot playtest requires the Godot target")
         if type(playable_content) is not bool:
             raise ValueError("playable_content must be an explicit boolean opt-in")
         if playable_content and target != "godot":
