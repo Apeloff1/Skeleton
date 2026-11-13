@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Dict, Mapping, Tuple
 
-ARCHETYPE_CONTENT_VERSION = 1
+ARCHETYPE_CONTENT_VERSION = 2
 COMPLETE_MARKER = "ARCHETYPE_LOOP_COMPLETE"
 FAILED_MARKER = "ARCHETYPE_LOOP_FAILED"
 
@@ -81,12 +81,16 @@ func _ready() -> void:
 \thud_label.position = Vector2(20.0, 20.0)
 \thud_label.add_theme_font_size_override("font_size", 20)
 \thud_label.add_theme_color_override("font_color", Color(0.94, 0.97, 1.0))
+\thud_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+\thud_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+\thud_label.size = Vector2(maxf(180.0, minf(get_viewport_rect().size.x - 40.0, 660.0)), 110.0)
 \toverlay.add_child(hud_label)
 \thud_label.text = "{instruction}\\nArrow keys or touch controls to move"
 \tvar controls := Control.new()
 \tcontrols.name = "TouchControls"
 \toverlay.add_child(controls)
 \tcontrols.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+\tcontrols.mouse_filter = Control.MOUSE_FILTER_IGNORE
 \t_add_direction(controls, "ui_up", "UP", Vector2(90.0, -196.0))
 \t_add_direction(controls, "ui_left", "LEFT", Vector2(24.0, -130.0))
 \t_add_direction(controls, "ui_down", "DOWN", Vector2(90.0, -130.0))
@@ -104,8 +108,16 @@ func _add_direction(controls: Control, action: String, caption: String, offset: 
 \tbutton.offset_top = offset.y
 \tbutton.offset_right = offset.x + 60.0
 \tbutton.offset_bottom = offset.y + 60.0
-\tbutton.button_down.connect(func(): Input.action_press(action))
-\tbutton.button_up.connect(func(): Input.action_release(action))
+\tbutton.button_down.connect(_press_action.bind(action))
+\tbutton.button_up.connect(_release_action.bind(action))
+
+
+func _press_action(action: String) -> void:
+\tInput.action_press(action)
+
+
+func _release_action(action: String) -> void:
+\tInput.action_release(action)
 
 
 func _exit_tree() -> void:
