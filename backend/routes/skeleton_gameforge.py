@@ -63,6 +63,13 @@ def eras() -> Dict[str, Any]:
     return {"eras": out, "count": len(out)}
 
 
+@router.get("/genres")
+def genres() -> Dict[str, Any]:
+    """Read-only 158-genre taxonomy; a vote is not playable-engine certification."""
+    from skeleton.context.genre_catalog import genre_catalog_payload
+    return genre_catalog_payload()
+
+
 @router.get("/generations")
 def generations() -> Dict[str, Any]:
     from skeleton.forge.hardware import catalog

@@ -9,6 +9,7 @@ import { humanize } from '../graph';
 import { DESIGN_AXES } from '../instruments';
 import { PLAYABLE_SLICES, PLAYABLE_TUNING_EFFECTS } from '../questionnaire';
 import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
+import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
 import { suggestPlayableMode } from '../playableSuggestions';
 import DesignInstruments from './DesignInstruments';
 import DesignPresetPanel from './DesignPresetPanel';
@@ -148,12 +149,68 @@ function OptionGroup({ id, prompt, options, value, onPick, color = C.blue, capti
   );
 }
 
+/** Browsing defaults to the familiar 36; search reaches all registered genres. */
+function GenrePicker({ value, onPick }: { value?: string; onPick: (v: string) => void }) {
+  const [query, setQuery] = React.useState('');
+  const [family, setFamily] = React.useState('popular');
+  const matches = filterGenreChoices(query, family);
+  const shown = matches.slice(0, 80);
+  return (
+    <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="What kind of game is it?" testID="q-group-brief-genre">
+      <Text style={st.q}>What kind of game is it?</Text>
+      <Text style={st.help}>{GENRE_COUNT} selectable game genres and subgenres. Each is a creative-brief hint mapped to a design era, not a promise of a dedicated playable engine.</Text>
+      <TextInput
+        testID="q-genre-search"
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search all genres (for example: colony, racing, puzzle)"
+        placeholderTextColor={C.dim}
+        accessibilityLabel="Search game genres"
+        autoCapitalize="none"
+        maxLength={48}
+        style={[st.input, { minHeight: TOUCH, marginBottom: 8 }]}
+      />
+      <View style={st.chips}>
+        <Chip label="Popular 36" selected={family === 'popular'} onPress={() => setFamily('popular')} testID="q-genre-family-popular" />
+        <Chip label="All" selected={family === 'all'} onPress={() => setFamily('all')} testID="q-genre-family-all" />
+        {GENRE_GROUPS.map((g) => (
+          <Chip key={g.id} label={g.label} selected={family === g.id} onPress={() => setFamily(g.id)} testID={'q-genre-family-' + g.id} />
+        ))}
+      </View>
+      {value && !shown.includes(value) ? (
+        <View style={st.chips}>
+          <Chip label={'Selected: ' + humanize(value)} selected onPress={() => onPick(value)} testID={'q-brief-genre-' + value} />
+        </View>
+      ) : null}
+      <Text style={st.help}>{shown.length} of {matches.length} matching genres shown{matches.length > shown.length ? '; refine search or choose a category' : ''}.</Text>
+      <View style={st.chips}>
+        {shown.map((genre) => (
+          <Chip
+            key={genre}
+            label={humanize(genre)}
+            selected={value === genre}
+            color={C.accent}
+            onPress={() => onPick(genre)}
+            testID={'q-brief-genre-' + genre}
+            a11yLabel={humanize(genre) + (value === genre ? ', selected' : '')}
+          />
+        ))}
+      </View>
+      {!shown.length ? <Text style={st.help}>No matching genre. Try a broader term or another category.</Text> : null}
+    </View>
+  );
+}
+
 function BriefStep({ state, dispatch }: QuestionnaireFlowProps) {
   return (
     <Card>
       <Text style={st.help}>Optional. The brief votes an era only when no design beat is answered; it always names and themes the game.</Text>
       {BRIEF_FACETS.map((f) => (
-        <OptionGroup key={f.id} id={`brief-${f.id}`} prompt={f.prompt} options={f.options} value={state.brief[f.id]} onPick={(v) => dispatch({ type: 'setBrief', facet: f.id, value: v })} color={C.accent} />
+        f.id === 'genre' ? (
+          <GenrePicker key={f.id} value={state.brief.genre} onPick={(v) => dispatch({ type: 'setBrief', facet: 'genre', value: v })} />
+        ) : (
+          <OptionGroup key={f.id} id={`brief-${f.id}`} prompt={f.prompt} options={f.options} value={state.brief[f.id]} onPick={(v) => dispatch({ type: 'setBrief', facet: f.id, value: v })} color={C.accent} />
+        )
       ))}
     </Card>
   );

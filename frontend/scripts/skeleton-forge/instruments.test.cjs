@@ -118,3 +118,55 @@ test('63+ genre options are discoverable within the existing five-step Forge', (
   assert.match(text(html), /all 67 Galaxy genres/);
   assert.match(html, /data-testid="q-galaxy-genres-toggle"/);
 });
+
+
+test('the recovered 158-genre creative brief supports search while preserving selected genre', () => {
+  const Genres = load('src/skeletonForge/genreCatalog.ts');
+  assert.equal(Genres.GENRE_COUNT, 158);
+  assert.equal(Genres.GENRE_GROUPS.length, 11);
+  assert.equal(Genres.GENRE_CHOICES.length, 158);
+  assert.equal(new Set(Genres.GENRE_CHOICES).size, 158);
+  assert.equal(Genres.POPULAR_GENRES.length, 36);
+  for (const term of ['colony-sim', 'tactical-rpg', '4x', 'rhythm', 'racing', 'visual-novel']) {
+    assert.ok(Genres.GENRE_CHOICES.includes(term), 'Missing historical genre: ' + term);
+  }
+  const state = {
+    ...Q.INITIAL_STATE,
+    step: 'brief', vision: 'Original cross-genre adventure',
+    brief: { genre: 'city-builder' },
+  };
+  const html = render(h(Flow, {
+    state, dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {},
+  }));
+  assert.match(text(html), /158 selectable game genres and subgenres/);
+  assert.match(html, /data-testid="q-genre-search"/);
+  assert.match(html, /data-testid="q-genre-family-racing-sports"/);
+  assert.match(html, /data-testid="q-brief-genre-city-builder"/);
+  assert.match(text(html), /not a promise of a dedicated playable engine/);
+  assert.equal(Q.buildRunRequest(state).answers.genre, 'city-builder');
+  assert.equal(Q.buildRunRequest({
+    ...state, brief: { genre: 'colony-sim' },
+  }).answers.genre, 'colony-sim');
+  assert.deepEqual(Genres.filterGenreChoices('colony'), ['colony-sim']);
+  assert.ok(Genres.filterGenreChoices('', 'racing-sports').includes('sailing'));
+  assert.equal(Genres.filterGenreChoices('___absent___').length, 0);
+});
+
+test('recovered saved presets validate all expanded genre options and preserve native options', () => {
+  const Presets = load('src/skeletonForge/designPresets.ts');
+  for (const genre of ['colony-sim', 'racing', 'survival-horror', 'tactical-rpg']) {
+    const state = {
+      ...Q.INITIAL_STATE,
+      brief: { genre },
+      quest: { enabled: true, length: 7 },
+      playable: { enabled: true, mode: 'survival', launch: false },
+      instruments: { tempo: 0.8, grind: 0.65 },
+    };
+    const original = Q.buildRunRequest(state);
+    const record = Presets.makeDesignPreset('Genre-' + genre, state, 100);
+    const restored = Presets.decodeDesignPresets(
+      Presets.encodeDesignPresets([record])
+    )[0];
+    assert.deepEqual(Q.buildRunRequest(restored.state), original);
+  }
+});
