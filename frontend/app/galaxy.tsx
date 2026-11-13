@@ -17,6 +17,7 @@ import { useRouter, useNavigation } from 'expo-router';
 import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
 const GalaxyStudioFactoryModal = lazyDefault(() => import('../src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal'));
 import theme from '../src/theme/tokens';
+import { loadGalaxyDraft, type GalaxyDraftSnapshot } from '../src/features/GalaxyStudioFactory/draftCustody';
 import { handoffFromGalaxy, type CreatorBridgeDraft, type GalaxyBridgeSelection } from '../src/skeletonForge/creatorBridge';
 import { consumeCreatorBridge, storeCreatorBridge } from '../src/skeletonForge/creatorBridgeStorage';
 
@@ -24,15 +25,20 @@ export default function GalaxyRoute() {
   const router = useRouter();
   const navigation = useNavigation();
   const [incoming, setIncoming] = React.useState<CreatorBridgeDraft | null>(null);
+  const [savedGalaxy, setSavedGalaxy] = React.useState<GalaxyDraftSnapshot | null>(null);
   const [ready, setReady] = React.useState(false);
   const [handoffError, setHandoffError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let mounted = true;
-    void consumeCreatorBridge('galaxy')
-      .then((draft) => { if (mounted) setIncoming(draft); })
-      .catch(() => { if (mounted) setHandoffError('Could not restore the GameForge handoff.'); })
-      .finally(() => { if (mounted) setReady(true); });
+    void Promise.all([
+      consumeCreatorBridge('galaxy').catch(() => null),
+      loadGalaxyDraft().catch(() => null),
+    ]).then(([draft, saved]) => {
+      if (!mounted) return;
+      setIncoming(draft);
+      setSavedGalaxy(saved);
+    }).finally(() => { if (mounted) setReady(true); });
     return () => { mounted = false; };
   }, []);
 
@@ -68,7 +74,8 @@ export default function GalaxyRoute() {
       {handoffError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24' }}>{handoffError}</Text> : null}
       {ready ? (
         <LazyMount><GalaxyStudioFactoryModal visible={true} onClose={close}
-          initialForgeDraft={incoming} onSendToForge={continueInForge} /></LazyMount>
+          initialForgeDraft={incoming} initialGalaxyDraft={savedGalaxy}
+          handoffError={handoffError} onSendToForge={continueInForge} /></LazyMount>
       ) : null}
     </View>
   );
