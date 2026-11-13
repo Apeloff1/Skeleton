@@ -11,6 +11,7 @@ import { PLAYABLE_SLICES, PLAYABLE_TUNING_EFFECTS } from '../questionnaire';
 import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import { suggestPlayableMode } from '../playableSuggestions';
 import DesignInstruments from './DesignInstruments';
+import DesignPresetPanel from './DesignPresetPanel';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
   blockReason, buildRunRequest, eraSource, progress, reachable, shadowedBriefFacets, stepIndex,
@@ -205,6 +206,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         })}
       </View>
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
+      <DesignPresetPanel state={state} dispatch={dispatch} />
 
       <View style={st.group} testID="q-playable-slice-options" accessibilityRole="radiogroup" accessibilityLabel="Playable original mini-game">
         <Text style={st.q}>Playable genre prototypes</Text>

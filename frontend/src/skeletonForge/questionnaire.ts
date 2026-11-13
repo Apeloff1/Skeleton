@@ -121,6 +121,7 @@ export type QuestionnaireAction =
   | { type: 'setGalaxyGenre'; genre: string | null }
   | { type: 'importGalaxy'; profile: GalaxyProfile }
   | { type: 'clearGalaxyProfile' }
+  | { type: 'restoreDesignPreset'; state: QuestionnaireState }
   | { type: 'setQuestEnabled'; value: boolean }
   | { type: 'setQuestLength'; value: number }
   | { type: 'setPlayableEnabled'; value: boolean }
@@ -268,6 +269,8 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     }
     case 'goto':
       return reachable(state, action.step) ? { ...state, step: action.step } : state;
+    case 'restoreDesignPreset':
+      return { ...action.state, step: 'options' };
     case 'reset':
       return INITIAL_STATE;
     default:
