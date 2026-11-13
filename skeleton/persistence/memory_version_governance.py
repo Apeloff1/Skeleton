@@ -8,7 +8,8 @@ semantics.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+from uuid import NAMESPACE_URL, uuid5
 import hashlib
 import json
 
@@ -95,7 +96,11 @@ def governed_rollback(
     if target.state is MemoryState.TOMBSTONED:
         raise MemoryConflict("rollback target is tombstoned")
     provenance = tuple(dict.fromkeys((*target.provenance_refs, evidence_ref, f"rollback-from:{current.version}", f"rollback-target:{target_version}")))
+    # Stable UUID custody ties retries to the same scoped rollback operation.
+    operation_uuid = str(uuid5(NAMESPACE_URL, f"memory-rollback:{tenant_id}:{namespace}:{memory_id}:{operation_id}"))
     proposal = MemoryWriteProposal(
+        proposal_id=operation_uuid,
+        proposed_at=now if now is not None else datetime.now(timezone.utc),
         tenant_id=tenant_id,
         namespace=namespace,
         subject_id=current.subject_id,
@@ -104,10 +109,10 @@ def governed_rollback(
         content=target.content,
         content_ref=target.content_ref,
         provenance_refs=provenance,
-        source_operation_id=operation_id,
+        source_operation_id=operation_uuid,
         target_memory_id=memory_id,
         expected_version=expected_head_version,
         expires_at=target.expires_at,
         data_class=target.data_class,
     )
-    return repository.write(proposal, now=now)
+    return repository.commit(proposal, now=now)

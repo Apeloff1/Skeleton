@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from skeleton.ai.training.jeeves_game_corpus_builder import (
     INTAKE_SCHEMA, build, partition_projects,
@@ -93,6 +94,8 @@ class GameCorpusBuilderTests(unittest.TestCase):
             self.assertEqual(len(training), 48)
             self.assertEqual(sum(map(len, evals.values())), 16)
             self.assertTrue(receipt["heldout_used_for_training"] is False)
+            self.assertEqual(result["loader_acceptance"]["manifest_path"], str(manifest.absolute()))
+            self.assertEqual(result["manifest_sha256"], receipt["manifest_sha256"])
             lines_train = [
                 json.loads(line)
                 for line in (dest / "first_production_candidate-train.jsonl").read_text().splitlines()
@@ -152,6 +155,60 @@ class GameCorpusBuilderTests(unittest.TestCase):
             with self.assertRaisesRegex(ProductionCheckpointError, "already contains"):
                 build(**options)
             self.assertEqual(manifest.read_bytes(), existing)
+
+    def test_failed_publication_does_not_delete_a_concurrent_replacement(self) -> None:
+        import os
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            sources, dest = root / "sources", root / "output"
+            sources.mkdir()
+            dest.mkdir()
+            intake, _ = self._write_intake(sources)
+            original_link = os.link
+            train = dest / "game_release_001-train.jsonl"
+            calls = 0
+
+            def replace_before_second_link(source, destination):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    # Model another owner replacing the name after our first
+                    # successful publish but before a later publish fails.
+                    train.unlink()
+                    train.write_bytes(b"another owner's dataset")
+                    raise FileExistsError("publication collision")
+                return original_link(source, destination)
+
+            with patch("skeleton.ai.training.jeeves_game_corpus_builder.os.link", side_effect=replace_before_second_link):
+                with self.assertRaisesRegex(ProductionCheckpointError, "files were preserved"):
+                    build(intake=intake, destination=dest, prefix="game_release_001",
+                          partition_seed="split_001", rights_review_id="rights_operator_001")
+            self.assertEqual(train.read_bytes(), b"another owner's dataset")
+            self.assertFalse((dest / "game_release_001-manifest.json").exists())
+
+    def test_published_manifest_replacement_cannot_receive_the_original_receipt(self) -> None:
+        import os
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            sources, dest = root / "sources", root / "output"
+            sources.mkdir()
+            dest.mkdir()
+            intake, _ = self._write_intake(sources)
+            original_link = os.link
+            manifest = dest / "game_release_001-manifest.json"
+            replacement = b"another owner's reviewed manifest"
+
+            def replace_published_manifest(source, destination):
+                original_link(source, destination)
+                if Path(destination) == manifest:
+                    manifest.unlink()
+                    manifest.write_bytes(replacement)
+
+            with patch("skeleton.ai.training.jeeves_game_corpus_builder.os.link", side_effect=replace_published_manifest):
+                with self.assertRaisesRegex(ProductionCheckpointError, "changed during publication"):
+                    build(intake=intake, destination=dest, prefix="game_release_001",
+                          partition_seed="split_001", rights_review_id="rights_operator_001")
+            self.assertEqual(manifest.read_bytes(), replacement)
 
     def test_partition_is_deterministic_across_record_order(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

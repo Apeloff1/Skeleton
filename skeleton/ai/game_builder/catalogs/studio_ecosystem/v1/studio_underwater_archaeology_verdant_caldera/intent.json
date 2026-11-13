@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_underwater_archaeology_verdant_caldera",
+  "title": "Verdant Caldera: The Tidal Archive",
+  "subtitle": "Original the tidal archive design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010311903,
+  "width": 27,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 12,
+  "theme": "forest",
+  "starting_health": 3
+}

@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for opalstrand."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('opalstrand_arrival', (), (), ('arrival_record',)), Quest('opalstrand_source', ('opalstrand_arrival',), ('arrival_record',), ('source_proof',)), Quest('opalstrand_witness', ('opalstrand_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('opalstrand_reconcile', ('opalstrand_source', 'opalstrand_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('opalstrand_crossing', ('opalstrand_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('opalstrand_conclusion', ('opalstrand_crossing',), ('crossing_pass',), ('ending_unlocked',)))

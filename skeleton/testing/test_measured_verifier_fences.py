@@ -9,9 +9,26 @@ from skeleton.ai.runtime.training.evaluation import EvaluationLedger
 from skeleton.ai.runtime.training.verifier import (
     MeasuredVerifierError,
     MeasuredVerifierRunner,
+    _runtime_identity,
     canonical,
 )
 from skeleton.testing.test_measured_local_verifier import _evaluate, _sources
+
+
+def test_runtime_fingerprint_stable_across_evidence_roundtrips(monkeypatch):
+    """Repeated verification must not drift, but implementation edits must fail closed."""
+    _, sources = _sources()
+    for source in sources:
+        pinned_digest = source.payload["runtime_digest"]
+        for _ in range(4):
+            assert _runtime_identity(source.model) == pinned_digest
+            canonical(source.payload)
+            source.assert_current()
+
+    verifier = sources[-1]
+    monkeypatch.setattr(verifier.model, "_label", lambda _answer: ("reject", 1.0))
+    with pytest.raises(MeasuredVerifierError, match="implementation identity"):
+        verifier.assert_current()
 
 
 def _executed_cases(tmp_path):

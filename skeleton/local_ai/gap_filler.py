@@ -6,7 +6,7 @@ import importlib
 from typing import Dict, Callable
 from .local_ai_index import SEAMS
 
-# Literal import targets: 45 indexed core adapters and 200 numbered seams.
+# Literal import targets: 50 indexed core adapters and 200 numbered seams.
 # Keep imports lazy; never interpolate a caller-controlled import string.
 _REGISTERED_SEAM_LOADERS = {
     "local_model_adapter": lambda: importlib.import_module("skeleton.local_ai.local_model_adapter"),
@@ -54,6 +54,11 @@ _REGISTERED_SEAM_LOADERS = {
     "xlsx_ops": lambda: importlib.import_module("skeleton.local_ai.xlsx_ops"),
     "ffmpeg_ops": lambda: importlib.import_module("skeleton.local_ai.ffmpeg_ops"),
     "docx_ops": lambda: importlib.import_module("skeleton.local_ai.docx_ops"),
+    "enterprise_auth": lambda: importlib.import_module("skeleton.local_ai.enterprise_auth"),
+    "enterprise_gateway": lambda: importlib.import_module("skeleton.local_ai.enterprise_gateway"),
+    "enterprise_policy": lambda: importlib.import_module("skeleton.local_ai.enterprise_policy"),
+    "enterprise_observability": lambda: importlib.import_module("skeleton.local_ai.enterprise_observability"),
+    "enterprise_sla": lambda: importlib.import_module("skeleton.local_ai.enterprise_sla"),
     "seam_000": lambda: importlib.import_module("skeleton.local_ai.seam_000"),
     "seam_001": lambda: importlib.import_module("skeleton.local_ai.seam_001"),
     "seam_002": lambda: importlib.import_module("skeleton.local_ai.seam_002"),

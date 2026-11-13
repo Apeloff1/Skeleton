@@ -1,0 +1,15 @@
+{
+  "case": "08_surrogate_unicode",
+  "gate": "path",
+  "expect": "reject",
+  "reason": "Surrogate Unicode cannot be canonical evidence",
+  "payload": {
+    "relative_path": "\ud800",
+    "root_id": "installation",
+    "entry_type": "model",
+    "bytes": 1000,
+    "byte_limit": 100000000,
+    "suffix": ".gguf",
+    "immutable": true
+  }
+}

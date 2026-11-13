@@ -668,7 +668,7 @@ class GlobalResourceScheduler:
 
     def _effective_priority(self, ticket: RequestTicket) -> int:
         age = max(0, self._tick - ticket.submitted_tick)
-        improvement = age // self.policy.aging_interval
+        improvement = max(0, (age - 1) // self.policy.aging_interval)
         return max(0, ticket.request.priority - improvement)
 
     def _fits_candidate(self, ticket: RequestTicket) -> bool:

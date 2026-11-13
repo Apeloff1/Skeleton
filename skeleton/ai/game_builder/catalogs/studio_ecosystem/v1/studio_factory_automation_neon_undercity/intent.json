@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_factory_automation_neon_undercity",
+  "title": "Neon Undercity: The Maker Commons",
+  "subtitle": "Original the maker commons design in Neon Undercity; only the grid preview compiles today.",
+  "seed": 203010313033,
+  "width": 25,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 10,
+  "theme": "arcade",
+  "starting_health": 5
+}

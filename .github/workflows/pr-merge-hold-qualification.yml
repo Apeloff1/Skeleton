@@ -1,0 +1,50 @@
+name: PR Merge Hold Qualification
+
+# Read-only tests of proposed PR source. This workflow is deliberately
+# separate from the trusted pull_request_target required check.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - '.github/workflows/pr-merge-hold.yml'
+      - '.github/workflows/pr-merge-hold-qualification.yml'
+      - 'scripts/check_pr_merge_hold.py'
+      - 'tests/test_pr_merge_hold_gate.py'
+      - 'skeleton/pr_automation/**'
+      - 'skeleton/ai/build/pr_automation/**'
+      - 'machine/ai_file_tree.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-merge-hold-qualification-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualification:
+    name: PR Merge Hold Qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout proposed exact head for isolated read-only tests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up pinned Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install isolated test runner
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Validate live PR hold gate regressions
+        run: python -m unittest discover -s tests -p 'test_pr_merge_hold_gate.py' -v
+      - name: Validate automerge policy hold regressions
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest skeleton/testing/test_automerge_pr_text_holds_20261110.py
+      - name: Validate canonical AI file tree
+        run: python scripts/check_ai_file_tree.py

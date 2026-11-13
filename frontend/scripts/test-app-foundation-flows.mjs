@@ -185,6 +185,12 @@ const live = { skip: BASE ? false : 'set SKELETON_E2E_BASE_URL to run the live f
 const operatorTokenFile = process.env.SKELETON_E2E_OPERATOR_TOKEN_FILE;
 const operatorToken = operatorTokenFile ? readFileSync(operatorTokenFile, 'utf8').trim() : '';
 if (operatorTokenFile) assert.ok(operatorToken, 'operator token file must not be empty');
+// Full-live CI must not pass when Node skips authorized build flow tests.
+const requireFullLive = process.env.SKELETON_E2E_REQUIRE_FULL_LIVE === '1';
+if (requireFullLive) {
+  assert.ok(BASE, 'full live E2E requires SKELETON_E2E_BASE_URL');
+  assert.ok(operatorToken, 'full live E2E requires authorized operator token');
+}
 const buildLive = { skip: operatorToken ? false : 'set SKELETON_E2E_OPERATOR_TOKEN_FILE for authorized build mutation steps' };
 async function call(method, path, body, token) {
   const r = await fetch(`${BASE}${path}`, {

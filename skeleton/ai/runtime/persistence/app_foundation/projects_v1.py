@@ -114,9 +114,9 @@ class ProjectsV1Store:
             return items, nxt
 
     def link(self, actor_id: str, tenant_id: str, project_id: str,
-             execution_id: str) -> Optional[ProjectBuildLink]:
+             execution_id: str, *, transaction=None) -> Optional[ProjectBuildLink]:
         """Link an execution; None if project not in scope. Raises BuildLinkConflict."""
-        with self.db.tx() as c:
+        def insert(c):
             r = c.execute("SELECT * FROM projects WHERE project_id=? AND owner_id=? AND tenant_id=?",
                           (project_id, actor_id, tenant_id)).fetchone()
             if r is None:
@@ -140,6 +140,10 @@ class ProjectsV1Store:
             c.execute("UPDATE projects SET status=?, updated_at=? WHERE project_id=?",
                       (updated.status.value, time.time(), project_id))
             return result
+        if transaction is not None:
+            return insert(transaction)
+        with self.db.tx() as c:
+            return insert(c)
 
     def list_build_rows(self, project_id: str, limit: int = 50, cursor: Optional[str] = None):
         """Newest first; returns (rows, next_cursor). Caller has already scope-checked the project."""

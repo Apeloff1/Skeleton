@@ -1,0 +1,3 @@
+"""Source-original six-objective quest dependency DAG for copperhollow."""
+from skeleton.ai.runtime.production_fabric.planning.quests import Quest
+QUESTS = (Quest('copperhollow_arrival', (), (), ('arrival_record',)), Quest('copperhollow_source', ('copperhollow_arrival',), ('arrival_record',), ('source_proof',)), Quest('copperhollow_witness', ('copperhollow_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('copperhollow_reconcile', ('copperhollow_source', 'copperhollow_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('copperhollow_crossing', ('copperhollow_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('copperhollow_conclusion', ('copperhollow_crossing',), ('crossing_pass',), ('ending_unlocked',)))

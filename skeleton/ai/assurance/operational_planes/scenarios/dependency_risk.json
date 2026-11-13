@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.operational_plane.scenarios.v1",
+  "plane": "release.dependency_risk",
+  "synthetic": true,
+  "examples": [
+    {
+      "name": "nominal",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "unpatched_critical_dependencies": 0,
+        "unapproved_dependency_changes": 0
+      },
+      "expected": "nominal"
+    },
+    {
+      "name": "primary_breach",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "unpatched_critical_dependencies": 1,
+        "unapproved_dependency_changes": 0
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "secondary_breach",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "unpatched_critical_dependencies": 0,
+        "unapproved_dependency_changes": 1
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "stale",
+      "observed_at": 1000,
+      "now": 1061,
+      "measurements": {
+        "unpatched_critical_dependencies": 0,
+        "unapproved_dependency_changes": 0
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "future",
+      "observed_at": 1001,
+      "now": 1000,
+      "measurements": {
+        "unpatched_critical_dependencies": 0,
+        "unapproved_dependency_changes": 0
+      },
+      "expected": "blocked"
+    }
+  ]
+}

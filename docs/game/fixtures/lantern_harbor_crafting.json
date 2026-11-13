@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "world_id": "lantern_harbor",
+  "recipes": [
+    {
+      "recipe_id": "make_wick",
+      "consumes": [
+        [
+          "fiber",
+          2
+        ]
+      ],
+      "produces": [
+        [
+          "wick",
+          1
+        ]
+      ],
+      "currency_cost": 1,
+      "requires": [],
+      "grants": [
+        "wick_known"
+      ]
+    },
+    {
+      "recipe_id": "build_lantern",
+      "consumes": [
+        [
+          "oil",
+          1
+        ],
+        [
+          "wick",
+          1
+        ]
+      ],
+      "produces": [
+        [
+          "lantern",
+          1
+        ]
+      ],
+      "currency_cost": 3,
+      "requires": [
+        "wick_known"
+      ],
+      "grants": [
+        "light_available"
+      ]
+    }
+  ],
+  "initial_inventory": [
+    [
+      "fiber",
+      4
+    ],
+    [
+      "oil",
+      2
+    ]
+  ],
+  "initial_currency": 10,
+  "initial_flags": []
+}

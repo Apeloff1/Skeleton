@@ -19,9 +19,10 @@ import os
 import time
 from typing import Any
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, Query
 
-router = APIRouter(tags=["ExpoFlaps"], prefix="/health")
+router = APIRouter(route_class=PublicExceptionRoute, tags=["ExpoFlaps"], prefix="/health")
 
 FLAP_LOG_PATH = os.environ.get("EXPO_FLAP_LOG", "/var/log/supervisor/expo_flaps.log")
 

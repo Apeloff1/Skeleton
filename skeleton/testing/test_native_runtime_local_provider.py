@@ -80,6 +80,11 @@ def _local_env(monkeypatch, path) -> None:
     monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(path))
     monkeypatch.setenv("AI_LOCAL_MODEL_CACHE_SIZE", "8")
     monkeypatch.setenv("AI_LOCAL_MODEL_SEED", "19")
+    # Native-runtime functional coverage uses explicit development-only
+    # authorization, never an implicit production guard bypass.
+    monkeypatch.setenv("AI_DEPLOYMENT_ENV", "development")
+    monkeypatch.setenv("AI_LOCAL_GUARD_REQUIRED", "false")
+    monkeypatch.setenv("AI_LOCAL_LEGACY_DEV_ACK", "unsafe-local-dev-only")
     for name in (
         "OPENAI_API_KEY",
         "OPENAI_BASE_URL",
@@ -147,6 +152,15 @@ async def test_native_runtime_executes_through_local_inference_engine(tmp_path) 
     assert second.execution_receipt_digest == first.execution_receipt_digest
 
 
+def test_native_provider_does_not_start_unguarded_without_explicit_dev_consent(tmp_path, monkeypatch):
+    path, _expected, _receipt = _write_native(tmp_path)
+    _local_env(monkeypatch, path)
+    from skeleton.provider_runtime import ProviderUnavailableError
+
+    with pytest.raises(ProviderUnavailableError, match="explicit development-only authorization"):
+        ProviderRegistry.from_env()
+
+
 @pytest.mark.asyncio
 async def test_provider_registry_activates_native_runtime_artifact_offline(
     tmp_path,
@@ -156,7 +170,7 @@ async def test_provider_registry_activates_native_runtime_artifact_offline(
     _local_env(monkeypatch, path)
     _block_internet(monkeypatch)
 
-    registry = ProviderRegistry.from_env()
+    registry = ProviderRegistry.from_env(require_guarded_local=False)
     adapter = registry.require_active()
     status = registry.statuses()
 
@@ -493,7 +507,7 @@ async def test_engine_coordinator_executes_native_runtime_artifact_offline(
         now=operation.created_at,
     )
 
-    registry = ProviderRegistry.from_env()
+    registry = ProviderRegistry.from_env(require_guarded_local=False)
     adapter = registry.require_active()
     assert isinstance(adapter.engine.model, NativeRuntimeLocalModel)
     assert adapter.engine.model.model_digest == expected.model_digest

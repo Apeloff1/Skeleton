@@ -19,7 +19,7 @@ import time
 from typing import Sequence
 
 from skeleton.app.offline_cpu_budget import (
-    CpuWorkerPlan, plan_cpu_workers,
+    CpuBudgetError, CpuWorkerPlan, plan_cpu_workers,
     probe_cpu_topology, probe_memory_topology,
 )
 
@@ -283,7 +283,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                                 "reason": decision.reason, "digest": decision.digest})
         else:
             result = plan_energy_workers(base, probe_power())
-    except ValueError as exc:
+    except (CpuBudgetError, EnergyError) as exc:
         print("energy admission rejected: " + str(exc), file=sys.stderr)
         return 2
     response = {"schema": SCHEMA, "allowed_workers": result.allowed_workers,

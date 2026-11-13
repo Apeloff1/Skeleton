@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_sunken_metro",
+  "title": "Sunken Metro: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Sunken Metro; prototype maps are not full genre implementations.",
+  "seed": 202610302441,
+  "width": 19,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "arcade",
+  "starting_health": 4
+}

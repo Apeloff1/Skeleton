@@ -1,8 +1,8 @@
 name: Reproducible Release
 
+# Exact-head reproducibility proof is explicitly dispatched; a tag alone is
+# never release qualification or permission to publish artifacts.
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -110,6 +110,34 @@ jobs:
             --input requirements-build.txt \
             --input requirements.txt \
             --sbom-ref dist/release-sbom.cdx.json
+
+      - name: Verify native Assembly payload in wheel
+        working-directory: source-a
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheels = sorted(Path("dist").glob("*.whl"))
+          if len(wheels) != 1:
+              raise SystemExit("release must produce exactly one wheel")
+          required = {
+              "skeleton/native/asm/skeleton_asm.h",
+              "skeleton/native/asm/aarch64.S",
+              "skeleton/native/asm/x86_64.S",
+              "skeleton/native/asm/README.md",
+          }
+          with ZipFile(wheels[0]) as artifact:
+              entries = set(artifact.namelist())
+              missing = required - entries
+              if missing:
+                  raise SystemExit(f"native Assembly wheel payload missing: {sorted(missing)}")
+              for name in sorted(required):
+                  if not artifact.getinfo(name).file_size:
+                      raise SystemExit(f"native Assembly wheel payload empty: {name}")
+          PY
 
       - name: Build release B from clean checkout
         working-directory: source-b

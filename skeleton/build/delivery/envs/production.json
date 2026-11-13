@@ -1,0 +1,10 @@
+{
+  "extends": "staging",
+  "tier": "production",
+  "replicas": 4,
+  "health": {"max_latency_ms": 800},
+  "rollout": {"strategy": "canary", "stages": [5, 25, 50, 100], "bake_seconds": 600},
+  "resources": {"cpu_millicores": 2000, "memory_mib": 2048},
+  "database": {"url": "secret://skeleton/production/db-url", "pool_size": 20},
+  "windows": ["tue 08:00-15:00", "wed 08:00-15:00", "thu 08:00-15:00"]
+}

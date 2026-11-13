@@ -555,12 +555,23 @@ def provision(args) -> dict:
     else:
         files = _reuse_runtime(*runtime_source, target / "runtime")
     model.chmod(0o444)
+    # Pin every extracted adjacent shared-library name and digest. This is a
+    # file inventory, not a claim about system libraries or tokenizer identity.
+    runtime_libraries = {
+        PurePosixPath(record["path"]).name: record["sha256"]
+        for record in files
+        if PurePosixPath(record["path"]).name.startswith("lib")
+        and ".so" in PurePosixPath(record["path"]).name
+    }
+    if not runtime_libraries:
+        raise ValueError("Pinned runtime archive has no adjacent shared libraries.")
     manifest = {
         "schema_version": DEPLOYMENT_SCHEMA,
         "runtime_kind": "llama.cpp-cli",
         "model_id": MODEL_IDS[profile],
         "executable_path": "runtime/llama-completion",
         "executable_sha256": EXECUTABLE_SHA256,
+        "runtime_libraries": runtime_libraries,
         "model_path": recipe["filename"],
         "model_sha256": recipe["sha256"],
         "config": {

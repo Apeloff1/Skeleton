@@ -33,22 +33,53 @@ def test_native_contract_export_overlay_is_declared_and_additive() -> None:
         b"]\n"
     )
     base = b"__all__ = []\n"
-    assert _contract_export_mirror_valid(base, base + appendix, manifest)
+    # The current manifest deliberately owns execution authority in runtime/core;
+    # no extra contract-export facade is declared. Test that policy first.
+    assert not _contract_export_mirror_valid(base, base + appendix, manifest)
+
+    # Exercise the narrowly permitted AST facade with an explicitly declared
+    # synthetic manifest; never change the production ownership declaration.
+    declared_manifest = dict(manifest)
+    declared_manifest["mappings"] = [
+        {
+            **row,
+            "overlay_children": [*row.get("overlay_children", []), "execution_authority.py"],
+            "parity_exceptions": [
+                *row.get("parity_exceptions", []),
+                {
+                    "path": "__init__.py",
+                    "mode": "compatibility_facade",
+                    "facade_required_import": "from .execution_authority import (",
+                },
+            ],
+        } if row.get("id") == "AIFT-CONTRACTS" else row
+        for row in manifest["mappings"]
+    ]
+    declared_manifest["native_ai_owners"] = [
+        *manifest["native_ai_owners"],
+        {
+            "path": "skeleton/ai/runtime/contracts/execution_authority.py",
+            "kind": "file",
+            "ownership_mode": "canonical_native",
+            "residual_only": False,
+        },
+    ]
+    assert _contract_export_mirror_valid(base, base + appendix, declared_manifest)
     assert not _contract_export_mirror_valid(
-        base, base + appendix + b"__import__('os').system('false')\n", manifest
+        base, base + appendix + b"__import__('os').system('false')\n", declared_manifest
     )
     assert not _contract_export_mirror_valid(
-        base, base + appendix.replace(b'"ResourceBudget"', b'"UnboundSymbol"'), manifest
+        base, base + appendix.replace(b'"ResourceBudget"', b'"UnboundSymbol"'), declared_manifest
     )
     assert not _contract_export_mirror_valid(
-        base, base + appendix.replace(b"ResourceBudget,", b"ResourceBudget as Unsafe,"), manifest
+        base, base + appendix.replace(b"ResourceBudget,", b"ResourceBudget as Unsafe,"), declared_manifest
     )
     assert not _contract_export_mirror_valid(
-        b"__all__ = [1]\n", base + appendix, manifest
+        b"__all__ = [1]\n", base + appendix, declared_manifest
     )
-    missing_owner = dict(manifest)
+    missing_owner = dict(declared_manifest)
     missing_owner["native_ai_owners"] = [
-        item for item in manifest["native_ai_owners"]
+        item for item in declared_manifest["native_ai_owners"]
         if item.get("path") != "skeleton/ai/runtime/contracts/execution_authority.py"
     ]
     assert not _contract_export_mirror_valid(base, base + appendix, missing_owner)

@@ -504,9 +504,57 @@ function Card({ title, subtitle, meta, icon, color, onPress }: {
 function DetailSheet({ item, tab, onClose, color }: { item: any; tab: TabKey; onClose: () => void; color: string }) {
   const academy = useSettings(s => s.academy);
   const [playing, setPlaying] = useState(false);
+  const [assessmentAnswers, setAssessmentAnswers] = useState<Record<string, string>>({});
+  const [assessmentResult, setAssessmentResult] = useState<any | null>(null);
+  const [assessmentError, setAssessmentError] = useState('');
+  const [assessmentBusy, setAssessmentBusy] = useState(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { return () => { ttsStop(); setPlaying(false); }; }, [item?.id || item?._id]);
+  useEffect(() => {
+    setAssessmentAnswers({});
+    setAssessmentResult(null);
+    setAssessmentError('');
+    setAssessmentBusy(false);
+    if (tab === 'assessments' && item?.id) {
+      apiFetch(`${API}/api/academy/assessment-attempts?assessment_id=${encodeURIComponent(String(item.id))}&limit=1`)
+        .then(async response => {
+          const payload = await response.json().catch(() => ({}));
+          if (response.ok && payload?.attempts?.[0]?.receipt_sha256 && payload.attempts[0].receipt_verified === true) setAssessmentResult(payload.attempts[0]);
+          else if (response.status !== 401 && !response.ok) setAssessmentError(payload?.detail || 'Previous attempts could not be restored.');
+        })
+        .catch(() => setAssessmentError('Previous attempts could not be restored.'));
+    }
+  }, [item?.id, item?._id, tab]);
   if (!item) return null;
+
+  const submitAssessment = async () => {
+    const questions = Array.isArray(item.questions) ? item.questions : [];
+    const questionIds = questions.map((question: any) => String(question.id || '')).filter(Boolean);
+    if (!questionIds.length || questionIds.some((id: string) => !assessmentAnswers[id])) {
+      setAssessmentError('Answer every question before submitting.');
+      return;
+    }
+    setAssessmentBusy(true);
+    setAssessmentError('');
+    try {
+      const idempotencyKey = globalThis.crypto?.randomUUID?.()
+        || `assessment-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+      const response = await apiFetch(`${API}/api/academy/assessment/${encodeURIComponent(String(item.id))}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers: assessmentAnswers, idempotency_key: idempotencyKey }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload?.attempt?.receipt_sha256 || payload.attempt.receipt_verified !== true) {
+        throw new Error(payload?.detail?.message || payload?.detail || `Submission failed (HTTP ${response.status})`);
+      }
+      setAssessmentResult(payload.attempt);
+    } catch (error) {
+      setAssessmentError(error instanceof Error ? error.message : 'Assessment submission failed.');
+    } finally {
+      setAssessmentBusy(false);
+    }
+  };
 
   const togglePlay = () => {
     if (playing) { ttsStop(); setPlaying(false); return; }
@@ -667,6 +715,51 @@ function DetailSheet({ item, tab, onClose, color }: { item: any; tab: TabKey; on
                 <Row label="Duration" value={`${item.duration_minutes || 60} min`} />
                 <Row label="Passing score" value={`${item.passing_score || 70}%`} />
                 <Row label="Questions" value={`${item.questions?.length || item.question_count || 0}`} />
+                {(item.questions || []).map((question: any, questionIndex: number) => {
+                  const questionId = String(question.id || '');
+                  return (
+                    <View key={questionId || questionIndex} style={s.assessmentQuestion}>
+                      <Text style={s.sheetSection}>{questionIndex + 1}. {question.text || question.question}</Text>
+                      {(question.options || []).map((option: string) => {
+                        const selected = assessmentAnswers[questionId] === option;
+                        return (
+                          <TouchableOpacity
+                            key={option}
+                            disabled={!!assessmentResult || assessmentBusy}
+                            onPress={() => setAssessmentAnswers(previous => ({ ...previous, [questionId]: option }))}
+                            style={[s.assessmentOption, selected && { borderColor: color, backgroundColor: color + '22' }]}
+                          >
+                            <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={18} color={selected ? color : '#64748B'} />
+                            <Text style={s.quizOptText}>{option}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  );
+                })}
+                {!!assessmentError && <Text accessibilityRole="alert" style={s.assessmentError}>{assessmentError}</Text>}
+                {assessmentResult ? (
+                  <View style={[s.assessmentReceipt, { borderColor: assessmentResult.passed ? '#10B981' : '#F59E0B' }]}>
+                    <Text style={[s.assessmentScore, { color: assessmentResult.passed ? '#10B981' : '#F59E0B' }]}>
+                      {assessmentResult.score}% · {assessmentResult.passed ? 'Passed' : 'Practice and retry'}
+                    </Text>
+                    <Text style={s.assessmentReceiptText}>Receipt {String(assessmentResult.receipt_sha256).slice(0, 16)}…</Text>
+                    {(assessmentResult.results || []).map((result: any) => (
+                      <Text key={result.question_id} style={s.sheetParagraph}>
+                        {result.correct ? '✓' : '✗'} Question {result.question_id}: {result.points_earned}/{result.points_possible}
+                      </Text>
+                    ))}
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={submitAssessment}
+                    disabled={assessmentBusy || !(item.questions || []).length}
+                    style={[s.assessmentSubmit, { backgroundColor: color }, assessmentBusy && { opacity: 0.6 }]}
+                  >
+                    {assessmentBusy ? <ActivityIndicator color="#FFF" /> : <Ionicons name="shield-checkmark" size={18} color="#FFF" />}
+                    <Text style={s.assessmentSubmitText}>Submit verified attempt</Text>
+                  </TouchableOpacity>
+                )}
               </>
             )}
           </ScrollView>
@@ -756,6 +849,15 @@ const s = StyleSheet.create({
   endText: { textAlign: 'center', color: '#64748B', padding: 20, fontSize: 11, fontStyle: 'italic' },
   emptyWrap: { padding: 40, alignItems: 'center' },
   emptyText: { color: '#64748B', fontSize: 13, marginTop: 10 },
+
+  assessmentQuestion: { marginTop: 18, paddingTop: 4 },
+  assessmentOption: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: '#334155', backgroundColor: '#0F172A' },
+  assessmentError: { color: '#FCA5A5', marginTop: 16, fontSize: 13, lineHeight: 18 },
+  assessmentSubmit: { minHeight: 46, marginTop: 20, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  assessmentSubmitText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
+  assessmentReceipt: { marginTop: 20, borderRadius: 10, borderWidth: 1, padding: 14, backgroundColor: '#0F172A' },
+  assessmentScore: { fontSize: 17, fontWeight: '800', marginBottom: 8 },
+  assessmentReceiptText: { color: '#94A3B8', fontSize: 11, marginBottom: 8 },
 
   // Detail sheet
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
