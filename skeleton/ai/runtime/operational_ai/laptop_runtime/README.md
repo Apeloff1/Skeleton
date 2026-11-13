@@ -329,3 +329,16 @@ action needs both full operator-approved hashes plus
 Neither operation starts a model, executes source, changes
 the original project or invokes Git.
 `docs/ai/JEEVES_NATIVE_ESCROW_TO_STAGE.md`.
+
+## Native source-campaign review and goal composition
+
+The advanced local-only Jeeves coding campaign uses a single operator-visible
+workbench. It runs only through the existing GGUF/SQLite ownership and
+separately verified source-custody authorities. A read-only task composer can
+prepare SHA-bound original-source jobs; independent explicit approvals are
+required before inference or patch publication. Never treat source drafts
+or model text as executable code. The original project remains unchanged.
+
+- `docs/ai/JEEVES_NATIVE_CAMPAIGN_SOURCE_ASSEMBLY.md`
+- `docs/ai/JEEVES_NATIVE_CAMPAIGN_DESKTOP.md`
+- `docs/ai/JEEVES_NATIVE_CAMPAIGN_GOAL_COMPOSER.md`
