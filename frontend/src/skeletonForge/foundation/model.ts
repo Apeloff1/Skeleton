@@ -183,6 +183,23 @@ export function persistedRunSnapshot(snapshot: RunSnapshot): RunSnapshot {
   };
 }
 
+/** Stable optimistic-concurrency revision even for two edits in one millisecond.
+ * Without this, the Studio-to-Forge return bridge can mistakenly accept
+ * an ancestor's updatedAt token after two same-clock-time edits.
+ */
+export function nextStudioRevision(previousIso: string, requestedIso: string): string {
+  const prior = Date.parse(previousIso);
+  const requested = Date.parse(requestedIso);
+  if (!Number.isFinite(requested) || !Number.isFinite(prior)) {
+    throw new Error('Invalid Studio source revision timestamp');
+  }
+  const next = Math.max(requested, prior + 1);
+  if (!Number.isFinite(next) || next > 8_640_000_000_000_000) {
+    throw new Error('Studio revision timestamp exhausted');
+  }
+  return new Date(next).toISOString();
+}
+
 /** Compare emitted inputs, not the user's navigation step or screen focus. */
 export function changedBuildInputs(previous: QuestionnaireState, next: QuestionnaireState): boolean {
   return JSON.stringify(buildRunRequest(previous)) !== JSON.stringify(buildRunRequest(next));
@@ -339,7 +356,7 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
         lastRunOutdated: current.lastRun
           ? Boolean(current.lastRunOutdated || changedBuildInputs(current.questionnaire, questionnaire))
           : false,
-        updatedAt: action.at,
+        updatedAt: nextStudioRevision(current.updatedAt, action.at),
       });
     }
     case 'openBuild':
@@ -391,7 +408,9 @@ export function applyRecordRun(
 ): FoundationState {
   const current = state.projects.find((project) => project.id === projectId);
   if (!current) return state;
-  const updatedAt = snapshot.finishedAt != null ? new Date(snapshot.finishedAt).toISOString() : current.updatedAt;
+  const updatedAt = snapshot.finishedAt != null
+    ? nextStudioRevision(current.updatedAt, new Date(snapshot.finishedAt).toISOString())
+    : current.updatedAt;
   // The user can edit design axes or return from the advanced cockpit while
   // native generation is still running. Completion proves the *submitted*
   // configuration, not a newer, unsent questionnaire. Never falsely clear
@@ -689,7 +708,7 @@ export function reconcileStudioReturn(
       ? Boolean(snapshot[index].lastRunOutdated
           || changedBuildInputs(snapshot[index].questionnaire, questionnaire))
       : false,
-    updatedAt: at,
+    updatedAt: nextStudioRevision(snapshot[index].updatedAt, at),
   };
   const vetted = sanitizeProjects([draft]);
   if (vetted.corrupt || vetted.projects.length !== 1) {
