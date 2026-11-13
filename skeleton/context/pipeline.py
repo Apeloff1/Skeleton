@@ -250,6 +250,8 @@ class GameForgeRun:
                            if hasattr(run.context.get("build_plan"), "to_dict")
                            else run.context.get("build_plan")),
         }
+        if playable_content and run.context.get("playable_scene_playtest") is not None:
+            payload["playable_scene_playtest"] = run.context["playable_scene_playtest"]
         if axis_overrides:
             payload["operator_axes"] = axis_overrides
         if quest_content and run.context.get("native_quest_receipt") is not None:
@@ -511,6 +513,19 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         if mode == "require" and not played.get("passed"):
             detail = "; ".join(played.get("errors") or []) or played.get("reason") or played.get("status")
             raise RuntimeError(f"playtest {played.get('status')}: {detail}"[:600])
+    # Independently boot the selected playable archetype scene. A successful
+    # default-world boot does not prove its separate win/lose loop completes.
+    # In strict mode the scene must complete before project publication.
+    scene_played = None
+    if ctx.get("playable_content") and mode != "off":
+        from skeleton.forge.playtest import playtest_archetype_scene
+        scene_played = playtest_archetype_scene(
+            files, str(ctx.get("playable_archetype") or "extraction"),
+        )
+        ctx["playable_scene_playtest"] = scene_played
+        if mode == "require" and not scene_played.get("passed"):
+            detail = "; ".join(scene_played.get("errors") or []) or scene_played.get("reason") or scene_played.get("status")
+            raise RuntimeError(f"playable scene {scene_played.get('status')}: {detail}"[:600])
     project = None
     root = ctx.get("project_root")
     if root:
@@ -525,10 +540,13 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "check": "ok",
         "playtest": None if played is None else played.get("status"),
     }
+    if scene_played is not None:
+        details["playable_scene_playtest"] = scene_played.get("status")
     if ctx.get("native_quest_receipt"):
         details["native_quest_sha256"] = ctx["native_quest_receipt"]["quest_sha256"]
     _commit(ctx, "emit", ctx["era"], f"{len(files)} files", details)
-    return {"emitted": True, "project": project, "check_ok": True, "playtest": played}
+    return {"emitted": True, "project": project, "check_ok": True, "playtest": played,
+            "playable_scene_playtest": scene_played}
 
 
 def _publish_build_evidence(root, documents: Dict[str, str]) -> None:
