@@ -591,6 +591,76 @@
         "backend/tests/test_dragon_delivery_routes.py"
       ],
       "release_boundary": "No network acquisition, review authority, model training, compiler subprocess or distribution authorization is exposed to the browser."
+    },
+    {
+      "capability_id": "game.forge_design",
+      "version": "1.0.0",
+      "owner_plane": "engine-api",
+      "enabled": true,
+      "implementation_state": "prototype_local_design_and_interactive_source_partial_quality",
+      "risk_class": "medium",
+      "input_modalities": [
+        "text",
+        "structured-design"
+      ],
+      "output_modalities": [
+        "structured-design",
+        "godot-source-project"
+      ],
+      "required_planes": [
+        "engine-api",
+        "model-provider",
+        "artifact-files",
+        "cost-capacity",
+        "evaluation"
+      ],
+      "required_provider_capabilities": [
+        "text-generation",
+        "structured-output"
+      ],
+      "tool_policy": {
+        "mode": "none",
+        "generated_code_execution": "prohibited"
+      },
+      "memory_policy": {
+        "mode": "prohibited"
+      },
+      "retrieval_policy": {
+        "mode": "optional-reviewed"
+      },
+      "verification_level": "structural",
+      "data_class_ceiling": "confidential",
+      "budget_profile": {
+        "class": "bounded-local-game-design",
+        "max_model_attempts": 2,
+        "max_output_tokens": 1024,
+        "max_total_seconds": 600
+      },
+      "instruction_policy_ref": "policy://game.forge_design/local-data-proposal@1",
+      "readiness_requirements": [
+        "explicit pinned local deployment and native runtime",
+        "selected local backend declares and implements structured-output; text-only models are denied",
+        "strict typed gameplay proposal admission",
+        "existing Forge compiler and projector",
+        "Godot required for native input qualification"
+      ],
+      "degraded_behavior": {
+        "model_unavailable": "explicit_compiler_fallback_or_require_model_denial",
+        "invalid_proposal": "compiler_keeps_authority",
+        "missing_godot": "source_only_or_required_playtest_failure",
+        "deadline": "no_final_project_publication"
+      },
+      "golden_journeys": [
+        "artifact"
+      ],
+      "implementation_evidence": [
+        "skeleton/forge/game_builder.py",
+        "skeleton/forge/playable_runtime.py",
+        "scripts/build_jeeves_game.py",
+        "tests/test_forge_gameplay_design.py",
+        "tests/test_forge_interactive_runtime.py"
+      ],
+      "release_boundary": "Local prototype capability. Model output is data, never host paths or executable source. Public diagnostic scores do not establish general model quality or release readiness."
     }
   ],
   "invariants": [

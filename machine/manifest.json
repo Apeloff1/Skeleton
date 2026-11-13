@@ -830,6 +830,33 @@
       "discovery": "title and transcript search; active/archive filters; pinned-first ordering",
       "backup": "organization metadata has a versioned backup envelope; legacy v1/v2 bundles remain importable",
       "qualification": "implementation candidate; source and browser evidence recorded separately"
+    },
+    "forge_game_builder": {
+      "owner": "skeleton/forge/game_builder.py",
+      "design_owner": "skeleton/forge/game_design_spec.py",
+      "proposal_owner": "skeleton/forge/ai_builder/plan_guard.py",
+      "runtime_owner": "skeleton/forge/playable_runtime.py",
+      "operator": "python scripts/build_jeeves_game.py",
+      "proposal_policy": "policy://game.forge_design/local-data-proposal@1",
+      "model_execution": "existing local inference plane; explicit pinned Jeeves GGUF; no hosted fallback",
+      "authority": "strict bounded gameplay data only; existing compiler retains genre/engine/scope/brief and explicit gameplay labels",
+      "artifacts": "existing Forge projector; operator publication is create-only after deadline and required native input proof",
+      "verification": "Godot content-table proof, native boot and input journey are separate evidence states",
+      "rollback": "omit the optional planner/use deterministic compiler; existing projects and receipts are preserved"
+    },
+    "game_quality_evaluation": {
+      "owner": "skeleton/eval/game_builder_quality.py",
+      "operator": "python scripts/evaluate_jeeves_game_builder_quality.py",
+      "workload": "24 fixed public diagnostic tasks; not a hidden generalization holdout",
+      "identity": "taskset/scorer/source/test/model/runtime/config hashes plus immutable response chain",
+      "dimensions": [
+        "structure",
+        "requirements",
+        "correctness",
+        "latency"
+      ],
+      "authority": "measurement only; generated code is never executed and scores do not promote model or release quality",
+      "state": "operator-private diagnostic artifacts; not conversation or model-state authority"
     }
   }
 }

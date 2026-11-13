@@ -96,6 +96,7 @@ function fixture(disk = new Map()) {
     '../src/utils/apiBase': { API_BASE: 'https://backend.test' }, '../src/utils/apiClient': { __esModule: true, default: api },
     '../src/components/PrivateImage': { __esModule: true, default: 'PrivateImage', savePrivateImage: async () => 'saved' },
     '../src/features/Playable/GamePreview': { __esModule: true, default: 'GamePreview' }, '../src/hooks/useHaptics': { useHaptics: () => haptics },
+    '../src/features/Playable/GameBuilderBriefPanel': { __esModule: true, default: 'GameBuilderBriefPanel' },
     '../src/utils/safeStorage': { safeGetItem: async () => null, safeSetItem: async () => {} }, '../src/utils/liveops': { awardXp() {} },
     '../src/auth/gameforgeAuth': auth, '../src/product/creatorIdentity': identity, '../src/product/buildJobLifecycle': lifecycle,
     '../src/product/playableJobObservation': store, '../src/theme/tokens': { __esModule: true, default: { hitSlop: { md: {} } } },
