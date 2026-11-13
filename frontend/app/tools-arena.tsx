@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Crypto from 'expo-crypto';
 import theme from '../src/theme/tokens';
 import { useModalLogger } from '../src/utils/modalLogger';
 import RetryBanner from '../src/components/UI/RetryBanner';
@@ -84,15 +85,12 @@ async function invokeTool(tool: ToolId, params: Record<string, any>) {
 // ─────────────────────────────────────────────────────────────────────
 //  COMPONENT
 // ─────────────────────────────────────────────────────────────────────
-let arenaSessionSequence = 0;
-
 function createArenaSessionId(): string {
-  const cryptoObject = (globalThis as any).crypto;
-  if (cryptoObject && typeof cryptoObject.randomUUID === 'function') {
-    return `arena_${cryptoObject.randomUUID()}`;
-  }
-  arenaSessionSequence += 1;
-  return `arena_${Date.now().toString(36)}_${arenaSessionSequence.toString(36)}`;
+  // A session identifier is a security boundary, not a sortable UI key.
+  // Expo supplies native cryptographic randomness on mobile and web.
+  // Fail closed if its secure generator is unavailable; never fall back to
+  // timestamps, counters, Math.random(), or another predictable identifier.
+  return `arena_${Crypto.randomUUID()}`;
 }
 
 export default function ToolsArena() {

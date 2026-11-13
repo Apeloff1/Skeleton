@@ -1,0 +1,23 @@
+{
+  "case": "11_cross_field_c",
+  "gate": "stream",
+  "expect": "reject",
+  "reason": "Token receipt fits generation reservation",
+  "payload": {
+    "request_id": "r_001",
+    "chunks": [
+      {
+        "index": 0,
+        "text": "Hi"
+      },
+      {
+        "index": 1,
+        "text": "."
+      }
+    ],
+    "max_bytes": 1024,
+    "terminal": "stop",
+    "generated_tokens": 129,
+    "token_ceiling": 128
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_frosted_crater",
+  "title": "Frosted Crater: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Frosted Crater; only the grid preview compiles today.",
+  "seed": 203010312283,
+  "width": 21,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 7,
+  "theme": "space",
+  "starting_health": 5
+}

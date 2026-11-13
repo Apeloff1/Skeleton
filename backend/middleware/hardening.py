@@ -23,6 +23,7 @@ import os
 import time
 from typing import Callable
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -188,7 +189,7 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
             )
 
 
-hardening_router = APIRouter(tags=["hardening"])
+hardening_router = APIRouter(route_class=PublicExceptionRoute, tags=["hardening"])
 
 
 @hardening_router.get("/health/detailed")

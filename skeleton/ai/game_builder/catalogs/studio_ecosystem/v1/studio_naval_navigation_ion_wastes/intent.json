@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_naval_navigation_ion_wastes",
+  "title": "Ion Wastes: Naval Navigation",
+  "subtitle": "An original naval navigation brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610301878,
+  "width": 21,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "space",
+  "starting_health": 3
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/inference_nan.schema.json",
+  "title": "models.inference_nan observation contract",
+  "description": "Reject invalid inference numerics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nonfinite_activation_count",
+        "invalid_logits_batches"
+      ],
+      "properties": {
+        "nonfinite_activation_count": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for nonfinite_activation_count"
+        },
+        "invalid_logits_batches": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0,
+          "description": "Upper bound for invalid_logits_batches"
+        }
+      }
+    }
+  }
+}

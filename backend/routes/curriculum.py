@@ -11,18 +11,21 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-from fastapi import APIRouter, HTTPException
+from core.public_exception_route import PublicExceptionRoute
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 import uuid
 
+from routes.gameforge_auth import get_current_user
+
 # Import CS Classes
 from cs_classes import get_class, get_all_classes, get_class_summary
 from class_week_generator import expand_class_with_full_weeks, generate_full_week_content
 
-router = APIRouter(prefix="/curriculum", tags=["Curriculum Engine"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/curriculum", tags=["Curriculum Engine"])
 
 # ============================================================================
 # MODELS
@@ -49,6 +52,9 @@ class QuizSubmission(BaseModel):
     course_id: str
     week: int
     answers: List[Dict[str, Any]]
+
+class ClassWeekQuizSubmission(BaseModel):
+    answers: Dict[str, int] = Field(..., min_length=1, max_length=10)
 
 class CertificateRequest(BaseModel):
     course_id: str
@@ -283,8 +289,7 @@ async def get_class_week(class_id: str, week_num: int):
     }
 
 
-@router.get("/classes/{class_id}/week/{week_num}/quiz")
-async def get_class_week_quiz(class_id: str, week_num: int):
+def _build_class_week_quiz(class_id: str, week_num: int) -> dict:
     """Deterministic 5-question MCQ quiz auto-derived from the week's topics.
     
     Builds questions like:
@@ -354,41 +359,57 @@ async def get_class_week_quiz(class_id: str, week_num: int):
         "questions": questions,
         "passing_score": 4,   # 4 of 5 to pass
     }
-    """Get content for a specific week of a class.
-    
-    Returns the FULL generator-backed week if the underlying dataset only
-    contains a summary. No more 404 'broken promise' on per-week lookup.
-    """
-    class_data = get_class(class_id)
-    if not class_data:
-        raise HTTPException(status_code=404, detail=f"Class '{class_id}' not found")
 
-    weeks = class_data.get("weeks", [])
-    if isinstance(weeks, list):
-        for week in weeks:
-            if isinstance(week, dict) and week.get("week") == week_num:
-                # If the existing week is sparse (no code_examples / no exercises),
-                # still synthesise via the generator. Otherwise return as-is.
-                if week.get("code_examples") or week.get("exercises"):
-                    return week
-                # fall through to generator below
-                summary = week
-                return generate_full_week_content(
-                    class_id=class_data.get("id", class_id),
-                    week_summary=summary,
-                    parent_title=class_data.get("title", ""),
-                )
 
-    weeks_summary = class_data.get("weeks_summary", [])
-    for week in weeks_summary:
-        if week.get("week") == week_num:
-            return generate_full_week_content(
-                class_id=class_data.get("id", class_id),
-                week_summary=week,
-                parent_title=class_data.get("title", ""),
-            )
+@router.get("/classes/{class_id}/week/{week_num}/quiz")
+async def get_class_week_quiz(class_id: str, week_num: int, user=Depends(get_current_user)):
+    """Return an authenticated quiz without exposing its answer key."""
+    quiz = _build_class_week_quiz(class_id, week_num)
+    return {
+        **quiz,
+        "questions": [
+            {"id": question["id"], "prompt": question["prompt"], "options": question["options"]}
+            for question in quiz["questions"]
+        ],
+    }
 
-    raise HTTPException(status_code=404, detail=f"Week {week_num} not found")
+
+@router.post("/classes/{class_id}/week/{week_num}/quiz")
+async def grade_class_week_quiz(
+    class_id: str,
+    week_num: int,
+    submission: ClassWeekQuizSubmission,
+    user=Depends(get_current_user),
+):
+    """Grade the exact server-authored question set and return bounded feedback."""
+    quiz = _build_class_week_quiz(class_id, week_num)
+    expected_ids = {question["id"] for question in quiz["questions"]}
+    if set(submission.answers) != expected_ids:
+        raise HTTPException(status_code=422, detail="Submit one answer for every question in this quiz")
+    if any(not isinstance(value, int) or isinstance(value, bool) or value < 0 or value > 3 for value in submission.answers.values()):
+        raise HTTPException(status_code=422, detail="Quiz answer indexes must be between 0 and 3")
+    results = []
+    correct = 0
+    for question in quiz["questions"]:
+        selected = submission.answers[question["id"]]
+        passed = selected == question["correct_index"]
+        correct += int(passed)
+        results.append({
+            "question_id": question["id"],
+            "correct": passed,
+            "correct_index": question["correct_index"],
+            "explanation": question["explanation"],
+        })
+    total = len(results)
+    return {
+        "class_id": class_id,
+        "week": week_num,
+        "correct": correct,
+        "total": total,
+        "passed": correct >= quiz["passing_score"],
+        "passing_score": quiz["passing_score"],
+        "results": results,
+    }
 
 @router.get("/classes/{class_id}/code-examples")
 async def get_class_code_examples(class_id: str):

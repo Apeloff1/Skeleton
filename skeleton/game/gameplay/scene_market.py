@@ -417,15 +417,9 @@ def cli(argv: Sequence[str]) -> int:
         p.add_argument("--source-json" if command == "simulate"
                        else "--session-json", required=True)
         p.add_argument("--actions-json", required=True)
-    for command in ("verify", "export", "ledger", "ledger-export"):
+    for command in ("verify", "export"):
         sub.add_parser(command).add_argument("--session-json", required=True)
-    for command in ("import", "ledger-import"):
-        sub.add_parser(command).add_argument("--bundle-json", required=True)
-    feasible = sub.add_parser("feasibility")
-    feasible.add_argument("--source-json", required=True)
-    reconcile = sub.add_parser("ledger-reconcile")
-    reconcile.add_argument("--before-json", required=True)
-    reconcile.add_argument("--after-json", required=True)
+    sub.add_parser("import").add_argument("--bundle-json", required=True)
     args = parser.parse_args(list(argv))
     try:
         if args.command == "demo":
@@ -439,27 +433,6 @@ def cli(argv: Sequence[str]) -> int:
             result = verify_market(_json(args.session_json))
         elif args.command == "export":
             result = export_market(_json(args.session_json))
-        elif args.command == "feasibility":
-            from skeleton.game.gameplay.scene_market_feasibility import (
-                analyze_market_feasibility,
-            )
-            result = analyze_market_feasibility(_json(args.source_json))
-        elif args.command == "ledger-reconcile":
-            from skeleton.game.gameplay.scene_market_reconciliation import (
-                reconcile_market,
-            )
-            result = reconcile_market(_json(args.before_json),
-                                      _json(args.after_json))
-        elif args.command in ("ledger", "ledger-export", "ledger-import"):
-            from skeleton.game.gameplay.scene_market_ledger import (
-                audit_market_ledger, export_market_ledger, import_market_ledger,
-            )
-            if args.command == "ledger":
-                result = audit_market_ledger(_json(args.session_json))
-            elif args.command == "ledger-export":
-                result = export_market_ledger(_json(args.session_json))
-            else:
-                result = import_market_ledger(_json(args.bundle_json))
         else:
             result = import_market(_json(args.bundle_json))
         _bounded(result)

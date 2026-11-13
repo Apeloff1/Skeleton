@@ -1,12 +1,14 @@
 """routes/text_gamefile.py — 10 text→gamefile systems API (gate-crosswired)."""
 from __future__ import annotations
 
+from core.public_exception_route import PublicExceptionRoute
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from core import text_gamefile as tg
 
-router = APIRouter(prefix="/api/galaxy-studio/text-gamefile", tags=["text-gamefile"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/galaxy-studio/text-gamefile", tags=["text-gamefile"])
 
 
 @router.get("/generators")

@@ -431,6 +431,7 @@ def test_generic_secret_rotation_keeps_persistent_mongodb_credentials(tmp_path):
 def test_first_install_build_output_is_discarded_instead_of_retained_in_memory(tmp_path, monkeypatch):
     from skeleton.app.installer import install_application
 
+    (tmp_path / ".env").write_text("FRONTEND_PORT=3000\n", encoding="utf-8")
     report = PreloadReport(
         root=tmp_path, platform="Windows", python="bundled",
         checks=(PreloadCheck("host:ready", True, "ready"),),
@@ -475,6 +476,74 @@ def test_first_install_build_output_is_discarded_instead_of_retained_in_memory(t
     assert receipt.ok
     assert len(calls) == 2
     assert "pretend-secret" not in repr(receipt.to_dict())
+
+@pytest.mark.parametrize(
+    ("env_text", "expected_backend_url"),
+    [
+        ("", "http://localhost:8001"),
+        ("BACKEND_PORT=8101\n", "http://localhost:8101"),
+    ],
+)
+def test_clean_first_install_checks_critical_routes_on_default_and_custom_ports(
+    tmp_path, monkeypatch, env_text, expected_backend_url
+):
+    """Healthy first startup must not crash when no explicit port override exists."""
+
+    from skeleton.app.health import ProbeResult
+
+    # A clean .env.example does not declare any public host port overrides.
+    # Keep ambient developer/CI ports from changing that first-install case.
+    for key in ("BACKEND_PORT", "FRONTEND_PORT", "SKELETON_PORT", "MONGO_PORT", "CHROMA_PORT"):
+        monkeypatch.delenv(key, raising=False)
+    (tmp_path / ".env").write_text(env_text, encoding="utf-8")
+    host = PreloadReport(
+        root=tmp_path,
+        platform="test",
+        python="3.11",
+        checks=(PreloadCheck("host:ready", True, "ready"),),
+    )
+    monkeypatch.setattr("skeleton.app.installer.inspect_host", lambda *args, **kwargs: host)
+    monkeypatch.setattr(
+        "skeleton.app.installer.ensure_runtime_environment",
+        lambda *args, **kwargs: SetupResult(tmp_path / ".env", False, False, (), (), ()),
+    )
+    monkeypatch.setattr("skeleton.app.installer.preflight", lambda *args, **kwargs: ())
+    monkeypatch.setattr("skeleton.app.installer.checks_ok", lambda checks: True)
+    monkeypatch.setattr(
+        "skeleton.app.installer.compose_command",
+        lambda action, **kwargs: ("docker", "compose", action),
+    )
+    monkeypatch.setattr(
+        "skeleton.app.health.wait_for_application",
+        lambda **kwargs: (
+            ProbeResult("backend", expected_backend_url, True, 200, "healthy"),
+        ),
+    )
+    observed_urls = []
+
+    def check_routes(url, *, timeout):
+        observed_urls.append((url, timeout))
+        return {"ready": True}
+
+    monkeypatch.setattr(
+        "skeleton.app.first_install.critical_backend_route_report",
+        check_routes,
+    )
+
+    def runner(command, **kwargs):
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    receipt = install_application(
+        tmp_path, install_python=False, start=True, production=True, runner=runner
+    )
+
+    assert receipt.ok, receipt.to_dict()
+    assert observed_urls == [(expected_backend_url, 3.0)]
+    assert [phase.name for phase in receipt.phases if phase.required][-2:] == [
+        "readiness",
+        "critical-api-routes",
+    ]
+
 
 def test_setup_repairs_local_unauthenticated_mongo_urls(tmp_path):
     (tmp_path / ".env").write_text(
