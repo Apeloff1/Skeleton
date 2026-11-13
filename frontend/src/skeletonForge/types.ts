@@ -113,6 +113,8 @@ export interface RunRequest {
   operator_axes?: Record<string, number>;
   generation?: string | null;
   include_files?: boolean;
+  /** Optional playable Godot archetype sidecar scene (three verified templates). */
+  playable_content?: boolean;
   /** Optional native room-entry quest attached to the generated Godot project. */
   quest_content?: boolean;
   quest_length?: number;
@@ -167,6 +169,8 @@ export interface RunPayload {
     verify_loop?: VerifyLoopBlock | null;
     repair?: Record<string, unknown> | null;
     composition?: ComposeResult | null;
+    /** Actual generated sidecar scene template: extraction|combat_loop|pipeline. */
+    playable_archetype?: string | null;
   };
   jeeves?: { next?: { text?: string; action?: string; priority?: number } | null; briefing?: string } | null;
   sim?: { passed?: boolean; primary_dps?: number } | null;

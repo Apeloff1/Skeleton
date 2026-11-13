@@ -81,6 +81,8 @@ export interface QuestionnaireState {
   options: ForgeOptions;
   /** Explicit opt-in native Godot room-entry quest prototype. */
   quest?: { enabled: boolean; length: number };
+  /** Opt in to three existing executable Godot archetype sidecar scenes. */
+  playable?: { enabled: boolean };
 }
 
 export type QuestionnaireAction =
@@ -91,6 +93,7 @@ export type QuestionnaireAction =
   | { type: 'resetAxes' }
   | { type: 'setGalaxyGenre'; genre: string | null }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
+  | { type: 'setPlayableEnabled'; value: boolean }
   | { type: 'setQuestEnabled'; value: boolean }
   | { type: 'setQuestLength'; value: number }
   | { type: 'next' }
@@ -107,6 +110,7 @@ export const INITIAL_STATE: QuestionnaireState = {
   galaxyGenre: null,
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
   quest: { enabled: false, length: 3 },
+  playable: { enabled: false },
 };
 
 function toggle(map: Record<string, string>, key: string, value: string | null): Record<string, string> {
@@ -174,6 +178,8 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       brief.genre = mapped!;
       return { ...state, brief, galaxyGenre: action.genre };
     }
+    case 'setPlayableEnabled':
+      return { ...state, playable: { enabled: action.value === true } };
     case 'setQuestEnabled':
       return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true } };
     case 'setQuestLength': {
@@ -253,7 +259,12 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   const instrumentAxes = sparseInstrumentPayload(state.instruments);
   if (Object.keys(instrumentAxes).length) request.operator_axes = instrumentAxes;
   // Never change legacy request bytes for callers that did not opt in.
-  // Quest gameplay exists only in the native Godot project, not JSON export.
+  // The native sidecar is an independently executable Godot scene;
+  // JSON blueprint export cannot embed it.
+  if (state.playable?.enabled && request.target === 'godot') {
+    request.playable_content = true;
+  }
+  // Room quests are separate from the playable archetype sidecar scene.
   if (state.quest?.enabled && request.target === 'godot') {
     request.quest_content = true;
     request.quest_length = Math.max(1, Math.min(8, state.quest.length));

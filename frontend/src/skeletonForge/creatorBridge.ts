@@ -25,6 +25,7 @@ export interface CreatorBridgeDraft {
   galaxyGenre: string | null;
   options: QuestionnaireState['options'];
   quest: { enabled: boolean; length: number };
+  playable: { enabled: boolean };
 }
 export interface GalaxyBridgeSelection {
   title: string;
@@ -96,6 +97,7 @@ export function parseCreatorBridge(
     ['auto', 'vision', 'extraction', 'combat_loop', 'pipeline'].includes(options.archetype) ? options.archetype : 'auto';
   const era = typeof options.era === 'string' && validId.test(options.era) ? options.era : null;
   const generation = typeof options.generation === 'string' && validId.test(options.generation) ? options.generation : null;
+  const rawPlayable = record(input.playable);
   const rawQuest = record(input.quest);
   const length = rawQuest && Number.isInteger(rawQuest.length) &&
     (rawQuest.length as number) >= 1 && (rawQuest.length as number) <= 8 ? rawQuest.length as number : 3;
@@ -104,6 +106,7 @@ export function parseCreatorBridge(
     step, vision, brief, beats, instruments, galaxyGenre: genre,
     options: { archetype, target: originalTarget, era, generation },
     quest: { enabled: rawQuest?.enabled === true, length },
+    playable: { enabled: rawPlayable?.enabled === true },
   };
 }
 
@@ -113,6 +116,7 @@ export function handoffFromForge(state: QuestionnaireState, now: number = Date.n
     step: state.step, vision: state.vision, brief: state.brief, beats: state.beats,
     instruments: state.instruments, galaxyGenre: state.galaxyGenre,
     options: state.options, quest: state.quest,
+    playable: state.playable,
   };
   const valid = parseCreatorBridge(raw, 'galaxy', now);
   if (!valid) throw new Error('Cannot prepare bounded creator handoff');
@@ -158,6 +162,7 @@ export function handoffFromGalaxy(
     step: previous?.step ?? 'brief', vision, brief, beats: previous?.beats ?? {}, instruments: previous?.instruments ?? {},
     galaxyGenre: genre, options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
     quest: previous?.quest ?? { enabled: false, length: 3 },
+    playable: previous?.playable ?? { enabled: false },
   };
   const valid = parseCreatorBridge(raw, 'forge', now);
   if (!valid) throw new Error('Cannot prepare bounded Galaxy handoff');
@@ -171,6 +176,7 @@ export function forgeStateFromHandoff(raw: CreatorBridgeDraft, now: number = Dat
     step: draft.step, vision: draft.vision, brief: draft.brief, beats: draft.beats,
     instruments: draft.instruments, galaxyGenre: draft.galaxyGenre,
     options: draft.options, quest: draft.quest,
+    playable: draft.playable,
   };
   // A valid handoff must not become a way to jump past a blocked vision
   // step. Preserve completed progress; reset only an unreachable step.

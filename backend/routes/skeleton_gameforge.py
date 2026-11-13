@@ -29,6 +29,7 @@ class RunRequest(BaseModel):
     blend: Optional[list] = None
     t: float = 0.5
     generation: Optional[str] = None
+    playable_content: bool = False
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
 
@@ -78,6 +79,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             **({"operator_axes": req.operator_axes} if req.operator_axes is not None else {}),
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
+            **({"playable_content": True} if req.playable_content else {}),
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
         )
     except Exception as exc:

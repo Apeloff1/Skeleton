@@ -259,6 +259,22 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         })}
       </View>
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
+      <View style={st.group} testID="q-playable-content-controls" accessibilityRole="radiogroup" accessibilityLabel="Playable Godot prototype scene">
+        <Text style={st.q}>Playable Godot prototype scene</Text>
+        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Extraction, Combat Loop and Pipeline have dedicated prototypes. Compose from vision uses Extraction as its fallback playable scene. This is a separate launchable scene, not an automatic replacement for the main world or a claim of 158 gameplay engines.</Text>
+        <View style={st.chips}>
+          <Chip label="Blueprint only" selected={!state.playable?.enabled}
+            onPress={() => dispatch({ type: 'setPlayableEnabled', value: false })}
+            testID="q-playable-off" />
+          <Chip label="Add playable scene" selected={!!state.playable?.enabled}
+            disabled={state.options.target !== 'godot'} color={C.green}
+            onPress={() => dispatch({ type: 'setPlayableEnabled', value: true })}
+            testID="q-playable-on" />
+        </View>
+        {state.options.target !== 'godot' ? (
+          <Text style={st.help} testID="q-playable-inactive">Playable Godot scenes are not generated for JSON blueprint export.</Text>
+        ) : null}
+      </View>
       <View style={st.group} testID="q-native-quest-controls" accessibilityRole="radiogroup" accessibilityLabel="Native quest gameplay">
         <Text style={st.q}>Native quest gameplay (original quest runtime)</Text>
         <Text style={st.help}>Optional. Generate a real Godot room-entry quest with a visible objective HUD, room-triggered progression, and source-checked save snapshots. This does not add NPC conversations or combat quests.</Text>
@@ -347,7 +363,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       {onOpenGalaxyStudio ? (
         <View style={st.group}>
           <Text style={st.q}>Need the original full-production questionnaire?</Text>
-          <Text style={st.help}>Open Galaxy Studio for its 14 production matrices, narrative phase controls, nine style selectors and 100 extended sliders. Galaxy and this Forge run currently have separate drafts.</Text>
+          <Text style={st.help}>Open Galaxy Studio for its 14 production matrices, narrative phase controls, nine style selectors and 100 extended sliders. Galaxy matrices and Forge design knobs are preserved separately on device; compatible vision and genre choices transfer explicitly.</Text>
           <Button label="Open full Galaxy Studio questionnaire" tone="secondary" compact onPress={onOpenGalaxyStudio} testID="q-open-galaxy-studio" />
         </View>
       ) : null}
@@ -394,6 +410,8 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}
       {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
+      {req.playable_content ? <Row k="Playable scene" v={`Godot ${['extraction', 'combat_loop', 'pipeline'].includes(req.archetype) ? req.archetype : 'extraction'} prototype · controllable sidecar scene, with a win/lose loop`} /> : null}
+      {state.playable?.enabled && !req.playable_content ? <Banner tone="warn" testID="q-playable-not-exported">Playable sidecar scenes require Godot output; JSON blueprint export omits playable scenes.</Banner> : null}
       {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · Godot quest HUD and snapshot contract`} /> : null}
       {state.quest?.enabled && !req.quest_content ? <Banner tone="warn" testID="q-native-quest-not-exported">Native room quests are disabled for JSON blueprint output. Select Godot in Forge options to include one.</Banner> : null}
       <Row k="Era" v={req.era ? humanize(req.era) : 'decided by the forge'} />
