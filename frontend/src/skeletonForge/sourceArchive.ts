@@ -124,11 +124,14 @@ export function buildGodotSourceArchive(payload: RunPayload): GodotSourceArchive
   if (!payload.files || typeof payload.files !== 'object' || Array.isArray(payload.files)) {
     throw new Error('The returned project has no source files');
   }
-  const files = Object.entries(payload.files).sort(([a], [b]) => a.localeCompare(b, 'en'));
+  const files = Object.entries(payload.files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
   if (!files.length || files.length > MAX_EXPORT_FILES || !('project.godot' in payload.files)) {
     throw new Error('Source archive exceeds the file budget or lacks project.godot');
   }
   const digest = payload.source_manifest?.sha256;
+  if (payload.source_manifest?.schema !== 'skeleton.forge.source_manifest.v1') {
+    throw new Error('Unexpected Godot source manifest schema');
+  }
   if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)
       || digest !== payload.source_export.manifest_sha256) {
     throw new Error('Export source manifest is unsealed or inconsistent');

@@ -46,7 +46,7 @@ def test_default_http_run_removes_source_bodies_without_changing_run_request(mon
     assert out["file_names"] == sorted(fixture()["files"])
     assert "files" not in out
     assert "source_export" not in out
-    assert "project_root" not in calls[-1]
+    assert calls[-1]["project_root"] is None
     assert "include_files" not in calls[-1]
 
 
