@@ -116,6 +116,9 @@ export interface RunRequest {
   /** Explicitly request the native Godot room-entry quest subsystem. */
   quest_content?: boolean;
   quest_length?: number;
+  playable_content?: boolean;
+  playable_archetype?: string;
+  playable_main_scene?: boolean;
   generation?: string | null;
   include_files?: boolean;
 }
@@ -169,6 +172,9 @@ export interface RunPayload {
     verify_loop?: VerifyLoopBlock | null;
     repair?: Record<string, unknown> | null;
     composition?: ComposeResult | null;
+    playable_archetype?: string | null;
+    playable_scene?: string | null;
+    playable_launch_scene?: string | null;
   };
   jeeves?: { next?: { text?: string; action?: string; priority?: number } | null; briefing?: string } | null;
   sim?: { passed?: boolean; primary_dps?: number } | null;

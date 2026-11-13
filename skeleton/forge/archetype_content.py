@@ -1,6 +1,6 @@
 """Playable per-archetype Godot 4.3 content: scene, player controller, core loop.
 
-Every forge archetype (``extraction``, ``combat_loop``, ``pipeline``) gets a
+Every supported forge archetype gets a
 self-contained playable slice layered onto the emitted project:
 
 - ``scenes/archetypes/<name>/main.tscn`` — playable scene (player + loop);
@@ -187,6 +187,183 @@ func _tick(delta: float) -> void:
 \t\t_finish(true, "shipped=%d" % shipped)
 '''
 
+
+_PUZZLE = '''
+## Spatial switch-order puzzle. Press ui_accept within a target's ring.
+var switches: Array[Vector2] = [
+	Vector2(180, 0), Vector2(180, 150),
+	Vector2(-40, 150), Vector2(-180, -20)
+]
+var next_switch: int = 0
+const USE_RADIUS := 18.0
+
+func _draw() -> void:
+	for index in range(switches.size()):
+		var shade := Color(0.20, 0.90, 0.58) if index == next_switch else Color(0.4, 0.4, 0.4)
+		draw_circle(switches[index], 14.0, shade)
+		draw_arc(switches[index], USE_RADIUS, 0.0, TAU, 24, shade, 2.0)
+
+func _tick(_delta: float) -> void:
+	if next_switch >= switches.size():
+		_finish(true, "switches=%d" % next_switch)
+		return
+	var target: Vector2 = switches[next_switch]
+	player.autopilot_target = target
+	if player.global_position.distance_to(target) <= USE_RADIUS:
+		if player.autopilot or Input.is_action_just_pressed("ui_accept"):
+			next_switch += 1
+			queue_redraw()
+'''
+
+_RACING = '''
+## 2D checkpoint time trial. Complete three ordered laps before the clock.
+var course: Array[Vector2] = [
+	Vector2(210, -90), Vector2(290, 130), Vector2(40, 230),
+	Vector2(-240, 110), Vector2(-180, -150)
+]
+const GOAL_LAPS := 3
+const LAP_RADIUS := 24.0
+const TIME_LIMIT := 45.0
+var waypoint: int = 0
+var laps: int = 0
+var elapsed: float = 0.0
+
+func _draw() -> void:
+	for idx in range(course.size()):
+		var end: Vector2 = course[(idx + 1) % course.size()]
+		draw_line(course[idx], end, Color(0.32, 0.4, 0.7), 7.0)
+		var shade := Color(0.2, 0.96, 0.35) if idx == waypoint else Color(0.86, 0.77, 0.28)
+		draw_circle(course[idx], LAP_RADIUS, shade)
+
+func _tick(delta: float) -> void:
+	elapsed += delta
+	if elapsed >= TIME_LIMIT:
+		_finish(false, "checkpoint time limit")
+		return
+	player.autopilot_target = course[waypoint]
+	if player.global_position.distance_to(course[waypoint]) <= LAP_RADIUS:
+		waypoint += 1
+		if waypoint >= course.size():
+			waypoint = 0
+			laps += 1
+			if laps >= GOAL_LAPS:
+				_finish(true, "laps=%d time=%.1f" % [laps, elapsed])
+		queue_redraw()
+'''
+
+_SURVIVAL = '''
+## Survive thirst, scavenge essentials and reach a safe shelter.
+var supplies: Array[Vector2] = [
+	Vector2(160, 80), Vector2(90, 220), Vector2(-160, 180)
+]
+var shelter := Vector2(-220, -120)
+var collected: int = 0
+var hydration: float = 75.0
+const DRAIN_PER_SECOND := 2.0
+const PICKUP_RADIUS := 19.0
+
+func _draw() -> void:
+	for location in supplies:
+		draw_circle(location, 11.0, Color(0.25, 0.72, 0.98))
+	draw_circle(shelter, 21.0, Color(0.38, 0.9, 0.36))
+
+func _tick(delta: float) -> void:
+	hydration -= DRAIN_PER_SECOND * delta
+	if hydration <= 0.0:
+		_finish(false, "dehydrated")
+		return
+	if supplies.size() > 0:
+		player.autopilot_target = supplies[0]
+		if player.global_position.distance_to(supplies[0]) <= PICKUP_RADIUS:
+			if player.autopilot or Input.is_action_just_pressed("ui_accept"):
+				supplies.remove_at(0)
+				collected += 1
+				hydration = min(100.0, hydration + 12.0)
+				queue_redraw()
+	else:
+		player.autopilot_target = shelter
+		if player.global_position.distance_to(shelter) <= PICKUP_RADIUS:
+			_finish(true, "supplies=%d hydration=%d" % [collected, int(hydration)])
+'''
+
+_STEALTH = '''
+## Recover intel and reach extraction without crossing guard vision radii.
+var patrols: Array[Vector2] = [
+	Vector2(90, -120), Vector2(260, -80),
+	Vector2(40, 320), Vector2(-240, 170)
+]
+var objectives: Array[Vector2] = [
+	Vector2(160, 20), Vector2(260, 170), Vector2(-20, 200)
+]
+var exit_point := Vector2(-180, 50)
+var intel: int = 0
+const DETECTION_RADIUS := 64.0
+const USE_RADIUS := 18.0
+
+func _draw() -> void:
+	for guard in patrols:
+		draw_circle(guard, DETECTION_RADIUS, Color(0.9, 0.22, 0.24, 0.16))
+		draw_circle(guard, 9.0, Color(0.96, 0.26, 0.24))
+	for intel_point in objectives:
+		draw_circle(intel_point, 11.0, Color(0.25, 0.82, 0.98))
+	draw_circle(exit_point, 20.0, Color(0.25, 0.88, 0.32))
+
+func _tick(_delta: float) -> void:
+	for guard in patrols:
+		if player.global_position.distance_to(guard) < DETECTION_RADIUS:
+			_finish(false, "spotted by patrol")
+			return
+	if objectives.size() > 0:
+		player.autopilot_target = objectives[0]
+		if player.global_position.distance_to(objectives[0]) <= USE_RADIUS:
+			if player.autopilot or Input.is_action_just_pressed("ui_accept"):
+				objectives.remove_at(0)
+				intel += 1
+				queue_redraw()
+	else:
+		player.autopilot_target = exit_point
+		if player.global_position.distance_to(exit_point) <= USE_RADIUS:
+			_finish(true, "intel=%d undetected" % intel)
+'''
+
+_CRAFTING = '''
+## Collect mineral parts, assemble them at a workshop, deliver the item.
+var materials: Array[Vector2] = [
+	Vector2(160, -80), Vector2(240, 170), Vector2(-80, 210)
+]
+var workshop := Vector2(-170, 130)
+var delivery := Vector2(-180, -140)
+var collected: int = 0
+var crafted: bool = false
+const USE_RADIUS := 19.0
+
+func _draw() -> void:
+	for deposit in materials:
+		draw_circle(deposit, 11.0, Color(0.48, 0.79, 0.99))
+	draw_circle(workshop, 22.0, Color(0.98, 0.68, 0.27))
+	draw_circle(delivery, 23.0, Color(0.33, 0.9, 0.48))
+
+func _tick(_delta: float) -> void:
+	if materials.size() > 0:
+		player.autopilot_target = materials[0]
+		if player.global_position.distance_to(materials[0]) <= USE_RADIUS:
+			if player.autopilot or Input.is_action_just_pressed("ui_accept"):
+				materials.remove_at(0)
+				collected += 1
+				queue_redraw()
+	elif not crafted:
+		player.autopilot_target = workshop
+		if player.global_position.distance_to(workshop) <= USE_RADIUS:
+			if player.autopilot or Input.is_action_just_pressed("ui_accept"):
+				crafted = collected == 3
+				if not crafted:
+					_finish(false, "missing crafting materials")
+	else:
+		player.autopilot_target = delivery
+		if player.global_position.distance_to(delivery) <= USE_RADIUS:
+			_finish(true, "crafted item delivered from %d materials" % collected)
+'''
+
 _SCENE = '''[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/archetypes/{name}/core_loop.gd" id="1_loop"]
@@ -213,6 +390,11 @@ _SPECS: Dict[str, Tuple[str, float, int]] = {
     "extraction": (_EXTRACTION, 260.0, 1800),
     "combat_loop": (_COMBAT, 240.0, 3600),
     "pipeline": (_PIPELINE, 320.0, 3600),
+    "puzzle": (_PUZZLE, 300.0, 1800),
+    "racing": (_RACING, 420.0, 3600),
+    "survival": (_SURVIVAL, 280.0, 3600),
+    "stealth": (_STEALTH, 250.0, 3600),
+    "crafting": (_CRAFTING, 320.0, 3600),
 }
 
 

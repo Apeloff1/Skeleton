@@ -30,9 +30,21 @@ class RunRequest(BaseModel):
     galaxy_profile: Optional[Dict[str, Any]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
+    playable_content: bool = False
+    playable_archetype: Optional[str] = Field(default=None, max_length=64)
+    playable_main_scene: bool = False
     blend: Optional[list] = None
     t: float = 0.5
     generation: Optional[str] = None
+
+
+@router.get("/playable/archetypes")
+def playable_archetypes() -> Dict[str, Any]:
+    """Only return actual, source-backed Godot mini-games, not 67 false claims."""
+    from skeleton.forge.archetype_content import content_archetypes
+    names = content_archetypes()
+    return {"archetypes": list(names), "count": len(names),
+            "kind": "original_self_contained_godot_2d_mini_game"}
 
 
 @router.get("/eras")
@@ -75,6 +87,8 @@ def run(req: RunRequest) -> Dict[str, Any]:
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
+            **({"playable_content": True, "playable_archetype": req.playable_archetype,
+                "playable_main_scene": req.playable_main_scene} if req.playable_content else {}),
         )
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

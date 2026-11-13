@@ -69,6 +69,17 @@ export interface ForgeOptions {
   generation: string | null;
 }
 
+export const PLAYABLE_SLICES = [
+  { id: 'extraction', label: 'Extraction', hint: 'Recover three caches while managing heat and reach exit' },
+  { id: 'combat_loop', label: 'Arena Combat', hint: 'Survive and clear three escalating enemy waves' },
+  { id: 'pipeline', label: 'Factory Logistics', hint: 'Carry raw materials through refinery and delivery' },
+  { id: 'puzzle', label: 'Spatial Puzzle', hint: 'Activate switches in order to complete a room puzzle' },
+  { id: 'racing', label: 'Racing Time Trial', hint: 'Complete three laps through a checkpoint course' },
+  { id: 'survival', label: 'Scavenging Survival', hint: 'Manage hydration, collect supplies, reach shelter' },
+  { id: 'stealth', label: 'Stealth Infiltration', hint: 'Avoid guard vision, retrieve intel and escape' },
+  { id: 'crafting', label: 'Crafting Delivery', hint: 'Collect parts, use a workshop, deliver a crafted item' },
+] as const;
+
 export interface QuestionnaireState {
   step: Step;
   vision: string;
@@ -82,6 +93,8 @@ export interface QuestionnaireState {
   galaxyProfile?: GalaxyProfile | null;
   /** Opt-in native generated-room quest. */
   quest?: { enabled: boolean; length: number };
+  /** Native source-backed standalone mini-game, independent of blueprint archetype. */
+  playable?: { enabled: boolean; mode: string; launch: boolean };
   options: ForgeOptions;
 }
 
@@ -96,6 +109,9 @@ export type QuestionnaireAction =
   | { type: 'clearGalaxyProfile' }
   | { type: 'setQuestEnabled'; value: boolean }
   | { type: 'setQuestLength'; value: number }
+  | { type: 'setPlayableEnabled'; value: boolean }
+  | { type: 'setPlayableMode'; value: string }
+  | { type: 'setPlayableMainScene'; value: boolean }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'next' }
   | { type: 'back' }
@@ -111,6 +127,7 @@ export const INITIAL_STATE: QuestionnaireState = {
   galaxyGenre: null,
   galaxyProfile: null,
   quest: { enabled: false, length: 3 },
+  playable: { enabled: false, mode: 'extraction', launch: false },
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
 };
 
@@ -192,10 +209,32 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       return { ...state, brief, galaxyGenre: action.genre, galaxyProfile: null };
     }
     case 'setQuestEnabled':
-      return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true } };
+      return {
+        ...state,
+        quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true },
+        playable: action.value ? { ...INITIAL_STATE.playable!, ...state.playable, launch: false } : state.playable,
+      };
     case 'setQuestLength': {
       if (!Number.isInteger(action.value) || action.value < 1 || action.value > 8) return state;
       return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, length: action.value } };
+    }
+    case 'setPlayableEnabled': {
+      const enabled = action.value === true;
+      return { ...state, playable: {
+        ...INITIAL_STATE.playable!, ...state.playable, enabled,
+        launch: enabled ? !!state.playable?.launch : false,
+      } };
+    }
+    case 'setPlayableMode': {
+      if (!PLAYABLE_SLICES.some((item) => item.id === action.value)) return state;
+      return { ...state, playable: { ...INITIAL_STATE.playable!, ...state.playable, mode: action.value } };
+    }
+    case 'setPlayableMainScene': {
+      if (action.value && (state.quest?.enabled || state.options.target !== 'godot')) return state;
+      return { ...state, playable: {
+        ...INITIAL_STATE.playable!, ...state.playable,
+        launch: action.value === true && !!state.playable?.enabled,
+      } };
     }
     case 'setOption': {
       const value = action.value === '' ? null : action.value;
@@ -270,6 +309,14 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   const instrumentAxes = sparseInstrumentPayload(state.instruments);
   if (Object.keys(instrumentAxes).length) request.operator_axes = instrumentAxes;
   if (state.galaxyProfile) request.galaxy_profile = state.galaxyProfile;
+  if (state.playable?.enabled && request.target === 'godot') {
+    const chosen = PLAYABLE_SLICES.find((slice) => slice.id === state.playable?.mode);
+    if (chosen) {
+      request.playable_content = true;
+      request.playable_archetype = chosen.id;
+      request.playable_main_scene = !!state.playable.launch && !state.quest?.enabled;
+    }
+  }
   if (state.quest?.enabled && request.target === 'godot') {
     request.quest_content = true;
     request.quest_length = Number.isInteger(state.quest.length) && state.quest.length >= 1 && state.quest.length <= 8 ? state.quest.length : 3;

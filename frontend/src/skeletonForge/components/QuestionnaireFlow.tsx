@@ -7,6 +7,7 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { humanize } from '../graph';
 import { DESIGN_AXES } from '../instruments';
+import { PLAYABLE_SLICES } from '../questionnaire';
 import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import DesignInstruments from './DesignInstruments';
 import {
@@ -203,6 +204,52 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       </View>
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
 
+      <View style={st.group} testID="q-playable-slice-options" accessibilityRole="radiogroup" accessibilityLabel="Playable original mini-game">
+        <Text style={st.q}>Playable genre prototypes</Text>
+        <Text style={st.help}>
+          Include an original self-contained Godot mini-game with real controls and a win/lose loop.
+          Choose from the eight implemented prototypes; this does not mean all 67 historical genres have complete gameplay.
+        </Text>
+        <View style={st.chips}>
+          <Chip label="No extra mini-game" selected={!state.playable?.enabled}
+            onPress={() => dispatch({ type: 'setPlayableEnabled', value: false })}
+            testID="q-playable-off" />
+          <Chip label="Include playable prototype" selected={!!state.playable?.enabled}
+            disabled={state.options.target !== 'godot'}
+            onPress={() => dispatch({ type: 'setPlayableEnabled', value: true })}
+            testID="q-playable-on" />
+        </View>
+        {state.playable?.enabled && state.options.target === 'godot' ? (
+          <>
+            <Text style={st.help}>Select the implemented game loop:</Text>
+            <View style={st.chips}>
+              {PLAYABLE_SLICES.map((slice) => (
+                <Chip key={slice.id} label={slice.label}
+                  selected={state.playable?.mode === slice.id}
+                  a11yLabel={slice.label + '. ' + slice.hint}
+                  onPress={() => dispatch({ type: 'setPlayableMode', value: slice.id })}
+                  testID={'q-playable-mode-' + slice.id} />
+              ))}
+            </View>
+            <View style={st.chips}>
+              <Chip label="Keep current Godot launch scene" selected={!state.playable?.launch}
+                onPress={() => dispatch({ type: 'setPlayableMainScene', value: false })}
+                testID="q-playable-extra-only" />
+              <Chip label="Launch this mini-game as main" selected={!!state.playable?.launch}
+                disabled={!!state.quest?.enabled}
+                onPress={() => dispatch({ type: 'setPlayableMainScene', value: true })}
+                testID="q-playable-launch" />
+            </View>
+            {state.quest?.enabled ? (
+              <Text style={st.help} testID="q-playable-quest-conflict">
+                The room-entry quest requires the original Godot launch scene.
+                The mini-game can still be included as a separate selectable scene.
+              </Text>
+            ) : null}
+          </>
+        ) : null}
+      </View>
+
       <View style={st.group} testID="q-native-quest-controls" accessibilityRole="radiogroup" accessibilityLabel="Native quest gameplay">
         <Text style={st.q}>Native room-entry quest gameplay</Text>
         <Text style={st.help}>Optional real Godot quest runtime with room-triggered objectives, a quest HUD, and source-checked save snapshots. Does not automatically create NPC conversations or combat quests.</Text>
@@ -335,6 +382,7 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Beats" v={beatsTxt || '—'} />
       <Row k="Archetype" v={arch?.label ?? req.archetype} />
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
+      {req.playable_content ? <Row k="Playable mini-game" v={`${PLAYABLE_SLICES.find((slice) => slice.id === req.playable_archetype)?.label ?? req.playable_archetype} · ${req.playable_main_scene ? "startup scene" : "additional scene"}`} /> : null}
       {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · source-bound HUD and save contract`} /> : null}
       {state.quest?.enabled && !req.quest_content ? <Banner tone="warn" testID="q-native-quest-not-exported">Native room quests are disabled for JSON blueprint output. Select Godot in Forge options to include one.</Banner> : null}
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}
