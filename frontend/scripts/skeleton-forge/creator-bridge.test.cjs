@@ -7,10 +7,33 @@ const { load } = require('./harness.cjs');
 
 const Q = load('src/skeletonForge/questionnaire.ts');
 const H = load('src/skeletonForge/creatorBridge.ts');
+const Galaxy = load('src/skeletonForge/galaxyGenres.ts');
+const { FALLBACK_GENRES } = load('src/features/GalaxyStudioFactory/fallbackGenres.ts');
+const { GENRE_CHOICES } = load('src/skeletonForge/genreCatalog.ts');
 
 function make(...actions) {
   return actions.reduce(Q.questionnaireReducer, Q.INITIAL_STATE);
 }
+
+test('all 69 historical Galaxy fallback genres have a valid 158-choice GameForge counterpart', () => {
+  const tokens = new Set(GENRE_CHOICES);
+  const ids = FALLBACK_GENRES.map(x => x.id);
+  assert.equal(ids.length, 69);
+  assert.equal(new Set(ids).size, 69);
+  assert.equal(Galaxy.GALAXY_CHOICES.length, 69);
+  assert.deepEqual(new Set(Object.keys(Galaxy.GALAXY_TO_FORGE_BRIEF)), new Set(ids));
+  for (const id of ids) {
+    const mapped = Galaxy.mappedBriefGenre(id);
+    assert.ok(mapped && tokens.has(mapped), 'No supported brief vote for historical genre ' + id);
+    const state = make({ type: 'setGalaxyGenre', genre: id });
+    assert.equal(Q.buildRunRequest(state).answers.genre, mapped, id);
+    const forward = H.handoffFromGalaxy({ title: 'Example', vision: '', genreId: id }, null, 1700000000000);
+    assert.equal(forward.galaxyGenre, id);
+    assert.equal(forward.brief.genre, mapped);
+  }
+  assert.equal(Galaxy.mappedBriefGenre('beat_em_up'), 'beat-em-up');
+  assert.equal(Galaxy.mappedBriefGenre('shoot_em_up'), 'shoot-em-up');
+});
 
 test('explicit Forge → Galaxy → Forge handoff retains authored axes, beats and native quest', () => {
   const initial = make(
