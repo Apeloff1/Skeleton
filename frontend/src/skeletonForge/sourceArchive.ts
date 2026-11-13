@@ -36,11 +36,16 @@ function utf8(text: string): Uint8Array {
   return Uint8Array.from(out);
 }
 
-const CRC_TABLE = Uint32Array.from({ length: 256 }, (_, i) => {
+// Explicitly initialize a typed table; ArrayLike without indexed entries
+// is not portable across TypeScript/JS engines.
+const CRC_TABLE = new Uint32Array(256);
+for (let i = 0; i < CRC_TABLE.length; i++) {
   let crc = i;
-  for (let b = 0; b < 8; b++) crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
-  return crc >>> 0;
-});
+  for (let bit = 0; bit < 8; bit++) {
+    crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+  }
+  CRC_TABLE[i] = crc >>> 0;
+}
 function crc32(bytes: Uint8Array): number {
   let crc = 0xffffffff;
   for (const b of bytes) crc = CRC_TABLE[(crc ^ b) & 255] ^ (crc >>> 8);
@@ -125,7 +130,7 @@ export function buildGodotSourceArchive(payload: RunPayload): GodotSourceArchive
     throw new Error('The returned project has no source files');
   }
   const files = Object.entries(payload.files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
-  if (!files.length || files.length > MAX_EXPORT_FILES || !('project.godot' in payload.files)) {
+  if (!files.length || files.length > MAX_EXPORT_FILES || !Object.prototype.hasOwnProperty.call(payload.files, 'project.godot')) {
     throw new Error('Source archive exceeds the file budget or lacks project.godot');
   }
   const digest = payload.source_manifest?.sha256;
