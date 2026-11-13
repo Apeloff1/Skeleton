@@ -9,6 +9,7 @@
  */
 import type { Beat, RunRequest } from './types';
 import { isDesignAxis, normaliseAxisEdit, sparseInstrumentPayload } from './instruments';
+import { mappedBriefGenre, specializedVision } from './galaxyGenres';
 
 export const STEPS = ['vision', 'brief', 'beats', 'options', 'review'] as const;
 export type Step = typeof STEPS[number];
@@ -74,6 +75,8 @@ export interface QuestionnaireState {
   beats: Record<string, string>;
   /** Explicit overrides only; an absent axis remains driven by the forge. */
   instruments: Record<string, number>;
+  /** Historical Galaxy Studio genre specialization (mapped to a canonical vote). */
+  galaxyGenre?: string | null;
   options: ForgeOptions;
 }
 
@@ -83,6 +86,7 @@ export type QuestionnaireAction =
   | { type: 'setBeat'; beat: string; value: string | null }
   | { type: 'setAxis'; axis: string; value: number | null }
   | { type: 'resetAxes' }
+  | { type: 'setGalaxyGenre'; genre: string | null }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'next' }
   | { type: 'back' }
@@ -95,6 +99,7 @@ export const INITIAL_STATE: QuestionnaireState = {
   brief: {},
   beats: {},
   instruments: {},
+  galaxyGenre: null,
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
 };
 
@@ -135,7 +140,8 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     case 'setVision':
       return { ...state, vision: String(action.vision ?? '').slice(0, VISION_MAX + 200) };
     case 'setBrief':
-      return { ...state, brief: toggle(state.brief, action.facet, action.value) };
+      return { ...state, brief: toggle(state.brief, action.facet, action.value),
+        galaxyGenre: action.facet === 'genre' ? null : state.galaxyGenre };
     case 'setBeat':
       return { ...state, beats: toggle(state.beats, action.beat, action.value) };
     case 'setAxis': {
@@ -151,6 +157,17 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     }
     case 'resetAxes':
       return { ...state, instruments: {} };
+    case 'setGalaxyGenre': {
+      const mapped = mappedBriefGenre(action.genre);
+      if (action.genre && !mapped) return state;
+      const brief = { ...state.brief };
+      if (!action.genre || action.genre === state.galaxyGenre) {
+        if (state.galaxyGenre && brief.genre === mappedBriefGenre(state.galaxyGenre)) delete brief.genre;
+        return { ...state, brief, galaxyGenre: null };
+      }
+      brief.genre = mapped!;
+      return { ...state, brief, galaxyGenre: action.genre };
+    }
     case 'setOption': {
       const value = action.value === '' ? null : action.value;
       if (action.key === 'archetype' || action.key === 'target') {
@@ -214,7 +231,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   for (const [k, v] of Object.entries(state.brief)) answers[k] = v;
   for (const [k, v] of Object.entries(state.beats)) answers[k] = v;
   const request: RunRequest = {
-    vision: state.vision.trim().slice(0, VISION_MAX),
+    vision: specializedVision(state.vision, state.galaxyGenre, VISION_MAX),
     era: state.options.era,
     archetype: state.options.archetype || 'auto',
     target: state.options.target || 'godot',

@@ -7,6 +7,7 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { humanize } from '../graph';
 import { DESIGN_AXES } from '../instruments';
+import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import DesignInstruments from './DesignInstruments';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
@@ -172,6 +173,9 @@ function BeatsStep({ state, dispatch, beats, beatsLive }: QuestionnaireFlowProps
 
 function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio }: QuestionnaireFlowProps) {
   const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
+  const [galaxyOpen, setGalaxyOpen] = React.useState(false);
+  const [genreSearch, setGenreSearch] = React.useState('');
+  const filteredGenres = GALAXY_CHOICES.filter((g) => (g.id + ' ' + g.name + ' ' + g.desc).toLowerCase().includes(genreSearch.trim().toLowerCase()));
   return (
     <Card>
       <View accessibilityRole="radiogroup" accessibilityLabel="Forge archetype" style={st.group}>
@@ -216,6 +220,43 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
               <Chip key={g.key} label={String(g.label ?? humanize(g.key))} selected={state.options.generation === g.key} color={C.blue} onPress={() => dispatch({ type: 'setOption', key: 'generation', value: g.key })} testID={`q-gen-${g.key}`} />
             ))}
           </View>
+        </View>
+      ) : null}
+      <View style={st.group}>
+        <Button label={galaxyOpen ? 'Hide 67-genre catalog' : 'Advanced: choose from all 67 Galaxy genres'}
+          tone="secondary" compact testID="q-galaxy-genres-toggle"
+          onPress={() => setGalaxyOpen((open) => !open)} />
+      </View>
+      {galaxyOpen ? (
+        <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Specialized Galaxy Studio genres">
+          <Text style={st.help}>
+            Your chosen specialization is preserved in the build vision. GameForge maps it
+            to the nearest supported broad genre to choose a runtime dialect;
+            this is not a claim that every specialized mechanic is implemented.
+          </Text>
+          <TextInput testID="q-galaxy-genre-search" style={[st.input, { minHeight: TOUCH }]}
+            value={genreSearch} onChangeText={setGenreSearch}
+            placeholder="Search 67 genres" accessibilityLabel="Search Galaxy genres"
+            placeholderTextColor={C.dim} />
+          <Text style={st.help}>{filteredGenres.length} matching genres. {filteredGenres.length > 24 ? 'Showing first 24; refine your search.' : ''}</Text>
+          <View style={st.chips}>
+            <Chip label="No specialization" selected={!state.galaxyGenre}
+              onPress={() => dispatch({ type: 'setGalaxyGenre', genre: null })}
+              testID="q-galaxy-genre-auto" />
+            {filteredGenres.slice(0, 24).map((g) => (
+              <Chip key={g.id} label={g.name} role="radio"
+                selected={state.galaxyGenre === g.id}
+                a11yLabel={g.name + '. Maps to ' + mappedBriefGenre(g.id)}
+                onPress={() => dispatch({ type: 'setGalaxyGenre', genre: g.id })}
+                testID={'q-galaxy-genre-' + g.id} />
+            ))}
+          </View>
+          {state.galaxyGenre ? (
+            <Text style={st.help} testID="q-galaxy-genre-selection">
+              Selected: {galaxyGenre(state.galaxyGenre)?.name ?? '—'} ·
+              GameForge category: {mappedBriefGenre(state.galaxyGenre)}
+            </Text>
+          ) : null}
         </View>
       ) : null}
       {onOpenGalaxyStudio ? (
@@ -266,6 +307,7 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Beats" v={beatsTxt || '—'} />
       <Row k="Archetype" v={arch?.label ?? req.archetype} />
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
+      {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}
       {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
       <Row k="Era" v={req.era ? humanize(req.era) : 'decided by the forge'} />
       {req.generation ? <Row k="Hardware" v={humanize(req.generation)} /> : null}
