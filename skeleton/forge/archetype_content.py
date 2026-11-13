@@ -82,6 +82,8 @@ func _finish(ok: bool, reason: String) -> void:
 \tif finished:
 \t\treturn
 \tfinished = true
+\tif is_instance_valid(_status):
+\t\t_status.text = ARCHETYPE.replace("_", " ").capitalize() + (": COMPLETE | " if ok else ": FAILED | ") + reason
 \tif ok:
 \t\tprint("{complete} ", ARCHETYPE, " ", reason)
 \t\tloop_completed.emit(ARCHETYPE)
@@ -100,6 +102,8 @@ func _physics_process(delta: float) -> void:
 \t\t_finish(false, "frame budget exhausted")
 \t\treturn
 \t_tick(delta)
+\tif not finished and is_instance_valid(_status):
+\t\t_status.text = ARCHETYPE.replace("_", " ").capitalize() + " | " + _objective_text() + " | arrows: move | Enter: interact"
 '''
 
 _EXTRACTION = '''
@@ -121,12 +125,17 @@ func _tick(delta: float) -> void:
 \tif loot.size() > 0:
 \t\tplayer.autopilot_target = loot[0]
 \t\tif player.global_position.distance_to(loot[0]) <= PICKUP_RADIUS:
-\t\t\tloot.remove_at(0)
-\t\t\tcarried += 1
+\t\t\tif player.autopilot or Input.is_action_just_pressed("ui_accept"):
+\t\t\t\tloot.remove_at(0)
+\t\t\t\tcarried += 1
 \telse:
 \t\tplayer.autopilot_target = extract_point
 \t\tif player.global_position.distance_to(extract_point) <= PICKUP_RADIUS:
 \t\t\t_finish(true, "extracted loot=%d heat=%d" % [carried, int(heat)])
+
+
+func _objective_text() -> String:
+	return "Recover loot %d/3 | Heat %d/100 | Reach the extraction point" % [carried, int(heat)]
 '''
 
 _COMBAT = '''
@@ -163,10 +172,16 @@ func _tick(_delta: float) -> void:
 \t\t_finish(false, "player down")
 \t\treturn
 \tif target["pos"].distance_to(player.global_position) <= ATTACK_RANGE and frames % 6 == 0:
+\t\tif not (player.autopilot or Input.is_action_pressed("ui_accept")):
+\t\t\treturn
 \t\ttarget["hp"] -= ATTACK_DAMAGE
 \t\tif target["hp"] <= 0:
 \t\t\tenemies.remove_at(0)
 \t\t\tkills += 1
+
+
+func _objective_text() -> String:
+	return "Wave %d/%d | HP %d | Kills %d | Hold Enter to attack nearby enemies" % [wave, WAVES, player_hp, kills]
 '''
 
 _PIPELINE = '''
@@ -203,6 +218,10 @@ func _tick(delta: float) -> void:
 \t\t\t\tstage = "to_source"
 \tif shipped >= QUOTA:
 \t\t_finish(true, "shipped=%d" % shipped)
+
+
+func _objective_text() -> String:
+	return "Shipped %d/%d | Current stage: %s" % [shipped, QUOTA, stage]
 '''
 
 
@@ -231,6 +250,10 @@ func _tick(_delta: float) -> void:
 		if player.autopilot or Input.is_action_just_pressed("ui_accept"):
 			next_switch += 1
 			queue_redraw()
+
+
+func _objective_text() -> String:
+	return "Switch %d/%d | Move into the bright ring and press Enter" % [next_switch, switches.size()]
 '''
 
 _RACING = '''
@@ -267,6 +290,10 @@ func _tick(delta: float) -> void:
 			if laps >= GOAL_LAPS:
 				_finish(true, "laps=%d time=%.1f" % [laps, elapsed])
 		queue_redraw()
+
+
+func _objective_text() -> String:
+	return "Lap %d/%d | Checkpoint %d/%d | Time %.1f/%.1f s" % [laps, GOAL_LAPS, waypoint + 1, course.size(), elapsed, TIME_LIMIT]
 '''
 
 _SURVIVAL = '''
@@ -302,6 +329,10 @@ func _tick(delta: float) -> void:
 		player.autopilot_target = shelter
 		if player.global_position.distance_to(shelter) <= PICKUP_RADIUS:
 			_finish(true, "supplies=%d hydration=%d" % [collected, int(hydration)])
+
+
+func _objective_text() -> String:
+	return "Supplies %d/3 | Hydration %d | Press Enter to gather" % [collected, int(hydration)]
 '''
 
 _STEALTH = '''
@@ -342,6 +373,10 @@ func _tick(_delta: float) -> void:
 		player.autopilot_target = exit_point
 		if player.global_position.distance_to(exit_point) <= USE_RADIUS:
 			_finish(true, "intel=%d undetected" % intel)
+
+
+func _objective_text() -> String:
+	return "Intel %d/3 | Avoid red guard zones | Press Enter to retrieve" % [intel]
 '''
 
 _CRAFTING = '''
@@ -380,6 +415,10 @@ func _tick(_delta: float) -> void:
 		player.autopilot_target = delivery
 		if player.global_position.distance_to(delivery) <= USE_RADIUS:
 			_finish(true, "crafted item delivered from %d materials" % collected)
+
+
+func _objective_text() -> String:
+	return "Materials %d/3 | Crafted %s | Press Enter to work" % [collected, "yes" if crafted else "no"]
 '''
 
 _SCENE = '''[gd_scene load_steps=4 format=3]
