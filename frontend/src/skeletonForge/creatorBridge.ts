@@ -119,7 +119,13 @@ export function handoffFromGalaxy(
   prior: CreatorBridgeDraft | null = null,
   now: number = Date.now(),
 ): CreatorBridgeDraft {
-  const previous = prior ? parseCreatorBridge(prior, 'galaxy', now) : null;
+  // The receiving route already validated and consumed this short-lived handoff
+  // before opening the Galaxy editor. Once accepted into that route's memory,
+  // an editing session must not erase the user's authored Forge knobs or quest
+  // merely because they spent more than 20 minutes tuning Galaxy matrices.
+  // Revalidate shape against the original accepted timestamp; the *new*
+  // outbound handoff receives today's timestamp and its own short TTL.
+  const previous = prior ? parseCreatorBridge(prior, 'galaxy', prior.createdMs) : null;
   const genre = selection.genreId && galaxyIds.has(selection.genreId) ? selection.genreId : previous?.galaxyGenre ?? null;
   const brief = { ...(previous?.brief ?? {}) };
   if (genre) {
