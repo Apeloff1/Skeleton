@@ -2,7 +2,9 @@
  * Studio shell state: first-run, account gate, projects, and where Back goes.
  * Pure — screens and persistence sit on top of this reducer.
  */
-import { questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
+import { INITIAL_STATE, questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
+import { sparseInstrumentPayload } from '../instruments';
+import { mappedBriefGenre } from '../galaxyGenres';
 import { summarizeRun } from '../run';
 import type { RunPayload } from '../types';
 
@@ -141,12 +143,40 @@ export function initialFoundationState(): FoundationState {
 }
 
 export function freshQuestionnaire(): QuestionnaireState {
+  // All original and recovered creator controls must begin in a complete,
+  // independent state. Do not share mutable nested maps between projects.
   return {
-    step: 'vision',
-    vision: '',
+    ...INITIAL_STATE,
     brief: {},
     beats: {},
-    options: { archetype: 'auto', target: 'godot', era: null, generation: null },
+    instruments: {},
+    options: { ...INITIAL_STATE.options },
+    quest: { ...INITIAL_STATE.quest! },
+    playable: { ...INITIAL_STATE.playable! },
+    sourceExport: { ...INITIAL_STATE.sourceExport! },
+  };
+}
+
+/** Persist receipts and summaries, never the user's entire generated game. */
+export function persistedRunPayload(payload: RunPayload | null | undefined): RunPayload | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const { files: _sourceBodies, source_manifest: _manifest, source_export, ...summary } = payload;
+  if (source_export?.status === 'ready') {
+    return {
+      ...summary,
+      source_export: {
+        status: 'unavailable',
+        reason: 'Source ZIP is only available in the original live run. Save or share it before leaving.',
+      },
+    };
+  }
+  return { ...summary, ...(source_export ? { source_export } : {}) };
+}
+
+export function persistedRunSnapshot(snapshot: RunSnapshot): RunSnapshot {
+  return {
+    ...snapshot,
+    payload: persistedRunPayload(snapshot.payload),
   };
 }
 
@@ -338,7 +368,7 @@ export function applyRecordRun(state: FoundationState, projectId: string, snapsh
   const current = state.projects.find((project) => project.id === projectId);
   if (!current) return state;
   const updatedAt = snapshot.finishedAt != null ? new Date(snapshot.finishedAt).toISOString() : current.updatedAt;
-  return replaceProject(state, { ...current, lastRun: snapshot, updatedAt });
+  return replaceProject(state, { ...current, lastRun: persistedRunSnapshot(snapshot), updatedAt });
 }
 
 export interface PersistSnapshot {
@@ -352,7 +382,10 @@ export interface PersistSnapshot {
 export function persistSnapshot(state: FoundationState): PersistSnapshot {
   return {
     onboarded: state.onboarded,
-    projects: state.projects,
+    projects: state.projects.map((project) => ({
+      ...project,
+      lastRun: project.lastRun ? persistedRunSnapshot(project.lastRun) : null,
+    })),
     prefs: state.prefs,
     projectsCorrupt: state.projectsCorrupt,
     holdSaves: state.holdSaves,
@@ -496,7 +529,7 @@ function sanitizeProject(raw: unknown): StudioProject | null {
       startedAt: typeof run.startedAt === 'number' ? run.startedAt : null,
       finishedAt: typeof run.finishedAt === 'number' ? run.finishedAt : null,
       succeeded: run.succeeded,
-      payload: run.payload && typeof run.payload === 'object' ? run.payload : null,
+      payload: persistedRunPayload(run.payload),
     };
   }
   return {
@@ -504,7 +537,34 @@ function sanitizeProject(raw: unknown): StudioProject | null {
     title: typeof item.title === 'string' && item.title.trim() ? item.title : 'Untitled project',
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
-    questionnaire: { step: questionnaire.step, vision: questionnaire.vision, brief, beats, options: { ...options } },
+    questionnaire: {
+      ...freshQuestionnaire(),
+      step: questionnaire.step,
+      vision: questionnaire.vision,
+      brief,
+      beats,
+      options: { ...options },
+      // Legacy saved projects may not contain newer controls. Recover the
+      // exact supported axes/options without discarding older creative beats.
+      instruments: sparseInstrumentPayload(
+        questionnaire.instruments && typeof questionnaire.instruments === 'object'
+          && !Array.isArray(questionnaire.instruments)
+          ? questionnaire.instruments : {},
+      ),
+      galaxyGenre: typeof questionnaire.galaxyGenre === 'string'
+        && mappedBriefGenre(questionnaire.galaxyGenre)
+        ? questionnaire.galaxyGenre : null,
+      quest: {
+        enabled: questionnaire.quest?.enabled === true,
+        length: Number.isInteger(questionnaire.quest?.length)
+          && questionnaire.quest!.length >= 1 && questionnaire.quest!.length <= 8
+          ? questionnaire.quest!.length : 3,
+      },
+      playable: { enabled: questionnaire.playable?.enabled === true },
+      playtest: questionnaire.playtest === 'require' || questionnaire.playtest === 'auto'
+        ? questionnaire.playtest : 'off',
+      sourceExport: { enabled: questionnaire.sourceExport?.enabled === true },
+    },
     lastRun,
   };
 }
