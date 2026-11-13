@@ -253,7 +253,7 @@ def pick_api(query: str) -> tuple[str, dict]:
     m = re.search(r"(?:synonym|synonyms|related words?)\s+(?:for|of)?\s*(.+)", q)
     if m:
         return "datamuse", {"q": m.group(1)}
-    if any(w in q for w in ("crypto", "bitcoin", "ethereum", "coin price", "price of")):
+    if re.search(r"\b(?:crypto|cryptocurrency|bitcoin|ethereum|solana|dogecoin|cardano)\b", q) or "coin price" in q:
         coin = "bitcoin"
         for c in ("bitcoin", "ethereum", "solana", "dogecoin", "cardano"):
             if c in q:
