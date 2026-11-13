@@ -23,6 +23,7 @@ from skeleton.forge.eras import compile_era
 from skeleton.forge.gdscript_check import check_ok
 from skeleton.forge.godot_emit import emit_godot
 from skeleton.forge.source_manifest import source_manifest
+from skeleton.forge.playable_portal import SCRIPT_PATH, verify_playable_portal
 
 
 def base() -> dict[str, str]:
@@ -72,8 +73,12 @@ def test_playable_archetype_and_native_room_quest_coexist_at_emit(monkeypatch) -
     assert ctx["native_quest_receipt"]["replay_verified"] is True
     assert verify_native_quest(ctx["files"])
     assert "scenes/archetypes/pipeline/main.tscn" in ctx["files"]
-    assert ctx["file_count"] == len(before) + 3 + 2
-    assert source_manifest(ctx["files"])["file_count"] == len(before) + 3 + 2
+    assert verify_playable_portal(ctx["files"], "pipeline")
+    assert ctx["playable_portal_receipt"]["return_supported"] is True
+    assert ctx["playable_portal_receipt"]["headless_inert"] is True
+    assert SCRIPT_PATH in ctx["files"]
+    assert ctx["file_count"] == len(before) + 3 + 1 + 2
+    assert source_manifest(ctx["files"])["file_count"] == len(before) + 3 + 1 + 2
     ok, problems = check_ok(ctx["files"])
     assert ok, problems
 

@@ -61,6 +61,10 @@ def test_pipeline_attaches_playable_slice(name):
     files = out["files"]
     assert f"scenes/archetypes/{name}/main.tscn" in files
     assert check_files(files) == []
+    from skeleton.forge.playable_portal import verify_playable_portal
+    assert verify_playable_portal(files, name)
+    assert out["playable_portal"]["return_supported"] is True
+    assert out["playable_portal"]["sealed"] is True
 
 
 def test_attach_is_additive_and_falls_back():
