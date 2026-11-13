@@ -232,7 +232,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
                   This is only a small prototype, not full specialized genre gameplay.
                 </Text>
                 <Chip label="Use this prototype" role="button"
-                  selected={state.playable.mode === playableHint.mode}
+                  selected={state.playable?.mode === playableHint.mode}
                   onPress={() => dispatch({ type: 'setPlayableMode', value: playableHint.mode })}
                   testID="q-use-playable-suggestion" />
               </View>
