@@ -125,3 +125,54 @@ def attach_galaxy_profile(files: Mapping[str, str], profile: Optional[Mapping[st
         raise ValueError("Galaxy design artifact path collision")
     result[ARTIFACT_PATH] = canonical_profile_bytes(profile).decode("ascii") + "\n"
     return result
+
+
+def apply_galaxy_mechanics(plan: Any, profile: Optional[Mapping[str, Any]]) -> tuple[Any, Optional[dict[str, Any]]]:
+    """Compile *supported* historical mechanics into real Godot world settings.
+
+    The original 14 matrices describe much more than the current Godot
+    extraction runtime supports. Currently only an explicit, nonzero
+    ranged/gunplay mechanic means "start with a weapon". This directly
+    drives emitted GameState.gd and data/build_plan.json. All other dials
+    remain source-bound project design, not falsely presented as gameplay.
+    """
+    if profile is None:
+        return plan, None
+    from dataclasses import replace
+
+    mechanics = profile["config"]["mechanics_matrix"]
+    requested = tuple(
+        f"mechanics_matrix.{name}.count"
+        for name in ("gunplay", "ranged")
+        if mechanics.get(name, {}).get("count", 0) > 0
+    )
+    active_total = sum(
+        1
+        for key in MATRIX_FIELDS
+        for axes in profile["config"][key].values()
+        for value in axes.values()
+        if value > 0
+    )
+    receipt: dict[str, Any] = {
+        "schema": "skeleton.gameforge.galaxy_mechanics.v1",
+        "source_sha256": galaxy_profile_receipt(profile)["sha256"],
+        "active_matrix_dials": active_total,
+        "supported_inputs": list(requested),
+        "applied": [],
+        "unmapped_matrix_dials": active_total - len(requested),
+    }
+    if requested:
+        prior = plan.spawn_weapon
+        if not prior:
+            plan = replace(
+                plan,
+                spawn_weapon=True,
+                notes=[*plan.notes, "Galaxy requested ranged/gunplay: equip starting weapon"],
+            )
+        receipt["applied"].append({
+            "target": "build_plan.spawn_weapon",
+            "value": True,
+            "changed": not prior,
+            "source": list(requested),
+        })
+    return plan, receipt

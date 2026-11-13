@@ -14,7 +14,7 @@ from typing import Any, Dict, Mapping, Optional
 
 from skeleton.context.cockpit import Cockpit
 from skeleton.context.galaxy_profile import (
-    attach_galaxy_profile, galaxy_profile_receipt, normalise_galaxy_profile,
+    apply_galaxy_mechanics, attach_galaxy_profile, galaxy_profile_receipt, normalise_galaxy_profile,
 )
 from skeleton.context.dodeca import Dodecahedron
 from skeleton.context.oracle import Magic8Ball
@@ -258,6 +258,8 @@ class GameForgeRun:
                     "design/galaxy_studio_profile.json" in (run.context.get("files") or {})
                 ),
             }
+            if run.context.get("galaxy_mechanics") is not None:
+                payload["galaxy_mechanics"] = run.context["galaxy_mechanics"]
         self.bus.emit("gameforge.run.finished", {
             "succeeded": run.succeeded,
             "era": payload["era"],
@@ -407,6 +409,11 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         pack, tensor=cockpit.tensor, reading=cockpit.last_oracle,
         cortex=cortex, last_walk=last_walk,
     )
+    build_plan, galaxy_mechanics = apply_galaxy_mechanics(
+        build_plan, ctx.get("galaxy_profile"),
+    )
+    if galaxy_mechanics is not None:
+        ctx["galaxy_mechanics"] = galaxy_mechanics
     ctx["build_plan"] = build_plan
     repair = bool(ctx.get("repair", True))
     max_rounds = int(ctx.get("max_rounds", 3) or 3)

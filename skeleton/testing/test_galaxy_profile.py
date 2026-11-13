@@ -158,3 +158,59 @@ def test_run_route_forwards_full_galaxy_profile_as_one_isolated_build_input(monk
     assert seen["options"]["galaxy_profile"] == sample()
     assert out["file_names"] == ["project.godot"]
     assert "files" not in out
+
+
+def test_explicit_ranged_and_gunplay_matrix_changes_real_build_plan():
+    from dataclasses import dataclass
+    from skeleton.context.galaxy_profile import apply_galaxy_mechanics
+
+    @dataclass(frozen=True)
+    class Plan:
+        spawn_weapon: bool
+        notes: list[str]
+
+    profile = sample()
+    # 0 is the historical matrix default: no implicit weapon override.
+    profile["config"]["mechanics_matrix"]["ranged"] = {"count": 0}
+    baseline = normalise_galaxy_profile(profile)
+    unchanged, receipt = apply_galaxy_mechanics(Plan(False, []), baseline)
+    assert not unchanged.spawn_weapon
+    assert receipt["supported_inputs"] == []
+    assert receipt["applied"] == []
+
+    profile["config"]["mechanics_matrix"]["ranged"]["count"] = 7
+    profile["config"]["mechanics_matrix"]["gunplay"] = {"count": 3}
+    explicit = normalise_galaxy_profile(profile)
+    armed, receipt = apply_galaxy_mechanics(Plan(False, []), explicit)
+    assert armed.spawn_weapon
+    assert len(armed.notes) == 1
+    assert receipt["supported_inputs"] == [
+        "mechanics_matrix.gunplay.count", "mechanics_matrix.ranged.count",
+    ]
+    assert receipt["applied"] == [{
+        "target": "build_plan.spawn_weapon", "value": True,
+        "changed": True, "source": receipt["supported_inputs"],
+    }]
+    assert receipt["unmapped_matrix_dials"] == receipt["active_matrix_dials"] - 2
+    already, seen = apply_galaxy_mechanics(Plan(True, ["kept"]), explicit)
+    assert already.notes == ["kept"]
+    assert not seen["applied"][0]["changed"]
+
+
+def test_unsupported_matrix_dials_remain_preserved_without_fake_mechanics():
+    from dataclasses import dataclass
+    from skeleton.context.galaxy_profile import apply_galaxy_mechanics
+
+    @dataclass(frozen=True)
+    class Plan:
+        spawn_weapon: bool = False
+        notes: tuple[str, ...] = ()
+
+    raw = sample()
+    raw["config"]["world_matrix"]["forest"]["count"] = 100
+    profile = normalise_galaxy_profile(raw)
+    plan, receipt = apply_galaxy_mechanics(Plan(), profile)
+    assert not plan.spawn_weapon
+    assert receipt["active_matrix_dials"] > 0
+    assert receipt["unmapped_matrix_dials"] == receipt["active_matrix_dials"]
+    assert receipt["applied"] == []
