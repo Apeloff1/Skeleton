@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_misty_breakwater",
+  "title": "Misty Breakwater: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Misty Breakwater; only the grid preview compiles today.",
+  "seed": 203010314469,
+  "width": 23,
+  "height": 15,
+  "levels": 3,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 11,
+  "theme": "ocean",
+  "starting_health": 3
+}

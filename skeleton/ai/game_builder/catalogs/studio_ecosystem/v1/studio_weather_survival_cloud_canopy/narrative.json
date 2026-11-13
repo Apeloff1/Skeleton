@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_weather_survival_cloud_canopy",
+  "genre": "weather_survival",
+  "biome": "cloud_canopy",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Cloud Canopy",
+    "landmark": "suspended library",
+    "era": "post-transit reconstruction",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control aerial roots while severe canopy winds destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "hopeful"
+  },
+  "premise": "Pela Morrow, a meteorologist with expertise in microclimate sheltering and heat-loss modeling, must guide families through a destabilizing climate zone before severe canopy winds reaches the suspended library.",
+  "stakes": [
+    "Residents lose access to aerial roots",
+    "a private evacuation broker gains authority without independent evidence",
+    "The suspended library becomes inaccessible beyond multi-tier boughs"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured severe canopy winds closes the main approach",
+      "goal": "Acquire an independent account of aerial roots",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "a private evacuation broker challenges Pela Morrow's mandate",
+      "goal": "Apply microclimate sheltering and heat-loss modeling in multi-tier boughs",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of suspended library",
+      "goal": "guide families through a destabilizing climate zone",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains suspended library with auditable access to aerial roots"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain water, warmth and emergency stock without a private evacuation broker"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over aerial roots persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "suspended library",
+      "multi-tier boughs",
+      "crosswind shear"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}

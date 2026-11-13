@@ -18,6 +18,17 @@ class BundleTests(unittest.TestCase):
             item.add("tokenizer_custody",scenario("tokenizer_custody",subject="other"))
         with self.assertRaises(Rejected):
             item.seal(required=("native_identity","tokenizer_custody"))
+    def test_seal_requires_bounded_distinct_domain_names(self):
+        item=EvidenceBundle()
+        item.add("native_identity",scenario("native_identity"))
+        for bad in ([],[1],["native_identity"]*41):
+            with self.subTest(required=repr(bad)):
+                with self.assertRaises(Rejected):
+                    item.seal(required=bad)
+        sealed=item.seal(required=["native_identity"])
+        self.assertEqual(sealed.domains,("native_identity",))
+        self.assertEqual(len(sealed.identity_sha256),64)
+
     def test_sealed_bundle_is_not_mutable(self):
         item=EvidenceBundle()
         item.add("native_identity",scenario("native_identity"))

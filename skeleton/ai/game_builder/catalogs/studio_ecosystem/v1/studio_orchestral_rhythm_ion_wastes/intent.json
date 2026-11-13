@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_ion_wastes",
+  "title": "Ion Wastes: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010310282,
+  "width": 19,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 13,
+  "theme": "space",
+  "starting_health": 4
+}

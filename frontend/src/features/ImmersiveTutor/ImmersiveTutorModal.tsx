@@ -59,6 +59,8 @@ interface Achievement {
   xp_reward: number;
   icon: string;
   rarity: string;
+  earned?: boolean;
+  earned_at?: string;
 }
 
 interface DailyQuest {
@@ -190,8 +192,7 @@ const AchievementCard: React.FC<{
 const QuestCard: React.FC<{
   quest: DailyQuest;
   colors: any;
-  onComplete: () => void;
-}> = ({ quest, colors, onComplete }) => {
+}> = ({ quest, colors }) => {
   const difficultyColors: Record<string, string> = {
     easy: '#10B981',
     medium: '#F59E0B',
@@ -211,11 +212,8 @@ const QuestCard: React.FC<{
   const progress = (quest.progress || 0) / quest.target_count;
 
   return (
-    <TouchableOpacity
+    <View
       style={[styles.questCard, { backgroundColor: colors.surfaceAlt }]}
-      onPress={onComplete}
-      activeOpacity={0.7}
-      disabled={quest.completed}
     >
       <View style={[styles.questIconContainer, { backgroundColor: color + '20' }]}>
         <Ionicons name={icon as any} size={20} color={color} />
@@ -247,7 +245,7 @@ const QuestCard: React.FC<{
           <Ionicons name="checkmark" size={16} color="#fff" />
         </View>
       )}
-    </TouchableOpacity>
+    </View>
   );
 };
 
@@ -288,7 +286,7 @@ const XPProgress: React.FC<{
   xpToNext: number;
   colors: any;
 }> = ({ level, xp, xpToNext, colors }) => {
-  const progress = xpToNext > 0 ? (xp % xpToNext) / xpToNext : 0;
+  const progress = xpToNext > 0 ? Math.min(1, xp / xpToNext) : 0;
 
   return (
     <View style={[styles.xpProgress, { backgroundColor: colors.surfaceAlt }]}>
@@ -345,23 +343,44 @@ export const ImmersiveTutorModal: React.FC<ImmersiveTutorModalProps> = ({
       setLoading(true);
       setError(null);
 
-      // Fetch stages
-      const stagesRes = await apiFetch(`${API_BASE}/api/jeeves-synergy/stages/all`);
-      if (stagesRes.ok) {
-        const stagesData = await stagesRes.json();
-        setStages(stagesData.stages || []);
+      const encodedUser = encodeURIComponent(userId);
+      const [stagesRes, achievementsRes, profileRes, classProgressRes, readingProgressRes] = await Promise.all([
+        apiFetch(`${API_BASE}/api/jeeves-synergy/stages/all`),
+        apiFetch(`${API_BASE}/api/class-progress/user/${encodedUser}/achievements`),
+        apiFetch(`${API_BASE}/api/gamification/profile/${encodedUser}`),
+        apiFetch(`${API_BASE}/api/class-progress/user/${encodedUser}/overview`),
+        apiFetch(`${API_BASE}/api/reading/progress/${encodedUser}`),
+      ]);
+      if (!stagesRes.ok || !achievementsRes.ok || !profileRes.ok || !classProgressRes.ok || !readingProgressRes.ok) {
+        throw new Error('One or more learning authorities were unavailable.');
       }
+      const [stagesData, achievementsData, profile, classProgress, readingProgress] = await Promise.all([
+        stagesRes.json(), achievementsRes.json(), profileRes.json(), classProgressRes.json(), readingProgressRes.json(),
+      ]);
+      setStages(stagesData.stages || []);
+      setAchievements((achievementsData.achievements || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        xp_reward: item.xp || 0,
+        icon: item.icon || 'trophy',
+        rarity: item.rarity || 'common',
+        earned: item.earned === true,
+        earned_at: item.earned_at,
+      })));
+      const evidenceProgress: UserProgress = {
+        level: Number(profile.level || classProgress.level || 1),
+        xp: Number(profile.total_xp || classProgress.total_xp || 0),
+        xp_to_next: Number(profile.next_level_xp || 100),
+        streak_days: 0,
+        total_hours: Number(readingProgress.total_reading_time_hours || 0),
+        current_stage: 'onboarding',
+        stage_progress: Number(profile.progress_pct || 0),
+      };
+      setUserProgress(evidenceProgress);
 
-      // Fetch achievements
-      const achievementsRes = await apiFetch(`${API_BASE}/api/immersive-tutor/achievements/list`);
-      if (achievementsRes.ok) {
-        const achievementsData = await achievementsRes.json();
-        setAchievements(achievementsData.achievements || []);
-      }
-
-      // Fetch daily quests
       const questsRes = await apiFetch(
-        `${API_BASE}/api/immersive-tutor/quest/daily?user_level=${userProgress.level}&streak_days=${userProgress.streak_days}`,
+        `${API_BASE}/api/immersive-tutor/quest/daily?user_level=${evidenceProgress.level}&streak_days=${evidenceProgress.streak_days}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -369,7 +388,24 @@ export const ImmersiveTutorModal: React.FC<ImmersiveTutorModalProps> = ({
       );
       if (questsRes.ok) {
         const questsData = await questsRes.json();
-        setDailyQuests(questsData.quests || []);
+        const date = questsData.date || 'daily';
+        setDailyQuests((questsData.quests || []).map((quest: any, index: number) => {
+          const targetValues = Object.values(quest.target || {}).filter(value => typeof value === 'number') as number[];
+          return {
+            id: `${date}:${quest.type || index}`,
+            name: quest.title || quest.name || 'Learning goal',
+            description: String(quest.description || '').replace('{count}', String(targetValues[0] || 1)),
+            xp_reward: Number(quest.xp_reward || 0),
+            difficulty: quest.xp_reward >= 100 ? 'hard' : quest.xp_reward >= 60 ? 'medium' : 'easy',
+            quest_type: quest.type || 'practice',
+            estimated_time: Number(quest.time_limit_hours || 24) * 60,
+            target_count: Math.max(1, targetValues[0] || 1),
+            progress: 0,
+            completed: false,
+          };
+        }));
+      } else {
+        throw new Error(`Daily goals request failed (${questsRes.status}).`);
       }
 
       // Fetch synergy analysis
@@ -378,11 +414,11 @@ export const ImmersiveTutorModal: React.FC<ImmersiveTutorModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: userId,
-          total_hours: userProgress.total_hours,
-          domains_explored: ['programming', 'algorithms'],
-          achievements_earned: 5,
-          streak_days: userProgress.streak_days,
-          mastery_scores: { programming: 0.6, algorithms: 0.4 },
+          total_hours: evidenceProgress.total_hours,
+          domains_explored: (profile.skill_tree || []).map((skill: any) => skill.domain).slice(0, 50),
+          achievements_earned: Number(achievementsData.earned_count || 0),
+          streak_days: evidenceProgress.streak_days,
+          mastery_scores: Object.fromEntries((profile.skill_tree || []).slice(0, 50).map((skill: any) => [skill.domain, Number(skill.mastery_pct || 0) / 100])),
         }),
       });
       if (synergyRes.ok) {
@@ -416,7 +452,7 @@ export const ImmersiveTutorModal: React.FC<ImmersiveTutorModalProps> = ({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userId, userProgress.level, userProgress.streak_days, userProgress.total_hours]);
+  }, [userId]);
 
   useEffect(() => {
     if (visible) {
@@ -546,7 +582,6 @@ export const ImmersiveTutorModal: React.FC<ImmersiveTutorModalProps> = ({
             key={quest.id}
             quest={quest}
             colors={colors}
-            onComplete={() => {}}
           />
         ))}
       </View>
@@ -564,9 +599,6 @@ export const ImmersiveTutorModal: React.FC<ImmersiveTutorModalProps> = ({
           key={quest.id}
           quest={quest}
           colors={colors}
-          onComplete={() => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }}
         />
       ))}
     </View>
@@ -583,7 +615,7 @@ export const ImmersiveTutorModal: React.FC<ImmersiveTutorModalProps> = ({
           key={achievement.id}
           achievement={achievement}
           colors={colors}
-          unlocked={Math.random() > 0.5} // Mock - replace with actual user data
+          unlocked={achievement.earned === true}
         />
       ))}
     </View>

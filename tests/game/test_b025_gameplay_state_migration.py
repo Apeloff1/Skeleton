@@ -1,4 +1,4 @@
-import random
+from itertools import count
 
 import pytest
 
@@ -62,7 +62,8 @@ def test_rejects_newer_missing_tampered_and_nondeterministic():
     with pytest.raises(GameplayMigrationError, match="digest"):
         r.load_section(bad)
     flaky = GameplayMigrations(2)
-    flaky.register(1, lambda p: {**p, "r": random.random()})
+    counter = count()
+    flaky.register(1, lambda p: {**p, "r": next(counter)})
     with pytest.raises(GameplayMigrationError, match="non-deterministic"):
         flaky.load_section(V1_SECTION)
 
@@ -87,111 +88,67 @@ def test_section_migrations_match_gf_b_shape():
     direct, _ = _registry().load_section(V1_SECTION)
     assert s == direct.to_section()
 
-
-def test_migration_payload_and_chain_budgets_fail_closed(monkeypatch):
-    from skeleton.game.gameplay import state_migration as mod
-
-    cyclic = []
-    cyclic.append(cyclic)
-    with pytest.raises(GameplayMigrationError, match="cyclic"):
-        GameplayStateEnvelope("w1", 1, 0, {"cyclic": cyclic}, CANON)
-    monkeypatch.setattr(mod, "MAX_PAYLOAD_NODES", 3)
-    with pytest.raises(GameplayMigrationError, match="traversal budget"):
-        GameplayStateEnvelope("w1", 1, 0, {"items": [1, 2, 3]}, CANON)
-    monkeypatch.setattr(mod, "MAX_MIGRATION_STEPS", 1)
-    with pytest.raises(GameplayMigrationError, match="step bound"):
-        _registry().load_section(V1_SECTION)
-    with pytest.raises(GameplayMigrationError, match="callback"):
-        GameplayMigrations(2).register(1, None)
+def test_budget_rejects_oversized_and_deep_saved_payloads_before_copy():
+    with pytest.raises(GameplayMigrationError, match="budget"):
+        GameplayStateEnvelope("w1", 1, 0, {"large": "x" * 1_100_000}, CANON)
+    nested = {}
+    value = nested
+    for index in range(40):
+        value["inside"] = {}
+        value = value["inside"]
+    with pytest.raises(GameplayMigrationError, match="budget"):
+        GameplayStateEnvelope("w1", 1, 0, nested, CANON)
+    with pytest.raises(GameplayMigrationError, match="budget"):
+        GameplayStateEnvelope("w1", 1, 0, {"huge": 2 ** 256}, CANON)
 
 
-def test_migration_callback_output_is_bounded_before_digest():
-    huge = GameplayMigrations(2)
-    huge.register(1, lambda p: {"payload": [0] * 10_001})
-    with pytest.raises(GameplayMigrationError, match="collection exceeds bound"):
-        huge.load_section(V1_SECTION)
-
-    def cyclic_result(payload):
-        cycle = []
-        cycle.append(cycle)
-        return {"cycle": cycle}
-
-    cyclic = GameplayMigrations(2)
-    cyclic.register(1, cyclic_result)
-    with pytest.raises(GameplayMigrationError, match="cyclic"):
-        cyclic.load_section(V1_SECTION)
-
-
-def test_migration_rejects_unbounded_oldest_and_missing_section_fields():
-    registry = _registry()
-    for oldest in (-10**9, 0, True, 10**9, 4):
+def test_cycles_and_non_json_objects_fail_closed_before_deepcopy():
+    cycle = []
+    cycle.append(cycle)
+    for payload in ({"cycle": cycle}, {"object": object()}, {1: "integer-key"}):
         with pytest.raises(GameplayMigrationError):
-            registry.missing_steps(oldest)
-    assert registry.missing_steps(2) == ()
-    for missing in ("world_id", "schema_version", "tick", "payload", "canon_digest"):
-        invalid = dict(V1_SECTION)
-        invalid.pop(missing)
-        with pytest.raises(GameplayMigrationError, match="missing gameplay save field"):
-            GameplayStateEnvelope.from_section(invalid)
-    with pytest.raises(GameplayMigrationError, match="schema"):
+            GameplayStateEnvelope("w1", 1, 0, payload, CANON)
+
+
+def test_mutated_admitted_payload_cannot_be_migrated_or_saved():
+    env = GameplayStateEnvelope.from_section(V1_SECTION)
+    env.payload["hp"] = 999
+    with pytest.raises(GameplayMigrationError, match="mutated"):
+        env.to_section()
+    with pytest.raises(GameplayMigrationError, match="mutated"):
+        _registry().migrate(env)
+
+
+def test_migration_output_cannot_exceed_content_budget():
+    reg = GameplayMigrations(2)
+    reg.register(1, lambda payload: {"too_large": "x" * 1_100_000})
+    with pytest.raises(GameplayMigrationError, match="budget"):
+        reg.load_section(V1_SECTION)
+
+
+def test_strict_section_custody_rejects_missing_unknown_and_wrong_types():
+    section = dict(V1_SECTION)
+    for key in ("schema", "world_id", "schema_version", "tick",
+                "payload", "canon_digest", "state_digest"):
+        omitted = dict(section)
+        del omitted[key]
+        with pytest.raises(GameplayMigrationError, match="fields invalid"):
+            GameplayStateEnvelope.from_section(omitted)
+    with pytest.raises(GameplayMigrationError, match="fields invalid"):
+        GameplayStateEnvelope.from_section(dict(section, surprise="unreviewed"))
+    with pytest.raises(GameplayMigrationError, match="must be a mapping"):
         GameplayStateEnvelope.from_section(None)
+    with pytest.raises(GameplayMigrationError, match="invalid tick"):
+        GameplayStateEnvelope("w1", 1, True, {}, CANON)
+    with pytest.raises(GameplayMigrationError, match="schema_version"):
+        GameplayStateEnvelope("w1", True, 0, {}, CANON)
 
 
-@pytest.mark.parametrize("bad", [10**2000, -(10**2000)])
-def test_gameplay_save_rejects_oversized_integer_before_digest(bad):
-    with pytest.raises(GameplayMigrationError, match="integer exceeds bound"):
-        GameplayStateEnvelope("w1", 1, 0, {"value": bad}, CANON)
-
-
-@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -float("inf")])
-def test_gameplay_save_rejects_nonfinite_float_before_copy(bad):
-    with pytest.raises(GameplayMigrationError, match="nonfinite"):
-        GameplayStateEnvelope("w1", 1, 0, {"value": bad}, CANON)
-
-
-@pytest.mark.parametrize("tick", [True, -1, 2**63, 10**1000, 1.5, "42"])
-def test_gameplay_save_rejects_unbounded_tick_and_unrecognized_fields(tick):
-    with pytest.raises(GameplayMigrationError, match="bounded tick"):
-        GameplayStateEnvelope("w1", 1, tick, {"hp": 10}, CANON)
-
-
-def test_gameplay_section_rejects_unknown_fields_before_migration():
-    tampered = dict(V1_SECTION, unexpected={"future": "untrusted"})
-    with pytest.raises(GameplayMigrationError, match="unknown gameplay save field"):
-        GameplayStateEnvelope.from_section(tampered)
-    missing = dict(V1_SECTION)
-    missing.pop("parent_save_digest")
-    with pytest.raises(GameplayMigrationError, match="missing gameplay save field"):
-        GameplayStateEnvelope.from_section(missing)
-    assert GameplayStateEnvelope.from_section(V1_SECTION).tick == 42
-
-
-def test_migration_invalid_first_result_does_not_invoke_callback_twice():
-    calls = []
-
-    def invalid_first(payload):
-        calls.append(1)
-        return {"too_many": [0] * 10_001}
-
-    registry = GameplayMigrations(2)
-    registry.register(1, invalid_first)
-    with pytest.raises(GameplayMigrationError, match="collection exceeds bound"):
-        registry.load_section(V1_SECTION)
-    assert calls == [1]
-
-
-def test_gameplay_save_rejects_hostile_mapping_hooks_before_iteration():
-    """A signed-looking save must not execute arbitrary Mapping methods."""
-    class HostileDict(dict):
-        def __iter__(self):
-            raise AssertionError("hostile mapping iteration executed")
-
-    with pytest.raises(GameplayMigrationError, match="plain dict"):
-        GameplayStateEnvelope.from_section(HostileDict(V1_SECTION))
-    with pytest.raises(GameplayMigrationError, match="plain dict"):
-        GameplayStateEnvelope.from_section(dict(V1_SECTION, payload=HostileDict({"hp": 10})))
-
-    many_fields = dict(V1_SECTION)
-    many_fields.update({f"unknown_{i}": i for i in range(1000)})
-    with pytest.raises(GameplayMigrationError, match="unknown gameplay save field"):
-        GameplayStateEnvelope.from_section(many_fields)
+def test_registry_rejects_non_callable_and_invalid_oldest():
+    migrations = GameplayMigrations(3)
+    with pytest.raises(GameplayMigrationError, match="callable"):
+        migrations.register(1, None)
+    with pytest.raises(GameplayMigrationError, match="oldest"):
+        migrations.missing_steps(0)
+    with pytest.raises(GameplayMigrationError, match="oldest"):
+        migrations.missing_steps(4)

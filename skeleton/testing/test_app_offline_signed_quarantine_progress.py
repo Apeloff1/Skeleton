@@ -11,6 +11,7 @@ from skeleton.app.offline_signed_quarantine_progress import (
     SignedQuarantineProgressRecoveryError, recover_signed_quarantine_progress,
 )
 from skeleton.testing.test_app_offline_signed_progress_migration import migration
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 
 @pytest.fixture

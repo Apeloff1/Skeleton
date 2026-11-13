@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 // ============================================================================
 // CODEDOCK QUANTUM NEXUS - Multiplayer Bridge Collaboration
 // Lightweight stub implementation (yjs removed for EAS build compatibility)
@@ -65,15 +66,10 @@ const COLLABORATOR_COLORS = [
   '#8B5CF6', '#EC4899', '#2563EB', '#84CC16',
 ];
 
-let collaborationIdSequence = 0;
-
 function createCollaborationId(prefix: string): string {
-  const cryptoObject = (globalThis as any).crypto;
-  if (cryptoObject && typeof cryptoObject.randomUUID === 'function') {
-    return `${prefix}-${cryptoObject.randomUUID()}`;
-  }
-  collaborationIdSequence += 1;
-  return `${prefix}-${Date.now().toString(36)}-${collaborationIdSequence.toString(36)}`;
+  // Session and participant identities must not be predictable or enumerable.
+  // Use native secure randomness on both Expo web and mobile.
+  return `${prefix}-${Crypto.randomUUID()}`;
 }
 
 function stableColorIndex(value: string): number {

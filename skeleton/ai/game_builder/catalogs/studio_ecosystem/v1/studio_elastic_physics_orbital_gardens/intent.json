@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_elastic_physics_orbital_gardens",
+  "title": "Orbital Gardens: The Kinetic Workshop",
+  "subtitle": "Original the kinetic workshop design in Orbital Gardens; only the grid preview compiles today.",
+  "seed": 203010316396,
+  "width": 21,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 13,
+  "theme": "space",
+  "starting_health": 6
+}

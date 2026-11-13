@@ -103,8 +103,8 @@ def inspect_host(
     root: Path | None = None,
     *,
     runner: Runner = subprocess.run,
-    min_free_bytes: int = 2 * 1024**3,
-    recommended_free_bytes: int = 8 * 1024**3,
+    min_free_bytes: int = 6 * 1024**3,
+    recommended_free_bytes: int = 12 * 1024**3,
     require_python: bool = True,
     require_pip: bool = True,
 ) -> PreloadReport:
@@ -125,16 +125,28 @@ def inspect_host(
     )
 
     structure = preflight(root, runtime=False)
+    structural_failures = [item for item in structure if item.required and not item.ok]
+    # Keep the diagnostic bounded. A broken image compatibility guard must not
+    # be reported as a missing file or force a 30-minute Docker build attempt.
+    reasons = "; ".join(
+        f"{item.code}: {item.message}" for item in structural_failures[:6]
+    )
+    if len(structural_failures) > 6:
+        reasons += f"; and {len(structural_failures) - 6} more checks"
     checks.append(
         PreloadCheck(
             code="host:assembly",
             ok=checks_ok(structure),
             detail=(
-                "repository assembly structure is complete"
-                if checks_ok(structure)
-                else "repository assembly structure has missing required paths"
+                "repository assembly structure is complete and compatible"
+                if not structural_failures
+                else "repository assembly blocked: " + reasons
             ),
-            remediation="Restore the required application assembly files.",
+            remediation=(
+                "Repair missing application files or incompatible backend image pins "
+                "before running setup or Docker build."
+                if structural_failures else ""
+            ),
         )
     )
 

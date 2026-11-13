@@ -1,0 +1,87 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "project_id": "studio_tactical_command_orbital_gardens",
+  "genre": "tactical_command",
+  "biome": "orbital_gardens",
+  "release_certified": false,
+  "objective": "evacuate a threatened network of settlements",
+  "quest_id": "studio_tactical_command_orbital_gardens:three-acts",
+  "mechanics_targets": [
+    "fog of war, logistics and coordinated multi-unit tactics",
+    "command-latency bounds"
+  ],
+  "stage_graph": [
+    {
+      "id": "investigate",
+      "prerequisites": [],
+      "site": "rotating arboretums",
+      "verb": "survey",
+      "alternatives": [
+        "Document life-support imbalance without entering restricted ground",
+        "Find an independent route through rotating arboretums"
+      ],
+      "evidence": [
+        "hazard_measurement",
+        "eyewitness_note"
+      ],
+      "failure_rule": "insufficient_safe_access",
+      "reward": "reliable_survey"
+    },
+    {
+      "id": "intervene",
+      "prerequisites": [
+        "investigate"
+      ],
+      "site": "ring garden habitat",
+      "verb": "deploy",
+      "alternatives": [
+        "Prototype fog of war, logistics and coordinated multi-unit tactics around gas circulation",
+        "Use hydroponic nutrients under open public supervision"
+      ],
+      "evidence": [
+        "resource_receipt",
+        "engineering_audit"
+      ],
+      "failure_rule": "overspend_or_unconsented_action",
+      "reward": "verified_repair_attempt"
+    },
+    {
+      "id": "ratify",
+      "prerequisites": [
+        "intervene"
+      ],
+      "site": "shared workshop near ring garden habitat",
+      "verb": "publish",
+      "alternatives": [
+        "residents_vote",
+        "open_technical_governance"
+      ],
+      "evidence": [
+        "history_log",
+        "verified_outcome"
+      ],
+      "failure_rule": "missing_audit_receipt",
+      "reward": "branch_world_state"
+    }
+  ],
+  "branching": {
+    "commons": [
+      "verified_history",
+      "public_ledger"
+    ],
+    "cooperative": [
+      "verified_repair",
+      "local_consensus"
+    ],
+    "scarcity": [
+      "survival_proven"
+    ]
+  },
+  "resource_economy": {
+    "currency": "supply and command bandwidth",
+    "secondary": "hydroponic nutrients",
+    "no_mint_without_supply": true,
+    "max_concurrent_quests": "runtime_resource_based"
+  },
+  "implementation_status": "authored_director_data_only"
+}

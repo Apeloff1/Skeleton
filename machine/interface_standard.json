@@ -227,9 +227,12 @@
         "ResumeToken",
         "ChildExecutionRequest",
         "child join policy",
-        "interactive steering command"
+        "interactive steering command",
+        "sealed engine GET/PATCH runtime-control: versioned host serving/maintenance policy, scoped numeric learning status, actor/tenant echo, persisted expected-version CAS",
+        "bounded admin learner checkpoint export/import/reset/last-healthy restore under exact tenant/model/state+policy CAS with canonical audit receipts; exact named local model cooperation and per-model serving controls",
+        "Admin runtime-control full policy catalog, bounded retained numeric dataset export and exact generation/failure/source-pinned maintenance circuit reset under existing sealed service/tenant boundary"
       ],
-      "failure_contract": "checkpoint and stop safely",
+      "failure_contract": "checkpoint and stop safely; runtime-control rejects invalid bounds422, authority403, stale version409 and unavailable503; automatic command replay forbidden",
       "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
       "status": "present"
     },
@@ -616,9 +619,12 @@
         "ResumeToken",
         "ChildExecutionRequest",
         "child join policy",
-        "interactive steering command"
+        "interactive steering command",
+        "sealed engine GET/PATCH runtime-control: versioned host serving/maintenance policy, scoped numeric learning status, actor/tenant echo, persisted expected-version CAS",
+        "bounded admin learner checkpoint export/import/reset/last-healthy restore under exact tenant/model/state+policy CAS with canonical audit receipts; exact named local model cooperation and per-model serving controls",
+        "Admin runtime-control full policy catalog, bounded retained numeric dataset export and exact generation/failure/source-pinned maintenance circuit reset under existing sealed service/tenant boundary"
       ],
-      "failure_contract": "checkpoint and stop safely",
+      "failure_contract": "checkpoint and stop safely; runtime-control rejects invalid bounds422, authority403, stale version409 and unavailable503; automatic command replay forbidden",
       "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
       "status": "present"
     },
@@ -1384,9 +1390,12 @@
         "ResumeToken",
         "ChildExecutionRequest",
         "child join policy",
-        "interactive steering command"
+        "interactive steering command",
+        "sealed engine GET/PATCH runtime-control: versioned host serving/maintenance policy, scoped numeric learning status, actor/tenant echo, persisted expected-version CAS",
+        "bounded admin learner checkpoint export/import/reset/last-healthy restore under exact tenant/model/state+policy CAS with canonical audit receipts; exact named local model cooperation and per-model serving controls",
+        "Admin runtime-control full policy catalog, bounded retained numeric dataset export and exact generation/failure/source-pinned maintenance circuit reset under existing sealed service/tenant boundary"
       ],
-      "failure_contract": "checkpoint and stop safely",
+      "failure_contract": "checkpoint and stop safely; runtime-control rejects invalid bounds422, authority403, stale version409 and unavailable503; automatic command replay forbidden",
       "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
       "status": "present"
     },

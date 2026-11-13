@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "project_id": "studio_elastic_physics_verdant_caldera",
+  "genre": "elastic_physics",
+  "biome": "verdant_caldera",
+  "release_certified": false,
+  "foundation": {
+    "setting": "Verdant Caldera",
+    "landmark": "hanging botanical lab",
+    "era": "post-transit reconstruction",
+    "chronology": "The first response failed; original eyewitness records remain contested.",
+    "moral_problem": "Who should control mineral terraces while geothermal plumes destabilizes access?",
+    "causality": "No character can claim a recovered source before it is discovered.",
+    "tone": "high-stakes"
+  },
+  "premise": "Dava Kest, a inventor with expertise in rigid-body interactions, elasticity and momentum transfer, must repair a chain of motion-controlled civic mechanisms before geothermal plumes reaches the hanging botanical lab.",
+  "stakes": [
+    "Residents lose access to mineral terraces",
+    "a sabotaging patent guild gains authority without independent evidence",
+    "The hanging botanical lab becomes inaccessible beyond stepped jungle terraces"
+  ],
+  "plot_beats": [
+    {
+      "act": 1,
+      "id": "origin",
+      "cause": "Measured geothermal plumes closes the main approach",
+      "goal": "Acquire an independent account of mineral terraces",
+      "decision": "help first or investigate first",
+      "consequence": "The order of witness access changes"
+    },
+    {
+      "act": 2,
+      "id": "contest",
+      "cause": "a sabotaging patent guild challenges Dava Kest's mandate",
+      "goal": "Apply rigid-body interactions, elasticity and momentum transfer in stepped jungle terraces",
+      "decision": "negotiate access or build an original workaround",
+      "consequence": "Resource inventory and reputation diverge"
+    },
+    {
+      "act": 3,
+      "id": "settlement",
+      "cause": "A new incident exposes the limits of hanging botanical lab",
+      "goal": "repair a chain of motion-controlled civic mechanisms",
+      "decision": "open civic ownership or independently audited custodianship",
+      "consequence": "Endgame governance and resource sustainability change"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": [
+        "verified_history",
+        "public_ledger",
+        "resource_balance_nonnegative"
+      ],
+      "consequence": "Community council maintains hanging botanical lab with auditable access to mineral terraces"
+    },
+    {
+      "id": "cooperative",
+      "requires": [
+        "verified_repair",
+        "local_consensus",
+        "independent_safety_check"
+      ],
+      "consequence": "Independent working crews maintain mechanical energy and stability without a sabotaging patent guild"
+    },
+    {
+      "id": "scarcity",
+      "requires": [
+        "survival_proven",
+        "no_full_audit"
+      ],
+      "consequence": "The emergency is contained but unresolved inequity over mineral terraces persists"
+    }
+  ],
+  "canon": {
+    "immutable": [
+      "hanging botanical lab",
+      "stepped jungle terraces",
+      "steam temperature"
+    ],
+    "critical_characters": [
+      "protagonist",
+      "witness",
+      "rival"
+    ],
+    "continuity_rule": "Every ending must follow verified choice state",
+    "era_order": [
+      "origin",
+      "contest",
+      "settlement"
+    ]
+  },
+  "qualification": "authored_narrative_blueprint_unimplemented"
+}
