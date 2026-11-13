@@ -23,7 +23,7 @@ export const STEP_LABELS: Record<Step, string> = {
 
 /** Mirrors BRIEF_FACETS / the most common BRIEF_ERA_VOTES keys. */
 export const BRIEF_FACETS: readonly { id: string; prompt: string; options: string[] }[] = [
-  { id: 'genre', prompt: 'What kind of game is it?', options: ['action-adventure', 'rpg', 'shooter', 'roguelike', 'survival', 'extraction', 'soulslike', 'strategy', 'tactics', 'metroidvania', 'horror', 'stealth', 'cozy', 'arcade', 'deckbuilder', 'puzzle'] },
+  { id: 'genre', prompt: 'What kind of game is it?', options: ['action-adventure', 'action', 'adventure', 'rpg', 'crpg', 'jrpg', 'arpg', 'soulslike', 'shooter', 'fps', 'roguelike', 'roguelite', 'survival', 'extraction', 'strategy', 'rts', 'tactics', 'metroidvania', 'platformer', 'simulation', 'city-builder', 'horror', 'stealth', 'immersive-sim', 'cozy', 'arcade', 'bullet-heaven', 'deckbuilder', 'card', 'puzzle', 'fighting', 'battle-royale', 'mmo', 'mmorpg', 'visual-novel', 'narrative'] },
   { id: 'theme', prompt: 'Where is it set?', options: ['sci-fi', 'fantasy', 'dark-fantasy', 'modern', 'post-apocalyptic', 'cyberpunk', 'horror', 'cozy', 'retro', 'historical', 'anime', 'noir'] },
   { id: 'perspective', prompt: 'How do we see it?', options: ['first-person', 'third-person', 'top-down', 'isometric', 'side-scrolling'] },
   { id: 'combat', prompt: 'How does it fight?', options: ['tactical', 'real-time', 'turn-based', 'melee', 'fast', 'stealth', 'card-based', 'puzzle-based', 'none'] },

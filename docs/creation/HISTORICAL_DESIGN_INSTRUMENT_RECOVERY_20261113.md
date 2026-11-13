@@ -53,3 +53,14 @@ not falsely claimed fixed by these per-run controls.
    around explicit project IDs and approved writes.
 4. Require exact-head full frontend, backend, security and native
    device/Godot tests before main integration or release claims.
+
+## Canonical multi-genre questionnaire restoration
+
+The earlier frontend exposed only 16 of the backend's 36 registered
+`BRIEF_ERA_VOTES.genre` choices. The recovered options now enumerate **all
+36** backend-known choices: action/adventure, CRPG/JRPG/ARPG, strategy/RTS,
+tactics, platformer, city-builder/simulation, immersive-sim, fighters,
+battle-royale, MMO, visual novels, narrative, bullet-heaven and the other
+previously available options. The backend already maps these genre tokens to
+canonical eras; this recovery does not imply their complete native gameplay
+systems have been generated or device-playtested.

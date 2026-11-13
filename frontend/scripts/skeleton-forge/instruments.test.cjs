@@ -38,7 +38,8 @@ test('instrument panel is accessible and differentiates automatic from explicit'
   assert.match(text(html), /1 of 10 overridden/);
   assert.match(text(html), /90% override/);
   assert.match(text(html), /Automatic/);
-  assert.equal((html.match(/role="adjustable"/g) || []).length, 10);
+  assert.equal((html.match(/data-testid="instrument-track-/g) || []).length, 10);
+  assert.ok((html.match(/role="slider"|role="adjustable"/g) || []).length >= 1);
   assert.ok(attrs(html, 'aria-label').includes('Increase Risk'));
   assert.match(html, /data-testid="instrument-reset-all"/);
 });
@@ -53,4 +54,19 @@ test('existing questionnaire options exposes instrument cockpit without changing
     dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {},
   }));
   assert.match(text(review), /Design tuning Risk: 90%/);
+});
+
+
+test('complete historical backend genre vote vocabulary is available in the creator brief', () => {
+  const genres = Q.BRIEF_FACETS.find((f) => f.id === 'genre').options;
+  const expected = [
+    'action-adventure', 'action', 'adventure', 'rpg', 'crpg', 'jrpg', 'arpg',
+    'soulslike', 'strategy', 'rts', 'tactics', 'platformer', 'metroidvania',
+    'simulation', 'city-builder', 'shooter', 'fps', 'horror', 'survival',
+    'extraction', 'roguelike', 'roguelite', 'stealth', 'immersive-sim',
+    'fighting', 'puzzle', 'deckbuilder', 'card', 'battle-royale', 'mmo',
+    'mmorpg', 'visual-novel', 'narrative', 'cozy', 'arcade', 'bullet-heaven',
+  ];
+  assert.deepEqual(new Set(genres), new Set(expected));
+  assert.equal(new Set(genres).size, expected.length);
 });
