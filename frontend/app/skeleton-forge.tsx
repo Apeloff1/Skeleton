@@ -10,7 +10,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import ForgeCockpitScreen from '../src/skeletonForge/components/ForgeCockpitScreen';
 import { parseTabParam } from '../src/skeletonForge/cockpitScreen';
 import { C } from '../src/skeletonForge/components/theme';
-import { handoffFromForge, forgeStateFromHandoff, type CreatorBridgeDraft } from '../src/skeletonForge/creatorBridge';
+import { handoffFromForge, handoffToStudio, forgeStateFromHandoff, type CreatorBridgeDraft } from '../src/skeletonForge/creatorBridge';
 import { consumeCreatorBridge, storeCreatorBridge } from '../src/skeletonForge/creatorBridgeStorage';
 import type { QuestionnaireState } from '../src/skeletonForge/questionnaire';
 import { loadGalaxyDraft, type GalaxyDraftSnapshot } from '../src/features/GalaxyStudioFactory/draftCustody';
@@ -55,7 +55,7 @@ export default function SkeletonForgeRoute() {
     if (handoffInFlight.current) return;
     handoffInFlight.current = true;
     try {
-      void storeCreatorBridge(handoffFromForge(draft))
+      void storeCreatorBridge(handoffFromForge(draft, Date.now(), incoming))
         .then(() => router.push('/galaxy' as any))
         .catch(() => setHandoffError('Could not save the GameForge draft. Navigation cancelled to preserve your work.'))
         .finally(() => { handoffInFlight.current = false; });
@@ -63,7 +63,21 @@ export default function SkeletonForgeRoute() {
       handoffInFlight.current = false;
       setHandoffError('Invalid GameForge draft; nothing was transferred.');
     }
-  }, [router]);
+  }, [router, incoming]);
+
+  const returnToStudio = React.useCallback((draft: QuestionnaireState) => {
+    if (handoffInFlight.current || !incoming?.studioProjectId || !incoming.studioProjectUpdatedAt) return;
+    handoffInFlight.current = true;
+    try {
+      void storeCreatorBridge(handoffToStudio(draft, incoming))
+        .then(() => router.replace('/skeleton-studio' as any))
+        .catch(() => setHandoffError('Could not save the edited Forge questionnaire for Studio. Stay here and retry.'))
+        .finally(() => { handoffInFlight.current = false; });
+    } catch {
+      handoffInFlight.current = false;
+      setHandoffError('Could not prepare a safe, source-bound Studio return.');
+    }
+  }, [incoming, router]);
 
   return (
     <SafeAreaView style={st.root}>
@@ -79,6 +93,7 @@ export default function SkeletonForgeRoute() {
           initialTab={parseTabParam(params.tab)}
           initialQuestionnaire={incoming ? forgeStateFromHandoff(incoming) : null}
           onOpenGalaxyStudio={openGalaxy}
+          onReturnToStudio={incoming?.studioProjectId && incoming.studioProjectUpdatedAt ? returnToStudio : undefined}
         />
       ) : null}
     </SafeAreaView>

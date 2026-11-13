@@ -19,9 +19,10 @@ export interface ForgeCockpitScreenProps {
   initialTab?: CockpitTab | null;
   initialQuestionnaire?: QuestionnaireState | null;
   onOpenGalaxyStudio?: (draft: QuestionnaireState) => void;
+  onReturnToStudio?: (draft: QuestionnaireState) => void;
 }
 
-export default function ForgeCockpitScreen({ initialTab = null, initialQuestionnaire = null, onOpenGalaxyStudio }: ForgeCockpitScreenProps) {
+export default function ForgeCockpitScreen({ initialTab = null, initialQuestionnaire = null, onOpenGalaxyStudio, onReturnToStudio }: ForgeCockpitScreenProps) {
   const [screen, dispatchScreen] = React.useReducer(cockpitScreenReducer, initialTab, initialScreenState);
   const [q, dispatchQ] = React.useReducer(questionnaireReducer, initialQuestionnaire ?? INITIAL_STATE);
   const catalog = useForgeCatalog();
@@ -92,6 +93,7 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
       testID="skeleton-forge-cockpit"
       tab={screen.tab}
       onTab={(tab) => dispatchScreen({ type: 'tab', tab })}
+      onReturnToStudio={onReturnToStudio ? () => onReturnToStudio(q) : undefined}
       badges={badges}
       reduceMotion={reduceMotion}
       notice={!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null}

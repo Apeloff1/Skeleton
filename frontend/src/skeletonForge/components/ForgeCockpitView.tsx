@@ -17,6 +17,7 @@ import ForgeRunPanel, { type ForgeRunPanelProps } from './ForgeRunPanel';
 import PlanViewer, { type PlanViewerProps } from './PlanViewer';
 import QuestionnaireFlow, { type QuestionnaireFlowProps } from './QuestionnaireFlow';
 import { C, TONE_COLOR, TOUCH, pressFeedback } from './theme';
+import { Button } from './primitives';
 
 /** Arrow keys move between cockpit tabs and wrap. Enter/Space stay on the tab's own press. */
 export function cockpitTabMove(current: CockpitTab, event: KeyEventLike): CockpitTab | null {
@@ -41,6 +42,8 @@ export interface ForgeCockpitViewProps {
   console: CockpitConsoleProps;
   /** Optional offline/backend banner shown above every tab. */
   notice?: string | null;
+  /** Explicit save-back action only for a source-bound Studio project. */
+  onReturnToStudio?: () => void;
   /** Overrides the OS reduce-motion preference when set. */
   reduceMotion?: boolean;
   testID?: string;
@@ -104,6 +107,17 @@ export default function ForgeCockpitView(props: ForgeCockpitViewProps) {
         <Text style={st.title} accessibilityRole="header">Skeleton Forge</Text>
         <Text style={st.subtitle}>{COCKPIT_TAB_HINTS[tab]}</Text>
       </View>
+      {props.onReturnToStudio ? (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }} testID="cockpit-return-to-studio">
+          <Button
+            label="Save edits back to Studio"
+            tone="secondary"
+            onPress={props.onReturnToStudio}
+            testID="cockpit-save-to-studio"
+            a11yHint="Save the edited questionnaire to its original Studio project, or a new copy if it changed"
+          />
+        </View>
+      ) : null}
       <CockpitTabBar tab={tab} onTab={props.onTab} badges={props.badges} reduceMotion={reduceMotion} />
       {notice ? (
         <View style={st.notice} accessibilityRole="alert" testID="cockpit-notice">
