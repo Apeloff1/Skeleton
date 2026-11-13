@@ -172,6 +172,11 @@ export interface RunPayload {
   build_plan?: BuildPlanPayload | null;
   operator_axes?: Record<string, number>;
   galaxy_profile?: { sha256?: string; matrices?: number; source?: string; artifact?: string };
+  galaxy_mechanics?: {
+    schema?: string; source_sha256?: string; active_matrix_dials?: number;
+    supported_inputs?: string[]; unmapped_matrix_dials?: number;
+    applied?: { target: string; value: boolean; changed: boolean; source: string[] }[];
+  };
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];
   [k: string]: unknown;

@@ -63,8 +63,14 @@ authoritative tenant-scoped draft database.
 
 The full profile reaches the actual canonical build artifact and source
 manifest. Four semantically direct controls enter the working GameForge
-tensor. The title, specialized genre, visual tone/style and user-authored
-vision also reach the vision-based composer.
+tensor. An explicit positive `mechanics_matrix.ranged.count` or
+`mechanics_matrix.gunplay.count` also enables `spawn_weapon` in the
+real `BuilderBrain` plan used by the Godot emitter; this affects the
+starting-weapon flag in emitted GameState and `data/build_plan.json`.
+A deterministic `galaxy_mechanics` response receipt reports the applied
+field, source keys and count of **unmapped** active matrix dials. The title,
+specialized genre, visual tone/style and user-authored vision also reach
+the vision-based composer.
 
 The original 14 matrices are **preserved as first-class inputs**, but every
 individual matrix axis does not yet independently mutate generated Godot

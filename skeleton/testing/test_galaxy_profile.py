@@ -207,7 +207,7 @@ def test_unsupported_matrix_dials_remain_preserved_without_fake_mechanics():
         notes: tuple[str, ...] = ()
 
     raw = sample()
-    raw["config"]["world_matrix"]["forest"]["count"] = 100
+    raw["config"]["world_matrix"]["forest"] = {"count": 100}
     profile = normalise_galaxy_profile(raw)
     plan, receipt = apply_galaxy_mechanics(Plan(), profile)
     assert not plan.spawn_weapon
