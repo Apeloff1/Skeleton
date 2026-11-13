@@ -27,7 +27,6 @@ _AXES = frozenset((
     "risk", "tempo", "lethality", "opacity", "scarcity",
     "agency", "spectacle", "intimacy", "grind", "authorial",
 ))
-_DIRECT = frozenset(("tempo", "risk", "lethality", "scarcity"))
 
 
 def _fixed(value: float, digits: int = 2) -> float:
@@ -55,10 +54,12 @@ def compile_playable_tuning(
     Does not substitute arbitrary source, scene paths, snippets, game IDs,
     or shaders. Parameter values cannot bypass fixed code locations.
     """
-    if not source_axes:
+    if source_axes is None:
         return player, loop, None
     if not isinstance(source_axes, Mapping) or len(source_axes) > 10:
         raise ValueError("invalid bounded playable tuning payload")
+    if not source_axes:
+        return player, loop, None
 
     axes: dict[str, float] = {}
     for key, value in source_axes.items():

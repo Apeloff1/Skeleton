@@ -356,7 +356,7 @@ def test_cockpit_sparse_tuning_is_bounded_and_does_not_execute_untrusted_values(
         {"tempo": "0.8"},
         {x: 0 for x in "abcdefghijk"},
     ]
-    for axes in invalid:
+    for axes in invalid + [[], "", False, 0]:
         with pytest.raises(ValueError):
             archetype_files("racing", tuning=axes)
     assert SOURCE_PATH not in archetype_files("racing")
