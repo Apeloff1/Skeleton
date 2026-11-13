@@ -138,3 +138,57 @@ def test_json_target_cannot_generate_native_playable_scenes():
             "An original blueprint", target="json",
             playable_content=True,
         )
+
+
+@pytest.mark.parametrize("archetype,axes,expected", [
+    ("extraction", {"tempo": 0.0, "risk": 1.0, "scarcity": 1.0, "agency": 0.0},
+     ("speed: float = 195.0", "HEAT_PER_SECOND := 10.00", "HEAT_LIMIT := 70.00", "PICKUP_RADIUS := 8.00")),
+    ("combat_loop", {"tempo": 1.0, "lethality": 1.0, "grind": 1.0, "agency": 1.0},
+     ("speed: float = 300.0", "CONTACT_DAMAGE := 5", "WAVES := 5", "ATTACK_RANGE := 40.00")),
+    ("pipeline", {"tempo": 0.0, "risk": 1.0, "grind": 1.0, "agency": 1.0},
+     ("speed: float = 240.0", "MAX_FRAMES := 3600", "QUOTA := 8", "RADIUS := 20.00")),
+])
+def test_operator_knobs_generate_distinct_native_mechanics(archetype, axes, expected):
+    from skeleton.forge.archetype_content import archetype_files, verify_archetype_content
+    tuned = archetype_files(archetype, operator_axes=axes)
+    baseline = archetype_files(archetype)
+    assert tuned != baseline
+    source = tuned[f"scripts/archetypes/{archetype}/core_loop.gd"]
+    player = tuned[f"scripts/archetypes/{archetype}/player_controller.gd"]
+    assert expected[0] in player
+    assert all(part in source for part in expected[1:])
+    attached = attach_archetype_content(base(), archetype, operator_axes=axes)
+    assert verify_archetype_content(attached, archetype, operator_axes=axes)
+    assert not verify_archetype_content(attached, archetype)
+
+
+@pytest.mark.parametrize("invalid", [
+    {"risk": float("nan")}, {"tempo": float("inf")}, {"risk": -0.001},
+    {"tempo": 1.001}, {"agency": True}, {"unsupported": 0.5},
+    {f"axis_{i}": 0.5 for i in range(11)},
+])
+def test_native_mechanics_reject_unbounded_or_unknown_axes(invalid):
+    from skeleton.forge.archetype_content import archetype_files
+    with pytest.raises(ValueError):
+        archetype_files("extraction", operator_axes=invalid)
+
+
+def test_final_mechanics_attestation_rejects_quest_writer_modification(monkeypatch):
+    from skeleton.ai.game_builder import godot_quest_bridge
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    original = godot_quest_bridge.attach_native_quest
+
+    def tamper(files, *, length=3):
+        generated, receipt = original(files, length=length)
+        generated["scripts/archetypes/pipeline/core_loop.gd"] += "\n# tamper"
+        return generated, receipt
+
+    monkeypatch.setattr(godot_quest_bridge, "attach_native_quest", tamper)
+    ctx = {
+        "era": "extraction_now", "target": "godot", "archetype": "pipeline",
+        "playable_content": True, "quest_content": True,
+        "operator_axes": {"tempo": 0.8, "grind": 1.0},
+        "files": base(), "playtest_mode": "off", "project_root": None,
+    }
+    with pytest.raises(RuntimeError, match="final native playable mechanics verification failed"):
+        pipeline._stage_emit(ctx)

@@ -112,3 +112,21 @@ def test_core_loop_completes_in_real_godot(name, tmp_path):
     assert "SCRIPT ERROR" not in log, log[-2000:]
     assert f"{COMPLETE_MARKER} {name}" in log, log[-2000:]
     assert proc.returncode == 0
+
+
+
+def test_pipeline_applies_selected_creator_axes_to_actual_godot_scripts():
+    from skeleton.forge.archetype_content import verify_archetype_content
+    axes = {"tempo": 0.9, "agency": 0.8, "grind": 0.95, "intimacy": 0.7}
+    out = GameForgeRun().execute(
+        "An original ore automation game", archetype="pipeline",
+        playable_content=True, operator_axes=axes,
+    )
+    assert out["succeeded"] is True
+    assert verify_archetype_content(out["files"], "pipeline", operator_axes=axes)
+    assert out["playable_mechanics"]["source_verified"] is True
+    assert out["playable_mechanics"]["applied_axes"] == {
+        "tempo": 0.9, "agency": 0.8, "grind": 0.95,
+    }
+    assert "const QUOTA := 8" in out["files"]["scripts/archetypes/pipeline/core_loop.gd"]
+    assert "speed: float = 384.0" in out["files"]["scripts/archetypes/pipeline/player_controller.gd"]

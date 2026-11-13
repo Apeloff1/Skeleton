@@ -17,9 +17,12 @@ Content is additive: no emitted file is overwritten.
 """
 from __future__ import annotations
 
-from typing import Dict, Mapping, Tuple
+import math
+from typing import Dict, Mapping, Optional, Tuple
 
-ARCHETYPE_CONTENT_VERSION = 2
+from skeleton.context.tensor import AXES
+
+ARCHETYPE_CONTENT_VERSION = 3
 COMPLETE_MARKER = "ARCHETYPE_LOOP_COMPLETE"
 FAILED_MARKER = "ARCHETYPE_LOOP_FAILED"
 
@@ -210,6 +213,7 @@ _COMBAT = '''
 const WAVES := 3
 const ATTACK_RANGE := 24.0
 const ATTACK_DAMAGE := 5
+const CONTACT_DAMAGE := 1
 var wave: int = 0
 var enemies: Array[Dictionary] = []
 var player_hp: int = 100
@@ -234,7 +238,7 @@ func _tick(_delta: float) -> void:
 \tfor enemy in enemies:
 \t\tenemy["pos"] = enemy["pos"].move_toward(player.global_position, 0.5)
 \t\tif enemy["pos"].distance_to(player.global_position) < 8.0 and frames % 30 == 0:
-\t\t\tplayer_hp -= 1
+\t\t\tplayer_hp -= CONTACT_DAMAGE
 \tif player_hp <= 0:
 \t\t_finish(false, "player down")
 \t\treturn
@@ -341,11 +345,97 @@ def content_archetypes() -> Tuple[str, ...]:
     return tuple(sorted(_SPECS))
 
 
-def archetype_files(name: str) -> Dict[str, str]:
-    """Return the playable file set for ``name`` (raises KeyError if unknown)."""
+def _admit_axes(raw: Optional[Mapping[str, float]]) -> Dict[str, float]:
+    """No implicit defaults: only *explicit* operator overrides change loops."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping) or len(raw) > len(AXES):
+        raise ValueError("playable mechanics require at most ten creator axes")
+    for axis, value in raw.items():
+        if type(axis) is not str or axis not in AXES:
+            raise ValueError("unknown playable creator axis")
+        if type(value) not in (float, int) or not math.isfinite(value) or not 0.0 <= value <= 1.0:
+            raise ValueError("playable creator axes must be finite unit-interval values")
+    return {axis: float(raw[axis]) for axis in AXES if axis in raw}
+
+
+def _swap_constant(script: str, before: str, after: str) -> str:
+    """Fail when canonical generated script templates change unexpectedly."""
+    if script.count(before) != 1:
+        raise RuntimeError("playable tuning template drift: " + before[:100])
+    return script.replace(before, after)
+
+
+def _number(value: float) -> str:
+    return f"{value:.2f}"
+
+
+def archetype_files(
+    name: str, *, operator_axes: Optional[Mapping[str, float]] = None,
+) -> Dict[str, str]:
+    """Deterministic Godot playable slice with optional *mechanical* knobs.
+
+    Tempo controls movement in all three archetypes. Risk adjusts extraction
+    heat and the pipeline time budget; lethality changes combat contact damage;
+    scarcity changes extraction heat budget; agency changes interaction range;
+    grind controls combat wave count and pipeline delivery quota. Remaining
+    creative-only axes stay in the tensor/blueprint, never falsely advertised
+    as live native gameplay settings.
+    """
     if type(name) is not str or name not in _SPECS:
         raise KeyError("unsupported original playable archetype")
+    axes = _admit_axes(operator_axes)
     body, speed, max_frames = _SPECS[name]
+    if "tempo" in axes:
+        speed = round(speed * (0.75 + 0.5 * axes["tempo"]), 2)
+    if name == "extraction":
+        if "risk" in axes:
+            body = _swap_constant(
+                body, "const HEAT_PER_SECOND := 6.0",
+                "const HEAT_PER_SECOND := " + _number(3.0 + 7.0 * axes["risk"]),
+            )
+        if "scarcity" in axes:
+            body = _swap_constant(
+                body, "const HEAT_LIMIT := 100.0",
+                "const HEAT_LIMIT := " + _number(120.0 - 50.0 * axes["scarcity"]),
+            )
+        if "agency" in axes:
+            body = _swap_constant(
+                body, "const PICKUP_RADIUS := 12.0",
+                "const PICKUP_RADIUS := " + _number(8.0 + 12.0 * axes["agency"]),
+            )
+    elif name == "combat_loop":
+        if "lethality" in axes:
+            body = _swap_constant(
+                body, "const CONTACT_DAMAGE := 1",
+                "const CONTACT_DAMAGE := " + str(1 + int(4.0 * axes["lethality"] + 0.5)),
+            )
+        if "grind" in axes:
+            body = _swap_constant(
+                body, "const WAVES := 3",
+                "const WAVES := " + str(2 + int(3.0 * axes["grind"] + 0.5)),
+            )
+        if "agency" in axes:
+            body = _swap_constant(
+                body, "const ATTACK_RANGE := 24.0",
+                "const ATTACK_RANGE := " + _number(16.0 + 24.0 * axes["agency"]),
+            )
+    elif name == "pipeline":
+        if "grind" in axes:
+            body = _swap_constant(
+                body, "const QUOTA := 4",
+                "const QUOTA := " + str(2 + int(6.0 * axes["grind"] + 0.5)),
+            )
+        if "agency" in axes:
+            body = _swap_constant(
+                body, "const RADIUS := 12.0",
+                "const RADIUS := " + _number(8.0 + 12.0 * axes["agency"]),
+            )
+        if "risk" in axes:
+            # High risk shortens the completion window but never removes
+            # enough time for a low-end machine to finish the 4-load demo.
+            max_frames = round(max_frames * (1.5 - 0.5 * axes["risk"]))
+
     fmt = {"name": name, "version": ARCHETYPE_CONTENT_VERSION}
     title = "".join(part.capitalize() for part in name.split("_")) + "Main"
     return {
@@ -358,7 +448,20 @@ def archetype_files(name: str) -> Dict[str, str]:
     }
 
 
-def attach_archetype_content(files: Mapping[str, str], name: str) -> Dict[str, str]:
+def verify_archetype_content(
+    files: Mapping[str, str], name: str, *, operator_axes: Optional[Mapping[str, float]] = None,
+) -> bool:
+    """Source-verification after all independent Godot/quest file writers."""
+    return isinstance(files, Mapping) and all(
+        files.get(path) == body
+        for path, body in archetype_files(name, operator_axes=operator_axes).items()
+    )
+
+
+def attach_archetype_content(
+    files: Mapping[str, str], name: str, *,
+    operator_axes: Optional[Mapping[str, float]] = None,
+) -> Dict[str, str]:
     """Layer ``name``'s playable slice onto an emitted project (additive only).
 
     Unknown archetypes (e.g. composed ``auto``/``vision`` blueprints) fall back
@@ -373,7 +476,7 @@ def attach_archetype_content(files: Mapping[str, str], name: str) -> Dict[str, s
         raise ValueError("playable project file identity or source is invalid")
     key = name if name in _SPECS else "extraction"
     out = dict(files)
-    for path, body in archetype_files(key).items():
+    for path, body in archetype_files(key, operator_axes=operator_axes).items():
         if path in out and out[path] != body:
             raise ValueError("playable archetype output collides with existing source: " + path)
         out[path] = body

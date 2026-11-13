@@ -252,6 +252,8 @@ class GameForgeRun:
                            if hasattr(run.context.get("build_plan"), "to_dict")
                            else run.context.get("build_plan")),
         }
+        if playable_content and run.context.get("playable_mechanics_receipt") is not None:
+            payload["playable_mechanics"] = run.context["playable_mechanics_receipt"]
         if playable_content and run.context.get("playable_portal_receipt") is not None:
             payload["playable_portal"] = {
                 **run.context["playable_portal_receipt"],
@@ -491,9 +493,12 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     files = ctx.get("files") or {}
     if ctx.get("playable_content"):
-        from skeleton.forge.archetype_content import content_archetypes, attach_archetype_content
+        from skeleton.forge.archetype_content import (
+            content_archetypes, attach_archetype_content, verify_archetype_content,
+        )
         requested = ctx.get("archetype") or "extraction"
-        files = attach_archetype_content(files, requested)
+        axes = ctx.get("operator_axes") or {}
+        files = attach_archetype_content(files, requested, operator_axes=axes)
         archetype_name = requested if requested in content_archetypes() else "extraction"
         # Source-admitted in-game launcher: without it the playable sidecar
         # only exists as a hidden file in the Godot editor and cannot be
@@ -508,6 +513,23 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ctx["file_count"] = len(files)
         ctx["playable_archetype"] = archetype_name
         ctx["playable_portal_receipt"] = portal_receipt
+        ctx["playable_mechanics_receipt"] = {
+            "schema": "skeleton.forge.playable_mechanics.v1",
+            "archetype": archetype_name,
+            "applied_axes": {
+                name: value for name, value in axes.items()
+                if name in {
+                    "tempo",
+                    "agency",
+                    *({"risk", "scarcity"} if archetype_name == "extraction" else set()),
+                    *({"lethality", "grind"} if archetype_name == "combat_loop" else set()),
+                    *({"risk", "grind"} if archetype_name == "pipeline" else set()),
+                }
+            },
+            "source_verified": verify_archetype_content(
+                files, archetype_name, operator_axes=axes,
+            ),
+        }
     if ctx.get("quest_content"):
         from skeleton.ai.game_builder.godot_quest_bridge import attach_native_quest
         files, receipt = attach_native_quest(
@@ -520,10 +542,12 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
     # cannot receive a pass based only on their pre-composition versions.
     if ctx.get("playable_content"):
         from skeleton.forge.playable_portal import verify_playable_portal
-        if not verify_playable_portal(
-            files, str(ctx.get("playable_archetype") or "extraction"),
-        ):
+        from skeleton.forge.archetype_content import verify_archetype_content
+        active = str(ctx.get("playable_archetype") or "extraction")
+        if not verify_playable_portal(files, active):
             raise RuntimeError("final in-game playable portal verification failed")
+        if not verify_archetype_content(files, active, operator_axes=ctx.get("operator_axes")):
+            raise RuntimeError("final native playable mechanics verification failed")
     if ctx.get("quest_content"):
         from skeleton.ai.game_builder.godot_quest_bridge import verify_native_quest
         if not verify_native_quest(files):
