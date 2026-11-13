@@ -22,7 +22,8 @@ function source() {
     extraGenreIds: ['puzzle', 'survival'], extraSubgenreIds: ['mystery_vn'],
     multiGenreMode: true, quickMode: false,
     complexity: 9, ageTarget: 'ALL', selectedEraId: 'ps5_2020',
-    ageEraYear: 2026,
+    ageEraYear: 2026, targetFiles: 250_000,
+    scaleCommand: '250,000 files', showDescriptions: false,
     classic: { worldSize: 8, aiComplexity: 9, physicsRealism: 7, juice: 5 },
     styleChoices: { animationStyle: 'cinematic', cameraEffects: false, gamePace: 'breakneck' },
     styleParams: { graphic_style: 'pixel_art', music_style: 'synthwave' },
@@ -55,6 +56,9 @@ test('all 14 Galaxy matrix families, narrative phases, and 100 extended controls
   assert.equal(snapshot.matrices.unique_flair.phase_13.diversity, 1000);
   assert.equal(snapshot.narrative.prologue.secrets, 43);
   assert.equal(snapshot.classic.worldSize, 8);
+  assert.equal(snapshot.targetFiles, 250_000);
+  assert.equal(snapshot.scaleCommand, '250,000 files');
+  assert.equal(snapshot.showDescriptions, false);
   assert.equal(snapshot.production.sliders.accessibility, 97);
   assert.equal(snapshot.styleChoices.animationStyle, 'cinematic');
   assert.equal(snapshot.styleChoices.cameraEffects, false);
@@ -82,6 +86,8 @@ test('unsafe and unknown matrix families, ranges and option enum values fail clo
   original.classic.worldSize = Number.POSITIVE_INFINITY;
   original.extraParams.param_1 = -3;
   original.production.sliders.detail = 110;
+  original.targetFiles = 2_000_000;
+  original.scaleCommand = 'x'.repeat(500);
   const result = Draft.normalizeGalaxyDraft(original, NOW);
   assert.ok(result);
   assert.equal(result.matrices.invalid, undefined);
@@ -93,6 +99,8 @@ test('unsafe and unknown matrix families, ranges and option enum values fail clo
   assert.equal(result.classic.worldSize, undefined);
   assert.equal(result.extraParams.param_1, undefined);
   assert.equal(result.production.sliders.detail, undefined);
+  assert.equal(result.targetFiles, 1_000_000);
+  assert.equal(result.scaleCommand.length, 120);
 });
 
 test('Galaxy studio button snapshots draft before invoking the separate Forge handoff', () => {
@@ -102,6 +110,9 @@ test('Galaxy studio button snapshots draft before invoking the separate Forge ha
   assert.match(modal, /await saveGalaxyDraft\(snapshot\)/);
   assert.match(modal, /matrices: matrixValues, narrative: narrativePhaseValues/);
   assert.match(modal, /disabled=\{handoffBusy\}/);
+  assert.match(modal, /onRequestClose=\{\(\) => \{ void persistAndClose\(\); \}\}/);
+  assert.match(modal, /await persistGalaxyDraft\(\);/);
+  assert.match(modal, /targetFiles, scaleCommand, showDescriptions/);
   assert.match(modal, /onSendToForge\(\{ title, vision: gameVision/);
   assert.match(route, /loadGalaxyDraft\(\)/);
   assert.match(route, /initialGalaxyDraft=\{savedGalaxy\}/);

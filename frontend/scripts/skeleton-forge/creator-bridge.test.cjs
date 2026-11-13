@@ -105,6 +105,26 @@ test('untrusted duplicate/unsafe choice and axis keys cannot poison restored req
   assert.deepEqual(safe.quest, { enabled: true, length: 3 });
 });
 
+test('editing in Galaxy for hours does not discard a previously accepted Forge draft', () => {
+  const createdMs = 1700000000000;
+  const initial = make(
+    { type: 'setVision', vision: 'A cooperative dungeon builder' },
+    { type: 'setBeat', beat: 'space', value: 'dungeon' },
+    { type: 'setAxis', axis: 'tempo', value: 0.71 },
+    { type: 'setQuestEnabled', value: true },
+    { type: 'setQuestLength', value: 8 },
+  );
+  const accepted = H.handoffFromForge(initial, createdMs);
+  assert.equal(H.parseCreatorBridge(accepted, 'galaxy', createdMs + H.CREATOR_BRIDGE_TTL_MS + 1), null);
+  const outbound = H.handoffFromGalaxy({ title: '', vision: '', genreId: null }, accepted, createdMs + 4 * 3600 * 1000);
+  const restored = H.forgeStateFromHandoff(outbound, createdMs + 4 * 3600 * 1000 + 1);
+  assert.equal(restored.vision, 'A cooperative dungeon builder');
+  assert.equal(restored.beats.space, 'dungeon');
+  assert.equal(restored.instruments.tempo, 0.71);
+  assert.equal(restored.quest.length, 8);
+  assert.equal(Q.buildRunRequest(restored).quest_content, true);
+});
+
 test('Galaxy and Forge routes only hand off after explicit user action', () => {
   const root = path.resolve(__dirname, '../..');
   const forgeRoute = fs.readFileSync(path.join(root, 'app/skeleton-forge.tsx'), 'utf8');
@@ -117,5 +137,8 @@ test('Galaxy and Forge routes only hand off after explicit user action', () => {
   assert.match(galaxyModal, /onPress=\{transferToForge\}/);
   assert.match(galaxyModal, /await saveGalaxyDraft\(snapshot\)/);
   assert.match(galaxyModal, /GALAXY_DRAFT_SCHEMA/);
+  assert.match(galaxyRoute, /await storeCreatorBridge\(handoffFromGalaxy\(selection, incoming\)\)/);
+  assert.match(galaxyModal, /await onSendToForge\(\{ title, vision: gameVision/);
+  assert.match(galaxyModal, /handoffLock\.current = true/);
   assert.doesNotMatch(forgeRoute, /onOpenGalaxyStudio=\{\(\) => router\.push/);
 });
