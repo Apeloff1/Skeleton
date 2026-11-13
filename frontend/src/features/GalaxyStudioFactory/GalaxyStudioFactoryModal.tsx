@@ -379,6 +379,18 @@ function StylePicker<T extends string>({
 export default function GalaxyStudioFactoryModal
 ({ visible, onClose, initialForgeDraft = null, initialGalaxyDraft = null, handoffError = null, onSendToForge }: Props) {
   const [step, setStep] = useState<Step>('pick');
+  // An editor already open during sign-out must not persist or submit its
+  // previous account's authored project under the newly active identity.
+  // A fresh visible opening (or remount) explicitly establishes ownership.
+  const editorEpoch = useRef(getAuthEpoch());
+  useEffect(() => {
+    if (visible) editorEpoch.current = getAuthEpoch();
+  }, [visible]);
+  const assertEditorOwner = () => {
+    if (editorEpoch.current !== getAuthEpoch()) {
+      throw new Error('Creator account changed while the Galaxy editor was open');
+    }
+  };
   const [handoffBusy, setHandoffBusy] = useState(false);
   const handoffLock = useRef(false);
   const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
@@ -1394,6 +1406,7 @@ export default function GalaxyStudioFactoryModal
     });
 
   const persistGalaxyDraft = async () => {
+      assertEditorOwner();
       const snapshot: GalaxyDraftSnapshot = {
         schema: GALAXY_DRAFT_SCHEMA, savedMs: Date.now(),
         title, gameVision, systemArch, worldLaws, agentInstructions,
@@ -1407,6 +1420,7 @@ export default function GalaxyStudioFactoryModal
         matrices: matrixValues, narrative: narrativePhaseValues,
       };
       await saveGalaxyDraft(snapshot);
+      assertEditorOwner();
   };
 
   const saveGalaxyDraftOnly = async () => {
@@ -1450,7 +1464,9 @@ export default function GalaxyStudioFactoryModal
       return;
     }
     try {
+      assertEditorOwner();
       await saveGalaxyProfile(makeGalaxyBuildPayload(selectedGenre));
+      assertEditorOwner();
       setStatusMsg('Complete Galaxy design saved on this device. Restore it from GameForge whenever needed.');
     } catch {
       setStatusMsg('Could not save the Galaxy design locally; your current controls remain unchanged.');
@@ -1471,7 +1487,8 @@ export default function GalaxyStudioFactoryModal
       // Save every editable input before leaving, including all 14 matrix
       // families, production parameters, genre fusion and extended sliders.
       await persistGalaxyDraft();
-      const handoffId = prepareGalaxyHandoff(makeGalaxyBuildPayload(selectedGenre), Date.now(), getAuthEpoch());
+      assertEditorOwner();
+      const handoffId = prepareGalaxyHandoff(makeGalaxyBuildPayload(selectedGenre), Date.now(), editorEpoch.current);
       if (onSendToForge) {
         await onSendToForge({
           title: title.trim(), vision: gameVision, genreId: selectedGenre.id, handoffId,
@@ -1492,6 +1509,12 @@ export default function GalaxyStudioFactoryModal
   // ═══ BUILD — creates server build, then starts client clock with REAL id ═══
   const startBuild = async () => {
     if (!visibleRef.current || loading || buildControlBusyRef.current || !title.trim() || !selectedGenre) return;
+    try {
+      assertEditorOwner();
+    } catch {
+      setStatusMsg('Creator account changed. Close and reopen Galaxy Studio before building.');
+      return;
+    }
     buildControlBusyRef.current = true;
     stopPolling();
     const epoch = pollEpochRef.current;

@@ -37,7 +37,7 @@ test('Galaxy handoff exactly inventories every historical matrix', () => {
     assert.match(source, new RegExp('\\b' + field + ':\\s*[a-zA-Z]+Matrix'));
   }
   assert.match(source, /makeGalaxyBuildPayload\(selectedGenre\)/);
-  assert.match(source, /prepareGalaxyHandoff\(makeGalaxyBuildPayload\(selectedGenre\), Date\.now\(\), getAuthEpoch\(\)\)/);
+  assert.match(source, /prepareGalaxyHandoff\(makeGalaxyBuildPayload\(selectedGenre\), Date\.now\(\), editorEpoch\.current\)/);
   assert.match(source, /galaxy-send-full-design-to-gameforge/);
 });
 
@@ -122,6 +122,22 @@ test('Galaxy full-profile handoff refuses account-epoch changes even with the or
   for (const epoch of invalid) assert.throws(() => G.prepareGalaxyHandoff(payload(), 2020, epoch));
   const modal = fs.readFileSync(path.join(ROOT, 'src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'), 'utf8');
   const cockpit = fs.readFileSync(path.join(ROOT, 'src/skeletonForge/components/ForgeCockpitScreen.tsx'), 'utf8');
-  assert.match(modal, /prepareGalaxyHandoff\(makeGalaxyBuildPayload\(selectedGenre\), Date\.now\(\), getAuthEpoch\(\)\)/);
+  assert.match(modal, /prepareGalaxyHandoff\(makeGalaxyBuildPayload\(selectedGenre\), Date\.now\(\), editorEpoch\.current\)/);
   assert.match(cockpit, /consumeGalaxyHandoff\(galaxyHandoffId, Date\.now\(\), getAuthEpoch\(\)\)/);
+});
+
+test('long-lived Galaxy editor fences saved drafts, transfers and build submissions on auth rotation', () => {
+  const modal = fs.readFileSync(path.join(ROOT,
+    'src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'), 'utf8');
+  assert.match(modal, /const editorEpoch = useRef\(getAuthEpoch\(\)\)/);
+  assert.match(modal, /if \(visible\) editorEpoch\.current = getAuthEpoch\(\)/);
+  assert.match(modal, /const assertEditorOwner = \(\) => \{/);
+  assert.match(modal, /if \(editorEpoch\.current !== getAuthEpoch\(\)\)/);
+  for (const operation of ['persistGalaxyDraft', 'saveFullGalaxyDesign',
+    'sendToGameForge', 'startBuild']) {
+    const idx = modal.indexOf('const ' + operation + ' = async () => {');
+    assert.ok(idx >= 0, operation + ' must remain available');
+    const next = modal.slice(idx, idx + (operation === 'sendToGameForge' ? 1200 : 800));
+    assert.match(next, /assertEditorOwner\(\)/, operation + ' must deny stale account state');
+  }
 });
