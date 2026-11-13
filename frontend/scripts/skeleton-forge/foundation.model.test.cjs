@@ -7,6 +7,7 @@ const m = load('src/skeletonForge/foundation/model.ts');
 const storage = load('src/skeletonForge/foundation/storage.ts');
 const a11y = load('src/skeletonForge/foundation/a11y.ts');
 const Q = load('src/skeletonForge/questionnaire.ts');
+const H = load('src/skeletonForge/creatorBridge.ts');
 
 const AT = '2026-10-17T12:00:00.000Z';
 
@@ -325,4 +326,295 @@ test('forged saved source or unsafe scene controls hold the complete Studio proj
     assert.equal(checked.corrupt, true);
     assert.deepEqual(checked.projects, []);
   }
+});
+
+
+// Archived Studio owner-scoped reconciliation, persistence and recovery acceptance.
+test('saved first-install projects keep recovered knobs, playable quest, validation and source ZIP preference', async () => {
+  const first = m.freshQuestionnaire();
+  const second = m.freshQuestionnaire();
+  assert.notEqual(first.options, second.options);
+  assert.notEqual(first.instruments, second.instruments);
+  assert.notEqual(first.sourceExport, second.sourceExport);
+  assert.equal(first.playtest, 'off');
+  const actions = [
+    { type: 'setVision', vision: 'An original offline game' },
+    { type: 'setAxis', axis: 'risk', value: 0.63 },
+    { type: 'setAxis', axis: 'agency', value: 0.88 },
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setQuestEnabled', value: true },
+    { type: 'setQuestLength', value: 7 },
+    { type: 'setPlaytestMode', value: 'require' },
+    { type: 'setSourceExportEnabled', value: true },
+    { type: 'goto', step: 'review' },
+  ];
+  const questionnaire = actions.reduce(Q.questionnaireReducer, first);
+  const p = project('recovered_controls', { questionnaire });
+  const persisted = m.persistSnapshot(base({ projects: [p] }));
+  const store = storage.memoryKv();
+  await storage.saveFoundation(store, persisted);
+  const reloaded = await storage.loadFoundation(store);
+  assert.equal(reloaded.projectsCorrupt, false);
+  const restored = reloaded.projects[0].questionnaire;
+  assert.equal(restored.step, 'review');
+  assert.deepEqual(restored.instruments, { risk: 0.63, agency: 0.88 });
+  assert.equal(restored.playable.enabled, true);
+  assert.deepEqual(restored.quest, { enabled: true, length: 7 });
+  assert.equal(restored.playtest, 'require');
+  assert.equal(restored.sourceExport.enabled, true);
+  const request = Q.buildRunRequest(restored);
+  assert.equal(request.playable_content, true);
+  assert.equal(request.quest_length, 7);
+  assert.equal(request.playtest, 'require');
+  assert.equal(request.include_files, true);
+});
+
+test('saved studio receipts are metadata-only and never persist an 8 MiB authored game', async () => {
+  const q = m.freshQuestionnaire();
+  const runSnapshot = {
+    phase: 'done', error: null, startedAt: 1, finishedAt: 2, succeeded: true,
+    payload: {
+      succeeded: true,
+      files: { 'project.godot': 'a'.repeat(1024 * 1024) },
+      source_export: { status: 'ready', bytes: 1024 * 1024, file_count: 1, manifest_sha256: 'a'.repeat(64) },
+      source_manifest: { schema: 'skeleton.forge.source_manifest.v1', files: { 'project.godot': 'a'.repeat(64) }, file_count: 1, sha256: 'a'.repeat(64) },
+      file_names: ['project.godot'],
+      forge: { file_count: 1, blueprint_id: 'bp-safe' },
+    },
+  };
+  const stamped = m.applyRecordRun(base({ projects: [project('source', { questionnaire: q })] }), 'source', runSnapshot);
+  const receipt = stamped.projects[0].lastRun.payload;
+  assert.equal(receipt.files, undefined);
+  assert.equal(receipt.source_manifest, undefined);
+  assert.equal(receipt.source_export.status, 'unavailable');
+  assert.match(receipt.source_export.reason, /original live run/);
+  assert.deepEqual(receipt.file_names, ['project.godot']);
+
+  const stored = storage.memoryKv();
+  await storage.saveFoundation(stored, m.persistSnapshot(stamped));
+  const serialized = stored.dump()[storage.KEYS.projects];
+  assert.ok(serialized.length < 10000, 'full source bodies must never land in generic AsyncStorage projects');
+  const reloaded = await storage.loadFoundation(stored);
+  assert.equal(reloaded.projects[0].lastRun.payload.files, undefined);
+  assert.equal(reloaded.projects[0].lastRun.payload.source_export.status, 'unavailable');
+  const oldUnsanitized = base({ projects: [project('old', { lastRun: runSnapshot })] });
+  assert.equal(m.persistSnapshot(oldUnsanitized).projects[0].lastRun.payload.files, undefined);
+});
+
+test('legacy projects without newly recovered controls retain authorship and gain safe defaults', () => {
+  const legacy = project('legacy', {
+    questionnaire: {
+      step: 'beats', vision: 'My old creative game', brief: { genre: 'rpg' },
+      beats: { pace: 'unhurried' },
+      options: { archetype: 'auto', target: 'godot', era: null, generation: null },
+    },
+  });
+  const saved = m.sanitizeProjects([legacy]);
+  assert.equal(saved.corrupt, false);
+  assert.equal(saved.projects[0].questionnaire.vision, 'My old creative game');
+  assert.equal(saved.projects[0].questionnaire.brief.genre, 'rpg');
+  assert.deepEqual({ ...saved.projects[0].questionnaire.instruments }, {});
+  assert.equal(saved.projects[0].questionnaire.playable.enabled, false);
+  assert.equal(saved.projects[0].questionnaire.playtest, 'off');
+  assert.equal(saved.projects[0].questionnaire.sourceExport.enabled, false);
+});
+
+test('explicit legacy import cannot overwrite existing account projects and is blocked without access', () => {
+  const owned = project('shared-id', {
+    title: 'My current account project',
+    questionnaire: m.freshQuestionnaire(),
+  });
+  const legacyDuplicate = project('shared-id', {
+    title: 'Older unscoped copy should not overwrite current project',
+  });
+  const legacyNew = project('old-original', {
+    title: 'Original archive recovered by consent',
+    questionnaire: {
+      step: 'brief', vision: 'A historical original game',
+      brief: { genre: 'rpg' }, beats: {},
+      options: { target: 'godot', archetype: 'auto', era: null, generation: null },
+    },
+  });
+  const before = base({ projects: [owned] });
+  const imported = m.foundationReducer(before, {
+    type: 'importLegacy', projects: [legacyDuplicate, legacyNew],
+  });
+  assert.deepEqual(imported.projects.map(x => x.id), ['old-original', 'shared-id']);
+  assert.equal(imported.projects[1].title, owned.title);
+  assert.equal(imported.projects[0].questionnaire.vision, 'A historical original game');
+  assert.equal(imported.projects[0].questionnaire.sourceExport.enabled, false);
+  assert.equal(m.foundationReducer(before, {
+    type: 'importLegacy', projects: [legacyNew, { id: null }],
+  }), before, 'one corrupt entry must not partially import legacy data');
+  assert.equal(m.foundationReducer(
+    base({ projects: [owned], auth: signedOutEnforced() }),
+    { type: 'importLegacy', projects: [legacyNew] },
+  ).projects.length, 1);
+  assert.equal(m.foundationReducer(
+    base({ projects: [owned], holdSaves: true }),
+    { type: 'importLegacy', projects: [legacyNew] },
+  ).projects.length, 1);
+});
+
+test('overlapping Studio saves cannot revert the newest questionnaire snapshot', async () => {
+  const memory = storage.memoryKv();
+  let releaseFirstProjectWrite;
+  let firstProjectWriteStarted;
+  const started = new Promise(resolve => { firstProjectWriteStarted = resolve; });
+  const firstSaved = project('serial', { title: 'Earlier genre' });
+  const lastSaved = project('serial', { title: 'Latest creator controls' });
+  const store = {
+    getItem: (key) => memory.getItem(key),
+    async setItem(key, value) {
+      if (key === storage.KEYS.projects && value.includes('Earlier genre')) {
+        firstProjectWriteStarted();
+        await new Promise(resolve => { releaseFirstProjectWrite = resolve; });
+      }
+      await memory.setItem(key, value);
+    },
+  };
+  const first = storage.saveFoundation(store, m.persistSnapshot(
+    base({ projects: [firstSaved] }),
+  ));
+  await started;
+  const second = storage.saveFoundation(store, m.persistSnapshot(
+    base({ projects: [lastSaved] }),
+  ));
+  // The later complete snapshot must not overtake a delayed earlier write.
+  await Promise.resolve();
+  assert.equal(memory.dump()[storage.KEYS.projects], undefined);
+  releaseFirstProjectWrite();
+  await Promise.all([first, second]);
+  assert.equal((await storage.loadFoundation(memory)).projects[0].title, 'Latest creator controls');
+});
+
+test('a failed earlier save does not poison a later repair or retry', async () => {
+  const memory = storage.memoryKv();
+  let failOnce = true;
+  const store = {
+    getItem: key => memory.getItem(key),
+    async setItem(key, value) {
+      if (key === storage.KEYS.projects && failOnce) {
+        failOnce = false;
+        throw new Error('temporary storage pressure');
+      }
+      await memory.setItem(key, value);
+    },
+  };
+  const first = storage.saveFoundation(store, m.persistSnapshot(
+    base({ projects: [project('p1')] }),
+  ));
+  const second = storage.saveFoundation(store, m.persistSnapshot(
+    base({ projects: [project('p2')] }),
+  ));
+  await assert.rejects(first, /temporary storage pressure/);
+  await second;
+  const loaded = await storage.loadFoundation(memory);
+  assert.deepEqual(loaded.projects.map(p => p.id), ['p2']);
+});
+
+test('duplicate historical project IDs are held for recovery, not silently merged', () => {
+  const same = project('collision');
+  const result = m.sanitizeProjects([same, { ...same, title: 'A second authored world' }]);
+  assert.equal(result.corrupt, true);
+  assert.deepEqual(result.projects, []);
+  const active = base({ projects: [project('existing')] });
+  assert.equal(m.foundationReducer(active, {
+    type: 'importLegacy',
+    projects: [same, { ...same, title: 'A second authored world' }],
+  }), active);
+});
+
+test('returning cockpit edits respects the exact Studio project revision', () => {
+  const original = project('p_origin', { questionnaire: m.freshQuestionnaire() });
+  const newState = Q.questionnaireReducer(original.questionnaire, {
+    type: 'setVision', vision: 'A new authored game world',
+  });
+  const nextDate = '2026-11-13T14:00:00.000Z';
+  const applied = m.reconcileStudioReturn([original], 'p_origin', AT, newState, nextDate);
+  assert.equal(applied.status, 'applied');
+  assert.equal(applied.projects[0].id, original.id);
+  assert.equal(applied.projects[0].questionnaire.vision, 'A new authored game world');
+  assert.equal(applied.projects[0].updatedAt, nextDate);
+  const conflict = m.reconcileStudioReturn(applied.projects, 'p_origin', AT, newState, nextDate);
+  assert.equal(conflict.status, 'conflict');
+  assert.equal(conflict.projects[0].updatedAt, nextDate);
+  assert.equal(m.reconcileStudioReturn([original], 'nonexistent', AT, newState, nextDate).status, 'missing');
+});
+
+test('a changed Studio project gets a separate copy, never a silent overwrite', () => {
+  const prior = project('p_origin', { title: 'My original project' });
+  const edited = Q.questionnaireReducer(m.freshQuestionnaire(), {
+    type: 'setVision', vision: 'My returned original game',
+  });
+  const returned = m.recoverStudioReturnAsCopy([prior], edited, '2026-11-13T14:00:00.000Z');
+  assert.equal(returned.projects.length, 2);
+  assert.equal(returned.projects[1], prior);
+  assert.notEqual(returned.project.id, prior.id);
+  assert.match(returned.project.title, /Forge copy/);
+  assert.equal(returned.project.questionnaire.vision, 'My returned original game');
+  const repeated = m.recoverStudioReturnAsCopy(returned.projects, edited, '2026-11-13T14:00:00.000Z');
+  assert.equal(new Set(repeated.projects.map(p => p.id)).size, 3);
+  assert.notEqual(repeated.project.id, returned.project.id);
+});
+
+test('a failed supporting save cannot partially publish a newer authored project', async () => {
+  const data = storage.memoryKv();
+  let fails = true;
+  const seen = [];
+  const store = {
+    getItem: key => data.getItem(key),
+    async setItem(key, value) {
+      seen.push(key);
+      if (key === storage.KEYS.prefs && fails) {
+        fails = false;
+        throw new Error('Preferences disk write failed');
+      }
+      await data.setItem(key, value);
+    },
+  };
+  const current = base({ projects: [project('first')] });
+  await assert.rejects(storage.saveFoundation(store, m.persistSnapshot(current)), /disk write/);
+  assert.equal(data.dump()[storage.KEYS.projects], undefined);
+  await storage.saveFoundation(store, m.persistSnapshot(base({ projects: [project('latest')] })));
+  assert.equal((await storage.loadFoundation(data)).projects[0].id, 'latest');
+  assert.deepEqual(seen.slice(-3), [
+    storage.KEYS.prefs, storage.KEYS.onboarded, storage.KEYS.projects,
+  ]);
+});
+
+test('source-bound Studio-to-cockpit-to-Studio edits survive a complete device save/reload', async () => {
+  const initial = Q.questionnaireReducer(m.freshQuestionnaire(),
+    { type: 'setVision', vision: 'A small original local-game world' });
+  const original = project('p_roundtrip', { questionnaire: initial });
+  const envelope = H.handoffFromStudio(
+    initial, original.id, original.updatedAt, 1700000000000,
+  );
+  assert.equal(envelope.studioProjectUpdatedAt, AT);
+  const edited = [
+    { type: 'setAxis', axis: 'agency', value: 0.83 },
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setPlaytestMode', value: 'require' },
+    { type: 'setSourceExportEnabled', value: true },
+  ].reduce(Q.questionnaireReducer, initial);
+  const fromCockpit = H.handoffToStudio(edited, envelope, 1700000005000);
+  const accepted = H.studioStateFromHandoff(fromCockpit, 1700000005001);
+  assert.equal(accepted.playtest, 'require');
+  const applied = m.reconcileStudioReturn(
+    [original], fromCockpit.studioProjectId,
+    fromCockpit.studioProjectUpdatedAt, accepted,
+    '2026-11-13T16:00:00.000Z',
+  );
+  assert.equal(applied.status, 'applied');
+  const device = storage.memoryKv();
+  await storage.saveFoundation(device, m.persistSnapshot(base({ projects: applied.projects })));
+  const restarted = await storage.loadFoundation(device);
+  assert.equal(restarted.projectsCorrupt, false);
+  const saved = restarted.projects[0].questionnaire;
+  assert.equal(saved.vision, initial.vision);
+  assert.deepEqual(saved.instruments, { agency: 0.83 });
+  assert.equal(saved.playable.enabled, true);
+  assert.equal(saved.playtest, 'require');
+  assert.equal(saved.sourceExport.enabled, true);
+  assert.equal(Q.buildRunRequest(saved).include_files, true);
 });
