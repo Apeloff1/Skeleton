@@ -55,15 +55,82 @@ signal loop_failed(archetype: String, reason: String)
 
 const ARCHETYPE := "{name}"
 const MAX_FRAMES := {max_frames}
+const FLOOR := Color(0.055, 0.075, 0.12, 1.0)
+const GRID := Color(0.11, 0.15, 0.22, 1.0)
+const PLAYER_COLOR := Color(0.24, 0.85, 0.96, 1.0)
+const TARGET_COLOR := Color(0.96, 0.77, 0.23, 1.0)
+const GOAL_COLOR := Color(0.34, 0.94, 0.58, 1.0)
+
 var frames: int = 0
 var finished: bool = false
+var hud_label: Label = null
 @onready var player: CharacterBody2D = $Player
+
+
+func _ready() -> void:
+\t# Build an offline-only accessible HUD and pointer/touch D-pad. On headless
+\t# Godot qualification the same loop runs without UI or device assumptions.
+\tif DisplayServer.get_name() == "headless":
+\t\treturn
+\tvar overlay := CanvasLayer.new()
+\toverlay.name = "ForgeGameplayHUD"
+\toverlay.layer = 12
+\tadd_child(overlay)
+\thud_label = Label.new()
+\thud_label.name = "Objectives"
+\thud_label.position = Vector2(20.0, 20.0)
+\thud_label.add_theme_font_size_override("font_size", 20)
+\thud_label.add_theme_color_override("font_color", Color(0.94, 0.97, 1.0))
+\toverlay.add_child(hud_label)
+\thud_label.text = "{instruction}\\nArrow keys or touch controls to move"
+\tvar controls := Control.new()
+\tcontrols.name = "TouchControls"
+\toverlay.add_child(controls)
+\tcontrols.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+\t_add_direction(controls, "ui_up", "UP", Vector2(90.0, -196.0))
+\t_add_direction(controls, "ui_left", "LEFT", Vector2(24.0, -130.0))
+\t_add_direction(controls, "ui_down", "DOWN", Vector2(90.0, -130.0))
+\t_add_direction(controls, "ui_right", "RIGHT", Vector2(156.0, -130.0))
+
+
+func _add_direction(controls: Control, action: String, caption: String, offset: Vector2) -> void:
+\tvar button := Button.new()
+\tbutton.name = "Move" + caption
+\tbutton.text = caption
+\tbutton.focus_mode = Control.FOCUS_NONE
+\tcontrols.add_child(button)
+\tbutton.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+\tbutton.offset_left = offset.x
+\tbutton.offset_top = offset.y
+\tbutton.offset_right = offset.x + 60.0
+\tbutton.offset_bottom = offset.y + 60.0
+\tbutton.button_down.connect(func(): Input.action_press(action))
+\tbutton.button_up.connect(func(): Input.action_release(action))
+
+
+func _exit_tree() -> void:
+\tfor action in ["ui_up", "ui_down", "ui_left", "ui_right"]:
+\t\tInput.action_release(action)
+
+
+func _draw() -> void:
+\tdraw_rect(Rect2(Vector2(-960.0, -720.0), Vector2(1920.0, 1440.0)), FLOOR)
+\tfor i in range(-12, 13):
+\t\tdraw_line(Vector2(float(i) * 80.0, -720.0), Vector2(float(i) * 80.0, 720.0), GRID, 1.0)
+\tfor j in range(-9, 10):
+\t\tdraw_line(Vector2(-960.0, float(j) * 80.0), Vector2(960.0, float(j) * 80.0), GRID, 1.0)
+\t_draw_objectives()
+\tdraw_circle(player.global_position, 12.0, PLAYER_COLOR)
+\tdraw_arc(player.global_position, 16.0, 0.0, TAU, 32, Color(0.0, 0.18, 0.25), 2.0)
 
 
 func _finish(ok: bool, reason: String) -> void:
 \tif finished:
 \t\treturn
 \tfinished = true
+\tif hud_label != null:
+\t\thud_label.text = ("COMPLETED: " if ok else "FAILED: ") + reason + "\\nReturn to Forge world using the top button"
+\tqueue_redraw()
 \tif ok:
 \t\tprint("{complete} ", ARCHETYPE, " ", reason)
 \t\tloop_completed.emit(ARCHETYPE)
@@ -82,6 +149,9 @@ func _physics_process(delta: float) -> void:
 \t\t_finish(false, "frame budget exhausted")
 \t\treturn
 \t_tick(delta)
+\tqueue_redraw()
+\tif hud_label != null:
+\t\thud_label.text = "{instruction}\\n" + _hud_status()
 '''
 
 _EXTRACTION = '''
@@ -109,6 +179,18 @@ func _tick(delta: float) -> void:
 \t\tplayer.autopilot_target = extract_point
 \t\tif player.global_position.distance_to(extract_point) <= PICKUP_RADIUS:
 \t\t\t_finish(true, "extracted loot=%d heat=%d" % [carried, int(heat)])
+
+
+func _hud_status() -> String:
+\treturn "Caches: %d/3 | Heat: %d%% | Reach green extraction" % [carried, int(heat)]
+
+
+func _draw_objectives() -> void:
+\tfor cache in loot:
+\t\tdraw_rect(Rect2(cache - Vector2(11.0, 11.0), Vector2(22.0, 22.0)), TARGET_COLOR)
+\t\tdraw_circle(cache, 17.0, Color(0.9, 0.61, 0.11, 0.35))
+\tdraw_circle(extract_point, 25.0, GOAL_COLOR)
+\tdraw_circle(extract_point, 15.0, FLOOR)
 '''
 
 _COMBAT = '''
@@ -149,6 +231,17 @@ func _tick(_delta: float) -> void:
 \t\tif target["hp"] <= 0:
 \t\t\tenemies.remove_at(0)
 \t\t\tkills += 1
+
+
+func _hud_status() -> String:
+\treturn "Wave: %d/%d | Enemies: %d | HP: %d | Kills: %d" % [wave, WAVES, enemies.size(), player_hp, kills]
+
+
+func _draw_objectives() -> void:
+\tfor enemy in enemies:
+\t\tvar pos: Vector2 = enemy["pos"]
+\t\tdraw_circle(pos, 12.0, Color(0.96, 0.32, 0.37))
+\t\tdraw_arc(pos, 17.0, 0.0, TAU, 24, TARGET_COLOR, 2.0)
 '''
 
 _PIPELINE = '''
@@ -185,6 +278,16 @@ func _tick(delta: float) -> void:
 \t\t\t\tstage = "to_source"
 \tif shipped >= QUOTA:
 \t\t_finish(true, "shipped=%d" % shipped)
+
+
+func _hud_status() -> String:
+\treturn "Shipments: %d/%d | Step: %s | Yellow source / blue refinery / green depot" % [shipped, QUOTA, stage]
+
+
+func _draw_objectives() -> void:
+\tdraw_rect(Rect2(source - Vector2(18.0, 18.0), Vector2(36.0, 36.0)), TARGET_COLOR)
+\tdraw_circle(refinery, 22.0, Color(0.32, 0.61, 1.0))
+\tdraw_circle(depot, 22.0, GOAL_COLOR)
 '''
 
 _SCENE = '''[gd_scene load_steps=4 format=3]
@@ -207,6 +310,12 @@ shape = SubResource("CircleShape2D_player")
 
 [node name="Camera" type="Camera2D" parent="Player"]
 '''
+
+_INSTRUCTIONS = {
+    "extraction": "Collect three golden caches, then reach the green extraction point",
+    "combat_loop": "Clear three enemy waves by approaching red targets",
+    "pipeline": "Ship four loads through the source, refinery and depot",
+}
 
 # name -> (loop body, controller speed, frame budget)
 _SPECS: Dict[str, Tuple[str, float, int]] = {
@@ -231,7 +340,8 @@ def archetype_files(name: str) -> Dict[str, str]:
         f"scenes/archetypes/{name}/main.tscn": _SCENE.format(name=name, title=title),
         f"scripts/archetypes/{name}/player_controller.gd": _CONTROLLER.format(speed=speed, **fmt),
         f"scripts/archetypes/{name}/core_loop.gd": _LOOP_HEADER.format(
-            max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER, **fmt
+            max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER,
+            instruction=_INSTRUCTIONS[name], **fmt
         ) + body,
     }
 
