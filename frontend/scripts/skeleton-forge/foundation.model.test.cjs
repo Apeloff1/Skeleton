@@ -235,3 +235,93 @@ test('a thrown device read holds saves instead of inventing an empty studio', as
   assert.match(state.hydrateError, /disk locked/);
   assert.equal(state.screen, 'onboarding');
 });
+
+test('saved first-install projects keep recovered knobs, playable quest, validation and source ZIP preference', async () => {
+  const first = m.freshQuestionnaire();
+  const second = m.freshQuestionnaire();
+  assert.notEqual(first.options, second.options);
+  assert.notEqual(first.instruments, second.instruments);
+  assert.notEqual(first.sourceExport, second.sourceExport);
+  assert.equal(first.playtest, 'off');
+  const actions = [
+    { type: 'setVision', vision: 'An original offline game' },
+    { type: 'setAxis', axis: 'risk', value: 0.63 },
+    { type: 'setAxis', axis: 'agency', value: 0.88 },
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setQuestEnabled', value: true },
+    { type: 'setQuestLength', value: 7 },
+    { type: 'setPlaytestMode', value: 'require' },
+    { type: 'setSourceExportEnabled', value: true },
+    { type: 'goto', step: 'review' },
+  ];
+  const questionnaire = actions.reduce(Q.questionnaireReducer, first);
+  const p = project('recovered_controls', { questionnaire });
+  const persisted = m.persistSnapshot(base({ projects: [p] }));
+  const store = storage.memoryKv();
+  await storage.saveFoundation(store, persisted);
+  const reloaded = await storage.loadFoundation(store);
+  assert.equal(reloaded.projectsCorrupt, false);
+  const restored = reloaded.projects[0].questionnaire;
+  assert.equal(restored.step, 'review');
+  assert.deepEqual(restored.instruments, { risk: 0.63, agency: 0.88 });
+  assert.equal(restored.playable.enabled, true);
+  assert.deepEqual(restored.quest, { enabled: true, length: 7 });
+  assert.equal(restored.playtest, 'require');
+  assert.equal(restored.sourceExport.enabled, true);
+  const request = Q.buildRunRequest(restored);
+  assert.equal(request.playable_content, true);
+  assert.equal(request.quest_length, 7);
+  assert.equal(request.playtest, 'require');
+  assert.equal(request.include_files, true);
+});
+
+test('saved studio receipts are metadata-only and never persist an 8 MiB authored game', async () => {
+  const q = m.freshQuestionnaire();
+  const runSnapshot = {
+    phase: 'done', error: null, startedAt: 1, finishedAt: 2, succeeded: true,
+    payload: {
+      succeeded: true,
+      files: { 'project.godot': 'a'.repeat(1024 * 1024) },
+      source_export: { status: 'ready', bytes: 1024 * 1024, file_count: 1, manifest_sha256: 'a'.repeat(64) },
+      source_manifest: { schema: 'skeleton.forge.source_manifest.v1', files: { 'project.godot': 'a'.repeat(64) }, file_count: 1, sha256: 'a'.repeat(64) },
+      file_names: ['project.godot'],
+      forge: { file_count: 1, blueprint_id: 'bp-safe' },
+    },
+  };
+  const stamped = m.applyRecordRun(base({ projects: [project('source', { questionnaire: q })] }), 'source', runSnapshot);
+  const receipt = stamped.projects[0].lastRun.payload;
+  assert.equal(receipt.files, undefined);
+  assert.equal(receipt.source_manifest, undefined);
+  assert.equal(receipt.source_export.status, 'unavailable');
+  assert.match(receipt.source_export.reason, /original live run/);
+  assert.deepEqual(receipt.file_names, ['project.godot']);
+
+  const stored = storage.memoryKv();
+  await storage.saveFoundation(stored, m.persistSnapshot(stamped));
+  const serialized = stored.dump()[storage.KEYS.projects];
+  assert.ok(serialized.length < 10000, 'full source bodies must never land in generic AsyncStorage projects');
+  const reloaded = await storage.loadFoundation(stored);
+  assert.equal(reloaded.projects[0].lastRun.payload.files, undefined);
+  assert.equal(reloaded.projects[0].lastRun.payload.source_export.status, 'unavailable');
+  const oldUnsanitized = base({ projects: [project('old', { lastRun: runSnapshot })] });
+  assert.equal(m.persistSnapshot(oldUnsanitized).projects[0].lastRun.payload.files, undefined);
+});
+
+test('legacy projects without newly recovered controls retain authorship and gain safe defaults', () => {
+  const legacy = project('legacy', {
+    questionnaire: {
+      step: 'beats', vision: 'My old creative game', brief: { genre: 'rpg' },
+      beats: { pace: 'unhurried' },
+      options: { archetype: 'auto', target: 'godot', era: null, generation: null },
+    },
+  });
+  const saved = m.sanitizeProjects([legacy]);
+  assert.equal(saved.corrupt, false);
+  assert.equal(saved.projects[0].questionnaire.vision, 'My old creative game');
+  assert.equal(saved.projects[0].questionnaire.brief.genre, 'rpg');
+  assert.deepEqual(saved.projects[0].questionnaire.instruments, {});
+  assert.equal(saved.projects[0].questionnaire.playable.enabled, false);
+  assert.equal(saved.projects[0].questionnaire.playtest, 'off');
+  assert.equal(saved.projects[0].questionnaire.sourceExport.enabled, false);
+});
+
