@@ -693,11 +693,27 @@ export function reconcileStudioReturn(
   projects: readonly StudioProject[], projectId: string,
   expectedUpdatedAt: string, questionnaire: QuestionnaireState,
   at: string,
-): { status: 'applied' | 'conflict' | 'missing' | 'invalid'; projects: StudioProject[] } {
+): { status: 'applied' | 'already-applied' | 'conflict' | 'missing' | 'invalid'; projects: StudioProject[] } {
   const snapshot = [...projects];
   const index = snapshot.findIndex((p) => p.id === projectId);
   if (index < 0) return { status: 'missing', projects: snapshot };
   if (snapshot[index].updatedAt !== expectedUpdatedAt) {
+    // A device write may commit successfully and then fail before the
+    // one-time handoff acknowledgement. If the exact same questionnaire is
+    // already saved, a retry must acknowledge it rather than cloning an
+    // extra game. Normalize both records before comparing authored state.
+    const incoming = sanitizeProjects([{
+      ...snapshot[index], questionnaire,
+    }]);
+    if (incoming.corrupt || incoming.projects.length !== 1) {
+      return { status: 'invalid', projects: snapshot };
+    }
+    const current = sanitizeProjects([snapshot[index]]);
+    if (!current.corrupt && current.projects.length === 1
+        && JSON.stringify(current.projects[0].questionnaire)
+          === JSON.stringify(incoming.projects[0].questionnaire)) {
+      return { status: 'already-applied', projects: snapshot };
+    }
     return { status: 'conflict', projects: snapshot };
   }
   const draft = {
