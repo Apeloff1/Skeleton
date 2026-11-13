@@ -160,6 +160,28 @@ export function freshQuestionnaire(): QuestionnaireState {
   };
 }
 
+/** Persist receipts and summaries, not multi-megabyte generated source bodies.
+ * Source ZIP can only be exported from the original account-bound live run.
+ */
+export function persistedRunPayload(payload: RunPayload | null | undefined): RunPayload | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const { files: _sourceBodies, source_manifest: _manifest, source_export, ...summary } = payload;
+  if (source_export?.status === 'ready') {
+    return {
+      ...summary,
+      source_export: {
+        status: 'unavailable',
+        reason: 'Source ZIP is only available in the original live run. Save or share it before leaving.',
+      },
+    };
+  }
+  return { ...summary, ...(source_export ? { source_export } : {}) };
+}
+
+export function persistedRunSnapshot(snapshot: RunSnapshot): RunSnapshot {
+  return { ...snapshot, payload: persistedRunPayload(snapshot.payload) };
+}
+
 export function projectTitle(vision: string): string {
   const line = vision.trim().split('\n')[0]?.trim() ?? '';
   if (!line) return 'Untitled project';
@@ -358,7 +380,7 @@ export function applyRecordRun(state: FoundationState, projectId: string, snapsh
   const current = state.projects.find((project) => project.id === projectId);
   if (!current) return state;
   const updatedAt = snapshot.finishedAt != null ? new Date(snapshot.finishedAt).toISOString() : current.updatedAt;
-  return replaceProject(state, { ...current, lastRun: snapshot, updatedAt });
+  return replaceProject(state, { ...current, lastRun: persistedRunSnapshot(snapshot), updatedAt });
 }
 
 export interface PersistSnapshot {
@@ -372,7 +394,10 @@ export interface PersistSnapshot {
 export function persistSnapshot(state: FoundationState): PersistSnapshot {
   return {
     onboarded: state.onboarded,
-    projects: state.projects,
+    projects: state.projects.map((project) => ({
+      ...project,
+      lastRun: project.lastRun ? persistedRunSnapshot(project.lastRun) : null,
+    })),
     prefs: state.prefs,
     projectsCorrupt: state.projectsCorrupt,
     holdSaves: state.holdSaves,
@@ -553,7 +578,7 @@ function sanitizeProject(raw: unknown): StudioProject | null {
       startedAt: typeof run.startedAt === 'number' ? run.startedAt : null,
       finishedAt: typeof run.finishedAt === 'number' ? run.finishedAt : null,
       succeeded: run.succeeded,
-      payload: run.payload && typeof run.payload === 'object' ? run.payload : null,
+      payload: persistedRunPayload(run.payload),
     };
   }
   return {
