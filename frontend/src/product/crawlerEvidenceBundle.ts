@@ -64,7 +64,7 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
   gate(options);
   if (!sameSession(session, before)) refuse('The source session changed. Refresh before exporting.');
   const selected = [...sourceIds].sort();
-  const rows: Array<Record<string, unknown>> = [];
+  const rows: Record<string, unknown>[] = [];
   const checked = new Map<string, CapturedSource>();
   let totalBodyBytes = 0;
   for (const sourceId of selected) {
