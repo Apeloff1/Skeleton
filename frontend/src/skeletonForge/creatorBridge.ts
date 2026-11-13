@@ -126,11 +126,25 @@ export function handoffFromGalaxy(
   // Revalidate shape against the original accepted timestamp; the *new*
   // outbound handoff receives today's timestamp and its own short TTL.
   const previous = prior ? parseCreatorBridge(prior, 'galaxy', prior.createdMs) : null;
-  const genre = selection.genreId && galaxyIds.has(selection.genreId) ? selection.genreId : previous?.galaxyGenre ?? null;
+  const selectedId = typeof selection.genreId === 'string' ? selection.genreId.trim() : null;
+  const knownSpecialty = selectedId !== null && galaxyIds.has(selectedId);
+  // A backend-fetched Galaxy genre may not yet be in its offline fallback.
+  // Preserve one if it exactly corresponds to an authorized 158-choice
+  // GameForge token; never silently discard an unrecognized selection.
+  const canonicalToken = selectedId?.toLowerCase().replace(/_/g, '-') ?? null;
+  if (selectedId && !knownSpecialty && (!canonicalToken || !availableGenres.has(canonicalToken))) {
+    throw new Error('Selected Galaxy genre has no compatible GameForge mapping');
+  }
+  const genre = knownSpecialty ? selectedId : selectedId ? null : previous?.galaxyGenre ?? null;
   const brief = { ...(previous?.brief ?? {}) };
-  if (genre) {
-    const mapped = mappedBriefGenre(genre);
-    if (mapped && availableGenres.has(mapped)) brief.genre = mapped;
+  if (knownSpecialty && selectedId) {
+    const mapped = mappedBriefGenre(selectedId);
+    if (!mapped || !availableGenres.has(mapped)) {
+      throw new Error('Galaxy specialization mapping is incomplete');
+    }
+    brief.genre = mapped;
+  } else if (canonicalToken && availableGenres.has(canonicalToken)) {
+    brief.genre = canonicalToken;
   }
   const vision = cleanText(selection.vision, 4000).trim() ||
     cleanText(selection.title, 160).trim() || previous?.vision || '';
