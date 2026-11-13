@@ -669,3 +669,28 @@ export function reconcileStudioReturn(
   snapshot[index] = vetted.projects[0];
   return { status: 'applied', projects: snapshot };
 }
+
+/** User-approved return from Forge: preserve edits as a new project if the
+ * original was changed/deleted while the cockpit was open. */
+export function recoverStudioReturnAsCopy(
+  projects: readonly StudioProject[], questionnaire: QuestionnaireState, at: string,
+): { project: StudioProject; projects: StudioProject[] } {
+  const occupied = new Set(projects.map((p) => p.id));
+  const stamp = Date.parse(at);
+  if (!Number.isFinite(stamp)) throw new Error('Invalid Studio return timestamp');
+  let id = '';
+  for (let index = 0; index < 128; index++) {
+    const proposed = 'p_return_' + Math.floor(stamp).toString(36) + '_' + index.toString(36);
+    if (!occupied.has(proposed)) { id = proposed; break; }
+  }
+  if (!id) throw new Error('No available Studio project ID for returned Forge edits');
+  const candidate: StudioProject = {
+    id, title: projectTitle(questionnaire.vision) + ' (Forge copy)',
+    createdAt: at, updatedAt: at, questionnaire, lastRun: null,
+  };
+  const checked = sanitizeProjects([candidate]);
+  if (checked.corrupt || checked.projects.length !== 1) {
+    throw new Error('Returned Forge questionnaire was invalid');
+  }
+  return { project: checked.projects[0], projects: [checked.projects[0], ...projects] };
+}

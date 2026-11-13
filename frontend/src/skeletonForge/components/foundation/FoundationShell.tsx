@@ -34,6 +34,8 @@ export interface ShellPorts {
    * unless the user explicitly imports it. */
   legacyAvailable?: boolean;
   importLegacy?: () => Promise<StudioProject[]>;
+  studioReturnNotice?: string | null;
+  cockpitTransferError?: string | null;
   platform: A11yPlatformSnapshot;
   catalog: {
     beats: Beat[];
@@ -66,7 +68,7 @@ export interface ShellPorts {
     onStatus: () => void;
   };
   onSetup: () => void;
-  onOpenCockpit: () => void;
+  onOpenCockpit: (project?: StudioProject) => void;
   onVision?: (vision: string) => void;
   newId?: () => string;
   nowIso?: () => string;
@@ -141,6 +143,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
   }, [state, newId, iso]);
 
   const active = state.projects.find((project) => project.id === state.activeId) ?? null;
+  const openActiveCockpit = () => ports.onOpenCockpit(active ?? undefined);
   React.useEffect(() => {
     ports.onVision?.(active?.questionnaire.vision ?? '');
   }, [active?.questionnaire.vision, ports]);
@@ -237,7 +240,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
   const onGuidance = (action: StepAction) => {
     if (action.id === 'edit-brief') dispatch({ type: 'openBrief' });
     else if (action.id === 'projects') dispatch({ type: 'openDashboard' });
-    else if (action.id === 'cockpit') ports.onOpenCockpit();
+    else if (action.id === 'cockpit') openActiveCockpit();
     else if (action.id === 'retry' && active) startForge(active, buildRunRequest(active.questionnaire));
   };
 
@@ -332,7 +335,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
         onRetryCatalog={ports.catalog.reload}
         onProjects={() => dispatch({ type: 'openDashboard' })}
         onViewBuild={() => dispatch({ type: 'openBuild' })}
-        onOpenCockpit={ports.onOpenCockpit}
+        onOpenCockpit={openActiveCockpit}
         conflict={pendingForge && other ? {
           title: other.title,
           onConfirm: () => startForge(active, pendingForge),
@@ -375,7 +378,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
         onAskCockpit={ports.console.onStatus}
         onBrief={() => dispatch({ type: 'openBrief' })}
         onProjects={() => dispatch({ type: 'openDashboard' })}
-        onOpenCockpit={ports.onOpenCockpit}
+        onOpenCockpit={openActiveCockpit}
       />
     );
   } else if (state.screen === 'account') {
@@ -439,6 +442,16 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
               testID="studio-import-legacy"
             />
             {legacyError ? <Banner tone="bad" testID="studio-legacy-error">{legacyError}</Banner> : null}
+          </View>
+        ) : null}
+        {ports.studioReturnNotice ? (
+          <View style={st.persist}>
+            <Banner tone="idle" testID="studio-return-status">{ports.studioReturnNotice}</Banner>
+          </View>
+        ) : null}
+        {ports.cockpitTransferError ? (
+          <View style={st.persist}>
+            <Banner tone="bad" testID="studio-cockpit-transfer-error">{ports.cockpitTransferError}</Banner>
           </View>
         ) : null}
         {body}
