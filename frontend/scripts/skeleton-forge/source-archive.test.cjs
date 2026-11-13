@@ -83,7 +83,7 @@ test('exact-run source archives are valid deterministic unzip-ready files', () =
 
 test('export refuses path traversal, Windows absolute paths and unlisted source files', () => {
   for (const name of ['../world.gd', 'src/../world.gd', '/etc/hosts', 'C:\\boot.ini',
-    'scripts\\test.gd', 'a//x.gd', 'foo:bar', '.git/config', 'scripts/a?.gd']) {
+    'scripts\\test.gd', 'a//x.gd', 'foo:bar', '.git/config', 'scripts/.git/config', 'scripts/a?.gd', 'assets/con.txt', 'assets/AUX', 'drivers/lpt1.gd', 'scripts/CON.gd']) {
     assert.throws(() => Archive.buildGodotSourceArchive(fixture({
       'project.godot': 'config_version=5\n', [name]: 'extends Node\n',
     })), /Unsafe or unlisted Godot project source path/, name);

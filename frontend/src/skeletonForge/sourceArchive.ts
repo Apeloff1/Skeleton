@@ -51,11 +51,17 @@ function crc32(bytes: Uint8Array): number {
   for (const b of bytes) crc = CRC_TABLE[(crc ^ b) & 255] ^ (crc >>> 8);
   return (crc ^ 0xffffffff) >>> 0;
 }
+const WINDOWS_DEVICES = new Set([
+  'con', 'nul', 'aux', 'prn', ...Array.from({ length: 9 }, (_, i) => 'com' + (i + 1)),
+  ...Array.from({ length: 9 }, (_, i) => 'lpt' + (i + 1)),
+]);
 function safeSourcePath(path: string): boolean {
-  if (typeof path !== 'string' || !path || path.length > 240 || path.includes('\\')) return false;
-  if (path.startsWith('/') || path.startsWith('.') || path.includes(':') || path.includes('//')) return false;
-  return path.split('/').every(part =>
-    part !== '.' && part !== '..' && /^[a-zA-Z0-9_.-]{1,120}$/.test(part));
+  if (typeof path !== 'string' || !path || path.length > 240
+      || path.includes('\\') || path.includes(':') || path.startsWith('/')) return false;
+  return path.split('/').every(part => part.length > 0
+    && !part.startsWith('.') && part.trimEnd() === part && !part.endsWith('.')
+    && /^[a-zA-Z0-9_.-]{1,120}$/.test(part)
+    && !WINDOWS_DEVICES.has(part.split('.')[0].toLowerCase()));
 }
 function put16(view: DataView, offset: number, value: number): void {
   view.setUint16(offset, value, true);

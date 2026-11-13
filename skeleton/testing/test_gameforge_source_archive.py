@@ -65,6 +65,23 @@ def test_opted_in_archive_preserves_original_exact_run_and_source_digest(monkeyp
     }
 
 
+@pytest.mark.parametrize("mutator", [
+    lambda p: p["files"].__setitem__("scripts/quest.gd", "extends Node\\n# injected\\n"),
+    lambda p: p["source_manifest"]["files"].__setitem__("scripts/quest.gd", "0" * 64),
+    lambda p: p["source_manifest"].__setitem__("sha256", "0" * 64),
+    lambda p: p["files"].__setitem__("scripts/nul.gd", "extends Node\\n"),
+    lambda p: p["files"].__setitem__(".git/config", "private\\n"),
+    lambda p: p["files"].__setitem__("assets/con.gd", "extends Node\\n"),
+])
+def test_source_export_recomputes_full_manifest_and_rejects_unsafe_paths(monkeypatch, mutator):
+    payload = fixture()
+    mutator(payload)
+    stub(monkeypatch, payload)
+    out = run(RunRequest(vision="An original Godot world", include_files=True))
+    assert out["source_export"]["status"] == "unavailable"
+    assert "files" not in out
+
+
 def test_non_godot_export_fails_closed_without_transferring_source_bodies(monkeypatch):
     stub(monkeypatch, fixture())
     out = run(RunRequest(target="json", include_files=True))

@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional
+import re
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -13,6 +14,27 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 router = APIRouter(prefix="/api/skeleton", tags=["skeleton-gameforge"])
+
+_EXPORT_SEGMENT = re.compile(r"^[A-Za-z0-9_.-]{1,120}$")
+_EXPORT_DEVICES = {"con", "nul", "aux", "prn"} | {
+    f"{prefix}{index}" for prefix in ("com", "lpt") for index in range(1, 10)
+}
+
+
+def _safe_export_path(name: str) -> bool:
+    """Match the limited portable ZIP path contract before returning files."""
+    if not isinstance(name, str) or not name or len(name) > 240:
+        return False
+    if "\\" in name or ":" in name or name.startswith("/"):
+        return False
+    parts = name.split("/")
+    return all(
+        part and part not in {".", ".."} and not part.startswith(".")
+        and part.rstrip(" .") == part
+        and _EXPORT_SEGMENT.fullmatch(part) is not None
+        and part.split(".")[0].casefold() not in _EXPORT_DEVICES
+        for part in parts
+    )
 
 
 class RunRequest(BaseModel):
@@ -105,13 +127,23 @@ def run(req: RunRequest) -> Dict[str, Any]:
         source_bytes = 0
         if ready:
             for name, body in files.items():
-                if not isinstance(name, str) or not isinstance(body, str):
+                if not _safe_export_path(name) or not isinstance(body, str):
                     ready = False
                     break
                 source_bytes += len(body.encode("utf-8"))
                 if source_bytes > 8 * 1024 * 1024:
                     ready = False
                     break
+        if ready:
+            # The build's manifest is evidence, not authority by assertion.
+            # Recompute against the exact source returned to this caller.
+            # Size limits run first, then the source projector validates all
+            # paths and content, then the full SHA-256 inventory must match.
+            from skeleton.forge.source_manifest import source_manifest
+            try:
+                ready = source_manifest(files) == manifest
+            except (ValueError, TypeError, UnicodeError):
+                ready = False
         if ready:
             payload["source_export"] = {
                 "status": "ready",
