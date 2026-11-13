@@ -88,7 +88,13 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
   }
   const instruments: Record<string, number> = Object.create(null);
   for (const [axis, value] of Object.entries(input.instruments)) {
-    if (!isDesignAxis(axis) || typeof value !== 'number') reject('unrecognised cockpit axis');
+    if (!isDesignAxis(axis)) reject('unrecognised cockpit axis');
+    // UI controls may clamp an actively edited gesture, but an untrusted
+    // *saved* draft must reject out-of-range values rather than silently
+    // converting an impossible authoring state into a different one.
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+      reject('cockpit axis must be finite and within zero to one');
+    }
     const normalized = normaliseAxisEdit(value);
     if (normalized === null) reject('cockpit value must be finite and bounded');
     instruments[axis] = normalized;
