@@ -12,15 +12,40 @@
  *  pops back to wherever the user came from.
  */
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
 const GalaxyStudioFactoryModal = lazyDefault(() => import('../src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal'));
 import theme from '../src/theme/tokens';
+import { handoffFromGalaxy, type CreatorBridgeDraft, type GalaxyBridgeSelection } from '../src/skeletonForge/creatorBridge';
+import { consumeCreatorBridge, storeCreatorBridge } from '../src/skeletonForge/creatorBridgeStorage';
 
 export default function GalaxyRoute() {
   const router = useRouter();
   const navigation = useNavigation();
+  const [incoming, setIncoming] = React.useState<CreatorBridgeDraft | null>(null);
+  const [ready, setReady] = React.useState(false);
+  const [handoffError, setHandoffError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let mounted = true;
+    void consumeCreatorBridge('galaxy')
+      .then((draft) => { if (mounted) setIncoming(draft); })
+      .catch(() => { if (mounted) setHandoffError('Could not restore the GameForge handoff.'); })
+      .finally(() => { if (mounted) setReady(true); });
+    return () => { mounted = false; };
+  }, []);
+
+  const continueInForge = React.useCallback((selection: GalaxyBridgeSelection) => {
+    try {
+      void storeCreatorBridge(handoffFromGalaxy(selection, incoming))
+        .then(() => router.replace('/skeleton-forge?tab=build' as any))
+        .catch(() => setHandoffError('Could not save the Galaxy draft. Your current settings are unchanged.'));
+    } catch {
+      setHandoffError('Invalid Galaxy draft; nothing was transferred.');
+    }
+  }, [router, incoming]);
+
   const close = React.useCallback(() => {
     // If we have history (e.g. arrived via /menu), pop. Otherwise, on a
     // direct deep-link load (`/galaxy`), navigate to a safe landing page
@@ -40,7 +65,11 @@ export default function GalaxyRoute() {
 
   return (
     <View style={styles.root} testID="galaxy-studio-route">
-      <LazyMount><GalaxyStudioFactoryModal visible={true} onClose={close} /></LazyMount>
+      {handoffError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24' }}>{handoffError}</Text> : null}
+      {ready ? (
+        <LazyMount><GalaxyStudioFactoryModal visible={true} onClose={close}
+          initialForgeDraft={incoming} onSendToForge={continueInForge} /></LazyMount>
+      ) : null}
     </View>
   );
 }

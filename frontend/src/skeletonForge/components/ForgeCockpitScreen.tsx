@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
-import { buildRunRequest, INITIAL_STATE, questionnaireReducer, STEPS, stepIndex } from '../questionnaire';
+import { buildRunRequest, INITIAL_STATE, questionnaireReducer, STEPS, stepIndex, type QuestionnaireState } from '../questionnaire';
 import { baseEra } from '../eras';
 import { planStatus } from '../plan';
 import { cockpitScreenReducer, composeSummaryOf, consoleFailures, initialScreenState, tabBadges, type CockpitTab } from '../cockpitScreen';
@@ -15,12 +15,13 @@ import ForgeCockpitView from './ForgeCockpitView';
 
 export interface ForgeCockpitScreenProps {
   initialTab?: CockpitTab | null;
-  onOpenGalaxyStudio?: () => void;
+  initialQuestionnaire?: QuestionnaireState | null;
+  onOpenGalaxyStudio?: (draft: QuestionnaireState) => void;
 }
 
-export default function ForgeCockpitScreen({ initialTab = null, onOpenGalaxyStudio }: ForgeCockpitScreenProps) {
+export default function ForgeCockpitScreen({ initialTab = null, initialQuestionnaire = null, onOpenGalaxyStudio }: ForgeCockpitScreenProps) {
   const [screen, dispatchScreen] = React.useReducer(cockpitScreenReducer, initialTab, initialScreenState);
-  const [q, dispatchQ] = React.useReducer(questionnaireReducer, INITIAL_STATE);
+  const [q, dispatchQ] = React.useReducer(questionnaireReducer, initialQuestionnaire ?? INITIAL_STATE);
   const catalog = useForgeCatalog();
   const compose = useLiveCompose(q.vision);
   const run = useForgeRun();
@@ -68,7 +69,7 @@ export default function ForgeCockpitScreen({ initialTab = null, onOpenGalaxyStud
         eras: catalog.eras,
         generations: catalog.generations,
         onForge: startRun,
-        onOpenGalaxyStudio,
+        onOpenGalaxyStudio: onOpenGalaxyStudio ? () => onOpenGalaxyStudio(q) : undefined,
         forging: run.phase === 'running',
         composeSummary: composeSummaryOf(compose.result),
         onViewPlan: hasPlan ? openPlan : undefined,

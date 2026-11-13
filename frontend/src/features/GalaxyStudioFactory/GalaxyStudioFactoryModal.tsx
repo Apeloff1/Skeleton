@@ -45,9 +45,16 @@ import { shareResult } from '../../utils/shareResult';
 import { classifyBuildJob } from '../../product/buildJobLifecycle';
 
 import { FALLBACK_GENRES } from './fallbackGenres';
+import { GALAXY_TO_FORGE_BRIEF } from '../../skeletonForge/galaxyGenres';
+import type { CreatorBridgeDraft, GalaxyBridgeSelection } from '../../skeletonForge/creatorBridge';
 const BACKEND = CANONICAL_API_BASE;
 
-interface Props { visible: boolean; onClose: () => void; }
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  initialForgeDraft?: CreatorBridgeDraft | null;
+  onSendToForge?: (selection: GalaxyBridgeSelection) => void;
+}
 type Step = 'pick' | 'building' | 'done';
 
 const BUILD_STOP_REASONS: Record<string, string> = {
@@ -365,7 +372,7 @@ function StylePicker<T extends string>({
 }
 
 export default function GalaxyStudioFactoryModal
-({ visible, onClose }: Props) {
+({ visible, onClose, initialForgeDraft = null, onSendToForge }: Props) {
   const [step, setStep] = useState<Step>('pick');
   // ★ 2026-05 SOTA UX: Quick / Advanced mode toggle.
   // Default ON (Quick) so first-time users see a focused, friendly form.
@@ -627,7 +634,11 @@ export default function GalaxyStudioFactoryModal
     }
   }, [genres]);
 
-  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
+  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(() => {
+    const genreId = initialForgeDraft?.galaxyGenre ??
+      Object.entries(GALAXY_TO_FORGE_BRIEF).find(([, vote]) => vote === initialForgeDraft?.brief.genre)?.[0];
+    return (FALLBACK_GENRES.find((genre) => genre.id === genreId) as Genre | undefined) ?? null;
+  });
   const [selectedSubgenre, setSelectedSubgenre] = useState<string | null>(null);
   // ═══ Multi-genre / multi-subgenre fusion support ═══
   // The primary `selectedGenre` above stays the lead; extra picks fuse in.
@@ -652,7 +663,7 @@ export default function GalaxyStudioFactoryModal
     : 1.0;
   const [genreSearch, setGenreSearch] = useState('');
   const [expandedGenre, setExpandedGenre] = useState<string | null>(null);
-  const [gameVision, setGameVision] = useState('');
+  const [gameVision, setGameVision] = useState(initialForgeDraft?.vision ?? '');
   const [systemArch, setSystemArch] = useState('');
   const [worldLaws, setWorldLaws] = useState('');
   const [agentInstructions, setAgentInstructions] = useState('');
@@ -2529,6 +2540,28 @@ export default function GalaxyStudioFactoryModal
           </View>
         )}
 
+        {initialForgeDraft ? (
+          <View style={{ padding: 12, borderWidth: 1, borderColor: '#2563EB', borderRadius: 12, marginVertical: 10 }}>
+            <Text style={{ color: T.text, fontWeight: '700' }} testID="galaxy-imported-gameforge-draft">
+              Imported GameForge vision and compatible genre. Original Forge design knobs, beats, and quest options are preserved for return.
+            </Text>
+          </View>
+        ) : null}
+        {onSendToForge ? (
+          <View style={{ padding: 12, backgroundColor: T.surfaceAlt, borderRadius: 12, marginVertical: 10 }}>
+            <TouchableOpacity
+              testID="galaxy-continue-in-gameforge" accessibilityRole="button"
+              accessibilityLabel="Continue this Galaxy game draft in GameForge"
+              onPress={() => onSendToForge({ title, vision: gameVision, genreId: selectedGenre?.id ?? null })}
+              style={{ backgroundColor: '#1D4ED8', padding: 12, borderRadius: 9, alignItems: 'center' }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>Continue this game in GameForge</Text>
+            </TouchableOpacity>
+            <Text style={{ color: T.textMuted, marginTop: 6, fontSize: 11 }}>
+              Transfers the authored vision and primary genre. Prior Forge knobs, beats, and quest settings are retained. Galaxy-only production matrices and extended sliders remain in Galaxy, not silently mis-mapped.
+            </Text>
+          </View>
+        ) : null}
         <YourChoicesCard
           title={title}
           genre={selectedGenre?.name ?? null}
