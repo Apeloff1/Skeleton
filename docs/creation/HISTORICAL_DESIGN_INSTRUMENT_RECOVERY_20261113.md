@@ -114,4 +114,3 @@ follow-up introduces 158 searchable categories and subgenres (preserving all
 36 legacy era votes), with parity tests and a read-only `/api/skeleton/genres`
 endpoint. See `docs/creation/EXPANDED_GAME_GENRE_CATALOG_20261113.md`.
 This is intake classification, not 158 verified distinct gameplay runtimes.
-

@@ -142,4 +142,3 @@ test('63+ genre options are discoverable within the existing five-step Forge', (
   assert.match(text(html), /all 67 Galaxy genres/);
   assert.match(html, /data-testid="q-galaxy-genres-toggle"/);
 });
-

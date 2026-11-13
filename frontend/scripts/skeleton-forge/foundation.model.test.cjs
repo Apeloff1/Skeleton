@@ -531,7 +531,7 @@ test('source-bound Studio-to-cockpit-to-Studio edits survive a complete device s
   assert.equal(saved.sourceExport.enabled, true);
   assert.equal(Q.buildRunRequest(saved).include_files, true);
 });
- 
+
 test('saved build receipt becomes outdated only after material game design changes', () => {
   const oldRun = {
     phase: 'done', error: null, startedAt: 1, finishedAt: 2, succeeded: true,
@@ -660,4 +660,3 @@ test('a committed Studio return can be acknowledged after a failed handoff delet
     '2026-11-13T23:15:01.000Z',
   ).status, 'conflict');
 });
-

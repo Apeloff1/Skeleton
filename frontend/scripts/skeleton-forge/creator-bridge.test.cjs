@@ -312,4 +312,3 @@ test('Studio origin survives a Galaxy detour and cannot be forged from unrelated
     ...studio, target: 'studio', studioProjectUpdatedAt: 'not-an-ISO-date',
   }, 1700000000001), null);
 });
-

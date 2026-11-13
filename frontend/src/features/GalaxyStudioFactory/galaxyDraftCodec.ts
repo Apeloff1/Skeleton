@@ -185,4 +185,3 @@ export function normalizeGalaxyDraft(raw: unknown, now: number = Date.now()): Ga
     matrices: matricesFrom(v.matrices), narrative,
   };
 }
-

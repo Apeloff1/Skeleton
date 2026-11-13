@@ -55,4 +55,3 @@ test('Studio ↔ Forge route uses an explicit source-bound return, not a blind g
   assert.match(cockpit, /testID="cockpit-save-to-studio"/);
   assert.match(route, /handoffFromForge\(draft, Date\.now\(\), incoming\)/);
 });
-
