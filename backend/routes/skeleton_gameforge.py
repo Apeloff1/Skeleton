@@ -27,6 +27,8 @@ class RunRequest(BaseModel):
     blend: Optional[list] = None
     t: float = 0.5
     generation: Optional[str] = None
+    quest_content: bool = False
+    quest_length: int = Field(default=3, ge=1, le=8)
 
 
 @router.get("/eras")
@@ -66,6 +68,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             answers=req.answers or None,
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
+            **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
         )
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
