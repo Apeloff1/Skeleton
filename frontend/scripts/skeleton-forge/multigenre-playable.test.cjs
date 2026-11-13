@@ -147,3 +147,24 @@ test('unsupported Galaxy genres show no misleading playable recommendation', () 
   );
   assert.doesNotMatch(display(state), /data-testid="q-playable-suggestion"/);
 });
+
+
+test('creator explains exact authored cockpit effects for every supported mini-game', () => {
+  for (const mode of MODES) {
+    const state = reducer(
+      { type: 'setPlayableEnabled', value: true },
+      { type: 'setPlayableMode', value: mode },
+    );
+    const hints = Q.PLAYABLE_TUNING_EFFECTS[mode];
+    assert.ok(hints && hints.includes('Tempo → movement speed'));
+    const html = display(state);
+    assert.match(html, /data-testid="q-playable-tuning-hint"/);
+    assert.match(text(html), /Other design sliders remain in the full GameForge tensor/);
+  }
+  assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.racing, [
+    'Tempo → movement speed', 'Risk → checkpoint time limit',
+  ]);
+  assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.survival, [
+    'Tempo → movement speed', 'Scarcity → hydration drain',
+  ]);
+});

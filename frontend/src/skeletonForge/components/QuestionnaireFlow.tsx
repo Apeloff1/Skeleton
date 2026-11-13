@@ -7,7 +7,7 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { humanize } from '../graph';
 import { DESIGN_AXES } from '../instruments';
-import { PLAYABLE_SLICES } from '../questionnaire';
+import { PLAYABLE_SLICES, PLAYABLE_TUNING_EFFECTS } from '../questionnaire';
 import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import { suggestPlayableMode } from '../playableSuggestions';
 import DesignInstruments from './DesignInstruments';
@@ -247,6 +247,11 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
                   testID={'q-playable-mode-' + slice.id} />
               ))}
             </View>
+            <Text style={st.help} testID="q-playable-tuning-hint">
+              Active prototype cockpit mappings: {(PLAYABLE_TUNING_EFFECTS[state.playable?.mode ?? 'extraction'] ?? []).join(' · ')}.
+              Other design sliders remain in the full GameForge tensor, but are not yet interpreted by this mini-game.
+              Open Design instruments above to edit the sliders.
+            </Text>
             <View style={st.chips}>
               <Chip label="Keep main world; add in-game switch button" selected={!state.playable?.launch}
                 onPress={() => dispatch({ type: 'setPlayableMainScene', value: false })}

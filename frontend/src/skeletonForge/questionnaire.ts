@@ -80,6 +80,20 @@ export const PLAYABLE_SLICES = [
   { id: 'crafting', label: 'Crafting Delivery', hint: 'Collect parts, use a workshop, deliver a crafted item' },
 ] as const;
 
+/** Honest, implemented native effects only. All other axes stay in the
+ * canonical tensor; the source receipt identifies remaining unmapped edits.
+ */
+export const PLAYABLE_TUNING_EFFECTS: Record<string, readonly string[]> = {
+  extraction: ['Tempo → movement speed', 'Risk → heat pressure'],
+  combat_loop: ['Tempo → movement speed', 'Lethality → starting health'],
+  pipeline: ['Tempo → movement speed'],
+  puzzle: ['Tempo → movement speed'],
+  racing: ['Tempo → movement speed', 'Risk → checkpoint time limit'],
+  survival: ['Tempo → movement speed', 'Scarcity → hydration drain'],
+  stealth: ['Tempo → movement speed', 'Risk → guard detection radius'],
+  crafting: ['Tempo → movement speed'],
+};
+
 export interface QuestionnaireState {
   step: Step;
   vision: string;

@@ -1,0 +1,54 @@
+# Original prototype tuning through the recovered GameForge cockpit
+
+## Integration
+
+The complete Galaxy Studio → GameForge recovery already transfers explicit
+10-axis cockpit edits to the standard GameForge tensor and source receipt.
+Previously, the eight authored mini-games ignored those edits. This patch
+adds a deterministic opt-in native tuning compiler that affects actual Godot
+game logic without rewriting the existing 10-stage pipeline.
+
+Only explicit slider edits are applied:
+
+| Axis | Native runtime effect | Scope |
+| --- | --- | --- |
+| Tempo | Player movement speed, bounded 75–125% of original | All eight |
+| Risk | Extractor heat per second | Extraction |
+| Risk | Checkpoint race time deadline | Racing |
+| Risk | Guard detection radius | Stealth |
+| Scarcity | Hydration depletion | Survival |
+| Lethality | Starting HP | Combat |
+
+The compiler chooses fixed numeric templates and bounded float constants;
+the user cannot inject arbitrary GDScript. The remaining axes stay in the
+authoritative ten-axis tensor and appear explicitly as unmapped in a
+per-mode tuning receipt. The source is never misrepresented as having
+implemented every control.
+
+A no-edit run emits exactly the prior three-file prototype and keeps its
+existing ledger and project source. With explicit knobs, a new inert
+\`data/playable_tuning.json\` lists the original axis edits, actual derived
+numeric effects, mapped and unmapped controls. The standard source manifest
+and \`playable_prototype\` response both cover this artifact and the emitted
+scene/controller/core-loop source with SHA-256 digests.
+
+The existing Galaxy questionnaire, ten-axis cockpit, optional room quest,
+and bonus-scene launcher can coexist with this tuning. The 67 historic
+genres are still a catalog, not a claim of 67 released game engines.
+
+## Qualification
+
+After implementation and source completion:
+
+\`PYTHONPATH=.:backend python -m pytest -q
+skeleton/testing/test_multigenre_playable_slices.py
+skeleton/testing/test_historical_gameforge_convergence.py
+skeleton/testing/test_native_godot_quest.py\`
+
+\`cd frontend && node --test scripts/skeleton-forge/multigenre-playable.test.cjs
+scripts/skeleton-forge/historical-convergence.test.cjs\`
+
+Plus exact-head backend/frontend/static guards. A Godot runtime test must
+independently show all eight native completion witnesses and real device
+controls. Native unavailability and skipped security jobs are **not passes**.
+No merge/release until qualified.

@@ -190,6 +190,10 @@ export interface RunPayload {
     launcher?: string | null;
     source_files?: Record<string, string>;
     source_sha256?: string;
+    tuning?: {
+      schema: string; mode: string; axes: Record<string, number>;
+      applied: Record<string, number>; mapped_axes: string[]; unmapped_axes: string[];
+    };
     sealed?: boolean;
   };
   native_quest?: {

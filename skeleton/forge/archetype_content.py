@@ -538,23 +538,39 @@ def content_archetypes() -> Tuple[str, ...]:
     return tuple(sorted(_SPECS))
 
 
-def archetype_files(name: str) -> Dict[str, str]:
-    """Return the playable file set for ``name`` (raises KeyError if unknown)."""
+def archetype_files(
+    name: str, *, tuning: Mapping[str, float] | None = None,
+) -> Dict[str, str]:
+    """Emit canonical prototype with optional explicit, bounded cockpit edits."""
     if type(name) is not str or name not in _SPECS:
         raise KeyError("unsupported original playable archetype")
+    from skeleton.forge.playable_tuning import (
+        SOURCE_PATH, compile_playable_tuning, tuning_source,
+    )
+
     body, speed, max_frames = _SPECS[name]
     fmt = {"name": name, "version": ARCHETYPE_CONTENT_VERSION}
     title = "".join(part.capitalize() for part in name.split("_")) + "Main"
-    return {
+    player = _CONTROLLER.format(speed=speed, **fmt)
+    loop = _LOOP_HEADER.format(
+        max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER, **fmt
+    ) + body
+    player, loop, receipt = compile_playable_tuning(
+        name, tuning, speed=speed, player=player, loop=loop,
+    )
+    emitted = {
         f"scenes/archetypes/{name}/main.tscn": _SCENE.format(name=name, title=title),
-        f"scripts/archetypes/{name}/player_controller.gd": _CONTROLLER.format(speed=speed, **fmt),
-        f"scripts/archetypes/{name}/core_loop.gd": _LOOP_HEADER.format(
-            max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER, **fmt
-        ) + body,
+        f"scripts/archetypes/{name}/player_controller.gd": player,
+        f"scripts/archetypes/{name}/core_loop.gd": loop,
     }
+    if receipt is not None:
+        emitted[SOURCE_PATH] = tuning_source(receipt)
+    return emitted
 
 
-def attach_archetype_content(files: Mapping[str, str], name: str) -> Dict[str, str]:
+def attach_archetype_content(
+    files: Mapping[str, str], name: str, *, tuning: Mapping[str, float] | None = None,
+) -> Dict[str, str]:
     """Layer ``name``'s playable slice onto an emitted project (additive only).
 
     Unknown archetypes (e.g. composed ``auto``/``vision`` blueprints) fall back
@@ -569,7 +585,7 @@ def attach_archetype_content(files: Mapping[str, str], name: str) -> Dict[str, s
         raise ValueError("playable project file identity or source is invalid")
     key = name if name in _SPECS else "extraction"
     out = dict(files)
-    for path, body in archetype_files(key).items():
+    for path, body in archetype_files(key, tuning=tuning).items():
         if path in out and out[path] != body:
             raise ValueError("playable archetype output collides with existing source: " + path)
         out[path] = body

@@ -533,7 +533,9 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.forge.archetype_content import content_archetypes, attach_archetype_content
         requested = ctx.get("playable_archetype_selection") or ctx.get("archetype") or "extraction"
         selected = requested if requested in content_archetypes() else "extraction"
-        files = attach_archetype_content(files, selected)
+        files = attach_archetype_content(
+            files, selected, tuning=ctx.get("operator_axes") or None,
+        )
         ctx["files"] = files
         ctx["file_count"] = len(files)
         ctx["playable_archetype"] = selected
@@ -581,6 +583,10 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ]
         if ctx.get("playable_launcher"):
             paths.append(ctx["playable_launcher"])
+        from skeleton.forge.playable_tuning import SOURCE_PATH as TUNING_PATH
+        if TUNING_PATH in files:
+            paths.append(TUNING_PATH)
+            ctx["playable_tuning"] = json.loads(files[TUNING_PATH])
         source_hashes = {
             path: validated_manifest["files"][path] for path in sorted(paths)
         }
@@ -595,6 +601,7 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
             "launcher": ctx.get("playable_launcher"),
             "source_files": source_hashes,
             "source_sha256": source_digest,
+            **({"tuning": ctx["playable_tuning"]} if ctx.get("playable_tuning") else {}),
         }
     ok, problems = check_ok(files)
     if not ok:
