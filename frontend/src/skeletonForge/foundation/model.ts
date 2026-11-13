@@ -117,6 +117,7 @@ export type FoundationAction =
   | { type: 'signedOut' }
   | { type: 'setPrefs'; prefs: StudioPrefs }
   | { type: 'recordRun'; projectId: string; snapshot: RunSnapshot }
+  | { type: 'importLegacy'; projects: StudioProject[] }
   | { type: 'persistError'; error: string | null };
 
 const LOADING_AUTH: AuthView = {
@@ -357,6 +358,16 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
       return { ...state, prefs: sanitizePrefs(action.prefs) };
     case 'recordRun':
       return applyRecordRun(state, action.projectId, action.snapshot);
+    case 'importLegacy': {
+      if (!canEnter(state) || state.holdSaves) return state;
+      const existing = new Set(state.projects.map((project) => project.id));
+      const admitted = sanitizeProjects(action.projects);
+      if (admitted.corrupt) return state;
+      const fresh = admitted.projects.filter((project) => !existing.has(project.id));
+      // Original unscoped data remains read-only; never overwrite a
+      // current account's project with an ambiguous old project ID.
+      return fresh.length ? { ...state, projects: [...fresh, ...state.projects] } : state;
+    }
     case 'persistError':
       return { ...state, persistError: action.error };
     default:
