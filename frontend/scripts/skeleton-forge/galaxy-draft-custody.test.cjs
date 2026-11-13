@@ -103,6 +103,32 @@ test('unsafe and unknown matrix families, ranges and option enum values fail clo
   assert.equal(result.scaleCommand.length, 120);
 });
 
+test('dense 14-family production matrices survive a complete JSON roundtrip without a lossy ten-axis projection', () => {
+  const original = source();
+  for (const family of matrices) {
+    original.matrices[family] = Object.fromEntries(
+      Array.from({ length: 50 }, (_, phase) => [
+        'phase_' + phase,
+        Object.fromEntries(Array.from({ length: 7 }, (_, axis) => [
+          'axis_' + axis, (phase * 7 + axis) % 1001,
+        ])),
+      ]),
+    );
+  }
+  const snapshot = Draft.normalizeGalaxyDraft(original, NOW);
+  assert.ok(snapshot);
+  const bytes = JSON.stringify(snapshot);
+  assert.ok(bytes.length < Draft.GALAXY_DRAFT_MAX_BYTES, bytes.length);
+  const restored = Draft.normalizeGalaxyDraft(JSON.parse(bytes), NOW + 1000);
+  assert.ok(restored);
+  assert.equal(Object.keys(restored.matrices).length, 14);
+  assert.equal(Object.keys(restored.matrices.mechanics).length, 50);
+  assert.equal(Object.keys(restored.matrices.unique_flair.phase_49).length, 7);
+  assert.equal(restored.matrices.unique_flair.phase_49.axis_6, (49 * 7 + 6) % 1001);
+  assert.equal(Object.keys(restored.extraParams).length, 100);
+  assert.equal(restored.targetFiles, 250_000);
+});
+
 test('Galaxy studio button snapshots draft before invoking the separate Forge handoff', () => {
   const root = path.resolve(__dirname, '../..');
   const modal = fs.readFileSync(path.join(root, 'src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'), 'utf8');
@@ -113,6 +139,8 @@ test('Galaxy studio button snapshots draft before invoking the separate Forge ha
   assert.match(modal, /onRequestClose=\{\(\) => \{ void persistAndClose\(\); \}\}/);
   assert.match(modal, /await persistGalaxyDraft\(\);/);
   assert.match(modal, /targetFiles, scaleCommand, showDescriptions/);
+  assert.match(modal, /testID="galaxy-save-draft"/);
+  assert.match(modal, /testID="galaxy-draft-saved"/);
   assert.match(modal, /onSendToForge\(\{ title, vision: gameVision/);
   assert.match(route, /loadGalaxyDraft\(\)/);
   assert.match(route, /initialGalaxyDraft=\{savedGalaxy\}/);
