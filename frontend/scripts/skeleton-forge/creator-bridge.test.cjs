@@ -161,6 +161,13 @@ test('Galaxy and Forge routes only hand off after explicit user action', () => {
   assert.match(galaxyModal, /await saveGalaxyDraft\(snapshot\)/);
   assert.match(galaxyModal, /GALAXY_DRAFT_SCHEMA/);
   assert.match(galaxyRoute, /await storeCreatorBridge\(handoffFromGalaxy\(selection, incoming\)\)/);
+  // Direct close should restore the original Forge draft as a fresh
+  // one-time message; only explicit Continue applies Galaxy edits.
+  assert.match(galaxyRoute, /if \(incoming\) \{/);
+  assert.match(galaxyRoute, /const previous = handoffFromGalaxy\(/);
+  assert.match(galaxyRoute, /await storeCreatorBridge\(previous\)/);
+  assert.match(galaxyRoute, /router\.replace\('\/skeleton-forge\?tab=build'/);
+
   assert.match(galaxyModal, /await onSendToForge\(\{ title, vision: gameVision/);
   assert.match(galaxyModal, /handoffLock\.current = true/);
   assert.doesNotMatch(forgeRoute, /onOpenGalaxyStudio=\{\(\) => router\.push/);
