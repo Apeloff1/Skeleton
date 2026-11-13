@@ -175,9 +175,36 @@ test('first-install Studio project keys are isolated across accounts without sto
   assert.equal(kv.size, 2);
   bearer = 'alice-offline-bearer';
   epoch++;
-  assert.equal(await alice.getItem('skeleton.studio.projects.v1'), '[{"title":"Alice original design"}]');
+  // Even returning to the same token does not revive an old session's
+  // adapter: it is bound to an exact authentication epoch.
+  await assert.rejects(alice.getItem('skeleton.studio.projects.v1'), /Account changed/);
+  const aliceAgain = studioStorage.asyncStorageKv();
+  assert.equal(await aliceAgain.getItem('skeleton.studio.projects.v1'), '[{"title":"Alice original design"}]');
   await assert.rejects(alice.getItem('unrecognized-project-file'), /Unexpected/);
   await assert.rejects(alice.setItem('unrecognized-project-file', 'private'), /Unexpected/);
+});
+
+test('all keys in one project snapshot use one immutable account identity', async () => {
+  const alice = studioStorage.asyncStorageKv();
+  await alice.setItem('skeleton.studio.onboarded.v1', '1');
+  rotateOnWrite = true;
+  await assert.rejects(
+    alice.setItem('skeleton.studio.prefs.v1', '{"textSize":"large"}'),
+    /Account changed/,
+  );
+  assert.equal(bearer, 'bob-offline-bearer');
+  await assert.rejects(
+    alice.setItem('skeleton.studio.projects.v1', '[{"title":"Private Alice project"}]'),
+    /Account changed/,
+  );
+  const bob = studioStorage.asyncStorageKv();
+  for (const key of ['skeleton.studio.onboarded.v1', 'skeleton.studio.projects.v1', 'skeleton.studio.prefs.v1']) {
+    assert.equal(await bob.getItem(key), null, key + ' cannot receive the prior account snapshot');
+  }
+  bearer = 'alice-offline-bearer'; epoch++;
+  const aliceAgain = studioStorage.asyncStorageKv();
+  assert.equal(await aliceAgain.getItem('skeleton.studio.onboarded.v1'), '1');
+  assert.match(await aliceAgain.getItem('skeleton.studio.prefs.v1'), /large/);
 });
 
 test('legacy unscoped projects are only read by an explicit migration adapter', async () => {
@@ -199,10 +226,12 @@ test('account rotation while writing Studio projects rejects publication to the 
     /Account changed during Studio project write/,
   );
   assert.equal(bearer, 'bob-offline-bearer');
-  assert.equal(await store.getItem('skeleton.studio.projects.v1'), null);
+  await assert.rejects(store.getItem('skeleton.studio.projects.v1'), /Account changed/);
+  assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null);
   bearer = 'alice-offline-bearer';
   epoch++;
-  assert.match(await store.getItem('skeleton.studio.projects.v1'), /Alice only/);
+  await assert.rejects(store.getItem('skeleton.studio.projects.v1'), /Account changed/);
+  assert.match(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), /Alice only/);
 });
 
 test('first-install Studio unmounts old local projects when the signed-in account changes', () => {
