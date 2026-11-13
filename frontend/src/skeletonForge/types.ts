@@ -175,7 +175,8 @@ export interface RunPayload {
   galaxy_mechanics?: {
     schema?: string; source_sha256?: string; active_matrix_dials?: number;
     supported_inputs?: string[]; unmapped_matrix_dials?: number;
-    applied?: { target: string; value: boolean; changed: boolean; source: string[] }[];
+    room_votes?: Record<string, number>;
+    applied?: { target: string; value: boolean | string; changed: boolean; source: string[] }[];
   };
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];

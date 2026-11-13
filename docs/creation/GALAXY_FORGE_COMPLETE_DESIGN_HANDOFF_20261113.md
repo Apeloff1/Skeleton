@@ -92,3 +92,19 @@ After creating the complete candidate branch:
   tracked independently; skipped or queued gates are not passes.
 
 No launch or first-install qualification claimed.
+
+
+## Native world room-mix compiler for existing matrix controls
+
+Further historical matrix decisions now genuinely influence the canonical
+Godot room graph, instead of being metadata only. Explicit positive values
+of mechanics_matrix.melee/tactical.count vote for *combat*-heavy rooms;
+mechanics_matrix.crafting/forging.count votes for *loot*-heavy rooms; and
+world_matrix.volcanic.count votes for *heat-hazard*-heavy rooms. The strongest
+sum wins, with fixed combat → loot → heat priority for ties. These values
+flow into BuildPlan.room_bias, which the actual world room generator uses.
+
+The response receipt includes all positive source keys, vote strengths and
+the resulting 'unmapped_matrix_dials' count. Values absent/zero are ignored
+and preserve the original plan. Heat-hazard rooms are not a full volcanic
+biome implementation, nor are loot rooms a full crafting system.
