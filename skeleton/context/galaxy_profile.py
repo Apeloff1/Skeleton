@@ -175,4 +175,39 @@ def apply_galaxy_mechanics(plan: Any, profile: Optional[Mapping[str, Any]]) -> t
             "changed": not prior,
             "source": list(requested),
         })
+    # The Godot world generator supports only combat, loot and heat room
+    # categories. Treat historical matrix counts as explicit votes for those
+    # real room distributions, not as fictitious new world biomes.
+    categories = (
+        ("combat", "mechanics_matrix", ("melee", "tactical")),
+        ("loot", "mechanics_matrix", ("crafting", "forging")),
+        ("heat", "world_matrix", ("volcanic",)),
+    )
+    votes = []
+    for category, matrix_name, features in categories:
+        matrix = profile["config"][matrix_name]
+        activated = [
+            (feature, matrix.get(feature, {}).get("count", 0))
+            for feature in features if matrix.get(feature, {}).get("count", 0) > 0
+        ]
+        if activated:
+            strength = sum(value for _, value in activated)
+            sources = [f"{matrix_name}.{feature}.count" for feature, _ in activated]
+            receipt["supported_inputs"].extend(sources)
+            votes.append((strength, category, sources))
+    if votes:
+        strongest = max(weight for weight, _, _ in votes)
+        _, chosen, sources = next(v for v in votes if v[0] == strongest)
+        prior = plan.room_bias
+        if chosen != prior:
+            plan = replace(
+                plan, room_bias=chosen,
+                notes=[*plan.notes, f"Galaxy room distribution {chosen}: {', '.join(sources)}"],
+            )
+        receipt["applied"].append({
+            "target": "build_plan.room_bias", "value": chosen,
+            "changed": chosen != prior, "source": sources,
+        })
+        receipt["room_votes"] = {category: strength for strength, category, _ in votes}
+    receipt["unmapped_matrix_dials"] = max(0, active_total - len(receipt["supported_inputs"]))
     return plan, receipt

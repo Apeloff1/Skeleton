@@ -214,3 +214,84 @@ def test_unsupported_matrix_dials_remain_preserved_without_fake_mechanics():
     assert receipt["active_matrix_dials"] > 0
     assert receipt["unmapped_matrix_dials"] == receipt["active_matrix_dials"]
     assert receipt["applied"] == []
+
+
+
+def test_historical_room_dials_reach_real_godot_room_distribution():
+    from dataclasses import dataclass
+    from skeleton.context.galaxy_profile import apply_galaxy_mechanics
+    from skeleton.forge.eras import compile_era
+    from skeleton.forge.godot_emit import emit_godot
+
+    @dataclass(frozen=True)
+    class Plan:
+        spawn_weapon: bool = False
+        room_bias: str = "balanced"
+        notes: tuple[str, ...] = ()
+
+    pack = compile_era("extraction_now")
+    for matrix, feature, expected in (
+        ("mechanics_matrix", "melee", "combat"),
+        ("mechanics_matrix", "crafting", "loot"),
+        ("world_matrix", "volcanic", "heat"),
+    ):
+        raw = sample()
+        raw["config"][matrix][feature] = {"count": 7}
+        plan, receipt = apply_galaxy_mechanics(Plan(), normalise_galaxy_profile(raw))
+        assert plan.room_bias == expected
+        assert receipt["applied"] == [{
+            "target": "build_plan.room_bias", "value": expected,
+            "changed": True, "source": [f"{matrix}.{feature}.count"],
+        }]
+        assert receipt["unmapped_matrix_dials"] == receipt["active_matrix_dials"] - 1
+        emitted = emit_godot(pack, build_plan={
+            "seed": "galaxy-historical-deterministic", "room_bias": plan.room_bias,
+        })
+        actual_plan = json.loads(emitted["data/build_plan.json"])
+        assert actual_plan["room_bias"] == expected
+        rooms = json.loads(emitted["data/rooms.json"])["rooms"]
+        assert rooms[0]["kind"] == "spawn"
+        assert rooms[-1]["kind"] == "extract"
+        assert len(rooms) >= 3
+
+
+def test_room_votes_choose_strongest_and_ties_use_stable_explicit_order():
+    from dataclasses import dataclass
+    from skeleton.context.galaxy_profile import apply_galaxy_mechanics
+
+    @dataclass(frozen=True)
+    class Plan:
+        spawn_weapon: bool = False
+        room_bias: str = "balanced"
+        notes: tuple[str, ...] = ()
+
+    raw = sample()
+    raw["config"]["mechanics_matrix"]["melee"] = {"count": 2}
+    raw["config"]["mechanics_matrix"]["forging"] = {"count": 8}
+    raw["config"]["world_matrix"]["volcanic"] = {"count": 4}
+    plan, receipt = apply_galaxy_mechanics(Plan(), normalise_galaxy_profile(raw))
+    assert plan.room_bias == "loot"
+    assert receipt["room_votes"] == {"combat": 2, "loot": 8, "heat": 4}
+    assert receipt["unmapped_matrix_dials"] == receipt["active_matrix_dials"] - 3
+    raw["config"]["mechanics_matrix"]["melee"]["count"] = 8
+    plan, receipt = apply_galaxy_mechanics(Plan(), normalise_galaxy_profile(raw))
+    assert plan.room_bias == "combat"
+    assert receipt["room_votes"] == {"combat": 8, "loot": 8, "heat": 4}
+
+
+def test_room_distribution_keeps_existing_build_when_creator_did_not_choose_it():
+    from dataclasses import dataclass
+    from skeleton.context.galaxy_profile import apply_galaxy_mechanics
+
+    @dataclass(frozen=True)
+    class Plan:
+        spawn_weapon: bool = False
+        room_bias: str = "heat"
+        notes: tuple[str, ...] = ()
+
+    raw = sample()
+    raw["config"]["mechanics_matrix"]["tactical"] = {"count": 0}
+    plan, receipt = apply_galaxy_mechanics(Plan(), normalise_galaxy_profile(raw))
+    assert plan.room_bias == "heat"
+    assert "room_votes" not in receipt
+    assert receipt["applied"] == []
