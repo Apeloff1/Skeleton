@@ -70,9 +70,9 @@ jobs:
         run: |
           node scripts/patch-node-modules.js
           node scripts/verify-no-release-npm-security.js
-      - name: Archive, privacy and eight-scene frontend tests
+      - name: Complete offline source, questionnaire, archive and scene contract suite
         working-directory: frontend
-        run: node --test scripts/skeleton-forge/source-archive.test.cjs scripts/skeleton-forge/run-session-isolation.test.cjs scripts/skeleton-forge/native-scene-qualification.test.cjs
+        run: yarn test:skeleton-forge
       - name: Typecheck full frontend
         working-directory: frontend
         run: yarn typecheck
