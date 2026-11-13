@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_aerial_traversal_glacial_fjord",
+  "title": "Glacial Fjord: Aerial Traversal",
+  "subtitle": "An original aerial traversal brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610302578,
+  "width": 21,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 7,
+  "theme": "ocean",
+  "starting_health": 6
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_echo_caverns",
+  "title": "Echo Caverns: City Stewardship",
+  "subtitle": "An original city stewardship brief in Echo Caverns; prototype maps are not full genre implementations.",
+  "seed": 202610303584,
+  "width": 25,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 3,
+  "theme": "arcade",
+  "starting_health": 3
+}

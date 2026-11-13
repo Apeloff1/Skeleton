@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_time_loop_detective_glacial_fjord",
+  "title": "Glacial Fjord: Time Loop Detective",
+  "subtitle": "An original time loop detective brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610303090,
+  "width": 21,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "ocean",
+  "starting_health": 4
+}

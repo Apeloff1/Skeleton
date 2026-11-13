@@ -268,14 +268,7 @@ class LaptopFlow:
             if exc.code == "not_found":
                 raise CanonError("review_required") from None
             raise
-        try:
-            self._validate_review(review, world)
-        except CanonError as exc:
-            # A successfully written world with an interrupted review write
-            # has no approval, even if an old review remains on disk.
-            if exc.code == "review_stale_source":
-                raise CanonError("review_required") from None
-            raise
+        self._validate_review(review, world)
         return world, review
 
     @staticmethod

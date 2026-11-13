@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_glass_steppe",
+  "title": "Glass Steppe: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Glass Steppe; only the grid preview compiles today.",
+  "seed": 203010314395,
+  "width": 19,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 7,
+  "theme": "desert",
+  "starting_health": 5
+}

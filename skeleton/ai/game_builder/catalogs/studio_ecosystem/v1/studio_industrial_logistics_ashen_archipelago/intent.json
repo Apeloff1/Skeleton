@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_industrial_logistics_ashen_archipelago",
+  "title": "Ashen Archipelago: Industrial Logistics",
+  "subtitle": "An original industrial logistics brief in Ashen Archipelago; prototype maps are not full genre implementations.",
+  "seed": 202610302339,
+  "width": 23,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 7,
+  "theme": "ocean",
+  "starting_health": 6
+}

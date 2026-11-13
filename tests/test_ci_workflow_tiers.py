@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from scripts.check_ci_workflow_tiers import ROOT, SCHEDULED_RECOVERY, audit, events
+from scripts.check_ci_workflow_tiers import ROOT, PAUSED_RECOVERY, SCHEDULED_RECOVERY, audit, events
 
 
 class WorkflowTierTests(unittest.TestCase):
@@ -38,20 +38,49 @@ class WorkflowTierTests(unittest.TestCase):
         self.assertIn("os.environ.get('GH_ACTOR') != 'Apeloff1'", canary)
         self.assertIn("os.environ.get('GH_EVENT') != 'workflow_dispatch'", canary)
         readiness = (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
-        self.assertIn("skeleton/testing --tb=short", readiness)
+        # The full canonical suite now executes in eight exhaustive shards.
+        # Verify the admission invokes the real splitter and remains blocked
+        # on all shards; do not replace this with a mock or skip-based gate.
+        self.assertIn("python scripts/run_domain_suite_shard.py --index", readiness)
+        self.assertIn("needs: domain_suite", readiness)
+        runner = (ROOT / "scripts/run_domain_suite_shard.py").read_text(encoding="utf-8")
+        self.assertIn('options.get("testpaths") != ["skeleton/testing"]', runner)
+        self.assertIn('"--tb=short"', runner)
+        self.assertIn('"--maxfail=1"', runner)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
-    def test_operational_recovery_is_bounded_and_cannot_register_pr_ci(self):
-        self.assertEqual(len(SCHEDULED_RECOVERY), 3)
-        policy = json.loads(
+    def test_backlog_housekeeping_is_manual_without_weakening_recovery(self):
+        """Owner-directed backlog work pauses optional writers, not CI gates."""
+        manual = (
+            "actions-housekeeping-cli.yml",
+            "three-hour-actions-queue-expiry.yml",
+            "owner-historical-actions-cleanup.yml",
+        )
+        for name in manual:
+            source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+            self.assertEqual(events(source), {"workflow_dispatch"}, name)
+        queue_drain = (ROOT / ".github/workflows/queue-drain.yml").read_text(encoding="utf-8")
+        self.assertIn("schedule", events(queue_drain))
+        for name in ("merge-readiness.yml", "backend-quality.yml", "malware-gate.yml",
+                     "dependency-review.yml", "secret-scanning.yml",
+                     "workflow-input-security.yml"):
+            source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+            self.assertIn("pull_request", events(source), name)
+
+    def test_recovery_registry_preserves_owner_pause_and_ci_gates(self):
+        registry = json.loads(
             (ROOT / "machine/ci_workflow_tiers.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(set(policy["operational_scheduled_non_pr"]), SCHEDULED_RECOVERY)
-        for name in SCHEDULED_RECOVERY:
+        self.assertEqual(set(registry["operational_scheduled_non_pr"]), SCHEDULED_RECOVERY)
+        self.assertEqual(set(registry["operational_paused_manual_only"]), PAUSED_RECOVERY)
+        self.assertEqual(SCHEDULED_RECOVERY, {"queue-drain.yml"})
+        self.assertEqual(len(PAUSED_RECOVERY), 2)
+        queue = (ROOT / ".github/workflows/queue-drain.yml").read_text()
+        self.assertEqual(events(queue), {"workflow_dispatch", "schedule", "push"})
+        for name in PAUSED_RECOVERY:
             with self.subTest(name=name):
-                source = (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
-                self.assertEqual(events(source), {"workflow_dispatch", "schedule", "push"})
-                self.assertRegex(source, r"(?m)^permissions: \{\}$")
+                source = (ROOT / ".github/workflows" / name).read_text()
+                self.assertEqual(events(source), {"workflow_dispatch"})
 
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
@@ -100,19 +129,19 @@ class WorkflowTierTests(unittest.TestCase):
             )
             self.assertEqual(audit(root), [])
             evidence.unlink()
-            # An exempt queue-maintenance workflow must never become a PR
-            # admission or acquire broad workflow token permissions.
-            recovery_path = root / ".github/workflows" / "queue-drain.yml"
-            recovery_before = recovery_path.read_text(encoding="utf-8")
-            recovery_path.write_text(recovery_before.replace(
-                "  schedule:", "  pull_request:\n  schedule:", 1
-            ))
-            self.assertTrue(any("operational-only trigger" in issue for issue in audit(root)))
-            recovery_path.write_text(recovery_before.replace(
-                "permissions: {}", "permissions: write-all", 1
-            ))
-            self.assertTrue(any("operational-only trigger" in issue for issue in audit(root)))
-            recovery_path.write_text(recovery_before)
+            queue = root / ".github/workflows/queue-drain.yml"
+            before = queue.read_text()
+            queue.write_text(before.replace("  schedule:", "  pull_request:\n  schedule:", 1))
+            self.assertTrue(any("operational-only trigger" in x for x in audit(root)))
+            queue.write_text(before.replace("permissions: {}", "permissions: write-all", 1))
+            self.assertTrue(any("operational-only trigger" in x for x in audit(root)))
+            queue.write_text(before)
+            paused = root / ".github/workflows/actions-housekeeping-cli.yml"
+            before = paused.read_text()
+            paused.write_text(before.replace("  workflow_dispatch:",
+                                             "  workflow_dispatch:\n  schedule:\n    - cron: '0 * * * *'", 1))
+            self.assertTrue(any("paused workflow gained automatic" in x for x in audit(root)))
+            paused.write_text(before)
             self.assertEqual(audit(root), [])
             for index in range(10):
                 (
@@ -136,6 +165,50 @@ class WorkflowTierTests(unittest.TestCase):
             (root / ".github/workflows" / name).write_text(original)
             self.assertTrue(any("unexpectedly active" in p for p in audit(root)))
             (root / ".github/workflows" / name).unlink()
+            # Both source suites remain manual-only for independent review;
+            # restoring an automatic subscription is a tier-policy regression.
+            strict = root / ".github/workflows/strict-replay-source-qualification.yml"
+            strict_original = strict.read_text()
+            strict.write_text(strict_original.replace(
+                "  workflow_dispatch:", "  pull_request:\n  workflow_dispatch:", 1,
+            ))
+            self.assertTrue(any(
+                "source qualification must be manually dispatched" in issue
+                for issue in audit(root)
+            ))
+            strict.write_text(strict_original)
+            # Dispatch validation is insufficient if checkout still follows a
+            # moving branch; the immutable source SHA must be checked twice.
+            strict.write_text(strict_original.replace(
+                "ref: ${{ inputs.candidate_sha }}", "ref: main",
+            ))
+            self.assertTrue(any(
+                "immutable SHA admission or checkout attestation missing" in issue
+                for issue in audit(root)
+            ))
+            strict.write_text(strict_original)
+            strict.write_text(strict_original.replace(
+                "group: strict-replay-source-${{ inputs.candidate_sha }}",
+                "group: strict-replay-source-${{ github.sha }}",
+            ))
+            self.assertTrue(any(
+                "manual candidate concurrency must preserve independent immutable evidence" in issue
+                for issue in audit(root)
+            ))
+            strict.write_text(strict_original)
+
+            # The required Merge Readiness lane must retain the same exact
+            # source suites even though separate automatic runs are removed.
+            readiness.write_text(readiness_original.replace(
+                "test_replay_checkpoint_v6.py", "missing_replay_checkpoint_v6.py",
+            ))
+            self.assertTrue(any(
+                "required quality gate lost source test" in issue
+                for issue in audit(root)
+            ))
+            readiness.write_text(readiness_original)
+            self.assertEqual(audit(root), [])
+
             core = root / ".github/workflows" / registry["core_automatic_pr"][0]
             core.write_text("name: disabled\non:\n  workflow_dispatch:\njobs:\n")
             self.assertTrue(any("core PR trigger missing" in p for p in audit(root)))

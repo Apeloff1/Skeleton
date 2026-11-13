@@ -1484,21 +1484,94 @@ def _idempotency_attrs(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[bool
     return replay, remember
 
 
-def _idempotency_wrapper_verified(tree: ast.Module) -> bool:
-    """Recognize the shared guard only when both replay and completion exist."""
-    for node in tree.body:
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or node.name != "_forge_idempotent":
+def _forge_wrapper_attrs(tree: ast.Module) -> tuple[bool, bool]:
+    """Audit the real decorator's replay and completion, without API imports."""
+    for outer in tree.body:
+        if not isinstance(outer, (ast.FunctionDef, ast.AsyncFunctionDef)) or outer.name != "_forge_idempotent":
             continue
-        calls = {
-            child.func.attr
-            for child in ast.walk(node)
-            if isinstance(child, ast.Call)
-            and isinstance(child.func, ast.Attribute)
-            and isinstance(child.func.value, ast.Name)
-            and child.func.value.id == "_idempotency"
-        }
-        return {"operation", "complete"}.issubset(calls)
-    return False
+        guards = [
+            node for node in outer.body
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == "guarded"
+        ]
+        returns_guard = any(
+            isinstance(node, ast.Return) and isinstance(node.value, ast.Name)
+            and node.value.id == "guarded" for node in outer.body
+        )
+        if len(guards) != 1 or not returns_guard:
+            return False, False
+        for node in ast.walk(guards[0]):
+            if not isinstance(node, (ast.With, ast.AsyncWith)):
+                continue
+            for item in node.items:
+                call = item.context_expr
+                if not (
+                    isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
+                    and isinstance(call.func.value, ast.Name)
+                    and call.func.value.id == "_idempotency"
+                    and call.func.attr == "operation"
+                    and isinstance(item.optional_vars, ast.Name)
+                    and item.optional_vars.id == "replay"
+                ):
+                    continue
+                replay = any(
+                    isinstance(child, ast.If)
+                    and isinstance(child.test, ast.Compare)
+                    and isinstance(child.test.left, ast.Name)
+                    and child.test.left.id == "replay"
+                    and len(child.test.ops) == 1
+                    and isinstance(child.test.ops[0], ast.IsNot)
+                    and len(child.test.comparators) == 1
+                    and isinstance(child.test.comparators[0], ast.Constant)
+                    and child.test.comparators[0].value is None
+                    and any(
+                        isinstance(ret, ast.Return) and isinstance(ret.value, ast.Name)
+                        and ret.value.id == "replay" for ret in ast.walk(child)
+                    )
+                    for child in node.body
+                )
+                # Requiring a syntactic call anywhere under the with-body
+                # accepts `if False: complete(...)` and other dead paths.
+                # The guarded decorator's live success path must be ordered:
+                # await the route response, complete its durable custody,
+                # then return the exact response. Only direct statements
+                # qualify; a nested/dead conditional cannot forge coverage.
+                body = node.body
+                awaited = [
+                    i for i, stmt in enumerate(body)
+                    if isinstance(stmt, ast.Assign)
+                    and len(stmt.targets) == 1
+                    and isinstance(stmt.targets[0], ast.Name)
+                    and stmt.targets[0].id == "response"
+                    and isinstance(stmt.value, ast.Await)
+                    and isinstance(stmt.value.value, ast.Call)
+                    and isinstance(stmt.value.value.func, ast.Name)
+                    and stmt.value.value.func.id == "fn"
+                ]
+                completions = [
+                    i for i, stmt in enumerate(body)
+                    if isinstance(stmt, ast.Expr)
+                    and isinstance(stmt.value, ast.Call)
+                    and isinstance(stmt.value.func, ast.Attribute)
+                    and isinstance(stmt.value.func.value, ast.Name)
+                    and stmt.value.func.value.id == "_idempotency"
+                    and stmt.value.func.attr == "complete"
+                    and len(stmt.value.args) >= 2
+                    and isinstance(stmt.value.args[1], ast.Name)
+                    and stmt.value.args[1].id == "response"
+                ]
+                returns = [
+                    i for i, stmt in enumerate(body)
+                    if isinstance(stmt, ast.Return)
+                    and isinstance(stmt.value, ast.Name)
+                    and stmt.value.id == "response"
+                ]
+                complete = (
+                    len(awaited) == len(completions) == len(returns) == 1
+                    and awaited[0] < completions[0] < returns[0]
+                )
+                return replay, complete
+        return False, False
+    return False, False
 
 
 def _queued_build_idempotency_verified(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
@@ -1545,19 +1618,28 @@ def idempotency_handler_rows() -> list[dict[str, object]]:
         tree = parse_module_tree(module)
         if tree is None or not isinstance(tree, ast.Module):
             continue
-        guarded_wrapper = _idempotency_wrapper_verified(tree)
+        wrapper_replay, wrapper_remember = _forge_wrapper_attrs(tree)
         for node in tree.body:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            replay, remember = _idempotency_attrs(node)
-            if module == "skeleton.api.routes" and node.name == "game_build" and _queued_build_idempotency_verified(node):
-                replay, remember = True, True
-            if guarded_wrapper and any(
+            wrapped = any(
                 isinstance(decorator, ast.Name) and decorator.id == "_forge_idempotent"
                 for decorator in node.decorator_list
-            ):
-                replay, remember = True, True
-            if not replay and not remember:
+            )
+            replay, remember = (
+                (wrapper_replay, wrapper_remember) if wrapped else _idempotency_attrs(node)
+            )
+            # Durable game_build uses independently scoped queue idempotency,
+            # not the forge decorator. Never hide it when its guard disappears.
+            queued_build = (
+                not wrapped and module == "skeleton.api.routes"
+                and node.name == "game_build"
+            )
+            if queued_build:
+                guarded = _queued_build_idempotency_verified(node)
+                replay, remember = guarded, guarded
+            # Broken queued builds must be visible to the fail-closed audit.
+            if not queued_build and not wrapped and not replay and not remember:
                 continue
             for decorator in node.decorator_list:
                 parsed = _decorator_route(decorator)

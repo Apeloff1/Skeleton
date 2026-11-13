@@ -20,6 +20,10 @@ from skeleton.testing.test_app_offline_signed_game_library_audit import (
     _entry as _signed_entry,
 )
 from skeleton.testing.test_app_offline_policy_chain_delivery import chain_delivery
+from skeleton.testing.test_app_offline_policy_chain_delivery import delivered  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_policy_signed_delivery import policy_migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_policy_signed_progress_migration import migration  # noqa: F401  (transitive fixture)
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX custody")
 

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_defense_cloud_canopy",
+  "title": "Cloud Canopy: Tactical Defense",
+  "subtitle": "An original tactical defense brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610300581,
+  "width": 19,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 9,
+  "theme": "forest",
+  "starting_health": 5
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_command_echo_caverns",
+  "title": "Echo Caverns: The Citizen Fleet",
+  "subtitle": "Original the citizen fleet design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010313598,
+  "width": 19,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "arcade",
+  "starting_health": 4
+}

@@ -1,0 +1,117 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.visual.v1",
+  "project_id": "studio_circuit_racing_ashen_archipelago",
+  "genre": "circuit_racing",
+  "biome": "ashen_archipelago",
+  "release_certified": false,
+  "art_direction": {
+    "original_design": true,
+    "location": "Ashen Archipelago",
+    "terrain": "basalt islands",
+    "theme": "ocean",
+    "light_model": "reactive_volcanic_ash",
+    "palette": [
+      "#10283D",
+      "#247B9F",
+      "#8CD3E1",
+      "#EDFDFB"
+    ],
+    "character_silhouette": "tools for traction, cornering and regenerative braking"
+  },
+  "asset_recipes": [
+    {
+      "id": "primary_character",
+      "type": "rigged_character",
+      "description": "Readable driver with equipment used in race",
+      "inputs": [
+        "silhouette",
+        "joint_limit",
+        "outfit_palette"
+      ],
+      "deliverables": [
+        "body_mesh",
+        "rig",
+        "collision_volume",
+        "lod_chain"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "biome_kit",
+      "type": "procedural_geometry",
+      "description": "Reusable basalt islands modular kit showing ash deposition damage",
+      "inputs": [
+        "terrain_profile",
+        "materials",
+        "collision_shape"
+      ],
+      "deliverables": [
+        "scene_prefabs",
+        "atlased_materials",
+        "lod_chain"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "landmark_interior",
+      "type": "architectural_environment",
+      "description": "Navigable original interior of cliffside signal tower",
+      "inputs": [
+        "functional_layout",
+        "interior_lighting",
+        "landmark_history"
+      ],
+      "deliverables": [
+        "modular_rooms",
+        "streaming_cells",
+        "occlusion_data"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "interactive_tool",
+      "type": "action_prop",
+      "description": "Original tires and battery state tool for traction, cornering and regenerative braking",
+      "inputs": [
+        "interaction_envelope",
+        "animation_state",
+        "accessibility_icon"
+      ],
+      "deliverables": [
+        "mesh",
+        "tool_state",
+        "interaction_sound"
+      ],
+      "status": "not_created"
+    },
+    {
+      "id": "hazard_vfx",
+      "type": "climate_system",
+      "description": "Scoped volcanic ash field with measured ash deposition response",
+      "inputs": [
+        "physical_state",
+        "resource_budget",
+        "fallback_mode"
+      ],
+      "deliverables": [
+        "effects_shaders",
+        "telemetry",
+        "low_end_fallback"
+      ],
+      "status": "not_created"
+    }
+  ],
+  "runtime_requirements": {
+    "physical_ram": "sample_live_capacity",
+    "gpu_memory": "adaptive_budget",
+    "virtual_ram": "spill_and_rehydrate_with_integrity",
+    "disk": "bounded_content_addressed_cache",
+    "streaming": "camera_and_scene_priority",
+    "quality": "dynamic_lod_with_fidelity_receipts"
+  },
+  "legal_review": {
+    "external_source": "none",
+    "license_evidence": "originality_review_pending"
+  },
+  "asset_owner": "existing_studio_asset_pipeline"
+}

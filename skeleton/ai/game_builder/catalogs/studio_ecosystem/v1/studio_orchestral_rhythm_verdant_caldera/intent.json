@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_verdant_caldera",
+  "title": "Verdant Caldera: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010310430,
+  "width": 27,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 9,
+  "theme": "forest",
+  "starting_health": 4
+}

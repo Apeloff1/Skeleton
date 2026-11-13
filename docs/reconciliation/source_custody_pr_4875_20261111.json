@@ -1,0 +1,413 @@
+{
+  "schema": 1,
+  "source_pr": 4875,
+  "source_head": "a57879f1692b159c6289036023f35a6333046297",
+  "merge_base": "e00bfb0809b34573c2df313ea16e17fd10bead38",
+  "current_main": "42c9908bee87bacde621b99e6015250cb41d64da",
+  "covered_by_subtree": 0,
+  "adopted_subtrees": [],
+  "adopted_files": [
+    {
+      "path": ".github/workflows/jeeves-native-sqlite-source-qualification.yml",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "f6c1788069b3e6bf42ecb67815f0f5f7aeffc4cc"
+    },
+    {
+      "path": "backend/tests/test_discourse_tenant_authority.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "cf667b3f39a6e11463d9725238671440d2653096"
+    }
+  ],
+  "already_in_main": 2857,
+  "deferred_semantic_conflicts": [
+    {
+      "path": ".github/workflows/backend-quality.yml",
+      "reason": "concurrent-main-edit",
+      "base": "3b65ab91671266e53dbde6784119829f33161c7f",
+      "head": "f61272efe28ec89d1abed9af0eb6cb5f43322009",
+      "main": "01602952acc684e88ebfe960b8035dd8eb685519"
+    },
+    {
+      "path": ".machine/repository.toml",
+      "reason": "concurrent-main-edit",
+      "base": "14af3cdca79fe8081896d67bde432dcee3dfc175",
+      "head": "957bc0fb23824e32fe9dbcc5d46932ea7e1cb311",
+      "main": "23679e89f91573e21a012a7cf832df5686597052"
+    },
+    {
+      "path": "README.md",
+      "reason": "concurrent-main-edit",
+      "base": "9b6881585e91d9c8eda34cd1d95978259272b5bc",
+      "head": "2e54dce496f17557c7ee3901ed736c470539a8e9",
+      "main": "bae44cacdb17a6b82659c98d5c1a07b985bb8407"
+    },
+    {
+      "path": "backend/core/expressive_tts.py",
+      "reason": "concurrent-main-edit",
+      "base": "d95cd8c364c592bdac8f738782d92eb17cf35dd3",
+      "head": "14d17b2cdb23382544a8398bf2364487dce65728",
+      "main": "690215e2f9374c3b20b2088fc1cfb1403c104a3b"
+    },
+    {
+      "path": "backend/core/lazy_registry.py",
+      "reason": "concurrent-main-edit",
+      "base": "00b3baf7a35055761f28020363759a88c176b5d1",
+      "head": "5179b80334d64b33f51425a11da73d7e3207bc75",
+      "main": "3b6237d360ab58f2f2a68337df3130c7cded8813"
+    },
+    {
+      "path": "backend/gameforge/knowledge/free_apis.py",
+      "reason": "concurrent-main-edit",
+      "base": "a2137fd28ad31ac5580ac15d6f7a9accff56f94c",
+      "head": "1304e1cee22b070a4f5304247f7d4ae043d1d8c2",
+      "main": "92d6e70f490fd696b43f9a9fe18f87a6126faf4a"
+    },
+    {
+      "path": "backend/gameforge/rooms/room_api_gateway.py",
+      "reason": "concurrent-main-edit",
+      "base": "29ed091f9e4846e9e251f1ca49839b052ef7055d",
+      "head": "6a69fb756d76c12e1dc25e92d36f2b6ddc3ffbe4",
+      "main": "b0c64843018733db53068eb831637810d884568e"
+    },
+    {
+      "path": "backend/routes/ai_toolkit_enhanced.py",
+      "reason": "concurrent-main-edit",
+      "base": "5461d918f6f90c3c18dde80306fd87245fb3ea9b",
+      "head": "cd76033f13e81792cd7ae9a3b980fd4055b18a10",
+      "main": "dc1a7e09903ddae0e2a63068f2682aa4ae71509f"
+    },
+    {
+      "path": "backend/routes/apk_inspector.py",
+      "reason": "concurrent-main-edit",
+      "base": "26e25bcf834a59ff643a041396f93d9fb5039f0b",
+      "head": "7f0816c1f8181bfdd0bf53136601f2353ba3edc6",
+      "main": "23a98ec101a01481bc81fbfd4ac4bc33d64a2837"
+    },
+    {
+      "path": "backend/routes/code_intelligence.py",
+      "reason": "concurrent-main-edit",
+      "base": "cd58a4ad6ac3e6345d0ec0c471e189596115ad3f",
+      "head": "5deff8e78274f5c4ed44dfc05035101f03de4baa",
+      "main": "3a9f2bf63e447baee2854b89f958726962b84145"
+    },
+    {
+      "path": "backend/routes/collaboration.py",
+      "reason": "concurrent-main-edit",
+      "base": "f5b1ead44f495f594b7fde5801299075cd0c1a8f",
+      "head": "1bc576dc28d8da94811afb3bab1096b63680dfc7",
+      "main": "433f6669be66e7e3d872ad1706b3a80c986784c1"
+    },
+    {
+      "path": "backend/routes/curriculum.py",
+      "reason": "concurrent-main-edit",
+      "base": "8f0a0b86314372a34a783bf4fabfbeda4ea364d7",
+      "head": "ad79397679f761fe8c2292ec703dbe59bb2b14e0",
+      "main": "11cf2c1e4484b096d6cbb2269abde7322b1956e9"
+    },
+    {
+      "path": "backend/routes/discourse.py",
+      "reason": "concurrent-main-edit",
+      "base": "4c9f9bfb03118150c8d0904966a58a39ea8b6aac",
+      "head": "0f15cdb218036add5c4e7b52cbad8677752d6ff1",
+      "main": "4fcdb60b4e2cdea653888f84656c9cb414eb419d"
+    },
+    {
+      "path": "backend/routes/galaxy_studio.py",
+      "reason": "concurrent-main-edit",
+      "base": "6a916cc0c3f2f718268b18726d681606a78bef34",
+      "head": "a3ac86a27ab214a4b528a3fdc1d33fa9a8cf183f",
+      "main": "49329856e1ff1165a95fe404450fdf492aebb31e"
+    },
+    {
+      "path": "backend/routes/jeeves_persona.py",
+      "reason": "concurrent-main-edit",
+      "base": "c48f769a7cf4eae2a88a7e9816e285ae3740a8ec",
+      "head": "72f3e2c5b3f639d70a4f57223092d54c469ccade",
+      "main": "e5c1dbabcedccb27f31c277cf7814021776a1ee2"
+    },
+    {
+      "path": "backend/routes/jeeves_tutor.py",
+      "reason": "concurrent-main-edit",
+      "base": "d640d4d5345be02e2c00ea7e1b05bb7d8562d8b6",
+      "head": "164147d9380577d92fefdbbc444fb98718348064",
+      "main": "d496a15a686a85411c6d29b236c6481e2587ea45"
+    },
+    {
+      "path": "backend/routes/rosetta_challenge.py",
+      "reason": "concurrent-main-edit",
+      "base": "8c698027343b3ad327f9f1c127a359cd26e6202f",
+      "head": "c22d29d6f62dfb2f452bb7f40f094bde47830019",
+      "main": "92ce75ac1bf118b776cb7367cacade7f07e66217"
+    },
+    {
+      "path": "backend/routes/sota_2026.py",
+      "reason": "concurrent-main-edit",
+      "base": "76265e9fa5073d4d2e51e90ded332467bd9d1b03",
+      "head": "ee7e37953bdc90b4b706d7dbc575697b51a7e7c7",
+      "main": "222909563bd263888a9863f9074dab91c999f863"
+    },
+    {
+      "path": "backend/services/binary_builder.py",
+      "reason": "concurrent-main-edit",
+      "base": "95fb61724d80c473f0e680bb7684d52eb01cd263",
+      "head": "94de53442979b16f38416597a26b5c969fb0c8bb",
+      "main": "18ad54e643dbe07c5801885e4886c0e6fcece56c"
+    },
+    {
+      "path": "frontend/Dockerfile",
+      "reason": "concurrent-main-edit",
+      "base": "40032bcfc7a13cd5bef1d3529750077287e79f40",
+      "head": "7041884966ddf1b56be6fb2dc5eb9f0f24756b7d",
+      "main": "9d70ba3b03a33a87d2e981f99cac36f2ab98e68f"
+    },
+    {
+      "path": "machine/ai_file_tree.json",
+      "reason": "concurrent-main-edit",
+      "base": "76b1a388ed32cd296a2b384198759568c72fe79b",
+      "head": "be02b65c005d51b0c5784e392dc945de5fa48e8b",
+      "main": "1fc4f79bf6ab796da1cf96d709eb22d0c89ac54c"
+    },
+    {
+      "path": "scripts/check_app_assembly.py",
+      "reason": "concurrent-main-edit",
+      "base": "3a3353d1172a467889288310b45f94eafd793095",
+      "head": "b4ee63d5429a656063a1a5e1309fbedfca883c8d",
+      "main": "579d846110abfdae4f730abba3d81f794c0bf919"
+    },
+    {
+      "path": "scripts/check_ci_workflow_tiers.py",
+      "reason": "concurrent-main-edit",
+      "base": "7dfb1da75fee88d86cc730b889c12d391f48cd4c",
+      "head": "fa5c573f946c51dec31bee969ab9632a8855071e",
+      "main": "9e535c5bde8c2550111c8ecf2afc5b0f59df26d2"
+    },
+    {
+      "path": "scripts/check_toolchain_contract.py",
+      "reason": "concurrent-main-edit",
+      "base": "d78088123c59dabea0a4000c94130d9be05fef84",
+      "head": "971368a6e00ff0e25693daf33eeb49a2740d6b03",
+      "main": "8c2b0ee12b7a39357534a5cf8bd50ad18de89421"
+    },
+    {
+      "path": "scripts/game/offline_grid_campaign.py",
+      "reason": "concurrent-main-edit",
+      "base": "de8e209a31a39f841ba87fbc77b8f04e364f2691",
+      "head": "7ad3a03f1cb32ae0cb311439f3f44da492df0256",
+      "main": "1d0528a7b1035808f8855bd9201cdf076ee9b44e"
+    },
+    {
+      "path": "scripts/windows/build_installer.ps1",
+      "reason": "concurrent-main-edit",
+      "base": "a6fcb6ea956d12ae718cb217f567ae20f9677b57",
+      "head": "66cfc7774f3e7cef4b1cf0ed5a300f7bce0afe06",
+      "main": "7509349163c1539a540b46316b326a72043f773c"
+    },
+    {
+      "path": "skeleton/ai/build/core/delivery/packaging.py",
+      "reason": "concurrent-main-edit",
+      "base": "c32a860f7c01c16f7a15c38b4ba473f77814f930",
+      "head": "0e4874c5f44d9a0f24cbe4e6e24e6e04a39e9c87",
+      "main": "f86b1952e958670cad55fabbb6d41523f831dea0"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dual_runtime_verify.py",
+      "reason": "concurrent-main-edit",
+      "base": "a598ed682e502ec4ddfba1d72952a460c6d32c75",
+      "head": "61a9c5a67cbd940ab43e8f94aba7f1f9babef442",
+      "main": "e8ce65d72b79fc365aa4b1f526cd3eef5fa3596f"
+    },
+    {
+      "path": "skeleton/ai/research/legacy/gameforge/knowledge/free_apis.py",
+      "reason": "concurrent-main-edit",
+      "base": "a2137fd28ad31ac5580ac15d6f7a9accff56f94c",
+      "head": "1304e1cee22b070a4f5304247f7d4ae043d1d8c2",
+      "main": "92d6e70f490fd696b43f9a9fe18f87a6126faf4a"
+    },
+    {
+      "path": "skeleton/app/assembly.py",
+      "reason": "concurrent-main-edit",
+      "base": "a5ef95b5881e47e2b48ff39260b6dd6784c28b47",
+      "head": "b5b1b52654d804cb03f34a34df9a864977412a76",
+      "main": "2e029a6c4da9605e0b2fba608c7408ac038b1411"
+    },
+    {
+      "path": "skeleton/app/cli.py",
+      "reason": "concurrent-main-edit",
+      "base": "aaee38f0a177ae377a66e43d886c7e1f25ffd134",
+      "head": "8c16ce7a593599d8c2ae34da454c72ba9894bf1d",
+      "main": "c01a2d46b4a77a36deec6eca4a2c47b274e8d247"
+    },
+    {
+      "path": "skeleton/app/first_install.py",
+      "reason": "concurrent-main-edit",
+      "base": "79f8f2a87fa2245e679f1e8221b61322afc64098",
+      "head": "097fd2aa6dac7fcdf4e257ac02aced7ba6224157",
+      "main": "92a8756e95a971b44c2d33334785a568199cad9f"
+    },
+    {
+      "path": "skeleton/app/installer.py",
+      "reason": "concurrent-main-edit",
+      "base": "54f9e4d5dc457f430c671495c3a5fefeebb3708c",
+      "head": "a4d365a7defd833d21aac47d761c1100f6352d19",
+      "main": "44f6b4563c538ba74aac954ca14f0639d2319dc2"
+    },
+    {
+      "path": "skeleton/app/offline_delivery_archive.py",
+      "reason": "concurrent-main-edit",
+      "base": "334f0a3fee25b14cc5438aad0c6189ab9a65913a",
+      "head": "3511f29527a4ca144b50c0b0f1479aa2eeaba171",
+      "main": "104a74db40ceb99c091c71f42355272d45bff0e9"
+    },
+    {
+      "path": "skeleton/build/delivery/packaging.py",
+      "reason": "concurrent-main-edit",
+      "base": "c32a860f7c01c16f7a15c38b4ba473f77814f930",
+      "head": "0e4874c5f44d9a0f24cbe4e6e24e6e04a39e9c87",
+      "main": "f86b1952e958670cad55fabbb6d41523f831dea0"
+    },
+    {
+      "path": "skeleton/game/gameplay/offline_grid_campaign.py",
+      "reason": "concurrent-main-edit",
+      "base": "5864970aaa0ef3d96907248cf4bc584336848050",
+      "head": "656ee14777f5e6a793fb957c4ef7b530757d1196",
+      "main": "0834ae569db47e52eda08ad89b24bc438e9ee6c5"
+    },
+    {
+      "path": "skeleton/jeeves/worlds/world_canon.py",
+      "reason": "concurrent-main-edit",
+      "base": "05fde3634c305aca9502a5e839bb93dfa939b760",
+      "head": "b5c04652908e8599114dc7ed5521ac5115a03b23",
+      "main": "5bcc9de45c7c4d187019dfbb9c434323d269f5d8"
+    },
+    {
+      "path": "skeleton/local_ai/model_loader.py",
+      "reason": "concurrent-main-edit",
+      "base": "51c9a1adb0d9ef98e3b2a091f1014ebeed56fe63",
+      "head": "dc06b1357edcadf5a17d2c5ed7a7ed244b80fc5b",
+      "main": "c1c201318762663651d685937641d7338774c0e0"
+    },
+    {
+      "path": "skeleton/testing/test_ai_git_knowledge.py",
+      "reason": "concurrent-main-edit",
+      "base": "4cfd3e5e848fa6f3ee3f03ca369fb165f2cc702f",
+      "head": "7caa09ef75da153c76fcc22f9bbc59eb37f48356",
+      "main": "78bb41ec6b3cb86602015d6ef67a2e05ee909183"
+    },
+    {
+      "path": "skeleton/testing/test_ai_native_endurance.py",
+      "reason": "concurrent-main-edit",
+      "base": "3ecff1f18f081d77e3d36b51afb05ed090c51652",
+      "head": "aa954bdf08503af7e0e1106fb85b455c87c986db",
+      "main": "286ab7681f184524e4209f4aefd6cdad98d9dc43"
+    },
+    {
+      "path": "skeleton/testing/test_app_assembly.py",
+      "reason": "concurrent-main-edit",
+      "base": "630dbb7101cc3cc06c843c15287e2ddbefe41c46",
+      "head": "5e15334aa5b22c4992dce9d90e9f5fed5111f54d",
+      "main": "86e97dd3cb492ba35ff836b4736661f6ee239476"
+    },
+    {
+      "path": "skeleton/testing/test_app_installer.py",
+      "reason": "concurrent-main-edit",
+      "base": "3a0d925fbcfd1899641782f20732e2fcbad70b6a",
+      "head": "a6e2e670454ec095423e7e383ba1c14ca2d4f42e",
+      "main": "3910cd59aff0de159dc4012a8eb064a3b60899ad"
+    },
+    {
+      "path": "skeleton/testing/test_app_offline_mixed_game_library_relocation.py",
+      "reason": "concurrent-main-edit",
+      "base": "b90801cca80e17b1520fd9b15cf81ed20fa6cc99",
+      "head": "be2446d95ea54c66577a5f0adbe38f51b651406f",
+      "main": "439373413b9ebdcc600bb581e139025df9e1513a"
+    },
+    {
+      "path": "skeleton/testing/test_app_offline_signed_game_library_audit.py",
+      "reason": "concurrent-main-edit",
+      "base": "efe7229637853dc495a20e7b60b177fb0ad7b314",
+      "head": "b66283d6702b49724becd1a107c3c740b2abe4d7",
+      "main": "d0271fdbfc1139f18bb3d076dc5c7828fd5a5565"
+    },
+    {
+      "path": "backend/tests/test_discourse_judge_admission.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "80659441eb048f526091f49d04246d135faffef8",
+      "main": "7b916520298fae5d29c3c2e39dccf438c4ebda89"
+    },
+    {
+      "path": "backend/tests/test_free_api_dns_pin.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "250fa34f37d6452d95eaa24584ec216612029af3",
+      "main": "a843209598214917d3212fef31ce087b1f858864"
+    },
+    {
+      "path": "backend/tests/test_room_api_dns_pin.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "98a8207db206ff7fa1743ae4d19e69981e9ee83b",
+      "main": "3b180d8033ba8c9bb7b8628f41ba62ddac7ecdc2"
+    },
+    {
+      "path": "machine/product_surface_specification.json",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "6264c1d5dc32577d873c8d236e5a493d5f960c42",
+      "main": "a6bb423da82c54750e75157d3c3691be59dbcecb"
+    },
+    {
+      "path": "scripts/check_product_surface_specification.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "e9dfe8f5a8c21a6cea9d75560ec599acb2f4027a",
+      "main": "3ab2c36fbf010bab723a85b3bdcf3e0d9f1b4efe"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/session.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "a7bf719bff8cde2765cbddd8a3574390fbacb8bd",
+      "main": "9043d01d87c74926e5f6f626ac20ad5b0c1855ab"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/world_canon.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "b5c04652908e8599114dc7ed5521ac5115a03b23",
+      "main": "5bcc9de45c7c4d187019dfbb9c434323d269f5d8"
+    },
+    {
+      "path": "skeleton/ai/runtime/ecs/ai.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "a56ac3581cd475b259cf3ee54b2a952bbbdbf337",
+      "main": "4236d91952477b715d452ca0133f364bcc40f2c5"
+    },
+    {
+      "path": "skeleton/ecs/ai.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "a56ac3581cd475b259cf3ee54b2a952bbbdbf337",
+      "main": "4236d91952477b715d452ca0133f364bcc40f2c5"
+    },
+    {
+      "path": "skeleton/game/gameplay/offline_grid_save_slot.py",
+      "reason": "concurrent-main-edit",
+      "base": null,
+      "head": "0bec432869e48bc227dcbcd74b016c14ce69c052",
+      "main": "6eea47d62759374234a831e37e9a8e2cea3ff445"
+    },
+    {
+      "path": "skeleton/testing/test_combat_session.py",
+      "reason": "unindexed-main",
+      "source": "71175daf742956785b8d158bb6b7bf569768133f"
+    }
+  ],
+  "unindexed_tree_paths": 2221,
+  "all_security_ci_device_release_holds_active": true,
+  "source_parent_preserved": true,
+  "note": "Source-safe subtrees/files only. Deferred changes require independent review. Held branch, not merge approval."
+}
