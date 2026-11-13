@@ -205,6 +205,12 @@ def main() -> int:
         failures,
     )
 
+    require(
+        '"requests==2.32.5"' in quality_security,
+        "security origin-guard source tests require pinned requests dependency",
+        failures,
+    )
+
     # Backend's tests/__init__.py and repository-root tests/__init__.py are
     # intentionally independent packages. Importing both under one pytest
     # invocation causes collection failures that mask real security results.
