@@ -15,9 +15,11 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import tempfile
-from pathlib import Path
+import zipfile
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from skeleton.context.pipeline import GameForgeRun
@@ -68,6 +70,86 @@ def _launch(exe: Path, args: list[str], cwd: Path, *, timeout: int) -> dict[str,
             "errors": ["native Godot command timed out"],
             "output": (as_text(data) + as_text(stderr))[-6000:],
         }
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for piece in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(piece)
+    return digest.hexdigest()
+
+
+def verify_engine_archive(
+    exe: Path, archive: Path, expected_archive_sha256: str,
+) -> dict[str, str]:
+    """Bind the launched Godot executable to a pinned, local ZIP archive.
+
+    No downloads, no extraction, no command execution. In particular, a
+    plausible-looking 64-character hash alone is never provenance evidence.
+    The caller is still responsible for admitting the EXPECTED digest from a
+    trusted official release manifest.
+    """
+    if (len(expected_archive_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in expected_archive_sha256)):
+        raise ValueError("archive SHA-256 must be a lowercase trusted digest")
+    if not exe.is_file() or not archive.is_file() or exe.resolve() == archive.resolve():
+        raise ValueError("archive and actual engine executable must be distinct files")
+    if not (0 < archive.stat().st_size <= 350 * 1024 * 1024):
+        raise ValueError("Godot distribution archive size outside source-custody bounds")
+    if not (0 < exe.stat().st_size <= 400 * 1024 * 1024):
+        raise ValueError("Godot executable size outside source-custody bounds")
+    archive_actual = _sha256_file(archive)
+    if archive_actual != expected_archive_sha256:
+        raise ValueError("Godot archive does not match expected SHA-256")
+    actual_binary = _sha256_file(exe)
+    matching_members: list[str] = []
+    with zipfile.ZipFile(archive, "r") as distribution:
+        records = distribution.infolist()
+        if len(records) > 32:
+            raise ValueError("Godot release archive contains too many members")
+        names: set[str] = set()
+        for item in records:
+            name = item.filename
+            parts = PurePosixPath(name).parts
+            if (not parts or name.startswith("/") or "\\" in name
+                    or any(part in ("", ".", "..") for part in parts)
+                    or name.casefold() in names):
+                raise ValueError("Godot archive has unsafe or duplicate source paths")
+            names.add(name.casefold())
+            mode = (item.external_attr >> 16) & 0o170000
+            if mode == stat.S_IFLNK:
+                raise ValueError("Godot archive contains a symbolic link")
+            if item.flag_bits & 1:
+                raise ValueError("encrypted Godot archive member is unsupported")
+            if item.is_dir():
+                continue
+            if item.file_size > 400 * 1024 * 1024:
+                raise ValueError("Godot archive entry exceeds bounded binary size")
+            # Only candidate executable names are hashed; other artifacts
+            # cannot masquerade as the engine under an arbitrary name.
+            if not PurePosixPath(name).name.casefold().startswith("godot"):
+                continue
+            hash_member = hashlib.sha256()
+            with distribution.open(item, "r") as stream:
+                length = 0
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    length += len(chunk)
+                    if length > 400 * 1024 * 1024:
+                        raise ValueError("Godot archive decompression size exceeded")
+                    hash_member.update(chunk)
+            if hash_member.hexdigest() == actual_binary:
+                matching_members.append(name)
+    if len(matching_members) != 1:
+        raise ValueError("Godot executable does not match exactly one pinned archive member")
+    return {
+        "archive_sha256": archive_actual,
+        "godot_binary_sha256": actual_binary,
+        "archive_member": matching_members[0],
+        # This proves only cryptographic custody against the caller's
+        # expected hash, not official origin or desktop/device correctness.
+        "binary_matches_archive": "true",
+    }
 
 
 def _scenario(exe: Path, name: str, axes: dict[str, float], root: Path) -> dict[str, Any]:
@@ -137,14 +219,15 @@ def _scenario(exe: Path, name: str, axes: dict[str, float], root: Path) -> dict[
 def main() -> int:
     cli = argparse.ArgumentParser()
     cli.add_argument("--godot", required=True, type=Path)
-    cli.add_argument("--archive-sha256", required=True)
+    cli.add_argument("--archive", required=True, type=Path,
+                     help="Local Godot ZIP distribution containing the executable")
+    cli.add_argument("--archive-sha256", required=True,
+                     help="Expected SHA-256 from an independently admitted release manifest")
     args = cli.parse_args()
     exe = args.godot.resolve(strict=True)
     _require(exe.is_file() and os.access(exe, os.X_OK),
              "native Godot binary missing or not executable")
-    _require(len(args.archive_sha256) == 64
-             and all(c in "0123456789abcdef" for c in args.archive_sha256),
-             "Godot archive SHA-256 must be pinned by the calling job")
+    custody = verify_engine_archive(exe, args.archive, args.archive_sha256)
     expected_names = ("combat_loop", "extraction", "pipeline")
     _require(content_archetypes() == expected_names,
              "native suite must be reviewed when archetype inventory changes")
@@ -164,8 +247,11 @@ def main() -> int:
              "native GameForge qualification did not complete all six scenarios")
     print(json.dumps({
         "schema": "skeleton.forge.native_scenarios.v1",
-        "godot_archive_sha256": args.archive_sha256,
-        "godot_binary_sha256": hashlib.file_digest(exe.open("rb"), "sha256").hexdigest(),
+        "godot_archive_sha256": custody["archive_sha256"],
+        "godot_binary_sha256": custody["godot_binary_sha256"],
+        "godot_archive_member": custody["archive_member"],
+        "binary_matches_pinned_archive": True,
+        "expected_digest_origin_verified": False,
         "headless_godot_executed": True,
         "independent_scenarios": len(evidence),
         "real_device_qualified": False,
