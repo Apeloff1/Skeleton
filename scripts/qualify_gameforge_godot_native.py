@@ -169,7 +169,7 @@ def parse_godot_major_four(text: str) -> str:
     candidate = text.strip()
     if len(candidate) > 400 or "\n" in candidate or "\r" in candidate:
         raise ValueError("Godot CLI reported an invalid version string")
-    if not re.fullmatch(r"4\\.\\d+(?:\\.\\d+)?(?:\\.(?:stable|rc|beta|alpha|dev))?\\.[A-Za-z0-9.\\-]+", candidate):
+    if not re.fullmatch(r"4\.\d+(?:\.\d+)?(?:\.(?:stable|rc|beta|alpha|dev))?\.[A-Za-z0-9.\-]+", candidate):
         raise ValueError("Godot 4 CLI version was not verified")
     return candidate
 
