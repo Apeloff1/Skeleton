@@ -35,6 +35,10 @@ export interface ForgeRunPanelProps {
   now?: number;
   onCancel?: () => void;
   onRetry?: () => void;
+  /** Invoked only for explicitly prepared exact-run Godot source exports. */
+  onExport?: () => void;
+  exportBusy?: boolean;
+  exportError?: string | null;
   onViewEra?: (era: string) => void;
   /** Open the build-plan viewer. */
   onViewPlan?: () => void;
@@ -43,7 +47,7 @@ export interface ForgeRunPanelProps {
   testID?: string;
 }
 
-export default function ForgeRunPanel({ phase, payload, error, startedAt, finishedAt, now = Date.now(), onCancel, onRetry, onViewEra, onViewPlan, reduceMotion = false, testID }: ForgeRunPanelProps) {
+export default function ForgeRunPanel({ phase, payload, error, startedAt, finishedAt, now = Date.now(), onCancel, onRetry, onExport, exportBusy = false, exportError, onViewEra, onViewPlan, reduceMotion = false, testID }: ForgeRunPanelProps) {
   const elapsed = startedAt != null ? (finishedAt ?? now) - startedAt : 0;
   const sum = React.useMemo(() => summarizeRun(payload), [payload]);
   const playableEvidence = React.useMemo(() => playableSceneView(payload), [payload]);
@@ -112,6 +116,33 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               {payload.native_quest?.steps ? <Fact k="Native quest" v={String(payload.native_quest.steps) + ' room objectives' + (payload.native_quest.sealed ? ' · source sealed' : ' · unsealed')} /> : null}
               {sum.generation ? <Fact k="Hardware" v={humanize(sum.generation)} /> : null}
             </View>
+            {payload.source_export?.status === 'ready' && payload.succeeded === true ? (
+              <View style={{ marginTop: 12 }} testID="run-source-export">
+                <Text style={st.cardTitle}>Portable Godot source project</Text>
+                <Text style={st.small}>
+                  {payload.source_export.file_count} files · {payload.source_export.bytes} source bytes ·
+                  manifest {payload.source_export.manifest_sha256?.slice(0, 16)}
+                </Text>
+                <Text style={st.small}>
+                  A source-only ZIP that opens in Godot. This is not a compiled, signed or device-qualified game installer.
+                </Text>
+                {onExport ? (
+                  <Button
+                    label={exportBusy ? 'Preparing Godot ZIP…' : 'Save or share Godot ZIP'}
+                    onPress={onExport}
+                    busy={exportBusy}
+                    tone="secondary"
+                    testID="run-export-godot-zip"
+                  />
+                ) : null}
+              </View>
+            ) : null}
+            {payload.source_export?.status === 'unavailable' ? (
+              <Banner tone="warn" testID="run-source-export-unavailable">
+                {payload.source_export.reason || 'Godot source export could not be prepared within the safe limits.'}
+              </Banner>
+            ) : null}
+            {exportError ? <Banner tone="bad" testID="run-source-export-error">{exportError}</Banner> : null}
             {sum.composedFeatures.length ? (
               <View style={st.feats} accessibilityLabel={`Composed systems: ${sum.composedFeatures.join(', ')}${sum.composedFallback ? ' (fallback)' : ''}`}>
                 {sum.composedFeatures.map((f) => {
