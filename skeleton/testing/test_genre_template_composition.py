@@ -68,3 +68,30 @@ def test_tampered_slice_fails_verification() -> None:
     s = compose_slice(_reg(), "s", ["core.movement"])
     s["packs"][0]["params"]["speed"] = 99
     assert not verify_slice(_reg(), s)
+
+
+def test_forged_claims_rejected_even_if_outer_digest_is_recomputed() -> None:
+    import copy
+    from skeleton.ai.game_builder.genre_template_composition import _digest
+    original = compose_slice(_reg(), "legit", [
+        "core.movement", "combat.melee", "quest.objectives",
+    ])
+    for mutate in (
+        lambda d: d["capabilities"].update({"economy": "core.movement"}),
+        lambda d: d["capabilities"].__setitem__("combat", "core.movement"),
+        lambda d: d["packs"].pop(0),
+    ):
+        forged = copy.deepcopy(original)
+        mutate(forged)
+        forged["digest"] = _digest({
+            key: value for key, value in forged.items() if key != "digest"
+        })
+        assert not verify_slice(_reg(), forged)
+
+
+def test_forged_slice_cannot_omit_or_duplicate_mechanic_packs() -> None:
+    from skeleton.ai.game_builder.genre_template_composition import _digest
+    d = compose_slice(_reg(), "legit", ["core.movement", "combat.melee"])
+    d["packs"].append(dict(d["packs"][0]))
+    d["digest"] = _digest({key: value for key, value in d.items() if key != "digest"})
+    assert not verify_slice(_reg(), d)

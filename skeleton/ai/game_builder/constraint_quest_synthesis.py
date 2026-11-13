@@ -107,7 +107,7 @@ def synthesize_quest(
     if (type(policy.max_reward_per_step) is not int or
             not 1 <= policy.max_reward_per_step <= 100_000 or
             type(policy.max_total_reward) is not int or
-            not 1 <= policy.max_total_reward <= 10_000_000 or
+            not 0 <= policy.max_total_reward <= 10_000_000 or
             not 1 <= len(policy.allowed_reward_kinds) <= 32):
         raise ValueError("quest reward policy invalid")
     if len(world.edges) > 10_000 or len(world.npcs) > 10_000:

@@ -123,15 +123,33 @@ def compose_slice(
 
 
 def verify_slice(registry: PackRegistry, slice_doc: Mapping[str, Any]) -> bool:
-    """True only if digests match and every referenced pack is unchanged in the registry."""
+    """Rebuild the entire immutable composition, not just the outer hash.
+
+    A recomputed unkeyed hash does not validate invented capabilities,
+    omitted dependencies, or a forged pack-to-capability mapping.
+    """
+    if not isinstance(registry, PackRegistry) or type(slice_doc) is not dict:
+        return False
+    if set(slice_doc) != {"schema", "slice_id", "packs", "capabilities", "digest"}:
+        return False
     if slice_doc.get("schema") != SCHEMA_ID:
         return False
-    body = {k: v for k, v in slice_doc.items() if k != "digest"}
-    if slice_doc.get("digest") != _digest(body):
+    packs = slice_doc.get("packs")
+    if type(packs) is not list or not 1 <= len(packs) <= 64:
         return False
     try:
-        return all(registry.get(p["id"]).digest == p["digest"] for p in slice_doc.get("packs", ()))
-    except (CompositionError, KeyError, TypeError):
+        if any(type(p) is not dict or set(p) != {"id", "digest", "params"} or
+               type(p["params"]) is not dict for p in packs):
+            return False
+        ids = [p["id"] for p in packs]
+        if any(type(pid) is not str for pid in ids) or len(set(ids)) != len(ids):
+            return False
+        expected = compose_slice(
+            registry, slice_doc["slice_id"], ids,
+            overrides={p["id"]: p["params"] for p in packs},
+        )
+        return expected == slice_doc
+    except (CompositionError, KeyError, TypeError, ValueError):
         return False
 
 

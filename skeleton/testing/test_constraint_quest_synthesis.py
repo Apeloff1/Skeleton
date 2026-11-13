@@ -77,3 +77,13 @@ def test_quest_synthesis_rejects_unbounded_or_malformed_requests() -> None:
         synthesize_quest(WORLD, ContentPolicy(allowed_reward_kinds=()), seed=1)
     with pytest.raises(ValueError):
         synthesize_quest(WORLD, ContentPolicy(max_reward_per_step=0), seed=1)
+
+
+def test_zero_total_reward_is_valid_unsatisfiable_policy_with_rejection_receipt():
+    # Zero is a legal, impossible cap. Preserve historical rejection semantics.
+    zero = ContentPolicy(max_reward_per_step=10, max_total_reward=0)
+    outcome = synthesize_quest(WORLD, zero, seed=11, max_attempts=2)
+    assert outcome["accepted"] is False
+    assert outcome["attempt"] == 2
+    assert "total reward exceeds cap" in outcome["errors"]
+    assert synthesize_quest(WORLD, zero, seed=11, max_attempts=2) == outcome
