@@ -36,7 +36,16 @@ function usePlatformA11y(): A11yPlatformSnapshot {
   return { motionSupported, systemReducedMotion, systemTextScale };
 }
 
-export default function FoundationScreen({ onSetup, onOpenCockpit }: { onSetup: () => void; onOpenCockpit: () => void }) {
+export default function FoundationScreen(props: { onSetup: () => void; onOpenCockpit: () => void }) {
+  const [authEpoch, setAuthEpoch] = React.useState(() => getAuthEpoch());
+  React.useEffect(() => subscribeAuthChanges(() => setAuthEpoch(getAuthEpoch())), []);
+  // The entire session, not merely its project list, must be discarded on
+  // account rotation. Compose results, console history, source artifacts,
+  // the owner ID and any in-flight run all belong to the previous identity.
+  return <FoundationScreenSession key={authEpoch} {...props} />;
+}
+
+function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => void; onOpenCockpit: () => void }) {
   const catalog = useForgeCatalog();
   const [vision, setVision] = React.useState('');
   const compose = useLiveCompose(vision);
@@ -45,21 +54,12 @@ export default function FoundationScreen({ onSetup, onOpenCockpit }: { onSetup: 
   const now = useNow(run.phase === 'running');
   const platform = usePlatformA11y();
   const [ownerId, setOwnerId] = React.useState<string | null>(null);
-  const [authEpoch, setAuthEpoch] = React.useState(() => getAuthEpoch());
   const [legacyAvailable, setLegacyAvailable] = React.useState(false);
   const runOwnerEpoch = React.useRef<number | null>(null);
   const runGeneration = React.useRef(0);
   const exportLock = React.useRef(false);
   const [exportBusy, setExportBusy] = React.useState(false);
   const [exportError, setExportError] = React.useState<string | null>(null);
-  React.useEffect(() => subscribeAuthChanges(() => {
-    runGeneration.current += 1;
-    setOwnerId(null);
-    setExportError(null);
-    // Unmount the old account's in-memory project list; a new scoped
-    // project store is bootstrapped under the incoming local bearer.
-    setAuthEpoch(getAuthEpoch());
-  }), []);
   React.useEffect(() => {
     let mounted = true;
     setLegacyAvailable(false);
@@ -67,7 +67,7 @@ export default function FoundationScreen({ onSetup, onOpenCockpit }: { onSetup: 
       if (mounted) setLegacyAvailable(present);
     }).catch(() => { if (mounted) setLegacyAvailable(false); });
     return () => { mounted = false; };
-  }, [authEpoch]);
+  }, []);
   const startForge = React.useCallback((projectId: string, request: RunRequest) => {
     runOwnerEpoch.current = getAuthEpoch();
     runGeneration.current += 1;
@@ -114,7 +114,6 @@ export default function FoundationScreen({ onSetup, onOpenCockpit }: { onSetup: 
 
   return (
     <FoundationShell
-      key={authEpoch}
       ports={{
         legacyAvailable,
         importLegacy,
