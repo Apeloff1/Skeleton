@@ -249,3 +249,46 @@ def test_pipeline_bonus_launcher_and_quest_are_composed_without_clobbering(monke
     assert ctx["native_quest_receipt"]["steps"] == 2
     assert files["data/rooms.json"] == godot_files()["data/rooms.json"]
     assert source_manifest(files)["file_count"] == len(files)
+
+
+
+def test_playable_receipt_binds_exact_scripts_and_godot_launcher(monkeypatch):
+    from skeleton.context import pipeline
+    from skeleton.forge.archetype_content import PLAYABLE_LAUNCHER_PATH
+    import hashlib
+
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    for launch in (False, True):
+        ctx = {
+            "era": "extraction_now", "target": "godot",
+            "files": godot_files(), "project_root": None, "playtest_mode": "off",
+            "playable_content": True, "playable_archetype_selection": "puzzle",
+            "playable_main_scene": launch,
+        }
+        pipeline._stage_emit(ctx)
+        receipt = ctx["playable_receipt"]
+        assert receipt["schema"] == "skeleton.gameforge.playable_source.v1"
+        assert receipt["mode"] == "puzzle"
+        assert receipt["scene"] == "res://scenes/archetypes/puzzle/main.tscn"
+        assert receipt["launch_scene"] == receipt["scene"] if launch else receipt["launch_scene"] is None
+        hashes = source_manifest(ctx["files"])["files"]
+        assert receipt["source_files"] == {
+            path: hashes[path] for path in sorted(receipt["source_files"])
+        }
+        assert receipt["launcher"] == (None if launch else PLAYABLE_LAUNCHER_PATH)
+        expected = hashlib.sha256(json.dumps(
+            receipt["source_files"], sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8")).hexdigest()
+        assert receipt["source_sha256"] == expected
+
+
+def test_receipts_are_absent_for_non_opt_in_default_output(monkeypatch):
+    from skeleton.context import pipeline
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    ctx = {
+        "era": "extraction_now", "target": "godot",
+        "files": godot_files(), "project_root": None, "playtest_mode": "off",
+        "playable_content": False,
+    }
+    pipeline._stage_emit(ctx)
+    assert "playable_receipt" not in ctx

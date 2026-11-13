@@ -182,6 +182,16 @@ export interface RunPayload {
   build_plan?: BuildPlanPayload | null;
   operator_axes?: Record<string, number>;
   galaxy_profile?: { sha256?: string; matrices?: number; source?: string; artifact?: string };
+  playable_prototype?: {
+    schema?: string;
+    mode?: string;
+    scene?: string;
+    launch_scene?: string | null;
+    launcher?: string | null;
+    source_files?: Record<string, string>;
+    source_sha256?: string;
+    sealed?: boolean;
+  };
   native_quest?: {
     schema?: string;
     source_world_sha256?: string;

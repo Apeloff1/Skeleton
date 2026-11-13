@@ -111,3 +111,18 @@ selection; a user must explicitly press "Use this prototype".
 Unsupported modes such as RPG and 2D platformer show **no fake playable
 recommendation**. The original full design profile always remains
 independent of this suggested mini-game and retains its source receipt.
+
+
+## Exact-source playable-prototype receipt
+
+An opt-in generated prototype now produces
+\`skeleton.gameforge.playable_source.v1\` with the exact selected mode,
+scene, startup scene (when selected), optional in-game launcher, and the
+SHA-256 of each emitted scene/controller/loop/launcher source file.
+A deterministic canonical digest binds the ordered subset together.
+The public response marks this \`sealed\` only after a successful canonical
+ten-stage forge run with a valid whole-project source manifest.
+
+This is source identity, **not** a claim that native Godot ran successfully
+or that locally stored content cannot be edited by a user. All real
+device, native runtime, controls, security and installer gates stay separate.

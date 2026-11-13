@@ -287,6 +287,11 @@ class GameForgeRun:
             }
             if run.context.get("galaxy_mechanics") is not None:
                 payload["galaxy_mechanics"] = run.context["galaxy_mechanics"]
+        if playable_content and run.context.get("playable_receipt") is not None:
+            payload["playable_prototype"] = {
+                **run.context["playable_receipt"],
+                "sealed": bool(run.succeeded and emitted_manifest is not None),
+            }
         if quest_content and run.context.get("native_quest_receipt") is not None:
             payload["native_quest"] = {
                 **run.context["native_quest_receipt"],
@@ -564,7 +569,33 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ctx["native_quest_receipt"] = receipt
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
-    source_manifest(files)
+    validated_manifest = source_manifest(files)
+    if ctx.get("playable_content"):
+        import hashlib
+        import json
+        selected = ctx["playable_archetype"]
+        paths = [
+            f"scenes/archetypes/{selected}/main.tscn",
+            f"scripts/archetypes/{selected}/player_controller.gd",
+            f"scripts/archetypes/{selected}/core_loop.gd",
+        ]
+        if ctx.get("playable_launcher"):
+            paths.append(ctx["playable_launcher"])
+        source_hashes = {
+            path: validated_manifest["files"][path] for path in sorted(paths)
+        }
+        source_digest = hashlib.sha256(
+            json.dumps(source_hashes, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        ctx["playable_receipt"] = {
+            "schema": "skeleton.gameforge.playable_source.v1",
+            "mode": selected,
+            "scene": ctx["playable_scene"],
+            "launch_scene": ctx.get("playable_launch_scene"),
+            "launcher": ctx.get("playable_launcher"),
+            "source_files": source_hashes,
+            "source_sha256": source_digest,
+        }
     ok, problems = check_ok(files)
     if not ok:
         raise RuntimeError("gdscript check failed: " + "; ".join(problems[:8]))
