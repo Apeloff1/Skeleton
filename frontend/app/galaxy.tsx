@@ -67,22 +67,41 @@ export default function GalaxyRoute() {
     }
   }, [router, incoming]);
 
-  const close = React.useCallback(() => {
-    // If we have history (e.g. arrived via /menu), pop. Otherwise, on a
-    // direct deep-link load (`/galaxy`), navigate to a safe landing page
-    // so the close button is never a no-op.
+  const closing = React.useRef(false);
+  const close = React.useCallback(async () => {
+    if (closing.current) return;
+    closing.current = true;
     try {
-      // expo-router exposes canGoBack on the underlying React Navigation nav.
-      const canGoBack = (navigation as any)?.canGoBack?.();
-      if (canGoBack) {
-        router.back();
-      } else {
-        router.replace('/menu' as any);
+      if (incoming) {
+        // Galaxy consumed the original one-time Forge handoff on entry.
+        // Reissue a fresh, bounded return handoff before leaving, so a
+        // remounted Forge route cannot silently lose its authored design.
+        // Deliberately do not apply Galaxy edits on Close: only the explicit
+        // "Continue this game in GameForge" action transfers changed choices.
+        if (getAuthEpoch() !== authEpoch || loadedAuthEpoch !== authEpoch) {
+          throw new Error('Creator account changed before returning to GameForge.');
+        }
+        const previous = handoffFromGalaxy(
+          { title: '', vision: '', genreId: null },
+          incoming,
+        );
+        await storeCreatorBridge(previous);
+        if (getAuthEpoch() !== authEpoch) {
+          throw new Error('Creator account changed before navigation.');
+        }
+        router.replace('/skeleton-forge?tab=build' as any);
+        return;
       }
+      // A direct Galaxy visit has no Forge questionnaire to restore.
+      const canGoBack = (navigation as any)?.canGoBack?.();
+      if (canGoBack) router.back();
+      else router.replace('/menu' as any);
     } catch {
-      try { router.replace('/menu' as any); } catch {}
+      setHandoffError('Could not preserve the original GameForge draft. Galaxy will stay open.');
+    } finally {
+      closing.current = false;
     }
-  }, [router, navigation]);
+  }, [router, navigation, incoming, authEpoch, loadedAuthEpoch]);
 
   return (
     <View style={styles.root} testID="galaxy-studio-route">
