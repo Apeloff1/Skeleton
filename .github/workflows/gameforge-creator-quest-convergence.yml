@@ -53,7 +53,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install focused source-test prerequisites
-        run: python -m pip install 'pytest>=8,<9' 'fastapi>=0.115' 'pydantic>=2' 'PyYAML>=6'
+        run: python -m pip install -e . 'pytest>=8,<9' 'pytest-asyncio>=1.4,<2' 'PyYAML>=6,<7'
       - name: Compile original and converged sources
         run: |
           python -m compileall -q skeleton/context skeleton/ai/game_builder/godot_quest_bridge.py skeleton/forge/archetype_content.py skeleton/ai/forge/archetype_content.py skeleton/forge/playtest.py skeleton/forge/playable_portal.py backend/routes/skeleton_gameforge.py skeleton/testing/test_creator_quest_convergence.py skeleton/testing/test_gameforge_playable_quest_convergence.py skeleton/testing/test_gameforge_archetype_playtest.py skeleton/testing/test_gameforge_playable_portal.py skeleton/testing/test_gameforge_source_archive.py
@@ -93,6 +93,8 @@ jobs:
         run: |
           corepack enable
           yarn install --frozen-lockfile
+      - name: Verify postinstall RSA nested digest security patch
+        run: node --test scripts/test-node-forge-digest-info-patch.cjs
       - name: Converged questionnaire and native quest regression
         run: |
           node --test \
