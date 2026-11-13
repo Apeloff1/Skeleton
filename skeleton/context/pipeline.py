@@ -516,6 +516,18 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ctx["files"] = files
         ctx["file_count"] = len(files)
         ctx["native_quest_receipt"] = receipt
+    # Verify *after both* feature writers run. Source-attested add-ons
+    # cannot receive a pass based only on their pre-composition versions.
+    if ctx.get("playable_content"):
+        from skeleton.forge.playable_portal import verify_playable_portal
+        if not verify_playable_portal(
+            files, str(ctx.get("playable_archetype") or "extraction"),
+        ):
+            raise RuntimeError("final in-game playable portal verification failed")
+    if ctx.get("quest_content"):
+        from skeleton.ai.game_builder.godot_quest_bridge import verify_native_quest
+        if not verify_native_quest(files):
+            raise RuntimeError("final native room quest verification failed")
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
     source_manifest(files)
