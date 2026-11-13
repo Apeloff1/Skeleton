@@ -3,7 +3,7 @@
  * Legacy GameForge axes, quest option and answered beats are carried unmodified when
  * visiting Galaxy, and restored when returning. Galaxy matrices remain Galaxy-owned.
  */
-import { STEPS, type QuestionnaireState } from './questionnaire';
+import { STEPS, reachable, type QuestionnaireState } from './questionnaire';
 import { DESIGN_AXES } from './instruments';
 import { GALAXY_CHOICES, mappedBriefGenre } from './galaxyGenres';
 import { GENRE_CHOICES } from './genreCatalog';
@@ -167,9 +167,12 @@ export function handoffFromGalaxy(
 export function forgeStateFromHandoff(raw: CreatorBridgeDraft, now: number = Date.now()): QuestionnaireState | null {
   const draft = parseCreatorBridge(raw, 'forge', now);
   if (!draft) return null;
-  return {
+  const restored: QuestionnaireState = {
     step: draft.step, vision: draft.vision, brief: draft.brief, beats: draft.beats,
     instruments: draft.instruments, galaxyGenre: draft.galaxyGenre,
     options: draft.options, quest: draft.quest,
   };
+  // A valid handoff must not become a way to jump past a blocked vision
+  // step. Preserve completed progress; reset only an unreachable step.
+  return reachable(restored, restored.step) ? restored : { ...restored, step: 'vision' };
 }
