@@ -30,6 +30,10 @@ export interface ShellPorts {
   load?: () => Promise<LoadResult>;
   save?: (snap: PersistSnapshot) => Promise<void>;
   auth?: AuthPort;
+  /** A legacy global device blob is never attributed to the active account
+   * unless the user explicitly imports it. */
+  legacyAvailable?: boolean;
+  importLegacy?: () => Promise<StudioProject[]>;
   platform: A11yPlatformSnapshot;
   catalog: {
     beats: Beat[];
@@ -84,6 +88,23 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
   const [busy, setBusy] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [pendingForge, setPendingForge] = React.useState<RunRequest | null>(null);
+  const [legacyBusy, setLegacyBusy] = React.useState(false);
+  const [legacyError, setLegacyError] = React.useState<string | null>(null);
+  const legacyLock = React.useRef(false);
+  const importLegacy = React.useCallback(() => {
+    if (!ports.importLegacy || legacyLock.current) return;
+    legacyLock.current = true;
+    setLegacyBusy(true);
+    setLegacyError(null);
+    void ports.importLegacy().then((projects) => {
+      dispatch({ type: 'importLegacy', projects });
+    }).catch((error: unknown) => {
+      setLegacyError(message(error, 'Could not safely import legacy Studio projects.'));
+    }).finally(() => {
+      legacyLock.current = false;
+      setLegacyBusy(false);
+    });
+  }, [ports.importLegacy]);
   const seq = React.useRef(0);
   const newId = React.useCallback(() => (ports.newId ? ports.newId() : createId(Date.now(), ++seq.current)), [ports]);
   const iso = React.useCallback(() => (ports.nowIso ? ports.nowIso() : new Date().toISOString()), [ports]);
@@ -403,6 +424,21 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
                 dispatch({ type: 'persistError', error: message(error, 'Could not save on this device.') });
               });
             }} testID="studio-retry-save" />
+          </View>
+        ) : null}
+        {ports.legacyAvailable && canEnter(state) && !state.holdSaves ? (
+          <View style={st.persist} testID="studio-legacy-project-import">
+            <Banner tone="warn">
+              Earlier projects use unscoped device storage. They might belong to another account that used this device. Import them only if they are yours. The original legacy copy stays unchanged.
+            </Banner>
+            <Button
+              label="Import my legacy local projects"
+              tone="secondary"
+              busy={legacyBusy}
+              onPress={importLegacy}
+              testID="studio-import-legacy"
+            />
+            {legacyError ? <Banner tone="bad" testID="studio-legacy-error">{legacyError}</Banner> : null}
           </View>
         ) : null}
         {body}

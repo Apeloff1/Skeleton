@@ -11,7 +11,7 @@ import { AccessibilityInfo, PixelRatio, Platform } from 'react-native';
 import { gameforgeAuthPort } from '../../foundation/authPort';
 import type { A11yPlatformSnapshot } from '../../foundation/a11y';
 import type { PersistSnapshot } from '../../foundation/model';
-import { asyncStorageKv } from '../../foundation/storageDevice';
+import { asyncStorageKv, hasLegacyStudioProjects, legacyReadOnlyKv } from '../../foundation/storageDevice';
 import { loadFoundation, saveFoundation } from '../../foundation/storage';
 import { composeSummaryOf, consoleFailures } from '../../cockpitScreen';
 import { useCockpitConsole } from '../../consoleHooks';
@@ -45,6 +45,8 @@ export default function FoundationScreen({ onSetup, onOpenCockpit }: { onSetup: 
   const now = useNow(run.phase === 'running');
   const platform = usePlatformA11y();
   const [ownerId, setOwnerId] = React.useState<string | null>(null);
+  const [authEpoch, setAuthEpoch] = React.useState(() => getAuthEpoch());
+  const [legacyAvailable, setLegacyAvailable] = React.useState(false);
   const runOwnerEpoch = React.useRef<number | null>(null);
   const runGeneration = React.useRef(0);
   const exportLock = React.useRef(false);
@@ -54,7 +56,18 @@ export default function FoundationScreen({ onSetup, onOpenCockpit }: { onSetup: 
     runGeneration.current += 1;
     setOwnerId(null);
     setExportError(null);
+    // Unmount the old account's in-memory project list; a new scoped
+    // project store is bootstrapped under the incoming local bearer.
+    setAuthEpoch(getAuthEpoch());
   }), []);
+  React.useEffect(() => {
+    let mounted = true;
+    setLegacyAvailable(false);
+    void hasLegacyStudioProjects().then((present) => {
+      if (mounted) setLegacyAvailable(present);
+    }).catch(() => { if (mounted) setLegacyAvailable(false); });
+    return () => { mounted = false; };
+  }, [authEpoch]);
   const startForge = React.useCallback((projectId: string, request: RunRequest) => {
     runOwnerEpoch.current = getAuthEpoch();
     runGeneration.current += 1;
@@ -90,10 +103,21 @@ export default function FoundationScreen({ onSetup, onOpenCockpit }: { onSetup: 
   const auth = React.useMemo(() => gameforgeAuthPort(), []);
   const load = React.useCallback(() => loadFoundation(store), [store]);
   const save = React.useCallback((snap: PersistSnapshot) => saveFoundation(store, snap), [store]);
+  const importLegacy = React.useCallback(async () => {
+    const epoch = getAuthEpoch();
+    const old = await loadFoundation(legacyReadOnlyKv());
+    if (epoch !== getAuthEpoch()) throw new Error('Account changed before legacy import completed');
+    if (old.projectsCorrupt) throw new Error('Legacy projects could not be verified; the original data was left unchanged.');
+    setLegacyAvailable(false);
+    return old.projects;
+  }, []);
 
   return (
     <FoundationShell
+      key={authEpoch}
       ports={{
+        legacyAvailable,
+        importLegacy,
         load,
         save,
         auth,
