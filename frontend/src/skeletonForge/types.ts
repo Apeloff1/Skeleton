@@ -187,6 +187,15 @@ export interface RunPayload {
   operator_axes?: Record<string, number>;
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];
+  /** Actual emitted files, returned only with explicit and bounded source export. */
+  files?: Record<string, string>;
+  source_manifest?: {
+    schema?: string; file_count?: number; sha256?: string; files?: Record<string, string>;
+  } | null;
+  source_export?: {
+    status?: 'ready' | 'unavailable'; bytes?: number; file_count?: number;
+    manifest_sha256?: string; reason?: string;
+  } | null;
   native_quest?: {
     schema?: string;
     source_world_sha256?: string;

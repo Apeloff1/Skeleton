@@ -89,7 +89,43 @@ def run(req: RunRequest) -> Dict[str, Any]:
     files = payload.get("files") or {}
     payload = dict(payload)
     payload["file_names"] = sorted(files)
-    if not req.include_files:
+    if req.include_files:
+        manifest = payload.get("source_manifest")
+        ready = (
+            req.target == "godot"
+            and payload.get("succeeded") is True
+            and isinstance(manifest, dict)
+            and manifest.get("schema") == "skeleton.forge.source_manifest.v1"
+            and isinstance(manifest.get("sha256"), str)
+            and len(manifest["sha256"]) == 64
+            and manifest.get("file_count") == len(files)
+            and isinstance(files, dict)
+            and 0 < len(files) <= 256
+        )
+        source_bytes = 0
+        if ready:
+            for name, body in files.items():
+                if not isinstance(name, str) or not isinstance(body, str):
+                    ready = False
+                    break
+                source_bytes += len(body.encode("utf-8"))
+                if source_bytes > 8 * 1024 * 1024:
+                    ready = False
+                    break
+        if ready:
+            payload["source_export"] = {
+                "status": "ready",
+                "bytes": source_bytes,
+                "file_count": len(files),
+                "manifest_sha256": manifest["sha256"],
+            }
+        else:
+            payload["source_export"] = {
+                "status": "unavailable",
+                "reason": "Godot source export unavailable (build failed, unsealed, or exceeds 256 files / 8 MiB)",
+            }
+            payload.pop("files", None)
+    else:
         payload.pop("files", None)
     return payload
 

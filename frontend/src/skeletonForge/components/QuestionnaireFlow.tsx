@@ -303,6 +303,22 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           </View>
         ) : null}
       </View>
+      <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Portable Godot source archive" testID="q-source-export">
+        <Text style={st.q}>Export your generated Godot project</Text>
+        <Text style={st.help}>Optional: prepare the actual generated source files for a local ZIP share after forging, limited to 256 files and 8 MiB of UTF-8 source. No regeneration, cloud upload, or unverified binary release.</Text>
+        <View style={st.chips}>
+          <Chip label="No source archive" selected={!state.sourceExport?.enabled}
+            onPress={() => dispatch({ type: 'setSourceExportEnabled', value: false })}
+            testID="q-source-export-off" />
+          <Chip label="Prepare Godot ZIP" selected={!!state.sourceExport?.enabled}
+            disabled={state.options.target !== 'godot'} color={C.green}
+            onPress={() => dispatch({ type: 'setSourceExportEnabled', value: true })}
+            testID="q-source-export-on" />
+        </View>
+        {state.options.target !== 'godot' ? (
+          <Text style={st.help}>Godot ZIP preparation requires a Godot source target.</Text>
+        ) : null}
+      </View>
       <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Godot headless qualification" testID="q-playtest-controls">
         <Text style={st.q}>Godot headless playtest</Text>
         <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; when a playable sidecar is selected, run its complete win/lose scene separately. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
@@ -427,6 +443,8 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}
       {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
+      {req.include_files ? <Row k="Portable source" v="Prepare bounded Godot ZIP from the exact build" /> : null}
+      {state.sourceExport?.enabled && !req.include_files ? <Banner tone="warn">Godot ZIP preparation is disabled for JSON blueprint output.</Banner> : null}
       {req.playtest ? <Row k="Headless playtest" v={req.playtest === 'require' ? 'Required: main-world boot and playable scene completion when selected' : 'Best effort: main-world and selected playable scene; unavailable means unverified'} /> : null}
       {state.playtest && state.playtest !== 'off' && !req.playtest ? <Banner tone="warn" testID="q-playtest-not-exported">Headless Godot qualification is disabled for JSON blueprint export.</Banner> : null}
       {req.playable_content ? <Row k="Playable scene" v={`Godot ${['extraction', 'combat_loop', 'pipeline'].includes(req.archetype) ? req.archetype : 'extraction'} prototype · controllable scene with launch/return control and a win/lose loop`} /> : null}

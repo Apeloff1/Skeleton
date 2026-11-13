@@ -85,6 +85,7 @@ export interface QuestionnaireState {
   playable?: { enabled: boolean };
   /** Optional Godot headless boot qualification. */
   playtest?: 'off' | 'auto' | 'require';
+  sourceExport?: { enabled: boolean };
 }
 
 export type QuestionnaireAction =
@@ -95,6 +96,7 @@ export type QuestionnaireAction =
   | { type: 'resetAxes' }
   | { type: 'setGalaxyGenre'; genre: string | null }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
+  | { type: 'setSourceExportEnabled'; value: boolean }
   | { type: 'setPlayableEnabled'; value: boolean }
   | { type: 'setPlaytestMode'; value: 'off' | 'auto' | 'require' }
   | { type: 'setQuestEnabled'; value: boolean }
@@ -115,6 +117,7 @@ export const INITIAL_STATE: QuestionnaireState = {
   quest: { enabled: false, length: 3 },
   playable: { enabled: false },
   playtest: 'off',
+  sourceExport: { enabled: false },
 };
 
 function toggle(map: Record<string, string>, key: string, value: string | null): Record<string, string> {
@@ -182,6 +185,8 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       brief.genre = mapped!;
       return { ...state, brief, galaxyGenre: action.genre };
     }
+    case 'setSourceExportEnabled':
+      return { ...state, sourceExport: { enabled: action.value === true } };
     case 'setPlayableEnabled':
       return { ...state, playable: { enabled: action.value === true } };
     case 'setPlaytestMode':
@@ -272,6 +277,11 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   }
   if (state.playtest && state.playtest !== 'off' && request.target === 'godot') {
     request.playtest = state.playtest;
+  }
+  // Prepare source from this exact run only; download must never silently
+  // start a new, potentially different build.
+  if (state.sourceExport?.enabled && request.target === 'godot') {
+    request.include_files = true;
   }
   // Room quests are separate from the playable archetype sidecar scene.
   if (state.quest?.enabled && request.target === 'godot') {

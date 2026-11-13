@@ -24,7 +24,7 @@ export function composeVision(vision: string, signal?: AbortSignal): Promise<Api
 }
 
 export function runForge(req: RunRequest, signal?: AbortSignal): Promise<ApiResult<RunPayload>> {
-  return api.post(`${SKELETON_API}/run`, { ...req, include_files: false }, { signal, timeoutMs: 180000, retries: 0 });
+  return api.post(`${SKELETON_API}/run`, { ...req, include_files: req.include_files === true }, { signal, timeoutMs: 180000, retries: 0 });
 }
 
 export function sendCockpit(command: string, signal?: AbortSignal): Promise<ApiResult<CockpitResult>> {
