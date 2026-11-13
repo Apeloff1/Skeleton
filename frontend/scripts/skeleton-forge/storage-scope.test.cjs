@@ -277,3 +277,71 @@ test('an initial Studio scope lookup error can be retried, but an acquired accou
   assert.match(await fresh.getItem('skeleton.studio.projects.v1'), /original/);
 });
 
+
+test('Studio commits a returning Forge draft exactly once before the handoff is removed', async () => {
+  const source = H.handoffFromStudio(
+    Q.INITIAL_STATE, 'project-original', '2026-11-13T16:00:00.000Z',
+  );
+  await bridgeStorage.storeCreatorBridge(H.handoffToStudio(Q.INITIAL_STATE, source));
+  const received = await bridgeStorage.withCreatorBridge('studio', async (draft) => {
+    assert.equal(draft.studioProjectId, 'project-original');
+    assert.equal(kv.size, 1, 'return must still exist until the receiving save commits');
+    await studioStorage.asyncStorageKv().setItem('skeleton.studio.projects.v1',
+      JSON.stringify([{ id: 'project-original', title: 'Committed only after validation' }]));
+    return draft.studioProjectId;
+  });
+  assert.equal(received, 'project-original');
+  assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
+  assert.equal(kv.size, 1, 'only the receiving Studio project remains');
+  assert.equal(await bridgeStorage.withCreatorBridge('studio', async () => {
+    throw new Error('same handoff claimed twice');
+  }), null);
+});
+
+test('Studio handoff commit failure leaves private authored changes retriable', async () => {
+  const source = H.handoffFromStudio(
+    Q.INITIAL_STATE, 'project-retry', '2026-11-13T16:00:00.000Z',
+  );
+  await bridgeStorage.storeCreatorBridge(H.handoffToStudio(Q.INITIAL_STATE, source));
+  await assert.rejects(
+    bridgeStorage.withCreatorBridge('studio', async () => {
+      throw new Error('device is temporarily full');
+    }), /device is temporarily full/,
+  );
+  assert.equal(kv.size, 1, 'unfinished return cannot consume the draft');
+  const retried = await bridgeStorage.withCreatorBridge('studio', async (draft) => draft.studioProjectId);
+  assert.equal(retried, 'project-retry');
+  assert.equal(kv.size, 0);
+});
+
+test('auth change mid-return cannot reissue the prior account draft to a new account', async () => {
+  const source = H.handoffFromStudio(
+    Q.INITIAL_STATE, 'alice-private-return', '2026-11-13T16:00:00.000Z',
+  );
+  await bridgeStorage.storeCreatorBridge(H.handoffToStudio(Q.INITIAL_STATE, source));
+  rotateOnWrite = true;
+  await assert.rejects(
+    bridgeStorage.withCreatorBridge('studio', async () => {
+      await studioStorage.asyncStorageKv().setItem(
+        'skeleton.studio.projects.v1', '[{"id":"alice-private-return"}]',
+      );
+    }), /Account changed/,
+  );
+  assert.equal(bearer, 'bob-offline-bearer');
+  assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
+  assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null);
+  assert.equal(kv.size, 2, 'Alice handoff and partial Alice project are under Alice keys only');
+  bearer = 'alice-offline-bearer'; epoch++;
+  const restored = await bridgeStorage.withCreatorBridge('studio', async (draft) => draft);
+  assert.equal(restored.studioProjectId, 'alice-private-return');
+  assert.equal(kv.size, 1);
+});
+
+test('first-install return no longer consumes a draft before saving it', () => {
+  const src = fs.readFileSync(
+    path.resolve(__dirname, '../../src/skeletonForge/components/foundation/FoundationScreen.tsx'), 'utf8',
+  );
+  assert.match(src, /withCreatorBridge\('studio', async \(returned\)/);
+  assert.doesNotMatch(src, /storeCreatorBridge\(returned\)/);
+  assert.doesNotMatch(src, /await consumeCreatorBridge\('studio'\)/);
+});
