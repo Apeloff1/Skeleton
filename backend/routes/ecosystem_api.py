@@ -7,8 +7,16 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.core.ecosystem_orchestrator import get_orchestrator
-from backend.core.security_augmentation import bound_text
+# The production Dockerfile flattens backend/ into /app. Match the actual
+# module identity rather than relying on the source checkout's backend/ parent.
+if __package__ == "routes":
+    from core.ecosystem_orchestrator import get_orchestrator
+    from core.security_augmentation import bound_text
+elif __package__ == "backend.routes":
+    from backend.core.ecosystem_orchestrator import get_orchestrator
+    from backend.core.security_augmentation import bound_text
+else:
+    raise ImportError("unsupported ecosystem route package layout")
 
 router = APIRouter(prefix="/api/ecosystem", tags=["ecosystem"])
 
@@ -32,7 +40,12 @@ async def create_session(body: CreateSessionBody):
     brief = bound_text(body.brief, max_len=8000)
     result = get_orchestrator().create_session(brief, era=body.era, actor="api")
     if not result.get("ok"):
-        raise HTTPException(status_code=400, detail=result.get("reason", "bad_request"))
+        reason = result.get("reason", "bad_request")
+        if reason in ("session_capacity", "session_id_collision"):
+            raise HTTPException(status_code=503, detail=reason)
+        if reason == "rate_limited":
+            raise HTTPException(status_code=429, detail=reason)
+        raise HTTPException(status_code=400, detail=reason)
     return result
 
 
@@ -43,6 +56,8 @@ async def run_session(body: RunBody):
         raise HTTPException(status_code=404, detail=result.get("reason"))
     if not result.get("ok") and result.get("reason") == "studio_busy":
         raise HTTPException(status_code=409, detail="studio_busy")
+    if not result.get("ok") and result.get("reason") == "rate_limited":
+        raise HTTPException(status_code=429, detail="rate_limited")
     return result
 
 
@@ -70,4 +85,4 @@ async def list_sessions(limit: int = 20):
 @router.get("/studio/status")
 async def studio_status():
     orch = get_orchestrator()
-    return {"ok": True, "studio": orch.studio.status(), "sessions": len(orch.sessions)}
+    return {"ok": True, "studio": orch.studio.status(), "sessions": orch.session_count()}

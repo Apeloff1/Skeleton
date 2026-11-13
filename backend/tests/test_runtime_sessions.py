@@ -67,3 +67,37 @@ def test_crash_auto_closes_session():
     frame = manager.step(session.id, dt=0.1, controls=FlightInput())
     assert frame.crashed is True
     assert manager.get(session.id).closed is True
+
+
+def test_checkpoint_restores_exact_session_and_owner_scope(tmp_path):
+    manager = RuntimeSessionManager(tmp_path, capacity=4)
+    session = manager.create(owner="alice", seed=17, resolution=12, thermal_count=1)
+    frame = manager.step(session.id, dt=0.02, controls=FlightInput(roll=0.25), owner="alice")
+
+    restored = RuntimeSessionManager(tmp_path, capacity=4)
+    loaded = restored.get(session.id, owner="alice")
+    assert loaded.simulation.tick == frame.tick
+    assert loaded.simulation.time == frame.time
+    assert restored.inventory(owner="alice")[0]["session_id"] == session.id
+    with pytest.raises(SessionNotFound):
+        restored.get(session.id, owner="bob")
+
+
+def test_corrupt_or_oversized_checkpoint_fails_closed(tmp_path):
+    (tmp_path / "bad.json").write_text('{"schema_version":1,"session_id":"bad","owner":"alice","resolution":999999}', encoding="utf-8")
+    manager = RuntimeSessionManager(tmp_path)
+    with pytest.raises(SessionNotFound):
+        manager.get("bad")
+
+
+@pytest.mark.parametrize("field,value", [
+    ("resolution", 513),
+    ("thermal_count", 257),
+    ("terrain_size", float("inf")),
+    ("seed", True),
+])
+def test_create_rejects_unbounded_simulation_inputs(field, value):
+    manager = RuntimeSessionManager()
+    options = {"resolution": 12, "thermal_count": 0, field: value}
+    with pytest.raises(ValueError):
+        manager.create(**options)

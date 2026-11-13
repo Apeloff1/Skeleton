@@ -28,6 +28,53 @@ class ReceiptPublicationError(ValueError):
     """A receipt could not be published without violating custody rules."""
 
 
+
+def preflight_receipt_destination(
+    destination: str | Path, *, protected_roots: Sequence[str | Path],
+    authorized: bool,
+) -> Path:
+    """Read-only, descriptor-pinned destination admission before costly work.
+
+    This check prevents predictable receipt failures from leaving an otherwise
+    newly exported game behind. It is NOT a reservation: the publisher repeats
+    its authority and no-clobber checks when the verified receipt is written.
+    """
+    if authorized is not True:
+        raise PermissionError("operator authorization required for receipt publication")
+    if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+        raise ReceiptPublicationError("descriptor-safe receipt publication unavailable")
+    target = Path(destination).expanduser().absolute()
+    if not _NAME.fullmatch(target.name):
+        raise ReceiptPublicationError("receipt filename must be a bounded .json name")
+    target_path = os.path.abspath(os.fspath(target))
+    for source in protected_roots:
+        source_path = os.path.abspath(os.fspath(Path(source).expanduser()))
+        if os.path.commonpath((source_path, target_path)) == source_path:
+            raise ReceiptPublicationError("receipt must be outside verified source roots")
+    try:
+        parent_fd = _root_fd(target.parent)
+    except (OSError, TypeError, ValueError) as exc:
+        raise ReceiptPublicationError("unsafe receipt destination parent") from exc
+    try:
+        parent = os.fstat(parent_fd)
+        if (not stat.S_ISDIR(parent.st_mode) or parent.st_mode & 0o022
+                or parent.st_uid != os.geteuid()):
+            raise ReceiptPublicationError("receipt parent must be owner-controlled")
+        _assert_original_root(target.parent, parent_fd)
+        try:
+            os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise ReceiptPublicationError("receipt destination already exists")
+        _assert_original_root(target.parent, parent_fd)
+    except (DualRuntimeVerificationError, OSError) as exc:
+        raise ReceiptPublicationError("unsafe receipt destination") from exc
+    finally:
+        os.close(parent_fd)
+    return target
+
+
 def publish_verified_receipt(
     receipt: Mapping[str, object], destination: str | Path, *,
     protected_roots: Sequence[str | Path], authorized: bool,
@@ -74,7 +121,6 @@ def publish_verified_receipt(
         raise ReceiptPublicationError("unsafe receipt destination parent") from exc
     temporary = ".receipt-" + secrets.token_hex(16)
     temporary_identity: tuple[int, int] | None = None
-    published = False
     try:
         parent = os.fstat(parent_fd)
         if (not stat.S_ISDIR(parent.st_mode) or parent.st_mode & 0o022
@@ -102,7 +148,6 @@ def publish_verified_receipt(
             temporary, target.name, src_dir_fd=parent_fd,
             dst_dir_fd=parent_fd, follow_symlinks=False,
         )
-        published = True
         final = os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
         if (not stat.S_ISREG(final.st_mode)
                 or (final.st_dev, final.st_ino) != temporary_identity
@@ -115,14 +160,16 @@ def publish_verified_receipt(
         os.fsync(parent_fd)
         return sha256(data).hexdigest()
     except BaseException as exc:
-        if published and temporary_identity is not None:
-            try:
-                final = os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
-                if (final.st_dev, final.st_ino) == temporary_identity:
-                    os.unlink(target.name, dir_fd=parent_fd)
-            except OSError:
-                pass
-        if isinstance(exc, (ReceiptPublicationError, PermissionError)):
+        # The hardlink is the publication linearization point. A later
+        # directory fsync, path-identity check or temporary cleanup failure
+        # makes durability uncertain, NOT publication safely reversible.
+        # Never unlink the published name: another process may already have
+        # observed it. Preserve it for owner-controlled quarantine/recovery;
+        # a retry must fail the existing-name no-clobber check.
+        # Authorization is checked before the publication transaction.
+        # EPERM from descriptor-bound filesystem IO is a custody failure,
+        # not an authorization denial: always normalize it for callers.
+        if isinstance(exc, ReceiptPublicationError):
             raise
         if isinstance(exc, DualRuntimeVerificationError):
             raise ReceiptPublicationError("receipt destination changed during publication") from exc
@@ -140,4 +187,4 @@ def publish_verified_receipt(
         os.close(parent_fd)
 
 
-__all__ = ["ReceiptPublicationError", "publish_verified_receipt"]
+__all__ = ["ReceiptPublicationError", "preflight_receipt_destination", "publish_verified_receipt"]

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_verdant_caldera",
+  "title": "Verdant Caldera: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Verdant Caldera; prototype maps are not full genre implementations.",
+  "seed": 202610300922,
+  "width": 21,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 8,
+  "theme": "forest",
+  "starting_health": 3
+}

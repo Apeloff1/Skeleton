@@ -1,0 +1,55 @@
+{
+  "schema": "skeleton.game_mechanic_scenario.v1",
+  "name": "attunement",
+  "domain": "arcane",
+  "initial": 39,
+  "capacity": 140,
+  "events": [
+    {
+      "id": "attunement:gain:1",
+      "action": "gain",
+      "amount": 4,
+      "tick": 1
+    },
+    {
+      "id": "attunement:spend:2",
+      "action": "spend",
+      "amount": 7,
+      "tick": 2
+    },
+    {
+      "id": "attunement:recover:3",
+      "action": "recover",
+      "amount": 2,
+      "tick": 3
+    },
+    {
+      "id": "attunement:observe:4",
+      "action": "observe",
+      "amount": 0,
+      "tick": 4
+    },
+    {
+      "id": "attunement:decay:5",
+      "action": "decay",
+      "amount": 3,
+      "tick": 5
+    }
+  ],
+  "assertions": {
+    "bounds": [
+      0,
+      140
+    ],
+    "accepted_receipts": 5,
+    "duplicate_receipts_change_state": false,
+    "stable_ordering": true,
+    "no_authorization_side_effects": true
+  },
+  "notes": [
+    "Designed for arcane simulation with bounded energy units.",
+    "Event IDs carry replay identity within a world instance.",
+    "Timestamps are logical ticks, not wall-clock time.",
+    "This fixture is synthetic and does not claim gameplay/device qualification."
+  ]
+}

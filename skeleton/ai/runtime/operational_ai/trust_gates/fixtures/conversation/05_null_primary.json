@@ -1,0 +1,22 @@
+{
+  "case": "05_null_primary",
+  "gate": "conversation",
+  "expect": "reject",
+  "reason": "No null identity or resource",
+  "payload": {
+    "session_id": null,
+    "messages": [
+      {
+        "role": "system",
+        "content": "Reply safely."
+      },
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ],
+    "max_bytes": 32768,
+    "revision": 1,
+    "final_role": "user"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_creature_sanctuary_luminous_marsh",
+  "title": "Luminous Marsh: The Living Sanctuary",
+  "subtitle": "Original the living sanctuary design in Luminous Marsh; only the grid preview compiles today.",
+  "seed": 203010313645,
+  "width": 25,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 4,
+  "theme": "forest",
+  "starting_health": 5
+}

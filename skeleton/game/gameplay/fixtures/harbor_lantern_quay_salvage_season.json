@@ -1,0 +1,31 @@
+{
+  "schema": "skeleton.game.harbor.salvage-season-board.v1",
+  "source_id": "lantern-quay",
+  "rounds": [
+    {
+      "id": "skiff_and_cache",
+      "board": {
+        "schema": "skeleton.game.harbor.salvage-board.v1",
+        "source_id": "lantern-quay",
+        "sites": [
+          {"id": "wrecked_skiff", "at": [2, 1], "weight": 1, "reward": 4},
+          {"id": "tide_cache", "at": [5, 3], "weight": 2, "reward": 7}
+        ],
+        "tool": "lantern", "max_turns": 128, "hull": 3,
+        "cargo_capacity": 3, "tide_period": 5
+      },
+      "min_reward": 11, "min_hull": 1, "points": 5
+    },
+    {
+      "id": "harbor_cache_return",
+      "board": {
+        "schema": "skeleton.game.harbor.salvage-board.v1",
+        "source_id": "lantern-quay",
+        "sites": [{"id": "tide_cache", "at": [5, 3], "weight": 2, "reward": 7}],
+        "tool": "lantern", "max_turns": 128, "hull": 3,
+        "cargo_capacity": 3, "tide_period": 5
+      },
+      "min_reward": 7, "min_hull": 1, "points": 7
+    }
+  ]
+}

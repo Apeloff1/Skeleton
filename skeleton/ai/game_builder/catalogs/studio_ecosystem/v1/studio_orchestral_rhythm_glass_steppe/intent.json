@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_orchestral_rhythm_glass_steppe",
+  "title": "Glass Steppe: Resonant Orchestra",
+  "subtitle": "Original resonant orchestra design in Glass Steppe; only the grid preview compiles today.",
+  "seed": 203010310467,
+  "width": 19,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 1,
+  "hazards_per_level": 11,
+  "theme": "desert",
+  "starting_health": 5
+}

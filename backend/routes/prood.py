@@ -18,6 +18,7 @@ import time
 from typing import Dict, List, Optional
 
 import httpx
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -27,7 +28,7 @@ from gameforge.prood.saga_orchestrator import SagaStep
 from gameforge.workflow.internal_build_system import create_internal_build_system
 from gameforge.workflow.jeeves_vault import jeeves_vault
 
-router = APIRouter(prefix="/api/prood", tags=["prood"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/prood", tags=["prood"])
 
 _BASE = "http://127.0.0.1:8001"
 
@@ -246,8 +247,8 @@ async def run_quorum(req: QuorumRequest):
     safely when the fault budget is exceeded). Returns the full vote log."""
     try:
         qc = QuorumConsensus(n=req.n, f=req.f)
-    except ValueError as e:
-        return {"ok": False, "error": str(e)}
+    except ValueError:
+        return {"ok": False, "error": "invalid_quorum_configuration"}
     faulty = set(req.faulty or [])
     result = qc.agree(req.value, proof=f"api:{time.time()}", faulty=faulty)
     await event_bus.publish(

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_circuit_racing_echo_caverns",
+  "title": "Echo Caverns: The Intercity Circuit",
+  "subtitle": "Original the intercity circuit design in Echo Caverns; only the grid preview compiles today.",
+  "seed": 203010312616,
+  "width": 19,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 13,
+  "theme": "arcade",
+  "starting_health": 6
+}

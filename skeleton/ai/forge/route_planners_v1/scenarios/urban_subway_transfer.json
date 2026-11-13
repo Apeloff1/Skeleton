@@ -1,0 +1,119 @@
+{
+  "schema": "skeleton.route_scenario.v1",
+  "id": "urban_subway_transfer",
+  "domain": "urban",
+  "mode": "walk",
+  "nodes": [
+    "start",
+    "crossroads",
+    "safehouse",
+    "lookout",
+    "goal"
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "crossroads",
+      "distance": 4,
+      "danger": 8,
+      "energy": 9
+    },
+    {
+      "from": "crossroads",
+      "to": "goal",
+      "distance": 6,
+      "danger": 9,
+      "energy": 10
+    },
+    {
+      "from": "start",
+      "to": "safehouse",
+      "distance": 6,
+      "danger": 7,
+      "energy": 11
+    },
+    {
+      "from": "safehouse",
+      "to": "goal",
+      "distance": 7,
+      "danger": 7,
+      "energy": 9
+    },
+    {
+      "from": "crossroads",
+      "to": "lookout",
+      "distance": 3,
+      "danger": 11,
+      "energy": 10
+    },
+    {
+      "from": "lookout",
+      "to": "goal",
+      "distance": 4,
+      "danger": 11,
+      "energy": 9
+    },
+    {
+      "from": "safehouse",
+      "to": "crossroads",
+      "distance": 4,
+      "danger": 8,
+      "energy": 9
+    },
+    {
+      "from": "start",
+      "to": "goal",
+      "distance": 14,
+      "danger": 5,
+      "energy": 13
+    }
+  ],
+  "requests": [
+    {
+      "origin": "start",
+      "destination": "goal",
+      "danger_budget": 100,
+      "energy_budget": 100,
+      "distance_weight": 1,
+      "danger_weight": 2,
+      "energy_weight": 1,
+      "blocked": []
+    },
+    {
+      "origin": "start",
+      "destination": "goal",
+      "danger_budget": 10,
+      "energy_budget": 15,
+      "distance_weight": 1,
+      "danger_weight": 5,
+      "energy_weight": 1,
+      "blocked": [
+        "crossroads"
+      ]
+    },
+    {
+      "origin": "start",
+      "destination": "goal",
+      "danger_budget": 0,
+      "energy_budget": 0,
+      "distance_weight": 1,
+      "danger_weight": 1,
+      "energy_weight": 1,
+      "blocked": []
+    }
+  ],
+  "invariants": [
+    "deterministic-route-order",
+    "budget-respecting",
+    "no-cycles",
+    "actual-edge-validation",
+    "blocked-node-rejection",
+    "no-unknown-node"
+  ],
+  "qualification": {
+    "synthetic": true,
+    "no_real_world_navigation": true,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_salt_dunes",
+  "title": "Salt Dunes: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Salt Dunes; only the grid preview compiles today.",
+  "seed": 203010317230,
+  "width": 23,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 7,
+  "theme": "desert",
+  "starting_health": 4
+}

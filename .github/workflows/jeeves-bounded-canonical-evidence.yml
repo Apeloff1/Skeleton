@@ -1,0 +1,60 @@
+name: Jeeves Bounded Canonical Evidence Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/jeeves/native_fabric/laptop_ops/contracts.py"
+      - "skeleton/ai/agents/jeeves/native_fabric/laptop_ops/contracts.py"
+      - "skeleton/testing/test_jeeves_laptop_canonical_bounds_20261111.py"
+      - ".github/workflows/jeeves-bounded-canonical-evidence.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-bounded-evidence-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  canonical_evidence_preflight:
+    name: Bounded source evidence and mirror parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout immutable PR head without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Assert checked-out SHA equals immutable PR head
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Use canonical Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install canonical Jeeves test import dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "PyYAML>=6,<7" "pytest>=8,<9" "pytest-asyncio>=0.24,<2"
+          "httpx>=0.28.1,<1" "motor==3.7.1" "pymongo==4.19.0"
+          "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3"
+          "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2"
+          "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
+      - name: Compile canonical source, mirror and focused regressions
+        run: |
+          python -m compileall -q \
+            skeleton/jeeves/native_fabric/laptop_ops/contracts.py \
+            skeleton/ai/agents/jeeves/native_fabric/laptop_ops/contracts.py \
+            skeleton/testing/test_jeeves_laptop_canonical_bounds_20261111.py
+      - name: Verify bounded canonical evidence and malicious-input denials
+        env:
+          PYTHONPATH: "."
+        run: python -m unittest -q skeleton.testing.test_jeeves_laptop_canonical_bounds_20261111
+      - name: Verify canonical AI-tree source and mirror parity
+        run: python scripts/check_ai_file_tree.py
+      - name: Verify architecture boundaries
+        run: python scripts/check_architecture_boundaries.py

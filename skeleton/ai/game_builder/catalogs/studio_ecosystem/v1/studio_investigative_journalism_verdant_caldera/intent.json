@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_verdant_caldera",
+  "title": "Verdant Caldera: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010314358,
+  "width": 27,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 5,
+  "theme": "forest",
+  "starting_health": 4
+}
