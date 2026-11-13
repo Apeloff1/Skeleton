@@ -179,6 +179,11 @@ export interface RunPayload {
   build_plan?: BuildPlanPayload | null;
   playtest?: { status?: string; passed?: boolean; verified?: boolean; errors?: string[] } | null;
   playable_scene_playtest?: { status?: string; passed?: boolean; verified?: boolean; scene?: string; errors?: string[] } | null;
+  /** Source-bound, opt-in in-game launch/return control for the playable archetype. */
+  playable_portal?: {
+    schema?: string; scene?: string; script?: string; source_sha256?: string;
+    return_supported?: boolean; headless_inert?: boolean; sealed?: boolean;
+  };
   operator_axes?: Record<string, number>;
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];

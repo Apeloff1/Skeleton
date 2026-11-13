@@ -18,6 +18,9 @@ on:
       - 'skeleton/testing/test_gameforge_playable_quest_convergence.py'
       - 'skeleton/testing/test_gameforge_archetype_playtest.py'
       - 'skeleton/forge/playtest.py'
+      - 'skeleton/forge/playable_portal.py'
+      - 'skeleton/testing/test_gameforge_playable_portal.py'
+      - 'skeleton/testing/test_archetype_playable_e2e.py'
       - '.github/workflows/gameforge-creator-quest-convergence.yml'
   workflow_dispatch:
 
@@ -48,13 +51,15 @@ jobs:
         run: python -m pip install 'pytest>=8,<9' 'fastapi>=0.115' 'pydantic>=2' 'PyYAML>=6'
       - name: Compile original and converged sources
         run: |
-          python -m compileall -q skeleton/context skeleton/ai/game_builder/godot_quest_bridge.py skeleton/forge/playtest.py backend/routes/skeleton_gameforge.py skeleton/testing/test_creator_quest_convergence.py skeleton/testing/test_gameforge_playable_quest_convergence.py skeleton/testing/test_gameforge_archetype_playtest.py
+          python -m compileall -q skeleton/context skeleton/ai/game_builder/godot_quest_bridge.py skeleton/forge/playtest.py skeleton/forge/playable_portal.py backend/routes/skeleton_gameforge.py skeleton/testing/test_creator_quest_convergence.py skeleton/testing/test_gameforge_playable_quest_convergence.py skeleton/testing/test_gameforge_archetype_playtest.py skeleton/testing/test_gameforge_playable_portal.py
       - name: Verify both feature paths together
         run: |
           python -m pytest -q \
             skeleton/testing/test_creator_quest_convergence.py \
             skeleton/testing/test_gameforge_playable_quest_convergence.py \
             skeleton/testing/test_gameforge_archetype_playtest.py \
+            skeleton/testing/test_gameforge_playable_portal.py \
+            skeleton/testing/test_archetype_playable_e2e.py \
             skeleton/testing/test_gameforge_instrument_overrides.py \
             skeleton/testing/test_extended_genre_catalog.py \
             skeleton/testing/test_native_godot_quest.py \

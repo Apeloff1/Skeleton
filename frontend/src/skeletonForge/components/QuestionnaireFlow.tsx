@@ -261,7 +261,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
       <View style={st.group} testID="q-playable-content-controls" accessibilityRole="radiogroup" accessibilityLabel="Playable Godot prototype scene">
         <Text style={st.q}>Playable Godot prototype scene</Text>
-        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Extraction, Combat Loop and Pipeline have dedicated prototypes. Compose from vision uses Extraction as its fallback playable scene. This is a separate launchable scene, not an automatic replacement for the main world or a claim of 158 gameplay engines.</Text>
+        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Extraction, Combat Loop and Pipeline have dedicated prototypes. Compose from vision uses Extraction as its fallback playable scene. The generated main world now includes an in-game button to launch this prototype and return again. It is an independently playable scene, not a claim of 158 gameplay engines.</Text>
         <View style={st.chips}>
           <Chip label="Blueprint only" selected={!state.playable?.enabled}
             onPress={() => dispatch({ type: 'setPlayableEnabled', value: false })}
@@ -429,7 +429,7 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
       {req.playtest ? <Row k="Headless playtest" v={req.playtest === 'require' ? 'Required: main-world boot and playable scene completion when selected' : 'Best effort: main-world and selected playable scene; unavailable means unverified'} /> : null}
       {state.playtest && state.playtest !== 'off' && !req.playtest ? <Banner tone="warn" testID="q-playtest-not-exported">Headless Godot qualification is disabled for JSON blueprint export.</Banner> : null}
-      {req.playable_content ? <Row k="Playable scene" v={`Godot ${['extraction', 'combat_loop', 'pipeline'].includes(req.archetype) ? req.archetype : 'extraction'} prototype · controllable sidecar scene, with a win/lose loop`} /> : null}
+      {req.playable_content ? <Row k="Playable scene" v={`Godot ${['extraction', 'combat_loop', 'pipeline'].includes(req.archetype) ? req.archetype : 'extraction'} prototype · controllable scene with launch/return control and a win/lose loop`} /> : null}
       {state.playable?.enabled && !req.playable_content ? <Banner tone="warn" testID="q-playable-not-exported">Playable sidecar scenes require Godot output; JSON blueprint export omits playable scenes.</Banner> : null}
       {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · Godot quest HUD and snapshot contract`} /> : null}
       {state.quest?.enabled && !req.quest_content ? <Banner tone="warn" testID="q-native-quest-not-exported">Native room quests are disabled for JSON blueprint output. Select Godot in Forge options to include one.</Banner> : null}

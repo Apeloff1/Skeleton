@@ -105,6 +105,10 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Fact k="Simulation" v={sum.simPassed === null ? '—' : sum.simPassed ? 'passed' : 'failed'} />
               <Fact k="Ledger" v={sum.ledgerValid === null ? '—' : sum.ledgerValid ? 'valid' : 'INVALID'} />
               {payload.forge?.playable_archetype ? <Fact k="Playable scene" v={payload.forge.playable_archetype} /> : null}
+              {payload.playable_portal ? (
+                <Fact k="In-game playable gateway" v={payload.playable_portal.sealed && payload.playable_portal.return_supported
+                  ? 'Source sealed · launch + return' : 'Not source sealed'} />
+              ) : null}
               {payload.native_quest?.steps ? <Fact k="Native quest" v={String(payload.native_quest.steps) + ' room objectives' + (payload.native_quest.sealed ? ' · source sealed' : ' · unsealed')} /> : null}
               {sum.generation ? <Fact k="Hardware" v={humanize(sum.generation)} /> : null}
             </View>
@@ -149,6 +153,11 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
             {payload.playtest?.status === 'passed' && payload.playtest.passed === true && payload.playtest.verified !== true ? (
               <Banner tone="warn" testID="run-world-binary-unverified">
                 World boot passed, but the Godot binary has not been verified against admitted release provenance.
+              </Banner>
+            ) : null}
+            {payload.playable_portal && !payload.playable_portal.sealed ? (
+              <Banner tone="warn" testID="run-playable-portal-unsealed">
+                In-game playable gateway was generated but its project/source receipt is not sealed.
               </Banner>
             ) : null}
             {playableEvidence ? (
