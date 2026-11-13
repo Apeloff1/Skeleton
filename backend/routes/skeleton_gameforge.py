@@ -130,7 +130,11 @@ def run(req: RunRequest) -> Dict[str, Any]:
                 if not _safe_export_path(name) or not isinstance(body, str):
                     ready = False
                     break
-                source_bytes += len(body.encode("utf-8"))
+                try:
+                    source_bytes += len(body.encode("utf-8"))
+                except UnicodeEncodeError:
+                    ready = False
+                    break
                 if source_bytes > 8 * 1024 * 1024:
                     ready = False
                     break

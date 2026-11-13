@@ -23,6 +23,11 @@ function utf8(text: string): Uint8Array {
   const out: number[] = [];
   for (let i = 0; i < text.length; i++) {
     const n = text.codePointAt(i)!;
+    // Malformed UTF-16 must never be silently encoded as a different file
+    // from the source hashed by the canonical Python projector.
+    if (n >= 0xd800 && n <= 0xdfff) {
+      throw new Error('Godot source contains an invalid UTF-16 surrogate');
+    }
     if (n > 0xffff) i++;
     if (n < 0x80) out.push(n);
     else if (n < 0x800) out.push(0xc0 | (n >> 6), 0x80 | (n & 63));
@@ -157,6 +162,7 @@ export function buildGodotSourceArchive(payload: RunPayload): GodotSourceArchive
     throw new Error('Manifest file inventory does not match the returned sources');
   }
   const entries: Entry[] = [];
+  const casefoldedNames = new Set<string>();
   let sourceBytes = 0;
   let archiveBytes = 22;
   for (const [name, body] of files) {
@@ -165,6 +171,11 @@ export function buildGodotSourceArchive(payload: RunPayload): GodotSourceArchive
         || !/^[0-9a-f]{64}$/.test(listed[name])) {
       throw new Error('Unsafe or unlisted Godot project source path');
     }
+    const foldedName = name.toLowerCase();
+    if (casefoldedNames.has(foldedName)) {
+      throw new Error('Case-colliding Godot project paths cannot be exported');
+    }
+    casefoldedNames.add(foldedName);
     const encodedName = utf8(name), encodedBody = utf8(body);
     sourceBytes += encodedBody.length;
     if (sourceBytes > MAX_EXPORT_SOURCE_BYTES) throw new Error('Godot export exceeds the 8 MiB source budget');

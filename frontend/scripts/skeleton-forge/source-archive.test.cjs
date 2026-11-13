@@ -113,6 +113,18 @@ test('the ZIP builder refuses unsealed, failed, oversized and mismatched runs', 
   assert.throws(() => Archive.buildGodotSourceArchive(fixture(many)), /file budget/);
 });
 
+test('invalid UTF-16 and case-colliding generated paths cannot become a portable ZIP', () => {
+  const invalidUnicode = fixture({ 'project.godot': String.fromCharCode(0xd800) });
+  assert.throws(() => Archive.buildGodotSourceArchive(invalidUnicode),
+    /invalid UTF-16 surrogate/);
+  const collision = fixture({
+    'project.godot': 'config_version=5\\n',
+    'scripts/Quest.gd': 'extends Node\\n',
+    'scripts/quest.gd': 'extends Node\\n',
+  });
+  assert.throws(() => Archive.buildGodotSourceArchive(collision), /Case-colliding/);
+});
+
 test('source bundle preparation is opt-in and remains roundtrippable through Galaxy', () => {
   assert.equal(Q.buildRunRequest(Q.INITIAL_STATE).include_files, undefined);
   const enabled = Q.questionnaireReducer(Q.INITIAL_STATE, { type: 'setSourceExportEnabled', value: true });

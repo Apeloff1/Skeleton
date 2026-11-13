@@ -72,6 +72,7 @@ def test_opted_in_archive_preserves_original_exact_run_and_source_digest(monkeyp
     lambda p: p["files"].__setitem__("scripts/nul.gd", "extends Node\\n"),
     lambda p: p["files"].__setitem__(".git/config", "private\\n"),
     lambda p: p["files"].__setitem__("assets/con.gd", "extends Node\\n"),
+    lambda p: p["files"].__setitem__("scripts/quest.gd", chr(0xD800)),
 ])
 def test_source_export_recomputes_full_manifest_and_rejects_unsafe_paths(monkeypatch, mutator):
     payload = fixture()
