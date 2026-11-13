@@ -59,12 +59,15 @@ export async function shareGodotSourceArchive(
   }
   if (!stillCurrent()) throw new Error('Godot source export cancelled because the account changed');
   const { File, Paths } = await import('expo-file-system');
-  const file = new File(Paths.cache, archive.filename);
+  // A unique native cache object avoids overlapping share operations
+  // clobbering another user/session's ZIP with the same manifest name.
+  const uniqueName = archive.filename.replace(/\.zip$/, `-${Crypto.randomUUID()}.zip`);
+  const file = new File(Paths.cache, uniqueName);
   // Never retain another authenticated user's authored project in the
   // shared device cache. A share sheet can fail or be cancelled, so cleanup
   // must run for both success and failure, not just auth rotation.
   try {
-    if (file.exists) file.delete();
+    if (file.exists) throw new Error('Godot share temp file already exists');
     file.create();
     file.write(archive.bytes);
     if (!stillCurrent()) {
