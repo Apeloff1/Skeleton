@@ -102,6 +102,7 @@ jobs:
             scripts/skeleton-forge/foundation.screens.test.cjs \
             scripts/skeleton-forge/run.components.test.cjs \
             scripts/skeleton-forge/creator-bridge.test.cjs \
+            scripts/skeleton-forge/navigation.test.cjs \
             scripts/skeleton-forge/galaxy-draft-custody.test.cjs \
             scripts/skeleton-forge/galaxy-genre-registry.test.cjs \
             scripts/skeleton-forge/storage-scope.test.cjs \

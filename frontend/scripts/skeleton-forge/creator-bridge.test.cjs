@@ -256,3 +256,60 @@ test('Galaxy and Forge routes only hand off after explicit user action', () => {
   assert.match(galaxyModal, /handoffLock\.current = true/);
   assert.doesNotMatch(forgeRoute, /onOpenGalaxyStudio=\{\(\) => router\.push/);
 });
+
+test('Studio → Forge → Studio preserves full authored questionnaire and origin revision', () => {
+  const initial = make(
+    { type: 'setVision', vision: 'A handcrafted local fantasy world' },
+    { type: 'setBrief', facet: 'genre', value: 'rpg' },
+    { type: 'setAxis', axis: 'risk', value: 0.66 },
+    { type: 'setQuestEnabled', value: true },
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setSourceExportEnabled', value: true },
+    { type: 'setPlaytestMode', value: 'require' },
+    { type: 'goto', step: 'review' },
+  );
+  const edited = Q.questionnaireReducer(initial,
+    { type: 'setAxis', axis: 'tempo', value: 0.28 });
+  const source = H.handoffFromStudio(initial, 'p_abc_0', '2026-11-13T13:00:00.000Z', 1700000000000);
+  assert.equal(source.target, 'forge');
+  assert.equal(source.studioProjectId, 'p_abc_0');
+  assert.equal(source.studioProjectUpdatedAt, '2026-11-13T13:00:00.000Z');
+  const outgoing = H.handoffToStudio(edited, source, 1700000000000 + 60 * 60 * 1000);
+  assert.equal(outgoing.target, 'studio');
+  assert.equal(outgoing.studioProjectId, 'p_abc_0');
+  const restored = H.studioStateFromHandoff(outgoing, outgoing.createdMs + 1);
+  assert.equal(restored.step, 'review');
+  assert.equal(restored.vision, initial.vision);
+  assert.deepEqual(restored.instruments, { risk: 0.66, tempo: 0.28 });
+  assert.equal(restored.quest.enabled, true);
+  assert.equal(restored.playable.enabled, true);
+  assert.equal(restored.sourceExport.enabled, true);
+  assert.equal(restored.playtest, 'require');
+  assert.equal(Q.buildRunRequest(restored).include_files, true);
+  assert.equal(Q.buildRunRequest(restored).quest_content, true);
+});
+
+test('Studio origin survives a Galaxy detour and cannot be forged from unrelated work', () => {
+  const state = make({ type: 'setVision', vision: 'A hand-crafted original quest' });
+  const studio = H.handoffFromStudio(state, 'p_origin', '2026-11-13T13:00:00.000Z', 1700000000000);
+  const galaxy = H.handoffFromForge(state, 1700000001000, studio);
+  assert.equal(galaxy.studioProjectId, 'p_origin');
+  const returnedForge = H.handoffFromGalaxy(
+    { title: '', vision: '', genreId: null }, galaxy, 1700000002000);
+  assert.equal(returnedForge.studioProjectId, 'p_origin');
+  assert.equal(H.handoffToStudio(state, returnedForge, 1700000003000).target, 'studio');
+  assert.throws(() => H.handoffToStudio(
+    state, H.handoffFromGalaxy({ title: '', vision: '', genreId: null }, null, 1700000000000),
+    1700000000001,
+  ), /was not opened from a Studio project/);
+  assert.throws(() => H.handoffFromStudio(
+    state, '../escape', '2026-11-13T13:00:00.000Z', 1700000000000,
+  ), /Unrecognized source Studio/);
+  const tampered = { ...studio, studioProjectId: '../hijack' };
+  assert.equal(H.parseCreatorBridge(tampered, 'forge', 1700000000001).studioProjectId, null);
+  assert.equal(H.studioStateFromHandoff({ ...studio, target: 'studio' }, 1700000000001) !== null, true);
+  assert.equal(H.studioStateFromHandoff({
+    ...studio, target: 'studio', studioProjectUpdatedAt: 'not-an-ISO-date',
+  }, 1700000000001), null);
+});
+

@@ -431,3 +431,37 @@ test('duplicate historical project IDs are held for recovery, not silently merge
     projects: [same, { ...same, title: 'A second authored world' }],
   }), active);
 });
+
+test('returning cockpit edits respects the exact Studio project revision', () => {
+  const original = project('p_origin', { questionnaire: m.freshQuestionnaire() });
+  const newState = Q.questionnaireReducer(original.questionnaire, {
+    type: 'setVision', vision: 'A new authored game world',
+  });
+  const nextDate = '2026-11-13T14:00:00.000Z';
+  const applied = m.reconcileStudioReturn([original], 'p_origin', AT, newState, nextDate);
+  assert.equal(applied.status, 'applied');
+  assert.equal(applied.projects[0].id, original.id);
+  assert.equal(applied.projects[0].questionnaire.vision, 'A new authored game world');
+  assert.equal(applied.projects[0].updatedAt, nextDate);
+  const conflict = m.reconcileStudioReturn(applied.projects, 'p_origin', AT, newState, nextDate);
+  assert.equal(conflict.status, 'conflict');
+  assert.equal(conflict.projects[0].updatedAt, nextDate);
+  assert.equal(m.reconcileStudioReturn([original], 'nonexistent', AT, newState, nextDate).status, 'missing');
+});
+
+test('a changed Studio project gets a separate copy, never a silent overwrite', () => {
+  const prior = project('p_origin', { title: 'My original project' });
+  const edited = Q.questionnaireReducer(m.freshQuestionnaire(), {
+    type: 'setVision', vision: 'My returned original game',
+  });
+  const returned = m.recoverStudioReturnAsCopy([prior], edited, '2026-11-13T14:00:00.000Z');
+  assert.equal(returned.projects.length, 2);
+  assert.equal(returned.projects[1], prior);
+  assert.notEqual(returned.project.id, prior.id);
+  assert.match(returned.project.title, /Forge copy/);
+  assert.equal(returned.project.questionnaire.vision, 'My returned original game');
+  const repeated = m.recoverStudioReturnAsCopy(returned.projects, edited, '2026-11-13T14:00:00.000Z');
+  assert.equal(new Set(repeated.projects.map(p => p.id)).size, 3);
+  assert.notEqual(repeated.project.id, returned.project.id);
+});
+

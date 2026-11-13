@@ -41,3 +41,18 @@ test('studio route, registry and menu agree', () => {
   assert.ok(card, 'studio menu card missing');
   assert.match(card, /route: '\/skeleton-studio'/);
 });
+
+test('Studio ↔ Forge route uses an explicit source-bound return, not a blind global draft', () => {
+  const route = read('app/skeleton-forge.tsx');
+  const studio = read('src/skeletonForge/components/foundation/FoundationScreen.tsx');
+  const cockpit = read('src/skeletonForge/components/ForgeCockpitView.tsx');
+  assert.match(studio, /handoffFromStudio\(project\.questionnaire, project\.id, project\.updatedAt\)/);
+  assert.match(studio, /storeCreatorBridge\(envelope\)/);
+  assert.match(studio, /reconcileStudioReturn\(/);
+  assert.match(studio, /recoverStudioReturnAsCopy\(/);
+  assert.match(route, /handoffToStudio\(draft, incoming\)/);
+  assert.match(route, /router\.replace\('\/skeleton-studio'/);
+  assert.match(cockpit, /testID="cockpit-save-to-studio"/);
+  assert.match(route, /handoffFromForge\(draft, Date\.now\(\), incoming\)/);
+});
+
