@@ -58,3 +58,22 @@ def test_control_remaps_do_not_mutate_other_game_sessions():
 def test_unknown_genre_rejected(genre):
     with pytest.raises(InputContractError):
         genre_action_map(genre)
+
+
+def test_all_original_67_galaxy_genres_have_exact_gamepad_keyboard_profiles():
+    import re
+    from pathlib import Path
+    from skeleton.game.presentation.genre_action_profiles import GALAXY_GENRE_FAMILY
+    source_path = (
+        Path(__file__).resolve().parents[3]
+        / "frontend/src/features/GalaxyStudioFactory/fallbackGenres.ts"
+    )
+    text = source_path.read_text(encoding="utf-8")
+    ids = set(re.findall(r"\{\s*id:\s*'([^']+)'\s*,\s*name:\s*'", text))
+    assert len(ids) == 67
+    assert set(GALAXY_GENRE_FAMILY) == ids
+    for name in sorted(ids):
+        profile = genre_control_profile(name)
+        assert profile["genre"] == name
+        assert "galaxy" in profile["catalogs"]
+        assert any(b["control"].startswith("gamepad:") for b in profile["bindings"])

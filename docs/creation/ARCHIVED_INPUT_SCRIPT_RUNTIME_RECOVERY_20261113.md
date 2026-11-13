@@ -22,7 +22,8 @@ and
 - Invalid remap rows were silently dropped; now fail as invalid and do not
   partially mutate existing profiles. Enforce bounded numbers of rows.
 - Genre-specific action profile catalog covers all 36 existing GameForge
-  questionnaire genres plus racing/sandbox, mapped to 8 action families
+  questionnaire genres **and all 67 original Galaxy Studio genres** plus
+  archive-era racing/sandbox where applicable, mapped to 8 input families
   and exposed through `GET /api/skeleton/controls/genres` and
   `GET /api/skeleton/controls/genres/{genre}`.
 - Static introspection has no dynamic provider, command execution or

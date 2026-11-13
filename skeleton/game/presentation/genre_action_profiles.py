@@ -24,6 +24,41 @@ GENRE_FAMILY: dict[str, str] = {
     "visual-novel": "adventure", "narrative": "adventure",
     "cozy": "sandbox", "arcade": "platformer", "racing": "racing",
 }
+# These 67 IDs are the *existing* Galaxy Studio fallback catalogue, not an
+# invented set of gameplay archetypes. Eight families govern input layout only;
+# each game keeps its original genre ID and independent mechanics pipeline.
+GALAXY_GENRE_FAMILY: dict[str, str] = {
+    "platformer_2d": "platformer", "platformer_3d": "platformer",
+    "rpg": "rpg", "fps": "shooter", "tps": "shooter",
+    "battle_royale": "shooter", "mmorpg": "rpg", "moba": "strategy",
+    "puzzle": "puzzle", "strategy_rts": "strategy", "turn_based_strategy": "strategy",
+    "four_x": "strategy", "grand_strategy": "strategy", "colony_sim": "sandbox",
+    "automation": "sandbox", "survival": "sandbox", "soulslike": "rpg",
+    "metroidvania": "platformer", "roguelike": "rpg", "deckbuilder": "puzzle",
+    "fighting": "platformer", "racing": "racing", "horror": "adventure",
+    "stealth": "adventure", "simulation": "sandbox", "city_builder": "sandbox",
+    "farming_sim": "sandbox", "sandbox": "sandbox", "visual_novel": "adventure",
+    "rhythm": "puzzle", "tower_defense": "strategy", "sports": "racing",
+    "extraction_shooter": "shooter", "social_deduction": "adventure",
+    "idle_clicker": "sandbox", "gacha": "rpg", "space_sim": "sandbox",
+    "flight_sim": "racing", "naval_pirate": "adventure", "party_game": "platformer",
+    "educational": "puzzle", "cozy_game": "sandbox", "hunting": "adventure",
+    "fishing": "sandbox", "mech_robot": "shooter", "bullet_hell": "shooter",
+    "walking_sim": "adventure", "point_and_click": "puzzle",
+    "auto_battler": "strategy", "dating_sim": "adventure",
+    "vehicle_combat": "shooter", "immersive_sim": "adventure",
+    "tycoon": "sandbox", "management_sim": "sandbox", "mmo": "rpg",
+    "action_adventure": "adventure", "open_world": "adventure",
+    "looter_shooter": "shooter", "extraction_rpg": "rpg", "card_game": "puzzle",
+    "board_game": "puzzle", "text_adventure": "adventure",
+    "roguelite_shooter": "shooter", "twin_stick": "shooter",
+    "stealth_action": "adventure", "tactics": "strategy",
+    "metaverse_social": "sandbox",
+}
+# Canonical questionnaire genres take precedence for shared spellings.
+QUESTIONNAIRE_GENRE_FAMILY = dict(GENRE_FAMILY)
+GENRE_FAMILY = {**GALAXY_GENRE_FAMILY, **QUESTIONNAIRE_GENRE_FAMILY}
+
 FAMILIES = frozenset({"adventure", "rpg", "strategy", "sandbox", "platformer", "shooter", "puzzle", "racing"})
 
 
@@ -125,6 +160,10 @@ def genre_control_profile(genre: str) -> dict[str, object]:
     return {
         "schema": "skeleton.game.genre_action_profile.v1",
         "genre": genre, "family": GENRE_FAMILY[genre],
+        "catalogs": sorted([name for name, present in (
+            ("galaxy", genre in GALAXY_GENRE_FAMILY),
+            ("gameforge", genre in QUESTIONNAIRE_GENRE_FAMILY),
+        ) if present]),
         "actions": [
             {"id": a.action_id, "kind": a.kind, "context": a.context}
             for a in sorted(m.actions.values(), key=lambda a: a.action_id)
@@ -138,4 +177,4 @@ def genre_control_profile(genre: str) -> dict[str, object]:
     }
 
 
-__all__ = ["GENRE_FAMILY", "FAMILIES", "genre_action_map", "genre_control_profile"]
+__all__ = ["GENRE_FAMILY", "GALAXY_GENRE_FAMILY", "QUESTIONNAIRE_GENRE_FAMILY", "FAMILIES", "genre_action_map", "genre_control_profile"]
