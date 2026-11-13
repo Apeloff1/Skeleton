@@ -89,6 +89,14 @@ def generations() -> Dict[str, Any]:
 
 @router.post("/run")
 def run(req: RunRequest) -> Dict[str, Any]:
+    # HTTP callers may generate an in-memory source manifest or download the
+    # bounded ZIP. They must never supply arbitrary server filesystem write
+    # destinations. CLI/internal callers retain the standalone project writer.
+    if req.project_root is not None or req.overwrite:
+        raise HTTPException(
+            status_code=400,
+            detail="HTTP GameForge builds cannot write server project paths; export source ZIP instead",
+        )
     from skeleton.context.pipeline import GameForgeRun
     try:
         payload = GameForgeRun.live().execute(
@@ -96,8 +104,8 @@ def run(req: RunRequest) -> Dict[str, Any]:
             era=req.era,
             archetype=req.archetype,
             target=req.target,
-            project_root=req.project_root,
-            overwrite=req.overwrite,
+            project_root=None,
+            overwrite=False,
             answers=req.answers or None,
             **({"operator_axes": req.operator_axes} if req.operator_axes is not None else {}),
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
