@@ -4166,13 +4166,14 @@
       "runtime_ready_claim": false,
       "action_mode": "informational",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "28d6bd90505597dbf8a69d4406bd142ae00f31c7dfb509a956ee738f6ed0eb28",
+      "source_sha256": "56b987228ed356b775b7fa29a9356f92bc943f304a2aecf454ebd13625d83ea7",
       "interaction_count": 0,
       "backend_surfaces": [],
       "navigation_targets": [
-        "/menu"
+        "/menu",
+        "/skeleton-forge"
       ],
-      "accessibility_signal_count": 1,
+      "accessibility_signal_count": 2,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6821,11 +6822,13 @@
       "runtime_ready_claim": false,
       "action_mode": "informational",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "5134d33b50f8d3407bdae44b9fe3b499097b69c1b7c9d9b58c3e455618ef5ab6",
+      "source_sha256": "e01aa1163e9325b459eab831009173eedf1f1845138f3f192554f7faeeae1ba2",
       "interaction_count": 0,
       "backend_surfaces": [],
-      "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "navigation_targets": [
+        "/galaxy"
+      ],
+      "accessibility_signal_count": 2,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
