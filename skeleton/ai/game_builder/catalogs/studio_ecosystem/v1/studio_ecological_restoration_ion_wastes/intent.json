@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_ion_wastes",
+  "title": "Ion Wastes: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Ion Wastes; prototype maps are not full genre implementations.",
+  "seed": 202610300854,
+  "width": 21,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 4,
+  "theme": "space",
+  "starting_health": 3
+}

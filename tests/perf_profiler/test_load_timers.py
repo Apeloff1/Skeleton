@@ -112,3 +112,121 @@ def test_load_timer_rejects_nonfinite_budgets_and_unbounded_labels():
         with pytest.raises(ValueError, match="phase name"):
             with timer.phase(name):
                 pass
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), 10**1000, "10", True])
+def test_bad_exit_clock_fails_closed_and_does_not_strand_open_phase(bad):
+    class Clock:
+        reads = 0
+
+        def now_ms(self):
+            self.reads += 1
+            return (0.0, bad, 10.0, 12.0)[self.reads - 1]
+
+    timer = LoadTimer(clock=Clock())
+    with pytest.raises(ValueError, match="timestamp must be finite"):
+        with timer.phase("bad"):
+            pass
+    assert timer.report().payload["ok"] is False
+    with timer.phase("recovered"):
+        pass
+    payload = timer.report().payload
+    assert payload["ok"] is False
+    assert payload["phases"][-1]["duration_ms"] == 2.0
+    assert {"phase": "bad", "error": "ValueError"} in payload["errors"]
+
+
+def test_bad_start_clock_does_not_publish_partial_node():
+    class Clock:
+        reads = 0
+
+        def now_ms(self):
+            self.reads += 1
+            return (float("nan"), 1.0, 2.0)[self.reads - 1]
+
+    timer = LoadTimer(clock=Clock())
+    with pytest.raises(ValueError, match="timestamp must be finite"):
+        with timer.phase("rejected"):
+            pass
+    with timer.phase("accepted"):
+        pass
+    assert [node["name"] for node in timer.report().payload["tree"]] == ["accepted"]
+
+
+def test_clock_failure_does_not_mask_original_body_exception():
+    class Clock:
+        reads = 0
+
+        def now_ms(self):
+            self.reads += 1
+            return 0.0 if self.reads == 1 else float("nan")
+
+    timer = LoadTimer(clock=Clock())
+    with pytest.raises(KeyError, match="original"):
+        with timer.phase("broken"):
+            raise KeyError("original")
+    errors = timer.report().payload["errors"]
+    assert {"phase": "broken", "error": "KeyError"} in errors
+    assert {"phase": "broken", "error": "ValueError"} in errors
+
+
+def test_clock_overflow_delta_unwinds_and_marks_report_invalid():
+    class Clock:
+        reads = 0
+
+        def now_ms(self):
+            self.reads += 1
+            return -1e308 if self.reads == 1 else 1e308
+
+    timer = LoadTimer(clock=Clock())
+    with pytest.raises(ValueError, match="finite non-negative duration"):
+        with timer.phase("overflow"):
+            pass
+    assert timer.report().payload["ok"] is False
+
+
+def test_load_timer_bounds_node_count_and_depth(monkeypatch):
+    from contextlib import ExitStack
+    from skeleton.perf_profiler import load_timers
+
+    monkeypatch.setattr(load_timers, "MAX_PHASE_DEPTH", 2)
+    timer = LoadTimer(clock=DeterministicClock())
+    with ExitStack() as stack:
+        stack.enter_context(timer.phase("outer"))
+        stack.enter_context(timer.phase("inner"))
+        with pytest.raises(ValueError, match="bounded depth"):
+            stack.enter_context(timer.phase("excess"))
+    assert len(timer.report().payload["phases"]) == 2
+
+    monkeypatch.setattr(load_timers, "MAX_PHASE_NODES", 2)
+    timer = LoadTimer(clock=DeterministicClock())
+    with timer.phase("first"):
+        pass
+    with timer.phase("second"):
+        pass
+    with pytest.raises(ValueError, match="bounded node limit"):
+        with timer.phase("third"):
+            pass
+    assert len(timer.report().payload["tree"]) == 2
+
+
+def test_budget_overflow_rejected_as_usage_value_error():
+    with pytest.raises(ValueError, match="budget_ms"):
+        LoadTimer(budget_ms=10**1000)
+
+
+def test_overflowed_total_cannot_be_sealed_as_nonfinite_json():
+    class Clock:
+        reads = 0
+
+        def now_ms(self):
+            self.reads += 1
+            return 0.0 if self.reads % 2 else 1e308
+
+    timer = LoadTimer(clock=Clock())
+    with timer.phase("first"):
+        pass
+    with timer.phase("second"):
+        pass
+    with pytest.raises(ValueError, match="total exceeds finite bound"):
+        timer.report()

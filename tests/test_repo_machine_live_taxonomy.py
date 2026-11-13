@@ -46,6 +46,20 @@ def test_all_skeleton_top_level_directories_have_machine_placement() -> None:
     assert unclassified == []
 
 
+def test_performance_and_qualification_roots_are_quality_owned() -> None:
+    """New standalone evidence packages never inherit AI runtime ownership."""
+    config = load_machine_config(ROOT)
+    for relative in (
+        "skeleton/perfgate/__init__.py",
+        "skeleton/qualification/__init__.py",
+    ):
+        assert (ROOT / relative).is_file()
+        placement = placement_for_path(config, relative)
+        assert (placement.zone, placement.owner, placement.lifecycle) == (
+            "quality", "quality-plane", "canonical"
+        )
+
+
 def test_profiler_runtime_is_owned_by_platform_observability() -> None:
     config = load_machine_config(ROOT)
     placement = placement_for_path(config, "skeleton/perf_profiler/runtime.py")
@@ -112,3 +126,53 @@ def test_governed_storage_and_release_cockpit_retain_existing_owners() -> None:
     cockpit = placement_for_path(config, "skeleton/ops/cockpit/smoke_verdict.py")
     assert (storage.zone, storage.owner) == ("platform", "platform-runtime")
     assert (cockpit.zone, cockpit.owner) == ("build-delivery", "delivery-plane")
+
+
+def test_godot_export_and_legacy_mass_build_have_explicit_existing_owners() -> None:
+    """Every nested legacy path resolves to its explicitly governed delivery root."""
+    config = load_machine_config(ROOT)
+    for candidate, canonical in (
+        ("skeleton/godot_export/runner.py", "skeleton/godot_export/export.py"),
+        ("skeleton/mass_build/B081/contract.py", "skeleton/mass_build/manifest.py"),
+    ):
+        observed = placement_for_path(config, candidate)
+        expected = placement_for_path(config, canonical)
+        assert (observed.zone, observed.owner, observed.lifecycle) == (
+            expected.zone, expected.owner, expected.lifecycle
+        )
+        assert (observed.zone, observed.owner, observed.lifecycle) == (
+            "build-delivery", "delivery-plane", "canonical"
+        )
+
+
+def test_godot_export_and_mass_build_are_owned_by_delivery_plane() -> None:
+    config = load_machine_config(ROOT)
+    for path in (
+        "skeleton/godot_export/export.py",
+        "skeleton/mass_build/manifest.py",
+    ):
+        placement = placement_for_path(config, path)
+        assert (placement.zone, placement.owner, placement.lifecycle) == (
+            "build-delivery",
+            "delivery-plane",
+            "canonical",
+        )
+
+def test_game_provider_environment_remains_explicitly_source_retained() -> None:
+    """A game-world replay adapter must not inherit credential-provider AI authority."""
+    import json
+
+    source = "skeleton/provider_environment.py"
+    candidate = ROOT / source
+    assert candidate.is_file() and not candidate.is_symlink()
+    manifest = json.loads(
+        (ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8")
+    )
+    retained = [
+        record for record in manifest["retained_outside_ai_tree"]
+        if record.get("path") == source
+    ]
+    assert len(retained) == 1
+    assert "game-environment" in retained[0]["owner"]
+    assert "outside credential-provider AI tree" in retained[0]["reason"]
+    assert all(record.get("source") != source for record in manifest["mappings"])

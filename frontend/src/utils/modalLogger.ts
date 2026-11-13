@@ -15,22 +15,21 @@ import { API_BASE as CANONICAL_API_BASE } from './apiBase';
  */
 import { useEffect, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
+import { sanitizeTelemetryDetail, sanitizeTelemetryEvent, redactTelemetryText } from './telemetryPrivacy';
 
 const BACKEND  = CANONICAL_API_BASE;
 const FLUSH_MS = 5000;
+const MAX_EVENTS_PER_UPLOAD = 100;
+const MAX_MEMORY_EVENTS = 500;
 const QUEUE_KEY = '@telemetry/queue';
 
 // One session id per app launch — persists across route changes.
 let _sessionId: string | null = null;
-let _sessionSequence = 0;
-
 function createSessionId(): string {
-  const cryptoObject = (globalThis as any).crypto;
-  if (cryptoObject && typeof cryptoObject.randomUUID === 'function') {
-    return `s_${cryptoObject.randomUUID()}`;
-  }
-  _sessionSequence += 1;
-  return `s_${Date.now().toString(36)}_${_sessionSequence.toString(36)}`;
+  // Telemetry identifiers can correlate user activity across screens.
+  // Never use enumerable timestamps or counters as a fallback.
+  return `s_${Crypto.randomUUID()}`;
 }
 
 function sessionId(): string {
@@ -56,12 +55,21 @@ const _buffer: TelemetryEvent[] = [];
 let _flushTimer: ReturnType<typeof setInterval> | null = null;
 let _flushInflight = false;
 
-async function _persistQueue(events: TelemetryEvent[]) {
+async function _persistQueue(events: TelemetryEvent[]): Promise<boolean> {
   try {
-    const existing = JSON.parse((await AsyncStorage.getItem(QUEUE_KEY)) || '[]');
-    const merged = [...existing, ...events].slice(-2000);
+    const old = JSON.parse((await AsyncStorage.getItem(QUEUE_KEY)) || '[]');
+    // Revalidate legacy queued events before rewriting them to disk.
+    const existing = Array.isArray(old) ? old.slice(-2000) : [];
+    const merged = [...existing, ...events]
+      .slice(-2000)
+      .map(sanitizeTelemetryEvent)
+      .filter((event): event is NonNullable<typeof event> => event !== null);
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(merged));
-  } catch { /* non-fatal */ }
+    return true;
+  } catch {
+    // Failed local storage is not a reason to send an unbounded request.
+    return false;
+  }
 }
 
 async function _drainQueue(): Promise<TelemetryEvent[]> {
@@ -69,25 +77,49 @@ async function _drainQueue(): Promise<TelemetryEvent[]> {
     const raw = await AsyncStorage.getItem(QUEUE_KEY);
     if (!raw) return [];
     await AsyncStorage.removeItem(QUEUE_KEY);
-    return JSON.parse(raw) as TelemetryEvent[];
+    const decoded: unknown = JSON.parse(raw);
+    if (!Array.isArray(decoded)) return [];
+    return decoded.slice(-2000)
+      .map(sanitizeTelemetryEvent)
+      .filter((event): event is NonNullable<typeof event> => event !== null) as TelemetryEvent[];
   } catch { return []; }
+}
+
+function _recoverInMemory(events: TelemetryEvent[]): void {
+  if (!events.length) return;
+  // A storage failure must not allow unbounded buffer expansion.
+  _buffer.unshift(...events.slice(-MAX_MEMORY_EVENTS));
+  if (_buffer.length > MAX_MEMORY_EVENTS) {
+    _buffer.splice(0, _buffer.length - MAX_MEMORY_EVENTS);
+  }
+}
+
+async function _retryLater(events: TelemetryEvent[]): Promise<void> {
+  if (events.length && !(await _persistQueue(events))) {
+    _recoverInMemory(events);
+  }
 }
 
 export async function flushTelemetry(): Promise<void> {
   if (_flushInflight) return;
-  const queued = await _drainQueue();
-  const batch = _buffer.splice(0, _buffer.length).concat(queued);
-  if (!batch.length) return;
   _flushInflight = true;
+  let admitted: TelemetryEvent[] = [];
   try {
+    const queued = await _drainQueue();
+    const ready = _buffer.splice(0, _buffer.length).concat(queued);
+    if (!ready.length) return;
+    // The server rejects oversized batches, so split before creating the
+    // request. Persist the remainder for the next scheduled flush.
+    admitted = ready.slice(0, MAX_EVENTS_PER_UPLOAD);
+    await _retryLater(ready.slice(MAX_EVENTS_PER_UPLOAD));
     const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ events: batch }),
+      body: JSON.stringify({ events: admitted }),
     });
-    if (!r.ok) await _persistQueue(batch);
+    if (!r.ok) await _retryLater(admitted);
   } catch {
-    await _persistQueue(batch);
+    await _retryLater(admitted);
   } finally {
     _flushInflight = false;
   }
@@ -114,20 +146,24 @@ export function recordEvent(
     if (getFeatureFlag('modal_telemetry_batch') === false) {
       if (severity === 'fatal' || severity === 'error') {
         // eslint-disable-next-line no-console
-        console.warn(`[telemetry:off] ${modalId} ${event}`, detail);
+        console.warn('[telemetry:off] error event suppressed');
       }
       return;
     }
   } catch { /* swallow — proceed with buffering */ }
-  _buffer.push({
-    modal_id:   modalId,
+  const row = sanitizeTelemetryEvent({
+    modal_id: modalId,
     session_id: sessionId(),
     event,
     severity,
-    ts_client:  Date.now() / 1000,
+    ts_client: Date.now() / 1000,
     duration_ms,
-    detail,
+    detail: sanitizeTelemetryDetail(detail),
   });
+  if (!row) return;
+  // Bound the in-memory queue even when offline or when uploads fail.
+  if (_buffer.length >= MAX_MEMORY_EVENTS) _buffer.shift();
+  _buffer.push(row as TelemetryEvent);
   _startFlusher();
   // Force-flush fatals immediately
   if (severity === 'fatal' || severity === 'error') {
@@ -155,10 +191,15 @@ export function useModalLogger(modalId: string) {
     action:  (name: string, detail?: any)               => recordEvent(modalId, `action:${name}`, 'info', detail),
     nav:     (to: string)                               => recordEvent(modalId, 'nav', 'info', { to }),
     metric:  (name: string, value: number, unit?: string)=> recordEvent(modalId, `metric:${name}`, 'info', { value, unit }),
-    warn:    (msg: string, detail?: any)                => recordEvent(modalId, 'warn', 'warn', { msg, ...detail }),
+    warn:    (msg: string, detail?: any)                => recordEvent(modalId, 'warn', 'warn', { msg, context: sanitizeTelemetryDetail(detail) }),
     error:   (err: any, detail?: any)                   => {
-      const e = err instanceof Error ? { name: err.name, message: err.message, stack: err.stack?.slice(0, 4000) } : { message: String(err) };
-      recordEvent(modalId, 'error', 'error', { ...e, ...detail });
+      // Exception message/stack can embed bearer tokens, source code and private
+      // filesystem paths; do not retain or upload them at all.
+      const errorType = err instanceof Error ? redactTelemetryText(err.name, 64) : 'UnknownError';
+      recordEvent(modalId, 'error', 'error', {
+        type: errorType,
+        context: sanitizeTelemetryDetail(detail),
+      });
     },
     raw:     (event: string, severity: Severity, detail?: any) => recordEvent(modalId, event, severity, detail),
   };

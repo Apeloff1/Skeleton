@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from hashlib import sha256
-from io import BytesIO, StringIO, TextIOWrapper
+from io import BytesIO, TextIOWrapper
 import json
 import os
 from pathlib import Path
@@ -26,7 +26,7 @@ from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.coordinato
 from skeleton.ai.runtime.operational_ai.orchestration.execution_spine.supervisor import SupervisedAI
 from skeleton.jeeves.agent.native_batch_runtime import (
     NativeBatchHold, NativeBatchTask, NativeBatchPolicy, NativeBatchConveyor,
-    preflight_batch_tasks,
+    preflight_batch_tasks, batch_identity,
 )
 from skeleton.jeeves.agent.native_batch_cli import (
     parse_casebook, main as batch_cli,
@@ -272,7 +272,10 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                       for t in tasks(2)],
         }).encode())
         stdin = TextIOWrapper(BytesIO(raw), encoding="utf-8")
-        stdout, stderr = StringIO(), StringIO()
+        # Use actual buffered text streams: production emits to an owned
+        # binary buffer, which a StringIO-only fixture does not provide.
+        stdout = TextIOWrapper(BytesIO(), encoding="utf-8", write_through=True)
+        stderr = TextIOWrapper(BytesIO(), encoding="utf-8", write_through=True)
         with (
             mock.patch("sys.stdin", stdin),
             mock.patch("sys.stdout", stdout),
@@ -281,6 +284,12 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
                        return_value=(nullcontext(), self.worker, object())) as active,
             mock.patch("skeleton.jeeves.agent.native_batch_cli.inspect_native_jeeves",
                        return_value=SimpleNamespace(source_bridge_ready=True)),
+            # Only the test fixture replaces the installed-source fence;
+            # the production fence is separately tested to reject synthetic workers.
+            mock.patch(
+                "skeleton.jeeves.agent.native_batch_cli.NativeSourceFence",
+                return_value=SimpleNamespace(assert_live=lambda _worker: None),
+            ),
         ):
             arguments = [
                 "--model-root", "/approved/private/model",
@@ -291,7 +300,14 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
             if approve:
                 arguments.append("--approve-native")
             status = batch_cli(arguments)
-        return status, stdout.getvalue(), stderr.getvalue(), active.call_count
+        stdout.flush()
+        stderr.flush()
+        return (
+            status,
+            stdout.buffer.getvalue().decode("utf-8", "strict"),
+            stderr.buffer.getvalue().decode("utf-8", "strict"),
+            active.call_count,
+        )
 
     def test_cli_real_path_commits_synthetic_source_only_batch(self):
         status, stdout, stderr, calls = self._cli()
@@ -328,6 +344,110 @@ class TestNativeBatchWithRealSqlite(unittest.TestCase):
         self.assertEqual(calls, 0)
         self.assertEqual(self.backend.calls, 0)
         self.assertNotIn("Keep private", stderr)
+
+
+    def test_native_batch_wall_budget_holds_after_committed_turn(self):
+        # A single slow turn must not escape the aggregate wall limit merely
+        # because the next-iteration guard is never reached. Its SQLite
+        # commit remains authoritative and cold-replayable.
+        ticks = iter((0.0, 0.0, 0.0, 0.25))
+        policy = NativeBatchPolicy(maximum_wall_seconds=0.1)
+        with self.assertRaisesRegex(NativeBatchHold, "wall-clock budget exhausted"):
+            self._conveyor(
+                policy=policy, monotonic=lambda: next(ticks),
+            ).run("batch_001", tasks(1))
+        self.assertEqual(self.backend.calls, 1)
+        with self.db.snapshot() as conn:
+            self.assertEqual(
+                conn.execute("SELECT COUNT(*) FROM turns").fetchone(), (1,),
+            )
+        self._cold()
+        replay = self._conveyor().run("batch_001", tasks(1))
+        self.assertEqual(replay.committed, 0)
+        self.assertEqual(replay.replayed, 1)
+        self.assertEqual(self.backend.calls, 0)
+
+    def test_native_batch_clock_rejects_nonfinite_and_reversed_time(self):
+        for label, readings in (
+            ("start", (float("nan"),)),
+            ("before", (0.0, float("inf"))),
+            ("begin", (0.0, 0.0, -1.0)),
+        ):
+            with self.subTest(label=label):
+                ticks = iter(readings)
+                with self.assertRaisesRegex(
+                    NativeBatchHold, "nonmonotonic native batch measurement",
+                ):
+                    self._conveyor(
+                        monotonic=lambda: next(ticks),
+                    ).run("batch_" + label, tasks(1))
+        self.assertEqual(self.backend.calls, 0)
+
+    def test_native_batch_denies_subclassed_tasks_before_attribute_hooks(self):
+        class HostileTask(NativeBatchTask):
+            armed = False
+
+            def __getattribute__(self, key):
+                if key in ("task_id", "prompt") and object.__getattribute__(
+                    self, "armed"
+                ):
+                    raise AssertionError("untrusted task attribute was accessed")
+                return object.__getattribute__(self, key)
+
+        foreign = HostileTask("task_0", "Private source-only task")
+        object.__setattr__(foreign, "armed", True)
+        with self.assertRaises(NativeBatchHold):
+            preflight_batch_tasks(
+                "batch_001", (foreign,), NativeBatchPolicy(),
+                configured_output_tokens=128,
+            )
+        with self.assertRaises(NativeBatchHold):
+            self._conveyor().run("batch_001", (foreign,))
+        with self.assertRaises(NativeBatchHold):
+            batch_identity(
+                "batch_001", (foreign,), tenant="local", subject="operator",
+                model_sha256=MODEL, tokenizer_sha256=TOKENIZER,
+            )
+        self.assertEqual(self.backend.calls, 0)
+
+    def test_native_batch_denies_policy_subclasses_without_truthiness(self):
+        class HostilePolicy(NativeBatchPolicy):
+            def __bool__(self):
+                raise AssertionError("untrusted policy truthiness was invoked")
+
+        foreign = HostilePolicy()
+        with self.assertRaises(NativeBatchHold):
+            preflight_batch_tasks(
+                "batch_001", tasks(1), foreign,
+                configured_output_tokens=128,
+            )
+        with self.assertRaises(NativeBatchHold):
+            self._conveyor(policy=foreign)
+        # The former 'policy or default' path silently accepted falsey,
+        # non-policy objects as if the operator had supplied no policy.
+        for invalid in (False, 0, {}, (), ""):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(NativeBatchHold):
+                    self._conveyor(policy=invalid)
+        self.assertEqual(self.backend.calls, 0)
+
+
+    def test_native_batch_ci_checks_out_immutable_source_head(self):
+        workflow = (
+            Path(__file__).resolve().parents[2]
+            / ".github/workflows/native-batch-operator-admission-qualification.yml"
+        ).read_text(encoding="utf-8")
+        expected_ref = 'ref: ${{ github.event.pull_request.head.sha }}'
+        expected_guard = 'run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"'
+        self.assertEqual(workflow.count(expected_ref), 1)
+        self.assertEqual(workflow.count(expected_guard), 1)
+        self.assertIn(
+            'EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}',
+            workflow,
+        )
+        self.assertLess(workflow.index(expected_ref), workflow.index(expected_guard))
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("fetch-depth: 1", workflow)
 
 
 if __name__ == "__main__":

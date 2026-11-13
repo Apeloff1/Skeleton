@@ -594,7 +594,7 @@ def _level_tscn(graph: Dict[str, Any], hardware: Optional[Dict[str, Any]] = None
 _EXPORT_PRESETS = (
     ("Linux", "Linux", True, "builds/linux/game.x86_64", ('binary_format/architecture="x86_64"', "binary_format/embed_pck=false")),
     ("Windows Desktop", "Windows Desktop", True, "builds/windows/game.exe", ('binary_format/architecture="x86_64"', "binary_format/embed_pck=false")),
-    ("Web", "Web", False, "builds/web/index.html", ("variant/extensions_support=false", "vram_texture_compression/for_desktop=true")),
+    ("Web", "Web", False, "builds/web/index.html", ("variant/thread_support=false", "variant/extensions_support=false", "vram_texture_compression/for_desktop=true")),
 )
 
 

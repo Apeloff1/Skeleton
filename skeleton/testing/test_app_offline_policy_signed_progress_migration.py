@@ -13,6 +13,7 @@ from skeleton.app.offline_policy_signed_progress_migration import (
 )
 from skeleton.app.offline_source_trust_policy import SCHEMA
 from skeleton.testing.test_app_offline_signed_progress_migration import migration
+from skeleton.testing.test_app_offline_signed_progress_migration import signed  # noqa: F401  (transitive fixture)
 
 
 @pytest.fixture

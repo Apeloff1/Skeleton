@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.market_exchange_scenario.v1",
+  "id": "settlement_heating_fuel",
+  "domain": "settlement",
+  "commodity": "heating_fuel",
+  "pricing": {
+    "base": 101,
+    "markup_percent": 115,
+    "tariff": 4,
+    "capacity": 304
+  },
+  "initial": {
+    "stock": 81,
+    "treasury": 7116,
+    "holdings": 0,
+    "wallet": 7116,
+    "version": 0,
+    "tick": 0
+  },
+  "commands": [
+    {
+      "id": "settlement_heating_fuel:buy:1",
+      "side": "buy",
+      "quantity": 2,
+      "expected_version": 0,
+      "tick": 1
+    },
+    {
+      "id": "settlement_heating_fuel:sell:2",
+      "side": "sell",
+      "quantity": 1,
+      "expected_version": 1,
+      "tick": 2
+    },
+    {
+      "id": "settlement_heating_fuel:buy:3",
+      "side": "buy",
+      "quantity": 3,
+      "expected_version": 2,
+      "tick": 3
+    }
+  ],
+  "invariants": [
+    "total-units-conserved",
+    "total-credits-conserved",
+    "no-negative-balances",
+    "version-advances-on-accept-only",
+    "duplicate-identity-rejected",
+    "optimistic-version-fencing"
+  ],
+  "qualification": {
+    "fixture_only": true,
+    "no_external_payment_settlement": true,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

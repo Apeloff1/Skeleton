@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_naval_navigation_luminous_marsh",
+  "genre": "naval_navigation",
+  "biome": "luminous_marsh",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_naval_navigation_luminous_marsh:restore",
+  "objective": "reconnect isolated trading ports",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "glowing reed fields",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near submerged civic bell",
+        "Seek a witness of bioluminescent flooding"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "submerged civic bell",
+      "entry": "survey_complete",
+      "actions": [
+        "navigate",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to reeds and peat",
+        "Establish an independent path around a blockade fleet"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "submerged civic bell",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of submerged civic bell",
+        "Construct a low-resource alternative using reeds and peat"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden bioluminescent flooding interrupts transfer",
+    "The a blockade fleet suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "reeds and peat",
+    "unlimited_rewards": false
+  }
+}

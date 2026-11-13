@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_cooperative_rescue_misty_breakwater",
+  "title": "Misty Breakwater: Cooperative Rescue",
+  "subtitle": "An original cooperative rescue brief in Misty Breakwater; prototype maps are not full genre implementations.",
+  "seed": 202610304045,
+  "width": 19,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 9,
+  "theme": "ocean",
+  "starting_health": 6
+}

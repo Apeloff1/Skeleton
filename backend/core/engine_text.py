@@ -61,6 +61,17 @@ def _text(value: object, field: str, *, maximum: int) -> str:
     normalized = value.strip()
     if len(normalized) > maximum:
         raise EngineTextError(f"{field} exceeds maximum length")
+    if any(0xD800 <= ord(char) <= 0xDFFF for char in normalized):
+        raise EngineTextError(f"{field} contains invalid Unicode")
+    return normalized
+
+
+def _identity_text(value: object, field: str, *, maximum: int) -> str:
+    if not isinstance(value, str) or value != value.strip():
+        raise EngineTextError(f"{field} must be a normalized identity")
+    normalized = _text(value, field, maximum=maximum)
+    if any(ord(char) < 32 or ord(char) == 127 for char in normalized):
+        raise EngineTextError(f"{field} contains forbidden identity controls")
     return normalized
 
 
@@ -108,13 +119,15 @@ class EngineTextRequest:
             value = getattr(self, field_name)
             if value is not None:
                 object.__setattr__(self, field_name, _text(value, field_name, maximum=maximum))
-        if self.temperature is not None and (
-            isinstance(self.temperature, bool)
-            or not isinstance(self.temperature, (int, float))
-            or not math.isfinite(self.temperature)
-            or not 0 <= self.temperature <= 2
-        ):
-            raise EngineTextError("temperature must be finite in [0,2]")
+        if self.temperature is not None:
+            if type(self.temperature) not in (int, float):
+                raise EngineTextError("temperature must be finite in [0,2]")
+            try:
+                safe_temperature = float(self.temperature)
+            except (OverflowError, TypeError, ValueError) as exc:
+                raise EngineTextError("temperature must be finite in [0,2]") from exc
+            if not math.isfinite(safe_temperature) or not 0 <= safe_temperature <= 2:
+                raise EngineTextError("temperature must be finite in [0,2]")
         if self.structured_output_schema is not None:
             try:
                 encoded = json.dumps(
@@ -141,7 +154,7 @@ class EngineTextRequest:
         object.__setattr__(
             self,
             "idempotency_key",
-            _text(self.idempotency_key, "idempotency_key", maximum=1024),
+            _identity_text(self.idempotency_key, "idempotency_key", maximum=1024),
         )
         policy_identity = (
             self.instruction_policy_id,
@@ -155,7 +168,7 @@ class EngineTextRequest:
             object.__setattr__(
                 self,
                 "instruction_policy_id",
-                _text(
+                _identity_text(
                     self.instruction_policy_id,
                     "instruction_policy_id",
                     maximum=256,
@@ -164,7 +177,7 @@ class EngineTextRequest:
             object.__setattr__(
                 self,
                 "instruction_policy_version",
-                _text(
+                _identity_text(
                     self.instruction_policy_version,
                     "instruction_policy_version",
                     maximum=64,
@@ -173,12 +186,12 @@ class EngineTextRequest:
         object.__setattr__(
             self,
             "tenant_id",
-            _text(self.tenant_id, "tenant_id", maximum=512),
+            _identity_text(self.tenant_id, "tenant_id", maximum=512),
         )
         object.__setattr__(
             self,
             "actor_id",
-            _text(self.actor_id, "actor_id", maximum=512),
+            _identity_text(self.actor_id, "actor_id", maximum=512),
         )
         capability = _text(self.capability, "capability", maximum=256)
         if capability not in {"assistant.chat", "assistant.compat"}:
@@ -516,6 +529,26 @@ def _context_segments(
     return tuple(segments)
 
 
+def _operation_identity_material(request: EngineTextRequest) -> str:
+    """Frame ambiguous identity fields without changing existing safe receipts.
+
+    Historical durable receipts used a pipe join. Preserve that exact recipe
+    for inputs that cannot collide by separator ambiguity; any pipe-bearing
+    identity gets an explicitly versioned, canonical length-safe digest.
+    The versioned form contains no pipes, so it cannot match the old format.
+    """
+    parts = (
+        request.tenant_id,
+        request.actor_id,
+        request.capability,
+        request.idempotency_key,
+    )
+    if not any("|" in part for part in parts):
+        return "|".join(parts)
+    framed = json.dumps(parts, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return "v2-framed-" + hashlib.sha256(framed).hexdigest()
+
+
 async def execute_engine_text(
     request: EngineTextRequest,
     *,
@@ -549,14 +582,7 @@ async def execute_engine_text(
         raise EngineTextError("canonical engine is not configured")
 
     now = datetime.now(timezone.utc)
-    identity_material = "|".join(
-        (
-            request.tenant_id,
-            request.actor_id,
-            request.capability,
-            request.idempotency_key,
-        )
-    )
+    identity_material = _operation_identity_material(request)
     operation_id = _stable_uuid(
         "backend-engine-text-operation",
         identity_material,
