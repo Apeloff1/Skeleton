@@ -26,7 +26,16 @@ function allowed(key: string): void {
 export function asyncStorageKv(): Kv {
   let owner: Promise<CreatorStorageScope> | null = null;
   const lockedScope = () => {
-    if (!owner) owner = creatorStorageScope(KEYS.projects);
+    if (!owner) {
+      const candidate = creatorStorageScope(KEYS.projects);
+      owner = candidate;
+      // Only a *failed initial acquisition* is retryable. Once a real
+      // fingerprint was captured, epoch rotation permanently fences this
+      // adapter, even when the old bearer is restored.
+      void candidate.catch(() => {
+        if (owner === candidate) owner = null;
+      });
+    }
     return owner;
   };
   async function scopedKey(key: string): Promise<{ key: string; scope: CreatorStorageScope }> {

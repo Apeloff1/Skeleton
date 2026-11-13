@@ -598,3 +598,34 @@ test('completion cannot mark a concurrently edited game as matching the generate
   assert.equal(m.projectStatus(refreshed.projects[0], null, 'idle'), 'Built');
 });
 
+
+test('same-millisecond Studio edits advance revision and protect advanced-cockpit CAS', () => {
+  const initial = project('p_clock', { questionnaire: m.freshQuestionnaire() });
+  let state = base({ projects: [initial], activeId: initial.id });
+  state = m.foundationReducer(state, {
+    type: 'questionnaire',
+    action: { type: 'setVision', vision: 'A new hand-built game' },
+    at: AT,
+  });
+  const one = state.projects[0].updatedAt;
+  state = m.foundationReducer(state, {
+    type: 'questionnaire',
+    action: { type: 'setAxis', axis: 'tempo', value: 0.7 },
+    at: AT,
+  });
+  const two = state.projects[0].updatedAt;
+  assert.notEqual(one, AT);
+  assert.ok(Date.parse(two) > Date.parse(one));
+  assert.equal(m.reconcileStudioReturn(
+    state.projects, initial.id, AT, m.freshQuestionnaire(), AT,
+  ).status, 'conflict');
+  const generated = {
+    phase: 'done', error: null, startedAt: 0, finishedAt: Date.parse(AT),
+    succeeded: true, payload: null,
+  };
+  const finished = m.applyRecordRun(state, initial.id, generated);
+  assert.ok(Date.parse(finished.projects[0].updatedAt) > Date.parse(two));
+  assert.equal(m.nextStudioRevision(one, AT), two);
+  assert.throws(() => m.nextStudioRevision('not-a-date', AT), /Invalid Studio source revision/);
+});
+

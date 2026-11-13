@@ -262,3 +262,18 @@ test('explicit Studio return is one-time, direction-checked and isolated across 
   assert.equal(restored.studioProjectUpdatedAt, '2026-11-13T16:00:00.000Z');
   assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
 });
+test('an initial Studio scope lookup error can be retried, but an acquired account scope cannot change', async () => {
+  const adapter = studioStorage.asyncStorageKv();
+  bearer = 'alice-offline-bearer';
+  epoch = 1;
+  const before = await scope.creatorStorageScope('skeleton.studio.projects.v1');
+  assert.ok(before.stillCurrent());
+  await adapter.setItem('skeleton.studio.projects.v1', '[{"title":"original"}]');
+  bearer = 'bob-offline-bearer'; epoch++;
+  await assert.rejects(adapter.getItem('skeleton.studio.projects.v1'), /Account changed/);
+  bearer = 'alice-offline-bearer'; epoch++;
+  await assert.rejects(adapter.getItem('skeleton.studio.projects.v1'), /Account changed/);
+  const fresh = studioStorage.asyncStorageKv();
+  assert.match(await fresh.getItem('skeleton.studio.projects.v1'), /original/);
+});
+
