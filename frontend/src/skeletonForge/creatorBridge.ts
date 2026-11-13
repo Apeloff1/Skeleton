@@ -87,7 +87,7 @@ export function parseCreatorBridge(
     && validId.test(input.studioProjectId) ? input.studioProjectId : null;
   const studioProjectUpdatedAt = studioProjectId
     && typeof input.studioProjectUpdatedAt === 'string'
-    && /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(input.studioProjectUpdatedAt)
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(input.studioProjectUpdatedAt)
     && Number.isFinite(Date.parse(input.studioProjectUpdatedAt))
       ? input.studioProjectUpdatedAt : null;
   const vision = cleanText(input.vision, 4000);
