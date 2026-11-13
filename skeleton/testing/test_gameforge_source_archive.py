@@ -49,6 +49,15 @@ def fixture(files: dict[str, str] | None = None, *, succeeded: bool = True) -> d
     {"t": 1.1},
     {"t": float("nan")},
     {"t": float("inf")},
+    {"era": "x" * 81},
+    {"archetype": "p" * 81},
+    {"target": "game_mode_" * 3},
+    {"generation": "g" * 81},
+    {"operator_axes": {f"dimension_{i}": 0.5 for i in range(17)}},
+    {"answers": {"../escape": "entry"}},
+    {"answers": {"genre": "x" * 81}},
+    {"answers": {"a" * 49: "rpg"}},
+    {"operator_axes": {"../outside": 0.25}},
 ])
 def test_http_request_admission_rejects_unbounded_inputs_before_generation(kwargs):
     with pytest.raises(ValidationError):
