@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 import subprocess
+from types import SimpleNamespace
+
+import pytest
 
 from skeleton.app.installer import install_application
 from skeleton.app.preloader import PreloadCheck, PreloadReport, inspect_host
@@ -147,12 +151,78 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert "& python $ArchivePreflight --archive $ArchivePath" in source
     assert "$PathBudgetViolations" in source
     assert "& git @ArchiveArgs" in source
-    assert 'git -C $RepoRoot show "$($SourceRef):skeleton/app/manifest.json"' in source
+    assert 'git -C $RepoRoot show "$($SourceCommit):skeleton/app/manifest.json"' in source
     assert '$RuntimePaths = @($RuntimePaths | Select-Object -Unique)' in source
     assert 'Windows payload missing required assembly path' in source
     assert "Get-FileHash -Algorithm SHA256" in source
     assert "Skeleton-Setup-*-windows-x64.exe" in source
     assert "ISCC.exe" in source
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell 7 is required")
+@pytest.mark.parametrize("version_args", [[], ["-Version", "1.2.3"]])
+def test_invalid_installer_source_preserves_existing_outputs(tmp_path, version_args):
+    """A bad revision must fail before cleaning build or release artifacts."""
+    root = tmp_path / "source"
+    script_dir = root / "scripts" / "windows"
+    script_dir.mkdir(parents=True)
+    shutil.copyfile("scripts/windows/build_installer.ps1", script_dir / "build_installer.ps1")
+    build_marker = root / ".build" / "windows-installer" / "keep.txt"
+    output_marker = root / "dist" / "windows" / "old-installer.exe"
+    for marker in (build_marker, output_marker):
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("preserve", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    result = subprocess.run(
+        ["pwsh", "-NoProfile", "-File", str(script_dir / "build_installer.ps1"),
+         "-SourceRef", "refs/heads/does-not-exist", *version_args],
+        cwd=root, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode != 0
+    assert "Unable to resolve SourceRef to a commit" in result.stderr
+    assert build_marker.read_text(encoding="utf-8") == "preserve"
+    assert output_marker.read_text(encoding="utf-8") == "preserve"
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell 7 is required")
+@pytest.mark.parametrize("existing_suffix", ["", ".sha256"])
+def test_installer_output_collision_preserves_existing_release(tmp_path, existing_suffix):
+    root = tmp_path / "source"
+    script_dir = root / "scripts" / "windows"
+    script_dir.mkdir(parents=True)
+    shutil.copyfile("scripts/windows/build_installer.ps1", script_dir / "build_installer.ps1")
+    (root / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "pyproject.toml"], check=True)
+    subprocess.run(["git", "-C", str(root), "-c", "user.name=Installer Test", "-c",
+                    "user.email=installer@example.invalid", "commit", "-qm", "fixture"], check=True)
+    output = root / "dist" / "windows" / f"Skeleton-Setup-1.2.3-windows-x64.exe{existing_suffix}"
+    output.parent.mkdir(parents=True)
+    output.write_text("preserve", encoding="utf-8")
+    result = subprocess.run(["pwsh", "-NoProfile", "-File", str(script_dir / "build_installer.ps1")],
+                            cwd=root, capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0
+    assert "Installer output already exists" in result.stderr
+    assert output.read_text(encoding="utf-8") == "preserve"
+    assert not (root / ".build" / "windows-installer").exists()
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell 7 is required")
+def test_installer_rejects_unsafe_source_version_before_cleanup(tmp_path):
+    root = tmp_path / "source"
+    script_dir = root / "scripts" / "windows"
+    script_dir.mkdir(parents=True)
+    shutil.copyfile("scripts/windows/build_installer.ps1", script_dir / "build_installer.ps1")
+    (root / "pyproject.toml").write_text('[project]\nversion = "1.2.3/escape"\n', encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "pyproject.toml"], check=True)
+    subprocess.run(["git", "-C", str(root), "-c", "user.name=Installer Test", "-c",
+                    "user.email=installer@example.invalid", "commit", "-qm", "fixture"], check=True)
+    result = subprocess.run(["pwsh", "-NoProfile", "-File", str(script_dir / "build_installer.ps1")],
+                            cwd=root, capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0
+    assert "filename-safe" in result.stderr
+    assert not (root / ".build" / "windows-installer").exists()
 
 
 
@@ -225,7 +295,7 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "$launch.ExitCode" in source
     assert '"unins000.exe"' in source
     assert "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" in source
-    assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in source
+    assert "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0" in source
     assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in source
     assert "dist/windows/Skeleton-Setup-*-windows-x64.exe" in source
 
@@ -397,20 +467,22 @@ def test_windows_installer_runs_actual_frozen_payload_preflight():
 
 def test_open_app_does_not_spawn_browser_when_application_is_down(monkeypatch):
     from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
 
-    monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", False, 503, "frontend offline"))
     calls = []
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: calls.append(url) or True)
     ok, detail = launcher.open_running_application()
     assert not ok
-    assert "backend offline" in detail
+    assert "frontend offline" in detail
     assert calls == []
 
 
 def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypatch):
     from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
 
-    monkeypatch.setattr(launcher, "runtime_status", lambda root: (True, "all services healthy"))
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", True, 200, "setup ready"))
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: False)
     ok, detail = launcher.open_running_application()
     assert not ok
@@ -419,7 +491,7 @@ def test_open_app_reports_browser_failure_after_successful_health_probe(monkeypa
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: True)
     ok, detail = launcher.open_running_application()
     assert ok
-    assert "all services healthy" in detail
+    assert "Setup UI opened" in detail
 
 def test_windows_ci_sparse_checkout_contains_every_installer_root():
     source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
@@ -433,15 +505,16 @@ def test_windows_ci_sparse_checkout_contains_every_installer_root():
 
 def test_open_app_uses_configured_frontend_port(monkeypatch, tmp_path):
     from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
 
     (tmp_path / ".env").write_text("FRONTEND_PORT=3300\n", encoding="utf-8")
-    monkeypatch.setattr(launcher, "runtime_status", lambda root: (True, "healthy"))
+    monkeypatch.setattr(launcher, "probe_local_setup", lambda *args, **kwargs: ProbeResult("frontend", "", True, 200, "setup ready"))
     opened = []
     monkeypatch.setattr(launcher.webbrowser, "open", lambda url: opened.append(url) or True)
 
     success, detail = launcher.open_running_application(tmp_path)
     assert success
-    assert opened == ["http://localhost:3300"]
+    assert opened == ["http://localhost:3300/setup"]
     assert "http://localhost:3300" in detail
 
 
@@ -568,3 +641,83 @@ def test_windows_runtime_probe_exception_uses_type_only(monkeypatch, tmp_path):
     assert not ok
     assert "RuntimeError" in detail
     assert "private service token" not in detail
+
+def test_windows_archive_includes_root_engine_docker_allowlist():
+    """The installed engine must use its reviewed context policy, not fallback."""
+    from pathlib import Path
+
+    source = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    manifest = Path("skeleton/app/manifest.json").read_text(encoding="utf-8")
+    assert '"Dockerfile.dockerignore",' in source
+    assert '"Dockerfile.dockerignore"' in manifest
+    assert '"backend/Dockerfile.dockerignore"' in manifest
+    assert '"frontend/.dockerignore"' in manifest
+    assert "/Dockerfile.dockerignore" in workflow
+    assert "skeleton/app/install_source_contracts.py" in manifest
+
+
+def test_open_app_does_not_spawn_browser_when_setup_ui_is_down(monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
+    monkeypatch.setattr(
+        launcher, "probe_local_setup",
+        lambda *args, **kwargs: SimpleNamespace(
+            ok=False, status=503, detail="setup endpoint unavailable",
+        ),
+    )
+    calls = []
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: calls.append(url) or True)
+    ok, detail = launcher.open_running_application()
+    assert not ok
+    assert "Setup UI unavailable" in detail
+    assert calls == []
+
+
+def test_open_app_stays_available_for_setup_while_backend_is_down(monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(launcher, "runtime_status", lambda root: (False, "backend offline"))
+    monkeypatch.setattr(
+        launcher, "probe_local_setup",
+        lambda *args, **kwargs: SimpleNamespace(
+            ok=True, status=200, detail="local setup route available",
+        ),
+    )
+    opened = []
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda url: opened.append(url) or True)
+    ok, detail = launcher.open_running_application()
+    assert ok
+    assert opened == ["http://localhost:3000/setup"]
+    assert "guarded AI readiness are NOT established" in detail
+    assert "backend offline" not in detail
+
+
+@pytest.mark.parametrize("host", (
+    "https://example.com:3000",
+    "http://example.com:3000",
+    "http://localhost:3000/admin",
+    "http://localhost:3000?token=unsafe",
+    "http://localhost:3000#fragment",
+    "http://user:secret@localhost:3000",
+    "http://localhost:3000@evil.example",
+))
+def test_open_app_denies_nonlocal_or_credentialed_setup_urls(monkeypatch, host):
+    from skeleton.app import windows_launcher as launcher
+
+    monkeypatch.setattr(
+        launcher, "public_service_urls",
+        lambda *args, **kwargs: {"frontend": host},
+    )
+    monkeypatch.setattr(
+        launcher, "probe_local_setup",
+        lambda *args, **kwargs: pytest.fail("unsafe URL must not be probed"),
+    )
+    monkeypatch.setattr(
+        launcher.webbrowser, "open",
+        lambda url: pytest.fail("unsafe URL must not reach the browser"),
+    )
+    allowed, detail = launcher.open_running_application()
+    assert allowed is False
+    assert "local HTTP endpoint" in detail

@@ -232,6 +232,13 @@ class NativeTokenizer:
             sha256(text.encode("utf-8")).hexdigest(),
         )
 
+    def stage_text(self, text: str, spool: object) -> str:
+        """Persist source-bound native token IDs in an explicit offline spool."""
+        from .long_context_spool import LongContextSpool
+        if not isinstance(spool, LongContextSpool):
+            raise TokenizerContractError("LongContextSpool required")
+        return spool.stage(self.encode_sequence(text))
+
     def token_text(self, token_id: int) -> str:
         if not _is_int(token_id) or not 0 <= token_id < self.vocab_size:
             raise TokenizerContractError("token id outside vocabulary")
@@ -393,12 +400,18 @@ def batch_token_windows(
     batch_size = _positive(max_batch_size, "max_batch_size", 4096)
     token_budget = _positive(max_tokens_per_batch, "max_tokens_per_batch", MAX_TOKENS)
     batches: list[TokenBatch] = []
+    total_windows = 0
+    total_tokens = 0
     current: list[TokenWindow] = []
     current_tokens = 0
     for window in windows:
         if not isinstance(window, TokenWindow):
             raise TokenizerContractError("TokenWindow required")
         demand = len(window.token_ids)
+        total_windows += 1
+        total_tokens += demand
+        if total_windows > MAX_TEXT_CHUNKS or total_tokens > MAX_TOKENS:
+            raise TokenizerContractError("token batch collection exceeds bounded runtime capacity")
         if demand > token_budget:
             raise TokenizerContractError("token window exceeds batch token budget")
         if current and (len(current) >= batch_size or current_tokens + demand > token_budget):

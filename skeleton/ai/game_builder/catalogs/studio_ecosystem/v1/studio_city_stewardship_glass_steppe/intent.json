@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_glass_steppe",
+  "title": "Glass Steppe: City Stewardship",
+  "subtitle": "An original city stewardship brief in Glass Steppe; prototype maps are not full genre implementations.",
+  "seed": 202610303499,
+  "width": 23,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 5,
+  "theme": "desert",
+  "starting_health": 6
+}

@@ -1,0 +1,17 @@
+{
+  "case": "01_valid_variant",
+  "gate": "tool",
+  "expect": "accept",
+  "reason": "Alternative legitimate operation",
+  "payload": {
+    "grant_id": "g_001",
+    "tool_id": "list_files",
+    "args": {
+      "path": "docs/README.md",
+      "byte_limit": 1024
+    },
+    "risk": "low",
+    "approved": true,
+    "request_id": "r_001"
+  }
+}

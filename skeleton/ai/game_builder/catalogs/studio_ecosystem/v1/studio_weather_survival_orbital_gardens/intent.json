@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_weather_survival_orbital_gardens",
+  "title": "Orbital Gardens: Stormline",
+  "subtitle": "Original stormline design in Orbital Gardens; only the grid preview compiles today.",
+  "seed": 203010316887,
+  "width": 21,
+  "height": 17,
+  "levels": 3,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 14,
+  "theme": "space",
+  "starting_health": 3
+}

@@ -1,0 +1,47 @@
+name: Dragon Atlas frontend qualification
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dragon-atlas-frontend-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  atlas_frontend:
+    name: Authenticated Atlas API, TS and UI contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact source-head checkout identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Use supported Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.20.0"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install reviewed dependencies without lifecycle scripts
+        run: yarn install --ignore-scripts --frozen-lockfile --non-interactive
+      - name: Apply approved local node_modules patches
+        run: node ./scripts/patch-node-modules.js
+      - name: Run source-bound client contract tests
+        run: node --test scripts/test-dragon-atlas-contract.cjs
+      - name: Compile full frontend TypeScript
+        run: yarn typecheck
+      - name: Lint Atlas client and mounted Jeeves UI
+        run: yarn eslint src/product/crawlerClient.ts src/features/Jeeves/atlasCampaignPlan.ts src/features/Jeeves/CrawlerResearchAtlasPanel.tsx src/features/Jeeves/CrawlerWorkspace.tsx --max-warnings=0

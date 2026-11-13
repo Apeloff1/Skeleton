@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_industrial_logistics_echo_caverns",
+  "genre": "industrial_logistics",
+  "biome": "echo_caverns",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Echo Caverns: Industrial Logistics",
+  "foundation": {
+    "setting": "Echo Caverns",
+    "era": "early reconstruction",
+    "environment": "ringing stone halls",
+    "history": "A forgotten underground listening post once protected acoustic reflectors, until recurring unstable resonance forced residents to abandon it.",
+    "theme": "collective repair versus extractive control",
+    "realism": "grounded speculative original"
+  },
+  "premise": "Vera Bryn, a engineer, must restart a failing supply corridor, relying on production-chain balancing despite unstable resonance.",
+  "central_conflict": "a brittle monopoly threatens the underground listening post by restricting acoustic reflectors.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Discovery",
+      "cause": "unstable resonance destroys the primary approach",
+      "effect": "The player must choose an alternative entry"
+    },
+    {
+      "act": 2,
+      "name": "Competing truths",
+      "cause": "a brittle monopoly contests access to acoustic reflectors",
+      "effect": "The protagonist must reconcile independent testimony"
+    },
+    {
+      "act": 3,
+      "name": "Reconstruction",
+      "cause": "The underground listening post becomes operable",
+      "effect": "The choice of stewardship rewrites the alliance map"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "public_proof",
+      "consequence": "Open council administers acoustic reflectors"
+    },
+    {
+      "id": "autonomy",
+      "requires": "self_organized_repair",
+      "consequence": "Locals create an autonomous stewardship cooperative"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimal_access",
+      "consequence": "Survival is proven but structural inequity remains"
+    }
+  ],
+  "canon": {
+    "landmark": "underground listening post",
+    "critical_resource": "acoustic reflectors",
+    "causal_order": [
+      "arrival",
+      "dispute",
+      "repair"
+    ],
+    "continuity_review_required": true
+  }
+}

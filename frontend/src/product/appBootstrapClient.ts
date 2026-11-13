@@ -148,7 +148,8 @@ function runtimeStatus(value: unknown, expected?: AppBootstrap | null): AppRunti
       || service.application.component !== 'engine' || service.application.ingress_prefix !== '/api/v1'
       || service.application.name !== value.application.name || service.application.version !== value.application.version)) return null;
   }
-  if (new Set(value.services.map(service => service.name)).size !== 3 || value.ok !== value.services.every(service => service.ok)) return null;
+  if (new Set(value.services.map(service => service.name)).size !== 3
+    || value.ok !== (value.services.every(service => service.ok) && value.product.available === true)) return null;
   const product = value.product;
   if (typeof product.available !== 'boolean' || ['canonical_actions', 'ready_actions', 'governed_unbound', 'unsafe_actions', 'policy_gaps'].some(key => !count(product[key]))
     || Number(product.ready_actions) > Number(product.canonical_actions) || typeof product.ready_pct !== 'number'

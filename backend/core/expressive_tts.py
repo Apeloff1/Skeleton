@@ -1,6 +1,7 @@
 """Expressive TTS shaping for engine-owned speech synthesis.\n\nThe backend owns presentation concerns only: tone presets, voice/speed choices,\ncadence shaping, chunking, and the product-facing response shape. Provider\ncredentials, provider transport, governance/admission, and speech execution\nbelong to the Skeleton engine process through EngineClient.\n\nThis keeps the historical immersive storyteller behavior while enforcing the\nStage-5 process boundary: backend may describe the desired speech operation but\ncannot instantiate or authenticate a model provider locally.\n"""
 from __future__ import annotations
 import base64
+import math
 import re
 import uuid
 from typing import Dict, List, Optional
@@ -8,6 +9,9 @@ from typing import Dict, List, Optional
 from core.engine_client import EngineClient, EngineClientError
 
 TTS_LIMIT = 4096
+MAX_NARRATION_TEXT_CHARS = 1_000_000
+MAX_NARRATION_CHUNKS = 4096
+MAX_ENGINE_AUDIO_BYTES = 48 * 1024 * 1024
 
 # ── TONE PRESETS ────────────────────────────────────────────────────────────
 # voice    : a valid tts-1-hd voice (alloy/ash/coral/echo/fable/nova/onyx/sage/shimmer)
@@ -56,12 +60,16 @@ _PAUSE_AFTER_INTRO = (
 
 
 def emotion_to_tone(emotional_state: Optional[str]) -> str:
-    if not emotional_state:
+    if emotional_state is None or emotional_state == "":
         return DEFAULT_TONE
+    if not isinstance(emotional_state, str):
+        raise ValueError("emotional state must be a string")
     return EMOTION_TONE.get(emotional_state.strip().lower(), DEFAULT_TONE)
 
 
 def resolve_tone(tone: Optional[str]) -> Dict:
+    if tone is not None and not isinstance(tone, str):
+        raise ValueError("TTS tone must be a string")
     t = (tone or DEFAULT_TONE).strip().lower()
     preset = TONE_PRESETS.get(t)
     if not preset:
@@ -72,15 +80,18 @@ def resolve_tone(tone: Optional[str]) -> Dict:
 
 def shape_cadence(text: str, tone: Optional[str] = None) -> str:
     """Rewrite a script with bounded, linear-time cadence shaping."""
+    if not isinstance(text, str):
+        raise ValueError("TTS text must be a string")
     preset = resolve_tone(tone)
     pauses = preset["pauses"]
     use_ellipses = preset["ellipses"]
     if not text:
         return ""
 
-    # Bound caller-controlled text before any shaping work. TTS accepts at most
-    # TTS_LIMIT characters anyway, so processing more only creates DoS surface.
-    s = text.strip()[:TTS_LIMIT]
+    # Bound caller-controlled input *before* stripping. Calling strip() on a
+    # million-character hostile string allocates and scans the whole value
+    # despite the TTS_LIMIT contract.
+    s = text[:TTS_LIMIT].strip()
     if not s:
         return ""
 
@@ -90,21 +101,33 @@ def shape_cadence(text: str, tone: Optional[str] = None) -> str:
     s = s.replace(" - ", " — ")
 
     if pauses in ("medium", "rich"):
-        # Input is whitespace-normalized, so connective matching can use
-        # bounded case-insensitive substring scans instead of backtracking regex.
-        for word in _BREATH_WORDS:
-            needle = f" {word.casefold()} "
-            cursor = 0
-            while True:
-                folded = s.casefold()
-                index = folded.find(needle, cursor)
-                if index < 0:
-                    break
-                if index > 0 and s[index - 1].isalpha():
-                    s = s[:index] + ", " + s[index + 1:]
-                    cursor = index + len(word) + 2
-                else:
-                    cursor = index + len(needle)
+        # One-pass connective detection: each character is visited once,
+        # with a fixed 16-word vocabulary. Avoid repeated casefold() and
+        # whole-string insertion on every occurrence (quadratic on "a and "
+        # repeated thousands of times).
+        emitted: list[str] = []
+        index = 0
+        length = len(s)
+        folded_words = tuple((word, word.casefold()) for word in _BREATH_WORDS)
+        while index < length:
+            if s[index] == " " and index > 0 and s[index - 1].isalpha():
+                matched = False
+                for word, folded_word in folded_words:
+                    end = index + 1 + len(word)
+                    if (
+                        end < length
+                        and s[end] == " "
+                        and s[index + 1:end].casefold() == folded_word
+                    ):
+                        emitted.append(", ")
+                        index += 1  # consume the original space exactly once
+                        matched = True
+                        break
+                if matched:
+                    continue
+            emitted.append(s[index])
+            index += 1
+        s = "".join(emitted)
 
         folded = s.casefold()
         for word in _PAUSE_AFTER_INTRO:
@@ -175,9 +198,26 @@ async def generate_expressive_tts(
     """Generate immersive HD audio. Returns {audio_base64, voice, speed, tone,
     spoken_text}. Always uses tts-1-hd (top scale). Raises on failure so the
     caller can present a graceful fallback."""
+    if type(shape) is not bool:
+        raise ValueError("TTS shaping flag must be boolean")
+    if not isinstance(text, str):
+        raise ValueError("TTS text must be a string")
     preset = resolve_tone(tone)
+    if voice_override is not None and (
+        not isinstance(voice_override, str)
+        or re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", voice_override) is None
+    ):
+        raise ValueError("TTS voice must be a normalized identifier")
     voice = voice_override or preset["voice"]
-    speed = float(speed_override) if speed_override is not None else float(preset["speed"])
+    if isinstance(speed_override, bool):
+        raise ValueError("TTS speed must be a finite numeric value")
+    try:
+        speed = float(speed_override) if speed_override is not None else float(preset["speed"])
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("TTS speed must be a finite numeric value") from exc
+    if not math.isfinite(speed):
+        raise ValueError("TTS speed must be finite")
+    # Preserve historical in-range clamping for otherwise valid numeric rates.
     speed = max(0.25, min(4.0, speed))
 
     spoken = shape_cadence(text, preset["id"]) if shape else (text or "").strip()[:TTS_LIMIT]
@@ -198,9 +238,13 @@ async def generate_expressive_tts(
         response_format="mp3",
         trace_id="expressive-tts:" + operation_id,
     )
+    if not isinstance(response, dict):
+        raise EngineClientError("engine speech response is not an object")
     audio = response.get("audio")
     if not isinstance(audio, (bytes, bytearray)) or not audio:
         raise EngineClientError("engine speech response is missing audio")
+    if len(audio) > MAX_ENGINE_AUDIO_BYTES:
+        raise EngineClientError("engine speech response exceeds the media budget")
     audio_b64 = base64.b64encode(bytes(audio)).decode("ascii")
     return {
         "audio_base64": audio_b64,
@@ -215,21 +259,60 @@ async def generate_expressive_tts(
 
 
 def chunk_for_narration(text: str, max_chars: int = 700) -> List[str]:
-    """Split long narration into sentence-bounded chunks for smooth, fast-first
-    playback (architect win: streaming-friendly narration)."""
-    if not text:
+    """Yield a complete narration in bounded, ordered chunks.
+
+    Prefer sentence ends and then whitespace, but always split unusually long
+    sentences or words. Never pass an oversized chunk to engine-owned TTS.
+    The scan walks the input once without making an unbounded split list.
+    """
+    if isinstance(max_chars, bool) or not isinstance(max_chars, int) or not 1 <= max_chars <= TTS_LIMIT:
+        raise ValueError(f"max_chars must be an integer in [1, {TTS_LIMIT}]")
+    if not isinstance(text, str):
+        raise TypeError("narration text must be a string")
+    if len(text) > MAX_NARRATION_TEXT_CHARS:
+        raise ValueError("narration text exceeds the maximum text budget")
+    if not text or not text.strip():
         return []
-    sentences = re.split(r"(?<=[.!?…])\s+", text.strip())
+
     out: List[str] = []
-    cur = ""
-    for sent in sentences:
-        if len(cur) + len(sent) + 1 > max_chars and cur:
-            out.append(cur.strip())
-            cur = sent
-        else:
-            cur = f"{cur} {sent}".strip()
-    if cur:
-        out.append(cur.strip())
+    current = ""
+
+    def append_sentence(sentence: str) -> None:
+        nonlocal current
+        pos = 0
+        length = len(sentence)
+        while pos < length:
+            while pos < length and sentence[pos].isspace():
+                pos += 1
+            if pos >= length:
+                break
+            stop = min(length, pos + max_chars)
+            if stop < length:
+                # A natural word break is preferable; an unbroken word still
+                # advances by max_chars rather than producing an oversized row.
+                boundary = sentence.rfind(" ", pos + 1, stop + 1)
+                if boundary > pos:
+                    stop = boundary
+            piece = sentence[pos:stop].strip()
+            pos = stop
+            if not piece:
+                continue
+            if current and len(current) + len(piece) + 1 > max_chars:
+                if len(out) >= MAX_NARRATION_CHUNKS:
+                    raise ValueError("narration exceeds the maximum chunk count")
+                out.append(current)
+                current = ""
+            current = f"{current} {piece}" if current else piece
+
+    start = 0
+    for match in re.finditer(r"(?<=[.!?…])\s+", text):
+        append_sentence(text[start:match.start()])
+        start = match.end()
+    append_sentence(text[start:])
+    if current:
+        if len(out) >= MAX_NARRATION_CHUNKS:
+            raise ValueError("narration exceeds the maximum chunk count")
+        out.append(current)
     return out
 
 

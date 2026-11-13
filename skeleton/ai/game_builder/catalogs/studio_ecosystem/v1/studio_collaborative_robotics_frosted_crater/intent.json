@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_frosted_crater",
+  "title": "Frosted Crater: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Frosted Crater; only the grid preview compiles today.",
+  "seed": 203010317684,
+  "width": 21,
+  "height": 21,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "space",
+  "starting_health": 4
+}

@@ -22,7 +22,8 @@ class ContractConformanceTests(unittest.TestCase):
     def test_current_catalog_is_valid(self) -> None:
         result = MODULE.validate(ROOT)
         self.assertEqual(result["status"], "valid")
-        self.assertEqual(result["contract_count"], 40)
+        schemas = json.loads((ROOT / "machine/ai_runtime_schemas.json").read_text(encoding="utf-8"))
+        self.assertEqual(result["contract_count"], len(schemas["records"]))
         self.assertEqual(result["override_count"], 3)
         self.assertEqual(result["executed_vector_count"], result["vector_count"])
         self.assertEqual(result["authority_scope"], "contract-conformance-only")
@@ -61,6 +62,21 @@ class ContractConformanceTests(unittest.TestCase):
         path.write_text(json.dumps(data), encoding="utf-8")
         with self.assertRaisesRegex(MODULE.ContractConformanceError, "override requires rationale"):
             MODULE.validate(root)
+
+    def test_runtime_controls_retain_schema_owner_and_derived_consumers(self) -> None:
+        for field, replacement, expected_error in (
+            ("producer_plane", "application-api", "producer must equal owner_plane"),
+            ("consumer_planes", ["application-api"], "consumer derivation drift"),
+        ):
+            with self.subTest(field=field):
+                root = self._fixture()
+                path = root / "machine/contract_conformance.json"
+                data = json.loads(path.read_text(encoding="utf-8"))
+                entry = next(e for e in data["entries"] if e["contract"] == "RuntimeMaintenanceRetry")
+                entry[field] = replacement
+                path.write_text(json.dumps(data), encoding="utf-8")
+                with self.assertRaisesRegex(MODULE.ContractConformanceError, expected_error):
+                    MODULE.validate(root)
 
     def test_rejects_vector_expectation_drift(self) -> None:
         root = self._fixture()
@@ -151,6 +167,8 @@ class ContractConformanceTests(unittest.TestCase):
         path = root / "machine/ai_master_plan.json"
         data = json.loads(path.read_text(encoding="utf-8"))
         volume = next(row for row in data["volumes"] if row["key"] == "VOL-003")
+        catalog = json.loads((root / "machine/contract_conformance.json").read_text(encoding="utf-8"))
+        volume["gaps"] = [catalog["masterplan_binding"]["qualification_gap"]]
         volume["completion_checkbox"] = True
         volume["completion_checkbox_mark"] = "[x]"
         path.write_text(json.dumps(data), encoding="utf-8")

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_settlement_survival_cloud_canopy",
+  "title": "Cloud Canopy: Settlement Survival",
+  "subtitle": "An original settlement survival brief in Cloud Canopy; prototype maps are not full genre implementations.",
+  "seed": 202610301605,
+  "width": 19,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 6,
+  "theme": "forest",
+  "starting_health": 5
+}

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_sunken_metro",
+  "title": "Sunken Metro: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Sunken Metro; only the grid preview compiles today.",
+  "seed": 203010317267,
+  "width": 25,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 9,
+  "theme": "arcade",
+  "starting_health": 5
+}

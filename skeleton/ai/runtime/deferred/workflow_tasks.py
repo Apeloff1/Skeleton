@@ -348,20 +348,33 @@ def classify(
     label: str,
     profiles: dict[TaskType, TaskProfile],
 ) -> TaskClassification:
+    if not isinstance(label, str) or not label.strip():
+        raise ValueError("task label required")
+    try:
+        task_type = TaskType(label.lower())
+        known_task = True
+    except ValueError:
+        task_type = TaskType.GENERIC
+        known_task = False
     if (
-        set(profiles) != set(TaskType)
-        or any(
-            profile.default_budget < 0
+        any(
+            not isinstance(profile, TaskProfile)
+            or profile.task_type is not key
+            or profile.default_budget < 0
             or any(not test for test in profile.default_tests)
             or any(not authority for authority in profile.authority)
-            for profile in profiles.values()
+            for key, profile in profiles.items()
+        )
+        or (known_task and set(profiles) != set(TaskType))
+        or (
+            not known_task
+            and (
+                TaskType.GENERIC not in profiles
+                or profiles[TaskType.GENERIC].authority
+            )
         )
     ):
         raise ValueError("complete task profiles required")
-    try:
-        task_type = TaskType(label.lower())
-    except ValueError:
-        task_type = TaskType.GENERIC
     return TaskClassification(
         task_type,
         1.0 if task_type is not TaskType.GENERIC else 0.0,

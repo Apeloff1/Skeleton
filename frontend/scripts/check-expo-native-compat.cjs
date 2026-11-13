@@ -1,26 +1,26 @@
 #!/usr/bin/env node
 "use strict";
-// Expo 54 bundled-native-module gate. Updating the SDK requires a reviewed
+// Expo 55 bundled-native-module gate. Updating the SDK requires a reviewed
 // replacement of this compatibility table, not an isolated RN peer bump.
-// Source: https://docs.expo.dev/versions/v54.0.0/
+// Source: expo@55.0.32 bundledNativeModules.json (https://docs.expo.dev/versions/v55.0.0/)
 const fs = require("node:fs");
 const path = require("node:path");
 
 const EXPECTED = Object.freeze({
-  "expo": "~54.0.35",
-  "react": "19.1.0",
-  "react-dom": "19.1.0",
-  "react-native": "0.81.5",
-  "@types/react": "~19.1.0",
-  "@react-native-community/netinfo": "11.4.1",
-  "@react-native-community/slider": "5.0.1",
-  "react-native-gesture-handler": "~2.28.0",
-  "react-native-reanimated": "~4.1.1",
+  "expo": "~55.0.32",
+  "react": "19.2.0",
+  "react-dom": "19.2.0",
+  "react-native": "0.83.10",
+  "@types/react": "~19.2.10",
+  "@react-native-community/netinfo": "11.5.2",
+  "@react-native-community/slider": "5.1.2",
+  "react-native-gesture-handler": "~2.30.0",
+  "react-native-reanimated": "4.2.1",
   "react-native-safe-area-context": "~5.6.0",
-  "react-native-screens": "~4.16.0",
-  "react-native-svg": "15.12.1",
-  "react-native-webview": "13.15.0",
-  "react-native-worklets": "0.5.1"
+  "react-native-screens": "~4.23.0",
+  "react-native-svg": "15.15.3",
+  "react-native-webview": "13.16.0",
+  "react-native-worklets": "0.7.4"
 });
 function lockVersionAllowed(actual, selector) {
   if (typeof actual !== "string") return false;
@@ -93,11 +93,11 @@ function run() {
   const lock = fs.readFileSync(path.join(__dirname, "..", "yarn.lock"), "utf8");
   const errors = validate(manifest, lock);
   if (errors.length) {
-    console.error("[expo-native-compat] SDK 54 incompatible or lockfile drift:\n" +
+    console.error("[expo-native-compat] SDK 55 incompatible or lockfile drift:\n" +
                   errors.map(item => "- " + item).join("\n"));
     process.exitCode = 1;
   } else {
-    console.log("[expo-native-compat] Expo SDK 54 native dependency and lockfile pins verified");
+    console.log("[expo-native-compat] Expo SDK 55 native dependency and lockfile pins verified");
   }
 }
 if (require.main === module) run();

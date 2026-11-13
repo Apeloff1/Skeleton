@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_investigative_journalism_luminous_marsh",
+  "title": "Luminous Marsh: The Witness Ledger",
+  "subtitle": "Original the witness ledger design in Luminous Marsh; only the grid preview compiles today.",
+  "seed": 203010314136,
+  "width": 25,
+  "height": 15,
+  "levels": 6,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 5,
+  "theme": "forest",
+  "starting_health": 6
+}

@@ -186,6 +186,10 @@ def governed_artifact(request, tmp_path, monkeypatch):
     monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(arguments["output_path"]))
     monkeypatch.setenv("AI_LOCAL_MODEL_SEED", "0")
     monkeypatch.setenv("AI_LOCAL_MODEL_CACHE_SIZE", "8")
+    # Explicit test-only legacy admission: production still requires trusted guarded components.
+    monkeypatch.setenv("AI_DEPLOYMENT_ENV", "development")
+    monkeypatch.setenv("AI_LOCAL_LEGACY_DEV_ACK", "unsafe-local-dev-only")
+    monkeypatch.setenv("AI_LOCAL_GUARD_REQUIRED", "false")
     for name in (
         "OPENAI_API_KEY",
         "OPENAI_BASE_URL",
@@ -317,7 +321,7 @@ async def _engine_stack(tmp_path, algorithm):
             ]
         ),
     )
-    registry = ProviderRegistry.from_env()
+    registry = ProviderRegistry.from_env(require_guarded_local=False)
     coordinator = EngineExecutionCoordinator(
         service,
         provider_registry=registry,

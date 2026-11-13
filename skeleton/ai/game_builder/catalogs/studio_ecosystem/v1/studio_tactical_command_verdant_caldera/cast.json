@@ -1,0 +1,93 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.cast.v1",
+  "project_id": "studio_tactical_command_verdant_caldera",
+  "genre": "tactical_command",
+  "biome": "verdant_caldera",
+  "release_certified": false,
+  "protagonist": {
+    "id": "protagonist",
+    "name": "Rina Kest",
+    "role": "commander",
+    "public_goal": "evacuate a threatened network of settlements",
+    "private_burden": "An earlier geothermal plumes report ignored by peers",
+    "abilities": [
+      "fog of war, logistics and coordinated multi-unit tactics",
+      "deploy"
+    ],
+    "weakness": "Refuses to publish uncertain evidence",
+    "arc": "Learns transparent stewardship of other people's work"
+  },
+  "support": [
+    {
+      "id": "witness",
+      "name": "Enzo Lark",
+      "role": "local testimony keeper",
+      "knows": "Three conflicting accounts of hanging botanical lab",
+      "relationship": "trust grows when corrections are acknowledged"
+    },
+    {
+      "id": "technician",
+      "name": "Dava Aster",
+      "role": "Maintainer of mineral terraces",
+      "knows": "Repair topology under steam temperature",
+      "relationship": "cooperates when measured evidence is shared"
+    },
+    {
+      "id": "rival",
+      "name": "Sumi Varis",
+      "role": "contested operations director",
+      "organization": "a blockade admiral",
+      "goal": "Exclusive access to mineral terraces",
+      "relationship": "can relent under documented public review"
+    }
+  ],
+  "factions": [
+    {
+      "id": "residents",
+      "interest": "security and agency",
+      "reputation": 0
+    },
+    {
+      "id": "operators",
+      "interest": "measurable restoration of supply and command bandwidth",
+      "reputation": 0
+    },
+    {
+      "id": "claimants",
+      "interest": "priority over mineral terraces",
+      "reputation": 0
+    }
+  ],
+  "social_rules": [
+    {
+      "decision": "publish_ledger",
+      "reputation_delta": {
+        "residents": 2,
+        "operators": 1,
+        "claimants": -1
+      }
+    },
+    {
+      "decision": "private_deal",
+      "reputation_delta": {
+        "residents": -2,
+        "operators": 0,
+        "claimants": 2
+      }
+    },
+    {
+      "decision": "neutral_audit",
+      "reputation_delta": {
+        "residents": 1,
+        "operators": 2,
+        "claimants": 0
+      }
+    }
+  ],
+  "conversation_flags": [
+    "evidence_seen",
+    "consent_granted",
+    "repair_receipt_recorded",
+    "faction_proposal_accepted"
+  ]
+}

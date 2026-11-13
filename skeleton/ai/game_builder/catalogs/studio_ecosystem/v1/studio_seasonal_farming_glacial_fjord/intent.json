@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_glacial_fjord",
+  "title": "Glacial Fjord: The Four Harvests",
+  "subtitle": "Original the four harvests design in Glacial Fjord; only the grid preview compiles today.",
+  "seed": 203010315044,
+  "width": 21,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "ocean",
+  "starting_health": 6
+}

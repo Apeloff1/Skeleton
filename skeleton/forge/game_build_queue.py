@@ -33,6 +33,10 @@ class JobTimeout(Exception):
     pass
 
 
+class GameBuildFailed(RuntimeError):
+    """A build request or its result could not be accepted safely."""
+
+
 @dataclass(frozen=True)
 class JobHandle:
     job_id: str
@@ -87,24 +91,78 @@ def _builder_deadline_s(body: Mapping[str, Any], options: Mapping[str, Any], ctx
     raw_timeout = getattr(ctx, "timeout_s", None)
     if raw_timeout is None:
         raw_timeout = DEFAULT_TIMEOUT_S
-    try:
-        timeout_s = float(raw_timeout)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("timeout_s must be a number of seconds") from exc
+    if (isinstance(raw_timeout, bool) or not isinstance(raw_timeout, (int, float))
+            or not 0 < raw_timeout <= 6 * 3600):
+        raise GameBuildFailed("Invalid game build time budget")
+    timeout_s = float(raw_timeout)
     raw = body.get("deadline_s", None)
     if raw is None:
         raw = options.get("deadline_s", None)
+    # The public build endpoint is capped at 120 seconds. Apply that same cap
+    # again at dispatch, including jobs queued by an older server version.
+    timeout_s = min(timeout_s, 120.0)
     if raw is None:
         return timeout_s
-    if isinstance(raw, bool):
-        raise ValueError("deadline_s must be a number of seconds")
-    try:
-        asked = float(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("deadline_s must be a number of seconds") from exc
-    if asked < 0:
-        raise ValueError("deadline_s must be a number of seconds")
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not 0 < raw <= 120:
+        raise GameBuildFailed("Invalid game build time budget")
+    asked = float(raw)
     return min(asked, timeout_s)
+
+
+def _authorized_brief(ctx: Any, body: Mapping[str, Any]) -> Any:
+    """Resolve project builds from the job owner's persisted project, never options."""
+    project_id = getattr(ctx, "project_id", None)
+    if not project_id:
+        return _brief_from_job_payload(body)
+    actor = getattr(ctx, "actor_id", None)
+    tenant = getattr(ctx, "tenant_id", None)
+    db = getattr(getattr(ctx, "_svc", None), "db", None)
+    if not actor or not tenant or db is None:
+        raise GameBuildFailed("Project build is unavailable")
+    try:
+        from skeleton.persistence.app_foundation.projects_v1 import ProjectsV1Store
+        project = ProjectsV1Store(db).get(actor, tenant, project_id)
+        if project is None:
+            raise GameBuildFailed("Project build is unavailable")
+        stored_brief = project.brief.as_dict()
+        # The request must still describe the owner-scoped snapshot admitted
+        # at enqueue time. Never silently build a changed or missing brief.
+        if not isinstance(body.get("brief"), dict) or body["brief"] != stored_brief:
+            raise GameBuildFailed("Project build is unavailable")
+        return stored_brief
+    except Exception:
+        # Storage errors and cross-tenant lookups are indistinguishable here.
+        raise GameBuildFailed("Project build is unavailable") from None
+
+
+def _recheck_project_admission(ctx: Any, body: Mapping[str, Any]) -> None:
+    """Recheck the originating session and charter at dispatch time.
+
+    This is a point-in-time check. It is not a policy-epoch fence and cannot
+    revoke a build that has already passed admission and begun execution.
+    """
+    if not getattr(ctx, "project_id", None):
+        return
+    if body.get("project_build_authorized") is not True:
+        raise GameBuildFailed("Project build authorization is unavailable")
+    session_id = body.get("project_build_session_id")
+    actor = getattr(ctx, "actor_id", None)
+    db = getattr(getattr(ctx, "_svc", None), "db", None)
+    if not isinstance(session_id, str) or not session_id or len(session_id) > 128 or not actor or db is None:
+        raise GameBuildFailed("Project build authorization is unavailable")
+    try:
+        rows = db.query(
+            "SELECT s.session_id FROM sessions s JOIN users u ON u.user_id=s.user_id "
+            "WHERE s.session_id=? AND s.user_id=? AND s.revoked=0 AND s.expires_at>? AND u.disabled=0",
+            (session_id, actor, time.time()),
+        )
+        if len(rows) != 1:
+            raise GameBuildFailed("Project build authorization is unavailable")
+        from skeleton.kernel.governance import get_governance
+        if get_governance().decide("forge", "run", 0).permitted is not True:
+            raise GameBuildFailed("Project build authorization is unavailable")
+    except Exception:
+        raise GameBuildFailed("Project build authorization is unavailable") from None
 
 
 def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -114,7 +172,16 @@ def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
     ctx.progress(0.05, "compiling brief")
     ctx.heartbeat()
     body = dict(payload or {})
-    options = body.get("options") if isinstance(body.get("options"), Mapping) else {}
+    options = body.get("options", {})
+    if not isinstance(options, Mapping):
+        raise GameBuildFailed("Invalid game build options")
+    # Old project-bound jobs lack proof that forge/run was admitted, and a
+    # later session revocation or charter denial must be observed at dispatch.
+    _recheck_project_admission(ctx, body)
+    # An old queued payload can outlive the HTTP validation that admitted it.
+    # Never execute an executable chosen by a request, even after an upgrade.
+    if "binary" in body or "binary" in options:
+        raise GameBuildFailed("Custom game build executables are not permitted")
 
     def on_progress(fraction: float, message: str) -> None:
         ctx.progress(0.1 + 0.85 * max(0.0, min(1.0, float(fraction))), message)
@@ -123,23 +190,41 @@ def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
     deadline_s = _builder_deadline_s(body, options, ctx)
     playtest = body.get("playtest", options.get("playtest", "off"))
     rounds = body.get("max_rounds", options.get("max_rounds", 3))
+    if isinstance(rounds, bool) or not isinstance(rounds, int) or not 1 <= rounds <= 3:
+        raise GameBuildFailed("Invalid game build round limit")
+    target = body.get("target", "")
+    if target == "":
+        target = options.get("target", "")
+    if target == "":
+        target = "godot"
+    if not isinstance(target, str) or target not in {"godot", "json", "yaml"}:
+        raise GameBuildFailed("Unsupported game build target")
     kwargs: dict[str, Any] = {
         "era": body.get("era") or options.get("era") or None,
         "repair_mode": str(body.get("repair_mode") or options.get("repair_mode") or "apply"),
         "playtest_mode": str(playtest or "off"),
-        "max_rounds": int(rounds),
-        "binary": body.get("binary") or options.get("binary"),
+        "max_rounds": rounds,
         "actor_id": getattr(ctx, "actor_id", None) or None,
         "tenant_id": getattr(ctx, "tenant_id", None) or None,
         "execution_id": getattr(ctx, "execution_id", None) or None,
         "project_id": getattr(ctx, "project_id", None) or None,
         "deadline_s": deadline_s,
         "on_progress": on_progress,
-        "target": str(body.get("target") or options.get("target") or "godot"),
+        "target": target,
     }
     if "archetype" in body or "archetype" in options:
         kwargs["archetype"] = body.get("archetype", options.get("archetype")) or None
-    result = build_playable_game(_brief_from_job_payload(body), **kwargs)
+    result = build_playable_game(_authorized_brief(ctx, body), **kwargs)
+    # A completed Python call is not the same as a successful build. Fail
+    # closed on a failed or malformed result so the queue cannot mark it done.
+    from skeleton.forge.game_builder import RUN_SCHEMA
+    if (not isinstance(result, Mapping) or result.get("schema_version") != RUN_SCHEMA
+            or result.get("ok") is not True
+            or not isinstance(result.get("file_names"), list)
+            or any(not isinstance(name, str) for name in result["file_names"])
+            or not isinstance(result.get("stubbed"), list)
+            or any(not isinstance(item, str) for item in result["stubbed"])):
+        raise GameBuildFailed("Game build did not complete successfully")
     try:
         ctx.progress(1.0, "complete" if result.get("ok") else "failed")
         ctx.heartbeat()

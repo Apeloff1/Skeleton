@@ -1,0 +1,39 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "moonlit_breakwater__cartographer",
+  "chapter": 29,
+  "title": "Moonlit Breakwater: The Cartographer's Harbor Charter",
+  "theme": "moonlit_breakwater",
+  "discipline": "cartographer",
+  "region": "Moonlit Breakwater",
+  "premise": "In a drowned port exposed at the edge of the lunar tide, the cartographer must chart hidden passages before nightfall using a living contour chart.",
+  "signal": "harbor mirror",
+  "key_name": "harbor mirror attunement",
+  "objective_name": "Harbor Charter",
+  "ending": "Recover the Harbor Charter and return with the charted evacuation line; Night Harbor Guild can finally verify the source testimony.",
+  "faction": "Night Harbor Guild",
+  "challenge": "Survive undertow gate while evading the lighthouse revenant without sacrificing the charted evacuation line.",
+  "choice_yes": "Disclose evidence and ask Night Harbor Guild to witness the living contour chart.",
+  "choice_no": "Keep the evidence sealed until the expedition's replay record is complete.",
+  "dilemma": "whether to publish an unsafe shortcut",
+  "tool": "living contour chart",
+  "reward": "charted evacuation line",
+  "enemy": "lighthouse revenant",
+  "chapter_links": [
+    "ember_orchard__navigator",
+    "moonlit_breakwater__diplomat"
+  ],
+  "provenance": "original-game-source",
+  "goal": [
+    "collect_source_key",
+    "recover_objective",
+    "reach_exit"
+  ],
+  "side_goals": [
+    "faction_contact",
+    "dialogue_choice",
+    "lore_discovered"
+  ],
+  "rewind": "deterministic_commands",
+  "safety": "headless_offline_no_plugins"
+}

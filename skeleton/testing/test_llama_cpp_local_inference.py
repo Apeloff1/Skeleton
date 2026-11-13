@@ -79,6 +79,10 @@ if "SLOW_REQUEST" in prompt:
 if "OVERFLOW_REQUEST" in prompt:
     print("x" * 8192)
     raise SystemExit(0)
+if "STDERR_FAILURE_REQUEST" in prompt:
+    print("native error context: " + prompt, file=sys.stderr)
+    print("private-token-piece-canary", file=sys.stderr)
+    raise SystemExit(7)
 if "INVALID_STRUCTURED_REQUEST" in prompt:
     print(json.dumps({"answer": 7}, sort_keys=True))
     raise SystemExit(0)
@@ -164,6 +168,32 @@ async def test_llama_cpp_executes_without_prompt_argv_or_provider_credentials(
     assert backend.gguf_header.version == 3
     assert backend.gguf_header.tensor_count == 1
     assert result.response_id is not None and result.response_id.startswith("local:llama:")
+
+
+@pytest.mark.asyncio
+async def test_native_failure_never_returns_or_logs_private_stderr(tmp_path: Path, caplog) -> None:
+    backend = LlamaCppModel(_config(tmp_path))
+    private_prompt_marker = "private-prompt-canary-49bc75"
+    with pytest.raises(LlamaCppRuntimeError, match="local runtime exited with code 7") as failure:
+        await LocalInferenceEngine(backend).generate(
+            LocalInferenceRequest(prompt="STDERR_FAILURE_REQUEST " + private_prompt_marker, max_output_tokens=8)
+        )
+    assert private_prompt_marker not in str(failure.value)
+    assert "private-token-piece-canary" not in str(failure.value)
+    assert private_prompt_marker not in caplog.text
+    assert "private-token-piece-canary" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_provider_adapter_preserves_sanitized_native_failure(tmp_path: Path, caplog) -> None:
+    secret = "private-provider-context-36ae1"
+    adapter = build_llama_cpp_adapter(_config(tmp_path))
+    with pytest.raises(LlamaCppRuntimeError, match="local runtime exited with code 7") as failure:
+        await adapter.generate(ProviderRequest(instructions="", prompt="STDERR_FAILURE_REQUEST " + secret, max_output_tokens=8))
+    assert secret not in str(failure.value)
+    assert "private-token-piece-canary" not in str(failure.value)
+    assert secret not in caplog.text
+    assert "private-token-piece-canary" not in caplog.text
 
 
 @pytest.mark.asyncio

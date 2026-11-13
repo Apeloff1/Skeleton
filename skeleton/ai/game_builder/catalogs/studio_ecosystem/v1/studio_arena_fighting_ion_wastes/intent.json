@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_arena_fighting_ion_wastes",
+  "title": "Ion Wastes: The Open Tournament",
+  "subtitle": "Original the open tournament design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010310773,
+  "width": 19,
+  "height": 17,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 14,
+  "theme": "space",
+  "starting_health": 5
+}

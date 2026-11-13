@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_seasonal_farming_frosted_crater",
+  "title": "Frosted Crater: The Four Harvests",
+  "subtitle": "Original the four harvests design in Frosted Crater; only the grid preview compiles today.",
+  "seed": 203010315229,
+  "width": 21,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 13,
+  "theme": "space",
+  "starting_health": 3
+}
