@@ -104,3 +104,14 @@ tracked separately in PR #5302.
 Tests pin all 67 selections against the literal existing Galaxy source,
 assert the target category is supported, verify reducer precedence,
 protect authored vision from truncation, and preserve offline operation.
+
+
+## Follow-up: 158-genre creator taxonomy (stacked review)
+
+The 36 genres above were the complete *legacy brief-vote vocabulary*, not the
+full range of game genres requested by the owner. A stacked, review-only
+follow-up introduces 158 searchable categories and subgenres (preserving all
+36 legacy era votes), with parity tests and a read-only `/api/skeleton/genres`
+endpoint. See `docs/creation/EXPANDED_GAME_GENRE_CATALOG_20261113.md`.
+This is intake classification, not 158 verified distinct gameplay runtimes.
+

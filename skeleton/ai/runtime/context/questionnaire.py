@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Tuple
 
 from skeleton.context.tensor import AXES, ContextTensor
+from skeleton.context.genre_catalog import GENRE_ERA_VOTES
 
 BEATS: Tuple[Dict[str, Any], ...] = (
     {"id": "pace", "prompt": "How does time feel?",
@@ -239,20 +240,7 @@ BRIEF_WEIGHTS: Dict[str, float] = {
 # Every target below must be a canonical era id (see forge.eras.list_eras);
 # ``test_questionnaire_brief`` pins that invariant.
 BRIEF_ERA_VOTES: Dict[str, Dict[str, str]] = {
-    "genre": {
-        "action-adventure": "modern_aaa", "action": "modern_aaa", "adventure": "modern_aaa",
-        "rpg": "crpg", "crpg": "crpg", "jrpg": "jrpg", "arpg": "soulslike",
-        "soulslike": "soulslike", "strategy": "grand_strategy", "rts": "grand_strategy",
-        "tactics": "tactics_grid", "platformer": "metroidvania", "metroidvania": "metroidvania",
-        "simulation": "city_builder", "city-builder": "city_builder", "shooter": "boomer_shooter",
-        "fps": "boomer_shooter", "horror": "horror_survival", "survival": "extraction_now",
-        "extraction": "extraction_now", "roguelike": "roguelike", "roguelite": "roguelike",
-        "stealth": "stealth", "immersive-sim": "immersive_sim", "fighting": "fighting_game",
-        "puzzle": "indie_experimental", "deckbuilder": "deckbuilder", "card": "deckbuilder",
-        "battle-royale": "battle_royale", "mmo": "mmorpg", "mmorpg": "mmorpg",
-        "visual-novel": "visual_novel", "narrative": "walking_sim", "cozy": "cozy_wholesome",
-        "arcade": "arcade_golden_age", "bullet-heaven": "bullet_heaven",
-    },
+    "genre": dict(GENRE_ERA_VOTES),
     "theme": {
         "sci-fi": "extraction_now", "fantasy": "crpg", "dark-fantasy": "soulslike",
         "modern": "modern_aaa", "post-apocalyptic": "extraction_now", "cyberpunk": "immersive_sim",
