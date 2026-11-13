@@ -391,7 +391,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "ce7104b6eedb972c8df30ef1887bb097c8d4ad2a",
+      "source_git_object_sha": "34ea29cc01223ae2201d38b620b57f21d03a010a",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -1644,7 +1644,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "1d502dad477e068307996d73bc88b7fd8e913b24",
+      "source_git_object_sha": "e56cbf7803b26a4122711def2aed6731e02ad313",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -1681,7 +1681,7 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "6a5b9f465d8ee295492a734232d63fba923f66e9",
+      "source_git_object_sha": "7a4c6ee98b5f9f16997042afa8b1e931f6c7928a",
       "role": "Incremental build graph, resource-bounded parallel scheduling, deterministic asset invalidation, build observability, release/remote build controls, and network audit support autonomous AI work.",
       "work_package_refs": [
         "WP-W27",
@@ -2713,7 +2713,7 @@
       "source": "skeleton/forge/creator",
       "destination": "skeleton/ai/forge/creator",
       "kind": "tree",
-      "source_git_object_sha": "78bfd4f83ea74946ed8779493e319e253ebd0338",
+      "source_git_object_sha": "7cfc48c5d0ba128aaa99e0804138e5ea70ad8427",
       "role": "Canonical engine-neutral intent compilation, persistent design graph, typed command surface, transactional preview, semantic diff, reversible generated-state history, approval boundaries, and work leases under skeleton/forge/creator; mirrored exactly into AI Forge.",
       "work_package_refs": [
         "WP-W12",
@@ -3141,7 +3141,7 @@
       "destination": "skeleton/ai/research/historical/sheaf",
       "kind": "tree",
       "source_git_object_sha": "b71b9d8ab5740a50a7d9df4db8a3acd6e5a7194e",
-      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "role": "Sheaf/\u010cech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
       "work_package_refs": [
         "WP-W09",
         "WP-W26"
@@ -5027,7 +5027,7 @@
       "source": "backend/gameforge/knowledge",
       "destination": "skeleton/ai/research/legacy/gameforge/knowledge",
       "kind": "tree",
-      "source_git_object_sha": "e746337edcead75de6741dc9105ad8a28314ceb2",
+      "source_git_object_sha": "415923a310391fe3c5a31eb1698ecab92ea1d6e7",
       "role": "Legacy knowledge/free-API ingestion retained as untrusted research evidence.",
       "work_package_refs": [
         "WP-W08",
@@ -8663,7 +8663,7 @@
       "kind": "tree",
       "ownership_mode": "canonical_native",
       "residual_only": true,
-      "role": "Residual canonical AI-native runtime surfaces—including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion—not claimed by more-specific mappings or native owners.",
+      "role": "Residual canonical AI-native runtime surfaces\u2014including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion\u2014not claimed by more-specific mappings or native owners.",
       "volume_refs": [
         "VOL-006",
         "VOL-007",
