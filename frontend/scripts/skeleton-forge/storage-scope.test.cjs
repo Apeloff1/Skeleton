@@ -36,7 +36,7 @@ const mockStorage = {
   },
   removeItem: async (key) => { kv.delete(key); },
 };
-let scope, bridgeStorage, galaxyStorage;
+let scope, bridgeStorage, galaxyStorage, studioStorage;
 try {
   Module._load = function isolatedAuthAndStorage(request, parent, isMain) {
     if (request === 'expo-crypto') return mockCrypto;
@@ -49,6 +49,7 @@ try {
   scope = load('src/skeletonForge/creatorStorageScope.ts');
   bridgeStorage = load('src/skeletonForge/creatorBridgeStorage.ts');
   galaxyStorage = load('src/features/GalaxyStudioFactory/draftCustody.ts');
+  studioStorage = load('src/skeletonForge/foundation/storageDevice.ts');
 } finally {
   Module._load = savedLoad;
 }
@@ -158,4 +159,59 @@ test('both routes unmount old editor state as soon as authentication epoch chang
     assert.match(source, /consumeCreatorBridge\(/);
     assert.match(source, /loadGalaxyDraft\(/);
   }
+});
+
+test('first-install Studio project keys are isolated across accounts without storing bearer tokens', async () => {
+  const alice = studioStorage.asyncStorageKv();
+  await alice.setItem('skeleton.studio.projects.v1', '[{"title":"Alice original design"}]');
+  assert.equal(await alice.getItem('skeleton.studio.projects.v1'), '[{"title":"Alice original design"}]');
+  assert.ok([...kv.keys()].every(key => !key.includes('alice-offline-bearer')));
+  assert.equal(kv.size, 1);
+  bearer = 'bob-offline-bearer';
+  epoch++;
+  const bob = studioStorage.asyncStorageKv();
+  assert.equal(await bob.getItem('skeleton.studio.projects.v1'), null);
+  await bob.setItem('skeleton.studio.projects.v1', '[{"title":"Bob original design"}]');
+  assert.equal(kv.size, 2);
+  bearer = 'alice-offline-bearer';
+  epoch++;
+  assert.equal(await alice.getItem('skeleton.studio.projects.v1'), '[{"title":"Alice original design"}]');
+  await assert.rejects(alice.getItem('unrecognized-project-file'), /Unexpected/);
+  await assert.rejects(alice.setItem('unrecognized-project-file', 'private'), /Unexpected/);
+});
+
+test('legacy unscoped projects are only read by an explicit migration adapter', async () => {
+  assert.equal(await studioStorage.hasLegacyStudioProjects(), false);
+  kv.set('skeleton.studio.projects.v1', '[{"title":"Unknown legacy project"}]');
+  assert.equal(await studioStorage.hasLegacyStudioProjects(), true);
+  assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null);
+  const old = studioStorage.legacyReadOnlyKv();
+  assert.equal(await old.getItem('skeleton.studio.projects.v1'), '[{"title":"Unknown legacy project"}]');
+  await assert.rejects(old.setItem('skeleton.studio.projects.v1', 'overwrite'), /read-only/);
+  assert.equal(kv.get('skeleton.studio.projects.v1'), '[{"title":"Unknown legacy project"}]');
+});
+
+test('account rotation while writing Studio projects rejects publication to the incoming account', async () => {
+  const store = studioStorage.asyncStorageKv();
+  rotateOnWrite = true;
+  await assert.rejects(
+    store.setItem('skeleton.studio.projects.v1', '[{"title":"Alice only"}]'),
+    /Account changed during Studio project write/,
+  );
+  assert.equal(bearer, 'bob-offline-bearer');
+  assert.equal(await store.getItem('skeleton.studio.projects.v1'), null);
+  bearer = 'alice-offline-bearer';
+  epoch++;
+  assert.match(await store.getItem('skeleton.studio.projects.v1'), /Alice only/);
+});
+
+test('first-install Studio unmounts old local projects when the signed-in account changes', () => {
+  const src = fs.readFileSync(
+    path.resolve(__dirname, '../../src/skeletonForge/components/foundation/FoundationScreen.tsx'),
+    'utf8',
+  );
+  assert.match(src, /setAuthEpoch\(getAuthEpoch\(\)\)/);
+  assert.match(src, /key=\{authEpoch\}/);
+  assert.match(src, /legacyReadOnlyKv\(\)/);
+  assert.match(src, /hasLegacyStudioProjects\(\)/);
 });
