@@ -1,0 +1,65 @@
+{
+  "project_id": "studio_naval_navigation_verdant_caldera",
+  "genre": "naval_navigation",
+  "biome": "verdant_caldera",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.narrative.v1",
+  "title": "Verdant Caldera: Naval Navigation",
+  "foundation": {
+    "setting": "Verdant Caldera",
+    "era": "early reconstruction",
+    "environment": "stepped jungle terraces",
+    "history": "The hanging botanical lab was built to protect mineral terraces, but geothermal plumes interrupted its stewardship.",
+    "theme": "collective repair versus extractive control",
+    "realism": "original grounded speculative setting"
+  },
+  "premise": "Kela Lark, a captain, must reconnect isolated trading ports using route and tide planning while geothermal plumes threatens the hanging botanical lab.",
+  "central_conflict": "a blockade fleet seeks control of mineral terraces; residents want accountable access.",
+  "plot_beats": [
+    {
+      "act": 1,
+      "name": "Arrival",
+      "cause": "geothermal plumes isolates the hanging botanical lab",
+      "effect": "Local routes and witnesses become inaccessible"
+    },
+    {
+      "act": 2,
+      "name": "The bargain",
+      "cause": "a blockade fleet offers privileged access to mineral terraces",
+      "effect": "The player must decide whether to share information"
+    },
+    {
+      "act": 3,
+      "name": "The remedy",
+      "cause": "The production plan determines who controls the restored system",
+      "effect": "Faction trust changes the final public arrangement"
+    }
+  ],
+  "endings": [
+    {
+      "id": "commons",
+      "requires": "shared_access_and_verified_repair",
+      "consequence": "Stewardship passes to a representative public council"
+    },
+    {
+      "id": "autonomy",
+      "requires": "local_repair_without_patronage",
+      "consequence": "Resident cooperatives operate the recovered infrastructure"
+    },
+    {
+      "id": "fragile",
+      "requires": "minimum_rescue_only",
+      "consequence": "The essential route survives with unresolved governance debts"
+    }
+  ],
+  "canon": {
+    "immutable_location": "hanging botanical lab",
+    "critical_resource": "mineral terraces",
+    "no_unresolved_plot_threads": false
+  },
+  "prototype_binding": {
+    "route": "original_studio",
+    "compilation_mode": "offline_grid_preview_only",
+    "genre_runtime_implemented": false
+  }
+}

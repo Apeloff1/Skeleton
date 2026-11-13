@@ -68,10 +68,32 @@ deterministic; it does not call a model provider.
 
 ## First install
 
+**Tester release is not ready.** The default local AI provider requires trusted
+guard components that the current Compose startup does not yet supply, so local
+chat remains unavailable even after model provisioning. Full-profile Chroma
+startup is blocked pending safe persistence recovery. The current revision has
+not been qualified on the target Windows laptop.
+
+Before any package or container installation, the read-only preload now checks the
+source-bounded backend Python image, all three Docker COPY build contexts and
+private context-exclusion rules. The Windows payload must retain
+`Dockerfile.dockerignore` alongside `Dockerfile`. Missing or incompatible
+build inputs fail before credentials are generated; do not remove the
+preflight or bypass its failure.
+
+Runtime doctor and `app check --runtime` also read `.env` through a bounded,
+descriptor-checked path. A symlink, hardlink, named pipe, oversized file,
+invalid encoding or replaced source fails closed with redacted remediation.
+Do not delete a suspicious existing `.env` or reinitialize persistent Mongo
+credentials to make diagnostics pass. Preserve the file for operator-led
+recovery. Healthy service probes are not trained-model activation evidence.
+
 Install **Git**, **Python 3.11+**, and **Docker Desktop or Docker Engine with Compose v2**.
 Start Docker before running the installer. Host Node/Yarn are optional; the
 container build supplies frontend dependencies. Initial dependency/image builds
-need internet access. Models, compiler SDKs, cores and firmware have separate setup.
+need internet access and at least **6 GiB free** on the installation filesystem;
+**12 GiB** is recommended for safe Docker build headroom. Models, compiler SDKs,
+cores and firmware have separate setup.
 
 ### Linux and macOS
 
@@ -109,8 +131,6 @@ uname -m
 cd ~
 git clone https://github.com/Apeloff1/Skeleton.git
 cd Skeleton
-# While PR #4357 is open, select the current installation candidate:
-git switch --track origin/codex/consumer-runtime-readiness-2026-10-25
 python3 -m venv .venv
 source .venv/bin/activate
 python scripts/install_app.py --production --start
@@ -118,8 +138,10 @@ python -m skeleton app doctor --live --studio --json
 ```
 
 The `uname -m` result must be `x86_64` for the pinned Linux model/runtime below.
-The branch selection is for this unmerged candidate; default `main` does not yet
-contain all of PR #4357.
+PR #4357 has been merged; a fresh clone uses the default branch. The hosted
+Windows installer smoke test covered an earlier revision, not the current source
+or an installation on your laptop. Check the [current readiness report](docs/ai/CONSUMER_READINESS_2026-10-31.md)
+before using this path for a tester.
 
 Open **http://localhost:3000/setup** first, then **http://localhost:3000/product**.
 The production flag serves the built web app through Nginx. Later commands must
@@ -152,9 +174,10 @@ There is no shared administrator password or automatic first-user elevation.
 
 ### Enable AI
 
-For the optional pinned **Linux x86-64 glibc** CPU model/runtime, explicitly provision
-artifacts, select the deployment in private `.env`, and recreate the engine. Windows
-users following the WSL 2 instructions above run these commands in the Ubuntu shell:
+The pinned **Linux x86-64 glibc** CPU model/runtime can be prepared with the
+commands below, but the default Compose startup currently lacks the trusted guard
+bootstrap needed to activate local inference. Provisioning alone will not make
+local chat available. Windows users run these commands in the Ubuntu shell:
 
 ```bash
 python scripts/provision_local_ai.py --target linux-x86_64-glibc \
@@ -203,7 +226,7 @@ Original-world completion tracks saved edits, positive simulation, measured revi
 a compiled desktop package, and source/package export preparation. The console
 editor reports approved cores, content and toolchain readiness separately.
 
-Enable **Review and refine** in chat for a bounded plan, draft, critique and
+Enable **Review and refine** in chat for a bounded plan, one to three draft candidates, critique and
 refinement workflow. The stages share the original request, source snapshot,
 deadline and resource allowance. Live progress and final details show actual
 provider receipts and model identities. Configure roles and recovery using the

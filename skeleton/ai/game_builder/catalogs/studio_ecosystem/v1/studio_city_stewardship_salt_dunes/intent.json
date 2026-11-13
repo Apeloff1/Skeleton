@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_city_stewardship_salt_dunes",
+  "title": "Salt Dunes: City Stewardship",
+  "subtitle": "An original city stewardship brief in Salt Dunes; prototype maps are not full genre implementations.",
+  "seed": 202610303448,
+  "width": 25,
+  "height": 17,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 9,
+  "theme": "desert",
+  "starting_health": 3
+}

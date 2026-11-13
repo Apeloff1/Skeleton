@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/clock_skew.schema.json",
+  "title": "observability.clock_skew observation contract",
+  "description": "Bound event ordering drift",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_clock_skew_ms",
+        "out_of_order_events"
+      ],
+      "properties": {
+        "max_clock_skew_ms": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 500,
+          "description": "Upper bound for max_clock_skew_ms"
+        },
+        "out_of_order_events": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 30,
+          "description": "Upper bound for out_of_order_events"
+        }
+      }
+    }
+  }
+}

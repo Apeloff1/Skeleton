@@ -1,0 +1,11 @@
+{
+  "id": "GFM-PROM-01",
+  "gate": "promotion",
+  "title": "Shadow/canary/production promotion with rollback",
+  "todo_ref": "P3: Shadow/canary/production model promotion",
+  "severity": "sev1",
+  "params": {
+    "max_canary_regression": 0.02
+  },
+  "requires_hardware": false
+}

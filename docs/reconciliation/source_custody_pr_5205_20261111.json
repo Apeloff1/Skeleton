@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "source_pr": 5205,
+  "source_head": "7ba519a19299c7f078af2193700c43d5c3e9d5fd",
+  "merge_base": "4823348975f85a6e64b20855f7dbeb46d8f13c24",
+  "target_main": "42c9908bee87bacde621b99e6015250cb41d64da",
+  "safe_source": [
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/export_verification.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "82bb9f0b378fe6dd128c9f3c75b54cff02988e4e"
+    },
+    {
+      "path": "skeleton/jeeves/worlds/export_verification.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "82bb9f0b378fe6dd128c9f3c75b54cff02988e4e"
+    }
+  ],
+  "already_on_main": 50,
+  "conflicts": [
+    {
+      "path": ".github/workflows/app-foundation-e2e.yml",
+      "reason": "main_change",
+      "base": "4a63092a7b41790d9fa541139c1d5760c78843c5",
+      "head": "ddfd38df3f896fae9f35d38cafc12eea66908311",
+      "main": "378e5deeddf778d77250289f20c6298eae177a01"
+    },
+    {
+      "path": "backend/routes/discourse.py",
+      "reason": "main_change",
+      "base": "45fb682cf4c9c2dffbb450058b688fb60fb2f06f",
+      "head": "9cf8dbb44f16dc4569fb07ffaddcbe1c1966dc07",
+      "main": "4fcdb60b4e2cdea653888f84656c9cb414eb419d"
+    },
+    {
+      "path": "backend/routes/galaxy_studio.py",
+      "reason": "main_change",
+      "base": "a3ac86a27ab214a4b528a3fdc1d33fa9a8cf183f",
+      "head": "25f705d4fef118149e4dd1c4771192d5c6b7e136",
+      "main": "49329856e1ff1165a95fe404450fdf492aebb31e"
+    },
+    {
+      "path": "backend/tests/test_discourse_judge_admission.py",
+      "reason": "main_change",
+      "base": "80659441eb048f526091f49d04246d135faffef8",
+      "head": "e2ea193c5a58549ef44669c6b34f387a27068983",
+      "main": "7b916520298fae5d29c3c2e39dccf438c4ebda89"
+    },
+    {
+      "path": "backend/tests/test_galaxy_file_budget.py",
+      "reason": "main_change",
+      "base": "75ba2d1a46d5367388d621ca59059cb5cd2cf076",
+      "head": "f237f228d9bfca2a20eef4a8719f717e49f9295d",
+      "main": "07fd9b882ca34cd7675e67557f25e453ebb5534d"
+    },
+    {
+      "path": "frontend/Dockerfile",
+      "reason": "main_change",
+      "base": "7041884966ddf1b56be6fb2dc5eb9f0f24756b7d",
+      "head": "4e366195bcf113e8ca28f29198a6805e21a5c525",
+      "main": "9d70ba3b03a33a87d2e981f99cac36f2ab98e68f"
+    },
+    {
+      "path": "machine/ai_file_tree.json",
+      "reason": "main_change",
+      "base": "c7aaead30b5d91d4db726129b8ba258570fd0173",
+      "head": "7653edf6010c0be91b0cd32aea191e54eec2b899",
+      "main": "1fc4f79bf6ab796da1cf96d709eb22d0c89ac54c"
+    },
+    {
+      "path": "machine/product_surface_specification.json",
+      "reason": "main_change",
+      "base": "6264c1d5dc32577d873c8d236e5a493d5f960c42",
+      "head": "54b954e81f1e2384c5e050f7461475e1ec2b82c9",
+      "main": "a6bb423da82c54750e75157d3c3691be59dbcecb"
+    },
+    {
+      "path": "skeleton/app/cli.py",
+      "reason": "main_change",
+      "base": "8c16ce7a593599d8c2ae34da454c72ba9894bf1d",
+      "head": "62f1d7dda9bab2fe617713271d75a19671e52baf",
+      "main": "c01a2d46b4a77a36deec6eca4a2c47b274e8d247"
+    },
+    {
+      "path": ".github/workflows/godot-provenance-source-qualification.yml",
+      "reason": "main_change",
+      "base": null,
+      "head": "dc603b0e115245153dbd0dc5e0c42eb35fb0ac6e",
+      "main": "e90b51be31ccb05ae5b8583a5b4e0c5f0a5ec584"
+    },
+    {
+      "path": ".github/workflows/strict-replay-source-qualification.yml",
+      "reason": "main_change",
+      "base": null,
+      "head": "1bc9ff2b8289161830246d5e444ff8a28ddc84b3",
+      "main": "93bac711b5eb7108730799c74fdcc44a7f724f80"
+    },
+    {
+      "path": "frontend/scripts/guarded-expo-export.cjs",
+      "reason": "main_change",
+      "base": null,
+      "head": "46fe3f8c909afd21fa3a5da4ffd5d90449f8f402",
+      "main": "0864d8430ce5ee4694cc721a639a84f948edd10f"
+    },
+    {
+      "path": "frontend/scripts/test-guarded-expo-export.cjs",
+      "reason": "main_change",
+      "base": null,
+      "head": "2ff2c94b48e5cce1c956f3f6460d7102621bb789",
+      "main": "853da47a88cba2f754c7115529335bdbff90d22a"
+    }
+  ],
+  "unknown_paths": 19,
+  "holds": [
+    "do-not-merge",
+    "review-only",
+    "exact-head-CI",
+    "device",
+    "security",
+    "release"
+  ],
+  "note": "Current main preserved for all contested paths; source intact in first parent. GitHub dirty-state removal does not qualify merge."
+}

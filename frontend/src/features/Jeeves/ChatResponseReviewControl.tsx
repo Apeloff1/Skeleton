@@ -25,6 +25,7 @@ export default function ChatResponseReviewControl({ enabled, change, disabled = 
   const [refreshing, setRefreshing] = useState(false);
   const blocked = disabled || !enabled && !available;
   const stageCount = cooperationStageCount(policy);
+  const draftCount = policy.draft_count ?? 1;
   const minimum = minimumCooperationTokens(policy);
   useEffect(() => { setCapDraft(String(policy.max_stage_output_tokens)); changeFieldError(null); }, [policy, changeFieldError]);
   useEffect(() => { if (!enabled) { setAdvanced(false); setRolePicker(null); } }, [enabled]);
@@ -39,6 +40,11 @@ export default function ChatResponseReviewControl({ enabled, change, disabled = 
     const roles = { ...policy.roles };
     if (model) roles[role] = { provider_id: model.provider_id, model_id: model.model_id }; else delete roles[role];
     changePolicy({ ...policy, roles }); setRolePicker(null);
+  };
+  const chooseDraftCount = (count: number) => {
+    const next = { ...policy };
+    if (count === 1) delete next.draft_count; else next.draft_count = count;
+    changePolicy(next);
   };
   const close = () => { setAdvanced(false); setRolePicker(null); };
   const issueText = [fieldError, ...issues].filter((value): value is string => !!value);
@@ -63,11 +69,11 @@ export default function ChatResponseReviewControl({ enabled, change, disabled = 
       </TouchableOpacity>
       {enabled && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Advanced response review settings"
         accessibilityState={{ expanded: advanced, disabled }} disabled={disabled} onPress={() => setAdvanced(true)} style={s.button}>
-        <Text style={s.label}>Advanced · {policy.review_rounds} {policy.review_rounds === 1 ? 'round' : 'rounds'}</Text>
+        <Text style={s.label}>Advanced · {draftCount} {draftCount === 1 ? 'draft' : 'drafts'} · {policy.review_rounds} {policy.review_rounds === 1 ? 'round' : 'rounds'}</Text>
       </TouchableOpacity>}
     </View>
     {enabled && <>
-      <Text style={s.detail}>Plan, draft, then review and refine for {policy.review_rounds} {policy.review_rounds === 1 ? 'round' : 'rounds'} ({stageCount} model stages). All stages share the total answer budget{answerTokenLimit ? ` of ${answerTokenLimit.toLocaleString()} tokens` : ' set by the engine'}; at least {minimum.toLocaleString()} total tokens are required. Resume keeps the exact saved settings.</Text>
+      <Text style={s.detail}>Plan, create {draftCount} {draftCount === 1 ? 'draft' : 'draft candidates'}, then review and refine for {policy.review_rounds} {policy.review_rounds === 1 ? 'round' : 'rounds'} ({stageCount} model stages). All stages share the total answer budget{answerTokenLimit ? ` of ${answerTokenLimit.toLocaleString()} tokens` : ' set by the engine'}; at least {minimum.toLocaleString()} total tokens are required. Resume keeps the exact saved settings.</Text>
       {issueText.map((issue, index) => <Text key={index} accessibilityRole="alert" style={s.error}>{issue}</Text>)}
     </>}
     <Modal visible={advanced} animationType="slide" onRequestClose={close}>
@@ -91,9 +97,12 @@ export default function ChatResponseReviewControl({ enabled, change, disabled = 
           {!models.length && <Text style={s.error}>No configured model inventory is currently observed. Existing role selections are preserved.</Text>}
         </> : <>
           <Text style={s.detail}>These settings apply to the next new turn. Saved pending work resumes with its original policy. All four roles use the main turn model unless you explicitly choose another configured model.</Text>
+          <Text style={s.section}>Draft candidates</Text>
+          <View style={s.row}>{[1, 2, 3].map(count => <Choice key={count} label={`${count} draft ${count === 1 ? 'candidate' : 'candidates'}`} selected={draftCount === count} disabled={disabled} press={() => chooseDraftCount(count)} />)}</View>
+          <Text style={s.detail}>Candidates run one at a time using the drafting model and the same request and plan. Each candidate is written without seeing the other drafts. The review compares all candidates before refinement produces one answer. Additional drafts can take longer and do not guarantee a better result.</Text>
           <Text style={s.section}>Review rounds</Text>
           <View style={s.row}>{[1, 2, 3].map(rounds => <Choice key={rounds} label={`${rounds} review ${rounds === 1 ? 'round' : 'rounds'}`} selected={policy.review_rounds === rounds} disabled={disabled} press={() => changePolicy({ ...policy, review_rounds: rounds })} />)}</View>
-          <Text style={s.detail}>{stageCount} model stages · minimum total answer budget {minimum.toLocaleString()} tokens{answerTokenLimit ? ` · current ${answerTokenLimit.toLocaleString()}` : ' · engine-set budget'}. The total allowance is shared; adding rounds does not increase it.</Text>
+          <Text style={s.detail}>{stageCount} model stages · minimum total answer budget {minimum.toLocaleString()} tokens{answerTokenLimit ? ` · current ${answerTokenLimit.toLocaleString()}` : ' · engine-set budget'}. The total allowance is shared; adding drafts or rounds does not increase it.</Text>
           <Text style={s.section}>Per-stage output ceiling</Text>
           <TextInput accessibilityLabel="Maximum tokens per review stage" value={capDraft} editable={!disabled} onChangeText={cap} keyboardType="number-pad" maxLength={4} style={s.input} />
           <View style={s.row}>{[64, 128, 256, 512, 1024, 2048, 4096].map(value => <Choice key={value} label={`Set review stage cap to ${value.toLocaleString()} tokens`} selected={policy.max_stage_output_tokens === value} disabled={disabled} press={() => cap(String(value))} />)}</View>

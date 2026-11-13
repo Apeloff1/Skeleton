@@ -25,3 +25,11 @@ def test_registry_requires_typed_tuples():
 def test_digest_snapshot_is_runtime_validated():
  r=AppendixReference("REF.X","machine/x.json",S("x"),"x")
  with pytest.raises(AppendixError,match="sha256"):ReferenceIndex((r,),()).stale_references({"machine/x.json":"not-a-digest"})
+
+def test_digest_snapshot_rejects_invalid_unreferenced_values_and_non_mapping():
+ r=AppendixReference("REF.X","machine/x.json",S("x"),"x")
+ index=ReferenceIndex((r,),())
+ with pytest.raises(AppendixError,match="sha256"):
+  index.stale_references({"machine/x.json":S("x"),"other.json":"untrusted"})
+ with pytest.raises(AppendixError,match="mapping"):
+  index.stale_references(None)

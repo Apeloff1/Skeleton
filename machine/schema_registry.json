@@ -670,6 +670,201 @@
       ],
       "source": "machine/ai_runtime_schemas.json",
       "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeLearningCheckpointControl",
+      "record_name": "RuntimeLearningCheckpointControl",
+      "version": 1,
+      "owner_plane": "engine-api",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeMaintenanceRetry",
+      "record_name": "RuntimeMaintenanceRetry",
+      "version": 1,
+      "owner_plane": "engine-api",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeOptimizationPolicyPatch",
+      "record_name": "RuntimeOptimizationPolicyPatch",
+      "version": 1,
+      "owner_plane": "engine-api",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeLearningDatasetExport",
+      "record_name": "RuntimeLearningDatasetExport",
+      "version": 1,
+      "owner_plane": "engine-api",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeLearningDatasetEnvelope",
+      "record_name": "RuntimeLearningDatasetEnvelope",
+      "version": 1,
+      "owner_plane": "engine-api",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeMaintenanceCircuitReset",
+      "record_name": "RuntimeMaintenanceCircuitReset",
+      "version": 1,
+      "owner_plane": "engine-api",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-AIWorkflowTemplate",
+      "record_name": "AIWorkflowTemplate",
+      "version": 1,
+      "owner_plane": "application-api",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-AIWorkflowCatalogEnvelope",
+      "record_name": "AIWorkflowCatalogEnvelope",
+      "version": 1,
+      "owner_plane": "application-api",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-LocalInferenceExecutionContract",
+      "record_name": "LocalInferenceExecutionContract",
+      "version": 1,
+      "owner_plane": "model-provider",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "model-provider",
+      "consumer_planes": [
+        "application-api",
+        "model-routing",
+        "retrieval"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeLearningExplanation",
+      "record_name": "RuntimeLearningExplanation",
+      "version": 1,
+      "owner_plane": "orchestration",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "orchestration",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "reasoning-verification"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-MaintenanceReadOnlyInspection",
+      "record_name": "MaintenanceReadOnlyInspection",
+      "version": 1,
+      "owner_plane": "engine-api",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-GalaxyArtifactExecutionObservation",
+      "record_name": "GalaxyArtifactExecutionObservation",
+      "version": 1,
+      "owner_plane": "application-api",
+      "compatibility_mode": "backward",
+      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "source": "machine/ai_runtime_schemas.json",
+      "migration_required_for_breaking_change": true
     }
   ]
 }

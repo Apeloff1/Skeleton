@@ -1,0 +1,26 @@
+{
+  "case": "09_cross_field_a",
+  "gate": "conversation",
+  "expect": "reject",
+  "reason": "Inference begins after an actual user turn",
+  "payload": {
+    "session_id": "chat_001",
+    "messages": [
+      {
+        "role": "system",
+        "content": "Reply safely."
+      },
+      {
+        "role": "user",
+        "content": "Hello"
+      },
+      {
+        "role": "assistant",
+        "content": "continuation"
+      }
+    ],
+    "max_bytes": 32768,
+    "revision": 1,
+    "final_role": "assistant"
+  }
+}

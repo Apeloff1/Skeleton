@@ -44,7 +44,8 @@ def test_dmg_source_contains_real_8bit_hardware_engine_and_unique_level_maps(tmp
     assert "SECTION \"Cartridge Entry\", ROM0[$0100]" in result.asm
     assert "SECTION \"Game State\", WRAM0" in result.asm
     assert "ldh [rLCDC], a" in result.asm
-    assert "ld [OAM+1], a" in result.asm
+    assert "DEF SPRITE_OAM_BASE EQU $FE00" in result.asm
+    assert "ld [SPRITE_OAM_BASE+1], a" in result.asm
     assert "DEF BG_BYTE_COUNT EQU 576" in result.asm
     assert "DEF LEVEL_COUNT EQU 3" in result.asm
     assert "ld hl, TILEMAP" in result.asm

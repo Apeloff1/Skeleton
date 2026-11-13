@@ -161,8 +161,15 @@ def test_queue_drain_has_one_recovery_worker_and_independent_housekeeping() -> N
     assert "  wake-housekeeping:\n" not in workflow
     assert "    runs-on: ubuntu-slim\n" in workflow
     assert "gh workflow run actions-housekeeping-cli.yml" not in workflow
-    assert "schedule:" in housekeeping
-    assert "cron: '23 4,16 * * *'" in housekeeping
+    # Housekeeping is intentionally owner-dispatched during backlog triage.
+    # The independent queue-drain controller retains its hourly schedule.
+    assert "  workflow_dispatch:" in housekeeping
+    assert "  schedule:" not in housekeeping
+    assert "  push:" not in housekeeping
+    assert "  workflow_run:" not in housekeeping
+    assert "  issue_comment:" not in housekeeping
+    assert "permissions: {}" in housekeeping
+    assert "group: actions-housekeeping-cli-v2-${{ github.repository }}" in housekeeping
     assert "def recover_pr_numbers()" not in workflow
 
 

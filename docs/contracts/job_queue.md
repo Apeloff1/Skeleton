@@ -45,6 +45,16 @@ h = job_api.enqueue("game.build", {"target": "gb"}, actor_id=user, tenant_id=ten
 - **Idempotency**: the key is a SHA-256 digest of the JSON array `[tenant_id, actor_id, kind, idempotency_key]`, prefixed `owned:` so identifiers containing colons remain distinct. Re-enqueueing with an identical `payload` and project binding returns the original handle with `replayed=True`. A different payload raises `IdempotencyMismatch`; the Projects API maps that to 409 `PROJECT.IDEMPOTENCY_MISMATCH`. Equality is a sha256 of the canonical JSON `{kind, payload}`. Legacy colon-scoped keys replay only when the persisted exact actor, tenant, kind, project, execution identity and request hash establish the same binding; unowned or unbound rows fail closed.
 - **Ownership**: the ready queue row and its actor, tenant, execution identity, timeout and request hash are committed in one transaction before a worker can claim it. Project-linked public jobs require an existing project owned by that actor and tenant. Trusted internal status/result calls remain available; HTTP adapters enforce ownership through `get_identity` first, including after restart.
 - **HTTP request binding**: an adapter can supply `request_digest`, the SHA-256 of its full submitted request, while passing a normalized worker payload. `/api/v1/game/build` binds the complete submitted JSON this way; explicit defaults and ignored fields cannot change under an existing key. Project build creation and its initial job link participate in the queue transaction after the idempotency check, preventing orphan builds or a producer status write after a fast worker finishes.
+- **Project admission**: HTTP project-linked builds use the session-authenticated
+  projects build route; `/api/v1/game/build` rejects a `project_id`. Before a
+  project job runs, dispatch checks its recorded admission, current originating
+  session and user, current forge charter and owner-scoped saved brief. Older
+  project jobs without that admission fail closed. These are point-in-time
+  checks, not an epoch fence or a guarantee of revocation after dispatch.
+- **Worker shutdown**: application services allow a bounded wait for their
+  worker to stop. If it is still executing, close raises and leaves the database
+  open; callers can retry after the worker exits. A stopping worker cannot be
+  mistaken for one available to accept new work.
 - **Long jobs and leases**: a claimed job is leased for `max(visibility_timeout_s, timeout_s + 120)` seconds. The default visibility is 1020 s, which covers 900 s builds. Every `ctx.progress/log/heartbeat` extends the lease, so a ~9 minute job is never reclaimed as stale. A worker that dies stops heartbeating, and its job becomes claimable again once the lease expires (at-least-once delivery).
 - **Timeout**: when the handler calls ctx after `timeout_s` has elapsed, it gets `JobTimeout` and the job fails with `error.code = "timeout"`.
 - **Failures**: a handler exception fails the job with `error.code = "handler_error"`; the message is redacted by `safe_exception_text`. `max_attempts` defaults to 1 for the public API, so there are no automatic retries. Cancelled jobs report `error.code = "cancelled"`.

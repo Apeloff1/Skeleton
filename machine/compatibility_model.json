@@ -631,6 +631,189 @@
         "retrieval"
       ],
       "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeLearningCheckpointControl",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeMaintenanceRetry",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeOptimizationPolicyPatch",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeLearningDatasetExport",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeLearningDatasetEnvelope",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeMaintenanceCircuitReset",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-AIWorkflowTemplate",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-AIWorkflowCatalogEnvelope",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-LocalInferenceExecutionContract",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "model-provider",
+      "consumer_planes": [
+        "application-api",
+        "model-routing",
+        "retrieval"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-RuntimeLearningExplanation",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "orchestration",
+      "consumer_planes": [
+        "application-api",
+        "engine-api",
+        "reasoning-verification"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-MaintenanceReadOnlyInspection",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "engine-api",
+      "consumer_planes": [
+        "deployment-release",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
+    },
+    {
+      "schema_id": "SCHEMA-GalaxyArtifactExecutionObservation",
+      "current_version": 1,
+      "supported_versions": [
+        1
+      ],
+      "reader_writer_mode": "backward",
+      "producer_plane": "application-api",
+      "consumer_planes": [
+        "deployment-release",
+        "operator-control",
+        "product-experience",
+        "streaming-realtime"
+      ],
+      "migration_required_for_breaking_change": true
     }
   ],
   "interface_matrix": [

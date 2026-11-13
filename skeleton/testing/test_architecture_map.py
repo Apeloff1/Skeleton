@@ -242,6 +242,9 @@ def test_architecture_sources_link_all_contract_layers() -> None:
             "ai_implementation_handoff": "machine/ai_implementation_handoff.json",
             "ai_closure_evidence": "machine/ai_closure_evidence.json",
             "ai_capability_registry": "machine/ai_capabilities.json",
+            "product_vertical_readiness": "machine/product_vertical_readiness.json",
+            "product_surface_specification": "machine/product_surface_specification.json",
+            "product_surface_validator": "scripts/check_product_surface_specification.py",
             "ai_file_tree": "machine/ai_file_tree.json",
             "enterprise_system_contract": "machine/enterprise_system_architecture.json",
             "enterprise_system_manual": "docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md",
@@ -455,7 +458,7 @@ def test_architecture_summary_reports_deep_structure_counts() -> None:
         "execution_hosts": 4,
         "execution_profiles": 10,
         "plane_execution": 27,
-        "startup_groups": 4,
+        "startup_groups": 3,
         "shutdown_groups": 4,
     }
 
@@ -560,25 +563,41 @@ def test_structural_validator_rejects_startup_dependency_in_same_group() -> None
     architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
     broken = deepcopy(architecture)
     lifecycle = broken["structural_blueprint"]["runtime_lifecycle"]
+    # Backend still requires a healthy engine even though the diagnostic UI
+    # does not. Mutate a real protected dependency rather than fabricating a
+    # frontend dependency that the canonical manifest no longer declares.
     application = next(
         group
         for group in lifecycle["startup_groups"]
         if group["id"] == "application-service"
     )
-    product = next(
+    engine = next(
         group
         for group in lifecycle["startup_groups"]
-        if group["id"] == "product-shell"
+        if group["id"] == "engine-service"
     )
-    application["nodes"].append("frontend")
-    product["nodes"].remove("frontend")
+    application["nodes"].remove("backend")
+    engine["nodes"].append("backend")
     zones = {zone["id"]: zone for zone in broken["zones"]}
     errors: list[str] = []
 
     _validate_structural_blueprint(broken, zones, REPO_ROOT, errors)
 
     assert any(
-        "startup order violates runtime dependency frontend->backend" in error
-        or "startup order violates runtime dependency frontend->skeleton" in error
+        "startup order violates runtime dependency backend->skeleton" in error
         for error in errors
     )
+
+
+def test_setup_ui_starts_without_protected_service_dependency() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    runtime_nodes = {node["id"]: node for node in architecture["runtime_nodes"]}
+    groups = architecture["structural_blueprint"]["runtime_lifecycle"]["startup_groups"]
+    startup_order = {node: group["order"] for group in groups for node in group["nodes"]}
+
+    assert runtime_nodes["frontend"]["depends_on"] == []
+    assert startup_order["frontend"] == 0
+    assert startup_order["frontend"] < startup_order["backend"]
+    assert startup_order["mongo"] < startup_order["skeleton"]
+    assert startup_order["skeleton"] < startup_order["backend"]
+    assert runtime_nodes["backend"]["depends_on"] == ["mongo", "skeleton"]

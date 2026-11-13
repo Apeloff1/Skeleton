@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_settlement_survival_glacial_fjord",
+  "title": "Glacial Fjord: Settlement Survival",
+  "subtitle": "An original settlement survival brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610301554,
+  "width": 21,
+  "height": 19,
+  "levels": 4,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "ocean",
+  "starting_health": 6
+}

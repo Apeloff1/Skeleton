@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.game.harbor.salvage-contract-board.v1",
+  "source_id": "lantern-quay",
+  "objectives": [
+    {"id": "find_skiff", "kind": "recover", "target": "wrecked_skiff", "points": 3},
+    {"id": "find_cache", "kind": "recover", "target": "tide_cache", "points": 5},
+    {"id": "secure_skiff", "kind": "secure", "target": "wrecked_skiff", "points": 7},
+    {"id": "secure_cache", "kind": "secure", "target": "tide_cache", "points": 9},
+    {"id": "profit", "kind": "reward", "target": 11, "points": 11},
+    {"id": "signal_rescue", "kind": "complete", "target": null, "points": 20}
+  ]
+}

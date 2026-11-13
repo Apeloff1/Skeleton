@@ -7,7 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from skeleton.main_guard.bisect import BisectError, bisect, classify_returncode, render_bisect_markdown
+from skeleton.main_guard.bisect import (
+    BAD, GOOD, BisectError, BisectStep, _verified_bisect_head,
+    bisect, classify_returncode, render_bisect_markdown,
+)
 from skeleton.testing.main_guard_test_support import commit, git, init_repo
 
 CHECK = [sys.executable, "-c", "import pathlib,sys; sys.exit(1 if 'BROKEN' in pathlib.Path('app.txt').read_text() else 0)"]
@@ -31,6 +34,19 @@ def test_finds_first_bad_commit_and_restores_head(tmp_path: Path, strategy: str,
     assert result.found
     assert result.first_bad is not None and result.first_bad.sha == shas[bad_index]
     assert result.first_bad.author_name == f"Dev{bad_index}"
+    assert git(repo, "rev-parse", "HEAD") == head_before
+    assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+    assert not (Path(git(repo, "rev-parse", "--absolute-git-dir")) / "BISECT_LOG").exists()
+
+
+def test_git_strategy_rejects_an_unverified_bad_endpoint(tmp_path: Path) -> None:
+    # All eight commits are good: Git bisect treats the supplied bad SHA as
+    # a caller assertion. The product must not certify it without running the
+    # actual test there, even if Git reports an apparent first-bad commit.
+    repo, shas = _history(tmp_path, bad_index=8)
+    head_before = git(repo, "rev-parse", "HEAD")
+    with pytest.raises(BisectError, match="declared bad endpoint"):
+        bisect(repo, shas[0], shas[-1], CHECK, strategy="git")
     assert git(repo, "rev-parse", "HEAD") == head_before
     assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
     assert not (Path(git(repo, "rev-parse", "--absolute-git-dir")) / "BISECT_LOG").exists()
@@ -68,3 +84,17 @@ def test_classify_returncode() -> None:
     assert classify_returncode(1) == "bad"
     assert classify_returncode(125) == "skip"
     assert classify_returncode(None, timed_out=True) == "skip"
+
+
+def test_bisect_head_fallback_requires_proven_adjacent_boundary() -> None:
+    class _Git:
+        def head_sha(self):
+            return "b" * 40
+
+    good, earlier, bad = "0" * 40, "a" * 40, "b" * 40
+    bad_step = BisectStep(bad, BAD, 1, 0.01)
+    good_step = BisectStep(earlier, GOOD, 0, 0.01)
+    assert _verified_bisect_head(_Git(), [earlier, bad], good, [bad_step]) is None
+    assert _verified_bisect_head(_Git(), [earlier, bad], good, [good_step, bad_step]) == bad
+    assert _verified_bisect_head(_Git(), [bad], good, [bad_step]) == bad
+    assert _verified_bisect_head(_Git(), [earlier, bad], good, [good_step]) is None

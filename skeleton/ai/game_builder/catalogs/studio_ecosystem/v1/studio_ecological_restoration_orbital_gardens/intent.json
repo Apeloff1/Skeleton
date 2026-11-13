@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_ecological_restoration_orbital_gardens",
+  "title": "Orbital Gardens: Ecological Restoration",
+  "subtitle": "An original ecological restoration brief in Orbital Gardens; prototype maps are not full genre implementations.",
+  "seed": 202610300956,
+  "width": 25,
+  "height": 21,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "space",
+  "starting_health": 5
+}
