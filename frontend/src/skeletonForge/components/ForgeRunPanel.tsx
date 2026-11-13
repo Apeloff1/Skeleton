@@ -146,6 +146,11 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Text style={st.cardTitle}>Playtest</Text>
               <StatusPill tone={sum.playtest.tone} label={sum.playtest.label} />
             </View>
+            {payload.playtest?.status === 'passed' && payload.playtest.passed === true && payload.playtest.verified !== true ? (
+              <Banner tone="warn" testID="run-world-binary-unverified">
+                World boot passed, but the Godot binary has not been verified against admitted release provenance.
+              </Banner>
+            ) : null}
             {playableEvidence ? (
               <View testID="run-playable-scene-qualification">
                 <View style={[st.head, { marginTop: 10 }]}>
@@ -153,6 +158,11 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
                   <StatusPill tone={playableEvidence.tone} label={playableEvidence.label} testID="run-playable-scene-status" />
                 </View>
                 {payload.playable_scene_playtest?.scene ? <Text style={st.small}>Source scene: {payload.playable_scene_playtest.scene}</Text> : null}
+                {payload.playable_scene_playtest?.status === 'passed' && payload.playable_scene_playtest.passed === true && payload.playable_scene_playtest.verified !== true ? (
+                  <Banner tone="warn" testID="run-playable-binary-unverified">
+                    Playable scene completed, but the Godot binary's release provenance is unverified.
+                  </Banner>
+                ) : null}
                 {payload.playable_scene_playtest?.errors?.length ? (
                   <Text style={[st.small, { color: C.red }]} testID="run-playable-scene-errors">
                     {payload.playable_scene_playtest.errors.slice(0, 3).join('; ')}
