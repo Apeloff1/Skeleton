@@ -25,6 +25,8 @@ export interface QuestionnaireFlowProps {
   eras?: EraRow[];
   generations?: GenerationRow[];
   onForge: (req: RunRequest) => void;
+  /** Navigate to the full historical Galaxy Studio matrix/slider questionnaire. */
+  onOpenGalaxyStudio?: () => void;
   forging?: boolean;
   /** Short compose summary shown on the review step. */
   composeSummary?: string | null;
@@ -168,7 +170,7 @@ function BeatsStep({ state, dispatch, beats, beatsLive }: QuestionnaireFlowProps
   );
 }
 
-function OptionsStep({ state, dispatch, eras = [], generations = [] }: QuestionnaireFlowProps) {
+function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio }: QuestionnaireFlowProps) {
   const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
   return (
     <Card>
@@ -214,6 +216,13 @@ function OptionsStep({ state, dispatch, eras = [], generations = [] }: Questionn
               <Chip key={g.key} label={String(g.label ?? humanize(g.key))} selected={state.options.generation === g.key} color={C.blue} onPress={() => dispatch({ type: 'setOption', key: 'generation', value: g.key })} testID={`q-gen-${g.key}`} />
             ))}
           </View>
+        </View>
+      ) : null}
+      {onOpenGalaxyStudio ? (
+        <View style={st.group}>
+          <Text style={st.q}>Need the original full-production questionnaire?</Text>
+          <Text style={st.help}>Open Galaxy Studio for its 14 production matrices, narrative phase controls, nine style selectors and 100 extended sliders. Galaxy and this Forge run currently have separate drafts.</Text>
+          <Button label="Open full Galaxy Studio questionnaire" tone="secondary" compact onPress={onOpenGalaxyStudio} testID="q-open-galaxy-studio" />
         </View>
       ) : null}
       <View style={st.group}>

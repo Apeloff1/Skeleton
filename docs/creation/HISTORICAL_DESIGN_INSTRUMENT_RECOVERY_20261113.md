@@ -64,3 +64,22 @@ battle-royale, MMO, visual novels, narrative, bullet-heaven and the other
 previously available options. The backend already maps these genre tokens to
 canonical eras; this recovery does not imply their complete native gameplay
 systems have been generated or device-playtested.
+
+## Full historical Galaxy Studio questionnaires found on main
+
+A deeper source audit confirms the complete historical Galaxy Studio Factory
+questionnaire is *already present* under `frontend/src/features/GalaxyStudioFactory`:
+`QuestionnaireMatrices.tsx` (14 matrices), `MatrixSliders.tsx`,
+`NarrativePhaseSliders.tsx`, `extraParams.ts` (100 controls),
+`styleSliders.ts` (9 named style selectors), `ProductionStudioPanel.tsx`,
+`presets.ts`, `gameEras.ts`, and the Galaxy editor route `/galaxy`.
+The historic Prood versions remain as provenance; Skeleton's current versions
+have additional integration and are not replaced wholesale.
+
+This slice also adds deliberate cross-navigation: GameForge Options opens the
+full Galaxy questionnaire, and Galaxy's completed-build view can open the
+runtime GameForge cockpit. **These remain separate local drafts and backend
+run types. This is discovery/workflow continuity, NOT a claim that all 14
+matrices have become canonical GameForge runtime inputs.** That schema mapping
+requires project-scoped handoff with explicit ownership, versioned validation,
+provenance and gameplay/export acceptance rather than blind JSON pass-through.

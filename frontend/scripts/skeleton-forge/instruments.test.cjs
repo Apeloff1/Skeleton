@@ -70,3 +70,15 @@ test('complete historical backend genre vote vocabulary is available in the crea
   assert.deepEqual(new Set(genres), new Set(expected));
   assert.equal(new Set(genres).size, expected.length);
 });
+
+
+test('the legacy full Galaxy matrix questionnaire is reachable from Forge options', () => {
+  const state = { ...Q.INITIAL_STATE, step: 'options', vision: 'a narrative adventure' };
+  const html = render(h(Flow, {
+    state, dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {},
+    onOpenGalaxyStudio: () => {},
+  }));
+  assert.match(text(html), /14 production matrices/);
+  assert.match(text(html), /100 extended sliders/);
+  assert.match(html, /data-testid="q-open-galaxy-studio"/);
+});
