@@ -175,7 +175,7 @@ HTML = r"""<!doctype html>
   <main class="main" id="workspace-main">
     <header class="topbar">
       <button id="sidebar-toggle" class="small mobile-only" aria-controls="sidebar" aria-expanded="true">Library &amp; connection</button>
-      <div class="conversation-heading"><span class="eyebrow">Jeeves / Local conversation</span><h1 id="conversation-title">A little space to think.</h1><p id="model">Not connected</p></div>
+      <div class="conversation-heading"><span class="eyebrow" id="workspace-eyebrow">Jeeves / Local conversation</span><h1 id="conversation-title">A little space to think.</h1><h1 id="forge-workspace-title" hidden>Game builder</h1><p id="model">Not connected</p></div>
       <div id="indicator" class="indicator">LOCKED</div>
       <details class="model-tools"><summary>Model tools</summary><div>
       <div id="lease-indicator" class="indicator" role="status">Execution lock unknown</div>
@@ -183,6 +183,11 @@ HTML = r"""<!doctype html>
       <button id="selftest-start" class="small" disabled>Run genuine local inference self-test</button>
       </div></details>
     </header>
+    <nav class="workspace-nav" aria-label="Jeeves workspaces">
+      <button id="chat-open" type="button" aria-pressed="true" aria-controls="chat-workspace">Conversation</button>
+      <button id="forge-open" type="button" aria-pressed="false" aria-controls="forge-panel">Game builder <span>Local model · Godot source</span></button>
+    </nav>
+    <div id="chat-workspace" class="chat-workspace">
     <div class="conversation-toolbar" aria-label="Selected conversation controls">
       <span id="conversation-state" class="hint">Saved on this device</span>
       <span id="revision">No conversation selected</span>
@@ -235,6 +240,57 @@ HTML = r"""<!doctype html>
       <div id="context-grounding-citations" aria-live="polite"></div>
       <p class="hint">Preview only. Actual inference rechecks local sources and separately persists the committed citation receipt. This is not source-rights or factual verification.</p>
     </details>
+    </div>
+    <section id="forge-panel" class="forge-panel" aria-label="Local Jeeves native game builder" hidden>
+      <div class="forge-page">
+        <div class="forge-hero"><span class="eyebrow">FROM A SMALL IDEA TO A REAL PROJECT</span>
+          <h2>Make your next playable idea.</h2>
+          <p>Your local Jeeves model proposes a bounded design. The maintained Forge compiler builds it, and Godot checks actual input before a source project is offered.</p>
+          <div class="forge-badges"><span>One local model</span><span>Original procedural games</span><span>Godot source ZIP</span></div>
+        </div>
+        <div id="forge-availability" class="forge-notice" role="status">Connect locally to inspect game-builder readiness.</div>
+        <div class="forge-starters" aria-label="Game genre">
+          <button id="forge-genre-shooter" class="forge-starter" type="button" aria-pressed="true"><span class="forge-glyph">◎</span><strong>Neon frontier</strong><small>Top-down shooter</small></button>
+          <button id="forge-genre-platformer" class="forge-starter" type="button" aria-pressed="false"><span class="forge-glyph">↟</span><strong>Moonlit ascent</strong><small>Platformer</small></button>
+          <button id="forge-genre-roguelike" class="forge-starter" type="button" aria-pressed="false"><span class="forge-glyph">◇</span><strong>Ember archive</strong><small>Roguelike RPG</small></button>
+        </div>
+        <form id="forge-form" class="forge-form">
+          <div class="forge-section-heading"><span>01 / Your idea</span><span id="forge-budget">0 / 4,000 UTF-8 bytes</span></div>
+          <label for="forge-brief">Describe the game you want to make</label>
+          <textarea id="forge-brief" rows="4" maxlength="4000" placeholder="A small world, a clear challenge, and one satisfying thing to do.">Explore a quiet salvage station, avoid its sentinels, and recover the beacon.</textarea>
+          <p class="hint">Your wording stays intact. The selected genre and explicit gameplay settings are included in the submitted brief.</p>
+          <div class="forge-section-heading"><span>02 / Shape the experience</span></div>
+          <div class="forge-fields">
+            <label for="forge-difficulty">Difficulty<select id="forge-difficulty"><option value="easy">Easy · forgiving</option><option value="normal" selected>Normal · balanced</option><option value="hard">Hard · demanding</option></select></label>
+            <label for="forge-theme">Visual theme<select id="forge-theme"><option value="moss">Moss</option><option value="neon" selected>Neon</option><option value="ember">Ember</option><option value="frost">Frost</option></select></label>
+            <label for="forge-encounter">Encounter style<select id="forge-encounter"><option value="swarm">Swarm</option><option value="patrol" selected>Patrol</option><option value="ranged">Ranged</option></select></label>
+            <label for="forge-speed">Player speed (120–360)<input id="forge-speed" type="number" min="120" max="360" step="1" value="230"></label>
+          </div>
+          <label for="forge-objective">Short objective shown in the game</label>
+          <input id="forge-objective" type="text" maxlength="100" value="Recover the beacon" placeholder="A short HUD label; no periods or semicolons">
+          <p class="hint">Use a single label of up to 100 characters, without periods or semicolons.</p>
+          <details id="forge-review-panel" class="forge-review"><summary>Review the exact build brief</summary><pre id="forge-reviewed-brief"></pre></details>
+          <div class="forge-submit-row"><button id="forge-review" class="secondary" type="button">Review brief</button><button id="forge-submit" class="primary" type="submit" disabled>Design, build &amp; verify ↗</button></div>
+          <p class="hint">Creating a build runs local model inference and maintained Godot runtime checks. It does not start a browser game or launch an installed application.</p>
+        </form>
+        <section id="forge-current" class="forge-result" aria-label="Selected game build" hidden>
+          <div class="forge-result-heading"><div><span class="eyebrow">BUILD OBSERVATION</span><h3 id="forge-result-title">Your game project</h3></div><button id="forge-check" type="button" class="small">Check original build</button></div>
+          <code id="forge-current-id"></code>
+          <p id="forge-status" role="status" aria-live="polite">No build selected.</p>
+          <ol id="forge-progress" class="forge-progress" aria-label="Observed build stages"></ol>
+          <div id="forge-proof" class="forge-proof"></div>
+          <pre id="forge-controls" class="forge-controls" hidden></pre>
+          <details class="forge-review"><summary>Source archive details</summary><p id="forge-archive-info" class="hint"></p></details>
+          <button id="forge-download" class="primary" type="button" disabled>Download Godot source ZIP</button>
+          <p class="hint">Extract the ZIP, open <code>project.godot</code> in Godot 4, and read <code>PLAY.md</code> for controls. Then play your project and judge its feel on your own device.</p>
+        </section>
+        <section class="forge-history" aria-label="Saved local game builds">
+          <div class="forge-result-heading"><div><span class="eyebrow">CONTINUE YOUR WORK</span><h3>Local builds</h3></div><button id="forge-refresh" class="small" type="button" disabled>Refresh builds</button></div>
+          <p class="hint">Reopen an original build to inspect its saved state. Reading a job never submits another model request.</p>
+          <div id="forge-jobs" class="forge-jobs"><p class="hint">Connect to inspect saved builds.</p></div>
+        </section>
+      </div>
+    </section>
     <div id="status" class="status" role="status">Paste the local access token to connect.</div>
     <dialog id="session-title-dialog" aria-labelledby="session-title-heading" aria-describedby="session-title-help">
       <form id="session-title-form">
@@ -287,7 +343,10 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 html,body{background:var(--canvas);color:var(--text)}button{font-size:12px;min-height:34px;border-radius:9px}button:hover:not(:disabled){border-color:#7184ac}.primary{background:#b8caf7;border-color:#b8caf7;color:#142443;font-weight:750}.primary:hover:not(:disabled){background:#d1ddfc;border-color:#d1ddfc}.secondary{background:#1b2130}.shell{grid-template-columns:320px minmax(0,1fr)}.sidebar{background:#141820;padding:24px 18px;gap:0;border-color:#29303f}.brand{margin-bottom:22px}.brand-mark{border-radius:50%;width:42px;height:42px;color:#d4e0fc;background:#26334c;border-color:#465d85;font-size:25px}.brand strong{font-size:22px;letter-spacing:-.7px}.brand small{letter-spacing:0;color:#aab7ce;font-size:11px}.connect{background:#1b2230;padding:12px;border-color:#354059}.connect .hint{margin:8px 0 0;font-size:11px}.connect input{padding:10px}.heading{margin-top:22px;margin-bottom:10px;letter-spacing:.9px;font-size:11px}.session-views{display:flex;gap:4px;background:#0f141e;padding:4px;border:1px solid #2d3648;border-radius:10px;margin-bottom:11px}.session-views button{flex:1;background:transparent;border-color:transparent;color:#b9c5da;min-height:30px}.session-views button[aria-pressed=true]{background:#2b3852;color:#eef2ff;border-color:#405578}.sessions{flex:1 0 140px;max-height:35vh;min-height:120px;margin:10px 0 2px}.session{padding:11px 12px;border-radius:10px;border:1px solid transparent;line-height:1.4}.session.active{background:#29364d;border-color:#455c83}.session .session-title{display:flex;gap:6px;align-items:baseline;font-size:13px;font-weight:650;color:#e7edf9}.session .pin-marker{color:#c6d6fb;font-size:11px}.session small{font-size:10px;color:#aab8ce;margin-top:5px}.session .session-preview{font-size:11px;color:#b4bfd1}.instructions{font-size:11px;margin:10px 0 12px}.workspace-section{flex-shrink:0;border-top:1px solid #2e3748;padding:14px 0;font-size:12px}.workspace-section>summary{cursor:pointer;font-weight:650;color:#d5def0;list-style-position:inside;padding:2px 0}.workspace-section>summary>span{display:block;font-size:10px;font-weight:400;color:#a5b3cb;margin:4px 0 0 14px}.workspace-section .knowledge-section{border:0;margin-top:14px;padding-top:0;max-height:none;overflow:visible}.workspace-section .knowledge-section>.heading{margin-top:0}.workspace-section .sidebar-footer{border:0;padding:14px 0 0}.workspace-section details{margin-top:8px}.workspace-section details>summary{cursor:pointer;line-height:1.5;color:#c2cfe8}.workspace-section details[open]>summary{margin-bottom:10px}.advanced-reference[open]{display:grid;gap:8px;padding-top:9px}.model-tools{position:relative;font-size:11px;flex-shrink:0}.model-tools>summary{cursor:pointer;padding:8px 10px;border:1px solid #39435a;border-radius:9px;color:#bac8e0;list-style-position:inside}.model-tools>div{position:absolute;right:0;top:calc(100% + 9px);z-index:8;width:260px;border:1px solid #485976;border-radius:12px;padding:14px;background:#1b2434;box-shadow:0 14px 30px #0007;display:grid;gap:9px}.model-tools .indicator{border-radius:7px;white-space:normal;line-height:1.5;text-align:center}.topbar{position:relative;gap:14px;padding:25px 34px 20px;border-color:#2b3241;align-items:center}.conversation-heading{min-width:0;flex:1}.eyebrow{display:block;text-transform:uppercase;letter-spacing:1.8px;font-size:9px;line-height:1.8;color:#a6b8d8;font-weight:650}.topbar h1{font-size:22px;font-weight:550;letter-spacing:-.6px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.topbar p{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;line-height:1.5;color:#a9b7cd;margin-top:5px}.indicator{font-size:9px;letter-spacing:.8px;padding:7px 10px;border-color:#435272;white-space:nowrap}.conversation-toolbar{display:flex;flex-shrink:0;gap:10px;align-items:center;border-bottom:1px solid #252e3f;padding:9px 34px;font-size:10px;color:#aebbd1}.conversation-toolbar .hint{font-size:10px}.conversation-actions{display:flex;gap:5px;margin-left:auto}.conversation-actions button{background:transparent;font-size:10px;min-height:28px;padding:4px 8px}.conversation-actions button[aria-pressed=true]{background:#2e3e5c;color:#d8e5ff;border-color:#718cb7}.intro{max-width:680px;padding:40px 36px;margin:auto;text-align:left}.intro .glow{display:grid;place-items:center;width:62px;height:62px;border:1px solid #465a7d;border-radius:20px;background:radial-gradient(ellipse at top,#394e78,#1c2435);color:#d6e1ff;font-size:34px;margin-bottom:24px}.intro h2{font-size:clamp(27px,3vw,42px);line-height:1.15;font-family:Georgia,ui-serif,serif;font-weight:400;letter-spacing:-1.2px;margin:0 0 18px}.intro p{font-size:14px;line-height:1.8;color:#b2bfd5;margin:10px 0}.intro .minor{font-size:11px;border-top:1px solid #2e374b;padding-top:14px;margin-top:20px;color:#a1afc7;line-height:1.7}.getting-started{display:grid;gap:9px;margin:24px 0;color:#c2cde0;font-size:12px}.getting-started span{display:flex;align-items:center;gap:10px}.getting-started b{font-size:10px;font-weight:600;width:22px;height:22px;border:1px solid #4a5b77;border-radius:50%;display:inline-grid;place-items:center;color:#d2e0fb;background:#202b3f}.messages{padding:30px 34px;max-width:960px;gap:20px}.messages:empty{display:none}.message{border-radius:14px;max-width:92%;padding:18px 20px;font-size:14px}.message.user{background:#283852;border-color:#435c83}.message.assistant{background:#181e2a;border-color:#313e55}.message header{font-size:9px;letter-spacing:1.3px;color:#c4d5f7}.message-actions button{min-height:28px;font-size:10px;background:transparent}.transcript-tools{flex-shrink:0;margin:7px 0}.transcript-tools button{border-color:transparent;background:transparent;color:#b3c2dc;font-size:10px}.composer{flex-shrink:0;width:calc(100% - 68px);max-width:892px;padding:17px;background:#1b2230;border-color:#465575;border-radius:16px;box-shadow:0 8px 30px #0003}.composer>label{font-size:11px;color:#cad7ee}.composer textarea{border-color:#34445f;background:#111925;min-height:84px;max-height:28vh;line-height:1.6;font-size:14px;padding:12px;resize:vertical}.generation-options{font-size:10px;color:#b5c5df;margin-top:9px}.generation-options>summary{cursor:pointer;width:fit-content;padding:5px 0}.generation-options .bottom{gap:12px;padding:8px 0;border-top:1px solid #34435d}.generation-options label{font-size:10px}.composer-submit{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:9px;flex-wrap:wrap}.composer-submit .hint{font-size:10px;margin-right:auto}.composer-submit button{min-height:36px;font-size:11px}.context-report{background:transparent;border-color:transparent;font-size:10px;line-height:1.5;padding:8px 34px;color:#aabbd7}.status{flex-shrink:0;padding:8px 34px 14px;font-size:11px;color:#b8c6dc;line-height:1.5}.dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}#session-title-dialog{max-width:470px}#session-title-dialog h2{font-family:Georgia,ui-serif,serif;font-size:27px;font-weight:400;margin:9px 0}#session-title-dialog label{display:block;font-size:12px;margin-top:20px}#session-title-input{display:block;width:100%;color:#f3f5fa;background:#0d1624;border:1px solid #526d96;border-radius:8px;font:inherit;padding:12px;margin-top:9px}.form-error{font-size:12px;color:#ffbcbf;min-height:1.5em}.session-empty{padding:14px 10px;line-height:1.7}.session-empty strong{display:block;color:#d5def0;font-size:12px;margin-bottom:5px}.session-empty p{font-size:11px;color:#aab9d1;margin:0}
 @media(min-width:721px) and (max-width:1100px){.shell{grid-template-columns:285px minmax(0,1fr)}.sidebar{padding:20px 14px}.topbar{padding:21px 24px 17px;flex-wrap:wrap}.conversation-heading{flex-basis:100%}.conversation-toolbar{padding:9px 24px}.intro{padding:28px}.composer{width:calc(100% - 40px)}.keyboard-hint{display:none}}
 @media(max-width:720px){.topbar{padding:13px 14px 10px;gap:9px}.topbar .conversation-heading{order:3;flex-basis:100%;min-width:0}.topbar h1{font-size:20px}.topbar p{font-size:9px}.topbar .indicator{margin-left:auto}.model-tools{font-size:10px}.model-tools>summary{padding:7px 8px}.model-tools .indicator{margin-left:0}.model-tools>div{right:0;width:min(260px,82vw)}.conversation-toolbar{padding:7px 12px;gap:6px;flex-wrap:wrap}.conversation-toolbar #revision{font-size:9px}.conversation-toolbar .hint{font-size:9px}.conversation-actions{gap:3px}.conversation-actions button{min-height:30px;padding:5px 7px;font-size:10px}.intro{padding:20px 22px;overflow:auto}.intro .glow{width:43px;height:43px;border-radius:14px;font-size:27px;margin-bottom:17px}.intro h2{font-size:28px;margin-bottom:12px}.intro p{font-size:12px;line-height:1.7}.intro .minor{font-size:10px;margin-top:14px;padding-top:10px}.getting-started{margin:14px 0;gap:7px;font-size:11px}.getting-started b{width:19px;height:19px}.composer{width:calc(100% - 20px);padding:11px;border-radius:12px}.composer textarea{min-height:62px;max-height:22vh;padding:10px;font-size:13px}.composer-submit{gap:6px;margin-top:6px}.composer-submit .keyboard-hint{display:none}.composer-submit button{font-size:11px;min-height:34px}.generation-options{margin-top:5px}.generation-options .bottom{gap:10px}.generation-options label{font-size:10px}.context-report{padding:6px 12px;font-size:9px;max-height:44px;overflow:auto}.status{padding:6px 12px 9px;font-size:10px;max-height:56px;overflow:auto}.messages{padding:16px 12px;gap:14px}.message{padding:14px;max-width:97%;font-size:13px}.transcript-tools{margin:2px}.sidebar{padding:18px 15px}.sidebar .sessions{max-height:29vh;min-height:120px}.sidebar .knowledge-section{max-height:none}.workspace-section{padding:13px 0}.brand{margin-bottom:17px}.brand #sidebar-close{min-height:32px}.shell.library-open .main{pointer-events:none}.sidebar-close:focus-visible{outline-offset:2px}}
+#forge-genre-shooter .forge-glyph{color:#a4d9f5}#forge-genre-platformer .forge-glyph{color:#c9b8ff}#forge-genre-roguelike .forge-glyph{color:#efc58c}#forge-genre-shooter[aria-pressed=true]{border-color:#8fcee8;background:linear-gradient(150deg,#22384d,#1b293b)}#forge-genre-platformer[aria-pressed=true]{border-color:#b6a0e9;background:linear-gradient(150deg,#342b4a,#222439)}#forge-genre-roguelike[aria-pressed=true]{border-color:#d5b17b;background:linear-gradient(150deg,#3b3029,#272734)}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+.workspace-nav{display:flex;flex-shrink:0;gap:8px;padding:10px 34px;border-bottom:1px solid #30394c;background:#131923}.workspace-nav button{background:transparent;border-color:transparent;color:#afbed8;text-align:left;padding:8px 13px;min-height:40px}.workspace-nav button[aria-pressed=true]{color:#e8efff;background:#2a3852;border-color:#52688f}.workspace-nav button span{display:block;font-size:9px;color:#b3c4df;margin-top:3px}.chat-workspace{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden}.forge-panel{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:28px 34px}.forge-page{max-width:960px;margin:0 auto;padding-bottom:30px}.forge-hero h2{font-family:Georgia,ui-serif,serif;font-weight:400;font-size:36px;letter-spacing:-.8px;line-height:1.2;margin:13px 0 14px}.forge-hero p{font-size:13px;line-height:1.8;color:#b7c6df;max-width:700px}.forge-badges{display:flex;gap:7px;flex-wrap:wrap;margin:18px 0 22px}.forge-badges span{font-size:10px;color:#c8d8f2;border:1px solid #445a7c;border-radius:20px;padding:6px 9px;background:#1b293d}.forge-notice{border:1px solid #3d516e;background:#1c2b40;color:#d0dff5;padding:12px 14px;line-height:1.6;font-size:12px;border-radius:10px;margin:16px 0}.forge-notice.warning{border-color:#80623e;background:#30281e;color:#efd7b6}.forge-starters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:20px 0}.forge-starter{text-align:left;min-height:140px;padding:17px;background:#192335;border:1px solid #3a4a65;border-radius:13px}.forge-starter[aria-pressed=true]{background:#283750;border-color:#9db5df}.forge-glyph{display:block;color:#c2d4f5;font-size:31px;line-height:1.3;margin-bottom:14px}.forge-starter strong{display:block;font-size:14px;font-weight:650;color:#ebf1ff}.forge-starter small{display:block;margin-top:6px;font-size:11px;color:#b5c5df}.forge-form,.forge-result,.forge-history{background:#171f2d;border:1px solid #35465f;border-radius:14px;padding:20px;margin:17px 0}.forge-form label{display:block;color:#c6d6ef;font-size:12px;line-height:1.6;margin-top:12px}.forge-form input,.forge-form textarea,.forge-form select{display:block;width:100%;color:#f0f4fc;background:#101927;border:1px solid #4b6082;border-radius:8px;padding:11px;margin-top:7px;min-height:42px;font-size:13px}.forge-form textarea{resize:vertical;min-height:110px;line-height:1.6}.forge-form .hint{font-size:11px;line-height:1.6}.forge-section-heading{display:flex;justify-content:space-between;gap:12px;color:#c7d7f1;font-size:10px;letter-spacing:.5px;font-weight:650;margin:9px 0 13px}.forge-section-heading:not(:first-child){border-top:1px solid #35445b;padding-top:21px;margin-top:22px}.forge-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 17px}.forge-review{margin:18px 0;padding:12px;border:1px solid #3c5274;border-radius:9px;background:#142337;font-size:12px;color:#ccdffb}.forge-review summary{cursor:pointer}.forge-review pre,.forge-controls{white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;line-height:1.8;color:#c3d4ef;max-height:250px;overflow:auto;margin:13px 0 0}.forge-submit-row{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap;margin:20px 0 12px}.forge-submit-row button{min-height:43px}.forge-result-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.forge-result h3,.forge-history h3{font-size:19px;line-height:1.4;margin:7px 0 12px;letter-spacing:-.3px}.forge-result code{font-size:10px;overflow-wrap:anywhere;color:#a7bedf}#forge-status{font-size:13px;line-height:1.7;color:#d8e5fa;margin:18px 0}.forge-progress{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));list-style:none;padding:0;margin:18px 0;gap:7px}.forge-progress li{border-top:2px solid #465570;padding-top:9px;color:#a7b7d1;font-size:10px;line-height:1.5}.forge-progress li.observed{border-color:#b2c9f1;color:#dfebff}.forge-progress li.current{border-color:#9ed8bd;color:#c8edda}.forge-proof{display:grid;gap:9px;margin:20px 0}.forge-proof-row{display:flex;justify-content:space-between;gap:13px;flex-wrap:wrap;font-size:11px;line-height:1.6;border-bottom:1px solid #2f4058;padding-bottom:8px}.forge-proof-row span:first-child{color:#b2c5e1}.forge-proof-row span:last-child{color:#dce9fc}.forge-controls{max-height:200px;padding:12px;border:1px solid #3d5678;border-radius:8px;background:#111d2d}.forge-result #forge-download{margin:9px 0;min-height:43px}.forge-jobs{display:grid;gap:8px;margin-top:17px}.forge-job{display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;background:#1c2a40;border:1px solid #3e5577;border-radius:9px;padding:12px}.forge-job strong{display:block;font-size:12px;color:#d9e7ff;overflow-wrap:anywhere}.forge-job small{display:block;color:#a8bfdf;font-size:10px;margin-top:5px;line-height:1.6}.forge-job>span:last-child{color:#cbdcfa;font-size:11px;white-space:nowrap}.forge-result .hint{font-size:11px;line-height:1.7;overflow-wrap:anywhere}.forge-form input:disabled,.forge-form select:disabled,.forge-form textarea:disabled{opacity:.55}.forge-history .hint{font-size:11px}.forge-form #forge-budget.warning{color:#ffd1ac}
+@media(max-width:720px){.workspace-nav{padding:8px 12px;gap:6px}.workspace-nav button{min-height:39px;padding:7px 11px;font-size:11px}.workspace-nav button span{font-size:8px}.forge-panel{padding:22px 13px}.forge-hero h2{font-size:30px;margin-top:11px}.forge-hero p{font-size:12px}.forge-badges{gap:5px}.forge-badges span{font-size:9px;padding:5px 8px}.forge-notice{font-size:11px}.forge-starters{gap:6px}.forge-starter{padding:12px 9px;min-height:135px}.forge-glyph{font-size:27px;margin-bottom:13px}.forge-starter strong{font-size:11px;line-height:1.5}.forge-starter small{font-size:9px;line-height:1.5}.forge-form,.forge-result,.forge-history{padding:15px 12px}.forge-fields{gap:0 10px}.forge-form label{font-size:11px}.forge-form input,.forge-form select{font-size:12px;padding:9px}.forge-submit-row{justify-content:stretch}.forge-submit-row button{flex:1;font-size:11px}.forge-result h3,.forge-history h3{font-size:17px}.forge-progress{gap:5px}.forge-progress li{font-size:9px}.forge-result-heading{align-items:flex-start}.forge-result-heading .small{font-size:10px}.forge-section-heading{font-size:9px}.forge-job{gap:9px;padding:11px 9px}.forge-job strong{font-size:11px}.forge-proof-row{font-size:10px}}
 
 """
 
@@ -313,7 +372,308 @@ JAVASCRIPT = r"""'use strict';
     network: new AbortController(), resourceTimer: null, longformSourceId: null,
     longformWork: null, longformPendingRequest: null,
     longformImportPending: null,
+    workspace: 'chat', forgeGenre: 'shooter', forgeJob: null, forgeRequest: null,
+    forgeJobs: [], forgeAvailability: null, forgeLimits: null,
+    forgeTimer: null, forgePolling: false, forgePollStarted: 0, forgePollErrors: 0,
   };
+  function nativeGameBrief(fields) {
+    const genres = {shooter: 'A small top-down shooter.', platformer: 'A small platformer.', roguelike: 'A small roguelike RPG.'};
+    if (!fields || !Object.hasOwn(genres, fields.genre) ||
+        !['easy', 'normal', 'hard'].includes(fields.difficulty) ||
+        !['moss', 'neon', 'ember', 'frost'].includes(fields.theme) ||
+        !['swarm', 'patrol', 'ranged'].includes(fields.encounter)) {
+      throw new Error('Choose valid game settings.');
+    }
+    if (typeof fields.brief !== 'string' || !fields.brief.trim() ||
+        /[\u0000-\u0008\u000b-\u001f\u007f\ud800-\udfff]/u.test(fields.brief)) {
+      throw new Error('Enter a valid game idea.');
+    }
+    const objective = fields.objective;
+    if (typeof objective !== 'string' || !objective.trim() || Array.from(objective).length > 100 ||
+        objective !== objective.trim() || /[.;\u0000-\u001f\u007f\u2028\u2029\ud800-\udfff]/u.test(objective)) {
+      throw new Error('Use a short objective of up to 100 characters, without periods, semicolons or line breaks.');
+    }
+    if (typeof fields.speed !== 'string' || !/^[0-9]{3}$/.test(fields.speed) ||
+        Number(fields.speed) < 120 || Number(fields.speed) > 360) {
+      throw new Error('Player speed must be a whole number from 120 to 360.');
+    }
+    // The compiler collapses whitespace, so every explicit label needs its
+    // own period boundary. The creator's original text remains an exact tail.
+    const brief = genres[fields.genre] + ' Scope: small prototype. ' +
+      'Difficulty: ' + fields.difficulty + '. Theme: ' + fields.theme +
+      '. Objective: ' + objective + '. Player speed: ' + fields.speed +
+      '. Encounter style: ' + fields.encounter + '.\n\nCreator brief:\n' + fields.brief;
+    if (new TextEncoder().encode(brief).byteLength > 4000) throw new Error('The complete game brief exceeds 4,000 UTF-8 bytes. Shorten your idea or objective.');
+    return brief;
+  }
+  function forgeFields() {
+    return {genre: state.forgeGenre, brief: get('forge-brief').value,
+      difficulty: get('forge-difficulty').value, theme: get('forge-theme').value,
+      encounter: get('forge-encounter').value, speed: get('forge-speed').value,
+      objective: get('forge-objective').value};
+  }
+  function forgeDraftChanged() {
+    try {
+      const brief = nativeGameBrief(forgeFields());
+      get('forge-budget').textContent = bytes(brief) + ' / 4,000 UTF-8 bytes';
+      get('forge-budget').classList.remove('warning');
+      get('forge-reviewed-brief').textContent = brief;
+    } catch (error) {
+      get('forge-budget').textContent = 'Check idea and settings';
+      get('forge-budget').classList.add('warning');
+      get('forge-reviewed-brief').textContent = error.message;
+    }
+  }
+  function workspace(mode) {
+    state.workspace = mode === 'forge' ? 'forge' : 'chat';
+    const forge = state.workspace === 'forge';
+    get('forge-panel').hidden = !forge; get('chat-workspace').hidden = forge;
+    get('conversation-title').hidden = forge; get('forge-workspace-title').hidden = !forge;
+    get('workspace-eyebrow').textContent = forge ? 'Jeeves / Native game builder' : 'Jeeves / Local conversation';
+    get('chat-open').setAttribute('aria-pressed', String(!forge));
+    get('forge-open').setAttribute('aria-pressed', String(forge));
+  }
+  function forgeActive() {
+    return !!state.forgeJob && state.forgeJob.terminal !== true;
+  }
+  function checkedForgeJob(value, expectedId) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) ||
+        typeof value.request_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value.request_id) ||
+        (expectedId && value.request_id !== expectedId) ||
+        !['queued', 'planning', 'building', 'verifying', 'complete', 'failed'].includes(value.state) ||
+        typeof value.terminal !== 'boolean' ||
+        value.terminal !== ['complete', 'failed'].includes(value.state) ||
+        typeof value.brief_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.brief_sha256)) {
+      throw new Error('The game build returned an invalid identity or state. Check the original request.');
+    }
+    return value;
+  }
+  function forgeArchiveReady(job, modelDigest) {
+    const result = job?.result; const build = result?.build; const archive = job?.archive;
+    return !!job && job.state === 'complete' && job.terminal === true &&
+      result?.ok === true && result.planning?.status === 'accepted' &&
+      typeof modelDigest === 'string' && result.planning.model_digest === modelDigest &&
+      build?.ok === true && build.interactive?.native_boot_verified === true &&
+      build.interactive?.input_journey_verified === true && !!archive &&
+      typeof archive.sha256 === 'string' && /^[a-f0-9]{64}$/.test(archive.sha256) &&
+      Number.isSafeInteger(archive.bytes) && archive.bytes > 0 && archive.bytes <= 16777216 &&
+      Number.isSafeInteger(archive.file_count) && archive.file_count > 0 && archive.file_count <= 512;
+  }
+  function renderForgeJob() {
+    const job = state.forgeJob;
+    get('forge-current').hidden = !job;
+    if (!job) return;
+    const spec = job.result?.build?.spec;
+    get('forge-result-title').textContent = typeof spec?.title === 'string' ? spec.title.slice(0, 140) : 'Your game project';
+    get('forge-current-id').textContent = job.request_id;
+    const labels = {queued: 'Queued for the local builder.', planning: 'Jeeves is proposing a bounded game design on this machine.',
+      building: 'The Forge compiler is creating the Godot source project.', verifying: 'Godot is checking the native input journey.',
+      complete: 'Source project published. Its verification evidence is shown below.', failed: 'The build stopped without a downloadable project.',
+      unknown: 'Delivery is uncertain. Check this original request; no second model request has been submitted.'};
+    const failure = job.error && typeof job.error.message === 'string' ? ' ' + job.error.message.slice(0, 240) : '';
+    get('forge-status').textContent = (labels[job.state] || 'Build state unavailable.') + failure;
+    const progress = get('forge-progress'); progress.replaceChildren();
+    const stages = [['queued', 'Queued'], ['planning', 'Local design'], ['building', 'Compile source'], ['verifying', 'Native input proof']];
+    const at = job.state === 'complete' ? stages.length : stages.findIndex(row => row[0] === job.state);
+    stages.forEach(([id, label], index) => {
+      const row = document.createElement('li'); row.textContent = label;
+      if (index < at) row.classList.add('observed');
+      if (id === job.state) {row.classList.add('current'); row.setAttribute('aria-current', 'step');}
+      progress.append(row);
+    });
+    const proof = get('forge-proof'); proof.replaceChildren();
+    const planning = job.result?.planning; const interactive = job.result?.build?.interactive;
+    const rows = [
+      ['Local model design', planning?.status === 'accepted' ? 'Accepted by the design guard' : planning ? 'Not accepted' : 'Awaiting recorded result'],
+      ['Native engine boot', interactive?.native_boot_verified === true ? 'Verified' : 'Not recorded'],
+      ['Native input journey', interactive?.input_journey_verified === true ? 'Verified' : 'Not recorded'],
+    ];
+    rows.forEach(([label, value]) => {
+      const row = document.createElement('div'); row.className = 'forge-proof-row';
+      const name = document.createElement('span'); name.textContent = label;
+      const observed = document.createElement('span'); observed.textContent = value;
+      row.append(name, observed); proof.append(row);
+    });
+    const controls = interactive?.controls;
+    get('forge-controls').hidden = !controls;
+    get('forge-controls').textContent = controls ? Object.entries(controls).slice(0, 8)
+      .filter(([, value]) => typeof value === 'string').map(([key, value]) => key + ': ' + value.slice(0, 240)).join('\n') : '';
+    get('forge-archive-info').textContent = job.archive ?
+      job.archive.file_count + ' source files · ' + job.archive.bytes + ' archive bytes\nSHA-256: ' + job.archive.sha256 :
+      'A source ZIP becomes available only after model admission and native input verification both succeed.';
+    updateControls();
+  }
+  function renderForgeJobs() {
+    const list = get('forge-jobs'); list.replaceChildren();
+    if (!state.forgeJobs.length) {
+      const empty = document.createElement('p'); empty.className = 'hint';
+      empty.textContent = 'No local builds yet. Start with one small, complete idea above.'; list.append(empty);
+    }
+    state.forgeJobs.slice(0, 20).forEach(job => {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'forge-job';
+      button.id = 'forge-resume-' + job.request_id;
+      button.disabled = !state.connected || state.busy || state.forgePolling;
+      const text = document.createElement('span');
+      const title = document.createElement('strong');
+      const spec = job.result?.build?.spec;
+      title.textContent = typeof spec?.title === 'string' ? spec.title.slice(0, 100) : job.request_id;
+      const detail = document.createElement('small'); detail.textContent = job.state + ' · original saved request';
+      text.append(title, detail);
+      const action = document.createElement('span'); action.textContent = job.terminal ? 'Open →' : 'Resume checks →';
+      button.append(text, action);
+      button.addEventListener('click', () => run(async () => {
+        stopForgePolling(); state.forgeRequest = null;
+        state.forgeJob = checkedForgeJob(await api('GET', '/v1/game-builds/' + job.request_id), job.request_id);
+        renderForgeJob(); state.forgePollStarted = performance.now(); state.forgePollErrors = 0;
+        if (forgeActive()) scheduleForgePoll(100);
+        get('forge-current').scrollIntoView({block: 'start'});
+      }));
+      list.append(button);
+    });
+  }
+  async function refreshForge() {
+    if (!state.connected) return;
+    const result = await api('GET', '/v1/game-builds');
+    if (!result || !Array.isArray(result.jobs) || result.jobs.length > 128 ||
+        typeof result.availability?.ready !== 'boolean') throw new Error('The local builder status could not be verified.');
+    state.forgeJobs = result.jobs.map(job => checkedForgeJob(job));
+    state.forgeAvailability = result.availability; state.forgeLimits = result.limits;
+    const availability = get('forge-availability');
+    availability.classList.toggle('warning', !result.availability.ready);
+    availability.textContent = result.availability.ready ?
+      'Local builder available. A new build requires an accepted Jeeves design and actual Godot input proof.' :
+      'New builds are unavailable (' + String(result.availability.code || 'unknown').slice(0, 90) + '). Your draft is preserved. Refresh builds after the local model or engine recovers.';
+    renderForgeJobs(); updateControls();
+  }
+  function stopForgePolling() {
+    if (state.forgeTimer !== null) clearTimeout(state.forgeTimer);
+    state.forgeTimer = null;
+  }
+  function scheduleForgePoll(delay = 1400) {
+    stopForgePolling();
+    if (state.connected && forgeActive()) state.forgeTimer = setTimeout(() => void pollForge(), delay);
+  }
+  async function pollForge() {
+    if (!state.connected || !state.forgeJob || state.forgePolling) return;
+    const epoch = state.epoch; const id = state.forgeJob.request_id;
+    state.forgePolling = true; updateControls();
+    try {
+      const job = checkedForgeJob(await api('GET', '/v1/game-builds/' + id), id);
+      if (state.forgeJob?.request_id !== id || epoch !== state.epoch) return;
+      if (state.forgeRequest?.request_id === id && state.forgeRequest.brief_sha256 !== job.brief_sha256) throw new Error('The saved build brief differs from the original request.');
+      state.forgeJob = job; state.forgePollErrors = 0; renderForgeJob();
+      if (job.terminal) {
+        stopForgePolling();
+        status(job.state === 'complete' ? 'Local source project completed. Review its recorded proof before downloading.' : 'The local build stopped. Its original result remains available.');
+        try {await refreshForge();} catch {if (epoch === state.epoch) status('The original build result was read, but the build list could not be refreshed.');}
+      } else if (performance.now() - state.forgePollStarted > 10 * 60 * 1000) {
+        status('Automatic build observation paused. Check the original build to continue; no new generation was submitted.');
+      } else scheduleForgePoll();
+    } catch (error) {
+      if (epoch !== state.epoch) return;
+      state.forgePollErrors++;
+      if (error.status === 404) {
+        state.forgeJob = {...state.forgeJob, state: 'failed', terminal: true,
+          error: {code: 'job_not_found', message: 'No saved job exists for this request. Refresh builds before explicitly creating a new one.'}};
+        renderForgeJob(); stopForgePolling();
+      }
+      status('Build observation is unavailable. Keep the original request ID and check it again. ' + error.message);
+      if (state.forgePollErrors < 5 && error.status !== 404) scheduleForgePoll(Math.min(8000, 1000 * 2 ** state.forgePollErrors));
+    } finally {if (epoch === state.epoch) {state.forgePolling = false; updateControls();}}
+  }
+  async function submitForge() {
+    if (!state.connected || forgeActive()) throw new Error('Finish observing the original build before starting another.');
+    const epoch = state.epoch;
+    const brief = nativeGameBrief(forgeFields());
+    await refreshForge();
+    if (epoch !== state.epoch || !state.connected) return;
+    if (!state.forgeAvailability?.ready) throw new Error('The local builder is unavailable. Your idea and settings are preserved.');
+    const request = Object.freeze({request_id: 'g_' + crypto.randomUUID().replace(/-/g, ''), brief,
+      brief_sha256: await exactLocalSha256(brief)});
+    if (epoch !== state.epoch) return;
+    stopForgePolling(); state.forgeRequest = request;
+    state.forgeJob = {request_id: request.request_id, brief_sha256: request.brief_sha256, state: 'unknown', terminal: false};
+    state.forgePollStarted = performance.now(); state.forgePollErrors = 0; renderForgeJob();
+    try {
+      const job = checkedForgeJob(await api('POST', '/v1/game-builds', {request_id: request.request_id, brief}), request.request_id);
+      if (job.brief_sha256 !== request.brief_sha256) throw new Error('The saved build brief differs from the submitted request.');
+      state.forgeJob = job; renderForgeJob();
+      status('Original build submitted. You may edit the next idea; this request keeps its admitted brief.');
+    } catch (error) {
+      if (epoch !== state.epoch) return;
+      // A lost acknowledgement is not permission to submit another model run.
+      status('Build delivery is uncertain. Use Check original build to read this request without generating again. ' + error.message);
+    }
+    if (epoch === state.epoch) scheduleForgePoll(200);
+  }
+  async function readBoundedForgeArchive(response, maximum, signal) {
+    if (!response.ok || response.redirected ||
+        (response.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase() !== 'application/zip' ||
+        !Number.isSafeInteger(maximum) || maximum < 1 || maximum > 16777216) throw new Error('The verified source ZIP is unavailable. Check the original build.');
+    const declared = response.headers.get('Content-Length');
+    if (declared !== null && (!/^[0-9]{1,9}$/.test(declared) || Number(declared) < 1 || Number(declared) > maximum)) throw new Error('Source ZIP exceeds its download budget.');
+    if (!response.body || typeof response.body.getReader !== 'function') throw new Error('This browser cannot read a bounded source download.');
+    const reader = response.body.getReader(); const chunks = []; let total = 0;
+    const abort = () => {void reader.cancel().catch(() => {});};
+    signal.addEventListener('abort', abort, {once: true});
+    try {
+      while (true) {
+        if (signal.aborted) throw new Error('Source download cancelled.');
+        const {done, value} = await reader.read();
+        if (signal.aborted) throw new Error('Source download cancelled.');
+        if (done) break;
+        if (!(value instanceof Uint8Array)) throw new Error('Source ZIP returned invalid bytes.');
+        total += value.byteLength;
+        if (total > maximum) throw new Error('Source ZIP exceeds its download budget.');
+        chunks.push(value);
+      }
+      if (!total || declared !== null && total !== Number(declared)) throw new Error('Source ZIP length could not be verified.');
+      const bytes = new Uint8Array(total); let offset = 0;
+      for (const chunk of chunks) {bytes.set(chunk, offset); offset += chunk.byteLength;}
+      return bytes;
+    } finally {
+      signal.removeEventListener('abort', abort);
+      try {await reader.cancel();} catch { /* Cancellation must not expose response bytes. */ }
+      reader.releaseLock();
+    }
+  }
+  async function downloadForge() {
+    if (!state.connected || !state.forgeJob) throw new Error('Open a completed local build first.');
+    const epoch = state.epoch; const id = state.forgeJob.request_id;
+    const job = checkedForgeJob(await api('GET', '/v1/game-builds/' + id), id);
+    if (!forgeArchiveReady(job, state.health?.model_digest)) throw new Error('This source project has no complete model and native input proof.');
+    state.forgeJob = job; renderForgeJob();
+    const network = state.network; const controller = new AbortController();
+    const abort = () => controller.abort(); network.signal.addEventListener('abort', abort, {once: true});
+    const timer = setTimeout(abort, 15000);
+    try {
+      const response = await fetch('/v1/game-builds/' + id + '/archive', {
+        method: 'GET', headers: {Authorization: 'Bearer ' + state.token},
+        cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller.signal,
+      });
+      const content = await readBoundedForgeArchive(response, 16777216, controller.signal);
+      const digest = await localMediaSha256(content);
+      if (epoch !== state.epoch || !state.connected || state.forgeJob?.request_id !== id || controller.signal.aborted) return;
+      if (content.byteLength !== job.archive.bytes || digest !== job.archive.sha256) throw new Error('Source ZIP digest differs from the saved artifact. No download was offered.');
+      download(content, 'jeeves-game-' + id + '.zip', 'application/zip');
+      status('Verified Godot source ZIP downloaded. Extract it and read PLAY.md.');
+    } finally {clearTimeout(timer); network.signal.removeEventListener('abort', abort);}
+  }
+  function clearForge() {
+    stopForgePolling();
+    Object.assign(state, {forgeJob: null, forgeRequest: null, forgeJobs: [], forgeAvailability: null,
+      forgeLimits: null, forgePolling: false, forgePollStarted: 0, forgePollErrors: 0, forgeGenre: 'shooter'});
+    get('forge-brief').value = ''; get('forge-objective').value = '';
+    get('forge-difficulty').value = 'normal'; get('forge-theme').value = 'neon';
+    get('forge-encounter').value = 'patrol'; get('forge-speed').value = '230';
+    get('forge-reviewed-brief').textContent = ''; get('forge-review-panel').open = false;
+    get('forge-current').hidden = true;
+    for (const id of ['forge-current-id', 'forge-result-title', 'forge-status', 'forge-archive-info', 'forge-controls']) get(id).textContent = '';
+    get('forge-proof').replaceChildren(); get('forge-progress').replaceChildren(); get('forge-jobs').replaceChildren();
+    get('forge-availability').textContent = 'Connect locally to inspect game-builder readiness.';
+    for (const genre of ['shooter', 'platformer', 'roguelike']) get('forge-genre-' + genre).setAttribute('aria-pressed', String(genre === 'shooter'));
+    forgeDraftChanged(); workspace('chat');
+  }
   async function refreshResources() {
     if (!state.connected || !state.token) return;
     try {
@@ -457,7 +817,7 @@ JAVASCRIPT = r"""'use strict';
 
   function updateControls() {
     const locked = !state.connected;
-    const working = state.busy || state.polling || unresolved();
+    const working = state.busy || state.polling || unresolved() || forgeActive();
     const foreignLease = ['busy', 'unavailable'].includes(state.health?.inference_lease?.state);
     ['new', 'fork', 'delete', 'import', 'system-prompt', 'session-search', 'sessions-more',
       'session-view-active', 'session-view-archived'].forEach(id => {
@@ -490,6 +850,16 @@ JAVASCRIPT = r"""'use strict';
     });
     get('context-preserve').disabled = locked || working;
     get('connect').disabled = state.busy || state.connected;
+    ['forge-brief', 'forge-difficulty', 'forge-theme', 'forge-encounter', 'forge-speed', 'forge-objective',
+      'forge-genre-shooter', 'forge-genre-platformer', 'forge-genre-roguelike', 'forge-review'].forEach(id => {
+      get(id).disabled = locked || state.busy;
+    });
+    get('forge-submit').disabled = locked || working || foreignLease || state.forgePolling ||
+      state.forgeAvailability?.ready !== true || state.health?.ready !== true;
+    get('forge-refresh').disabled = locked || state.busy;
+    get('forge-check').disabled = locked || state.busy || state.forgePolling || !state.forgeJob;
+    get('forge-download').disabled = locked || state.busy || !forgeArchiveReady(state.forgeJob, state.health?.model_digest);
+    document.querySelectorAll('.forge-job').forEach(button => {button.disabled = locked || state.busy || state.forgePolling;});
     get('health-refresh').disabled = locked || state.busy;
     get('selftest-start').disabled = locked || working || foreignLease || state.health?.ready !== true;
     get('selftest-export').disabled = locked || !state.selfTestReport;
@@ -587,6 +957,7 @@ JAVASCRIPT = r"""'use strict';
       pending: null, turn: null, polling: false, reference: null, health: null,
       writePending: null, writeRequest: '', showArchived: false,
       sessionMetadata: null, titleEditSession: '', titleEditRevision: 0});
+    clearForge();
     clearSessionMetadata(); showCollection();
     get('session-title-dialog').close();
     get('session-title-input').value = '';
@@ -817,6 +1188,7 @@ JAVASCRIPT = r"""'use strict';
       knowledgeScopeStatus();
     }
     state.session = result.session_id; state.revision = result.revision;
+    workspace('chat');
     showSessionMetadata(result);
     state.showArchived = result.archived === true; showCollection();
     state.messages = result.messages; state.evidence = result.evidence || []; state.audits = result.citation_audits || [];
@@ -1286,6 +1658,40 @@ JAVASCRIPT = r"""'use strict';
     });
     updateControls();
   }
+  get('chat-open').addEventListener('click', () => workspace('chat'));
+  get('forge-open').addEventListener('click', () => {
+    workspace('forge');
+    if (state.connected) void run(refreshForge);
+  });
+  const forgeStarters = {
+    shooter: {brief: 'Explore a quiet salvage station, avoid its sentinels, and recover the beacon.', objective: 'Recover the beacon', theme: 'neon'},
+    platformer: {brief: 'Cross moonlit rooftops, collect five lanterns, and reach the far gate.', objective: 'Reach the far gate', theme: 'frost'},
+    roguelike: {brief: 'Explore ember-lit chambers, defeat the archive guards, and recover the lost relics.', objective: 'Recover the relics', theme: 'ember'},
+  };
+  for (const genre of Object.keys(forgeStarters)) {
+    get('forge-genre-' + genre).addEventListener('click', () => {
+      const before = forgeStarters[state.forgeGenre]; const next = forgeStarters[genre];
+      if (!get('forge-brief').value.trim() || get('forge-brief').value === before.brief) get('forge-brief').value = next.brief;
+      if (!get('forge-objective').value.trim() || get('forge-objective').value === before.objective) get('forge-objective').value = next.objective;
+      if (get('forge-theme').value === before.theme) get('forge-theme').value = next.theme;
+      state.forgeGenre = genre;
+      for (const choice of Object.keys(forgeStarters)) get('forge-genre-' + choice).setAttribute('aria-pressed', String(choice === genre));
+      forgeDraftChanged();
+    });
+  }
+  for (const id of ['forge-brief', 'forge-difficulty', 'forge-theme', 'forge-encounter', 'forge-speed', 'forge-objective']) {
+    get(id).addEventListener('input', forgeDraftChanged);
+    get(id).addEventListener('change', forgeDraftChanged);
+  }
+  get('forge-review').addEventListener('click', () => {
+    forgeDraftChanged(); get('forge-review-panel').open = true;
+  });
+  get('forge-form').addEventListener('submit', event => {event.preventDefault(); void run(submitForge);});
+  get('forge-refresh').addEventListener('click', () => void run(refreshForge));
+  get('forge-check').addEventListener('click', () => {
+    state.forgePollStarted = performance.now(); state.forgePollErrors = 0; void pollForge();
+  });
+  get('forge-download').addEventListener('click', () => void run(downloadForge));
   get('sidebar-toggle').addEventListener('click', () => sidebar(!get('shell').classList.contains('library-open')));
   get('sidebar-close').addEventListener('click', () => sidebar(false, true));
   get('sidebar-scrim').addEventListener('click', () => sidebar(false, true));
@@ -1339,6 +1745,9 @@ JAVASCRIPT = r"""'use strict';
         (state.health.model_readiness_code || 'unknown') +
         '). Saved conversations remain accessible; no hosted fallback.');
     } else status('Connected locally. Choose a conversation or create a new one.');
+    if (state.workspace === 'forge') {
+      try {await refreshForge();} catch {get('forge-availability').textContent = 'Local builder readiness could not be read. Refresh builds to retry.';}
+    }
   }));
   get('disconnect').addEventListener('click', lock);
   get('health-refresh').addEventListener('click', () => void refreshHealth());
@@ -2070,7 +2479,10 @@ JAVASCRIPT = r"""'use strict';
   window.addEventListener('pagehide', () => {
     stopPolling(); state.network.abort(); state.token = '';
     clearMediaAdvisory(true);
+    clearForge();
   });
+  forgeDraftChanged();
+  workspace('chat');
   showCollection();
   sidebar(get('shell').classList.contains('library-open'));
   updateControls();

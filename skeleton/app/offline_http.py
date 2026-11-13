@@ -174,6 +174,7 @@ class OfflineHTTPApplication:
         self._turns: dict[tuple[str, str], _LocalTurn] = {}
         self._active_session: str | None = None
         self._closing = False
+        self._game_builder = None
         self._store = OfflineChatStore(database)
         self.longform = None
         try:
@@ -241,6 +242,12 @@ class OfflineHTTPApplication:
                     self._request_cancel(turn)
                 if turn.worker is not None:
                     workers.append(turn.worker)
+        # A game build uses this same backend and workspace. Drain its bounded
+        # worker before closing any authority it may still need to commit.
+        with self._lock:
+            game_builder = self._game_builder
+        if game_builder is not None:
+            game_builder.close()
         # Do not close the authority while a cancellation/commit is settling.
         for worker in workers:
             if worker is not threading.current_thread():
@@ -248,6 +255,17 @@ class OfflineHTTPApplication:
         if self.longform is not None:
             self.longform.close()
         self._store.close()
+
+    def _local_game_builder(self):
+        """Lazy application composition, never a second model or service."""
+        from skeleton.app.offline_game_builder import LocalGameBuilder
+
+        with self._lock:
+            if self._closing:
+                raise OfflineHTTPError(503, "local workspace is closing")
+            if self._game_builder is None:
+                self._game_builder = LocalGameBuilder(self.backend, self.database)
+            return self._game_builder
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
         if turn.state in TERMINAL_TURN_STATES:
@@ -655,6 +673,30 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(405, "unsupported local API method")
         if body is None:
             body = {}
+        if path == "/v1/game-builds" or path.startswith("/v1/game-builds/"):
+            from skeleton.app.offline_game_builder import GameBuildRejected
+
+            try:
+                manager = self._local_game_builder()
+                if path == "/v1/game-builds":
+                    if method == "GET":
+                        return 200, {"jobs": manager.list_jobs(),
+                                     "availability": manager.availability(),
+                                     "limits": manager.limits()}
+                    if method == "POST":
+                        _fields(body, {"request_id", "brief"}, {"request_id", "brief"})
+                        return 202, manager.submit(body["request_id"], body["brief"])
+                    raise OfflineHTTPError(405, "unsupported local game-build method")
+                parts = path[len("/v1/game-builds/"):].split("/")
+                if method != "GET":
+                    raise OfflineHTTPError(405, "unsupported local game-build method")
+                if len(parts) == 1 and parts[0]:
+                    return 200, manager.get(parts[0])
+                if len(parts) == 2 and parts[0] and parts[1] == "archive":
+                    return 200, manager.archive(parts[0])
+                raise OfflineHTTPError(404, "unknown local game-build route")
+            except GameBuildRejected as exc:
+                raise OfflineHTTPError(exc.status, exc.message) from None
         if path == "/v1/resources" and method == "GET":
             try:
                 return 200, self.resource_fabric.monitor()
@@ -1198,7 +1240,7 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         return
 
     def _write(self, status: int, payload: bytes, *, kind: str = "application/json",
-               web: bool = False) -> None:
+               web: bool = False, source_archive: bool = False) -> None:
         if len(payload) > MAX_JSON_BYTES:
             status = 503
             payload = b'{"error":"local response budget exceeded"}'
@@ -1207,6 +1249,9 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", kind + ("; charset=utf-8"
                                                  if kind.startswith("text/") else ""))
         self.send_header("Content-Length", str(len(payload)))
+        if source_archive and kind == "application/zip":
+            self.send_header("Content-Disposition",
+                             'attachment; filename="jeeves-godot-project.zip"')
         # One request per connection: never reuse a socket after rejecting a
         # bearer token or request body that was intentionally not consumed.
         self.send_header("Connection", "close")
@@ -1303,7 +1348,11 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
                 method, path, body, raw_body=raw
             )
             if isinstance(result, bytes):
-                self._write(status, result)
+                source_archive = (path.startswith("/v1/game-builds/")
+                                  and path.endswith("/archive"))
+                self._write(status, result,
+                            kind="application/zip" if source_archive else "application/json",
+                            source_archive=source_archive)
             else:
                 self._json(status, result)
         except OfflineHTTPError as exc:
