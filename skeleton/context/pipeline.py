@@ -87,7 +87,9 @@ class GameForgeRun:
                 operator_tensor: Optional[ContextTensor] = None,
                 operator_axes: Optional[Mapping[str, float]] = None,
                 galaxy_profile: Optional[Mapping[str, Any]] = None,
-                playable_content: bool = False) -> Dict[str, Any]:
+                playable_content: bool = False,
+                quest_content: bool = False,
+                quest_length: int = 3) -> Dict[str, Any]:
         """Run the ten-stage pipeline.
 
         ``playtest``: ``None``/"off" (default, static checks only), "auto"
@@ -103,6 +105,12 @@ class GameForgeRun:
             raise ValueError("playable_content must be an explicit boolean opt-in")
         if playable_content and target != "godot":
             raise ValueError("playable archetype scenes require the Godot target")
+        if type(quest_content) is not bool:
+            raise ValueError("quest_content must be an explicit boolean")
+        if quest_content and target != "godot":
+            raise ValueError("native quests require Godot target")
+        if type(quest_length) is not int or not 1 <= quest_length <= 8:
+            raise ValueError("quest_length must be an integer between 1 and 8")
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
         axis_overrides = normalise_operator_axes(operator_axes)
@@ -183,6 +191,8 @@ class GameForgeRun:
             "playtest_mode": playtest_mode,
             "repair_mode": repair_mode,
             "playable_content": playable_content,
+            "quest_content": quest_content,
+            "quest_length": quest_length,
         }
         stages = [
             Stage("ingest", _stage_ingest),
@@ -260,6 +270,11 @@ class GameForgeRun:
             }
             if run.context.get("galaxy_mechanics") is not None:
                 payload["galaxy_mechanics"] = run.context["galaxy_mechanics"]
+        if quest_content and run.context.get("native_quest_receipt") is not None:
+            payload["native_quest"] = {
+                **run.context["native_quest_receipt"],
+                "sealed": bool(run.succeeded and emitted_manifest is not None),
+            }
         self.bus.emit("gameforge.run.finished", {
             "succeeded": run.succeeded,
             "era": payload["era"],
@@ -503,6 +518,12 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         files = attach_galaxy_profile(files, ctx["galaxy_profile"])
         ctx["files"] = files
         ctx["file_count"] = len(files)
+    if ctx.get("quest_content"):
+        from skeleton.ai.game_builder.godot_quest_bridge import attach_native_quest
+        files, receipt = attach_native_quest(files, length=ctx.get("quest_length", 3))
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
+        ctx["native_quest_receipt"] = receipt
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
     source_manifest(files)
@@ -534,6 +555,8 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
     if ctx.get("galaxy_receipt"):
         details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
+    if ctx.get("native_quest_receipt"):
+        details["native_quest_sha256"] = ctx["native_quest_receipt"]["quest_sha256"]
     _commit(ctx, "emit", ctx["era"], f"{len(files)} files", details)
     return {"emitted": True, "project": project, "check_ok": True, "playtest": played}
 
