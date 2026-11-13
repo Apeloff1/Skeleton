@@ -6822,11 +6822,12 @@
       "runtime_ready_claim": false,
       "action_mode": "informational",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "e01aa1163e9325b459eab831009173eedf1f1845138f3f192554f7faeeae1ba2",
+      "source_sha256": "f1571106b243f7c54dbb011f022bb22a384cd49ba0f666bfc7b937a934c3550e",
       "interaction_count": 0,
       "backend_surfaces": [],
       "navigation_targets": [
-        "/galaxy"
+        "/galaxy",
+        "/skeleton-studio"
       ],
       "accessibility_signal_count": 2,
       "states": {
