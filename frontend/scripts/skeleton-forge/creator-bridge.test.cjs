@@ -129,6 +129,29 @@ test('Galaxy navigation retains opted-in playable sidecar scenes and original qu
   assert.equal(Q.buildRunRequest(restored).quest_content, true);
 });
 
+test('headless Godot qualification selection survives long Galaxy editing without changing defaults', () => {
+  const original = make(
+    { type: 'setVision', vision: 'A full offline boardgame world' },
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setPlaytestMode', value: 'require' },
+  );
+  const accepted = H.handoffFromForge(original, 1700000000000);
+  const changed = H.handoffFromGalaxy(
+    { title: '', vision: '', genreId: null },
+    accepted, 1700000000000 + 5 * 3600 * 1000,
+  );
+  const restored = H.forgeStateFromHandoff(changed, changed.createdMs + 1);
+  assert.equal(restored.playtest, 'require');
+  assert.equal(Q.buildRunRequest(restored).playtest, 'require');
+  const unexpected = H.parseCreatorBridge({
+    ...changed, playtest: 'execute-something-else',
+  }, 'forge', changed.createdMs + 1);
+  assert.equal(unexpected.playtest, 'off');
+  assert.equal(H.handoffFromGalaxy({
+    title: '', vision: 'New', genreId: null,
+  }, null, 1700000000000).playtest, 'off');
+});
+
 test('Galaxy direct navigation populates only compatible Forge vocabulary', () => {
   const draft = H.handoffFromGalaxy({
     title: 'Harbor colony',

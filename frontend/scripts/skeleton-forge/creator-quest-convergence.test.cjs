@@ -103,6 +103,42 @@ test('JSON blueprint never implicitly enables playable Godot, preserving authors
   })).playable_content, undefined);
 });
 
+test('required Godot qualification composes independently with playable scene, quest and axes', () => {
+  const state = reduce(
+    { type: 'setVision', vision: 'An original clockwork extraction game' },
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setQuestEnabled', value: true },
+    { type: 'setPlaytestMode', value: 'require' },
+    { type: 'setAxis', axis: 'risk', value: 0.5 },
+  );
+  const req = Q.buildRunRequest(state);
+  assert.equal(req.target, 'godot');
+  assert.equal(req.playtest, 'require');
+  assert.equal(req.playable_content, true);
+  assert.equal(req.quest_content, true);
+  assert.deepEqual(req.operator_axes, { risk: 0.5 });
+  assert.match(text(screen({ ...state, step: 'options' })), /Godot headless playtest/);
+  assert.match(text(screen({ ...state, step: 'review' })), /Headless playtest Required/);
+  assert.match(text(screen({ ...state, step: 'review' })), /main-world boot and playable scene completion/);
+});
+
+test('JSON export preserves authoring preferences but never requests a Godot playtest', () => {
+  const state = reduce(
+    { type: 'setVision', vision: 'An original printable game blueprint' },
+    { type: 'setPlayableEnabled', value: true },
+    { type: 'setQuestEnabled', value: true },
+    { type: 'setPlaytestMode', value: 'auto' },
+    { type: 'setOption', key: 'target', value: 'json' },
+  );
+  const request = Q.buildRunRequest(state);
+  assert.equal(request.target, 'json');
+  assert.equal(request.playtest, undefined);
+  assert.equal(request.playable_content, undefined);
+  assert.equal(request.quest_content, undefined);
+  assert.match(text(screen({ ...state, step: 'review' })), /Headless Godot qualification is disabled/);
+  assert.equal(state.playtest, 'auto');
+});
+
 test('no opt-ins keep baseline request contract byte-compatible', () => {
   assert.deepEqual(Q.buildRunRequest(Q.INITIAL_STATE), {
     vision: '', era: null, archetype: 'auto', target: 'godot',
