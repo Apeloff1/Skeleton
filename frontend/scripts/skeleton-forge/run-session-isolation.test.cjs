@@ -56,4 +56,7 @@ test('the device sharing path always clears temporary private ZIP data', () => {
   assert.match(src, /owner|stillCurrent/);
   assert.match(src, /Godot source file checksum mismatch/);
   assert.match(src, /Godot source manifest checksum mismatch/);
+  assert.match(src, /Crypto\.randomUUID\(\)/);
+  assert.match(src, /if \(file\.exists\) throw new Error/);
+  assert.doesNotMatch(src, /if \(file\.exists\) file\.delete\(\);\s*file\.create\(\)/);
 });
