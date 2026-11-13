@@ -397,8 +397,9 @@ export default function GalaxyStudioFactoryModal
   const toggleSection = useCallback((key: string) => {
     setCollapsedSections(s => ({ ...s, [key]: !s[key] }));
   }, []);
-  // Prime with baked-in fallback so the picker ALWAYS renders 52 genres,
-  // network or not. The network fetch below overwrites on success.
+  // Prime with the complete offline fallback catalog; do not hard-code
+  // the count because historical genres can be recovered independently.
+  // Live fetch may expand the available choices.
   const [genres, setGenres] = useState<Genre[]>(FALLBACK_GENRES as any);
   const [manifest, setManifest] = useState<any>(null);
   const [loading, setLoading] = useState(false);
