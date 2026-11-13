@@ -47,13 +47,13 @@ async def test_readiness_tracks_database_recovery_without_harming_vault_files(va
 
     assert live.status_code == 200
     assert unavailable.status_code == 503
-    assert unavailable.json()["checks"]["mongo"]["ok"] is False
+    assert unavailable.json() == {"detail": "internal server error"}
     assert recovered.status_code == 200
     assert recovered.json()["checks"]["mongo"]["ok"] is True
     assert recovered.json()["canonical_application"] == {
         "name": "Skeleton", "version": "16.0.0", "component": "backend", "ingress_prefix": "/api"
     }
-    assert unavailable.json()["canonical_application"] == recovered.json()["canonical_application"]
+    assert "canonical_application" not in unavailable.json()
     assert vault.status_code == 200
     for path in vaults:
         assert (path / ".probe").read_text() == "existing readiness data"
@@ -128,7 +128,7 @@ async def test_unwritable_vault_fails_readiness(vaults, monkeypatch):
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/health/ready")
     assert response.status_code == 503
-    assert response.json()["checks"]["vault_galaxy"]["ok"] is False
+    assert response.json() == {"detail": "internal server error"}
 
 
 @pytest.mark.asyncio
@@ -140,9 +140,9 @@ async def test_temporary_vault_fallback_is_not_reported_ready(vaults, monkeypatc
         ready = await client.get("/api/health/ready")
         vault = await client.get("/api/health/vault")
     assert ready.status_code == 503
-    assert ready.json()["checks"]["vault_builds"]["ok"] is False
+    assert ready.json() == {"detail": "internal server error"}
     assert vault.status_code == 503
-    assert vault.json()["checks"]["build_vault"]["ok"] is False
+    assert vault.json() == {"detail": "internal server error"}
 
 
 @pytest.mark.asyncio
@@ -153,7 +153,8 @@ async def test_deep_vault_degraded_response_serializes_path_object(vaults, monke
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/health/vault")
     assert response.status_code == 503
-    assert response.json()["checks"]["galaxy_vault"]["path"] == str(vaults[0])
+    assert response.json() == {"detail": "internal server error"}
+    assert str(vaults[0]) not in response.text
 
 
 @pytest.mark.asyncio
@@ -173,7 +174,7 @@ async def test_deep_vault_checks_selected_storage_and_fails_closed(vaults, monke
         response = await client.get("/api/health/vault")
     assert observed_paths == [str(vaults[1])]
     assert response.status_code == 503
-    assert response.json()["checks"]["disk_pressure"]["ok"] is False
+    assert response.json() == {"detail": "internal server error"}
 
 
 @pytest.mark.asyncio
