@@ -1,0 +1,67 @@
+{
+  "project_id": "studio_underground_exploration_misty_breakwater",
+  "genre": "underground_exploration",
+  "biome": "misty_breakwater",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_underground_exploration_misty_breakwater:restore",
+  "objective": "map safe evacuation routes",
+  "stage_graph": [
+    {
+      "id": "arrival",
+      "entry": "new_game",
+      "location": "mist-channel locks",
+      "verb": "survey",
+      "requirements": [
+        "Trace a safe route before low-visibility tides"
+      ],
+      "alternatives": [
+        "inspect_markers",
+        "interview_residents"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "dispute",
+      "entry": "arrival_complete",
+      "location": "historic sea wall",
+      "verb": "survey",
+      "requirements": [
+        "Establish control of fog horns"
+      ],
+      "alternatives": [
+        "publish_witness_records",
+        "negotiate_with_claimants"
+      ],
+      "reward": "social_legitimacy"
+    },
+    {
+      "id": "repair",
+      "entry": "dispute_complete",
+      "location": "historic sea wall",
+      "verb": "audit",
+      "requirements": [
+        "Demonstrate restoration of the historic sea wall"
+      ],
+      "alternatives": [
+        "cooperative_governance",
+        "independent_distribution"
+      ],
+      "reward": "world_state_update"
+    }
+  ],
+  "branch_outcomes": [
+    "public_proof",
+    "self_organized_repair",
+    "minimal_access"
+  ],
+  "risk_register": [
+    "low-visibility tides",
+    "an unstable cavern network"
+  ],
+  "resource_constraints": {
+    "resource": "fog horns",
+    "max_mint_without_source": 0
+  },
+  "genre_runtime_implemented": false
+}

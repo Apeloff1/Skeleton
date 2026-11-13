@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_collaborative_robotics_verdant_caldera",
+  "title": "Verdant Caldera: The Remote Repair Crew",
+  "subtitle": "Original the remote repair crew design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010317795,
+  "width": 27,
+  "height": 21,
+  "levels": 3,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 12,
+  "theme": "forest",
+  "starting_health": 3
+}

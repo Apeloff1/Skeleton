@@ -1,0 +1,39 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "saltglass_cavern__diplomat",
+  "chapter": 16,
+  "title": "Saltglass Cavern: The Diplomat's Resonance Tablet",
+  "theme": "saltglass_cavern",
+  "discipline": "diplomat",
+  "region": "Saltglass Cavern",
+  "premise": "In a crystalline underworld cut by migratory subterranean rivers, the diplomat must negotiate a route across a disputed threshold using a sealed bilingual accord.",
+  "signal": "echo flute",
+  "key_name": "echo flute attunement",
+  "objective_name": "Resonance Tablet",
+  "ending": "Recover the Resonance Tablet and return with the mutual passage covenant; Cavern Chorus can finally verify the source testimony.",
+  "faction": "Cavern Chorus",
+  "challenge": "Survive shard bloom while evading the mineral sentinel without sacrificing the mutual passage covenant.",
+  "choice_yes": "Disclose evidence and ask Cavern Chorus to witness the sealed bilingual accord.",
+  "choice_no": "Keep the evidence sealed until the expedition's replay record is complete.",
+  "dilemma": "whether to reveal the faction's old promise",
+  "tool": "sealed bilingual accord",
+  "reward": "mutual passage covenant",
+  "enemy": "mineral sentinel",
+  "chapter_links": [
+    "saltglass_cavern__cartographer",
+    "saltglass_cavern__machinist"
+  ],
+  "provenance": "original-game-source",
+  "goal": [
+    "collect_source_key",
+    "recover_objective",
+    "reach_exit"
+  ],
+  "side_goals": [
+    "faction_contact",
+    "dialogue_choice",
+    "lore_discovered"
+  ],
+  "rewind": "deterministic_commands",
+  "safety": "headless_offline_no_plugins"
+}

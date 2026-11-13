@@ -1,0 +1,106 @@
+{
+  "schema": "skeleton.quest_scenario.v1",
+  "quest_id": "narrative_flashback",
+  "domain": "narrative",
+  "stages": [
+    {
+      "key": "discover_flashback",
+      "evidence": "narrative:flashback:discover:proof",
+      "grants": "narrative:flashback:stage:1",
+      "risk": 3,
+      "sequence": 0,
+      "requires_previous_grant": null
+    },
+    {
+      "key": "prepare_flashback",
+      "evidence": "narrative:flashback:prepare:proof",
+      "grants": "narrative:flashback:stage:2",
+      "risk": 4,
+      "sequence": 1,
+      "requires_previous_grant": "narrative:flashback:stage:1"
+    },
+    {
+      "key": "execute_flashback",
+      "evidence": "narrative:flashback:execute:proof",
+      "grants": "narrative:flashback:stage:3",
+      "risk": 5,
+      "sequence": 2,
+      "requires_previous_grant": "narrative:flashback:stage:2"
+    },
+    {
+      "key": "resolve_flashback",
+      "evidence": "narrative:flashback:resolve:proof",
+      "grants": "narrative:flashback:stage:4",
+      "risk": 6,
+      "sequence": 3,
+      "requires_previous_grant": "narrative:flashback:stage:3"
+    }
+  ],
+  "happy_path": [
+    {
+      "id": "narrative_flashback:event:0",
+      "action": "advance",
+      "expected_version": 0,
+      "evidence": [
+        "narrative:flashback:discover:proof"
+      ]
+    },
+    {
+      "id": "narrative_flashback:event:1",
+      "action": "advance",
+      "expected_version": 1,
+      "evidence": [
+        "narrative:flashback:prepare:proof"
+      ]
+    },
+    {
+      "id": "narrative_flashback:event:2",
+      "action": "advance",
+      "expected_version": 2,
+      "evidence": [
+        "narrative:flashback:execute:proof"
+      ]
+    },
+    {
+      "id": "narrative_flashback:event:3",
+      "action": "advance",
+      "expected_version": 3,
+      "evidence": [
+        "narrative:flashback:resolve:proof"
+      ]
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing-proof",
+      "expected": "required-evidence-missing"
+    },
+    {
+      "name": "stale-version",
+      "expected": "stale-version"
+    },
+    {
+      "name": "duplicate-identity",
+      "expected": "duplicate-event"
+    },
+    {
+      "name": "unknown-action",
+      "expected": "validation-error"
+    },
+    {
+      "name": "terminal-reopen",
+      "expected": "terminal-state"
+    }
+  ],
+  "expected_terminal": {
+    "status": "completed",
+    "stage": 4,
+    "version": 4,
+    "grant_count": 4
+  },
+  "provenance": {
+    "source": "synthetic-test-fixture",
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "case": "04_wrong_primary_type",
+  "gate": "stream",
+  "expect": "reject",
+  "reason": "No implicit numeric identity coercion",
+  "payload": {
+    "request_id": 17,
+    "chunks": [
+      {
+        "index": 0,
+        "text": "Hi"
+      },
+      {
+        "index": 1,
+        "text": "."
+      }
+    ],
+    "max_bytes": 1024,
+    "terminal": "stop",
+    "generated_tokens": 2,
+    "token_ceiling": 128
+  }
+}

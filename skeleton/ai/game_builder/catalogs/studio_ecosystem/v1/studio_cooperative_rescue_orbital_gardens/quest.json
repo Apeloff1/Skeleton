@@ -1,0 +1,67 @@
+{
+  "project_id": "studio_cooperative_rescue_orbital_gardens",
+  "genre": "cooperative_rescue",
+  "biome": "orbital_gardens",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_cooperative_rescue_orbital_gardens:restore",
+  "objective": "coordinate multiple rescue teams",
+  "stage_graph": [
+    {
+      "id": "arrival",
+      "entry": "new_game",
+      "location": "rotating arboretums",
+      "verb": "survey",
+      "requirements": [
+        "Trace a safe route before life-support imbalance"
+      ],
+      "alternatives": [
+        "inspect_markers",
+        "interview_residents"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "dispute",
+      "entry": "arrival_complete",
+      "location": "ring garden habitat",
+      "verb": "coordinate",
+      "requirements": [
+        "Establish control of hydroponic nutrients"
+      ],
+      "alternatives": [
+        "publish_witness_records",
+        "negotiate_with_claimants"
+      ],
+      "reward": "social_legitimacy"
+    },
+    {
+      "id": "repair",
+      "entry": "dispute_complete",
+      "location": "ring garden habitat",
+      "verb": "audit",
+      "requirements": [
+        "Demonstrate restoration of the ring garden habitat"
+      ],
+      "alternatives": [
+        "cooperative_governance",
+        "independent_distribution"
+      ],
+      "reward": "world_state_update"
+    }
+  ],
+  "branch_outcomes": [
+    "public_proof",
+    "self_organized_repair",
+    "minimal_access"
+  ],
+  "risk_register": [
+    "life-support imbalance",
+    "a cascading emergency"
+  ],
+  "resource_constraints": {
+    "resource": "hydroponic nutrients",
+    "max_mint_without_source": 0
+  },
+  "genre_runtime_implemented": false
+}

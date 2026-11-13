@@ -236,7 +236,8 @@ def test_durable_owner_drift_withholds_guarded_generation():
         protected = CanonicalGuardedLocalService(guard, snapshots=canonical)
         with pytest.raises(SealedContextReplayError, match="changed"):
             await protected.generate(Request(), tenant_scope_id=TENANT, context_id=CONTEXT)
-        assert engine.calls == 1 and source.calls == 4
+        # Three canonical snapshots, two source inspections apiece.
+        assert engine.calls == 1 and source.calls == 6
 
     asyncio.run(scenario())
 
@@ -283,7 +284,8 @@ def test_durable_owner_cancellation_during_guarded_generation_withholds_result()
         protected = CanonicalGuardedLocalService(guard, snapshots=canonical)
         with pytest.raises(SealedContextBoundaryError):
             await protected.generate(Request(), tenant_scope_id=TENANT, context_id=CONTEXT)
-        assert engine.calls == 1 and source.calls == 2
+        # Cancellation is observed before the final source inspection.
+        assert engine.calls == 1 and source.calls == 4
 
     asyncio.run(scenario())
 
@@ -490,7 +492,7 @@ def test_protected_provider_dynamically_binds_its_exact_native_execution():
         first = await adapter.generate(request)
         second = await adapter.generate(request)
         assert first.provider == "local" and second.provider == "local"
-        assert source.calls == 12  # per turn: bootstrap + pre/postflight owner/source reads
+        assert source.calls == 16  # two reads each for bootstrap, preflight, pre-dispatch and postflight
         assert adapter.require_guarded_inference
         with pytest.raises(SealedContextBoundaryError):
             await snapshots.resolve(

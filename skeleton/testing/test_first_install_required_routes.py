@@ -9,8 +9,10 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
 
+import pytest
 
-def _doctor(monkeypatch, tmp_path, critical):
+
+def _doctor(monkeypatch, tmp_path, critical, *, providers=None):
     install = importlib.import_module("skeleton.app.first_install")
     health = importlib.import_module("skeleton.app.health")
 
@@ -33,7 +35,7 @@ def _doctor(monkeypatch, tmp_path, critical):
     def bounded(url, *, timeout, max_response_bytes=65536):
         if url.endswith("/api/health/registry"):
             return critical
-        return {
+        return providers if providers is not None else {
             "engine": "skeleton-engine", "providers": [],
             "llm_available": False, "availability_observed": True,
         }
@@ -73,6 +75,37 @@ def test_first_install_accepts_observed_required_routes(monkeypatch, tmp_path):
     assert report["critical_routes"]["ready"] is True
 
 
+@pytest.mark.parametrize("code", ["local_guard_unavailable", "local_guard_configuration_invalid"])
+def test_doctor_reports_observed_local_guard_problem_not_missing_weights(monkeypatch, tmp_path, code):
+    report = _doctor(monkeypatch, tmp_path, {"critical_routes": {
+        "ok": True, "report_available": True, "missing": [],
+    }}, providers={
+        "engine": "skeleton-engine", "active": "local", "providers": ["local"],
+        "llm_available": False, "availability_observed": True, "active_readiness_code": code,
+    })
+    assert report["ai"]["readiness_code"] == code
+    assert report["ai"]["available"] is False
+    assert any("guard" in step.lower() for step in report["next_steps"])
+    assert not any("Configure genuine trained local weights" in step for step in report["next_steps"])
+
+
+@pytest.mark.parametrize("overrides", [
+    {"active": "openai"}, {"llm_available": True}, {"availability_observed": False},
+    {"active_readiness_code": "secret: do-not-print"}, {"active_readiness_code": ["invalid"]},
+])
+def test_doctor_ignores_untrusted_or_contradictory_guard_codes(monkeypatch, tmp_path, overrides):
+    payload = {
+        "engine": "skeleton-engine", "active": "local", "providers": ["local"],
+        "llm_available": False, "availability_observed": True, "active_readiness_code": "local_guard_unavailable",
+    }
+    payload.update(overrides)
+    report = _doctor(monkeypatch, tmp_path, {"critical_routes": {
+        "ok": True, "report_available": True, "missing": [],
+    }}, providers=payload)
+    assert "readiness_code" not in report["ai"]
+    assert "do-not-print" not in str(report)
+
+
 def test_first_install_rejects_contradictory_ready_with_missing_routes(monkeypatch, tmp_path):
     report = _doctor(monkeypatch, tmp_path, {
         "critical_routes": {
@@ -95,7 +128,13 @@ def test_first_install_does_not_trust_malformed_route_report(monkeypatch, tmp_pa
     assert report["critical_routes"]["observed"] is False
 
 
-def _install_with_routes(monkeypatch, tmp_path, *, ready):
+def _install_with_routes(monkeypatch, tmp_path, *, ready, backend_override=True, observed_urls=None):
+    # The production installer now binds a stable private runtime file before
+    # Compose. Keep this mocked route-registry fixture realistic rather than
+    # bypassing a mandatory configuration custody gate.
+    (tmp_path / ".env").write_text(
+        "FRONTEND_PORT=3000\nBACKEND_PORT=8001\n", encoding="utf-8"
+    )
     installer = importlib.import_module("skeleton.app.installer")
     health = importlib.import_module("skeleton.app.health")
     doctor = importlib.import_module("skeleton.app.first_install")
@@ -103,6 +142,12 @@ def _install_with_routes(monkeypatch, tmp_path, *, ready):
     class Manifest:
         def mode_env(self, mode):
             return {}
+
+        def service(self, name):
+            assert name == "backend"
+            if backend_override:
+                raise AssertionError("backend override must not evaluate fallback service")
+            return SimpleNamespace(public_url="http://127.0.0.1:8099")
 
     monkeypatch.setattr(installer, "inspect_host", lambda *a, **kw: SimpleNamespace(checks=[]))
     monkeypatch.setattr(installer, "ensure_runtime_environment", lambda *a, **kw: SimpleNamespace(
@@ -113,12 +158,17 @@ def _install_with_routes(monkeypatch, tmp_path, *, ready):
     monkeypatch.setattr(installer, "checks_ok", lambda checks: True)
     monkeypatch.setattr(installer, "runtime_manifest", lambda manifest, **kw: manifest)
     monkeypatch.setattr(installer, "compose_command", lambda *a, **kw: ["docker", "compose"])
-    monkeypatch.setattr(installer, "public_service_urls", lambda *a, **kw: {
-        "backend": "http://127.0.0.1:8001",
-    })
+    monkeypatch.setattr(installer, "public_service_urls", lambda *a, **kw: (
+        {"backend": "http://127.0.0.1:8001"} if backend_override else {}
+    ))
     monkeypatch.setattr(health, "wait_for_application", lambda **kw: ())
     monkeypatch.setattr(health, "probes_ok", lambda results: True)
-    monkeypatch.setattr(doctor, "critical_backend_route_report", lambda *a, **kw: {"ready": ready})
+    def route_report(url, **kwargs):
+        if observed_urls is not None:
+            observed_urls.append(url)
+        return {"ready": ready}
+
+    monkeypatch.setattr(doctor, "critical_backend_route_report", route_report)
 
     def runner(args, **kwargs):
         return SimpleNamespace(returncode=0)
@@ -199,3 +249,22 @@ def test_ordinary_readiness_keeps_small_response_bound_over_real_http():
     install = importlib.import_module("skeleton.app.first_install")
     with _registry_server({"padding": "x" * 70000}) as base:
         assert install._bounded_json(base + "/api/ai/providers", timeout=5) is None
+
+
+def test_first_install_override_is_lazy_and_canonical_url_is_fallback_only(
+    monkeypatch, tmp_path,
+):
+    explicit = []
+    receipt = _install_with_routes(
+        monkeypatch, tmp_path, ready=True, observed_urls=explicit,
+    )
+    assert receipt.ok is True
+    assert explicit == ["http://127.0.0.1:8001"]
+
+    fallback = []
+    receipt = _install_with_routes(
+        monkeypatch, tmp_path, ready=True,
+        backend_override=False, observed_urls=fallback,
+    )
+    assert receipt.ok is True
+    assert fallback == ["http://127.0.0.1:8099"]

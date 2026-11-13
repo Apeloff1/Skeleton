@@ -13,9 +13,10 @@ sub-router never imports the parent at module-load time (no circular).
 """
 from __future__ import annotations
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 
-router = APIRouter(tags=["galaxy-studio"])
+router = APIRouter(route_class=PublicExceptionRoute, tags=["galaxy-studio"])
 
 
 @router.get("/code-library/stats")

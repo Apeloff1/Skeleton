@@ -297,7 +297,9 @@ def _runtime_identity(model) -> str:
             raise MeasuredVerifierError("backend helpers must expose identified Python code")
         if depth > 8 or (id(function) not in seen and len(seen) >= 256):
             raise MeasuredVerifierError("backend implementation exceeds fingerprint bounds")
-        encoded_code = marshal.dumps(code)
+        # Version 0 excludes reference-table optimizations from runtime identity.
+        # Preserve every code-object field while making repeat fingerprints stable.
+        encoded_code = marshal.dumps(code, 0)
         if id(function) not in seen:
             code_bytes += len(encoded_code)
             if code_bytes > 256 * 1024:

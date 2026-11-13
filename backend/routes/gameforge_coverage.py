@@ -16,9 +16,10 @@ import re
 import time
 from typing import Dict, List
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/api/gameforge/coverage", tags=["gameforge-coverage"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/gameforge/coverage", tags=["gameforge-coverage"])
 
 _BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _GAMEFORGE = os.path.join(_BACKEND, "gameforge")

@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_command_ion_wastes",
+  "title": "Ion Wastes: The Citizen Fleet",
+  "subtitle": "Original the citizen fleet design in Ion Wastes; only the grid preview compiles today.",
+  "seed": 203010313228,
+  "width": 19,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 7,
+  "theme": "space",
+  "starting_health": 6
+}

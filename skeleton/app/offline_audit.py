@@ -90,6 +90,7 @@ def _workspace(conn: sqlite3.Connection) -> dict[str, int]:
 
 
 def _library(conn: sqlite3.Connection) -> dict[str, int]:
+    from .offline_disk_index import verify_chunks
     from .offline_library import MAX_DOCUMENT_BYTES
 
     records = _rows(
@@ -102,29 +103,58 @@ def _library(conn: sqlite3.Connection) -> dict[str, int]:
         "SELECT rowid, body FROM offline_document_fts ORDER BY rowid",
     )
     by_id = {rowid: body for rowid, body in fts}
-    if len(by_id) != len(fts) or len(fts) != len(records):
+    if len(by_id) != len(fts):
         raise OfflineAuditError("FTS5 document count or identity does not match source rows")
+    # Disk-offloaded documents intentionally have no whole-document FTS row.
+    # Validate both projection families, including orphaned chunk identities.
+    if conn.execute(
+        "SELECT 1 FROM offline_document_chunks AS c "
+        "LEFT JOIN offline_documents AS d ON d.id=c.document_id "
+        "WHERE d.id IS NULL LIMIT 1"
+    ).fetchone():
+        raise OfflineAuditError("orphaned disk document chunk")
+    if conn.execute(
+        "SELECT 1 FROM offline_document_chunk_fts AS f "
+        "LEFT JOIN offline_document_chunks AS c ON c.id=f.rowid "
+        "WHERE c.id IS NULL LIMIT 1"
+    ).fetchone():
+        raise OfflineAuditError("orphaned disk chunk FTS5 projection")
     total_bytes = 0
     for docid, root, relative, digest, body, size in records:
         if (
-            type(docid) is not int or docid not in by_id
+            type(docid) is not int
             or not isinstance(root, str) or not root
             or not isinstance(relative, str) or not relative
             or relative.startswith("/") or "\x00" in relative
             or ".." in Path(relative).parts
             or not isinstance(digest, str) or not _HEX.fullmatch(digest)
             or not isinstance(body, str)
-            or type(size) is not int or size < 0 or size > MAX_DOCUMENT_BYTES
+            or type(size) is not int or size < 0
+            or (MAX_DOCUMENT_BYTES is not None and size > MAX_DOCUMENT_BYTES)
         ):
             raise OfflineAuditError("local document index row has invalid fields")
-        raw = body.encode("utf-8")
-        if (
-            len(raw) != size
-            or hashlib.sha256(raw).hexdigest() != digest
-            or by_id[docid] != body
-        ):
-            raise OfflineAuditError("local document or FTS5 projection failed integrity validation")
+        disk_chunks = conn.execute(
+            "SELECT 1 FROM offline_document_chunks WHERE document_id=? LIMIT 1",
+            (docid,),
+        ).fetchone()
+        if disk_chunks:
+            if (
+                body != "" or size == 0 or docid in by_id
+                or not verify_chunks(conn, docid, digest, size)
+            ):
+                raise OfflineAuditError("disk document chunk or FTS5 projection failed integrity validation")
+        else:
+            raw = body.encode("utf-8")
+            if (
+                len(raw) != size
+                or hashlib.sha256(raw).hexdigest() != digest
+                or by_id.get(docid) != body
+            ):
+                raise OfflineAuditError("local document or FTS5 projection failed integrity validation")
         total_bytes += size
+    document_ids = {row[0] for row in records}
+    if any(rowid not in document_ids for rowid in by_id):
+        raise OfflineAuditError("orphaned whole-document FTS5 projection")
     return {"documents": len(records), "indexed_bytes": total_bytes}
 
 

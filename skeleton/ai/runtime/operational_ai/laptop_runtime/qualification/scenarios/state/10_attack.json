@@ -1,0 +1,15 @@
+{
+  "schema": "laptop-qualification-case.v1",
+  "id": "10_attack",
+  "domain": "state",
+  "expected": "reject",
+  "payload": {
+    "next": "install-verified",
+    "digest": null
+  },
+  "reason": "Refuse adversarial state variant 10",
+  "threat": "identity-resource-or-authority-confusion",
+  "authority_boundary": "Operational state contract must run before any committed effect",
+  "operator_proof": "Real GGUF/native, target laptop, licensing, reviewer and exact-final-SHA security gates remain independent",
+  "release_claim": false
+}

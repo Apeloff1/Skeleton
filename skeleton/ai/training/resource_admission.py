@@ -182,7 +182,9 @@ def _linux_effective_cpus(
         period = int(read_text("/sys/fs/cgroup/cpu/cpu.cfs_period_us").strip())
         if quota > 0 and period > 0:
             upper.append(max(1, quota // period))
-    except (OSError, UnicodeError, ValueError):
+    except (OSError, UnicodeError, ValueError, KeyError):
+        # Injected probes may use dict lookups; missing cgroup v1 paths
+        # are absence of telemetry, never evidence of more CPU capacity.
         pass
     return min(upper) if upper else None
 

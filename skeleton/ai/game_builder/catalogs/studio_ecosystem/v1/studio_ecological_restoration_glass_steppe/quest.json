@@ -1,0 +1,73 @@
+{
+  "project_id": "studio_ecological_restoration_glass_steppe",
+  "genre": "ecological_restoration",
+  "biome": "glass_steppe",
+  "release_certified": false,
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "quest_id": "studio_ecological_restoration_glass_steppe:restore",
+  "objective": "rebuild the broken food web",
+  "route_policy": "branching_authored_objectives_not_executable_in_grid_preview",
+  "stages": [
+    {
+      "id": "survey",
+      "name": "Acquire evidence",
+      "location": "prismatic plains",
+      "entry": "arrival",
+      "actions": [
+        "inspect",
+        "interview",
+        "chart"
+      ],
+      "alternatives": [
+        "Map the safe perimeter near shattered outpost",
+        "Seek a witness of glass-shard gales"
+      ],
+      "reward": "route_knowledge"
+    },
+    {
+      "id": "mediate",
+      "name": "Resolve competing claims",
+      "location": "shattered outpost",
+      "entry": "survey_complete",
+      "actions": [
+        "restore",
+        "negotiate",
+        "protect"
+      ],
+      "alternatives": [
+        "Broker public access to ceramic heat tiles",
+        "Establish an independent path around a resource consortium"
+      ],
+      "reward": "faction_reputation"
+    },
+    {
+      "id": "deliver",
+      "name": "Verify resilient outcome",
+      "location": "shattered outpost",
+      "entry": "mediate_complete",
+      "actions": [
+        "restore",
+        "audit",
+        "publish"
+      ],
+      "alternatives": [
+        "Run a supervised restoration of shattered outpost",
+        "Construct a low-resource alternative using ceramic heat tiles"
+      ],
+      "reward": "new_world_state"
+    }
+  ],
+  "branch_states": [
+    "shared_access_and_verified_repair",
+    "local_repair_without_patronage",
+    "minimum_rescue_only"
+  ],
+  "failures": [
+    "Sudden glass-shard gales interrupts transfer",
+    "The a resource consortium suppresses records"
+  ],
+  "economy": {
+    "scarce_resource": "ceramic heat tiles",
+    "unlimited_rewards": false
+  }
+}

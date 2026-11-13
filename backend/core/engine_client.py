@@ -18,6 +18,7 @@ import binascii
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import hashlib
+import ipaddress
 import json
 import math
 import os
@@ -25,7 +26,7 @@ import re
 from skeleton.contracts.runtime_optimization import validate_runtime_policy_patch
 from time import monotonic
 from typing import Any, Mapping, Sequence
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -162,11 +163,19 @@ def _positive_float(value: object, field: str, *, maximum: float) -> float:
         raise EngineProtocolError(f"{field} must be numeric")
     try:
         result = float(value)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         raise EngineProtocolError(f"{field} must be numeric") from exc
-    if result <= 0 or result > maximum or result != result:
+    if not math.isfinite(result) or result <= 0 or result > maximum:
         raise EngineProtocolError(f"{field} is outside allowed range")
     return result
+
+
+def _header_text(value: object, field: str, *, maximum: int) -> str:
+    """Accept finite printable ASCII in delegated authority request headers."""
+    text = _text(value, field, maximum=maximum)
+    if not text.isascii() or any(not 33 <= ord(ch) <= 126 for ch in text):
+        raise EngineProtocolError(f"{field} contains invalid HTTP header characters")
+    return text
 
 
 def _positive_int(value: object, field: str, *, maximum: int) -> int:
@@ -191,6 +200,61 @@ def _json_object(value: object, field: str) -> dict[str, Any]:
     return dict(value)
 
 
+def _engine_origin(raw: str) -> str:
+    """Resolve one strict authority, never a redirecting/path-bearing token sink.
+
+    This is trusted operator configuration, not general-purpose web crawling.
+    Reject userinfo, fragments, query, origin-relative escapes and ambiguous
+    host spellings before any internal service bearer token can be sent.
+    """
+    if not isinstance(raw, str) or raw != raw.strip() or len(raw) > 4096:
+        raise EngineProtocolError("engine base_url must be normalized")
+    if (
+        any(ord(ch) < 33 or ord(ch) > 126 for ch in raw)
+        or "\\" in raw or "?" in raw or "#" in raw
+    ):
+        raise EngineProtocolError("engine base_url contains forbidden URL characters")
+    try:
+        parts = urlsplit(raw)
+        scheme = parts.scheme.lower()
+        host = parts.hostname
+        port = parts.port
+    except ValueError as exc:
+        raise EngineProtocolError("engine base_url is invalid") from exc
+    if (
+        scheme not in {"http", "https"}
+        or not parts.netloc
+        or not host
+        or parts.username is not None or parts.password is not None
+        or parts.query or parts.fragment
+        or parts.path not in {"", "/"}
+        or "%" in parts.netloc
+        or "@" in parts.netloc
+    ):
+        raise EngineProtocolError("engine base_url must be an origin without credentials or paths")
+    if port is not None and not 1 <= port <= 65535:
+        raise EngineProtocolError("engine base_url port is invalid")
+    if ":" in host:
+        try:
+            address = ipaddress.IPv6Address(host)
+        except ValueError as exc:
+            raise EngineProtocolError("engine base_url IPv6 authority is invalid") from exc
+        authority = "[" + address.compressed + "]"
+    else:
+        if (
+            len(host) > 253
+            or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?", host)
+            or ".." in host
+            or any(label.startswith("-") or label.endswith("-") or len(label) > 63
+                   for label in host.split("."))
+        ):
+            raise EngineProtocolError("engine base_url host is invalid")
+        authority = host.lower()
+    if port is not None:
+        authority += ":" + str(port)
+    return scheme + "://" + authority
+
+
 @dataclass(frozen=True, slots=True)
 class EngineClientConfig:
     """Bounded application-side engine transport configuration."""
@@ -206,13 +270,17 @@ class EngineClientConfig:
     max_poll_attempts: int = 2400
 
     def __post_init__(self) -> None:
-        base = _text(self.base_url.rstrip("/"), "base_url", maximum=4096)
-        if not (base.startswith("http://") or base.startswith("https://")):
-            raise EngineProtocolError("engine base_url must use http or https")
+        base = _engine_origin(self.base_url)
         object.__setattr__(self, "base_url", base)
         token = self.service_token
         if token is not None:
-            if not isinstance(token, str) or token != token.strip() or len(token) < 32 or len(token) > 4096:
+            if (
+                not isinstance(token, str)
+                or token != token.strip()
+                or not 32 <= len(token) <= 4096
+                or not token.isascii()
+                or any(not 33 <= ord(ch) <= 126 for ch in token)
+            ):
                 raise EngineProtocolError(
                     "engine service token must be normalized and at least 32 characters"
                 )
@@ -220,7 +288,7 @@ class EngineClientConfig:
         object.__setattr__(
             self,
             "service_principal",
-            _text(self.service_principal, "service_principal", maximum=512),
+            _header_text(self.service_principal, "service_principal", maximum=512),
         )
         object.__setattr__(
             self,
@@ -287,13 +355,13 @@ class EngineClientConfig:
             raise EngineProtocolError("engine service token is required when engine URL is configured")
         try:
             return cls(
-                base_url=raw_url.strip(),
-                service_token=raw_token.strip(),
+                # Do not silently strip malformed URL/header bytes.
+                # Invalid operator settings must fail at the same authority
+                # boundary as direct EngineClientConfig construction.
+                base_url=raw_url,
+                service_token=raw_token,
                 service_principal=(
-                    os.getenv(
-                        "SKL_ENGINE_SERVICE_PRINCIPAL",
-                        "codedock-backend",
-                    ).strip()
+                    os.getenv("SKL_ENGINE_SERVICE_PRINCIPAL", "codedock-backend")
                     or "codedock-backend"
                 ),
                 request_timeout_s=float(os.getenv("SKELETON_ENGINE_REQUEST_TIMEOUT_S", "15")),
@@ -593,7 +661,7 @@ def command_from_context(
         raise TypeError("context must be ContextEnvelope")
     normalized_cooperation = None
     if cooperation is not None:
-        from skeleton.intelligence.cooperation import normalize_cooperation_policy
+        from skeleton.intelligence.cooperation import cooperation_stages, normalize_cooperation_policy
 
         try:
             normalized_cooperation = normalize_cooperation_policy(cooperation)
@@ -601,9 +669,10 @@ def command_from_context(
             raise EngineProtocolError("cooperation policy is invalid") from exc
         if tools:
             raise EngineProtocolError("cooperative text review cannot execute tools")
+        cooperation_stage_count = len(cooperation_stages(normalized_cooperation))
         max_model_turns = max(
             _positive_int(max_model_turns, "max_model_turns", maximum=64),
-            2 + 2 * normalized_cooperation["review_rounds"],
+            cooperation_stage_count,
         )
     actor = _text(actor_id, "actor_id", maximum=512)
     cap = _text(capability, "capability", maximum=256)
@@ -887,7 +956,7 @@ def command_from_context(
     if normalized_cooperation is not None:
         # Each finite stage is admitted once; this increases neither aggregate
         # output tokens nor the operation's original wall/cost allowance.
-        resource_budget["max_provider_attempts"] = 2 + 2 * normalized_cooperation["review_rounds"]
+        resource_budget["max_provider_attempts"] = cooperation_stage_count
         if resolved_output_tokens < 64 * resource_budget["max_provider_attempts"]:
             raise EngineProtocolError("output allowance cannot cover every cooperation stage")
         resource_budget["max_input_tokens"] = input_capacity * resource_budget["max_provider_attempts"]
@@ -1099,8 +1168,8 @@ class EngineClient:
             # expand before the application can apply its response ceiling.
             "accept-encoding": "identity",
         }
-        if trace_id:
-            headers["x-trace-id"] = _text(
+        if trace_id is not None:
+            headers["x-trace-id"] = _header_text(
                 trace_id,
                 "trace_id",
                 maximum=512,
@@ -1137,6 +1206,9 @@ class EngineClient:
                     timeout=timeout,
                     transport=self._transport,
                     follow_redirects=False,
+                    # Never let HTTP_PROXY/HTTPS_PROXY route delegated engine
+                    # credentials to an unrelated network gateway.
+                    trust_env=False,
                 ) as client:
                     async with client.stream(
                         method,

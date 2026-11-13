@@ -34,8 +34,11 @@ def test_sidecar_and_command_routes_do_not_import_server_at_module_scope() -> No
 
 def test_harness_mounts_command_routes_not_the_gameforge_sidecar() -> None:
     text = (ROOT / "skeleton/deploy/harness.py").read_text(encoding="utf-8")
-    assert "skeleton.api.command_routes" in text
-    assert "gameforge_routes" not in text
+    assert "from skeleton.api.server import create_app, get_state" in text
+    server = (ROOT / "skeleton/api/server.py").read_text(encoding="utf-8")
+    assert "from skeleton.api.command_routes import router as command_router" in server
+    assert 'app.include_router(command_router, prefix="/api/v1")' in server
+    assert "gameforge_routes" not in server
 
 
 def test_public_snapshot_rejects_secret_keys() -> None:

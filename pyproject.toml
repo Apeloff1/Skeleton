@@ -3,42 +3,7 @@ line-length = 110
 target-version = ["py311"]
 
 [tool.pytest.ini_options]
-testpaths = [
-    "skeleton/testing",
-    "skeleton/economy/gameplay/tests",
-    "skeleton/gameforge/batch_b07*",
-    "skeleton/gameforge/batch_b080",
-    "tests/api_v1_edge",
-    "tests/backend_core",
-    "tests/forge_ai_builder",
-    "tests/frontier/worldsim",
-    "tests/game",
-    "tests/game_asset_ingest",
-    "tests/game_builder",
-    "tests/gate_plane_core_mount",
-    "tests/gate_plane_hooks_wire",
-    "tests/gate_plane_s2s_auth",
-    "tests/perf_profiler",
-    "tests/test_api_v1_reference_drift.py",
-    "tests/test_architecture_current_docs_refs.py",
-    "tests/test_frontier_nav_cognition_loop.py",
-    "tests/test_frontier_nav_route_repair.py",
-    "tests/test_game_frontier_event_authority.py",
-    "tests/test_game_frontier_runtime_binding.py",
-    "tests/test_game_frontier_scene_qa.py",
-    "tests/test_game_multi_actor_semantic.py",
-    "tests/test_gf_b032_memory_planes.py",
-    "tests/test_gf_b034_npc_cognition.py",
-    "tests/test_gf_b035_canon.py",
-    "tests/test_gf_b036_dialogue.py",
-    "tests/test_gf_b092_ir.py",
-    "tests/test_gf_b093_targets.py",
-    "tests/test_gf_b095_plugin_sdk.py",
-    "tests/test_gf_b097_semantic_merge.py",
-    "tests/test_gf_b099_ugc_sandbox.py",
-    "tests/test_request_seal_v2.py",
-    "tests/test_request_seal_v3_binding.py",
-]
+testpaths = ["skeleton/testing"]
 pythonpath = [".", "backend"]
 python_files = ["test_*.py"]
 
@@ -59,6 +24,7 @@ include = ["skeleton*"]
 "skeleton.ai.game_builder" = ["platform_catalog.json", "evolution_lineages.json", "legal_authorities.json"]
 "skeleton.native" = ["asm/*.S", "asm/*.md", "asm/*.h"]
 "skeleton.app" = ["manifest.json"]
+"skeleton.game.gameplay" = ["fixtures/*.json"]
 
 [build-system]
 requires = ["setuptools==84.2.1", "wheel==0.48.0"]
@@ -89,11 +55,15 @@ jeeves-production-training = ["torch>=2.5,<3"]
 hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 
 [project.scripts]
+skeleton-harbor-crafting = "skeleton.game.gameplay.harbor_crafting_cli:main"
+skeleton-harbor-beacon-rescue = "skeleton.game.gameplay.harbor_crafting_beacon_cli:main"
 skeleton = "skeleton.__main__:main"
+skeleton-game-craft = "skeleton.game.gameplay.crafting_cli:main"
 skeleton-dev = "skeleton.developer.cli:main"
 skeleton-bootstrap = "skeleton.developer.bootstrap:main"
 skeleton-repo-machine = "skeleton.repo_machine.cli:main"
 skeleton-train-local-model = "skeleton.ai.runtime.inference.train:main"
+skeleton-local-model-inventory = "skeleton.ai.model_runtime.offline_inventory:main"
 skeleton-game-learning = "skeleton.jeeves.game_learning_cli:main"
 skeleton-game-pareto-train = "skeleton.ai.runtime.inference.game_pareto_train:main"
 skeleton-game-pareto-export = "skeleton.ai.runtime.inference.game_pareto_dataset:main"
