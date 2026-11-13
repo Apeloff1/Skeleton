@@ -81,6 +81,33 @@ test('an admitted Godot binary does not emit provenance warning after separate s
   assert.doesNotMatch(screen, /binary has not been verified/);
 });
 
+test('generated source-sealed in-game gateway is separately visible from engine qualifications', () => {
+  const basic = payload(null, null);
+  const sealed = {
+    ...basic,
+    playable_portal: {
+      schema: 'skeleton.forge.playable_portal.v1',
+      scene: 'scenes/archetypes/pipeline/main.tscn',
+      source_sha256: 'a'.repeat(64),
+      return_supported: true,
+      sealed: true,
+    },
+  };
+  const body = text(render(h(Panel, { phase: 'done', payload: sealed })));
+  assert.match(body, /In-game playable gateway/);
+  assert.match(body, /Source sealed · launch \+ return/);
+  assert.match(body, /Playable scene not dynamically tested/);
+  assert.doesNotMatch(body, /gateway was generated but its project/);
+
+  const unsealed = {
+    ...sealed,
+    playable_portal: { ...sealed.playable_portal, sealed: false },
+  };
+  const unsafe = text(render(h(Panel, { phase: 'done', payload: unsealed })));
+  assert.match(unsafe, /Not source sealed/);
+  assert.match(unsafe, /gateway was generated but its project\/source receipt is not sealed/);
+});
+
 test('missing sidecar runtime proof stays explicitly unverified in finished panel', () => {
   const screen = text(render(h(Panel, { phase: 'done', payload: payload(null) })));
   assert.match(screen, /Playable scene not dynamically tested/);
