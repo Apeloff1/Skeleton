@@ -365,6 +365,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
         now={ports.now}
         onCancel={visible.live && visible.phase === 'running' ? ports.run.onCancel : undefined}
         onRetry={visible.phase === 'done' || visible.phase === 'error' ? () => startForge(active, buildRunRequest(active.questionnaire)) : undefined}
+        outdated={Boolean(active.lastRunOutdated && visible.phase !== 'running')}
         onExport={visible.live && visible.phase === 'done' && visible.payload?.source_export?.status === 'ready'
           ? ports.run.onExport : undefined}
         exportBusy={ports.run.exportBusy}

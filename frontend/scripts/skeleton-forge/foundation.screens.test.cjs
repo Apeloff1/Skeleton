@@ -316,3 +316,17 @@ test('legacy local project recovery is an explicit first-install action, not aut
   }));
   assert.doesNotMatch(hidden, /data-testid="studio-import-legacy"/);
 });
+
+test('stale first-install build shows explicit prior-receipt warning', () => {
+  const p = { succeeded: true, run: { run_id: 'previous', succeeded: true, stages: [] } };
+  const visible = text(render(h(BuildStatusScreen, {
+    title: 'Changed game', phase: 'done', payload: p,
+    startedAt: 1, finishedAt: 2, now: 3, error: null, outdated: true,
+    guidance: { id: 'projects', label: 'Back to projects', detail: 'Build complete' },
+    onGuidance: noop, consoleBusy: false, consoleSummary: null, consoleOk: null,
+    consoleFailures: 0, onAskCockpit: noop,
+    onBrief: noop, onProjects: noop, onOpenCockpit: noop,
+  })));
+  assert.match(visible, /This build belongs to an earlier version of the questionnaire/);
+  assert.match(visible, /forge again/);
+});

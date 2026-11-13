@@ -2,7 +2,7 @@
  * Studio shell state: first-run, account gate, projects, and where Back goes.
  * Pure — screens and persistence sit on top of this reducer.
  */
-import { INITIAL_STATE, questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
+import { INITIAL_STATE, buildRunRequest, questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
 import { sparseInstrumentPayload } from '../instruments';
 import { mappedBriefGenre } from '../galaxyGenres';
 import { summarizeRun } from '../run';
@@ -45,6 +45,8 @@ export interface StudioProject {
   updatedAt: string;
   questionnaire: QuestionnaireState;
   lastRun: RunSnapshot | null;
+  /** Previous successful receipt is retained, but no longer builds this brief. */
+  lastRunOutdated?: boolean;
 }
 
 export interface AuthView {
@@ -179,6 +181,11 @@ export function persistedRunSnapshot(snapshot: RunSnapshot): RunSnapshot {
     ...snapshot,
     payload: persistedRunPayload(snapshot.payload),
   };
+}
+
+/** Compare emitted inputs, not the user's navigation step or screen focus. */
+export function changedBuildInputs(previous: QuestionnaireState, next: QuestionnaireState): boolean {
+  return JSON.stringify(buildRunRequest(previous)) !== JSON.stringify(buildRunRequest(next));
 }
 
 export function projectTitle(vision: string): string {
@@ -329,6 +336,9 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
         ...current,
         questionnaire,
         title: projectTitle(questionnaire.vision),
+        lastRunOutdated: current.lastRun
+          ? Boolean(current.lastRunOutdated || changedBuildInputs(current.questionnaire, questionnaire))
+          : false,
         updatedAt: action.at,
       });
     }
@@ -379,7 +389,9 @@ export function applyRecordRun(state: FoundationState, projectId: string, snapsh
   const current = state.projects.find((project) => project.id === projectId);
   if (!current) return state;
   const updatedAt = snapshot.finishedAt != null ? new Date(snapshot.finishedAt).toISOString() : current.updatedAt;
-  return replaceProject(state, { ...current, lastRun: persistedRunSnapshot(snapshot), updatedAt });
+  return replaceProject(state, {
+    ...current, lastRun: persistedRunSnapshot(snapshot), lastRunOutdated: false, updatedAt,
+  });
 }
 
 export interface PersistSnapshot {
@@ -410,6 +422,7 @@ export function orderedProjects(projects: readonly StudioProject[]): StudioProje
 export function projectStatus(project: StudioProject, liveOwner: string | null, livePhase: BuildPhase): string {
   if (liveOwner === project.id && livePhase === 'running') return 'Forging';
   if (!project.lastRun) return 'Brief in progress';
+  if (project.lastRunOutdated) return 'Needs rebuild';
   if (project.lastRun.phase === 'error') return 'Needs attention';
   if (project.lastRun.succeeded) return 'Built';
   return 'Finished with failures';
@@ -417,6 +430,7 @@ export function projectStatus(project: StudioProject, liveOwner: string | null, 
 
 export function openTarget(project: StudioProject, liveOwner: string | null, livePhase: BuildPhase): 'brief' | 'build' {
   if (liveOwner === project.id && livePhase === 'running') return 'build';
+  if (project.lastRunOutdated) return 'brief';
   if (project.lastRun) return 'build';
   return 'brief';
 }
@@ -577,6 +591,7 @@ function sanitizeProject(raw: unknown): StudioProject | null {
       sourceExport: { enabled: questionnaire.sourceExport?.enabled === true },
     },
     lastRun,
+    lastRunOutdated: Boolean(lastRun && item.lastRunOutdated === true),
   };
 }
 
@@ -660,6 +675,10 @@ export function reconcileStudioReturn(
     ...snapshot[index],
     title: projectTitle(questionnaire.vision),
     questionnaire,
+    lastRunOutdated: snapshot[index].lastRun
+      ? Boolean(snapshot[index].lastRunOutdated
+          || changedBuildInputs(snapshot[index].questionnaire, questionnaire))
+      : false,
     updatedAt: at,
   };
   const vetted = sanitizeProjects([draft]);

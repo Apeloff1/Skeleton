@@ -527,3 +527,45 @@ test('source-bound Studio-to-cockpit-to-Studio edits survive a complete device s
   assert.equal(saved.sourceExport.enabled, true);
   assert.equal(Q.buildRunRequest(saved).include_files, true);
 });
+ 
+test('saved build receipt becomes outdated only after material game design changes', () => {
+  const oldRun = {
+    phase: 'done', error: null, startedAt: 1, finishedAt: 2, succeeded: true,
+    payload: { succeeded: true, era: 'extraction_now', run: { run_id: 'build1', succeeded: true, stages: [] } },
+  };
+  const draft = Q.questionnaireReducer(m.freshQuestionnaire(), {
+    type: 'setVision', vision: 'A medieval siege simulator',
+  });
+  let state = base({ projects: [project('p-game', { questionnaire: draft, lastRun: oldRun })], activeId: 'p-game' });
+  assert.equal(m.projectStatus(state.projects[0], null, 'idle'), 'Built');
+  state = m.foundationReducer(state, { type: 'questionnaire', action: { type: 'goto', step: 'brief' }, at: AT });
+  assert.equal(state.projects[0].lastRunOutdated, false);
+  state = m.foundationReducer(state, {
+    type: 'questionnaire', action: { type: 'setAxis', axis: 'risk', value: 0.74 }, at: AT,
+  });
+  assert.equal(state.projects[0].lastRunOutdated, true);
+  assert.equal(state.projects[0].lastRun.payload.run.run_id, 'build1');
+  assert.equal(m.projectStatus(state.projects[0], null, 'idle'), 'Needs rebuild');
+  assert.equal(m.openTarget(state.projects[0], null, 'idle'), 'brief');
+  const stored = m.sanitizeProjects(m.persistSnapshot(state).projects);
+  assert.equal(stored.corrupt, false);
+  assert.equal(stored.projects[0].lastRunOutdated, true);
+  state = m.foundationReducer(state, { type: 'recordRun', projectId: 'p-game', snapshot: oldRun });
+  assert.equal(state.projects[0].lastRunOutdated, false);
+  assert.equal(m.projectStatus(state.projects[0], null, 'idle'), 'Built');
+});
+
+test('advanced Forge return marks its original build stale without replacing authored receipts', () => {
+  const initial = Q.questionnaireReducer(m.freshQuestionnaire(), {
+    type: 'setVision', vision: 'Original local strategy world',
+  });
+  const receipt = { phase: 'done', error: null, startedAt: 1, finishedAt: 2,
+    succeeded: true, payload: { succeeded: true, run: { run_id: 'original', succeeded: true, stages: [] } } };
+  const source = project('p-advanced', { questionnaire: initial, lastRun: receipt });
+  const edited = Q.questionnaireReducer(initial, { type: 'setPlayableEnabled', value: true });
+  const result = m.reconcileStudioReturn([source], source.id, AT, edited, '2026-11-13T22:00:00.000Z');
+  assert.equal(result.status, 'applied');
+  assert.equal(result.projects[0].lastRunOutdated, true);
+  assert.equal(result.projects[0].lastRun.payload.run.run_id, 'original');
+  assert.equal(m.projectStatus(result.projects[0], null, 'idle'), 'Needs rebuild');
+});
