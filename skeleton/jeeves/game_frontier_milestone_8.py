@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import json
 
-from .game_frontier_campaign import CampaignLedger, CampaignError
+from .game_frontier_campaign import CampaignLedger, CampaignError, audit_receipt
 
 
 @dataclass(frozen=True)
@@ -24,8 +24,10 @@ class CampaignExport:
 def export_campaign(ledger: CampaignLedger, audit: str) -> CampaignExport:
     if not ledger.verify():
         raise CampaignError("ledger must verify before export")
-    if len(audit) != 64:
-        raise CampaignError("audit must be SHA-256")
+    # A 64-character digest-shaped string is not proof that the named
+    # campaign has been audited. Bind the export to its real ledger receipt.
+    if type(audit) is not str or audit != audit_receipt(ledger):
+        raise CampaignError("audit must match the verified campaign receipt")
     payload = json.dumps(
         {
             "campaign": ledger.campaign_id,

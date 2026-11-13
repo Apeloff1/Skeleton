@@ -32,5 +32,10 @@ def test_export_stable():
 
 
 def test_export_rejects_bad_audit():
+    ledger = _ledger()
     with pytest.raises(CampaignError):
-        export_campaign(_ledger(), "short")
+        export_campaign(ledger, "short")
+    with pytest.raises(CampaignError):
+        export_campaign(ledger, "0" * 64)
+    with pytest.raises(CampaignError):
+        export_campaign(ledger, None)
