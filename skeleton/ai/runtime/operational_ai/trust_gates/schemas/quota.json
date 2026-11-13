@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "fields": {
+    "tenant": {
+      "type": "text",
+      "max_bytes": 48,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    },
+    "prompt_used": {
+      "type": "int",
+      "min": 0,
+      "max": 100000000
+    },
+    "output_used": {
+      "type": "int",
+      "min": 0,
+      "max": 100000000
+    },
+    "new_prompt": {
+      "type": "int",
+      "min": 0,
+      "max": 100000000
+    },
+    "new_output": {
+      "type": "int",
+      "min": 0,
+      "max": 100000000
+    },
+    "tenant_ceiling": {
+      "type": "int",
+      "min": 1,
+      "max": 100000000
+    },
+    "global_remaining": {
+      "type": "int",
+      "min": 0,
+      "max": 100000000
+    }
+  }
+}

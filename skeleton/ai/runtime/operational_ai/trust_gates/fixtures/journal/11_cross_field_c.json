@@ -1,0 +1,15 @@
+{
+  "case": "11_cross_field_c",
+  "gate": "journal",
+  "expect": "reject",
+  "reason": "Only known event kinds are admitted",
+  "payload": {
+    "stream": "chat_001",
+    "sequence": 1,
+    "prev_sha": "0000000000000000000000000000000000000000000000000000000000000000",
+    "event_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "kind": "arbitrary.secret.access",
+    "payload_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "epoch": 1
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "project_id": "studio_celestial_navigation_cloud_canopy",
+  "genre": "celestial_navigation",
+  "biome": "cloud_canopy",
+  "release_certified": false,
+  "objective": "locate a missing relay before a transit corridor fails",
+  "quest_id": "studio_celestial_navigation_cloud_canopy:three-acts",
+  "mechanics_targets": [
+    "orbital windows, instrument calibration and coordinate inference",
+    "position error"
+  ],
+  "stage_graph": [
+    {
+      "id": "investigate",
+      "prerequisites": [],
+      "site": "multi-tier boughs",
+      "verb": "survey",
+      "alternatives": [
+        "Document severe canopy winds without entering restricted ground",
+        "Find an independent route through multi-tier boughs"
+      ],
+      "evidence": [
+        "hazard_measurement",
+        "eyewitness_note"
+      ],
+      "failure_rule": "insufficient_safe_access",
+      "reward": "reliable_survey"
+    },
+    {
+      "id": "intervene",
+      "prerequisites": [
+        "investigate"
+      ],
+      "site": "suspended library",
+      "verb": "calculate",
+      "alternatives": [
+        "Prototype orbital windows, instrument calibration and coordinate inference around crosswind shear",
+        "Use aerial roots under open public supervision"
+      ],
+      "evidence": [
+        "resource_receipt",
+        "engineering_audit"
+      ],
+      "failure_rule": "overspend_or_unconsented_action",
+      "reward": "verified_repair_attempt"
+    },
+    {
+      "id": "ratify",
+      "prerequisites": [
+        "intervene"
+      ],
+      "site": "shared workshop near suspended library",
+      "verb": "publish",
+      "alternatives": [
+        "residents_vote",
+        "open_technical_governance"
+      ],
+      "evidence": [
+        "history_log",
+        "verified_outcome"
+      ],
+      "failure_rule": "missing_audit_receipt",
+      "reward": "branch_world_state"
+    }
+  ],
+  "branching": {
+    "commons": [
+      "verified_history",
+      "public_ledger"
+    ],
+    "cooperative": [
+      "verified_repair",
+      "local_consensus"
+    ],
+    "scarcity": [
+      "survival_proven"
+    ]
+  },
+  "resource_economy": {
+    "currency": "fuel and measurement variance",
+    "secondary": "aerial roots",
+    "no_mint_without_supply": true,
+    "max_concurrent_quests": "runtime_resource_based"
+  },
+  "implementation_status": "authored_director_data_only"
+}

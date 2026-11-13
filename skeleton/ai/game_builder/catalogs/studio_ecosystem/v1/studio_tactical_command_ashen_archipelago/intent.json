@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_tactical_command_ashen_archipelago",
+  "title": "Ashen Archipelago: The Citizen Fleet",
+  "subtitle": "Original the citizen fleet design in Ashen Archipelago; only the grid preview compiles today.",
+  "seed": 203010313117,
+  "width": 23,
+  "height": 19,
+  "levels": 3,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 13,
+  "theme": "ocean",
+  "starting_health": 3
+}

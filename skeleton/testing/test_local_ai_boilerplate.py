@@ -7,10 +7,14 @@ from skeleton.local_ai import get_complete
 def test_complete_status():
     ai = get_complete()
     status = ai.status()
-    assert status["status"] == "complete"
+    # Legacy construction is only a seam inventory; it does not bind a GGUF
+    # model, tokenizer, authorization guard, or verified inference backend.
+    assert status["status"] == "unavailable"
     assert status["seams"] > 40
-    assert status["adapter"] is True
-    assert status["bridge"] is True
+    assert status["adapter"] == "legacy_unverified"
+    assert status["bridge"] == "disabled_unverified"
+    assert status["ready"] is False
+    assert status["readiness_code"] == "LOCAL_INFERENCE_NOT_BOUND"
 
 def test_clipped_g_bounds():
     from skeleton.local_ai.clipped_g_observer import ClippedGObserver

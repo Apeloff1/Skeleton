@@ -1,0 +1,15 @@
+{
+  "case": "08_surrogate_unicode",
+  "gate": "cancel",
+  "expect": "reject",
+  "reason": "Surrogate Unicode cannot be canonical evidence",
+  "payload": {
+    "request_id": "\ud800",
+    "state": "cancelled",
+    "now_ns": 1000000,
+    "deadline_ns": 2000000,
+    "generated_tokens": 4,
+    "acked": true,
+    "backend_active": false
+  }
+}

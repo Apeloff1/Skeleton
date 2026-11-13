@@ -175,3 +175,65 @@ def test_missing_canonical_root_fails_closed_when_required(tmp_path: Path) -> No
         item.path == tmp_path / "backend" and item.message == "missing canonical source root"
         for item in violations
     )
+
+
+def test_deep_package_sibling_api_is_not_root_api(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(
+        root,
+        "skeleton/ai/runtime/production_fabric/product/cli.py",
+        "from .api import LocalAPI\nfrom . import api\n",
+    )
+
+    assert collect_violations(root) == []
+
+
+def test_deep_package_relative_import_cannot_bypass_root_api(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(
+        root,
+        "skeleton/ai/runtime/production_fabric/product/cli.py",
+        "from .....api import LocalAPI\n",
+    )
+
+    violations = collect_violations(root)
+    assert len(violations) == 1
+    assert "must not depend upward on skeleton.api" in violations[0].message
+
+
+def test_relative_from_parent_import_api_is_checked(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(root, "skeleton/agents/task.py", "from .. import api\n")
+
+    violations = collect_violations(root)
+    assert len(violations) == 1
+    assert "must not depend upward on skeleton.api" in violations[0].message
+
+def test_deep_package_sibling_api_is_not_root_api(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(
+        root,
+        "skeleton/ai/runtime/production_fabric/product/cli.py",
+        "from .api import LocalAPI\nfrom . import api\n",
+    )
+    assert collect_violations(root) == []
+
+
+def test_deep_package_relative_import_cannot_bypass_root_api(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(
+        root,
+        "skeleton/ai/runtime/production_fabric/product/cli.py",
+        "from .....api import LocalAPI\n",
+    )
+    violations = collect_violations(root)
+    assert len(violations) == 1
+    assert "must not depend upward on skeleton.api" in violations[0].message
+
+
+def test_relative_from_parent_import_api_is_checked(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(root, "skeleton/agents/task.py", "from .. import api\n")
+    violations = collect_violations(root)
+    assert len(violations) == 1
+    assert "must not depend upward on skeleton.api" in violations[0].message

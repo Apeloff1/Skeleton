@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.world_event_scenario.v1",
+  "id": "economy_supply_shock",
+  "domain": "economy",
+  "sensor": "pressure",
+  "threshold": 51,
+  "severity": 1,
+  "cost": 3,
+  "boost": 10,
+  "cooldown": 6,
+  "initial": {
+    "region": "central",
+    "pressure": 100,
+    "resources": 100,
+    "resilience": 50
+  },
+  "commands": [
+    {
+      "id": "economy_supply_shock:open",
+      "action": "activate",
+      "tick": 1,
+      "expected_version": 0,
+      "intensity": 0,
+      "evidence": ""
+    },
+    {
+      "id": "economy_supply_shock:finish",
+      "action": "resolve",
+      "tick": 2,
+      "expected_version": 1,
+      "intensity": 0,
+      "evidence": "trusted-world-proof"
+    },
+    {
+      "id": "economy_supply_shock:ready",
+      "action": "release_cooldown",
+      "tick": 8,
+      "expected_version": 2,
+      "intensity": 0,
+      "evidence": ""
+    }
+  ],
+  "expected": {
+    "final_lifecycle": "idle",
+    "final_version": 3,
+    "accepted": 3,
+    "resolution_requires_evidence": true,
+    "duplicate_events_rejected": true,
+    "optimistic_version_fence": true
+  },
+  "qualification": {
+    "synthetic": true,
+    "provenance_authenticated": false,
+    "device_qualified": false,
+    "release_certified": false
+  }
+}

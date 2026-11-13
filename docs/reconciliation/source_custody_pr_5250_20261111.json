@@ -1,0 +1,619 @@
+{
+  "schema": 1,
+  "source_pr": 5250,
+  "source_head": "671915583cf5878124ebb410e4ac7d95ebb1cf00",
+  "merge_base": "e65c1c1070785650c09ee54aba3ededa06641611",
+  "target_main": "42c9908bee87bacde621b99e6015250cb41d64da",
+  "source_custody": true,
+  "ready_to_merge": false,
+  "adopted": [
+    {
+      "path": ".github/workflows/discourse-job-identity-qualification.yml",
+      "blob": "f20bb5d949cf25c5ea508acea4a7402bdb6781f4",
+      "status": "added"
+    }
+  ],
+  "deferred": [
+    {
+      "path": ".github/workflows/app-foundation-e2e.yml",
+      "blob": "621eab290ed1ed7112cd004c0807dd9148f5a088",
+      "status": "modified"
+    },
+    {
+      "path": ".github/workflows/backend-quality.yml",
+      "blob": "01602952acc684e88ebfe960b8035dd8eb685519",
+      "status": "modified"
+    },
+    {
+      "path": ".github/workflows/expo-export-content-evidence-qualification.yml",
+      "blob": "38fae31d394533d688f448bfd63c42582f622e4d",
+      "status": "added"
+    },
+    {
+      "path": ".github/workflows/harbor-patrol-cli-qualification.yml",
+      "blob": "9492dcd143172c6381b646887f46f89c731bbad9",
+      "status": "added"
+    },
+    {
+      "path": ".github/workflows/jeeves-integrated-source-qualification.yml",
+      "blob": "2cc0b7c8e7ed024586717ab272b84d5181940e7c",
+      "status": "modified"
+    },
+    {
+      "path": ".github/workflows/mainline-failure-regression-qualification.yml",
+      "blob": "1f61928efb425d5e77c49792029eb1c38e4d7525",
+      "status": "added"
+    },
+    {
+      "path": ".github/workflows/native-qualification-report-custody.yml",
+      "blob": "20b91948d41431bdd7aa6e4a03503a0b1135d8d7",
+      "status": "added"
+    },
+    {
+      "path": ".github/workflows/operational-literal-dispatch-qualification.yml",
+      "blob": "e39303f6a06332b7a3c9840395ec9a50036c34d3",
+      "status": "added"
+    },
+    {
+      "path": ".github/workflows/perf-profiler-literal-target-qualification.yml",
+      "blob": "e38b8342e6b8e8144da1e8a82ae2ebd26485c8ea",
+      "status": "added"
+    },
+    {
+      "path": ".github/workflows/pr-merge-hold-qualification.yml",
+      "blob": "8eda73e0cf9cdf8cba0dff85259e74ed11e79e8b",
+      "status": "added"
+    },
+    {
+      "path": ".github/workflows/pr-merge-hold.yml",
+      "blob": "32fec98bd409b221778b6dc2e15ffb8307b40477",
+      "status": "added"
+    },
+    {
+      "path": "backend/core/discourse_catalog.py",
+      "blob": "a4e7d782e5709f37a5ed54c4a851a5ba2aaa7bad",
+      "status": "added"
+    },
+    {
+      "path": "backend/routes/discourse.py",
+      "blob": "4fcdb60b4e2cdea653888f84656c9cb414eb419d",
+      "status": "modified"
+    },
+    {
+      "path": "backend/scripts/check_dynamic_import_safety.py",
+      "blob": "f2c3dca8c12fb6ba4367326291831c6aa854dc6b",
+      "status": "modified"
+    },
+    {
+      "path": "backend/tests/test_discourse_judge_admission.py",
+      "blob": "7b916520298fae5d29c3c2e39dccf438c4ebda89",
+      "status": "modified"
+    },
+    {
+      "path": "backend/tests/test_dynamic_import_safety.py",
+      "blob": "275561acb04a630cc56c56f1d19916775bca4064",
+      "status": "modified"
+    },
+    {
+      "path": "backend/tests/test_galaxy_file_budget.py",
+      "blob": "ccdae52ce27e9de4043f483ac02efaa371681d35",
+      "status": "modified"
+    },
+    {
+      "path": "docs/qa/APP_FOUNDATION_E2E_TEST_PLAN.md",
+      "blob": "9cf09ba7cfd0a1ecde38196a96bc2df3a3a9618f",
+      "status": "modified"
+    },
+    {
+      "path": "frontend/Dockerfile",
+      "blob": "9d70ba3b03a33a87d2e981f99cac36f2ab98e68f",
+      "status": "modified"
+    },
+    {
+      "path": "frontend/app/discourse.tsx",
+      "blob": "7b6c5100f14fa48aa0e5cfc1b629764e8a74ce35",
+      "status": "modified"
+    },
+    {
+      "path": "frontend/scripts/guarded-expo-export.cjs",
+      "blob": "0864d8430ce5ee4694cc721a639a84f948edd10f",
+      "status": "modified"
+    },
+    {
+      "path": "frontend/scripts/test-app-foundation-e2e-admission.cjs",
+      "blob": "f221a73f7f05782da36ca6e2db08e7534e696c10",
+      "status": "added"
+    },
+    {
+      "path": "frontend/scripts/test-app-foundation-flows.mjs",
+      "blob": "aeed6454428601327cf414ee07ca2d2b7e3e66ca",
+      "status": "modified"
+    },
+    {
+      "path": "frontend/scripts/test-discourse-async-jobs.mjs",
+      "blob": "eae7e8808e381276bf5401f44ab069742384d334",
+      "status": "added"
+    },
+    {
+      "path": "frontend/scripts/test-guarded-expo-export.cjs",
+      "blob": "853da47a88cba2f754c7115529335bdbff90d22a",
+      "status": "modified"
+    },
+    {
+      "path": "frontend/src/features/discourse/discourseJob.ts",
+      "blob": "33265821cef6b26b89989d26c9d07bd44629c1a2",
+      "status": "added"
+    },
+    {
+      "path": "machine/ai_file_tree.json",
+      "blob": "b3095744bd7b178221cb835b51a2a5c20ae93eff",
+      "status": "modified"
+    },
+    {
+      "path": "machine/product_surface_specification.json",
+      "blob": "7473d1d9d06eb7eb9eb7db7a7f38d4494ad3c606",
+      "status": "modified"
+    },
+    {
+      "path": "scripts/check_app_foundation_e2e_admission.py",
+      "blob": "3c257fe02c3a687e9f75a43208e7fe82bbb06eb7",
+      "status": "added"
+    },
+    {
+      "path": "scripts/check_backend_source_convergence.py",
+      "blob": "4608a3e8a5b1b5f759accf3a8961b917edb2efff",
+      "status": "added"
+    },
+    {
+      "path": "scripts/check_ci_crypto_dependencies.py",
+      "blob": "6bc85efc796a2dd515a20484b1d93d223965306c",
+      "status": "added"
+    },
+    {
+      "path": "scripts/check_post_merge_main.py",
+      "blob": "66e7c35cdee8ffcca95843de5c1b522519c82dfe",
+      "status": "added"
+    },
+    {
+      "path": "scripts/check_pr_merge_hold.py",
+      "blob": "af27679f541a23b4583a2d342be9f60d4e66fc2d",
+      "status": "added"
+    },
+    {
+      "path": "scripts/check_product_surface_specification.py",
+      "blob": "3ab2c36fbf010bab723a85b3bdcf3e0d9f1b4efe",
+      "status": "modified"
+    },
+    {
+      "path": "scripts/game/offline_grid_campaign.py",
+      "blob": "1d0528a7b1035808f8855bd9201cdf076ee9b44e",
+      "status": "modified"
+    },
+    {
+      "path": "scripts/provision_e2e_operator.py",
+      "blob": "94f3f7641b130669f292c83893c55ea114ccc251",
+      "status": "added"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/native_fabric/laptop_ops/batch/catalog.py",
+      "blob": "627eed1728c82da82720339934bb913796604f7e",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/native_fabric/laptop_ops/batch/fixtures.py",
+      "blob": "2f9c6461bfd0f3d557e3e5bf74917de786835c26",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/native_fabric/laptop_ops/runner.py",
+      "blob": "4f7123c004e1ba50aa69be46bd6de388607d9043",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/build/core/delivery/packaging.py",
+      "blob": "f86b1952e958670cad55fabbb6d41523f831dea0",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/build/pr_automation/automerge_engine.py",
+      "blob": "0b4b3cf922c9a2af785ab1cd9ae54746ce2aeae4",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/build/pr_automation/automerge_github.py",
+      "blob": "1dc4b67f3de7bfa751d967809ee3ed6cfabeaf73",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/build/pr_automation/automerge_model.py",
+      "blob": "ea33d1a50bf9b46bfa6449fa894516474a2e9b8d",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/build/pr_automation/automerge_policy.py",
+      "blob": "5fccc60f139633dbecd1c9aa2af582dad42b4f00",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/ecs/ai.py",
+      "blob": "4236d91952477b715d452ca0133f364bcc40f2c5",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/__init__.py",
+      "blob": "b90ad8fbe40fa8563885bf2ff641653a1f63bd99",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/context/__init__.py",
+      "blob": "377927b20baa0b5c88b4695fce2465c440bcdef0",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/deployment/__init__.py",
+      "blob": "5944c1dc4793432d66656226bbc613486d0f2bd6",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/evaluation/__init__.py",
+      "blob": "694606d49f1669ba185092e96beca98e919364ce",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/learning/__init__.py",
+      "blob": "ea49a86751a9f291ab0a73afb64551cddac0b0ca",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/model/__init__.py",
+      "blob": "2b0dbdce037db051a3e92e947593a7f9e110616a",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/persistence/__init__.py",
+      "blob": "5c63fd826bfcf1884cf320e0a6018de37a4fe7c6",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/planning/__init__.py",
+      "blob": "3251ca792b6612d7b1027b05cfb328bc58aa9dcf",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/queue/__init__.py",
+      "blob": "c04d79c3447c1209e2205b1b36b974950eeb04a2",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/retrieval/__init__.py",
+      "blob": "857a02f639fa346c30e8ee03f0a54ba09cb98cc6",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/security/__init__.py",
+      "blob": "0b6f86c1c8b7c8822a3c6613a18ae9058f016ea6",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/tooling/__init__.py",
+      "blob": "77206281efcc965cca16b9f18401ea4e1f5e9971",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/transport/__init__.py",
+      "blob": "c89fcdd7b4b16fda374a31173d469032ab57912d",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/deployment/qualification/paths.py",
+      "blob": "15e4e44631db44b888450d233d00efe3c608720b",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/deployment/qualification/proof.py",
+      "blob": "19eb79a3ed505c21f0acee84d8ce9cfb0710233e",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/deployment/qualification/verification.py",
+      "blob": "cd63a8eaca2a10808c334193e4d33d87022421e7",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/offline_cognition/core/testing.py",
+      "blob": "fdf1f3143012a2dc318da69f260bdc0701222ef4",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/reliability_fabric/engine.py",
+      "blob": "4905509efe01c64dbf378ae66aff086247aed468",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ai/runtime/operational_ai/trust_gates/engine.py",
+      "blob": "2777c013cfd07cc48787804400aeeca95ee87baf",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/app/offline_delivery_archive.py",
+      "blob": "104a74db40ceb99c091c71f42355272d45bff0e9",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/build/delivery/packaging.py",
+      "blob": "f86b1952e958670cad55fabbb6d41523f831dea0",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/ecs/ai.py",
+      "blob": "4236d91952477b715d452ca0133f364bcc40f2c5",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/game/gameplay/harbor_crafting_patrol_cli.py",
+      "blob": "9f755ef189834695fcbd69da4febfba663d2c6c7",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/game/gameplay/offline_grid_save_slot.py",
+      "blob": "6eea47d62759374234a831e37e9a8e2cea3ff445",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/jeeves/native_fabric/laptop_ops/batch/catalog.py",
+      "blob": "627eed1728c82da82720339934bb913796604f7e",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/jeeves/native_fabric/laptop_ops/batch/fixtures.py",
+      "blob": "2f9c6461bfd0f3d557e3e5bf74917de786835c26",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/jeeves/native_fabric/laptop_ops/runner.py",
+      "blob": "4f7123c004e1ba50aa69be46bd6de388607d9043",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/perf_profiler/_stats.py",
+      "blob": "34be340299e7058f3811ebb9bcb20be56b40c416",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/perf_profiler/alloc.py",
+      "blob": "8aa7a0895a52738dc25e5e8a5825fb94185d6c48",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/perf_profiler/cli.py",
+      "blob": "3f0f96314be70501e18e8298d8ef2221bf015d9e",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/perf_profiler/clock.py",
+      "blob": "308b9282199f77fe1d347e0e14fa0c6d1d63adab",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/perf_profiler/frames.py",
+      "blob": "c35535b3ab92eb42d26593d97deac9791fb09135",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/perf_profiler/load_timers.py",
+      "blob": "29b932cd01175ab0f345712d38a5077a184be620",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/pr_automation/automerge_engine.py",
+      "blob": "0b4b3cf922c9a2af785ab1cd9ae54746ce2aeae4",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/pr_automation/automerge_github.py",
+      "blob": "1dc4b67f3de7bfa751d967809ee3ed6cfabeaf73",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/pr_automation/automerge_model.py",
+      "blob": "ea33d1a50bf9b46bfa6449fa894516474a2e9b8d",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/pr_automation/automerge_policy.py",
+      "blob": "5fccc60f139633dbecd1c9aa2af582dad42b4f00",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_ai_native_endurance.py",
+      "blob": "55127bc17a62d6fdb6b0e61c21f5a35ffd115cac",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_ai_qualification_proof_boundaries_20261111.py",
+      "blob": "b99e6c1ff4de870ea805db1da15c5c54c575c5ae",
+      "status": "added"
+    },
+    {
+      "path": "skeleton/testing/test_ai_real_model_qualification.py",
+      "blob": "5d6607a66159b29129ada67557d912942d249971",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_app_offline_signed_game_library_audit.py",
+      "blob": "d0271fdbfc1139f18bb3d076dc5c7828fd5a5565",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_automerge_pr_text_holds_20261110.py",
+      "blob": "845b6570b5938e0e83d3e34d571ca59f3a4cc082",
+      "status": "added"
+    },
+    {
+      "path": "skeleton/testing/test_delivery_packaging.py",
+      "blob": "9e43f6acb35edf748bc335b86a041ef285872bab",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_dual_runtime_verify.py",
+      "blob": "6c691393df3f9305df828c950497d8f1507bd80e",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_ecs_ai.py",
+      "blob": "88159af195aaad74e7e75b9528b20cecd657e5e1",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_ecs_ai_quarantine.py",
+      "blob": "801e527359f92272c4599c920baf4e9c4fb14444",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_enterprise.py",
+      "blob": "601c97f97e2501bf0bf5e46170aa10309409347b",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_game_emulator_physical_planning.py",
+      "blob": "d800a4a856de1c372597add1e94eadf9d1b3aa1b",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_grid_playthrough_route.py",
+      "blob": "e50e44528359b1c568283f6ac6eaf0830ffa80f1",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_harbor_crafting_journal_transfer.py",
+      "blob": "aea2559a75165c0d6359ed0b62720c61ac290a5b",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_harbor_crafting_season.py",
+      "blob": "a551f570a7690c663b06f1b9bcbf8476360b6771",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_harbor_patrol_cli_dispatch_20261111.py",
+      "blob": "fcd8840a2e3f7ea3857f22404c23c5dda22b300e",
+      "status": "added"
+    },
+    {
+      "path": "skeleton/testing/test_jeeves_first_laptop_batch_denials.py",
+      "blob": "73f30c5051a18dddf7fe7b26a10f7d1c35e7bfb2",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_jeeves_first_laptop_batch_missing.py",
+      "blob": "5c61de437c1c09459f7881724c056320955b9342",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_jeeves_first_laptop_static_dispatch_20261111.py",
+      "blob": "e6e22e011315835e56a06f754888757ec71c36db",
+      "status": "added"
+    },
+    {
+      "path": "skeleton/testing/test_jeeves_native_batch.py",
+      "blob": "b45730fef322ea8c1822872fa1946f925803c77a",
+      "status": "modified"
+    },
+    {
+      "path": "skeleton/testing/test_post_merge_integration_20261110.py",
+      "blob": "1a2a66bb3d04af7f40bc5ab002fd5fff55312051",
+      "status": "added"
+    },
+    {
+      "path": "skeleton/testing/test_postmerge_campaign_create_custody.py",
+      "blob": "1816e605b773dd6a81833ea2e5932ff4e6267247",
+      "status": "added"
+    },
+    {
+      "path": "skeleton/testing/test_postmerge_save_ancestor_custody.py",
+      "blob": "cc9d5283b142aeb653d39e6481362dee668e26ef",
+      "status": "added"
+    },
+    {
+      "path": "tests/perf_profiler/test_alloc.py",
+      "blob": "09f867cf1178c280431f82088932f26dd8c130ea",
+      "status": "modified"
+    },
+    {
+      "path": "tests/perf_profiler/test_cli.py",
+      "blob": "ea4f438cb95507ec5972b2c02651279b43997150",
+      "status": "modified"
+    },
+    {
+      "path": "tests/perf_profiler/test_clock.py",
+      "blob": "44a41c652c5a9489e959b66e531d39db90a62f3a",
+      "status": "modified"
+    },
+    {
+      "path": "tests/perf_profiler/test_frames.py",
+      "blob": "90991732ab80a3b43f881a894d2870ce407671d5",
+      "status": "modified"
+    },
+    {
+      "path": "tests/perf_profiler/test_load_timers.py",
+      "blob": "1c2da3fef2c3de0c76e176aac4a02aa7c4a2dde8",
+      "status": "modified"
+    },
+    {
+      "path": "tests/test_app_foundation_e2e_admission.py",
+      "blob": "49d1b845ef5871aa32cc74385edf979b86d086e9",
+      "status": "added"
+    },
+    {
+      "path": "tests/test_app_foundation_e2e_build_isolation.py",
+      "blob": "0d4a8129d106183b07b4153f7121c415f9f6ebd7",
+      "status": "added"
+    },
+    {
+      "path": "tests/test_backend_source_convergence_ci.py",
+      "blob": "e47763dc18ad0e46ac8bc16ba85c5b28e8a0f833",
+      "status": "added"
+    },
+    {
+      "path": "tests/test_ci_crypto_dependencies.py",
+      "blob": "8bf5561d39742a5a17949e872f00f60fb47095f8",
+      "status": "added"
+    },
+    {
+      "path": "tests/test_ci_e2e_operator_provision.py",
+      "blob": "2e3cfb751ceab54e7addc36de0d63a23acbc1795",
+      "status": "added"
+    },
+    {
+      "path": "tests/test_offline_cognition_literal_dispatch_20261111.py",
+      "blob": "c4d3d837a0ffa61c8f603357ac6b3f4dc01ea048",
+      "status": "added"
+    },
+    {
+      "path": "tests/test_operational_literal_dispatch_20261111.py",
+      "blob": "9d21e519989f8fc0bb0a6cfc36b1c86839f7ab7a",
+      "status": "added"
+    },
+    {
+      "path": "tests/test_post_merge_main_qualification.py",
+      "blob": "7aa39c9884771d0536e0394bf98625156bdf7917",
+      "status": "added"
+    },
+    {
+      "path": "tests/test_pr_merge_hold_gate.py",
+      "blob": "ac3e3a69c13b9f424e5f22be8f2d132f1a7947a1",
+      "status": "added"
+    },
+    {
+      "path": "tests/test_product_surface_delegated_backend_20261110.py",
+      "blob": "0b1bcade065d25d65d5ac382e345aebf9bce9a86",
+      "status": "added"
+    },
+    {
+      "path": "tests/test_repo_machine_live_taxonomy.py",
+      "blob": "dd16a3a8d86bf432ab26b54ffcd5f3c6ca9c4de1",
+      "status": "modified"
+    }
+  ],
+  "notes": "Applied only exact unchanged-since-merge-base paths to current main. Source parent retains every deferred path. No forced ref update, no release or merge authorization."
+}

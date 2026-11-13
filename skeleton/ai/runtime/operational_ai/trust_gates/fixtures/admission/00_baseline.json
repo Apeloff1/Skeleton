@@ -1,0 +1,15 @@
+{
+  "case": "00_baseline",
+  "gate": "admission",
+  "expect": "accept",
+  "reason": "Canonical, explicitly bounded record",
+  "payload": {
+    "tenant": "local",
+    "deadline_ns": 2000000,
+    "now_ns": 1000000,
+    "queue_depth": 4,
+    "queue_ceiling": 16,
+    "requested_tokens": 128,
+    "token_ceiling": 2048
+  }
+}

@@ -6,7 +6,6 @@ invalid stage mutations cannot silently overwrite another creator's work.
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import sys
 from collections.abc import Sequence
@@ -63,9 +62,7 @@ def _edit(source: dict[str, Any], raw: Any) -> dict[str, Any]:
 
 
 def _seal(doc: dict[str, Any]) -> dict[str, Any]:
-    # The previous revision may carry a digest; never hash that stale seal.
-    doc["digest"] = dig({key: value for key, value in doc.items()
-                         if key != "digest"})
+    doc["digest"] = dig(doc)
     _bounded(doc)
     return doc
 
@@ -73,7 +70,7 @@ def _seal(doc: dict[str, Any]) -> dict[str, Any]:
 def new_author(source: Any) -> dict[str, Any]:
     spec = normalize_campaign(source)
     return _seal({
-        "schema_version": SCHEMA, "initial_source": copy.deepcopy(spec),
+        "schema_version": SCHEMA, "initial_source": spec,
         "source": spec, "source_digest": dig(spec),
         "revision": 0, "edits": [],
     })
@@ -120,7 +117,7 @@ def apply_author(payload: Any, edit: Any, *, expected_digest: str,
     return verify_author(_seal({
         **doc, "source": source, "source_digest": dig(source),
         "revision": doc["revision"] + 1,
-        "edits": [*doc["edits"], copy.deepcopy(edit)],
+        "edits": [*doc["edits"], edit],
     }))
 
 

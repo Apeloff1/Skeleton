@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "water_coastal_sailing route request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "origin",
+    "destination",
+    "danger_budget",
+    "energy_budget",
+    "distance_weight",
+    "danger_weight",
+    "energy_weight",
+    "blocked"
+  ],
+  "properties": {
+    "origin": {
+      "type": "string",
+      "enum": [
+        "start",
+        "crossroads",
+        "safehouse",
+        "lookout",
+        "goal"
+      ]
+    },
+    "destination": {
+      "type": "string",
+      "enum": [
+        "start",
+        "crossroads",
+        "safehouse",
+        "lookout",
+        "goal"
+      ]
+    },
+    "danger_budget": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "energy_budget": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "distance_weight": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "danger_weight": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "energy_weight": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "blocked": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "start",
+          "crossroads",
+          "safehouse",
+          "lookout",
+          "goal"
+        ]
+      }
+    }
+  },
+  "description": "Deterministic water route request with explicit constrained resource budgets. Node authorization remains the host's responsibility."
+}

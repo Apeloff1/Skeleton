@@ -1,0 +1,27 @@
+{
+  "schema": "skeleton.game.harbor.beacon-tides.v1",
+  "source_id": "lantern-quay",
+  "beacon_board_digest": "d4287b3671a53a5bbb2a4a681b1213dc0aafa708ce005dd2b3bb23490a20cc1b",
+  "period": 4,
+  "high_ticks": [
+    0,
+    1
+  ],
+  "hazard_tiles": [
+    [
+      3,
+      3
+    ],
+    [
+      4,
+      3
+    ]
+  ],
+  "stamina": 3,
+  "drain": 1,
+  "rest_gain": 2,
+  "rest_at": [
+    1,
+    3
+  ]
+}

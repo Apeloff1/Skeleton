@@ -8,7 +8,13 @@ from typing import Any, Callable, Mapping
 from ._helpers import ContractError, digest, require, require_str
 
 SDK_API = (1, 0)
-KINDS = {"exporter": ("export",), "tool": ("run",), "model": ("infer",)}
+KINDS = {
+    "exporter": ("export",),
+    "tool": ("run",),
+    "model": ("infer",),
+    # Mod content hooks (skeleton.ai.game_builder.mods): plan in, plan out.
+    "content_hook": ("apply",),
+}
 
 
 @dataclass(frozen=True)

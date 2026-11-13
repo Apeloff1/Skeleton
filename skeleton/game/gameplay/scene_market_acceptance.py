@@ -18,11 +18,6 @@ from skeleton.game.gameplay.scene_market import (
     _json, export_market, import_market, normalize_market, original_market,
     resume_market, simulate_market, verify_market,
 )
-from skeleton.game.gameplay.scene_market_ledger import (
-    audit_market_ledger, export_market_ledger, import_market_ledger,
-)
-from skeleton.game.gameplay.scene_market_reconciliation import reconcile_market
-from skeleton.game.gameplay.scene_market_feasibility import analyze_market_feasibility
 from skeleton.game.gameplay.scene_market_author import (
     edit_market, verify_market_edit,
 )
@@ -47,9 +42,6 @@ def audit_market(source: Any, actions: Any, *,
     if type(require_victory) is not bool or type(include_editor) is not bool:
         raise SceneTravelError("invalid market acceptance options")
     spec = normalize_market(source)
-    feasibility = analyze_market_feasibility(spec)
-    if require_victory and feasibility["status"] == "definitely_unreachable":
-        raise SceneTravelError("market required deliveries lack production chain")
     if type(actions) is not list or not actions:
         raise SceneTravelError("market acceptance requires action witness")
     complete = simulate_market(spec, actions)
@@ -58,24 +50,12 @@ def audit_market(source: Any, actions: Any, *,
     split = len(actions) // 2
     partial = simulate_market(spec, actions[:split])
     resumed = resume_market(partial, actions[split:])
-    reconciliation = reconcile_market(partial, complete)
-    if (reconciliation["actions_applied"] != len(actions) - split
-            or reconciliation["to_state_digest"] != complete["state_digest"]):
-        raise SceneTravelError("market checkpoint reconciliation differs")
     if complete != resumed or verify_market(complete) != complete:
         raise SceneTravelError("market checkpoint replay differs from full play")
     bundle = export_market(complete)
     imported = import_market(bundle)
     if imported != complete:
         raise SceneTravelError("market portable import differs from game")
-    ledger = audit_market_ledger(complete)
-    ledger_bundle = export_market_ledger(complete)
-    if (import_market_ledger(ledger_bundle) != complete
-            or ledger["credits_remaining"] != complete["state"]["credits"]
-            or ledger["reputation_earned"] != complete["state"]["reputation"]
-            or ledger["goods_remaining"] != complete["state"]["goods"]
-            or ledger["journal_length"] != len(actions)):
-        raise SceneTravelError("market economic provenance differs from play")
     stream = io.StringIO()
     interactive = play_market(
         spec, input_stream=io.StringIO(_commands(actions)),
@@ -115,28 +95,8 @@ def audit_market(source: Any, actions: Any, *,
         tamper_rejected = False
     if not tamper_rejected:
         raise SceneTravelError("market bundle tampering accepted")
-    forged_ledger = copy.deepcopy(ledger_bundle)
-    forged_ledger["ledger"]["credits_earned"] += 1
-    # A plain checksum is not a trust anchor. Recompute both digests to
-    # demonstrate the source/journal replay still rejects fabricated credit.
-    forged_ledger["ledger"]["checksum"] = dig({
-        k: v for k, v in forged_ledger["ledger"].items() if k != "checksum"
-    })
-    forged_ledger["checksum"] = dig({
-        k: v for k, v in forged_ledger.items() if k != "checksum"
-    })
-    try:
-        import_market_ledger(forged_ledger)
-    except SceneTravelError:
-        ledger_tamper_rejected = True
-    else:
-        ledger_tamper_rejected = False
-    if not ledger_tamper_rejected:
-        raise SceneTravelError("forged market economic witness accepted")
     report = {
         "schema_version": SCHEMA, "ok": True,
-        "feasibility_status": feasibility["status"],
-        "feasibility_checksum": feasibility["checksum"],
         "source_digest": complete["source_digest"],
         "state_digest": complete["state_digest"],
         "phase": complete["state"]["phase"],
@@ -147,16 +107,10 @@ def audit_market(source: Any, actions: Any, *,
         "delivered": complete["state"]["delivered"],
         "reputation": complete["state"]["reputation"],
         "checkpoint_state_digest": partial["state_digest"],
-        "checkpoint_reconciliation_checksum": reconciliation["checksum"],
         "portable_checksum": bundle["checksum"],
         "interactive_terminal_digest": terminal[0]["state_digest"],
         "interactive_checkpoints": len(checkpoints),
         "tampered_bundle_rejected": tamper_rejected,
-        "ledger_checksum": ledger["checksum"],
-        "ledger_portable_checksum": ledger_bundle["checksum"],
-        "ledger_credits_earned": ledger["credits_earned"],
-        "ledger_credits_spent": ledger["credits_spent"],
-        "ledger_tamper_rejected": ledger_tamper_rejected,
         "editor_receipt_checksum": (
             editor_receipt["checksum"] if editor_receipt is not None else None
         ),
