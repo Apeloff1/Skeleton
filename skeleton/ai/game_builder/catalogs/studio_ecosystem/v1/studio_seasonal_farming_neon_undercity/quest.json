@@ -1,0 +1,87 @@
+{
+  "schema": "skeleton.game_builder.studio_ecosystem.quest.v1",
+  "project_id": "studio_seasonal_farming_neon_undercity",
+  "genre": "seasonal_farming",
+  "biome": "neon_undercity",
+  "release_certified": false,
+  "objective": "sustain an original village across uncertain seasons",
+  "quest_id": "studio_seasonal_farming_neon_undercity:three-acts",
+  "mechanics_targets": [
+    "soil health, rotation, weather and food preservation",
+    "seasonal crop yield"
+  ],
+  "stage_graph": [
+    {
+      "id": "investigate",
+      "prerequisites": [],
+      "site": "elevated night markets",
+      "verb": "survey",
+      "alternatives": [
+        "Document grid brownouts without entering restricted ground",
+        "Find an independent route through elevated night markets"
+      ],
+      "evidence": [
+        "hazard_measurement",
+        "eyewitness_note"
+      ],
+      "failure_rule": "insufficient_safe_access",
+      "reward": "reliable_survey"
+    },
+    {
+      "id": "intervene",
+      "prerequisites": [
+        "investigate"
+      ],
+      "site": "hidden radio library",
+      "verb": "cultivate",
+      "alternatives": [
+        "Prototype soil health, rotation, weather and food preservation around power duty cycles",
+        "Use community capacitors under open public supervision"
+      ],
+      "evidence": [
+        "resource_receipt",
+        "engineering_audit"
+      ],
+      "failure_rule": "overspend_or_unconsented_action",
+      "reward": "verified_repair_attempt"
+    },
+    {
+      "id": "ratify",
+      "prerequisites": [
+        "intervene"
+      ],
+      "site": "shared workshop near hidden radio library",
+      "verb": "publish",
+      "alternatives": [
+        "residents_vote",
+        "open_technical_governance"
+      ],
+      "evidence": [
+        "history_log",
+        "verified_outcome"
+      ],
+      "failure_rule": "missing_audit_receipt",
+      "reward": "branch_world_state"
+    }
+  ],
+  "branching": {
+    "commons": [
+      "verified_history",
+      "public_ledger"
+    ],
+    "cooperative": [
+      "verified_repair",
+      "local_consensus"
+    ],
+    "scarcity": [
+      "survival_proven"
+    ]
+  },
+  "resource_economy": {
+    "currency": "soil nutrients and stored seed",
+    "secondary": "community capacitors",
+    "no_mint_without_supply": true,
+    "max_concurrent_quests": "runtime_resource_based"
+  },
+  "implementation_status": "authored_director_data_only"
+}

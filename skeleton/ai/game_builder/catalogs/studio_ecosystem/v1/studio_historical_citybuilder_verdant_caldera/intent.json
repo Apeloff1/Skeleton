@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_verdant_caldera",
+  "title": "Verdant Caldera: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Verdant Caldera; only the grid preview compiles today.",
+  "seed": 203010317304,
+  "width": 27,
+  "height": 19,
+  "levels": 6,
+  "collectibles_per_level": 4,
+  "hazards_per_level": 11,
+  "theme": "forest",
+  "starting_health": 6
+}

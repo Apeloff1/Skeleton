@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_historical_citybuilder_copper_mesa",
+  "title": "Copper Mesa: Founders of the Estuary",
+  "subtitle": "Original founders of the estuary design in Copper Mesa; only the grid preview compiles today.",
+  "seed": 203010316971,
+  "width": 19,
+  "height": 19,
+  "levels": 5,
+  "collectibles_per_level": 5,
+  "hazards_per_level": 5,
+  "theme": "desert",
+  "starting_health": 5
+}

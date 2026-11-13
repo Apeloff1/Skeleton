@@ -1,0 +1,16 @@
+{
+  "case": "10_cross_field_b",
+  "gate": "replay",
+  "expect": "reject",
+  "reason": "Request digest must match stored receipt",
+  "payload": {
+    "request_id": "r_001",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expected_model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "request_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "stored_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "revision": 1,
+    "replayed": true,
+    "has_generation": false
+  }
+}

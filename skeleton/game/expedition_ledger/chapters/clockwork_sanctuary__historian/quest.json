@@ -1,0 +1,39 @@
+{
+  "schema": "skeleton.game.expedition_ledger.v1",
+  "id": "clockwork_sanctuary__historian",
+  "chapter": 13,
+  "title": "Clockwork Sanctuary: The Historian's Meridian Key",
+  "theme": "clockwork_sanctuary",
+  "discipline": "historian",
+  "region": "Clockwork Sanctuary",
+  "premise": "In an overgrown observatory driven by silent brass escapements, the historian must recover lost testimony without rewriting it using a chronicle decoding slate.",
+  "signal": "hour-wheel",
+  "key_name": "hour-wheel attunement",
+  "objective_name": "Meridian Key",
+  "ending": "Recover the Meridian Key and return with the unaltered historical account; Custodians of Dawn can finally verify the source testimony.",
+  "faction": "Custodians of Dawn",
+  "challenge": "Survive charged gearfall while evading the watchmaker automaton without sacrificing the unaltered historical account.",
+  "choice_yes": "Disclose evidence and ask Custodians of Dawn to witness the chronicle decoding slate.",
+  "choice_no": "Keep the evidence sealed until the expedition's replay record is complete.",
+  "dilemma": "whether to reveal a compromising record",
+  "tool": "chronicle decoding slate",
+  "reward": "unaltered historical account",
+  "enemy": "watchmaker automaton",
+  "chapter_links": [
+    "clockwork_sanctuary__sentinel",
+    "clockwork_sanctuary__navigator"
+  ],
+  "provenance": "original-game-source",
+  "goal": [
+    "collect_source_key",
+    "recover_objective",
+    "reach_exit"
+  ],
+  "side_goals": [
+    "faction_contact",
+    "dialogue_choice",
+    "lore_discovered"
+  ],
+  "rewind": "deterministic_commands",
+  "safety": "headless_offline_no_plugins"
+}

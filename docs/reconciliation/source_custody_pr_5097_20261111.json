@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "source_pr": 5097,
+  "source_head": "b4f92529391075a12ee35a2c80ee5c47ca6bcbd9",
+  "target_main": "42c9908bee87bacde621b99e6015250cb41d64da",
+  "merge_base": "4823348975f85a6e64b20855f7dbeb46d8f13c24",
+  "three_way_source_custody": true,
+  "adopted": [
+    {
+      "path": "skeleton/ai/runtime/application/audit_parse.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "2fcb2cad618919c1240a9b95e82d130fa5215372"
+    },
+    {
+      "path": "skeleton/app/runtime/audit_parse.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "2fcb2cad618919c1240a9b95e82d130fa5215372"
+    },
+    {
+      "path": "skeleton/ai/agents/jeeves/worlds/export_verification.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "82bb9f0b378fe6dd128c9f3c75b54cff02988e4e"
+    },
+    {
+      "path": "skeleton/jeeves/worlds/export_verification.py",
+      "type": "blob",
+      "mode": "100644",
+      "sha": "82bb9f0b378fe6dd128c9f3c75b54cff02988e4e"
+    }
+  ],
+  "already_in_main_count": 3,
+  "deferred": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "reason": "concurrent-edits",
+      "base": "64f86efdd8b275d3b2857dc88fbb7c242b616bfa",
+      "source": "fbf68b71660064a3965b95e73e17e598fd03e818",
+      "main": "56dfe55237e0bb27b8c628ac5bd14b135854bc4a"
+    },
+    {
+      "path": "frontend/Dockerfile",
+      "reason": "concurrent-edits",
+      "base": "7041884966ddf1b56be6fb2dc5eb9f0f24756b7d",
+      "source": "7fdf5a9cf434dc4811c8f82b8481da5e949416a5",
+      "main": "9d70ba3b03a33a87d2e981f99cac36f2ab98e68f"
+    },
+    {
+      "path": "machine/ai_file_tree.json",
+      "reason": "concurrent-edits",
+      "base": "c7aaead30b5d91d4db726129b8ba258570fd0173",
+      "source": "713cd81b11dbc0716192535b7a59be7549650c30",
+      "main": "1fc4f79bf6ab796da1cf96d709eb22d0c89ac54c"
+    },
+    {
+      "path": "scripts/check_toolchain_contract.py",
+      "reason": "concurrent-edits",
+      "base": "971368a6e00ff0e25693daf33eeb49a2740d6b03",
+      "source": "2ec66a9beea1a9e2364df1c9fec879e2ceec040d",
+      "main": "8c2b0ee12b7a39357534a5cf8bd50ad18de89421"
+    },
+    {
+      "path": "skeleton/testing/test_ai_real_model_qualification.py",
+      "reason": "concurrent-edits",
+      "base": "f158216bb6a3abae8fd87d0709ee2de649f33d16",
+      "source": "a2c8b72cc359236830ca377333d79fb434f1aead",
+      "main": "1076da45e640cab9c6dcfc8e5657803e853d8abc"
+    },
+    {
+      "path": "skeleton/testing/test_app_offline_mixed_game_library_relocation.py",
+      "reason": "concurrent-edits",
+      "base": "be2446d95ea54c66577a5f0adbe38f51b651406f",
+      "source": "a58cbb0ab3be3fcbfd4f868a7083719c7c5f81d2",
+      "main": "439373413b9ebdcc600bb581e139025df9e1513a"
+    },
+    {
+      "path": "skeleton/testing/test_architecture_map.py",
+      "reason": "concurrent-edits",
+      "base": "f4c00a39ad58b0004ace0e32b2556817f854bb41",
+      "source": "93fe29a268476a8f53b3837bc6baff0519dc2c86",
+      "main": "03cffff56c0c42992c2495ef85ccf6990182bb74"
+    },
+    {
+      "path": "frontend/scripts/guarded-expo-export.cjs",
+      "reason": "concurrent-edits",
+      "base": null,
+      "source": "46fe3f8c909afd21fa3a5da4ffd5d90449f8f402",
+      "main": "0864d8430ce5ee4694cc721a639a84f948edd10f"
+    },
+    {
+      "path": "frontend/scripts/test-guarded-expo-export.cjs",
+      "reason": "concurrent-edits",
+      "base": null,
+      "source": "2ff2c94b48e5cce1c956f3f6460d7102621bb789",
+      "main": "853da47a88cba2f754c7115529335bdbff90d22a"
+    },
+    {
+      "path": "skeleton/ai/simulation/replay_checkpoint.py",
+      "reason": "concurrent-edits",
+      "base": null,
+      "source": "560159623f259cb7d56e70f563e03166823d5127",
+      "main": "07cb4c598872a5e75c355e4b590e8f1bab8de0df"
+    }
+  ],
+  "unknown_tree_paths": 3,
+  "approval": false,
+  "holds": [
+    "do-not-merge",
+    "CI",
+    "security",
+    "device",
+    "release"
+  ]
+}

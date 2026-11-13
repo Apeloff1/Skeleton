@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_puzzle_expedition_amber_highlands",
+  "title": "Amber Highlands: Puzzle Expedition",
+  "subtitle": "An original puzzle expedition brief in Amber Highlands; prototype maps are not full genre implementations.",
+  "seed": 202610300239,
+  "width": 23,
+  "height": 15,
+  "levels": 5,
+  "collectibles_per_level": 2,
+  "hazards_per_level": 3,
+  "theme": "forest",
+  "starting_health": 5
+}

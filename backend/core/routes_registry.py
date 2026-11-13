@@ -31,7 +31,7 @@ import sys
 import time
 from typing import List, Tuple, Union
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 #  A route entry is either ``(module_path, attribute_name)`` or
 #  ``(module_path, attribute_name, url_prefix)``.
@@ -116,11 +116,19 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
             if router is None:
                 skipped_names.append(f"{module_path} (attr {attr!r} missing)")
                 continue
+            admission = {}
+            router_prefix = str(getattr(router, "prefix", "")).rstrip("/")
+            if router_prefix == "/api/galaxy-studio" or router_prefix.startswith("/api/galaxy-studio/"):
+                # Galaxy's extracted sibling routers share the same private
+                # build/artifact owner even when mounted independently.
+                from routes.galaxy_studio_access import galaxy_request_access
+
+                admission["dependencies"] = [Depends(galaxy_request_access)]
             prior_routes = len(app.routes)
             if prefix:
-                app.include_router(router, prefix=prefix)
+                app.include_router(router, prefix=prefix, **admission)
             else:
-                app.include_router(router)
+                app.include_router(router, **admission)
             newly_mounted = app.routes[prior_routes:]
             # A caller or integration shim might append an unrelated direct
             # route while discarding the requested router. A changed route
@@ -198,6 +206,7 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
 # ───────────────────────────────────────────────────────────────────────
 KNOWN_ROUTES: List[RouteEntry] = [
     # ── Phase-1 (Feb 2026): v19.0+ subsystem routers ────────────────────
+    ("routes.core_v1_webhooks", "router"),
     ("routes.resilience_forge", "router"),
     ("routes.sentinel_array", "router"),
     ("routes.game_mechanics_nexus", "router"),
@@ -394,6 +403,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     # ── Game factory / studio / armor ──────────────────────────────────
     ("routes.game_factory", "router"),
     ("routes.studio_api", "router"),
+    ("routes.ecosystem_api", "router"),
     ("routes.overheat_system", "router"),
     ("routes.performance_armor", "router"),
     # ── Godot engine (in-repo binary, headless scaffolding + export) ────
@@ -554,6 +564,11 @@ def register_known_routes(app: FastAPI) -> dict:
     self-prefixed routers add their own /api/* paths)."""
     r1 = register_routes(app, KNOWN_ROUTES_WITH_PREFIX)
     r2 = register_routes(app, KNOWN_ROUTES)
+    # Core v1 routes emit typed CoreError responses; their handler must be
+    # installed only after the exact router was successfully mounted.
+    if "routes.core_v1_webhooks" in r2["mounted_names"]:
+        from routes.core_v1_webhooks import install_error_handler
+        install_error_handler(app)
     combined = {
         "ok": r1["ok"] + r2["ok"],
         "skipped": r1["skipped"] + r2["skipped"],

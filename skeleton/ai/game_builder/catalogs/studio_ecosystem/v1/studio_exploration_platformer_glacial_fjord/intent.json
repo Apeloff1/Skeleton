@@ -1,0 +1,13 @@
+{
+  "project_id": "studio_exploration_platformer_glacial_fjord",
+  "title": "Glacial Fjord: Exploration Platformer",
+  "subtitle": "An original exploration platformer brief in Glacial Fjord; prototype maps are not full genre implementations.",
+  "seed": 202610301042,
+  "width": 21,
+  "height": 15,
+  "levels": 4,
+  "collectibles_per_level": 3,
+  "hazards_per_level": 8,
+  "theme": "ocean",
+  "starting_health": 4
+}

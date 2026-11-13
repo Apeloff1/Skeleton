@@ -62,7 +62,7 @@ def test_decoded_wav_receipt_is_bound_to_actual_source_not_claimed_authority():
     assert asset.validation.digest
     assert asset.instruction_trusted is False
     assert intake._assets["homebrew-pcm"] is asset
-    assert intake.verify_verified_asset(asset,data) is None
+    assert intake.verify_verified_asset(asset,data) is asset
     with pytest.raises(MultimodalSanitizationError):
         intake.verify_verified_asset(asset,data[:-2]+b"\xff\xff")
 

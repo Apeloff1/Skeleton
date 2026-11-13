@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 from skeleton.kernel.errors import RetrievalError
-from skeleton.retrieval.chunking import Chunk, Chunker
+from .chunking import Chunk, Chunker
 
 
 @dataclass(frozen=True)

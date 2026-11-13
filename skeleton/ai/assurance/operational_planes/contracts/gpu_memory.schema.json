@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skeleton.local/ai/assurance/operational_planes/contracts/gpu_memory.schema.json",
+  "title": "hardware.gpu_memory observation contract",
+  "description": "Guard GPU allocation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observed_at",
+    "measurements"
+  ],
+  "properties": {
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event Unix epoch seconds; consumers supply independent current time"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gpu_vram_used_pct",
+        "gpu_eviction_latency_ms"
+      ],
+      "properties": {
+        "gpu_vram_used_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 94,
+          "description": "Upper bound for gpu_vram_used_pct"
+        },
+        "gpu_eviction_latency_ms": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 250,
+          "description": "Upper bound for gpu_eviction_latency_ms"
+        }
+      }
+    }
+  }
+}

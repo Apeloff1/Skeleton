@@ -76,12 +76,51 @@ def _parser(command: str) -> argparse.ArgumentParser:
     return parser
 
 
+def _load_organism_view_module(module: str):
+    """Resolve only explicitly registered module names, never an arbitrary import."""
+    if module == "skeleton.galaxy.lattice":
+        return import_module("skeleton.galaxy.lattice")
+    if module == "skeleton.galaxy.quarantine":
+        return import_module("skeleton.galaxy.quarantine")
+    if module == "skeleton.kernel.coverage":
+        return import_module("skeleton.kernel.coverage")
+    if module == "skeleton.kernel.hot":
+        return import_module("skeleton.kernel.hot")
+    if module == "skeleton.kernel.persist":
+        return import_module("skeleton.kernel.persist")
+    if module == "skeleton.kernel.scoreboard":
+        return import_module("skeleton.kernel.scoreboard")
+    if module == "skeleton.kernel.witness":
+        return import_module("skeleton.kernel.witness")
+    if module == "skeleton.organism.calendar":
+        return import_module("skeleton.organism.calendar")
+    if module == "skeleton.organism.caps":
+        return import_module("skeleton.organism.caps")
+    if module == "skeleton.organism.context_step":
+        return import_module("skeleton.organism.context_step")
+    if module == "skeleton.organism.observe":
+        return import_module("skeleton.organism.observe")
+    if module == "skeleton.organism.path10":
+        return import_module("skeleton.organism.path10")
+    if module == "skeleton.organism.rotctx":
+        return import_module("skeleton.organism.rotctx")
+    if module == "skeleton.organism.runloop":
+        return import_module("skeleton.organism.runloop")
+    if module == "skeleton.organism.satellites":
+        return import_module("skeleton.organism.satellites")
+    if module == "skeleton.organism.stacks":
+        return import_module("skeleton.organism.stacks")
+    if module == "skeleton.social.coverage":
+        return import_module("skeleton.social.coverage")
+    raise ImportError("module outside signed catalog")
+
+
 def _execute(command: str, org: Any, args: Any) -> Any:
     root = getattr(org, "root", None)
     cue = " ".join(args.cue) if command in _CUE else ""
     if command in _VIEWS:
         module, func, mode = _VIEWS[command]
-        method = getattr(import_module(module), func)
+        method = getattr(_load_organism_view_module(module), func)
         return (method() if mode == "plain" else
                 method(root) if mode == "root" else
                 method(root=root) if mode == "root_kw" else

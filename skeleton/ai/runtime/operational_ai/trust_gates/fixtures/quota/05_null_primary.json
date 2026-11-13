@@ -1,0 +1,15 @@
+{
+  "case": "05_null_primary",
+  "gate": "quota",
+  "expect": "reject",
+  "reason": "No null identity or resource",
+  "payload": {
+    "tenant": null,
+    "prompt_used": 100,
+    "output_used": 100,
+    "new_prompt": 20,
+    "new_output": 30,
+    "tenant_ceiling": 1000,
+    "global_remaining": 200
+  }
+}

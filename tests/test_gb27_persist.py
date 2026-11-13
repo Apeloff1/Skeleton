@@ -6,8 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from skeleton.persist import Persist, PersistEngine, capabilities
-from skeleton.persist.verify import run_all
+from skeleton.persistence.core import Persist, PersistEngine, capabilities
+from skeleton.persistence.core.verify import run_all
 
 
 class TestLocalGate(unittest.TestCase):

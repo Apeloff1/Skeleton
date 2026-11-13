@@ -7,13 +7,14 @@ Every agent is instructed to deliver ONLY AAA/Superior-tier output
 with excruciating detail, high intricacy, and SOTA mechanics.
 """
 
+from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 import uuid
 
-router = APIRouter(prefix="/api/jeeves-build", tags=["jeeves-build"])
+router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/jeeves-build", tags=["jeeves-build"])
 
 # ═══════════════════════════════════════════════════════════════════════
 # AAA QUALITY ENFORCEMENT DOCTRINE

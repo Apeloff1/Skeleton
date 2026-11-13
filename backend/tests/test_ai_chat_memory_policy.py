@@ -465,3 +465,38 @@ async def test_chat_memory_policy_fails_closed_without_canonical_engine(
     assert rejected.value.detail["code"] == "engine_unavailable"
     assert transcript_calls == 1
     assert calls == {"legacy": 0, "commit": 0}
+
+
+# Consumer runtime regression scenarios retain shared durable authority
+# alongside upstream receipt-aware fixtures. Their helpers remain independent.
+from backend.tests.chat_runtime_fixtures import chat_runtime as chat_runtime
+
+@pytest.mark.asyncio
+async def test_chat_memory_policy_reaches_delegated_engine_command_consumer_runtime(chat_runtime):
+    h = chat_runtime
+    h.engine.memory_refs = ('memory:canonical-1',)
+    response = await h.route.ai_chat(h.request(memory_policy={'persist_verified_response': True, 'kind': 'semantic', 'namespace': 'assistant'}), user=h.user)
+    assert response['success']
+    command = h.engine.commands[0]
+    intent = command.execution_request.context_policy['memory_write_intent']
+    assert intent['subject_id'] == 'owner-a'
+    assert intent['namespace'] == 'assistant' and intent['kind'] == 'semantic'
+    assert intent['content_from'] == 'verified_final_output'
+    assert 'engine:memory' in command.delegated_authority.scopes
+    assert response['engine_memory_refs'] == ['memory:canonical-1']
+    assert h.transcript()[-1].memory_refs == ('memory:canonical-1',)
+
+
+@pytest.mark.asyncio
+async def test_chat_memory_policy_fails_closed_without_canonical_engine_consumer_runtime(chat_runtime, monkeypatch):
+    h = chat_runtime
+
+    async def forbidden_legacy(*args, **kwargs):
+        raise AssertionError('memory opt-in must not activate a legacy provider')
+    monkeypatch.setattr(h.route, 'call_llm', forbidden_legacy)
+    monkeypatch.setattr(h.route.EngineClient, 'from_env', lambda: None)
+    with pytest.raises(HTTPException) as error:
+        await h.route.ai_chat(h.request(memory_policy={'persist_verified_response': True, 'kind': 'semantic'}), user=h.user)
+    assert error.value.status_code == 503
+    assert error.value.detail['code'] == 'engine_unavailable'
+    assert h.transcript() == ()

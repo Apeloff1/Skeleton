@@ -1,0 +1,17 @@
+{
+  "case": "07_wrong_last_type",
+  "gate": "quota",
+  "expect": "reject",
+  "reason": "No arbitrary object as a typed value",
+  "payload": {
+    "tenant": "local",
+    "prompt_used": 100,
+    "output_used": 100,
+    "new_prompt": 20,
+    "new_output": 30,
+    "tenant_ceiling": 1000,
+    "global_remaining": {
+      "untrusted": true
+    }
+  }
+}

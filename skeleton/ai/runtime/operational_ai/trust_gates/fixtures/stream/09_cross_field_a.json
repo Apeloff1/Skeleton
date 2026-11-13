@@ -1,0 +1,23 @@
+{
+  "case": "09_cross_field_a",
+  "gate": "stream",
+  "expect": "reject",
+  "reason": "Chunks are ordered without gaps",
+  "payload": {
+    "request_id": "r_001",
+    "chunks": [
+      {
+        "index": 0,
+        "text": "Hi"
+      },
+      {
+        "index": 3,
+        "text": "."
+      }
+    ],
+    "max_bytes": 1024,
+    "terminal": "stop",
+    "generated_tokens": 2,
+    "token_ceiling": 128
+  }
+}

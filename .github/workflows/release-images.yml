@@ -1,14 +1,20 @@
 name: Release Images
 
-# Tag-triggered release: verifies the tag matches the canonical version
+# Operator-triggered release: verifies the tag matches the canonical version
 # ([project].version in the root pyproject.toml), generates the
 # changelog section, then builds and pushes backend + frontend images to GHCR.
 # Auth is the built-in GITHUB_TOKEN only (packages: write); nothing else is required.
-# workflow_dispatch builds both images without pushing (dry run).
+# workflow_dispatch defaults to non-publishing dry run; explicit publish requires a v* tag.
 on:
-  push:
-    tags: ["v*"]
+  # Publishing requires an explicit operator decision on the exact signed-off tag.
+  # Creating a tag alone never publishes an image.
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish images only from a qualified v* tag (otherwise dry run)"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -24,12 +30,14 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      actions: read
+      checks: read
       packages: write
     env:
       REGISTRY: ghcr.io
       BACKEND_IMAGE: ghcr.io/apeloff1/skeleton-backend
       FRONTEND_IMAGE: ghcr.io/apeloff1/skeleton-frontend
-      PUSH: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+      PUSH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && startsWith(github.ref, 'refs/tags/v') }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,9 +46,16 @@ jobs:
           persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
+
+      - name: Deny publication intent outside a qualified version tag
+        if: inputs.publish == true && !startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          echo "Explicit image publication requires selecting a v* Git tag" >&2
+          exit 2
 
       - name: Resolve version and verify no drift
         id: version
@@ -59,6 +74,17 @@ jobs:
         run: |
           python scripts/generate_changelog.py --version "${{ steps.version.outputs.version }}" --to HEAD > "$RUNNER_TEMP/CHANGELOG_SECTION.md"
           cat "$RUNNER_TEMP/CHANGELOG_SECTION.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Refuse publication without current protected main and exact-head green CI
+        if: env.PUSH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_release_governance_verdict.py' -q
+          python scripts/release_governance_verdict.py \
+            --repo "$GITHUB_REPOSITORY" --sha "$(git rev-parse HEAD)" --branch main
 
       - name: Log in to GHCR
         if: env.PUSH == 'true'

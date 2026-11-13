@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.operational_plane.scenarios.v1",
+  "plane": "release.ci_failure",
+  "synthetic": true,
+  "examples": [
+    {
+      "name": "nominal",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "required_failed_checks": 0,
+        "required_pending_checks": 0
+      },
+      "expected": "nominal"
+    },
+    {
+      "name": "primary_breach",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "required_failed_checks": 1,
+        "required_pending_checks": 0
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "secondary_breach",
+      "observed_at": 1000,
+      "now": 1000,
+      "measurements": {
+        "required_failed_checks": 0,
+        "required_pending_checks": 1
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "stale",
+      "observed_at": 1000,
+      "now": 1061,
+      "measurements": {
+        "required_failed_checks": 0,
+        "required_pending_checks": 0
+      },
+      "expected": "blocked"
+    },
+    {
+      "name": "future",
+      "observed_at": 1001,
+      "now": 1000,
+      "measurements": {
+        "required_failed_checks": 0,
+        "required_pending_checks": 0
+      },
+      "expected": "blocked"
+    }
+  ]
+}

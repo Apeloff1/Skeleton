@@ -24,7 +24,9 @@ from skeleton.app.assembly import (
 from skeleton.app.preloader import inspect_host
 
 
-def _bounded_json(url: str, *, timeout: float) -> dict[str, object] | None:
+def _bounded_json(
+    url: str, *, timeout: float, max_response_bytes: int = 65536,
+) -> dict[str, object] | None:
     from skeleton.app.studio_readiness import _bounded_server
 
     parts = urlsplit(url)
@@ -37,7 +39,7 @@ def _bounded_json(url: str, *, timeout: float) -> dict[str, object] | None:
         timeout,
         endpoint=parts.path or "/",
         schema=None,
-        max_response_bytes=65536,
+        max_response_bytes=max_response_bytes,
     )
     value = result.get("report") if result.get("observed") is True else None
     return value if isinstance(value, dict) else None
@@ -55,7 +57,13 @@ def critical_backend_route_report(backend_base: str, *, timeout: float = 3.0) ->
         "missing": [],
         "scope": "Critical first-party route registration must be observed from the live backend.",
     }
-    status = _bounded_json(backend_base.rstrip("/") + "/api/health/registry", timeout=timeout)
+    # The registry includes the mounted route inventory, which exceeds 64 KiB
+    # on a complete installation. Keep the larger allowance local to this
+    # endpoint; ordinary readiness projections retain their smaller bound.
+    status = _bounded_json(
+        backend_base.rstrip("/") + "/api/health/registry",
+        timeout=timeout, max_response_bytes=512 * 1024,
+    )
     critical = status.get("critical_routes") if isinstance(status, dict) else None
     if (
         isinstance(critical, dict)
@@ -84,6 +92,8 @@ def first_install_report(
 ) -> dict[str, object]:
     """Return bounded, redacted host/configuration and optional live findings."""
 
+    if type(live) is not bool:
+        raise TypeError("live inspection must be an explicit boolean")
     if type(studio) is not bool:
         raise TypeError("studio inspection must be an explicit boolean")
     if (
@@ -98,13 +108,24 @@ def first_install_report(
     root = (root or find_repo_root()).resolve()
     host = inspect_host(root)
     checks = preflight(root, runtime=True, environ=environ)
-    values = _runtime_env(root, environ)
-    manifest = load_manifest()
     try:
-        manifest = runtime_manifest(manifest, root=root, environ=values)
-    except ValueError:
-        # The original port failure is already an explicit preflight finding.
+        values = _runtime_env(root, environ)
+    except (OSError, ValueError, UnicodeError):
+        # An unsafe credential source is not readable configuration evidence.
+        # Preserve the original in place for manual recovery, and do not make
+        # network requests that might otherwise be attributed to stale values.
+        values = {}
+        source_ok = False
         live = False
+    else:
+        source_ok = True
+    manifest = load_manifest()
+    if source_ok:
+        try:
+            manifest = runtime_manifest(manifest, root=root, environ=values)
+        except ValueError:
+            # The port failure is already reported by runtime preflight.
+            live = False
     provider = values.get("AI_PROVIDER", "local").strip().lower() or "local"
     provider = provider if provider in {"local", "openai"} else "unsupported"
     local_paths = [values.get(key, "").strip() for key in (
@@ -159,14 +180,30 @@ def first_install_report(
             status is not None
             and status.get("engine") == "skeleton-engine"
             and isinstance(status.get("providers"), list)
+            and len(status["providers"]) <= 32
+            and all(type(name) is str and 0 < len(name) <= 64
+                    for name in status["providers"])
+            # The active provider must actually exist in the canonical
+            # advertised inventory; an inconsistent response cannot attest
+            # configured local or hosted model availability.
+            and provider in status["providers"]
             and type(status.get("llm_available")) is bool
             and status.get("availability_observed") is True
+            # A healthy *different* provider must never certify the selected
+            # provider. The active provider is an exact canonical identity.
+            and status.get("active") == provider
+            and configured
         ):
             ai.update(
                 available=status["llm_available"],
                 observed=True,
                 scope="Canonical AI readiness projection; no inference or model quality claim.",
             )
+            code = status.get("active_readiness_code")
+            if (provider == "local" and status["llm_available"] is False
+                    and status.get("active") == "local" and isinstance(code, str)
+                    and code in {"local_guard_unavailable", "local_guard_configuration_invalid"}):
+                ai["readiness_code"] = code
         else:
             ai["scope"] = (
                 "Canonical AI readiness could not be observed; configuration does not establish availability."
@@ -179,7 +216,13 @@ def first_install_report(
             for check in host.checks
             if check.required and not check.ok and check.remediation
         )
-    if not checks_ok(checks):
+    if not source_ok:
+        next_steps.append(
+            "The private runtime .env is unsafe or unreadable. Preserve the original; "
+            "repair its file type, size, ownership or links before retrying setup. "
+            "Do not replace stored database credentials automatically."
+        )
+    elif not checks_ok(checks):
         next_steps.append(
             "Run python -m skeleton app setup, then python -m skeleton app check --runtime; preserve the private .env file."
         )
@@ -195,7 +238,15 @@ def first_install_report(
         next_steps.append(
             "Inspect backend /api/health/registry critical_routes and backend boot logs; required application routes are missing or unverified."
         )
-    if not configured or ai["available"] is False:
+    if ai.get("readiness_code") == "local_guard_unavailable":
+        next_steps.append(
+            "The required trusted local AI guard is unavailable. Preparing or replacing model weights alone will not enable local chat; see docs/qa/GUARDED_LOCAL_READINESS_2026-10-28.md."
+        )
+    elif ai.get("readiness_code") == "local_guard_configuration_invalid":
+        next_steps.append(
+            "The required local AI guard configuration is invalid. Review the engine configuration and docs/qa/GUARDED_LOCAL_READINESS_2026-10-28.md; do not disable the guard."
+        )
+    if not configured or (ai["available"] is False and "readiness_code" not in ai):
         next_steps.append(
             "Configure genuine trained local weights or the engine-owned hosted provider in .env; see docs/APP_ASSEMBLY.md. Restart the engine after changes."
         )
@@ -238,7 +289,10 @@ def first_install_report(
             backend_url=manifest.service("backend").public_url,
             live=live,
             timeout=timeout,
-            auth_token_file=auth_token_file,
+            # Unsafe .env or invalid port configuration disables live
+            # inspection; never pass an authenticated token to a downgraded
+            # diagnostics call that cannot bind its target.
+            auth_token_file=auth_token_file if live else None,
         )
         crawler = report["studio"]["server"]["crawler"]
         observed = crawler.get("report", {})

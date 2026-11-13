@@ -5,17 +5,70 @@ redirected into the app. Crawlable at /api/share/... (served by the backend).
 """
 from __future__ import annotations
 
-import os
-import html
-import json
+from routes.playable_access import project_router, scoped_database
 
-from fastapi import APIRouter, Request
+import os
+import re
+import html
+from urllib.parse import quote, urlencode, urlsplit
+
+from fastapi import Request
 from fastapi.responses import HTMLResponse
 
 from core.databases import client as _SHARED_MONGO_CLIENT
 
-router = APIRouter(prefix="/api/share", tags=["share"])
+router = project_router(prefix="/api/share", tags=["share"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
+_db = scoped_database(_db)
+
+
+def _app_origin() -> str:
+    """Use an operator-supplied origin, never the request Host header."""
+    raw = os.environ.get("PUBLIC_APP_URL", "").strip()
+    if not raw:
+        if os.environ.get("ENVIRONMENT", "").strip().lower() in {
+            "production", "prod", "staging",
+        }:
+            raise ValueError("PUBLIC_APP_URL is required outside development")
+        raw = "http://localhost:3000"
+    parsed = urlsplit(raw)
+    # An origin enters an HTTP header via Content-Security-Policy. Forbid
+    # whitespace/semicolons/control characters and malformed authority bytes.
+    # DNS names, IPv4 and bracketed IPv6 are the only accepted host shapes.
+    if not parsed.hostname or not parsed.hostname.isascii() or not re.fullmatch(
+        r"[A-Za-z0-9.:-]{1,253}", parsed.hostname
+    ):
+        raise ValueError("invalid PUBLIC_APP_URL host")
+    if (not parsed.hostname or parsed.username is not None
+            or parsed.password is not None or parsed.fragment or parsed.query
+            or parsed.path not in ("", "/") or "\\" in raw):
+        raise ValueError("PUBLIC_APP_URL must be a plain absolute origin")
+    production = os.environ.get("ENVIRONMENT", "").strip().lower() in {
+        "production", "prod", "staging",
+    }
+    if parsed.scheme != "https" and not (
+        parsed.scheme == "http"
+        and not production
+        and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+    ):
+        raise ValueError("PUBLIC_APP_URL must use HTTPS outside local development")
+    # Reject malformed ports and URL authority suffixes before using the origin.
+    port = parsed.port
+    if not parsed.netloc or (port is not None and not 1 <= port <= 65535):
+        raise ValueError("invalid PUBLIC_APP_URL authority")
+    if raw.rstrip("/") != f"{parsed.scheme}://{parsed.netloc}":
+        raise ValueError("PUBLIC_APP_URL must be one canonical origin")
+    return raw.rstrip("/")
+
+
+def _safe_link_id(value: str) -> str:
+    """Keep untrusted identifiers as one URL component, never URL syntax."""
+    if not isinstance(value, str) or not 1 <= len(value) <= 128:
+        raise ValueError("invalid share identifier")
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+        raise ValueError("invalid share identifier")
+    return quote(value, safe="")
+
 
 
 def _page(title: str, desc: str, image: str, deep_link: str) -> str:
@@ -23,17 +76,11 @@ def _page(title: str, desc: str, image: str, deep_link: str) -> str:
     d = html.escape(desc, quote=True)
     image_attr = html.escape(image, quote=True)
     deep_link_attr = html.escape(deep_link, quote=True)
-    # JSON encoding makes the redirect a JavaScript string literal rather than
-    # executable markup. Escape HTML-significant code points so a crafted URL
-    # cannot terminate the surrounding script element.
-    deep_link_js = (
-        json.dumps(deep_link)
-        .replace("<", "\\u003c")
-        .replace(">", "\\u003e")
-        .replace("&", "\\u0026")
-    )
+    # The redirect URL is attribute-escaped, not executed as JavaScript.
+    # No script is required; share responses enforce script-src 'none'.
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="1;url={deep_link_attr}">
 <title>{t}</title>
 <meta name="description" content="{d}">
 <meta property="og:type" content="website">
@@ -49,39 +96,62 @@ display:flex;min-height:100vh;align-items:center;justify-content:center;text-ali
 .c{{padding:32px;max-width:520px}}img{{width:220px;height:220px;border-radius:20px;border:1px solid #262626;object-fit:cover}}
 h1{{font-size:24px;letter-spacing:.4px}}a{{display:inline-block;margin-top:20px;background:#8B5CF6;color:#fff;
 text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:800}}p{{color:#A3A3A3}}</style>
-<script>setTimeout(function(){{location.href={deep_link_js}}},1200)</script></head>
+</head>
 <body><div class="c"><img src="{image_attr}" alt="cover"/><h1>{t}</h1><p>{d}</p>
 <a href="{deep_link_attr}">▶ Open in Galaxy Studio</a></div></body></html>"""
 
 
+# Deliberately scriptless share cards. Only same-origin/approved-app covers.
+# A generic https: source permits arbitrary off-origin image beacons, so scope
+# the CSP to the configured canonical application origin on every response.
+_SHARE_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+}
+
+
+def _share_html(content: str, *, status_code: int = 200) -> HTMLResponse:
+    app_origin = _app_origin()
+    policy = (
+        f"default-src 'none'; script-src 'none'; img-src 'self' {app_origin}; "
+        "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; "
+        "frame-ancestors 'none'; object-src 'none'"
+    )
+    return HTMLResponse(
+        content, status_code=status_code,
+        headers={**_SHARE_HEADERS, "Content-Security-Policy": policy},
+    )
+
+
 @router.get("/playable/{pid}", response_class=HTMLResponse)
 async def share_playable(pid: str, request: Request):
-    base = str(request.base_url).rstrip("/")
+    base = _app_origin()
     g = await _db.playables.find_one(
         {"playable_id": pid}, {"_id": 0, "title": 1, "genre": 1, "has_cover": 1,
                                "evaluation.overall": 1, "plays": 1})
-    base = _APP
     if not g:
-        return HTMLResponse(_page("Game not found", "This game is unavailable.",
+        return _share_html(_page("Game not found", "This game is unavailable.",
                                   f"{base}/icon.png", f"{base}/playable"), status_code=404)
     overall = (g.get("evaluation") or {}).get("overall")
     desc = f"A {g.get('genre','arcade')} game on Galaxy Studio" + (f" · scored {overall}/100" if overall else "") + \
            (f" · {g.get('plays')} plays" if g.get("plays") else "") + ". Play it now!"
-    image = f"{base}/api/playable/{pid}/cover.png"
-    return HTMLResponse(_page(g.get("title", "Untitled Game"), desc, image, f"{base}/playable?id={pid}"))
+    encoded_pid = _safe_link_id(pid)
+    image = f"{base}/api/playable/{encoded_pid}/cover.png"
+    deep_link = f"{base}/playable?{urlencode({'id': pid})}"
+    return _share_html(_page(g.get("title", "Untitled Game"), desc, image, deep_link))
 
 
 @router.get("/tournament/{tid}", response_class=HTMLResponse)
 async def share_tournament(tid: str, request: Request):
-    base = str(request.base_url).rstrip("/")
+    base = _app_origin()
     t = await _db.tournaments.find_one({"tournament_id": tid}, {"_id": 0})
-    base = _APP
     if not t:
-        return HTMLResponse(_page("Tournament not found", "This bracket is unavailable.",
+        return _share_html(_page("Tournament not found", "This bracket is unavailable.",
                                   f"{base}/icon.png", f"{base}/tournaments"), status_code=404)
     champ_img = f"{base}/icon.png"
     if t.get("champion_id"):
-        champ_img = f"{base}/api/playable/{t['champion_id']}/cover.png"
+        champ_img = f"{base}/api/playable/{_safe_link_id(t['champion_id'])}/cover.png"
     status = "🏆 Champion crowned!" if t.get("status") == "complete" else f"⚔️ Live · Round {t.get('current_round',0)+1}"
     desc = f"Bracket of {t.get('size')} · {status} — vote for your favourite game!"
-    return HTMLResponse(_page(t.get("name", "Tournament"), desc, champ_img, f"{base}/tournaments"))
+    return _share_html(_page(t.get("name", "Tournament"), desc, champ_img, f"{base}/tournaments"))

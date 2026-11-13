@@ -8,7 +8,7 @@ import json
 import math
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import asdict, dataclass, replace
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from skeleton.contracts.ai_execution import (
@@ -878,6 +878,59 @@ class CognitiveExecutionRuntime:
             now=now,
         )
 
+    def recover_passively(
+        self,
+        execution_id: str,
+        *,
+        approval_refs: Mapping[str, str] | None = None,
+        now: datetime | None = None,
+    ) -> ExecutionRunResult | None:
+        """Observe a checkpoint without invoking providers, tools or publishing output.
+
+        Return ``None`` when the execution requires an active provider. A staged
+        finalization always requires the original provider binding, even if a
+        cancellation or deadline is also present.
+        """
+        result = self.repository.result(execution_id)
+        execution = self.repository.get(execution_id)
+        if result is not None:
+            return ExecutionRunResult(execution_id=execution_id, state=execution.state, result=result)
+        if self.repository.finalization_intent(execution_id) is not None:
+            return None
+        return self._passive_recovery(
+            execution, self._checkpoint_payload(execution_id),
+            approval_refs=approval_refs or {}, now=now,
+        )
+
+    def _passive_recovery(
+        self,
+        execution: AIExecution,
+        payload: Mapping[str, object],
+        *,
+        approval_refs: Mapping[str, str],
+        now: datetime | None,
+    ) -> ExecutionRunResult | None:
+        if execution.cancellation_requested:
+            return self._finalize_non_success(
+                execution, payload, status="cancelled", error_code="cancellation_requested", now=now,
+            )
+        if self._deadline_expired(payload, now=now):
+            return self._finalize_non_success(
+                execution, payload, status="failed", error_code="execution_deadline_exceeded", now=now,
+            )
+        if execution.state is ExecutionState.WAITING_FOR_USER:
+            pending = self._pending_approvals(execution, payload)
+            missing = tuple(item for item in pending if not approval_refs.get(item.call_id))
+            if missing:
+                checkpoint = self.repository.latest_checkpoint(execution.execution_id)
+                return ExecutionRunResult(
+                    execution_id=execution.execution_id,
+                    state=execution.state,
+                    pending_approvals=missing,
+                    checkpoint_ref=(None if checkpoint is None else checkpoint.checkpoint_ref),
+                )
+        return None
+
     async def _drive(
         self,
         execution_id: str,
@@ -914,22 +967,11 @@ class CognitiveExecutionRuntime:
                 )
 
             payload = self._checkpoint_payload(execution_id)
-            if execution.cancellation_requested:
-                return self._finalize_non_success(
-                    execution,
-                    payload,
-                    status="cancelled",
-                    error_code="cancellation_requested",
-                    now=now,
-                )
-            if self._deadline_expired(payload, now=now):
-                return self._finalize_non_success(
-                    execution,
-                    payload,
-                    status="failed",
-                    error_code="execution_deadline_exceeded",
-                    now=now,
-                )
+            passive = self._passive_recovery(
+                execution, payload, approval_refs=approval_refs, now=now,
+            )
+            if passive is not None:
+                return passive
 
             self._assert_provider_binding(execution, payload)
             if self._provider_budget_exceeded(execution, payload):
@@ -942,16 +984,6 @@ class CognitiveExecutionRuntime:
                 )
 
             if execution.state is ExecutionState.WAITING_FOR_USER:
-                pending = self._pending_approvals(execution, payload)
-                missing = tuple(item for item in pending if not approval_refs.get(item.call_id))
-                if missing:
-                    checkpoint = self.repository.latest_checkpoint(execution_id)
-                    return ExecutionRunResult(
-                        execution_id=execution_id,
-                        state=execution.state,
-                        pending_approvals=missing,
-                        checkpoint_ref=(None if checkpoint is None else checkpoint.checkpoint_ref),
-                    )
                 execution = self._transition(
                     execution,
                     ExecutionState.TOOL_PENDING,

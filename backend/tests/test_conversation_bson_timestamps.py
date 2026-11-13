@@ -70,9 +70,9 @@ def _lease_document():
         "lease_granted_at": token.granted_at, "lease_expires_at": token.expires_at,
         "lease_previous_digest": None, "lease_digest": token.digest,
         "lease_token": token.as_dict(),
-        # Materialized ownership headers are atomic. A BSON fixture with an
-        # active epoch must retain the matching audit sequence and digest slot.
-        "ownership_receipt_digest": None, "ownership_audit_sequence": 1,
+        # Materialized ownership headers retain both audit sequence and digest.
+        "ownership_audit_sequence": 1,
+        "ownership_receipt_digest": "a" * 64,
     }
     return token, BSON.encode(document).decode()
 

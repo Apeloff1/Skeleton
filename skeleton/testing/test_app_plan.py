@@ -16,10 +16,13 @@ def test_default_plan_is_dependency_closed_and_layered():
     assert plan.profile == "default"
     assert set(plan.requested) == set(manifest.default_services)
     assert set(plan.services) == set(manifest.default_services)
-    assert plan.layers[0] == ("mongo",)
+    # The setup UI is an independent first-start service; backend and
+    # guarded engine still retain their own protected dependency chain.
+    assert plan.layers[0] == ("frontend", "mongo")
     assert plan.layers[1] == ("skeleton",)
     assert plan.layers[2] == ("backend",)
-    assert plan.layers[-1] == ("frontend",)
+    assert manifest.service("frontend").depends_on == ()
+    assert manifest.service("backend").depends_on == ("mongo", "skeleton")
 
 
 def test_full_plan_contains_default_and_optional_services():
@@ -38,8 +41,9 @@ def test_custom_plan_pulls_transitive_dependencies():
 
     assert plan.profile == "custom"
     assert plan.requested == ("frontend",)
-    assert set(plan.services) == {"mongo", "backend", "skeleton", "frontend"}
-    assert plan.services[-1] == "frontend"
+    # Requesting only diagnostics must not transitively start guarded AI.
+    assert plan.services == ("frontend",)
+    assert plan.layers == (("frontend",),)
 
 
 def test_dependency_closure_rejects_unknown_service():
@@ -87,8 +91,8 @@ def test_cli_plan_json_exposes_dependency_layers(capsys):
 
     assert exit_code == 0
     assert payload["profile"] == "default"
-    assert payload["layers"][0] == ["mongo"]
-    assert payload["layers"][-1] == ["frontend"]
+    assert payload["layers"][0] == ["frontend", "mongo"]
+    assert payload["layers"][-1] == ["backend"]
 
 
 def test_structural_preflight_includes_topology_verdict():
@@ -115,7 +119,7 @@ def test_compose_up_consumes_the_same_planned_order():
     assert command[-len(plan.services):] == plan.services
 
 
-def test_compose_profiles_are_derived_from_manifest_services():
+def test_compose_stop_profiles_are_derived_from_manifest_services():
     from dataclasses import replace
 
     from skeleton.app.assembly import compose_command
@@ -128,9 +132,19 @@ def test_compose_profiles_are_derived_from_manifest_services():
     )
     customized = replace(manifest, services=services)
 
-    command = compose_command("up", manifest=customized, full=True, build=False)
+    command = compose_command("down", manifest=customized)
 
     assert "--profile" in command
     profile_index = command.index("--profile")
     assert command[profile_index + 1] == "vector"
     assert "full" not in command[: profile_index + 2]
+    assert command[-1] == "stop"
+
+
+def test_chroma_cannot_be_started_via_a_custom_default_plan():
+    from skeleton.app.assembly import compose_command
+
+    manifest = load_manifest()
+    customized = replace(manifest, default_services=(*manifest.default_services, "chroma"))
+    with pytest.raises(ValueError, match="Chroma.*data"):
+        compose_command("up", manifest=customized)

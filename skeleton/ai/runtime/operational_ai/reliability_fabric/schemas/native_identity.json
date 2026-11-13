@@ -1,0 +1,128 @@
+{
+  "type": "object",
+  "fields": {
+    "schema": {
+      "type": "text",
+      "max_bytes": 64,
+      "enum": [
+        "ai.reliability.fabric.v1"
+      ]
+    },
+    "domain": {
+      "type": "text",
+      "max_bytes": 64,
+      "enum": [
+        "native_identity"
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "fields": {
+        "tenant": {
+          "type": "text",
+          "max_bytes": 48,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+        },
+        "subject": {
+          "type": "text",
+          "max_bytes": 48,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+        },
+        "model_sha256": {
+          "type": "text",
+          "max_bytes": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "scope": {
+          "type": "text",
+          "max_bytes": 120,
+          "pattern": "^[A-Za-z0-9:_-]+$"
+        }
+      }
+    },
+    "revision": {
+      "type": "int",
+      "min": 1,
+      "max": 1000000
+    },
+    "timing": {
+      "type": "object",
+      "fields": {
+        "issued_ns": {
+          "type": "int",
+          "min": 0,
+          "max": 1000000000000000000
+        },
+        "observed_ns": {
+          "type": "int",
+          "min": 0,
+          "max": 1000000000000000000
+        },
+        "expires_ns": {
+          "type": "int",
+          "min": 1,
+          "max": 1000000000000000000
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "fields": {
+        "bytes": {
+          "type": "int",
+          "min": 1,
+          "max": 2097152
+        },
+        "tokens": {
+          "type": "int",
+          "min": 1,
+          "max": 262144
+        },
+        "operations": {
+          "type": "int",
+          "min": 1,
+          "max": 8192
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "fields": {
+        "operator_approved": {
+          "type": "bool"
+        },
+        "source_verified": {
+          "type": "bool"
+        },
+        "source_sha256": {
+          "type": "text",
+          "max_bytes": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "details": {
+      "type": "object",
+      "fields": {
+        "installed_sha": {
+          "type": "text",
+          "max_bytes": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "loaded_sha": {
+          "type": "text",
+          "max_bytes": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tokenizer_sha": {
+          "type": "text",
+          "max_bytes": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rights_approved": {
+          "type": "bool"
+        }
+      }
+    }
+  }
+}

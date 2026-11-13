@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
@@ -52,6 +53,56 @@ def test_manifest_payload_is_json_serializable():
     assert '"machine/ai_app_construction.json"' in encoded
 
 
+def test_backend_image_python_guard_accepts_current_pinned_abi():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    assert backend_python_image_errors(source) == ()
+    actual = next(
+        item for item in preflight(root) if item.code == "image:backend-python"
+    )
+    assert actual.ok
+
+
+def test_backend_image_python_315_bump_is_rejected_before_setup():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    bumped = source.replace("FROM python:3.14-alpine@", "FROM python:3.15-alpine@")
+    assert bumped != source
+    errors = backend_python_image_errors(bumped)
+    assert any("violates its dependency guard" in error for error in errors)
+
+
+def test_backend_image_stage_version_drift_is_rejected():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    bumped = source.replace(
+        "FROM python:3.14-alpine@", "FROM python:3.15-alpine@", 1
+    )
+    errors = backend_python_image_errors(bumped)
+    assert any("share the same pinned" in error for error in errors)
+
+
+def test_backend_image_guard_removal_is_rejected():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    changed = source.replace(
+        "sys.version_info[:2] < (3, 15)", "sys.version_info[:2] >= (3, 10)"
+    )
+    assert changed != source
+    assert any(
+        "upper-bound guard is missing" in error
+        for error in backend_python_image_errors(changed)
+    )
+
+
 def test_structural_preflight_passes_for_repository_checkout():
     root = find_repo_root(Path(__file__))
     checks = preflight(root)
@@ -98,19 +149,49 @@ def test_up_command_is_deterministic_and_shell_free():
     assert "skeleton" in command
 
 
-def test_full_up_command_enables_optional_profile():
-    command = compose_command("up", full=True, build=False)
+def test_full_up_is_blocked_until_chroma_persistence_is_qualified():
+    with pytest.raises(ValueError, match="Chroma.*data"):
+        compose_command("up", full=True, build=False)
 
-    assert command[:6] == (
-        "docker",
-        "compose",
-        "-f",
-        "docker-compose.yml",
-        "--profile",
-        "full",
-    )
-    assert command[6:8] == ("up", "-d")
-    assert "chroma" in command
+
+def test_app_down_stops_all_declared_profiles_without_removing_data():
+    command = compose_command("down")
+    assert command[:4] == ("docker", "compose", "-f", "docker-compose.yml")
+    assert command[4:] == ("--profile", "full", "stop")
+    assert "down" not in command and "--remove-orphans" not in command
+    assert "--volumes" not in command and "-v" not in command
+
+
+def test_cli_refuses_unsafe_full_start_before_preflight_or_compose(monkeypatch, capsys):
+    from skeleton.app import cli
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Full startup must not dispatch or change configuration")
+
+    monkeypatch.setattr(cli, "preflight", forbidden)
+    monkeypatch.setattr(cli, "_run_compose", forbidden)
+    assert cli.run_app_cli(["up", "--full"]) == 1
+    assert "Chroma" in capsys.readouterr().out
+
+
+def test_app_compose_dispatch_disables_inherited_orphan_removal(monkeypatch, tmp_path):
+    import subprocess
+
+    from skeleton.app import cli
+
+    observed = {}
+
+    def runner(command, **kwargs):
+        observed.update(kwargs["env"])
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setenv("COMPOSE_REMOVE_ORPHANS", "1")
+    monkeypatch.setenv("SKELETON_TEST_SETTING", "preserved")
+    monkeypatch.setattr(cli.subprocess, "run", runner)
+    assert cli._run_compose(("docker", "compose", "up"), tmp_path,
+                            env_overrides={"COMPOSE_REMOVE_ORPHANS": "1"}) == 0
+    assert observed["COMPOSE_REMOVE_ORPHANS"] == "0"
+    assert observed["SKELETON_TEST_SETTING"] == "preserved"
 
 
 def test_logs_reject_unknown_service():
@@ -133,6 +214,9 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
         def read(self, _size):
             return b"ok"
 
+        def geturl(self):
+            return "http://localhost:8010/api/v1/health/live"
+
     seen = {}
 
     def fake_urlopen(request, timeout):
@@ -140,7 +224,7 @@ def test_http_probe_uses_declared_health_surface(monkeypatch):
         seen["timeout"] = timeout
         return _Response()
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", fake_urlopen)
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", fake_urlopen)
     service = load_manifest().service("skeleton")
 
     result = probe_url(service, timeout=1.25)
@@ -168,7 +252,7 @@ def test_default_smoke_profile_has_frontend_backend_and_engine():
 
 def test_frontend_clients_share_canonical_runtime_endpoints():
     root = find_repo_root(Path(__file__))
-    resolver = (root / "frontend/utils/apiBase.ts").read_text(encoding="utf-8")
+    resolver = (root / "frontend/src/utils/apiBase.ts").read_text(encoding="utf-8")
 
     assert "export const API_BASE" in resolver
     assert "export const SKELETON_API_BASE" in resolver
@@ -176,12 +260,13 @@ def test_frontend_clients_share_canonical_runtime_endpoints():
     assert "EXPO_PUBLIC_SKELETON_URL" in resolver
 
     expected_imports = {
-        "frontend/services/api.ts": "import { API_BASE } from '../utils/apiBase';",
-        "frontend/services/skeleton.ts": "import { SKELETON_API_BASE } from '../utils/apiBase';",
-        "frontend/src/utils/apiClient.ts": "import { API_BASE } from '../../utils/apiBase';",
-        "frontend/src/utils/bootHealth.ts": "import { API_BASE } from '../../utils/apiBase';",
-        "frontend/utils/safeFetch.ts": "import { API_BASE } from './apiBase';",
-        "frontend/constants/config.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/src/services/api.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/src/services/skeleton.ts": "import { SKELETON_API_BASE } from '../utils/apiBase';",
+        "frontend/src/utils/apiClient.ts": "import { API_BASE } from './apiBase';",
+        "frontend/src/utils/bootHealth.ts": "import { API_BASE } from './apiBase';",
+        "frontend/src/product/aiChatClient.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/src/product/appHealthClient.ts": "import { API_BASE, SKELETON_API_BASE } from '../utils/apiBase';",
+        "frontend/src/constants/config.ts": "import { API_BASE } from '../utils/apiBase';",
     }
     for relative, expected in expected_imports.items():
         source = (root / relative).read_text(encoding="utf-8")
@@ -190,7 +275,7 @@ def test_frontend_clients_share_canonical_runtime_endpoints():
 
 def test_frontend_skeleton_health_matches_engine_liveness_contract():
     root = find_repo_root(Path(__file__))
-    client = (root / "frontend/services/skeleton.ts").read_text(encoding="utf-8")
+    client = (root / "frontend/src/services/skeleton.ts").read_text(encoding="utf-8")
     routes = (root / "skeleton/api/routes.py").read_text(encoding="utf-8")
 
     assert "'/api/v1/health/live'" in client
@@ -204,7 +289,19 @@ def test_product_control_client_matches_mounted_backend_routes():
     registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
 
     assert "const ROOT = '/api/admin/ops/product-control';" in client
-    assert 'router = APIRouter(prefix="/api/admin/ops"' in ops
+    ops_tree = ast.parse(ops)
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "project_router"
+        and any(
+            keyword.arg == "prefix"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "/api/admin/ops"
+            for keyword in node.keywords
+        )
+        for node in ast.walk(ops_tree)
+    )
     assert '("routes.ops",' in registry
 
     required_routes = (
@@ -273,7 +370,7 @@ def test_wait_for_application_rejects_invalid_budget():
 
 def test_all_launcher_paths_converge_on_product_shell():
     root = find_repo_root(Path(__file__))
-    launch = (root / "frontend/components/LaunchCascade.tsx").read_text(encoding="utf-8")
+    launch = (root / "frontend/src/components/LaunchCascade.tsx").read_text(encoding="utf-8")
     welcome = (root / "frontend/app/welcome.tsx").read_text(encoding="utf-8")
     safe_mode = (root / "frontend/app/safe-mode.tsx").read_text(encoding="utf-8")
 
@@ -297,13 +394,18 @@ def test_production_web_ingress_routes_both_application_apis():
     engine_location = directives.index("location ^~ /api/v1/ {")
     backend_location = directives.index("location ^~ /api/ {")
     assert engine_location < backend_location
-    assert "proxy_pass http://skeleton:8001;" in nginx
-    assert "proxy_pass http://backend:8001;" in nginx
+    assert "server skeleton:8001 resolve;" in nginx
+    assert "server backend:8001 resolve;" in nginx
+    assert "proxy_pass http://application_engine;" in nginx
+    assert "proxy_pass http://application_backend;" in nginx
 
 
 def test_frontend_security_probe_supplies_compose_upstream_names():
     root = find_repo_root(Path(__file__))
-    workflow = (root / ".github/workflows/dependency-security.yml").read_text(encoding="utf-8")
+    active = root / ".github/workflows/dependency-security.yml"
+    archived = root / ".github/workflows-archive/dependency-security.yml"
+    # Validate the retained probe definition, independently of its execution schedule.
+    workflow = (active if active.is_file() else archived).read_text(encoding="utf-8")
 
     assert "--add-host skeleton:127.0.0.1" in workflow
     assert "--add-host backend:127.0.0.1" in workflow
@@ -458,7 +560,7 @@ def test_public_product_readiness_route_is_registered():
 
 def test_product_routes_are_registered_in_canonical_route_registry():
     root = find_repo_root(Path(__file__))
-    registry = (root / "frontend/utils/routeRegistry.ts").read_text(encoding="utf-8")
+    registry = (root / "frontend/src/utils/routeRegistry.ts").read_text(encoding="utf-8")
 
     for route in (
         "/product",
@@ -541,7 +643,7 @@ def test_runtime_probes_use_configured_ports_including_ready_route(monkeypatch):
     )
     assert len(results) >= 3
     assert ("frontend", "http://localhost:3300/") in seen
-    assert ("backend", "http://localhost:8101/api/health") in seen
+    assert ("backend", "http://localhost:8101/api/health/ready") in seen
     assert ("skeleton", "http://localhost:8110/api/v1/health/live") in seen
     assert ("application", "http://localhost:8101/api/app/ready") in seen
 
@@ -643,7 +745,7 @@ def test_probe_rejects_redirect_to_login_page_even_if_target_is_200(monkeypatch)
         def read(self, _size):
             return b"login page"
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: RedirectResponse())
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert not result.ok
     assert result.detail == "health endpoint redirected"
@@ -657,7 +759,7 @@ def test_probe_does_not_publish_sensitive_network_exception(monkeypatch):
     def unavailable(*_args, **_kwargs):
         raise URLError("private operator credential in daemon response")
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", unavailable)
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", unavailable)
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert result.ok is False
     assert "URLError" in result.detail
@@ -679,10 +781,71 @@ def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
         def read(self, _size):
             return b"redirect"
 
-    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+        def geturl(self):
+            return "http://localhost:8001/api/health"
+
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_args, **_kwargs: RedirectResponse())
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert not result.ok
     assert result.status == 302
+
+def test_health_probe_transport_forbids_redirects_and_proxy_environment(monkeypatch):
+    from urllib.request import HTTPRedirectHandler, ProxyHandler
+    from skeleton.app.health import probe_http
+
+    seen = {}
+
+    class DirectResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _size):
+            return b"ok"
+
+        def geturl(self):
+            return "http://localhost:8001/api/health"
+
+    class Opener:
+        def open(self, request, *, timeout):
+            seen["url"] = request.full_url
+            seen["timeout"] = timeout
+            return DirectResponse()
+
+    def fake_build_opener(*handlers):
+        proxies = [h for h in handlers if isinstance(h, ProxyHandler)]
+        assert len(proxies) == 1
+        assert proxies[0].proxies == {}
+        redirects = [h for h in handlers if isinstance(h, HTTPRedirectHandler)]
+        assert len(redirects) == 1
+        assert redirects[0].redirect_request(None, None, 302, "redirect", {}, "https://elsewhere.invalid") is None
+        return Opener()
+
+    monkeypatch.setattr("skeleton.app.health.build_opener", fake_build_opener)
+    result = probe_http("backend", "http://localhost:8001/api/health", timeout=1.75)
+
+    assert result.ok is True
+    assert seen == {"url": "http://localhost:8001/api/health", "timeout": 1.75}
+
+
+def test_direct_health_probe_rejects_302_before_network_follow(monkeypatch):
+    from urllib.error import HTTPError
+    from skeleton.app.health import probe_http
+
+    def redirect(_request, *, timeout):
+        raise HTTPError("http://localhost:8001/api/health", 302, "go", {}, None)
+
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", redirect)
+    result = probe_http("backend", "http://localhost:8001/api/health")
+
+    assert not result.ok
+    assert result.status == 302
+    assert result.detail == "health endpoint redirected"
+
 
 def test_full_profile_uses_custom_chroma_published_port(tmp_path):
     from skeleton.app.assembly import public_service_urls
@@ -700,7 +863,7 @@ def test_full_profile_probes_custom_chroma_health(monkeypatch):
     seen = []
 
     def probe(service, *, timeout):
-        seen.append((service.name, service.public_url))
+        seen.append((service.name, service.public_url, service.health_path))
         return ProbeResult(service.name, service.public_url, True, 200, "healthy")
 
     def http(name, url, *, timeout):
@@ -711,7 +874,23 @@ def test_full_profile_probes_custom_chroma_health(monkeypatch):
     probe_application(
         full=True, public_url_overrides={"chroma": "http://localhost:8222"},
     )
-    assert ("chroma", "http://localhost:8222") in seen
+    assert ("chroma", "http://localhost:8222", "/api/v2/heartbeat") in seen
+
+
+def test_optional_chroma_unavailability_fails_full_readiness_only(monkeypatch):
+    from skeleton.app.health import ProbeResult, probe_application, probes_ok
+
+    def probe(service, *, timeout):
+        ready = service.name != "chroma"
+        return ProbeResult(service.name, service.public_url, ready, 200 if ready else None, "observed")
+
+    monkeypatch.setattr("skeleton.app.health.probe_url", probe)
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_http",
+        lambda name, url, *, timeout: ProbeResult(name, url, True, 200, "healthy"),
+    )
+    assert probes_ok(probe_application(full=False))
+    assert not probes_ok(probe_application(full=True))
 
 def test_preflight_external_hostname_placeholder_text_is_not_a_secret(monkeypatch, tmp_path):
     from skeleton.app.assembly import preflight
@@ -779,3 +958,306 @@ def test_app_preflight_rejects_invalid_replica_set_host_list(tmp_path, monkeypat
     entry = next(c for c in checks if c.code == "env:MONGO_URL")
     assert not entry.ok
     assert "secret" not in entry.message
+
+
+def test_python_image_preflight_rejects_unsupported_clean_install_source(tmp_path):
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    bumped = source.replace("FROM python:3.14-alpine@", "FROM python:3.15-alpine@")
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend/Dockerfile").write_text(bumped, encoding="utf-8")
+
+    checks = preflight(tmp_path)
+    image_check = next(check for check in checks if check.code == "image:backend-python")
+    assert image_check.ok is False
+    assert "violates its dependency guard" in image_check.message
+    assert not checks_ok(checks)
+
+
+def test_python_image_guard_in_comment_does_not_count():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    changed = source.replace("RUN python -c '", "# RUN python -c '", 1)
+    assert changed != source
+    errors = backend_python_image_errors(changed)
+    assert any("upper-bound guard is missing" in error for error in errors)
+
+
+def test_python_image_unpinned_stage_is_rejected():
+    from skeleton.app.assembly import backend_python_image_errors
+
+    root = find_repo_root(Path(__file__))
+    source = (root / "backend/Dockerfile").read_text(encoding="utf-8")
+    changed = source.replace(
+        "FROM python:3.14-alpine@sha256:", "FROM python:3.14-alpine@", 1
+    )
+    assert changed != source
+    errors = backend_python_image_errors(changed)
+    assert any("digest-pinned Alpine stage" in error for error in errors)
+
+
+def test_fresh_install_backend_cors_tracks_selected_frontend_port():
+    """A custom published frontend port cannot be blocked by stale CORS defaults."""
+    root = find_repo_root(Path(__file__))
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    template = (root / ".env.example").read_text(encoding="utf-8")
+
+    assert (
+        "CORS_ORIGINS=${CORS_ORIGINS:-"
+        "http://localhost:${FRONTEND_PORT:-3000},"
+        "http://127.0.0.1:${FRONTEND_PORT:-3000}}"
+    ) in compose
+    assert "\nCORS_ORIGINS=\n" in template
+    assert "\nCORS_ORIGINS=http://localhost:3000" not in template
+
+
+def test_fresh_install_cors_defaults_preserve_operator_override(tmp_path):
+    from skeleton.app.setup_runtime import ensure_runtime_environment
+
+    # Operator policies and upgrades must not be expanded automatically.
+    manual = "https://operator.example.invalid"
+    (tmp_path / ".env").write_text(
+        f"CORS_ORIGINS={manual}\n", encoding="utf-8"
+    )
+    ensure_runtime_environment(tmp_path)
+    values = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert f"CORS_ORIGINS={manual}" in values
+
+# The runtime diagnostic path must enforce the same private-file input
+# boundaries as setup, without chmod'ing or rewriting a user's credentials.
+
+def test_runtime_env_reader_accepts_valid_simple_values_without_mutation(tmp_path):
+    import os
+
+    from skeleton.app.assembly import _read_dotenv
+
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        'FRONTEND_PORT=3300\nCORS_ORIGINS="http://localhost:3300"\n',
+        encoding="utf-8",
+    )
+    before = env_path.stat()
+    assert _read_dotenv(env_path) == {
+        "FRONTEND_PORT": "3300",
+        "CORS_ORIGINS": "http://localhost:3300",
+    }
+    after = env_path.stat()
+    assert (before.st_dev, before.st_ino, before.st_mode, before.st_size) == (
+        after.st_dev, after.st_ino, after.st_mode, after.st_size,
+    )
+    assert os.path.exists(env_path)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"F" * (256 * 1024 + 1),
+        b"\xff\xfeinvalid",
+    ],
+)
+def test_runtime_env_reader_rejects_oversize_and_invalid_utf8(tmp_path, payload):
+    from skeleton.app.assembly import _read_dotenv
+
+    (tmp_path / ".env").write_bytes(payload)
+    with pytest.raises(ValueError, match="runtime .env"):
+        _read_dotenv(tmp_path / ".env")
+
+
+def test_runtime_env_reader_rejects_symlink_without_following(tmp_path):
+    from skeleton.app.assembly import _read_dotenv
+
+    secret = tmp_path / "operator-secret"
+    secret.write_text("JWT_SECRET=must-remain-outside\n", encoding="utf-8")
+    target = tmp_path / ".env"
+    try:
+        target.symlink_to(secret)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation not supported on this host")
+    with pytest.raises(ValueError, match="symbolic link|safely opened"):
+        _read_dotenv(target)
+    assert secret.read_text(encoding="utf-8") == "JWT_SECRET=must-remain-outside\n"
+
+
+def test_runtime_env_reader_rejects_hardlinked_credentials(tmp_path):
+    import os
+
+    from skeleton.app.assembly import _read_dotenv
+
+    original = tmp_path / "operator-secret"
+    original.write_text("JWT_SECRET=must-remain-outside\n", encoding="utf-8")
+    try:
+        os.link(original, tmp_path / ".env")
+    except (OSError, NotImplementedError):
+        pytest.skip("hardlink creation not supported on this host")
+    if os.name == "nt":
+        pytest.skip("Windows hardlink identity policy is governed by ACLs")
+    with pytest.raises(ValueError, match="unlinked regular file"):
+        _read_dotenv(tmp_path / ".env")
+
+
+def test_runtime_env_reader_rejects_directory(tmp_path):
+    from skeleton.app.assembly import _read_dotenv
+
+    (tmp_path / ".env").mkdir()
+    with pytest.raises(ValueError, match="runtime .env"):
+        _read_dotenv(tmp_path / ".env")
+
+
+def test_runtime_env_reader_rejects_fifo_without_waiting(tmp_path):
+    import os
+
+    from skeleton.app.assembly import _read_dotenv
+
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("named pipes are unavailable")
+    os.mkfifo(tmp_path / ".env")
+    with pytest.raises(ValueError, match="unlinked regular file"):
+        _read_dotenv(tmp_path / ".env")
+
+
+@pytest.mark.parametrize("source_kind", ["oversize", "invalid-utf8", "directory"])
+def test_runtime_preflight_fails_closed_on_invalid_env_source(tmp_path, source_kind):
+    from skeleton.app.assembly import preflight
+
+    env = tmp_path / ".env"
+    if source_kind == "oversize":
+        env.write_bytes(b"A" * (256 * 1024 + 1))
+    elif source_kind == "invalid-utf8":
+        env.write_bytes(b"\xff\xfe")
+    else:
+        env.mkdir()
+
+    checks = preflight(tmp_path, runtime=True, environ={})
+    indexed = {check.code: check for check in checks}
+    assert indexed["env:source"].ok is False
+    assert indexed["runtime:ports"].ok is False
+    assert not checks_ok(checks)
+    assert "unsafe" in indexed["runtime:ports"].message
+    assert "A" * 64 not in repr(checks)
+
+
+def test_runtime_doctor_does_not_network_probe_when_env_source_is_unsafe(
+    tmp_path, monkeypatch
+):
+    from skeleton.app import first_install
+    from skeleton.app.preloader import PreloadReport
+
+    (tmp_path / ".env").write_bytes(b"Z" * (256 * 1024 + 1))
+    host = PreloadReport(
+        root=tmp_path, platform="test", python="3.11", checks=(),
+    )
+    monkeypatch.setattr(first_install, "inspect_host", lambda _root: host)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("unsafe runtime environment must suppress every live probe")
+
+    monkeypatch.setattr(
+        "skeleton.app.health.probe_application", forbidden
+    )
+    monkeypatch.setattr(first_install, "critical_backend_route_report", forbidden)
+    report = first_install.first_install_report(
+        tmp_path, live=True, environ={},
+    )
+
+    assert report["configuration_ready"] is False
+    assert report["services_ready"] is None
+    assert report["ai"]["observed"] is False
+    assert report["critical_routes"]["observed"] is False
+    assert any(
+        check["code"] == "env:source" and not check["ok"]
+        for check in report["checks"]["configuration"]
+    )
+    assert any("private runtime .env is unsafe" in step for step in report["next_steps"])
+    assert "ZZZZ" not in repr(report)
+
+
+def test_runtime_env_reader_missing_source_returns_empty(tmp_path):
+    from skeleton.app.assembly import _read_dotenv
+
+    assert _read_dotenv(tmp_path / ".env") == {}
+
+
+
+def test_app_status_hides_unsafe_runtime_config_error(monkeypatch, capsys):
+    from skeleton.app import cli
+
+    def unsafe():
+        raise ValueError("private operator secret material must not be logged")
+
+    monkeypatch.setattr(cli, "runtime_manifest", unsafe)
+    assert cli._print_status(as_json=True) == 2
+    serialized = capsys.readouterr().out
+    import json
+
+    value = json.loads(serialized)
+    assert value["ok"] is False
+    assert value["code"] == "runtime_configuration_unavailable"
+    assert "private operator secret material" not in serialized
+
+
+def test_first_install_studio_drops_live_token_after_unsafe_env(tmp_path, monkeypatch):
+    from skeleton.app import first_install, studio_readiness
+    from skeleton.app.preloader import PreloadReport
+
+    (tmp_path / ".env").write_bytes(b"Q" * (256 * 1024 + 1))
+    monkeypatch.setattr(
+        first_install,
+        "inspect_host",
+        lambda _root: PreloadReport(
+            root=tmp_path, platform="test", python="3.11", checks=()
+        ),
+    )
+    observed: list[tuple[object, object]] = []
+
+    def fake_studio(*_args, **kwargs):
+        observed.append((kwargs["live"], kwargs["auth_token_file"]))
+        return {
+            "local_host": {"observed": False},
+            "server": {"observed": False, "crawler": {"observed": False}},
+        }
+
+    monkeypatch.setattr(studio_readiness, "studio_readiness_report", fake_studio)
+    report = first_install.first_install_report(
+        tmp_path,
+        live=True,
+        studio=True,
+        auth_token_file=tmp_path / "private-operator-token",
+        environ={},
+    )
+    assert observed == [(False, None)]
+    assert report["configuration_ready"] is False
+    assert report["crawler"]["observed"] is False
+
+
+def test_new_install_contract_module_is_required_in_windows_payload():
+    from skeleton.app.assembly import load_manifest
+
+    manifest = load_manifest()
+    assert "skeleton/app/install_source_contracts.py" in manifest.required_paths
+
+
+@pytest.mark.parametrize(
+    ("other", "conflicting_port"),
+    [
+        ("FRONTEND_PORT", "3000"),
+        ("BACKEND_PORT", "8001"),
+        ("SKELETON_PORT", "8010"),
+        ("MONGO_PORT", "27017"),
+    ],
+)
+def test_chroma_published_host_port_cannot_overlap_existing_service(
+    tmp_path, other, conflicting_port,
+):
+    from skeleton.app.assembly import public_service_urls, runtime_manifest
+
+    # The Chroma full profile may be guarded at startup, but its published
+    # port must never silently collide with the canonical service sockets.
+    (tmp_path / ".env").write_text(
+        f"CHROMA_PORT={conflicting_port}\n", encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="CHROMA_PORT"):
+        runtime_manifest(root=tmp_path, environ={})
+    with pytest.raises(ValueError, match="CHROMA_PORT"):
+        public_service_urls(tmp_path, environ={})

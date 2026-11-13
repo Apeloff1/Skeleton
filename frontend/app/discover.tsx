@@ -10,11 +10,12 @@ import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  StyleSheet, SafeAreaView, Image, RefreshControl,
+  StyleSheet, SafeAreaView, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/utils/apiClient';
+import PrivateImage from '../src/components/PrivateImage';
 import { useHaptics } from '../src/hooks/useHaptics';
 import theme from '../src/theme/tokens';
 
@@ -32,7 +33,7 @@ function Cover({ g, size }: { g: Game; size: number }) {
     return <View style={[styles.fallback, { width: size, height: size }]}><Text style={{ fontSize: size * 0.4 }}>🎮</Text></View>;
   }
   return (
-    <Image source={{ uri: `${BACKEND}/api/playable/${g.playable_id}/cover.png` }} style={{ width: size, height: size, borderRadius: 12, backgroundColor: '#141414' }} resizeMode="cover" onError={() => setErr(true)} />
+    <PrivateImage uri={`${BACKEND}/api/playable/${g.playable_id}/cover.png`} style={{ width: size, height: size, borderRadius: 12, backgroundColor: '#141414' }} resizeMode="cover" onError={() => setErr(true)} />
   );
 }
 

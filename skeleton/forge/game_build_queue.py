@@ -4,11 +4,9 @@
 ``build_playable_game``. Progress goes through ``ctx.progress`` and
 ``ctx.heartbeat``.
 
-Internal Systems #4097 (head ``959eec134``) owns the real queue in
-``skeleton.app_services.job_api`` (see ``docs/contracts/job_queue.md``). That
-module is not on main yet, and this branch does not vendor its persistence
-stack. When the import succeeds, every call delegates to that API. Until
-then an in-process queue implements the same ``enqueue`` / ``JobHandle`` /
+The durable queue owner is ``skeleton.app_services.job_api`` (see
+``docs/contracts/job_queue.md``). Every call delegates to that API when it is
+available. An optional in-process fallback implements the same ``enqueue`` / ``JobHandle`` /
 ``JobContext`` surface, including one worker so a build cannot block the
 request thread. Projects ``POST /builds`` already enqueues kind ``game.build``;
 this handler accepts that payload and the product route payload.
@@ -33,6 +31,10 @@ class IdempotencyMismatch(Exception):
 
 class JobTimeout(Exception):
     pass
+
+
+class GameBuildFailed(RuntimeError):
+    """A build request or its result could not be accepted safely."""
 
 
 @dataclass(frozen=True)
@@ -89,24 +91,78 @@ def _builder_deadline_s(body: Mapping[str, Any], options: Mapping[str, Any], ctx
     raw_timeout = getattr(ctx, "timeout_s", None)
     if raw_timeout is None:
         raw_timeout = DEFAULT_TIMEOUT_S
-    try:
-        timeout_s = float(raw_timeout)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("timeout_s must be a number of seconds") from exc
+    if (isinstance(raw_timeout, bool) or not isinstance(raw_timeout, (int, float))
+            or not 0 < raw_timeout <= 6 * 3600):
+        raise GameBuildFailed("Invalid game build time budget")
+    timeout_s = float(raw_timeout)
     raw = body.get("deadline_s", None)
     if raw is None:
         raw = options.get("deadline_s", None)
+    # The public build endpoint is capped at 120 seconds. Apply that same cap
+    # again at dispatch, including jobs queued by an older server version.
+    timeout_s = min(timeout_s, 120.0)
     if raw is None:
         return timeout_s
-    if isinstance(raw, bool):
-        raise ValueError("deadline_s must be a number of seconds")
-    try:
-        asked = float(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("deadline_s must be a number of seconds") from exc
-    if asked < 0:
-        raise ValueError("deadline_s must be a number of seconds")
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not 0 < raw <= 120:
+        raise GameBuildFailed("Invalid game build time budget")
+    asked = float(raw)
     return min(asked, timeout_s)
+
+
+def _authorized_brief(ctx: Any, body: Mapping[str, Any]) -> Any:
+    """Resolve project builds from the job owner's persisted project, never options."""
+    project_id = getattr(ctx, "project_id", None)
+    if not project_id:
+        return _brief_from_job_payload(body)
+    actor = getattr(ctx, "actor_id", None)
+    tenant = getattr(ctx, "tenant_id", None)
+    db = getattr(getattr(ctx, "_svc", None), "db", None)
+    if not actor or not tenant or db is None:
+        raise GameBuildFailed("Project build is unavailable")
+    try:
+        from skeleton.persistence.app_foundation.projects_v1 import ProjectsV1Store
+        project = ProjectsV1Store(db).get(actor, tenant, project_id)
+        if project is None:
+            raise GameBuildFailed("Project build is unavailable")
+        stored_brief = project.brief.as_dict()
+        # The request must still describe the owner-scoped snapshot admitted
+        # at enqueue time. Never silently build a changed or missing brief.
+        if not isinstance(body.get("brief"), dict) or body["brief"] != stored_brief:
+            raise GameBuildFailed("Project build is unavailable")
+        return stored_brief
+    except Exception:
+        # Storage errors and cross-tenant lookups are indistinguishable here.
+        raise GameBuildFailed("Project build is unavailable") from None
+
+
+def _recheck_project_admission(ctx: Any, body: Mapping[str, Any]) -> None:
+    """Recheck the originating session and charter at dispatch time.
+
+    This is a point-in-time check. It is not a policy-epoch fence and cannot
+    revoke a build that has already passed admission and begun execution.
+    """
+    if not getattr(ctx, "project_id", None):
+        return
+    if body.get("project_build_authorized") is not True:
+        raise GameBuildFailed("Project build authorization is unavailable")
+    session_id = body.get("project_build_session_id")
+    actor = getattr(ctx, "actor_id", None)
+    db = getattr(getattr(ctx, "_svc", None), "db", None)
+    if not isinstance(session_id, str) or not session_id or len(session_id) > 128 or not actor or db is None:
+        raise GameBuildFailed("Project build authorization is unavailable")
+    try:
+        rows = db.query(
+            "SELECT s.session_id FROM sessions s JOIN users u ON u.user_id=s.user_id "
+            "WHERE s.session_id=? AND s.user_id=? AND s.revoked=0 AND s.expires_at>? AND u.disabled=0",
+            (session_id, actor, time.time()),
+        )
+        if len(rows) != 1:
+            raise GameBuildFailed("Project build authorization is unavailable")
+        from skeleton.kernel.governance import get_governance
+        if get_governance().decide("forge", "run", 0).permitted is not True:
+            raise GameBuildFailed("Project build authorization is unavailable")
+    except Exception:
+        raise GameBuildFailed("Project build authorization is unavailable") from None
 
 
 def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -116,7 +172,16 @@ def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
     ctx.progress(0.05, "compiling brief")
     ctx.heartbeat()
     body = dict(payload or {})
-    options = body.get("options") if isinstance(body.get("options"), Mapping) else {}
+    options = body.get("options", {})
+    if not isinstance(options, Mapping):
+        raise GameBuildFailed("Invalid game build options")
+    # Old project-bound jobs lack proof that forge/run was admitted, and a
+    # later session revocation or charter denial must be observed at dispatch.
+    _recheck_project_admission(ctx, body)
+    # An old queued payload can outlive the HTTP validation that admitted it.
+    # Never execute an executable chosen by a request, even after an upgrade.
+    if "binary" in body or "binary" in options:
+        raise GameBuildFailed("Custom game build executables are not permitted")
 
     def on_progress(fraction: float, message: str) -> None:
         ctx.progress(0.1 + 0.85 * max(0.0, min(1.0, float(fraction))), message)
@@ -125,23 +190,41 @@ def handle_game_build(ctx: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
     deadline_s = _builder_deadline_s(body, options, ctx)
     playtest = body.get("playtest", options.get("playtest", "off"))
     rounds = body.get("max_rounds", options.get("max_rounds", 3))
+    if isinstance(rounds, bool) or not isinstance(rounds, int) or not 1 <= rounds <= 3:
+        raise GameBuildFailed("Invalid game build round limit")
+    target = body.get("target", "")
+    if target == "":
+        target = options.get("target", "")
+    if target == "":
+        target = "godot"
+    if not isinstance(target, str) or target not in {"godot", "json", "yaml"}:
+        raise GameBuildFailed("Unsupported game build target")
     kwargs: dict[str, Any] = {
         "era": body.get("era") or options.get("era") or None,
         "repair_mode": str(body.get("repair_mode") or options.get("repair_mode") or "apply"),
         "playtest_mode": str(playtest or "off"),
-        "max_rounds": int(rounds),
-        "binary": body.get("binary") or options.get("binary"),
+        "max_rounds": rounds,
         "actor_id": getattr(ctx, "actor_id", None) or None,
         "tenant_id": getattr(ctx, "tenant_id", None) or None,
         "execution_id": getattr(ctx, "execution_id", None) or None,
         "project_id": getattr(ctx, "project_id", None) or None,
         "deadline_s": deadline_s,
         "on_progress": on_progress,
-        "target": str(body.get("target") or options.get("target") or "godot"),
+        "target": target,
     }
     if "archetype" in body or "archetype" in options:
         kwargs["archetype"] = body.get("archetype", options.get("archetype")) or None
-    result = build_playable_game(_brief_from_job_payload(body), **kwargs)
+    result = build_playable_game(_authorized_brief(ctx, body), **kwargs)
+    # A completed Python call is not the same as a successful build. Fail
+    # closed on a failed or malformed result so the queue cannot mark it done.
+    from skeleton.forge.game_builder import RUN_SCHEMA
+    if (not isinstance(result, Mapping) or result.get("schema_version") != RUN_SCHEMA
+            or result.get("ok") is not True
+            or not isinstance(result.get("file_names"), list)
+            or any(not isinstance(name, str) for name in result["file_names"])
+            or not isinstance(result.get("stubbed"), list)
+            or any(not isinstance(item, str) for item in result["stubbed"])):
+        raise GameBuildFailed("Game build did not complete successfully")
     try:
         ctx.progress(1.0, "complete" if result.get("ok") else "failed")
         ctx.heartbeat()
@@ -209,14 +292,21 @@ class _FallbackQueue:
         idempotency_key: Optional[str] = None,
         correlation_id: Optional[str] = None,
         timeout_s: float = DEFAULT_TIMEOUT_S,
+        request_digest: Optional[str] = None,
     ) -> JobHandle:
         if not actor_id or not tenant_id:
             raise ValueError("actor_id and tenant_id are required")
         if not (0 < float(timeout_s) <= 6 * 3600):
             raise ValueError("timeout_s must be in (0, 21600]")
+        if project_id:
+            raise ValueError("project-linked jobs require the durable queue owner")
+        if request_digest is not None and (not isinstance(request_digest, str) or len(request_digest) != 64
+                or any(char not in "0123456789abcdef" for char in request_digest)):
+            raise ValueError("request_digest must be a SHA-256 hex digest")
         body = dict(payload)
-        digest = request_hash(kind, body)
-        scoped = f"{tenant_id}:{actor_id}:{kind}:{idempotency_key}" if idempotency_key else None
+        digest = request_digest if request_digest is not None else request_hash(kind, body)
+        scoped = ("owned:" + hashlib.sha256(json.dumps([tenant_id, actor_id, kind, idempotency_key],
+                  separators=(",", ":")).encode()).hexdigest()) if idempotency_key else None
         now = self.clock()
         with self._lock:
             if scoped and scoped in self._by_idempotency:
@@ -295,6 +385,12 @@ class _FallbackQueue:
     def get_by_execution(self, execution_id: str) -> Optional[str]:
         with self._lock:
             return self._by_execution.get(execution_id)
+
+    def get_identity(self, job_id: str) -> dict[str, str]:
+        with self._lock:
+            row = self._jobs[job_id]
+            return {key: row.get(key, "") for key in
+                    ("job_id", "execution_id", "kind", "actor_id", "tenant_id")}
 
     def cancel(self, job_id: str) -> bool:
         with self._lock:
@@ -436,7 +532,7 @@ def _backend():
 
 
 def using_internal_systems_queue() -> bool:
-    """True when #4097's ``skeleton.app_services.job_api`` imported."""
+    """True when the canonical durable job API is available."""
     _backend()
     return _using_real
 
@@ -447,11 +543,13 @@ def register_handler(kind: str, fn: Callable[..., Any]) -> None:
 
 def enqueue(kind: str, payload: Mapping[str, Any], *, actor_id: str, tenant_id: str,
             project_id: Optional[str] = None, idempotency_key: Optional[str] = None,
-            correlation_id: Optional[str] = None, timeout_s: float = DEFAULT_TIMEOUT_S) -> JobHandle:
+            correlation_id: Optional[str] = None, timeout_s: float = DEFAULT_TIMEOUT_S,
+            request_digest: Optional[str] = None) -> JobHandle:
     try:
         handle = _backend().enqueue(
             kind, payload, actor_id=actor_id, tenant_id=tenant_id, project_id=project_id,
             idempotency_key=idempotency_key, correlation_id=correlation_id, timeout_s=timeout_s,
+            request_digest=request_digest,
         )
     except Exception as exc:
         if exc.__class__.__name__ == "IdempotencyMismatch" and not isinstance(exc, IdempotencyMismatch):
@@ -511,13 +609,23 @@ def enqueue_game_build(payload: Mapping[str, Any], **kwargs: Any) -> JobHandle:
     return enqueue(BUILD_KIND, payload, **kwargs)
 
 
-def execution_view(execution_id: str) -> dict[str, Any]:
+def execution_view(execution_id: str, *, actor_id: Optional[str] = None,
+                   tenant_id: Optional[str] = None) -> dict[str, Any]:
     """Status document for ``GET /api/v1/game/build/{execution_id}``."""
     from skeleton.forge.game_builder import RUN_SCHEMA
 
     job_id = get_by_execution(execution_id)
     if not job_id:
         raise KeyError(execution_id)
+    if actor_id is not None or tenant_id is not None:
+        backend = _backend()
+        identity = backend.get_identity(job_id)
+        if not isinstance(identity, Mapping):
+            identity = vars(identity)
+        if (not actor_id or not tenant_id or identity.get("actor_id") != actor_id
+                or identity.get("tenant_id") != tenant_id or identity.get("kind") != BUILD_KIND
+                or identity.get("execution_id") != execution_id):
+            raise KeyError(execution_id)
     status = get_status(job_id)
     result = get_result(job_id)
     return {

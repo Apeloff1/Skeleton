@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "fields": {
+    "request_id": {
+      "type": "text",
+      "max_bytes": 96,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+    },
+    "chunks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "fields": {
+          "index": {
+            "type": "int",
+            "min": 0,
+            "max": 100000
+          },
+          "text": {
+            "type": "text",
+            "max_bytes": 4096,
+            "allow_empty": true
+          }
+        }
+      },
+      "min_items": 1,
+      "max_items": 256
+    },
+    "max_bytes": {
+      "type": "int",
+      "min": 1,
+      "max": 262144
+    },
+    "terminal": {
+      "type": "text",
+      "max_bytes": 64,
+      "enum": [
+        "stop",
+        "length",
+        "cancelled"
+      ]
+    },
+    "generated_tokens": {
+      "type": "int",
+      "min": 0,
+      "max": 8192
+    },
+    "token_ceiling": {
+      "type": "int",
+      "min": 1,
+      "max": 8192
+    }
+  }
+}

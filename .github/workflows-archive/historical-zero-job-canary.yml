@@ -1,0 +1,165 @@
+name: Historical Actions zero-job canary recovery
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/historical-zero-job-canary.yml']
+
+permissions: {}
+
+concurrency:
+  group: historical-zero-job-canary-v1-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: Verify one closed-PR historical tombstone and attempt documented deletion
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 8
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPOSITORY: ${{ github.repository }}
+      GH_REF: ${{ github.ref }}
+      GH_EVENT: ${{ github.event_name }}
+    steps:
+      - name: Fail-closed tombstone identity proof, single DELETE, and terminal verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          REPO = 'Apeloff1/Skeleton'
+          RUN_ID = 34952509012
+          SHA = 'c29683c96673ef5ef6fff775a5fd9053e1bbf795'
+          CREATED = '2026-09-15T09:26:44Z'
+          BRANCH = 'frontier/work-live12'
+          PATH = '.github/workflows/ci.yml'
+          PR = 83
+          API = 'https://api.github.com/repos/' + REPO
+          token = os.environ.get('GH_TOKEN')
+          if not token or (
+              os.environ.get('GH_REPOSITORY') != REPO
+              or os.environ.get('GH_REF') != 'refs/heads/main'
+              or os.environ.get('GH_EVENT') != 'push'
+          ):
+              raise SystemExit('Refusing unexpected execution context')
+
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': 'Bearer ' + token,
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'skeleton-historical-zero-job-canary',
+          }
+          def api(method, path):
+              req = urllib.request.Request(
+                  API + path, method=method,
+                  headers=headers,
+                  data=b'' if method == 'DELETE' else None,
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as res:
+                      body = res.read()
+                      return res.status, json.loads(body) if body else None
+              except urllib.error.HTTPError as exc:
+                  body = exc.read(1500).decode('utf-8', errors='replace')
+                  return exc.code, body
+
+          def require_get(path, validator):
+              status, body = api('GET', path)
+              if status != 200 or not validator(body):
+                  raise RuntimeError(
+                      'Fail-closed historical proof for ' + path
+                      + ': HTTP ' + str(status)
+                  )
+              return body
+
+          def verify():
+              run = require_get(
+                  '/actions/runs/' + str(RUN_ID),
+                  lambda r: isinstance(r, dict),
+              )
+              identity = {
+                  'id': RUN_ID,
+                  'status': 'queued',
+                  'conclusion': None,
+                  'event': 'pull_request',
+                  'head_sha': SHA,
+                  'head_branch': BRANCH,
+                  'path': PATH,
+                  'run_attempt': 1,
+                  'created_at': CREATED,
+                  'updated_at': CREATED,
+              }
+              for field, expected in identity.items():
+                  if run.get(field) != expected:
+                      raise RuntimeError('Historical run changed: ' + field)
+              age = datetime.datetime.now(datetime.timezone.utc) - (
+                  datetime.datetime.fromisoformat(CREATED.replace('Z', '+00:00'))
+              )
+              if age.total_seconds() < 7 * 86400:
+                  raise RuntimeError('Run age too short for historical deletion')
+              jobs = require_get(
+                  '/actions/runs/' + str(RUN_ID) + '/jobs?per_page=100',
+                  lambda x: (
+                      isinstance(x, dict) and x.get('total_count') == 0
+                      and x.get('jobs') == []
+                  ),
+              )
+              artifacts = require_get(
+                  '/actions/runs/' + str(RUN_ID) + '/artifacts?per_page=100',
+                  lambda x: (
+                      isinstance(x, dict) and x.get('total_count') == 0
+                      and x.get('artifacts') == []
+                  ),
+              )
+              require_get(
+                  '/actions/runs/' + str(RUN_ID) + '/pending_deployments',
+                  lambda x: x == [],
+              )
+              associated = require_get(
+                  '/commits/' + SHA + '/pulls?per_page=100',
+                  lambda x: (
+                      isinstance(x, list) and len(x) == 1
+                      and x[0].get('number') == PR
+                  ),
+              )
+              pull = require_get(
+                  '/pulls/' + str(PR),
+                  lambda x: isinstance(x, dict) and x.get('number') == PR,
+              )
+              if (
+                  pull.get('state') != 'closed'
+                  or not pull.get('merged_at')
+                  or (pull.get('head') or {}).get('ref') != BRANCH
+                  or (pull.get('head') or {}).get('sha') == SHA
+              ):
+                  raise RuntimeError('Closed merged PR supersession unproven')
+              print('Exact historical identity, empty jobs/artifacts, '
+                    'no pending deployments, and closed PR #83 all verified')
+              return True
+
+          verify()
+          # Revalidate immediately before the only destructive API call.
+          verify()
+          status, body = api('DELETE', '/actions/runs/' + str(RUN_ID))
+          print('Documented delete endpoint result: HTTP', status)
+          if status != 204:
+              print('Provider refused deletion; 30 other historical records '
+                    'were not touched. Response:', str(body)[:500])
+              raise SystemExit(2)
+          status, body = api('GET', '/actions/runs/' + str(RUN_ID))
+          if status != 404:
+              raise RuntimeError('DELETE acknowledged but historical run '
+                                 'still present: HTTP ' + str(status))
+          print('Confirmed historical run ' + str(RUN_ID)
+                + ' removed by provider; no other run targeted')
+          PY
