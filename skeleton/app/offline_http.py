@@ -77,6 +77,7 @@ MAX_CHAT_REQUEST_BYTES = 64 * 1024
 MAX_MEDIA_ADVISORY_REQUEST_BYTES = 6 * 1024 * 1024
 MAX_CONNECTIONS = 16
 MAX_TURN_TICKETS = 32
+MAX_QUEUED_TURNS = 16
 TERMINAL_TURN_STATES = frozenset({"complete", "failed", "cancelled"})
 
 
@@ -152,7 +153,9 @@ class OfflineHTTPApplication:
     """One locally selected model identity, one SQLite authority, bounded work."""
 
     def __init__(self, backend: LocalDesktopModel, database: str | Path,
-                 *, token: str) -> None:
+                 *, token: str, max_queued_turns: int = 0) -> None:
+        if type(max_queued_turns) is not int or not 0 <= max_queued_turns <= MAX_QUEUED_TURNS:
+            raise ValueError("queued turn capacity must be an integer from 0 to 16")
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         # The generic offline desktop still supports native model fixtures.
@@ -172,6 +175,10 @@ class OfflineHTTPApplication:
         self._inference_circuit = LocalInferenceCircuit()
         self._inference_lease = LocalInferenceLease(self.database)
         self._turns: dict[tuple[str, str], _LocalTurn] = {}
+        # Process-local FIFO admission only; pending plaintext is never replayed
+        # across a restart. The existing backend and kernel lease remain sole owners.
+        self.max_queued_turns = max_queued_turns
+        self._pending_turns: dict[tuple[str, str], dict[str, Any]] = {}
         self._active_session: str | None = None
         self._closing = False
         self._game_builder = None
@@ -271,6 +278,12 @@ class OfflineHTTPApplication:
         if turn.state in TERMINAL_TURN_STATES:
             return
         turn.cancel_requested = True
+        key = (turn.session_id, turn.request_id)
+        if key in self._pending_turns:
+            del self._pending_turns[key]
+            turn.state = "cancelled"
+            turn.finished_at = time.time()
+            return
         turn.state = "cancelling"
         if turn.loop is not None and turn.task is not None:
             try:
@@ -312,6 +325,9 @@ class OfflineHTTPApplication:
         if type(retry) is not bool:
             raise OfflineHTTPError(400, "retry must be a boolean")
         rid, digest = self._turn_identity(request, self.default_output_tokens)
+        # Detach the only mutable admitted field from the caller before queueing.
+        if "document_ids" in request:
+            request["document_ids"] = list(request["document_ids"])
         with self._store.read_snapshot():
             self._session(session_id)
             # Reject an already-owned ID with changed inputs before admission.
@@ -339,81 +355,105 @@ class OfflineHTTPApplication:
             # GGUF cannot be offered as a healthy new request. A completed
             # idempotent turn remains readable even when the model is gone.
             self._admit_local_generation()
+            # Keep per-conversation ordering explicit: one unresolved turn per
+            # session. Different sessions may opt into bounded FIFO admission.
+            if self._active_session == session_id or any(
+                pending_sid == session_id for pending_sid, _ in self._pending_turns
+            ):
+                raise OfflineHTTPError(409, "another local generation is still running for this session")
             if self._active_session is not None:
-                raise OfflineHTTPError(409, "another local generation is still running")
+                if self.max_queued_turns == 0:
+                    raise OfflineHTTPError(409, "another local generation is still running")
+                if len(self._pending_turns) >= self.max_queued_turns:
+                    raise OfflineHTTPError(429, "local generation queue is full")
             if existing is not None:
                 del self._turns[key]
             while len(self._turns) >= MAX_TURN_TICKETS:
-                # Admission above guarantees every retained ticket is terminal.
-                self._turns.pop(next(iter(self._turns)))
+                terminal_key = next((
+                    k for k, ticket in self._turns.items()
+                    if ticket.state in TERMINAL_TURN_STATES
+                    and ticket.finished_at is not None
+                ), None)
+                if terminal_key is None:
+                    raise OfflineHTTPError(429, "local generation ticket capacity reached")
+                del self._turns[terminal_key]
             turn = _LocalTurn(session_id, rid, digest)
-            worker = threading.Thread(
-                target=self._run_turn, args=(turn, request),
-                name="skeleton-local-turn", daemon=False,
-            )
-            turn.worker = worker
             self._turns[key] = turn
-            self._active_session = session_id
-            try:
-                worker.start()
-            except BaseException:
-                del self._turns[key]
-                self._active_session = None
-                raise
+            self._pending_turns[key] = request
+            self._start_next_turn_locked()
             return 202, turn.public()
 
+    def _start_next_turn_locked(self) -> None:
+        """Dispatch at most one job under the application admission lock.
+
+        Queued tickets hold no model lease and start no thread. New execution
+        rechecks model readiness, canonical request identity and durable replay
+        in _perform_turn. There is no implicit retry or parallel GGUF execution.
+        """
+        while not self._closing and self._active_session is None and self._pending_turns:
+            key = next(iter(self._pending_turns))
+            request = self._pending_turns.pop(key)
+            turn = self._turns[key]
+            try:
+                worker = threading.Thread(
+                    target=self._run_turn, args=(turn, request),
+                    name="skeleton-local-turn", daemon=False,
+                )
+                turn.worker = worker
+                self._active_session = turn.session_id
+                worker.start()
+            except (RuntimeError, OSError):
+                turn.worker = None
+                turn.error = "local generation worker unavailable"
+                turn.finished_at = time.time()
+                turn.state = "failed"
+                self._active_session = None
+                continue
+            return
+
     def _run_turn(self, turn: _LocalTurn, request: dict[str, Any]) -> None:
+        result = None
+        error = None
+        final_state = "failed"
         try:
             with self._turn_lock:
                 if turn.cancel_requested:
                     raise asyncio.CancelledError()
                 turn.state = "running"
             result = self._perform_turn(turn.session_id, request, turn=turn)
-            with self._turn_lock:
-                # Durable commit wins a late cancellation request.
-                turn.result = result
-                turn.state = "complete"
+            # A durable commit wins a late cancellation request.
+            final_state = "complete"
         except asyncio.CancelledError:
-            with self._turn_lock:
-                turn.state = "cancelled"
+            final_state = "cancelled"
         except OfflineHTTPError as exc:
-            # OfflineHTTPError is an internal exception too: future callers
-            # may construct it with CLI stderr, a model path or prompt text.
-            # Async tickets are public to the authenticated client and must
-            # NEVER serialize exception strings, even when the status code is
-            # expected. Keep only a bounded, stable operator-facing category.
-            message = {
+            # Never serialize raw runtime exceptions into public tickets.
+            error = {
                 400: "local request validation failed",
                 403: "local model operation denied",
                 404: "local conversation unavailable",
                 409: "local conversation conflict",
                 422: "local grounding unavailable",
                 423: "another local service owns the inference execution slot",
+                429: "local generation admission capacity reached",
                 503: "local model or durable storage unavailable",
             }.get(exc.status, "local generation failed")
-            with self._turn_lock:
-                turn.state = "failed"
-                turn.error = message
         except (OfflineAIError, RuntimeContractError):
-            # Backends may include absolute model paths, CLI output or private
-            # runtime details in exceptions. Tickets are client-visible.
-            with self._turn_lock:
-                turn.state = "failed"
-                turn.error = "local model or durable conversation operation failed"
+            error = "local model or durable conversation operation failed"
         except BaseException:
-            # This is a dedicated worker thread. An unusual native binding can
-            # raise BaseException (e.g. SystemExit) instead of Exception. Never
-            # strand a user-visible ticket in "running" after the worker dies.
-            # The finally block still releases the single-model admission slot.
-            with self._turn_lock:
-                turn.state = "failed"
-                turn.error = "local generation failed; inspect the model and retry"
+            # Unusual native failures must not strand the execution slot.
+            error = "local generation failed; inspect the model and retry"
         finally:
             with self._turn_lock:
+                # Publish terminal state, timestamp and slot release atomically.
+                # No client observes terminal completion with a still-owned slot.
+                turn.result = result
+                turn.error = error
                 turn.finished_at = time.time()
                 turn.task = None
                 turn.loop = None
+                turn.state = final_state
                 self._active_session = None
+                self._start_next_turn_locked()
 
     def _read_committed_turn(
         self, session_id: str, request_id: str, *,
@@ -813,7 +853,9 @@ class OfflineHTTPApplication:
         if path == "/v1/status" and method == "GET":
             with self._turn_lock:
                 active = next((t for t in self._turns.values()
-                               if t.state not in TERMINAL_TURN_STATES), None)
+                               if t.session_id == self._active_session
+                               and t.state not in TERMINAL_TURN_STATES), None)
+                queued_turn_count = len(self._pending_turns)
                 active_turn = None if active is None else {
                     "session_id": active.session_id, "request_id": active.request_id,
                     "state": active.state, "cancel_requested": active.cancel_requested,
@@ -842,6 +884,8 @@ class OfflineHTTPApplication:
                 "async_turns": True,
                 "cancellation": True,
                 "max_turn_tickets": MAX_TURN_TICKETS,
+                "max_queued_turns": self.max_queued_turns,
+                "queued_turn_count": queued_turn_count,
                 "active_turn": active_turn,
                 "context_tokens": context_tokens,
                 "max_output_tokens": min(output_tokens, max(1, context_tokens - 1)),
@@ -1048,8 +1092,10 @@ class OfflineHTTPApplication:
                 }
             if method == "DELETE":
                 with self._turn_lock:
-                    if self._active_session == sid:
-                        raise OfflineHTTPError(409, "cancel the active turn and wait for it to settle before deleting")
+                    if self._active_session == sid or any(
+                        pending_sid == sid for pending_sid, _ in self._pending_turns
+                    ):
+                        raise OfflineHTTPError(409, "cancel the active or queued turn before deleting")
                     self._store.delete(sid, self.model_digest,
                                        self.tokenizer_digest)
                     self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
@@ -1171,6 +1217,7 @@ class OfflineHTTPApplication:
             finally:
                 with self._turn_lock:
                     self._active_session = None
+                    self._start_next_turn_locked()
         if tail == "turns" and method == "POST":
             return self.submit_turn(sid, body)
         if tail == "fork" and method == "POST":
@@ -1596,6 +1643,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="new private bearer-token file; never overwritten")
     parser.add_argument("--port", type=int, default=0,
                         help="localhost TCP port, default: OS-assigned ephemeral port")
+    parser.add_argument("--queued-turns", type=int, default=0, choices=range(MAX_QUEUED_TURNS + 1),
+                        help="optional bounded pending turns across sessions; one execution owner")
     parser.add_argument("--open-browser", action="store_true",
                         help="open the local workspace after binding; token remains in its private file")
     args = parser.parse_args(argv)
@@ -1609,7 +1658,7 @@ def main(argv: list[str] | None = None) -> int:
                    else load_gguf_deployment(args.gguf_deployment))
         db = args.database or private_desktop_database(backend.model_digest)
         token = secrets.token_urlsafe(48)
-        app = OfflineHTTPApplication(backend, db, token=token)
+        app = OfflineHTTPApplication(backend, db, token=token, max_queued_turns=args.queued_turns)
         # Bind before creating private credentials: a conflicting port must
         # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:

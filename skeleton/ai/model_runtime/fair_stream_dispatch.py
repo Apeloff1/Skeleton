@@ -9,7 +9,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from threading import RLock
-from typing import Mapping, Protocol
+from typing import TYPE_CHECKING, Mapping, Protocol
+
+if TYPE_CHECKING:
+    from .fair_stream_execution_journal import FairStreamExecutionJournal
+    from .fair_stream_recovery import RecoveryAuthorization
 
 from .fair_stream_live_budget import LiveStreamBudgetSampler
 from .fair_stream_queue import MeasuredStreamBudget, StreamRequest, MAX_TOKENS

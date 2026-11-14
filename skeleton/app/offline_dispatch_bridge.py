@@ -9,6 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 import sqlite3
 import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from skeleton.ai.model_runtime.fair_stream_execution_journal import FairStreamExecutionJournal
+    from skeleton.ai.model_runtime.fair_stream_recovery import RecoveryAuthorization
 
 from skeleton.ai.model_runtime.fair_stream_dispatch import (
     DispatchUncertain, DurableExecutionOwner,

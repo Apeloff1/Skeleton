@@ -816,3 +816,66 @@ def test_descriptor_replacement_is_not_admitted_as_the_original_lease(tmp_path):
         leave_local_lease(token)
         os.close(first)
         os.close(second)
+
+def test_opt_in_queue_serializes_distinct_sessions_and_cancels_before_execution(tmp_path, monkeypatch):
+    """Admission only: intentionally mocked execution failure, no inference claim."""
+    import threading
+
+    app = OfflineHTTPApplication(
+        native_model(), tmp_path / "queued.sqlite3", token="q" * 64, max_queued_turns=2,
+    )
+    entered = threading.Event()
+    release = threading.Event()
+    started = []
+
+    def blocked_failure(sid, request, *, turn=None):
+        started.append(request["request_id"])
+        if request["request_id"] == "first":
+            entered.set()
+            assert release.wait(10)
+        raise OfflineHTTPError(503, "private runtime detail")
+
+    monkeypatch.setattr(app, "_perform_turn", blocked_failure)
+
+    def request(rid):
+        return {"message": "hello", "request_id": rid, "max_output_tokens": 2}
+
+    def settled(sid, rid):
+        deadline = time.monotonic() + 10
+        while True:
+            ticket = app.turn_status(sid, rid)
+            if ticket["terminal"]:
+                assert ticket["finished_at"] is not None
+                return ticket
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+
+    try:
+        sessions = [app.dispatch("POST", "/v1/sessions", {})[1]["session_id"] for _ in range(4)]
+        first, second, third, fourth = sessions
+        assert app.submit_turn(first, request("first"))[0] == 202
+        assert entered.wait(5)
+        assert app.submit_turn(second, request("second"))[1]["state"] == "queued"
+        assert app.submit_turn(third, request("third"))[1]["state"] == "queued"
+        assert app.submit_turn(second, request("second"))[0] == 202
+        with pytest.raises(OfflineHTTPError) as same:
+            app.submit_turn(second, request("duplicate-session"))
+        assert same.value.status == 409
+        with pytest.raises(OfflineHTTPError) as full:
+            app.submit_turn(fourth, request("fourth"))
+        assert full.value.status == 429
+        with pytest.raises(OfflineHTTPError) as deleting:
+            app.dispatch("DELETE", f"/v1/sessions/{second}", {})
+        assert deleting.value.status == 409
+        cancelled = app.turn_status(second, "second", cancel=True)
+        assert cancelled["state"] == "cancelled" and cancelled["finished_at"] is not None
+        assert app.submit_turn(fourth, request("fourth"))[1]["state"] == "queued"
+        release.set()
+        for sid, rid in [(first, "first"), (third, "third"), (fourth, "fourth")]:
+            assert settled(sid, rid)["error"] == "local model or durable storage unavailable"
+        assert started == ["first", "third", "fourth"]
+        assert app._active_session is None
+        assert not app._pending_turns
+    finally:
+        release.set()
+        app.close()

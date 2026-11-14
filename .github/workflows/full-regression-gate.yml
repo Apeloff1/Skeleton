@@ -244,9 +244,58 @@ jobs:
           scripts/test-telemetry-batch-admission.cjs
           scripts/test-wasm-origin-execution-boundary.cjs
 
+  source-security-regression:
+    name: Draft-capable source security evidence
+    needs: head-sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Verify source selection
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          if [[ -n "$BASE_SHA" ]]; then
+            [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+            git cat-file -e "$BASE_SHA^{commit}"
+          fi
+      - name: Exercise malware and artifact policy contracts
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_malware_policy.py' -q
+          python -m unittest discover -s tests -p 'test_malware_policy_streaming.py' -q
+          python -m unittest discover -s tests -p 'test_package_lifecycle_policy.py' -q
+          python -m unittest discover -s tests -p 'test_artifact_policy.py' -q
+          python -m unittest discover -s tests -p 'test_artifact_reference.py' -q
+      - name: Scan exact candidate without publishing or modifying artifacts
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+        run: |
+          set -euo pipefail
+          python scripts/check_package_lifecycle.py
+          python backend/scripts/check_malware_iocs.py
+          python scripts/artifact_reference.py --check
+          if [[ -n "$BASE_SHA" ]]; then
+            python scripts/check_malware_policy.py --base "$BASE_SHA"
+            python scripts/check_artifact_policy.py --base "$BASE_SHA"
+          else
+            python scripts/check_malware_policy.py --all
+            python scripts/check_artifact_policy.py --all
+          fi
+
   gate:
     name: Full regression gate
-    needs: [head-sha, python-regression, node-regression]
+    needs: [head-sha, python-regression, node-regression, source-security-regression]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -256,6 +305,7 @@ jobs:
           HEAD_SHA_RESULT: ${{ needs.head-sha.result }}
           PYTHON_RESULT: ${{ needs.python-regression.result }}
           NODE_RESULT: ${{ needs.node-regression.result }}
+          SECURITY_RESULT: ${{ needs.source-security-regression.result }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -266,6 +316,7 @@ jobs:
               "head-sha": os.environ["HEAD_SHA_RESULT"],
               "python-regression": os.environ["PYTHON_RESULT"],
               "node-regression": os.environ["NODE_RESULT"],
+              "source-security-regression": os.environ["SECURITY_RESULT"],
           }
           failures = {
               name: result
