@@ -192,3 +192,11 @@ def test_stream_is_denied_before_ungated_generate():
             pass
     with pytest.raises(ProviderPolicyError):
         asyncio.run(drain())
+
+
+def test_governed_readiness_alias_preserves_canonical_class_identity():
+    from skeleton import provider_model_readiness as canonical
+    from skeleton.ai.runtime import provider_model_readiness as alias
+
+    for name in alias.__all__:
+        assert getattr(alias, name) is getattr(canonical, name)
