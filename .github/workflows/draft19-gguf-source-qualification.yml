@@ -24,6 +24,8 @@ on:
       - "machine/draft19_reconciliation.json"
       - "scripts/check_draft19_reconciliation.py"
       - "tests/test_draft19_reconciliation.py"
+      - "scripts/check_draft19_ci_paths.py"
+      - "tests/test_draft19_ci_paths.py"
       - ".github/workflows/draft19-gguf-source-qualification.yml"
 
 permissions:
@@ -65,6 +67,10 @@ jobs:
           python -m py_compile scripts/check_draft19_reconciliation.py tests/test_draft19_reconciliation.py
       - name: Verify complete held-source registry
         run: python scripts/check_draft19_reconciliation.py
+      - name: Admit literal Python source and pytest paths
+        run: |
+          python scripts/check_draft19_ci_paths.py
+          python -m unittest discover -s tests -p 'test_draft19_ci_paths.py' -v
       - name: Run adversarial ledger tests
         run: python -m unittest discover -s tests -p 'test_draft19_reconciliation.py' -v
       - name: Install approved local-AI import-chain test dependencies
