@@ -6,5 +6,5 @@ class InvariantViolation(ValueError):
 
 
 def require(condition: bool, message: str) -> None:
-    if not condition:
+    if condition is not True:
         raise InvariantViolation(message)
