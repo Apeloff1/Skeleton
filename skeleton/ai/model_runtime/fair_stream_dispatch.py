@@ -334,6 +334,31 @@ class GuardedFairStreamDispatch:
             raise DispatchUncertain("durable lease differs from permit")
         return state
 
+    def _verify_bound_sealed_receipt(
+        self, permit: DispatchPermit, state: dict[str, object],
+        receipt: Mapping[str, object],
+    ) -> None:
+        """Verify both independent result stores for the canonical native owner."""
+        from .fair_stream_execution_journal import JournaledExecutionOwner
+        from .fair_stream_result_vault import SealedFairStreamResultVault
+
+        owner = self._owner
+        if type(owner) is not JournaledExecutionOwner or type(owner._backend) is not SealedFairStreamResultVault:
+            # Generic execution owners use their own durable-result contract.
+            return
+        with owner._lock:
+            journal, vault = owner._journal, owner._backend
+            if journal.session_id != state["session_id"] or vault.session_id != journal.session_id:
+                raise DispatchUncertain("sealed result session mismatch")
+            signed = journal.recover_committed_receipt(permit)
+            if type(receipt) is not dict or receipt != signed:
+                raise DispatchUncertain("signed receipt differs from bound journal")
+            consumed, digest = vault.verify_published_result(permit, state)
+            if (type(signed["consumed_tokens"]) is not int
+                    or consumed != signed["consumed_tokens"]
+                    or digest != signed["result_digest"]):
+                raise DispatchUncertain("journal and authenticated sealed output disagree")
+
     def reconcile_committed(
         self, *, journal: "FairStreamExecutionJournal",
         authorization: "RecoveryAuthorization", recovery_key: bytes,
@@ -345,15 +370,15 @@ class GuardedFairStreamDispatch:
         an uncommitted execution, an unknown result or a rolled-back anchor.
         """
         from .fair_stream_execution_journal import (
-            ExecutionOutcomeUnknown, FairStreamExecutionJournal,
+            FairStreamExecutionJournal, JournaledExecutionOwner,
         )
-        from .fair_stream_recovery import (
-            RecoveryAuthorization, verify_recovery_authorization,
-        )
+        from .fair_stream_recovery import verify_recovery_authorization
 
         if type(journal) is not FairStreamExecutionJournal:
             raise ValueError("canonical committed execution journal required")
         with self._lock:
+            if type(self._owner) is JournaledExecutionOwner and journal is not self._owner._journal:
+                raise ValueError("recovery requires the bound execution journal")
             if self._executing:
                 raise DispatchUncertain("execution owner is still active")
             state = self._session.verify()
@@ -383,9 +408,14 @@ class GuardedFairStreamDispatch:
             )
             # Never call execute_and_commit, even if the journal has only a
             # RUNNING intent. The execution result must already be durable.
+            self._executing = True
             try:
                 receipt = journal.recover_committed_receipt(permit)
-                updated = self._session.acknowledge(receipt, whole_request=self._whole_request)
+                self._verify_bound_sealed_receipt(permit, state, receipt)
+                updated = self._session.acknowledge(
+                    receipt, whole_request=self._whole_request,
+                    expected_anchor=(state["generation"], state["digest"]),
+                )
             except BaseException as exc:
                 # SQLite I/O errors, interruption and malformed receipts are
                 # also uncertain outcomes. Do not leave the app reporting an
@@ -394,6 +424,8 @@ class GuardedFairStreamDispatch:
                 raise DispatchUncertain(
                     "committed receipt unavailable or custody reconciliation failed"
                 ) from exc
+            finally:
+                self._executing = False
             self._issued.clear()
             self._issued_token_budget = None
             self._uncertain = False
@@ -577,7 +609,11 @@ class GuardedFairStreamDispatch:
                     ) from exc
                 # Never accept an unsigned result or manufacture a completion.
                 try:
-                    updated = self._session.acknowledge(receipt, whole_request=self._whole_request)
+                    self._verify_bound_sealed_receipt(permit, refreshed, receipt)
+                    updated = self._session.acknowledge(
+                        receipt, whole_request=self._whole_request,
+                        expected_anchor=(refreshed["generation"], refreshed["digest"]),
+                    )
                 except BaseException as exc:
                     self._uncertain = True
                     raise DispatchUncertain(

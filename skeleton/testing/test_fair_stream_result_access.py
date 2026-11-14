@@ -282,3 +282,23 @@ def test_distinct_handle_to_same_result_inode_rejected(setup):
             )
     finally:
         second.close()
+
+def test_valid_read_grant_cannot_release_output_with_disagreeing_signed_count(setup):
+    from skeleton.ai.model_runtime.fair_stream_custody import sign_execution_result
+    from skeleton.ai.model_runtime.fair_stream_execution_journal import _receipt_bytes
+
+    receipt = sign_execution_result(
+        execution_key=EXECUTION_KEY, session_id=SESSION, generation=2,
+        checkpoint_digest=CHECKPOINT, lease_id=LEASE, consumed_tokens=7,
+        result_digest=setup["receipt"]["result_digest"],
+    )
+    setup["journal"]._connection.execute(
+        "UPDATE local_fair_stream_execution_journal SET consumed_tokens=?,receipt=?",
+        (7, _receipt_bytes(receipt)),
+    )
+    g = grant(setup)
+    with pytest.raises(SealedResultUnavailable, match="signed consumed"):
+        setup["reader"].read_once(permit(), operator_grant=g)
+    with pytest.raises(ResultReadDenied, match="already consumed"):
+        setup["reader"].read_once(permit(), operator_grant=g)
+    assert setup["backend"].calls == 1

@@ -581,3 +581,80 @@ def test_published_native_result_recovery_never_reexecutes(
         "SELECT state FROM local_fair_stream_execution_journal"
     ).fetchone() == ("committed",)
     assert registry.status()["consumed_or_revoked"] == 1
+
+@pytest.mark.parametrize("damage", ["none", "missing", "nonce", "signed-count", "foreign-journal"])
+def test_committed_recovery_verifies_bound_native_vault(private_files, monkeypatch, damage):
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchUncertain
+    from skeleton.ai.model_runtime.fair_stream_recovery import issue_recovery_authorization
+    from skeleton.ai.model_runtime.fair_stream_custody import sign_execution_result
+    from skeleton.ai.model_runtime.fair_stream_execution_journal import _receipt_bytes
+
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry, request_id="committed-native",
+        tenant_id="alice", prompt="hello", max_output_tokens=2,
+    )
+    service.submit(StreamRequest("committed-native", "alice", InferencePhase.PREFILL, 2, 16))
+    original_ack = session.acknowledge
+
+    def lost_ack(*args, **kwargs):
+        raise OSError("simulated loss after signed journal commit")
+
+    monkeypatch.setattr(session, "acknowledge", lost_ack)
+    with pytest.raises(DispatchUncertain, match="receipt not durably reconciled"):
+        service.execute_next(token_budget=2)
+    monkeypatch.setattr(session, "acknowledge", original_ack)
+    before = session.verify()
+    lease = before["checkpoint"]["pending"][0]
+    approval = issue_recovery_authorization(
+        recovery_key=b"o" * 32, session_id=SESSION,
+        generation=before["generation"], checkpoint_digest=before["checkpoint_digest"],
+        lease_id=lease["lease_id"], nonce="f" * 32,
+    )
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("committed recovery invoked native inference")
+
+    monkeypatch.setattr(vault._backend, "generate", forbidden)
+    if damage == "missing":
+        vault._connection.execute("DELETE FROM local_fair_stream_sealed_results")
+    elif damage == "nonce":
+        vault._connection.execute("UPDATE local_fair_stream_sealed_results SET nonce=zeroblob(12)")
+    elif damage == "signed-count":
+        count, digest = journal._connection.execute(
+            "SELECT consumed_tokens,result_digest FROM local_fair_stream_execution_journal"
+        ).fetchone()
+        different = (count + 1) % 3
+        forged = sign_execution_result(
+            execution_key=EXECUTION_KEY, session_id=SESSION,
+            generation=before["generation"], checkpoint_digest=before["checkpoint_digest"],
+            lease_id=lease["lease_id"], consumed_tokens=different, result_digest=digest,
+        )
+        journal._connection.execute(
+            "UPDATE local_fair_stream_execution_journal SET consumed_tokens=?,receipt=?",
+            (different, _receipt_bytes(forged)),
+        )
+    if damage == "foreign-journal":
+        with sqlite3.connect(":memory:") as connection:
+            other = FairStreamExecutionJournal(
+                connection, session_id=SESSION, execution_key=EXECUTION_KEY,
+            )
+            with pytest.raises(ValueError, match="bound execution journal"):
+                service.reconcile_committed(journal=other, authorization=approval, recovery_key=b"o" * 32)
+        assert session.verify() == before
+        return
+    if damage != "none":
+        with pytest.raises(DispatchUncertain, match="committed receipt"):
+            service.reconcile_committed(journal=journal, authorization=approval, recovery_key=b"o" * 32)
+        assert session.verify() == before and service.status().execution_uncertain
+        return
+    done = service.reconcile_committed(journal=journal, authorization=approval, recovery_key=b"o" * 32)
+    assert done.pending_leases == 0 and not done.execution_uncertain
+    assert registry.status()["consumed_or_revoked"] == 1

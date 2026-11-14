@@ -338,6 +338,7 @@ class SealedFairStreamResultVault:
 
     def read_committed(
         self, permit: DispatchPermit, *, expected_result_digest: str,
+        expected_consumed_tokens: int | None = None,
     ) -> bytes:
         """Authorized in-process read bound to an already signed receipt.
 
@@ -346,12 +347,20 @@ class SealedFairStreamResultVault:
         """
         _identity(permit)
         expected = _hex(expected_result_digest, 64, "result receipt digest")
+        if expected_consumed_tokens is not None and (
+            type(expected_consumed_tokens) is not int
+            or not 0 <= expected_consumed_tokens <= permit.tokens
+        ):
+            raise ValueError("invalid signed consumed token count")
         with self._lock:
             self._require_open()
             row = self._row(permit.lease_id)
             if row is None:
                 raise SealedResultUnavailable("result not committed")
-            _, plaintext = self._authenticate_row(permit, row, expected)
+            consumed, plaintext = self._authenticate_row(permit, row, expected)
+            if expected_consumed_tokens is not None and consumed != expected_consumed_tokens:
+                raise SealedResultUnavailable("signed consumed token count mismatch")
+            self._require_open()
             return plaintext
 
     def verify_published_result(self, permit: DispatchPermit, state: Mapping[str, object]) -> tuple[int, str]:

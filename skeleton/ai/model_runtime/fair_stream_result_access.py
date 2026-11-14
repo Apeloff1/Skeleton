@@ -233,6 +233,9 @@ class AuthorizedSealedResultReader:
             ):
                 raise ResultReadDenied("journal receipt does not bind permit")
             digest = _hex(receipt.get("result_digest"), 64, "receipt digest")
+            consumed = receipt.get("consumed_tokens")
+            if type(consumed) is not int or not 0 <= consumed <= permit.tokens:
+                raise ResultReadDenied("invalid signed consumed token count")
             nonce = verify_result_read_grant(
                 operator_grant, public_key=self._public_key,
                 permit=permit, session_id=self._journal.session_id,
@@ -263,5 +266,5 @@ class AuthorizedSealedResultReader:
             # COMMIT and decrypt burns the grant; the operator must issue a
             # different signed nonce after reviewing the uncertain read.
             return self._vault.read_committed(
-                permit, expected_result_digest=digest,
+                permit, expected_result_digest=digest, expected_consumed_tokens=consumed,
             )
