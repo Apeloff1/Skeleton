@@ -263,6 +263,10 @@ class WorkflowTierTests(unittest.TestCase):
             self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
             readiness.write_text(readiness_original)
 
+            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
+            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            readiness.write_text(readiness_original)
+
             # The required Merge Readiness lane must retain the same exact
             # source suites even though separate automatic runs are removed.
             readiness.write_text(readiness_original.replace(
