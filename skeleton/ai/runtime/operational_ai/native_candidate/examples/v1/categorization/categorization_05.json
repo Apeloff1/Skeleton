@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "categorization_05",
+  "domain": "categorization",
+  "prompt": "Route fictional record 604 about a invoice to exactly one category: finance, engineering, logistics or human_resources.",
+  "completion": "finance",
+  "group_id": "categorization_05",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

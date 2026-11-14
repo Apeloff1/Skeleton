@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "deduplication_15",
+  "domain": "deduplication",
+  "severity": "high",
+  "objective": "Quantify native model extraction and data transformation fidelity for deduplication trial 15",
+  "steps": [
+    {
+      "prompt": "Remove duplicate words, preserving the first occurrence. Return only the comma-and-space separated unique words: amber, silver, jade, copper, cyan, ivory, amber, silver",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "amber, silver, jade, copper, cyan, ivory"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

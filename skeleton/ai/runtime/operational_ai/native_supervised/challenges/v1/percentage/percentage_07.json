@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "percentage_07",
+  "domain": "percentage",
+  "ordinal": 7,
+  "arguments": {
+    "index": 7,
+    "a": 149,
+    "b": 9,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 7: Compute 80 percent of 1490. Integer only.",
+  "expected": "1192",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

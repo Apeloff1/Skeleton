@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "deduplication_04",
+  "domain": "deduplication",
+  "severity": "high",
+  "objective": "Quantify native model extraction and data transformation fidelity for deduplication trial 4",
+  "steps": [
+    {
+      "prompt": "Remove duplicate words, preserving the first occurrence. Return only the comma-and-space separated unique words: navy, coral, red, teal, blue, amber, navy, coral, red",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "navy, coral, red, teal, blue, amber"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "json_merge_05",
+  "domain": "json_merge",
+  "ordinal": 5,
+  "arguments": {
+    "index": 5,
+    "a": 135,
+    "b": 7,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 5: Combine JSON objects {\"a\":135} and {\"b\":7}; compact keys a,b only.",
+  "expected": "{\"a\":135,\"b\":7}",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

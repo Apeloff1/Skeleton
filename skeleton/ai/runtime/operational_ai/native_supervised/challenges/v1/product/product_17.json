@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "product_17",
+  "domain": "product",
+  "ordinal": 17,
+  "arguments": {
+    "index": 17,
+    "a": 219,
+    "b": 6,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 17: Multiply 219 by 6. Return the decimal integer only.",
+  "expected": "1314",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

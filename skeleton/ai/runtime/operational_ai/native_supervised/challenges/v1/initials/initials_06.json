@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "initials_06",
+  "domain": "initials",
+  "ordinal": 6,
+  "arguments": {
+    "index": 6,
+    "a": 142,
+    "b": 8,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 6: Give uppercase initials of: atlas river molde.",
+  "expected": "ARM",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "routing_01",
+  "domain": "routing",
+  "prompt": "Route synthetic message 200 tagged lane=north, target=dispatch. Return only the selected target label.",
+  "completion": "dispatch",
+  "group_id": "routing_01",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

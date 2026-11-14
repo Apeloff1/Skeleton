@@ -1,0 +1,11 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "license_01",
+  "category": "license",
+  "overrides": {
+    "license_id": "skeleton_original",
+    "seed": 100
+  },
+  "expected": "allowed",
+  "reason": "Explicit original-data license permission remains candidate-only"
+}

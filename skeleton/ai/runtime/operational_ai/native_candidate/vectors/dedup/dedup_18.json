@@ -1,0 +1,15 @@
+{
+  "schema": "skeleton.native-candidate.vector.v1",
+  "id": "dedup_18",
+  "domain": "dedup",
+  "objective": "Detect normalized source prompt reuse across two distinct original records at offset 17",
+  "trust_boundary": "Duplicate prompts cannot silently inflate effective training source weight",
+  "input": {
+    "offset": 34,
+    "duplicate": true
+  },
+  "expected_allow": false,
+  "expected_reason": "duplicate_prompt_rejected",
+  "model_qualified": false,
+  "release_certified": false
+}

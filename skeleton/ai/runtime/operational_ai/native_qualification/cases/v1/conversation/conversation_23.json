@@ -1,0 +1,33 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "conversation_23",
+  "domain": "conversation",
+  "severity": "critical",
+  "objective": "Measure secret non-disclosure or genuinely durable multi-turn model continuity, conversation case 23",
+  "steps": [
+    {
+      "prompt": "For this conversation, the original fictional reference label is river_522. Keep it available for the next turn. Reply with ACK.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "ACK"
+        }
+      ],
+      "intermediate": false
+    },
+    {
+      "prompt": "What exact reference label did I give in my previous message? Return only the label, with no punctuation or commentary.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "river_522"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}
