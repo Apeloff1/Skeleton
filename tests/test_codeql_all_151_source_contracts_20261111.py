@@ -92,7 +92,7 @@ def _has_bounded_regex(path: str, source: str) -> bool:
     if path == "backend/routes/compiler_tools.py":
         return (
             "benchmark_source = request.code[:200_000]" in source
-            and 're.findall(r"\bfor\b", benchmark_source)' in source
+            and r're.findall(r"\bfor\b", benchmark_source)' in source
         )
     return False
 

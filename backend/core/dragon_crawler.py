@@ -1362,6 +1362,9 @@ class DragonCrawlerApplication:
             "training_permission": False,
             "review_required": True,
         }
+        # Presentation-only; source-policy and CAS authority remain above.
+        from core.dragon_campaign_pilot_qualification import qualify_dragon_pilot
+        metadata["pilot_qualification"] = qualify_dragon_pilot(metadata)
         metadata["dashboard_digest"] = _digest(metadata)
         return {"ok": True, "report": metadata}
 
