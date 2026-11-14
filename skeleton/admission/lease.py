@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import sqlite3
+import stat
 import time
 import uuid
 from contextlib import contextmanager
@@ -35,7 +36,9 @@ class AdmissionLease:
     """
 
     def __init__(self, ledger_path: Path, *, clock: Callable[[], float] = time.time):
-        self.ledger_path = Path(ledger_path)
+        # Freeze the absolute path once: a later chdir must not select a new ledger.
+        self.ledger_path = Path(ledger_path).absolute()
+        self._identity: tuple[int, int] | None = None
         self.clock = clock
         self.ledger_path.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -62,19 +65,42 @@ class AdmissionLease:
         except sqlite3.Error as exc:
             raise RuntimeError("admission ledger unavailable; fail closed") from exc
 
+    def _file_identity(self) -> tuple[int, int]:
+        metadata = self.ledger_path.lstat()
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise RuntimeError("admission ledger unavailable; private regular file required")
+        return metadata.st_dev, metadata.st_ino
+
     @contextmanager
     def _transaction(self, *, bootstrap: bool = False) -> Iterator[sqlite3.Connection]:
         # Do not silently replace a ledger that disappears between operations.
-        uri = self.ledger_path.resolve().as_uri() + ("?mode=rwc" if bootstrap else "?mode=rw")
+        uri = self.ledger_path.as_uri() + ("?mode=rwc" if bootstrap else "?mode=rw")
         db = None
         try:
+            try:
+                before = self._file_identity()
+            except FileNotFoundError:
+                if not bootstrap:
+                    raise
+                before = None
+            if self._identity is not None and before != self._identity:
+                raise RuntimeError("admission ledger identity changed; fail closed")
             db = sqlite3.connect(uri, uri=True, timeout=2.0, isolation_level=None)
+            opened = self._file_identity()
+            if before is not None and before != opened:
+                raise RuntimeError("admission ledger identity changed; fail closed")
             db.execute("PRAGMA synchronous=FULL")
             db.execute("BEGIN IMMEDIATE")
             if not bootstrap and db.execute("PRAGMA user_version").fetchone()[0] != _SCHEMA:
                 raise RuntimeError("admission ledger schema mismatch; fail closed")
             yield db
+            if self._file_identity() != opened:
+                raise RuntimeError("admission ledger identity changed; fail closed")
             db.execute("COMMIT")
+            if self._file_identity() != opened:
+                raise RuntimeError("admission ledger identity changed; fail closed")
+            if bootstrap:
+                self._identity = opened
         except (sqlite3.Error, OSError) as exc:
             raise RuntimeError("admission ledger unavailable; fail closed") from exc
         finally:
@@ -84,10 +110,13 @@ class AdmissionLease:
 
     def _now(self, db: sqlite3.Connection) -> float:
         now = self.clock()
-        if type(now) not in (int, float) or not math.isfinite(now) or now < 0:
+        # Bound timestamps to a representable civil-time range (through year 9999).
+        # This also keeps arithmetic precise and rejects oversized Python ints.
+        if type(now) not in (int, float) or not 0 <= now <= 253402300799:
             raise RuntimeError("invalid admission clock; fail closed")
         row = db.execute("SELECT ts FROM ledger_clock WHERE id=1").fetchone()
-        if row is None or not math.isfinite(row[0]) or now < row[0]:
+        if (row is None or type(row[0]) not in (int, float)
+                or not math.isfinite(row[0]) or row[0] < 0 or now < row[0]):
             raise RuntimeError("admission clock regressed; fail closed")
         db.execute("UPDATE ledger_clock SET ts=? WHERE id=1", (now,))
         return float(now)
