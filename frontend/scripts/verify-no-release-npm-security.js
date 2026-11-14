@@ -117,22 +117,22 @@ function verifyNodeForgeNestedDigestAlgorithmGuard() {
   const rsaSource = fs.readFileSync(rsaPath, 'utf8');
   const version = require('node-forge/package.json').version;
   if (version === '1.4.3') {
-    const source = fs.readFileSync(rsaPath);
-    const sha = require('crypto').createHash('sha1')
-      .update('blob ' + source.length + '\0')
-      .update(source).digest('hex');
-    if (sha !== '65f6e8469d8a7695f4438722577230136f9dd425' ||
-        !rsaSource.includes('var _encodeDigestInfo = function(oid, digest, withParameters)') ||
-        !rsaSource.includes('d.substring(0, withParameters.length) !== withParameters') ||
-        !rsaSource.includes('d.substring(0, withoutParameters.length) !== withoutParameters')) {
-      throw new Error('node-forge 1.4.3 canonical DER guard or upstream source provenance missing');
+    // 1.4.3 rejects non-canonical DER DigestInfo encodings, superseding the
+    // old nested-length local patch. Require exact reviewed upstream bytes;
+    // do not waive or skip the malicious RSA signature test above.
+    const { verifyReviewedForgeRsa } = require('./node-forge-rsa-custody.cjs');
+    const receipt = verifyReviewedForgeRsa(version, rsaSource);
+    if (receipt.patchRequired || receipt.locallyPatched ||
+        receipt.securityDecision !== 'reviewed_upstream_canonical_der') {
+      throw new Error('node-forge 1.4.3 canonical-DER source custody is not verified');
     }
-  } else if (new Set(['1.4.0', '1.4.2']).has(version)) {
+  } else if (version === '1.4.0' || version === '1.4.2') {
+    // Legacy formats retain their reviewed nested-element patch.
     if (!rsaSource.includes('obj.value[0].value.length !==')) {
       throw new Error('node-forge nested DigestAlgorithm source guard is missing');
     }
   } else {
-    throw new Error('node-forge installed version requires security review');
+    throw new Error(`node-forge ${version} requires a new security qualification`);
   }
 }
 

@@ -21,6 +21,60 @@
   ],
   "surfaces": [
     {
+      "surface_id": "modal:AchievementsModal",
+      "kind": "hub_modal",
+      "source": "frontend/src/features/Achievements/AchievementsModal.tsx",
+      "owner": "frontend/product-shell",
+      "maturity": "operational_candidate",
+      "runtime_ready_claim": false,
+      "action_mode": "interactive",
+      "backend_mode": "local_or_navigation",
+      "source_sha256": "38c341e8f59e26b4197573bb5e34edebe2c8fd162d47e00168dc99a5ccaf1963",
+      "interaction_count": 11,
+      "backend_surfaces": [],
+      "navigation_targets": [],
+      "accessibility_signal_count": 7,
+      "states": {
+        "loading": "Show bounded progress while required state is unresolved; never imply completion.",
+        "empty": "Explain that no authoritative records exist and provide the next valid action.",
+        "error": "Preserve prior valid state and expose a sanitized actionable failure.",
+        "retry": "Retry only the failed idempotent read or mutation under the current principal.",
+        "success": "Render only server-confirmed or durably committed results with provenance where applicable.",
+        "unavailable": "Name the unavailable dependency or authority requirement without synthetic fallback data."
+      },
+      "validation_evidence": [
+        "frontend/src/features/Achievements/AchievementsModal.tsx",
+        "scripts/check_product_surface_specification.py"
+      ]
+    },
+    {
+      "surface_id": "modal:AdvancedFeaturesModal",
+      "kind": "hub_modal",
+      "source": "frontend/src/features/Advanced/AdvancedFeaturesModal.tsx",
+      "owner": "frontend/product-shell",
+      "maturity": "full_spec_target",
+      "runtime_ready_claim": false,
+      "action_mode": "interactive",
+      "backend_mode": "local_or_navigation",
+      "source_sha256": "6e18c0306a6c16772b436576496cbc7d409df0cc7616d9a4deed620143262c50",
+      "interaction_count": 8,
+      "backend_surfaces": [],
+      "navigation_targets": [],
+      "accessibility_signal_count": 0,
+      "states": {
+        "loading": "Show bounded progress while required state is unresolved; never imply completion.",
+        "empty": "Explain that no authoritative records exist and provide the next valid action.",
+        "error": "Preserve prior valid state and expose a sanitized actionable failure.",
+        "retry": "Retry only the failed idempotent read or mutation under the current principal.",
+        "success": "Render only server-confirmed or durably committed results with provenance where applicable.",
+        "unavailable": "Name the unavailable dependency or authority requirement without synthetic fallback data."
+      },
+      "validation_evidence": [
+        "frontend/src/features/Advanced/AdvancedFeaturesModal.tsx",
+        "scripts/check_product_surface_specification.py"
+      ]
+    },
+    {
       "surface_id": "modal:AIGameGeneratorModal",
       "kind": "hub_modal",
       "source": "frontend/src/features/AIGameGenerator/AIGameGeneratorModal.tsx",
@@ -125,60 +179,6 @@
       },
       "validation_evidence": [
         "frontend/src/features/AI/AISuggestionsModal.tsx",
-        "scripts/check_product_surface_specification.py"
-      ]
-    },
-    {
-      "surface_id": "modal:AchievementsModal",
-      "kind": "hub_modal",
-      "source": "frontend/src/features/Achievements/AchievementsModal.tsx",
-      "owner": "frontend/product-shell",
-      "maturity": "operational_candidate",
-      "runtime_ready_claim": false,
-      "action_mode": "interactive",
-      "backend_mode": "local_or_navigation",
-      "source_sha256": "38c341e8f59e26b4197573bb5e34edebe2c8fd162d47e00168dc99a5ccaf1963",
-      "interaction_count": 11,
-      "backend_surfaces": [],
-      "navigation_targets": [],
-      "accessibility_signal_count": 7,
-      "states": {
-        "loading": "Show bounded progress while required state is unresolved; never imply completion.",
-        "empty": "Explain that no authoritative records exist and provide the next valid action.",
-        "error": "Preserve prior valid state and expose a sanitized actionable failure.",
-        "retry": "Retry only the failed idempotent read or mutation under the current principal.",
-        "success": "Render only server-confirmed or durably committed results with provenance where applicable.",
-        "unavailable": "Name the unavailable dependency or authority requirement without synthetic fallback data."
-      },
-      "validation_evidence": [
-        "frontend/src/features/Achievements/AchievementsModal.tsx",
-        "scripts/check_product_surface_specification.py"
-      ]
-    },
-    {
-      "surface_id": "modal:AdvancedFeaturesModal",
-      "kind": "hub_modal",
-      "source": "frontend/src/features/Advanced/AdvancedFeaturesModal.tsx",
-      "owner": "frontend/product-shell",
-      "maturity": "full_spec_target",
-      "runtime_ready_claim": false,
-      "action_mode": "interactive",
-      "backend_mode": "local_or_navigation",
-      "source_sha256": "6e18c0306a6c16772b436576496cbc7d409df0cc7616d9a4deed620143262c50",
-      "interaction_count": 8,
-      "backend_surfaces": [],
-      "navigation_targets": [],
-      "accessibility_signal_count": 0,
-      "states": {
-        "loading": "Show bounded progress while required state is unresolved; never imply completion.",
-        "empty": "Explain that no authoritative records exist and provide the next valid action.",
-        "error": "Preserve prior valid state and expose a sanitized actionable failure.",
-        "retry": "Retry only the failed idempotent read or mutation under the current principal.",
-        "success": "Render only server-confirmed or durably committed results with provenance where applicable.",
-        "unavailable": "Name the unavailable dependency or authority requirement without synthetic fallback data."
-      },
-      "validation_evidence": [
-        "frontend/src/features/Advanced/AdvancedFeaturesModal.tsx",
         "scripts/check_product_surface_specification.py"
       ]
     },
@@ -3337,6 +3337,35 @@
       "validation_evidence": [
         "frontend/app/discover.tsx",
         "scripts/check_product_surface_specification.py"
+      ]
+    },
+    {
+      "surface_id": "route:dragon-crawler-pilot",
+      "kind": "expo_route",
+      "source": "frontend/app/dragon-crawler-pilot.tsx",
+      "owner": "frontend/product-shell",
+      "maturity": "informational",
+      "runtime_ready_claim": false,
+      "action_mode": "informational",
+      "backend_mode": "local_or_navigation",
+      "source_sha256": "119690448fbfbbf486be858d19830724f8fdc5e1796eac3848aab7c058c28cd3",
+      "interaction_count": 0,
+      "backend_surfaces": [],
+      "navigation_targets": [],
+      "accessibility_signal_count": 0,
+      "states": {
+        "loading": "Show bounded progress while required state is unresolved; never imply completion.",
+        "empty": "Explain that no authoritative records exist and provide the next valid action.",
+        "error": "Preserve prior valid state and expose a sanitized actionable failure.",
+        "retry": "Retry only the failed idempotent read or mutation under the current principal.",
+        "success": "Render only server-confirmed or durably committed results with provenance where applicable.",
+        "unavailable": "Name the unavailable dependency or authority requirement without synthetic fallback data."
+      },
+      "validation_evidence": [
+        "frontend/app/dragon-crawler-pilot.tsx",
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/features/Jeeves/CrawlerReleasePrototype.tsx",
+        "docs/DRAGON_CRAWLER_USER_PILOT_SPEC.md"
       ]
     },
     {
