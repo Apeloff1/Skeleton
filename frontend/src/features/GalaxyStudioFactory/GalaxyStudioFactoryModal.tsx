@@ -44,9 +44,8 @@ import { jeevesSpeak } from '../Academy/jeevesTts';
 import { shareResult } from '../../utils/shareResult';
 import { classifyBuildJob } from '../../product/buildJobLifecycle';
 
-import { mergeGalaxyGenreCatalog } from './genreRegistry';
+import { FALLBACK_GENRES } from './fallbackGenres';
 import { prepareGalaxyHandoff } from '../../skeletonForge/galaxyHandoff';
-import { saveGalaxyProfile } from '../../skeletonForge/galaxyProfileCustody';
 const BACKEND = CANONICAL_API_BASE;
 
 interface Props { visible: boolean; onClose: () => void; }
@@ -387,7 +386,7 @@ export default function GalaxyStudioFactoryModal
   }, []);
   // Prime with baked-in fallback so the picker ALWAYS renders 52 genres,
   // network or not. The network fetch below overwrites on success.
-  const [genres, setGenres] = useState<Genre[]>(mergeGalaxyGenreCatalog(null) as Genre[]);
+  const [genres, setGenres] = useState<Genre[]>(FALLBACK_GENRES as any);
   const [manifest, setManifest] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -869,12 +868,12 @@ export default function GalaxyStudioFactoryModal
         staleMaxMs: 30 * 24 * 60 * 60_000, // serve up to 30 d stale
       });
       if (data && Array.isArray(data.genres) && data.genres.length > 0) {
-        setGenres(mergeGalaxyGenreCatalog(data) as Genre[]);
+        setGenres(data.genres);
         return;
       }
     } catch {}
     // Guarantee the fallback is always present
-    setGenres(prev => mergeGalaxyGenreCatalog({ genres: prev }) as Genre[]);
+    setGenres(prev => (prev && prev.length > 0 ? prev : (FALLBACK_GENRES as any)));
   };
 
   const addLog = useCallback((msg: string) => {
@@ -1360,20 +1359,6 @@ export default function GalaxyStudioFactoryModal
       mutation_matrix: mutationMatrix,
       unique_flair_matrix: uniqueFlairMatrix,
     });
-
-  /** Explicit, device-only save of all 14 matrices and extended settings. */
-  const saveFullGalaxyDesign = async () => {
-    if (loading || step !== 'pick' || !title.trim() || !selectedGenre) {
-      setStatusMsg('Choose a game title and genre before saving your design.');
-      return;
-    }
-    try {
-      await saveGalaxyProfile(makeGalaxyBuildPayload(selectedGenre));
-      setStatusMsg('Complete Galaxy design saved on this device. Restore it from GameForge whenever needed.');
-    } catch {
-      setStatusMsg('Could not save the Galaxy design locally; your current controls remain unchanged.');
-    }
-  };
 
   const sendToGameForge = () => {
     if (loading || step !== 'pick' || !title.trim() || !selectedGenre) {
@@ -1880,21 +1865,6 @@ export default function GalaxyStudioFactoryModal
 
         <TextInput testID="galaxy-studio-title-input" style={s.titleInput} placeholder="Game title (e.g. Shadow Realm)" placeholderTextColor={T.textMuted} value={title} onChangeText={setTitle} maxLength={60} />
 
-        <TouchableOpacity
-          testID="galaxy-save-full-design-on-device"
-          accessibilityRole="button"
-          accessibilityLabel="Save all Galaxy matrices, sliders and design decisions on this device"
-          accessibilityState={{ disabled: loading || !title.trim() || !selectedGenre }}
-          disabled={loading || !title.trim() || !selectedGenre}
-          onPress={() => { void saveFullGalaxyDesign(); }}
-          style={{ marginTop: 8, padding: 12, borderRadius: 12, borderWidth: 1,
-            borderColor: '#0EA5E9', backgroundColor: '#0EA5E915' }}
-        >
-          <Text style={{ color: T.text, fontWeight: '800', fontSize: 13 }}>Save complete Galaxy design on device</Text>
-          <Text style={{ color: T.textMuted, fontSize: 11, marginTop: 3 }}>
-            Keeps the full questionnaire for 30 days locally. It is not encrypted and is never automatically built or uploaded.
-          </Text>
-        </TouchableOpacity>
         <TouchableOpacity
           testID="galaxy-send-full-design-to-gameforge"
           onPress={sendToGameForge}
