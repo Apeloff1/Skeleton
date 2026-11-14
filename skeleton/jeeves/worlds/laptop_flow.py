@@ -11,8 +11,7 @@ from typing import Any
 
 from .bundle import _artifact_read
 from .session import (SessionStore, SCHEMA as SESSION_SCHEMA, export_session as portable_export,
-                      import_session as portable_import, replay_choices, validate_session,
-                      player_view)
+                      import_session as portable_import, replay_choices, validate_session)
 from .studio_engine import StudioEngineStore
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, _text, canonical, compile_html,
@@ -135,6 +134,7 @@ class LaptopFlow:
                     "world_id": world_id,
                     "source_digest": expected_digest,
                     "candidate_digest": candidate_digest,
+                    "operation_digest": digest(operation),
                     "changes": changes,
                     "proof": prove(candidate).as_dict(),
                     "reviewed": False,
@@ -146,7 +146,8 @@ class LaptopFlow:
             os.close(fd)
 
     def review(self, world_id: str, expected_digest: str, operation: Any,
-               review_note: str) -> dict[str, Any]:
+               review_note: str, *, expected_candidate_digest: str | None = None,
+               expected_operation_digest: str | None = None) -> dict[str, Any]:
         """Publish an explicitly reviewed edit under one canonical writer lease.
 
         Source CAS, proof, and review custody share a single lock. A concurrent
@@ -164,8 +165,18 @@ class LaptopFlow:
                 current = self._world(fd, world_id)
                 if digest(current) != expected_digest:
                     raise CanonError("stale_source")
+                if expected_operation_digest is not None:
+                    if (not isinstance(expected_operation_digest, str) or
+                            len(expected_operation_digest) != 64 or
+                            expected_operation_digest != digest(operation)):
+                        raise CanonError("review_operation_mismatch")
                 revised = edit(current, operation)
                 new_digest = digest(revised)
+                if expected_candidate_digest is not None:
+                    if (not isinstance(expected_candidate_digest, str) or
+                            len(expected_candidate_digest) != 64 or
+                            expected_candidate_digest != new_digest):
+                        raise CanonError("review_candidate_mismatch")
                 if new_digest == expected_digest:
                     raise CanonError("review_requires_change")
                 proof = prove(revised).as_dict()
@@ -257,14 +268,7 @@ class LaptopFlow:
             if exc.code == "not_found":
                 raise CanonError("review_required") from None
             raise
-        try:
-            self._validate_review(review, world)
-        except CanonError as exc:
-            # A successfully written world with an interrupted review write
-            # has no approval, even if an old review remains on disk.
-            if exc.code == "review_stale_source":
-                raise CanonError("review_required") from None
-            raise
+        self._validate_review(review, world)
         return world, review
 
     @staticmethod
@@ -558,21 +562,26 @@ class LaptopFlow:
                     })
                 existing = None
                 if slot is not None:
-                    # The canonical world lock is already held here. Never call
-                    # SessionStore.inspect/export/preflight_import, which would
-                    # reacquire the same non-reentrant writer lock and falsely
-                    # diagnose every healthy saved session as lease_busy.
-                    # The private validated slot read uses this *same* pinned fd.
-                    data = self.sessions._session(fd, world_id, slot, world)
-                    view = player_view(data, world)
-                    exported = portable_export(data, world)
-                    restored = portable_import(exported, world)
-                    preview = player_view(restored, world)
+                    # The acceptance caller already owns the canonical world
+                    # lease. Re-entering LaptopFlow.inspect_session/export/
+                    # preflight_restore would invoke verify() and deadlock on
+                    # that same non-reentrant lease (lease_busy). Read through
+                    # the SessionStore using the pinned source digest instead.
+                    # Its read-only methods revalidate replay and save checks,
+                    # while the outer lease excludes concurrent world/session
+                    # writers for the entire three-step inspection.
+                    source_lease = receipt["source_digest"]
+                    view = self.sessions.inspect(
+                        world_id, slot, expected_world_digest=source_lease)
+                    exported = self.sessions.export(
+                        world_id, slot, expected_world_digest=source_lease)
+                    preview = self.sessions.preflight_import(
+                        world_id, exported, expected_world_digest=source_lease)
                     if preview["session_digest"] != view["session_digest"]:
                         raise CanonError("laptop_acceptance_session_mismatch")
                     existing = {
                         "slot": slot, "session_digest": view["session_digest"],
-                        "revision": preview["revision"], "restorable": True,
+                        "revision": preview["revision"], "restorable": preview["restorable"],
                     }
                 return {
                     "schema": "jeeves.world.laptop_acceptance.v1",
