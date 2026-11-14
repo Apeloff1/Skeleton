@@ -59,6 +59,7 @@ def fake_host():
     host._frame = {
         "width": 2, "height": 2, "format": "rgb24",
         "pixel_sha256": hashlib.sha256(host._pixels).hexdigest(),
+        "audio_sha256": hashlib.sha256(host._audio).hexdigest(),
         "rotation": 0, "video_callbacks": 1, "runs": 2,
         "audio_frames": 4, "sample_rate": 44100.0, "fps": 60.0,
         "audio_available": True, "shutdown": False,
@@ -156,6 +157,9 @@ class AudioSavestateRegression(unittest.TestCase):
         try:
             snapshot = host.snapshot()
             self.assertEqual(snapshot["audio_size"], 16)
+            self.assertEqual(
+                snapshot["frame"]["audio_sha256"], hashlib.sha256(host._audio).hexdigest(),
+            )
             self.assertEqual(
                 base64.b64decode(snapshot["audio_base64"]), bytes([1, 0, 2, 0] * 4),
             )
