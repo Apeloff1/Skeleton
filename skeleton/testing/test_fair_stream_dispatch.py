@@ -318,3 +318,23 @@ def test_inherited_guard_rejects_before_acquiring_lock(monkeypatch):
                           lambda: guard.execute_once(None)):
             with pytest.raises(CustodyQuarantined, match="inherited"):
                 operation()
+
+
+def test_failed_queued_revocation_retains_request_for_cancel_retry():
+    guard = make()
+    guard.submit(request())
+    before = guard._session.verify()
+
+    def unavailable(request_id):
+        raise RuntimeError("revocation unavailable")
+
+    guard._revoke_queued_prompt = unavailable
+    with pytest.raises(DispatchDeferred, match="revocation unavailable"):
+        guard.cancel("r1", tenant_id="tenant")
+    assert guard._session.verify() == before
+    assert not guard.uncertain
+    revoked = []
+    guard._revoke_queued_prompt = revoked.append
+    updated = guard.cancel("r1", tenant_id="tenant")
+    assert revoked == ["r1"]
+    assert updated["checkpoint"]["requests"] == []

@@ -121,7 +121,7 @@ class GuardedFairStreamDispatch:
     def submit(self, request: StreamRequest) -> dict[str, object]:
         self._require_owner_process()
         with self._lock:
-            if self._issued or self._uncertain:
+            if self._issued or self._uncertain or self._session.pending_ids():
                 raise DispatchUncertain("pending dispatch must be reconciled")
             return self._session.submit(request)
 
@@ -144,14 +144,15 @@ class GuardedFairStreamDispatch:
                 tenant_id is not None and matching[0]["tenant_id"] != tenant_id
             ):
                 raise ValueError("unknown authorized queued request")
-            updated = self._session.cancel(request_id)
+            # Deny execution authority before removing durable queued state.
+            # A failed revoke leaves the request available for explicit cancel
+            # retry; no permanent uncertain-execution state is fabricated.
             if self._revoke_queued_prompt is not None:
                 try:
                     self._revoke_queued_prompt(request_id)
-                except BaseException as exc:
-                    self._uncertain = True
-                    raise DispatchUncertain("queued prompt revocation requires reconciliation") from exc
-            return updated
+                except Exception as exc:
+                    raise DispatchDeferred("queued prompt revocation unavailable") from exc
+            return self._session.cancel(request_id)
         finally:
             self._lock.release()
 

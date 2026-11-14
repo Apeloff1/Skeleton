@@ -161,8 +161,8 @@ def submit_authenticated_native_cpu_prompt(
     authenticated_tenant_id MUST originate from the app's verified principal,
     never from a request body. This operation is not a replacement for the
     durable journal's one-use request identity or the live OS pressure guard.
-    If durable submit succeeds but status retrieval fails, the grant is
-    revoked and the request is held for explicit operator reconciliation.
+    Status is derived from the committed admission snapshot under the same
+    app lock. An uncertain write burns the grant instead of restaging it.
     """
     if (type(service) is not OfflineAdaptiveDispatchService
             or type(vault) is not SealedFairStreamResultVault
@@ -185,13 +185,10 @@ def submit_authenticated_native_cpu_prompt(
             or vault._backend.registry is not registry
             or vault._backend.runtime is not runtime):
         raise ValueError("native app ownership binding mismatch")
-    # Serialize staging and durable admission against local planning/cancel.
+    # Use the exact same app -> guard lock order as every other operation.
+    # Contention must be rejected before even tokenizing/staging plaintext.
     guard = service._guard
-    guard._require_owner_process()
-    if not guard._lock.acquire(blocking=False):
-        from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchDeferred
-        raise DispatchDeferred("active dispatch prevents native admission")
-    try:
+    with service._operation():
         state = service._session.verify()
         if state.get("session_id") != registry.session_id:
             raise ValueError("native app ownership binding mismatch")
@@ -211,12 +208,12 @@ def submit_authenticated_native_cpu_prompt(
             max_output_tokens=max_output_tokens,
         )
         try:
-            return service.submit(request)
+            updated = guard.submit(request)
+            return service._status_from_state(updated)
         except BaseException:
-            registry.revoke(request.request_id)
+            # Revocation itself must not depend on a functioning clock.
+            registry.revoke_staged(request.request_id)
             raise
-    finally:
-        guard._lock.release()
 
 
 def cancel_authenticated_native_cpu_prompt(

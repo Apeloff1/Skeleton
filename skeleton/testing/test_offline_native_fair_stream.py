@@ -267,7 +267,7 @@ def test_failed_native_submission_revokes_ephemeral_grant(
     )
     def broken(_):
         raise RuntimeError("simulated durable submit failure")
-    monkeypatch.setattr(service, "submit", broken)
+    monkeypatch.setattr(service._guard, "submit", broken)
     with pytest.raises(RuntimeError, match="durable submit failure"):
         submit_authenticated_native_cpu_prompt(
             service=service, vault=vault, runtime=runtime, registry=registry,
@@ -601,3 +601,32 @@ def test_abandoned_native_failure_unblocks_next_authorized_request(private_files
     assert vault._connection.execute(
         "SELECT request_id FROM local_fair_stream_sealed_results"
     ).fetchall() == [("next-native",)]
+
+
+def test_native_admission_contention_never_stages_or_burns_prompt(private_files):
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchDeferred
+    from skeleton.app.offline_native_fair_stream import submit_authenticated_native_cpu_prompt
+
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    before = session.verify()
+    def submit():
+        return submit_authenticated_native_cpu_prompt(
+            service=service, vault=vault, runtime=runtime, registry=registry,
+            authenticated_tenant_id="alice",
+            request=StreamRequest("contended", "alice", InferencePhase.PREFILL, 2, 16),
+            prompt="hello", max_output_tokens=2,
+        )
+    with service._operation():
+        with pytest.raises(DispatchDeferred):
+            submit()
+    assert registry.status()["staged"] == 0
+    assert registry.status()["consumed_or_revoked"] == 0
+    assert session.verify() == before
+    assert submit().generation == before["generation"] + 1
+    assert registry.status()["staged"] == 1

@@ -303,13 +303,22 @@ class NativePromptRegistry:
                     )
 
     def revoke_staged(self, request_id: str) -> None:
-        """Revoke an existing grant, without burning an unknown identity."""
+        """Remove existing authority even if the monotonic clock is unavailable.
+
+        An absent grant is already safe to cancel. This path never authorizes
+        work, recreates a prompt, or burns arbitrary unknown identities.
+        """
         _require_owner_process(self._owner_pid)
         with self._lock:
-            self._expire_locked(self._clock_locked())
-            _id(request_id, "request")
-            if request_id in self._staged:
-                self.revoke(request_id)
+            request_id = _id(request_id, "request")
+            pinned = self._staged.get(request_id)
+            if pinned is not None:
+                if request_id not in self._staged_at:
+                    raise NativeFairStreamDenied("prompt staging timestamp invariant failed")
+                self._budget.release(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
+                self._used.add(request_id)
+                del self._staged[request_id]
+                del self._staged_at[request_id]
 
     def status(self) -> dict[str, int | str]:
         _require_owner_process(self._owner_pid)

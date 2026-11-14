@@ -414,3 +414,21 @@ def test_active_native_interrupt_is_tenant_scoped_and_one_use(monkeypatch):
     assert not backend.request_interrupt(tenant_id="alice", request_id="request-1")
     with pytest.raises(NativeFairStreamDenied, match="missing authorized"):
         backend.generate(permit(), state())
+
+
+def test_revocation_can_remove_plaintext_when_clock_is_unavailable(monkeypatch):
+    from skeleton.ai.model_runtime import native_fair_stream_backend as native_module
+
+    _, registry, _ = setup()
+    def no_clock():
+        raise OSError("clock unavailable")
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(native_module, "monotonic_ns", no_clock)
+        registry.revoke_staged("request-1")
+        registry.revoke_staged("request-1")
+        registry.revoke_staged("unknown")
+    status = registry.status()
+    assert status["staged"] == 0
+    assert status["staged_prompt_bytes"] == 0
+    assert status["consumed_or_revoked"] == 1
