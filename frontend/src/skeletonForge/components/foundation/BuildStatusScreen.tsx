@@ -4,17 +4,21 @@
  * existing console hook — this screen does not poll.
  */
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import type { StepAction } from '../../foundation/model';
 import type { RunPhase } from '../../hooks';
-import type { RunPayload } from '../../types';
+import { playHandoff } from '../../run';
+import type { RunPayload, RunRequest } from '../../types';
+import { useStudioA11y } from '../a11yContext';
 import { Banner, Button, SectionTitle } from '../primitives';
 import ForgeRunPanel from '../ForgeRunPanel';
+import { ScaledText as Text } from '../ScaledText';
 import { C } from '../theme';
+import { PlayHandoffCard } from './PlayHandoffCard';
 
 export function BuildStatusScreen({
   title, phase, payload, error, startedAt, finishedAt, now, onCancel, onRetry,
-  onExport, exportBusy, exportError, outdated = false,
+  onExport, exportBusy, exportError, outdated = false, request = null, live = true,
   guidance, onGuidance, consoleBusy, consoleSummary, consoleOk, consoleFailures, onAskCockpit,
   onBrief, onProjects, onOpenCockpit,
 }: {
@@ -31,6 +35,10 @@ export function BuildStatusScreen({
   exportBusy?: boolean;
   exportError?: string | null;
   outdated?: boolean;
+  /** Request that produced this build (target / playable scene choices). */
+  request?: Pick<RunRequest, 'target' | 'playable_content' | 'include_files'> | null;
+  /** False when the build record came from an earlier session. */
+  live?: boolean;
   guidance: StepAction;
   onGuidance: (action: StepAction) => void;
   consoleBusy: boolean;
@@ -42,6 +50,8 @@ export function BuildStatusScreen({
   onProjects: () => void;
   onOpenCockpit: () => void;
 }) {
+  const a11y = useStudioA11y();
+  const handoff = phase === 'done' ? playHandoff(payload, request) : null;
   return (
     <ScrollView contentContainerStyle={st.body} testID="studio-build" keyboardShouldPersistTaps="handled">
       <SectionTitle hint="Forge run">{title}</SectionTitle>
@@ -67,8 +77,20 @@ export function BuildStatusScreen({
         onExport={onExport}
         exportBusy={exportBusy}
         exportError={exportError}
+        reduceMotion={a11y.reduceMotion}
         testID="studio-run-panel"
       />
+      {handoff ? (
+        <PlayHandoffCard
+          handoff={handoff}
+          live={live}
+          onExport={onExport}
+          exportBusy={exportBusy}
+          exportError={exportError}
+          onBrief={onBrief}
+          onRetry={onRetry}
+        />
+      ) : null}
       <View testID="studio-next-step">
         <Text style={st.kicker} accessibilityRole="header">Next</Text>
         <Text style={st.copy}>{guidance.detail}</Text>
