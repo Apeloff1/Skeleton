@@ -1604,7 +1604,7 @@ def smoke_offline_http_inference() -> bool:
     token = secrets.token_urlsafe(48)
     with TemporaryDirectory(prefix="skeleton-local-http-accept-") as folder:
         database = Path(folder) / "acceptance.sqlite3"
-        app = OfflineHTTPApplication(backend, database, token=token)
+        app = OfflineHTTPApplication(backend, database, token=token, max_queued_turns=2)
         try:
             with LocalOnlyHTTPServer(app, port=0) as server:
                 port = server.server_port
@@ -1640,7 +1640,9 @@ def smoke_offline_http_inference() -> bool:
                     )
                     status, health = request("GET", "/v1/status", None)
                     if (denied_status != 401 or status != 200
-                            or health.get("model_digest") != backend.model_digest):
+                            or health.get("model_digest") != backend.model_digest
+                            or health.get("durable_admission_metadata") is not True
+                            or health.get("max_queued_turns") != 2):
                         return False
                     status, created = request("POST", "/v1/sessions", {})
                     if status != 201 or not created.get("session_id"):
@@ -1700,6 +1702,41 @@ def smoke_offline_http_inference() -> bool:
                             or grounded_retry.get("evidence") != grounded_answer.get("evidence")
                             or not isinstance(grounded_answer.get("evidence"), dict)):
                         accepted = False
+                    # Exercise the installed asynchronous path and its actual
+                    # native execution receipt, not a mocked queued answer.
+                    q_status, q_created = request("POST", "/v1/sessions", {})
+                    if q_status != 201 or not q_created.get("session_id"):
+                        return False
+                    queue_sid = q_created["session_id"]
+                    queue_path = "/v1/sessions/" + queue_sid + "/turns"
+                    queue_body = {
+                        "message": "hello world", "request_id": "frozen-queued-smoke",
+                        "max_output_tokens": 2,
+                    }
+                    queued_status, queued = request("POST", queue_path, queue_body)
+                    if queued_status != 202 or queued.get("request_id") != queue_body["request_id"]:
+                        return False
+                    deadline = time.monotonic() + 30
+                    while time.monotonic() < deadline:
+                        poll_status, queued = request(
+                            "GET", queue_path + "/" + queue_body["request_id"], None,
+                        )
+                        if poll_status != 200:
+                            return False
+                        if queued.get("terminal") is True:
+                            break
+                        time.sleep(0.02)
+                    if queued.get("state") != "complete":
+                        return False
+                    q_replay_status, q_replay = request("POST", queue_path, queue_body)
+                    q_result = queued.get("result") or {}
+                    if (q_replay_status != 200
+                            or q_result.get("revision") != 1
+                            or (q_result.get("local_execution_receipt") or {}).get("model_digest")
+                            != backend.model_digest
+                            or (q_replay.get("result") or {}).get("output_digest")
+                            != q_result.get("output_digest")):
+                        return False
                 finally:
                     server.shutdown()
                     worker.join(timeout=10)
@@ -1724,8 +1761,19 @@ def smoke_offline_http_inference() -> bool:
                 reopened, backend.model_digest, app.tokenizer_digest
             )
             retrieved = references.search("depth-buffer deterministic rasterizer")
+            queued_restored = reopened.load(queue_sid, backend.model_digest, app.tokenizer_digest)
+            queued_receipt = reopened.local_execution_receipt(
+                queue_sid, queue_body["request_id"], backend.model_digest, app.tokenizer_digest,
+            )
+            queued_admission = DurableTurnAdmissions(
+                reopened, backend.model_digest, app.tokenizer_digest,
+            ).lookup(queue_sid, queue_body["request_id"])
             return bool(
-                len(retrieved) > 0
+                queued_restored.revision == 1
+                and queued_receipt is not None
+                and queued_receipt["output_sha256"] == q_result["output_digest"]
+                and queued_admission is not None and queued_admission["state"] == "settled"
+                and len(retrieved) > 0
                 and retrieved[0]["document_id"] == reference_id
                 and retrieved[0]["passage"] == reference_text
                 and retrieved[0]["document_sha256"] == sha256(
