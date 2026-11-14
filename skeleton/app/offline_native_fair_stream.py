@@ -209,3 +209,27 @@ def cancel_authenticated_native_cpu_prompt(
     if service._guard._revoke_queued_prompt is None:
         raise ValueError("native prompt custody hook required")
     return service.cancel(request_id, tenant_id=authenticated_tenant_id)
+
+
+def interrupt_authenticated_native_cpu_prompt(
+    *, service: OfflineAdaptiveDispatchService, authenticated_tenant_id: str,
+    request_id: str,
+) -> bool:
+    """Signal active native generation without acquiring SQLite or dispatch locks.
+
+    True means a cooperative stop was requested, not that execution ended.
+    The durable running journal remains a replay fence until reconciliation.
+    """
+    if type(service) is not OfflineAdaptiveDispatchService:
+        raise ValueError("canonical native dispatch service required")
+    if type(authenticated_tenant_id) is not str or not authenticated_tenant_id:
+        raise ValueError("authenticated tenant required")
+    owner = service._guard._owner
+    if type(owner) is not JournaledExecutionOwner:
+        raise ValueError("canonical native owner required")
+    vault = owner._backend
+    if type(vault) is not SealedFairStreamResultVault or type(vault._backend) is not NativeFairStreamBackend:
+        raise ValueError("canonical native backend required")
+    return vault._backend.request_interrupt(
+        tenant_id=authenticated_tenant_id, request_id=request_id,
+    )

@@ -7,11 +7,12 @@ No prompt or key material is written into scheduler checkpoints or receipts.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
 import hmac
 import os
-from threading import RLock
+from threading import Event, RLock
 from time import monotonic_ns
 from typing import Mapping
 
@@ -32,6 +33,10 @@ DEFAULT_PROMPT_STAGE_AGE_NS = 300_000_000_000
 
 class NativeFairStreamDenied(RuntimeError):
     """No execution is authorized; an uncertain owner must not auto-retry."""
+
+
+class NativeExecutionInterrupted(NativeFairStreamDenied):
+    """Authenticated cooperative stop; never a signed result or retry grant."""
 
 
 def _require_owner_process(owner_pid: int) -> None:
@@ -323,6 +328,43 @@ class NativeFairStreamBackend:
         self.model_digest = model
         self.tokenizer_digest = tokenizer
         self._lock = RLock()
+        self._interrupt_lock = RLock()
+        self._active_interrupt: tuple[str, str, Event] | None = None
+
+    def request_interrupt(self, *, tenant_id: str, request_id: str) -> bool:
+        """Signal only the matching active request, without waiting on model I/O."""
+        _require_owner_process(self._owner_pid)
+        tenant, request = _id(tenant_id, "tenant"), _id(request_id, "request")
+        with self._interrupt_lock:
+            active = self._active_interrupt
+            if active is None or active[:2] != (tenant, request):
+                return False
+            active[2].set()
+            return True
+
+    @contextmanager
+    def _interrupt_scope(self, tenant: str, request: str):
+        signal = Event()
+        with self._interrupt_lock:
+            if self._active_interrupt is not None:
+                raise NativeFairStreamDenied("native interrupt scope already active")
+            self._active_interrupt = (tenant, request, signal)
+        try:
+            yield signal
+        finally:
+            with self._interrupt_lock:
+                if self._active_interrupt is not None and self._active_interrupt[2] is signal:
+                    self._active_interrupt = None
+
+    def _seal_interrupt_scope(self, signal: Event) -> None:
+        # Linearize success against concurrent stop requests. After sealing,
+        # stop requests cannot claim that the completed generation was stopped.
+        with self._interrupt_lock:
+            if self._active_interrupt is None or self._active_interrupt[2] is not signal:
+                raise NativeFairStreamDenied("native interrupt scope changed")
+            if signal.is_set():
+                raise NativeExecutionInterrupted("authenticated native interruption requested")
+            self._active_interrupt = None
 
     def _pending(
         self, permit: DispatchPermit, state: Mapping[str, object],
@@ -378,91 +420,101 @@ class NativeFairStreamBackend:
         self.registry._require_owner_process()
         with self._lock:
             tenant = self._pending(permit, state)
-            model, tokenizer = _cpu_runtime(self.runtime)
-            if (not hmac.compare_digest(model, self.model_digest)
-                    or not hmac.compare_digest(tokenizer, self.tokenizer_digest)):
-                raise NativeFairStreamDenied("pinned native runtime changed")
-            # Claim is intentionally irreversible, even on a preflight failure.
-            pinned = self.registry.claim(permit.request_id, tenant)
-            if (pinned.max_output_tokens < permit.tokens
-                    or not hmac.compare_digest(pinned.model_digest, model)
-                    or not hmac.compare_digest(pinned.tokenizer_digest, tokenizer)):
-                raise NativeFairStreamDenied("prompt/model/output grant mismatch")
-            try:
-                sequence = self.runtime.encode(pinned.prompt)
-                if (sha256(pinned.prompt.encode("utf-8")).hexdigest()
-                        != pinned.prompt_digest
-                        or self.runtime.tokenizer.decode_ids(sequence.token_ids)
-                        != pinned.prompt):
-                    raise NativeFairStreamDenied("tokenizer roundtrip or prompt drift")
-                if (len(sequence.token_ids) + permit.tokens > self.runtime.limits.max_context
-                        or self.runtime.estimate_kv_bytes(
-                            len(sequence.token_ids) + permit.tokens,
-                        ) > self.runtime.limits.max_kv_bytes):
-                    raise NativeFairStreamDenied("native context/KV pressure limit")
-                config = GenerationConfig(max_new_tokens=permit.tokens)
-                guard = self._pressure_guard
-                interrupt = guard.start(permit) if guard is not None else None
-                succeeded = False
+            with self._interrupt_scope(tenant, permit.request_id) as signal:
+                model, tokenizer = _cpu_runtime(self.runtime)
+                if (not hmac.compare_digest(model, self.model_digest)
+                        or not hmac.compare_digest(tokenizer, self.tokenizer_digest)):
+                    raise NativeFairStreamDenied("pinned native runtime changed")
+                # Claim is intentionally irreversible, even on a preflight failure.
+                pinned = self.registry.claim(permit.request_id, tenant)
+                if (pinned.max_output_tokens < permit.tokens
+                        or not hmac.compare_digest(pinned.model_digest, model)
+                        or not hmac.compare_digest(pinned.tokenizer_digest, tokenizer)):
+                    raise NativeFairStreamDenied("prompt/model/output grant mismatch")
                 try:
-                    result = self.runtime.generate_sequence(
-                        sequence, config, interrupt=interrupt,
-                    )
-                    _cpu_runtime(self.runtime)
-                    # A native model returning an object is NOT a completion:
-                    # validate its exact identity, token accounting, output
-                    # encoding and result capacity while the guard is active.
-                    if type(result) is not GenerationResult:
-                        raise NativeFairStreamDenied("untrusted native generation result")
-                    receipt = result.replay_receipt
-                    if (type(result.text) is not str
-                            or type(result.finish_reason) is not str
-                            or type(result.generated_ids) is not tuple
-                            or any(type(token_id) is not int
-                                   or not 0 <= token_id < self.runtime.tokenizer.vocab_size
-                                   for token_id in result.generated_ids)
-                            or type(result.usage.generated_tokens) is not int
-                            or result.usage.generated_tokens != len(result.generated_ids)
-                            or result.usage.generated_tokens > permit.tokens
-                            or result.usage.prompt_tokens != len(sequence.token_ids)
-                            or result.usage.total_tokens != (
-                                len(sequence.token_ids) + len(result.generated_ids)
-                            )
-                            or receipt.model_digest != model
-                            or receipt.tokenizer_digest != tokenizer
-                            or receipt.architecture_digest != self.runtime.architecture.digest
-                            or receipt.device_digest != self.runtime.device.digest
-                            or receipt.config_digest != self.runtime._config_digest(config)
-                            or receipt.request_digest != self.runtime._request_digest(
-                                sequence, config,
-                            )
-                            or receipt.seed != config.seed
-                            or receipt.output_digest != digest_json({
-                                "generated_ids": list(result.generated_ids),
-                                "text": result.text,
-                                "finish_reason": result.finish_reason,
-                            })
-                            or result.prompt_sequence.token_ids != sequence.token_ids):
-                        raise NativeFairStreamDenied("native output attestation mismatch")
+                    sequence = self.runtime.encode(pinned.prompt)
+                    if (sha256(pinned.prompt.encode("utf-8")).hexdigest()
+                            != pinned.prompt_digest
+                            or self.runtime.tokenizer.decode_ids(sequence.token_ids)
+                            != pinned.prompt):
+                        raise NativeFairStreamDenied("tokenizer roundtrip or prompt drift")
+                    if (len(sequence.token_ids) + permit.tokens > self.runtime.limits.max_context
+                            or self.runtime.estimate_kv_bytes(
+                                len(sequence.token_ids) + permit.tokens,
+                            ) > self.runtime.limits.max_kv_bytes):
+                        raise NativeFairStreamDenied("native context/KV pressure limit")
+                    config = GenerationConfig(max_new_tokens=permit.tokens)
+                    guard = self._pressure_guard
+                    pressure_interrupt = guard.start(permit) if guard is not None else None
+
+                    def interrupt() -> None:
+                        if signal.is_set():
+                            raise NativeExecutionInterrupted("authenticated native interruption requested")
+                        if pressure_interrupt is not None:
+                            pressure_interrupt()
+                        if signal.is_set():
+                            raise NativeExecutionInterrupted("authenticated native interruption requested")
+
+                    succeeded = False
                     try:
-                        output = result.text.encode("utf-8", errors="strict")
-                    except UnicodeEncodeError as exc:
-                        raise NativeFairStreamDenied("invalid native output Unicode") from exc
-                    if len(output) > MAX_RESULT_BYTES:
-                        raise NativeFairStreamDenied("native output exceeds sealed vault limit")
-                    # A final independent OS sample fences thermal/memory
-                    # pressure that changed after the last model callback.
-                    # A postflight hold is outcome-uncertain: no result escapes
-                    # to the encrypted vault or durable success journal.
-                    if interrupt is not None:
+                        result = self.runtime.generate_sequence(
+                            sequence, config, interrupt=interrupt,
+                        )
+                        _cpu_runtime(self.runtime)
+                        # A native model returning an object is NOT a completion:
+                        # validate its exact identity, token accounting, output
+                        # encoding and result capacity while the guard is active.
+                        if type(result) is not GenerationResult:
+                            raise NativeFairStreamDenied("untrusted native generation result")
+                        receipt = result.replay_receipt
+                        if (type(result.text) is not str
+                                or type(result.finish_reason) is not str
+                                or type(result.generated_ids) is not tuple
+                                or any(type(token_id) is not int
+                                       or not 0 <= token_id < self.runtime.tokenizer.vocab_size
+                                       for token_id in result.generated_ids)
+                                or type(result.usage.generated_tokens) is not int
+                                or result.usage.generated_tokens != len(result.generated_ids)
+                                or result.usage.generated_tokens > permit.tokens
+                                or result.usage.prompt_tokens != len(sequence.token_ids)
+                                or result.usage.total_tokens != (
+                                    len(sequence.token_ids) + len(result.generated_ids)
+                                )
+                                or receipt.model_digest != model
+                                or receipt.tokenizer_digest != tokenizer
+                                or receipt.architecture_digest != self.runtime.architecture.digest
+                                or receipt.device_digest != self.runtime.device.digest
+                                or receipt.config_digest != self.runtime._config_digest(config)
+                                or receipt.request_digest != self.runtime._request_digest(
+                                    sequence, config,
+                                )
+                                or receipt.seed != config.seed
+                                or receipt.output_digest != digest_json({
+                                    "generated_ids": list(result.generated_ids),
+                                    "text": result.text,
+                                    "finish_reason": result.finish_reason,
+                                })
+                                or result.prompt_sequence.token_ids != sequence.token_ids):
+                            raise NativeFairStreamDenied("native output attestation mismatch")
+                        try:
+                            output = result.text.encode("utf-8", errors="strict")
+                        except UnicodeEncodeError as exc:
+                            raise NativeFairStreamDenied("invalid native output Unicode") from exc
+                        if len(output) > MAX_RESULT_BYTES:
+                            raise NativeFairStreamDenied("native output exceeds sealed vault limit")
+                        # A final independent OS sample fences thermal/memory
+                        # pressure that changed after the last model callback.
+                        # A postflight hold is outcome-uncertain: no result escapes
+                        # to the encrypted vault or durable success journal.
                         interrupt()
-                    succeeded = True
-                    return result.usage.generated_tokens, output
-                finally:
-                    if guard is not None:
-                        guard.finish(success=succeeded)
-            except NativeFairStreamDenied:
-                raise
-            except Exception as exc:
-                raise NativeFairStreamDenied("native inference failed; no retry") from exc
+                        self._seal_interrupt_scope(signal)
+                        succeeded = True
+                        return result.usage.generated_tokens, output
+                    finally:
+                        if guard is not None:
+                            guard.finish(success=succeeded)
+                except NativeFairStreamDenied:
+                    raise
+                except Exception as exc:
+                    raise NativeFairStreamDenied("native inference failed; no retry") from exc
 

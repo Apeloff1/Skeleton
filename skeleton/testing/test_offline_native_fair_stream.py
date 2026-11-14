@@ -355,3 +355,66 @@ def test_native_queued_cancel_revokes_grant_and_rejects_foreign_owner(private_fi
     assert journal._connection.execute(
         "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
     ).fetchone()[0] == 0
+
+
+def test_interrupted_native_execution_preserves_running_journal_without_result(private_files, monkeypatch):
+    from threading import Event, Thread
+
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchUncertain
+    from skeleton.app.offline_native_fair_stream import (
+        interrupt_authenticated_native_cpu_prompt, submit_authenticated_native_cpu_prompt,
+    )
+
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    req = StreamRequest("stop-native", "alice", InferencePhase.PREFILL, 2, 16)
+    submit_authenticated_native_cpu_prompt(
+        service=service, vault=vault, runtime=runtime, registry=registry,
+        authenticated_tenant_id="alice", request=req, prompt="hello", max_output_tokens=2,
+    )
+    entered, signalled = Event(), Event()
+    outcomes = []
+    original = NativeLLMRuntime.generate_sequence
+
+    def paused(self, sequence, config, *, interrupt=None):
+        entered.set()
+        if not signalled.wait(5):
+            raise RuntimeError("test synchronization timed out")
+        interrupt()
+        return original(self, sequence, config, interrupt=interrupt)
+
+    def stop():
+        if entered.wait(5):
+            outcomes.append(interrupt_authenticated_native_cpu_prompt(
+                service=service, authenticated_tenant_id="bob", request_id=req.request_id,
+            ))
+            outcomes.append(interrupt_authenticated_native_cpu_prompt(
+                service=service, authenticated_tenant_id="alice", request_id=req.request_id,
+            ))
+        signalled.set()
+
+    monkeypatch.setattr(NativeLLMRuntime, "generate_sequence", paused)
+    worker = Thread(target=stop, daemon=True)
+    worker.start()
+    try:
+        with pytest.raises(DispatchUncertain):
+            service.execute_next(token_budget=2)
+    finally:
+        signalled.set()
+        worker.join(5)
+    assert outcomes == [False, True]
+    assert journal._connection.execute(
+        "SELECT state FROM local_fair_stream_execution_journal"
+    ).fetchone() == ("running",)
+    assert vault._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_sealed_results"
+    ).fetchone()[0] == 0
+    assert service.status().execution_uncertain
+    with pytest.raises(DispatchUncertain):
+        service.execute_next(token_budget=2)
