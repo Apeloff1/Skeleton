@@ -195,7 +195,7 @@ def audit(root: Path = ROOT) -> list[str]:
             failures.append(f"{name}: consolidated source must be callable without standalone PR/schedule triggers")
         if "permissions:\n  contents: read" not in child or "continue-on-error: true" in child:
             failures.append(f"{name}: consolidated source must retain read-only fail-closed policy")
-        group = re.search(r"(?m)^  group:\\s*(.+)$", child)
+        group = re.search(r"(?m)^  group:[ \t]*(.+)$", child)
         if (not group or
                 ("github.event.pull_request.number" in group.group(1)
                  and not any(fallback in group.group(1)

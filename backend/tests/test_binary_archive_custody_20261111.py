@@ -79,7 +79,8 @@ def test_generator_cannot_stream_unlimited_repeated_entries(monkeypatch, artifac
     def infinite():
         while True:
             yield "same.txt", "x"
-    with pytest.raises(ValueError, match="count"):
+    # The stricter canonical-name contract rejects the second repeated name.
+    with pytest.raises(ValueError, match="duplicate"):
         builder.build_zip({
             "build_id": "infinite",
             "generated_files_factory": infinite,
@@ -125,3 +126,18 @@ def test_archive_root_symlink_is_rejected(artifact_root, tmp_path, monkeypatch):
     monkeypatch.setattr(builder, "ARTIFACTS_ROOT", link)
     with pytest.raises((VaultPathError, OSError)):
         builder.build_zip({"build_id": "bad", "generated_files": {"ok.txt": "safe"}})
+
+
+def test_distinct_generator_cannot_exceed_scan_budget(monkeypatch, artifact_root):
+    monkeypatch.setattr(builder, "_MAX_PACKAGE_FILES", 3)
+    def infinite_distinct():
+        n = 0
+        while True:
+            yield f"asset-{n}.txt", "x"
+            n += 1
+    with pytest.raises(ValueError, match="count"):
+        builder.build_zip({
+            "build_id": "distinct",
+            "generated_files_factory": infinite_distinct,
+        })
+    assert not (artifact_root / "distinct.zip").exists()

@@ -81,6 +81,8 @@ def fake_host():
         },
         reward_components=("visual_change",), max_episode_steps=8,
     )
+    host._policy_signal_channels = tuple(features)
+    host._measured_signals = dict(features)
     host._observation = features
     commands = []
 
