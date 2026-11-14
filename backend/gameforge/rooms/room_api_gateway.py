@@ -222,7 +222,7 @@ async def _mcp_query(query: str, sources: list[str] | None) -> dict:
 def _safe_params(params: Any) -> dict[str, str] | None:
     if params is None:
         return None
-    if not isinstance(params, dict) or len(params) > 20:
+    if type(params) is not dict or len(params) > 20:
         raise ValueError("external API parameters exceed size limits")
     checked: dict[str, str] = {}
     for key, value in params.items():
@@ -287,16 +287,19 @@ def _safe_payload(value: Any) -> Any:
 
 async def _bounded_http_body(response: Any) -> str:
     """Stream under the decompressed byte cap; reject before reading oversized declared bodies."""
+    # Either legacy or current configuration may tighten the response cap.
+    # Use the stricter cap; never let an alias silently disable admission.
+    byte_ceiling = min(_MAX_EXTERNAL_RESPONSE_BYTES, _MAX_RESPONSE_BYTES)
     declared = response.headers.get("content-length")
     if declared is not None:
         if type(declared) is not str or not declared.isascii() or not declared.isdecimal() or len(declared) > 12:
             raise ValueError("external API response declared invalid byte budget")
         size = int(declared)
-        if size > _MAX_RESPONSE_BYTES:
+        if size > byte_ceiling:
             raise ValueError("external API response exceeds byte budget")
     chunks = bytearray()
     async for chunk in response.aiter_bytes():
-        if type(chunk) is not bytes or len(chunks) + len(chunk) > _MAX_RESPONSE_BYTES:
+        if type(chunk) is not bytes or len(chunks) + len(chunk) > byte_ceiling:
             raise ValueError("external API response exceeds byte budget")
         chunks.extend(chunk)
     return chunks.decode("utf-8", errors="replace")[:2000]
@@ -327,17 +330,19 @@ async def _api_query(target: dict) -> dict:
         return {"channel": "api", "target": name, "ok": True, "disabled": True,
                 "note": "external APIs disabled (inward-focused); set GAMEFORGE_ENABLE_EXTERNAL_APIS=1"}
     try:
+        # Reject malformed caller-owned data before allocating DNS or network
+        # work; no invalid method, header, query or body can trigger egress.
+        method = _safe_method(target.get("method", "GET"))
+        timeout = _safe_timeout(target.get("timeout", 8))
+        headers = _safe_headers(target.get("headers")) or {}
+        params = _safe_params(target.get("params"))
+        payload = _safe_payload(target.get("json"))
         # DNS resolution runs off the event loop under bounded wait. Double
         # resolution remains fail-closed: both checks reject non-public IPs
         # and the *second* answer is used as the actual socket authority.
         base_url, request_target = await asyncio.wait_for(
             asyncio.to_thread(_prepare_external_request, url), timeout=5.0
         )
-        method = _safe_method(target.get("method", "GET"))
-        timeout = _safe_timeout(target.get("timeout", 8))
-        headers = _safe_headers(target.get("headers")) or {}
-        params = _safe_params(target.get("params"))
-        payload = _safe_payload(target.get("json"))
         hostname = urlsplit(base_url).hostname
         if hostname is None:
             raise ValueError("external API host is missing")
@@ -385,7 +390,7 @@ async def query_concurrent(room_id: str, mcp_queries: list[str] | None = None,
         or len(api_targets) > _MAX_API_TARGETS
         or len(mcp_queries) + len(api_targets) > 40
     ):
-        raise ValueError("room API admission budget exceeded")
+        raise ValueError("room API fanout admission budget exceeded")
     if any(type(q) is not str or not 1 <= len(q) <= 4096 for q in mcp_queries):
         raise ValueError("room API admission budget: invalid MCP query")
     if any(type(target) is not dict or len(target) > 12 for target in api_targets):

@@ -48,6 +48,37 @@ def test_http_query_values_and_json_body_are_bounded():
     assert gateway._safe_payload({"k": True}) == {"k": True}
 
 
+def test_mapping_subclass_cannot_execute_items_hook_before_admission():
+    class HostileParams(dict):
+        def items(self):
+            raise AssertionError("caller-owned iterator executed")
+
+    with pytest.raises(ValueError, match="size limits"):
+        gateway._safe_params(HostileParams({"page": "1"}))
+
+
+@pytest.mark.parametrize("payload", [
+    {"url": "https://api.example.test/data", "method": "TRACE"},
+    {"url": "https://api.example.test/data", "timeout": True},
+    {"url": "https://api.example.test/data", "headers": {"Authorization": "secret"}},
+    {"url": "https://api.example.test/data", "params": {"x": ["not scalar"]}},
+    {"url": "https://api.example.test/data", "json": {"secret": object()}},
+])
+def test_invalid_request_never_triggers_dns_or_network(monkeypatch, payload):
+    monkeypatch.setattr(gateway, "_EXTERNAL_ENABLED", True)
+    attempts = []
+
+    def probe(url):
+        attempts.append(url)
+        return "https://api.example.test", "/data"
+
+    # A valid but rejected request must not even enter DNS preflight.
+    monkeypatch.setattr(gateway, "_prepare_external_request", probe)
+    response = asyncio.run(gateway._api_query(payload))
+    assert response["ok"] is False and response["error"] == "api_query_failed"
+    assert attempts == []
+
+
 def test_external_response_is_streamed_under_strict_byte_budget(monkeypatch):
     monkeypatch.setattr(gateway, "_MAX_EXTERNAL_RESPONSE_BYTES", 8)
 
@@ -61,6 +92,13 @@ def test_external_response_is_streamed_under_strict_byte_budget(monkeypatch):
         asyncio.run(fetch(FakeResponse([b"x"], {"content-length": "100"})))
     with pytest.raises(ValueError):
         asyncio.run(fetch(FakeResponse([b"x"], {"content-length": "bogus"})))
+
+
+def test_legacy_alias_cannot_widen_response_byte_cap(monkeypatch):
+    monkeypatch.setattr(gateway, "_MAX_RESPONSE_BYTES", 4)
+    monkeypatch.setattr(gateway, "_MAX_EXTERNAL_RESPONSE_BYTES", 1024)
+    with pytest.raises(ValueError, match="byte budget"):
+        asyncio.run(gateway._read_external_response(FakeResponse([b"12345"])))
 
 
 @pytest.mark.parametrize("targets,queries", [(17, 0), (0, 33), (17, 33)])
