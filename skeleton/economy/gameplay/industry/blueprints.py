@@ -186,16 +186,37 @@ class BlueprintBook:
             raise
 
     def _check_acyclic(self, start: str) -> None:
-        stack: list[tuple[str, tuple[str, ...]]] = [(start, (start,))]
+        self._depths(start)
+
+    def _depths(self, start: str) -> dict[str, int]:
+        """Iterative postorder DFS: each reachable node/edge is processed once."""
+        done: dict[str, int] = {}
+        active: set[str] = set()
+        stack = [(start, False)]
+        edges = 0
         while stack:
-            item_id, path = stack.pop()
-            bp = self.producer(item_id)
-            if bp is None:
+            item_id, leaving = stack.pop()
+            if item_id in done:
                 continue
-            for child, _ in bp.inputs:
-                if child in path:
-                    raise IndustryError("production chain has a cycle")
-                stack.append((child, path + (child,)))
+            recipe = self.producer(item_id)
+            if leaving:
+                done[item_id] = 0 if recipe is None else 1 + max(
+                    done[child] for child, _ in recipe.inputs
+                )
+                active.remove(item_id)
+                continue
+            if item_id in active:
+                raise IndustryError("production chain has a cycle")
+            if len(active) + len(done) >= 100_000:
+                raise IndustryError("production graph exceeds node budget")
+            active.add(item_id)
+            stack.append((item_id, True))
+            if recipe is not None:
+                edges += len(recipe.inputs)
+                if edges > 1_000_000:
+                    raise IndustryError("production graph exceeds edge budget")
+                stack.extend((child, False) for child, _ in reversed(recipe.inputs))
+        return done
 
     def __contains__(self, blueprint_id: object) -> bool:
         return blueprint_id in self._by_id
@@ -215,10 +236,7 @@ class BlueprintBook:
 
     def depth(self, item_id: str) -> int:
         """0 for raw materials, else 1 + deepest input."""
-        bp = self.producer(item_id)
-        if bp is None:
-            return 0
-        return 1 + max(self.depth(i) for i, _ in bp.inputs)
+        return self._depths(item_id)[item_id]
 
     def plan(
         self, target: str, qty: int, levels: Mapping[str, tuple[int, int]] | None = None
@@ -237,7 +255,8 @@ class BlueprintBook:
         plan = ChainPlan(target, qty)
         runs_by_bp: dict[str, int] = {}
         # process items from highest depth down so each item's demand is final
-        order = sorted(self._closure(target), key=lambda i: (-self.depth(i), i))
+        depths = self._depths(target)
+        order = sorted(depths, key=lambda i: (-depths[i], i))
         for item_id in order:
             demand = need.get(item_id, 0)
             bp = self.producer(item_id)
@@ -250,7 +269,7 @@ class BlueprintBook:
                 need[child] = need.get(child, 0) + row["used"] + row["lost"]
                 if row["lost"]:
                     plan.lost[child] = plan.lost.get(child, 0) + row["lost"]
-        for item_id in sorted(self._closure(target), key=lambda i: (self.depth(i), i)):
+        for item_id in sorted(depths, key=lambda i: (depths[i], i)):
             bp = self.producer(item_id)
             if bp is None:
                 plan.raw[item_id] = need.get(item_id, 0)
@@ -260,7 +279,7 @@ class BlueprintBook:
                         bp.blueprint_id,
                         item_id,
                         runs_by_bp[bp.blueprint_id],
-                        self.depth(item_id),
+                        depths[item_id],
                     )
                 )
         return plan
