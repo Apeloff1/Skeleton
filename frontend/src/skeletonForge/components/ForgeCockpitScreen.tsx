@@ -11,15 +11,53 @@ import { cockpitScreenReducer, composeSummaryOf, consoleFailures, initialScreenS
 import { useCockpitConsole } from '../consoleHooks';
 import { useForgeCatalog, useForgeRun, useLiveCompose, useNow } from '../hooks';
 import type { RunRequest } from '../types';
+import { consumeGalaxyHandoff } from '../galaxyHandoff';
 import ForgeCockpitView from './ForgeCockpitView';
 
 export interface ForgeCockpitScreenProps {
   initialTab?: CockpitTab | null;
+  onOpenGalaxyStudio?: () => void;
+  galaxyHandoffId?: string | null;
 }
 
-export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitScreenProps) {
+export default function ForgeCockpitScreen({ initialTab = null, onOpenGalaxyStudio, galaxyHandoffId }: ForgeCockpitScreenProps) {
   const [screen, dispatchScreen] = React.useReducer(cockpitScreenReducer, initialTab, initialScreenState);
   const [q, dispatchQ] = React.useReducer(questionnaireReducer, INITIAL_STATE);
+  const [handoffNotice, setHandoffNotice] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!galaxyHandoffId) return;
+    const profile = consumeGalaxyHandoff(galaxyHandoffId);
+    if (!profile) {
+      setHandoffNotice('Galaxy transfer expired or was already consumed. Return to Galaxy Studio to send the questionnaire again.');
+      return;
+    }
+    try {
+      dispatchQ({ type: 'importGalaxy', profile });
+      dispatchScreen({ type: 'tab', tab: 'build' });
+      setHandoffNotice('Full Galaxy Studio design imported. Review the creator instruments before generating.');
+    } catch {
+      setHandoffNotice('Galaxy questionnaire could not be validated. No design was imported.');
+    }
+  }, [galaxyHandoffId]);
+  const restoringGalaxyRef = React.useRef(false);
+  const restoreSavedGalaxy = React.useCallback(() => {
+    if (restoringGalaxyRef.current) return;
+    restoringGalaxyRef.current = true;
+    void import('../galaxyProfileCustody')
+      .then(({ loadGalaxyProfile }) => loadGalaxyProfile())
+      .then((profile) => {
+        if (!profile) {
+          setHandoffNotice('No valid saved Galaxy design is available for the current local account.');
+          return;
+        }
+        dispatchQ({ type: 'importGalaxy', profile });
+        dispatchScreen({ type: 'tab', tab: 'build' });
+        setHandoffNotice('Saved full Galaxy design restored. Review the imported genre and ten-axis mappings before forging.');
+      })
+      .catch(() => setHandoffNotice('The saved Galaxy design could not be restored; your current Forge draft was not replaced.'))
+      .finally(() => { restoringGalaxyRef.current = false; });
+  }, []);
+
   const catalog = useForgeCatalog();
   const compose = useLiveCompose(q.vision);
   const run = useForgeRun();
@@ -58,7 +96,7 @@ export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitSc
       onTab={(tab) => dispatchScreen({ type: 'tab', tab })}
       badges={badges}
       reduceMotion={reduceMotion}
-      notice={!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null}
+      notice={handoffNotice || (!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null)}
       questionnaire={{
         state: q,
         dispatch: dispatchQ,
@@ -67,6 +105,8 @@ export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitSc
         eras: catalog.eras,
         generations: catalog.generations,
         onForge: startRun,
+        onOpenGalaxyStudio,
+        onRestoreGalaxyProfile: restoreSavedGalaxy,
         forging: run.phase === 'running',
         composeSummary: composeSummaryOf(compose.result),
         onViewPlan: hasPlan ? openPlan : undefined,
