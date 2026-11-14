@@ -255,21 +255,17 @@ class WorkflowTierTests(unittest.TestCase):
             ))
             strict.write_text(strict_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            for job in ("source_01", "source_13", "source_25"):
+                with self.subTest(missing_job=job):
+                    readiness.write_text(readiness_original.replace(f"      - {job}\n", "", 1))
+                    self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
             readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
+            # Duplicate JSON keys are an ambiguous policy, not last-writer wins.
+            policy_path = root / "machine/ci_workflow_tiers.json"
+            policy_original = policy_path.read_text()
+            policy_path.write_text(policy_original.rstrip()[:-1] + ', "schema": "skeleton.ci.workflow_tiers.v1"}')
+            self.assertTrue(any("duplicate registry key" in issue for issue in audit(root)))
+            policy_path.write_text(policy_original)
 
             # The required Merge Readiness lane must retain the same exact
             # source suites even though separate automatic runs are removed.
