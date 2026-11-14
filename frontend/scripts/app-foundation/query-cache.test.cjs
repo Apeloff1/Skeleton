@@ -66,7 +66,7 @@ test('invalidate drops stale in-flight results and marks data stale', async () =
   c.invalidate(['games']);
   d.resolve('old');
   await p;
-  assert.equal(c.get(['games', 1]).status, 'loading', 'stale result ignored');
+  assert.equal(c.get(['games', 1]).status, 'idle', 'invalidated loading state is restartable');
   await c.fetch(['games', 1], async () => 'new');
   c.invalidate('["games"');
   assert.equal(c.isStale(['games', 1], 1e9), true);
@@ -98,4 +98,49 @@ test('viewStateOf / defaultIsEmpty', () => {
   assert.equal(Q.viewStateOf(ok(0)), 'ready');
   assert.equal(Q.viewStateOf(ok(null)), 'empty');
   assert.equal(Q.viewStateOf(ok([1]), () => true), 'empty');
+});
+
+
+test('reset revisions notify mounted readers and fence overlapping requests', async () => {
+  const c = new Q.QueryCache(clock());
+  const key = ['games', 1];
+  const revisions = [];
+  c.subscribe(key, () => revisions.push(c.getInvalidation(key)));
+  const old = deferred();
+  const first = c.fetch(key, () => old.p);
+  c.invalidate(['games', 1]);
+  assert.equal(c.get(key).fetching, false);
+  assert.equal(c.getInvalidation(key), 1);
+  const middle = deferred();
+  const second = c.fetch(key, () => middle.p);
+  c.invalidate(['games', 1]);
+  assert.equal(c.getInvalidation(key), 2);
+  await c.fetch(key, async () => 'current');
+  middle.resolve('middle');
+  old.resolve('old');
+  await Promise.all([first, second]);
+  assert.equal(c.get(key).data, 'current');
+  assert.equal(c.get(key).fetching, false);
+  assert.ok(revisions.includes(1) && revisions.includes(2));
+  c.clear();
+  assert.equal(c.getInvalidation(key), 3);
+  assert.equal(c.get(key).status, 'idle');
+});
+
+test('array invalidation respects complete key segments and retains last good data', async () => {
+  const c = new Q.QueryCache(clock());
+  const key = ['games', 1];
+  c.setData(key, 'last good');
+  c.setData(['games', 10], 'other project');
+  c.setData(['games', 1, 'builds'], 'child');
+  const old = deferred();
+  const p = c.fetch(key, () => old.p, { force: true });
+  c.invalidate(key);
+  assert.equal(c.get(key).data, 'last good');
+  assert.equal(c.get(key).fetching, false);
+  assert.equal(c.getInvalidation(['games', 10]), 0);
+  assert.equal(c.getInvalidation(['games', 1, 'builds']), 1);
+  old.resolve('obsolete');
+  await p;
+  assert.equal(c.get(key).data, 'last good');
 });

@@ -268,3 +268,57 @@ test('presence: join, heartbeat, leave once; errors swallowed; validation', asyn
   assert.throws(() => P.presenceBody('join', '', 'c'));
   assert.match(P.newClientId(() => 0.5), /^c_8{16}$/);
 });
+
+
+test('client fences late callbacks between end and next retry', async () => {
+  const clock = fakeClock([1]); const srv = mockServer(); const got = [];
+  const c = new EventStreamClient({ channels: ['build'], transport: srv.transport, clock, onEvent: e => got.push(e.id) });
+  c.start(); const first = srv.last();
+  first.open(); first.send(frame('1', 'build.progress', env('1')));
+  first.end(); await tick();
+  first.open(); first.send(frame('2', 'build.progress', env('2')));
+  assert.deepEqual(got, ['1']);
+  assert.equal(c.getState().status, 'reconnecting');
+  await clock.advance(500);
+  assert.equal(srv.last().headers['Last-Event-ID'], '1');
+  c.stop();
+});
+
+test('client stops delivering immediately when a subscriber stops during a chunk', () => {
+  const clock = fakeClock([1]); const srv = mockServer(); const got = [];
+  const c = new EventStreamClient({ channels: ['build'], transport: srv.transport, clock, onEvent: e => { got.push(e.id); c.stop(); } });
+  c.start(); srv.last().open();
+  srv.last().send(frame('1', 'build.progress', env('1')) + frame('2', 'build.progress', env('2')));
+  assert.deepEqual(got, ['1']);
+  assert.equal(c.getState().status, 'closed');
+});
+
+test('client retries a synchronous rotating-header failure without leaking error text', async () => {
+  const clock = fakeClock([1]); const srv = mockServer(); let attempts = 0;
+  const c = new EventStreamClient({ channels: ['build'], transport: srv.transport, clock, headers: () => {
+    if (++attempts === 1) throw new Error('private credential');
+    return { 'x-gf-seal': 'rotated' };
+  } });
+  assert.doesNotThrow(() => c.start());
+  assert.equal(c.getState().status, 'reconnecting');
+  await clock.advance(500);
+  assert.equal(srv.last().headers['x-gf-seal'], 'rotated');
+  c.stop();
+});
+
+test('presence bounds stalled heartbeats and orders leave after join', async () => {
+  const posts = []; let intervalFn; let release;
+  const held = new Promise(resolve => { release = resolve; });
+  const stop = P.startPresence('app', 'c_1', {
+    post: async (_path, body) => { posts.push(body.action); if (body.action === 'join') await held; },
+    setInterval: fn => { intervalFn = fn; return 1; },
+    clearInterval: () => {},
+  });
+  await tick();
+  for (let i = 0; i < 100; i++) intervalFn();
+  stop(); stop(); intervalFn();
+  await tick();
+  assert.deepEqual(posts, ['join']);
+  release(); await tick();
+  assert.deepEqual(posts, ['join', 'leave']);
+});
