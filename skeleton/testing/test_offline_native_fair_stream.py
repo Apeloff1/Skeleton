@@ -321,3 +321,37 @@ def test_native_owner_detects_journal_path_replacement_before_execution(
         service.execute_next(token_budget=2)
     assert registry.status()["staged"] == 1
     assert service.status().execution_uncertain
+
+
+def test_native_queued_cancel_revokes_grant_and_rejects_foreign_owner(private_files):
+    from skeleton.app.offline_native_fair_stream import (
+        submit_authenticated_native_cpu_prompt, cancel_authenticated_native_cpu_prompt,
+    )
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    request = StreamRequest("cancel-test", "alice", InferencePhase.PREFILL, 2, 16)
+    submit_authenticated_native_cpu_prompt(
+        service=service, vault=vault, runtime=runtime, registry=registry,
+        authenticated_tenant_id="alice", request=request, prompt="hello", max_output_tokens=2,
+    )
+    before = session.verify()
+    with pytest.raises(ValueError, match="authorized"):
+        cancel_authenticated_native_cpu_prompt(
+            service=service, authenticated_tenant_id="bob", request_id=request.request_id,
+        )
+    assert session.verify() == before
+    assert registry.status()["staged"] == 1
+    cancel_authenticated_native_cpu_prompt(
+        service=service, authenticated_tenant_id="alice", request_id=request.request_id,
+    )
+    assert registry.status()["staged"] == 0
+    assert registry.status()["consumed_or_revoked"] == 1
+    assert session.verify()["checkpoint"]["requests"] == []
+    assert journal._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
+    ).fetchone()[0] == 0

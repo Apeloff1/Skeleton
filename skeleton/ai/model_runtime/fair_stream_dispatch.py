@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from threading import RLock
-from typing import Mapping, Protocol
+from typing import Callable, Mapping, Protocol
 
 from .fair_stream_live_budget import LiveStreamBudgetSampler
 from .fair_stream_queue import MeasuredStreamBudget, StreamRequest, MAX_TOKENS
@@ -65,6 +65,7 @@ class GuardedFairStreamDispatch:
         sampler: LiveStreamBudgetSampler,
         owner: DurableExecutionOwner,
         *, storage_path: str,
+        revoke_queued_prompt: Callable[[str], None] | None = None,
     ) -> None:
         if not isinstance(session, DurableFairStreamSession):
             raise ValueError("durable authenticated session required")
@@ -80,6 +81,9 @@ class GuardedFairStreamDispatch:
         self._sampler = sampler
         self._owner = owner
         self._storage_path = storage_path
+        if revoke_queued_prompt is not None and not callable(revoke_queued_prompt):
+            raise ValueError('queued prompt revoke hook must be callable')
+        self._revoke_queued_prompt = revoke_queued_prompt
         self._lock = RLock()
         self._issued: dict[str, DispatchPermit] = {}
         self._issued_budget: int | None = None
@@ -97,11 +101,34 @@ class GuardedFairStreamDispatch:
                 raise DispatchUncertain("pending dispatch must be reconciled")
             return self._session.submit(request)
 
-    def cancel(self, request_id: str) -> dict[str, object]:
-        with self._lock:
-            if self._issued or self._uncertain:
+    def cancel(self, request_id: str, *, tenant_id: str | None = None) -> dict[str, object]:
+        """Cancel queued work only; never wait behind running model I/O."""
+        if type(request_id) is not str or not request_id or len(request_id) > 256:
+            raise ValueError("invalid queued request identity")
+        if tenant_id is not None and (type(tenant_id) is not str or not tenant_id):
+            raise ValueError("invalid authenticated tenant")
+        if not self._lock.acquire(blocking=False):
+            raise DispatchDeferred("active dispatch prevents queued cancellation")
+        try:
+            if self._issued or self._uncertain or self._session.pending_ids():
                 raise DispatchUncertain("pending dispatch must be reconciled")
-            return self._session.cancel(request_id)
+            state = self._session.verify()
+            matching = [row for row in state["checkpoint"]["requests"]
+                        if row["request_id"] == request_id]
+            if len(matching) != 1 or (
+                tenant_id is not None and matching[0]["tenant_id"] != tenant_id
+            ):
+                raise ValueError("unknown authorized queued request")
+            updated = self._session.cancel(request_id)
+            if self._revoke_queued_prompt is not None:
+                try:
+                    self._revoke_queued_prompt(request_id)
+                except BaseException as exc:
+                    self._uncertain = True
+                    raise DispatchUncertain("queued prompt revocation requires reconciliation") from exc
+            return updated
+        finally:
+            self._lock.release()
 
     def _sample(self, token_budget: int) -> tuple[MeasuredStreamBudget, DispatchObservation]:
         if type(token_budget) is not int or not 1 <= token_budget <= MAX_TOKENS:

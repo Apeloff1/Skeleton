@@ -117,6 +117,7 @@ def bind_native_cpu_dispatch_service(
     )
     service = OfflineAdaptiveDispatchService(
         session, owner, sampler=sampler, storage_path=storage_path,
+        revoke_queued_prompt=registry.revoke_staged,
     )
     return service, vault
 
@@ -171,15 +172,40 @@ def submit_authenticated_native_cpu_prompt(
             or vault._backend.runtime is not runtime
             or service._session.verify().get("session_id") != registry.session_id):
         raise ValueError("native app ownership binding mismatch")
-    stage_native_cpu_prompt(
-        runtime=runtime, registry=registry, request_id=request.request_id,
-        tenant_id=authenticated_tenant_id, prompt=prompt,
-        max_output_tokens=max_output_tokens,
-    )
+    # Serialize staging and durable admission against local planning/cancel.
+    guard = service._guard
+    if not guard._lock.acquire(blocking=False):
+        from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchDeferred
+        raise DispatchDeferred("active dispatch prevents native admission")
     try:
-        return service.submit(request)
-    except BaseException:
-        # Never retain plaintext admission after a failed or uncertain submit.
-        # Revocation burns this process-local identity; no automatic retry.
-        registry.revoke(request.request_id)
-        raise
+        state = service._session.verify()
+        if guard.uncertain or state["checkpoint"]["pending"]:
+            raise ValueError("pending dispatch requires reconciliation")
+        if any(row["request_id"] == request.request_id for row in state["checkpoint"]["requests"]):
+            raise ValueError("duplicate queued request")
+        stage_native_cpu_prompt(
+            runtime=runtime, registry=registry, request_id=request.request_id,
+            tenant_id=authenticated_tenant_id, prompt=prompt,
+            max_output_tokens=max_output_tokens,
+        )
+        try:
+            return service.submit(request)
+        except BaseException:
+            registry.revoke(request.request_id)
+            raise
+    finally:
+        guard._lock.release()
+
+
+def cancel_authenticated_native_cpu_prompt(
+    *, service: OfflineAdaptiveDispatchService, authenticated_tenant_id: str,
+    request_id: str,
+):
+    """Cancel a queued request using app-authenticated tenant identity."""
+    if type(service) is not OfflineAdaptiveDispatchService:
+        raise ValueError("canonical native dispatch service required")
+    if type(authenticated_tenant_id) is not str or not authenticated_tenant_id:
+        raise ValueError("authenticated tenant required")
+    if service._guard._revoke_queued_prompt is None:
+        raise ValueError("native prompt custody hook required")
+    return service.cancel(request_id, tenant_id=authenticated_tenant_id)

@@ -270,6 +270,15 @@ class NativePromptRegistry:
                 del self._staged_at[request_id]
             self._used.add(request_id)
 
+    def revoke_staged(self, request_id: str) -> None:
+        """Revoke an existing grant, without burning an unknown identity."""
+        _require_owner_process(self._owner_pid)
+        with self._lock:
+            self._expire_locked(self._clock_locked())
+            _id(request_id, "request")
+            if request_id in self._staged:
+                self.revoke(request_id)
+
     def status(self) -> dict[str, int | str]:
         _require_owner_process(self._owner_pid)
         with self._lock:
