@@ -199,7 +199,7 @@ def test_governed_ai_proposal_pins_both_story_and_transitive_gameplay_source(
     async def legitimate_model(prompt):
         prompts.append(json.loads(prompt))
         return json.dumps({
-            "kind": "scene", "slug": "new_playable_payoff",
+            "kind": "scene", "slug": "new-playable-payoff",
             "title": "An Original Played Dramatic Consequence",
             "summary": "An original narrative payoff with a costly dramatic choice",
             "body": "A new choice changes a region in the original signed story world.",
@@ -228,7 +228,7 @@ def test_governed_ai_proposal_pins_both_story_and_transitive_gameplay_source(
     ])["ok"]
     # The story direction packet did not change, only its transitively linked
     # source. Old proposals must nevertheless become stale at approval time.
-    gameplay_doc["bindings"][0]["source_anchor"] = "arrival_2"
+    gameplay_doc["bindings"][0]["source_anchor"] = "visit_1"
     source.write_text(json.dumps(gameplay_doc), encoding="utf-8")
     stale = run_game_cli([
         "jeeves", "review", "--project", str(root), "--digest", digest
@@ -240,4 +240,4 @@ def test_governed_ai_proposal_pins_both_story_and_transitive_gameplay_source(
         "--approve", digest,
     ])
     assert not rejected["ok"]
-    assert not (root / "design" / "scene" / "new_playable_payoff.md").exists()
+    assert not (root / "design" / "scene" / "new-playable-payoff.md").exists()
