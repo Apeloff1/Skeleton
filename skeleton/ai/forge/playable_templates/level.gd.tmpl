@@ -1,0 +1,41 @@
+extends Node2D
+## Level — PLACEHOLDER floor/wall art drawn procedurally from the forged grid.
+## Replace with a TileMapLayer + real tileset (see data/asset_manifest.json).
+
+var main = null
+var _floor_a: Color
+var _floor_b: Color
+var _wall: Color
+var _wall_top: Color
+var _hazard: Color
+
+
+func setup(m) -> void:
+	main = m
+	var pal: Dictionary = Game.CONFIG["palette"]
+	_floor_a = Color.html(str(pal["floor_a"]))
+	_floor_b = Color.html(str(pal["floor_b"]))
+	_wall = Color.html(str(pal["wall"]))
+	_wall_top = Color.html(str(pal["wall_top"]))
+	_hazard = Color.html(str(pal["hazard"]))
+	queue_redraw()
+
+
+func _draw() -> void:
+	if main == null:
+		return
+	var t: int = main.TILE
+	for y in range(main.height):
+		var row: String = main.rows[y]
+		for x in range(main.width):
+			var ch := row[x]
+			var r := Rect2(x * t, y * t, t, t)
+			if ch == "#":
+				draw_rect(r, _wall)
+				if main.tile_char(Vector2i(x, y + 1)) != "#":
+					draw_rect(Rect2(x * t, y * t + t - 6, t, 6), _wall_top)
+			else:
+				draw_rect(r, _floor_a if (x + y) % 2 == 0 else _floor_b)
+				if ch == "H":
+					draw_rect(r.grow(-3), _hazard)
+					draw_line(r.position + Vector2(6, 6), r.end - Vector2(6, 6), _hazard.lightened(0.4), 2.0)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -79,65 +80,69 @@ def _normalize_capabilities(
     return frozenset(normalized)
 
 
-def _canonical_idempotency_value(
-    value: object,
-    *,
-    path: str,
-    _active_containers: set[int] | None = None,
-) -> Any:
-    """Return a deterministic strict-JSON value for execution fingerprinting.
+def _canonical_idempotency_value(value: object, *, path: str) -> Any:
+    """Detach strict JSON identity before reservation or agent side effects.
 
-    Idempotency is an identity boundary, so the permissive provenance digest
-    fallback-to-repr behavior is intentionally not used here. Unsupported,
-    recursive, or non-finite context values fail before a reservation or agent
-    side effect can occur.
+    Bounded traversal prevents recursive, excessively deep or very large
+    requests from turning fingerprinting into an unbounded resource sink.
     """
+    remaining_nodes = 100_000
+    remaining_bytes = 8_388_608
+    active: set[int] = set()
 
-    if value is None or isinstance(value, (str, bool, int)):
-        return value
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise ValueError(f"{path} must contain only finite JSON numbers")
-        return value
+    def visit(item: object, depth: int) -> Any:
+        nonlocal remaining_nodes, remaining_bytes
+        remaining_nodes -= 1
+        if remaining_nodes < 0 or depth > 64:
+            raise ValueError(f"{path} exceeds structural identity budget")
+        if item is None or type(item) is bool:
+            return item
+        if type(item) is str:
+            if len(item) > 1_048_576:
+                raise ValueError(f"{path} exceeds text identity budget")
+            try:
+                remaining_bytes -= len(item.encode("utf-8"))
+            except UnicodeError as exc:
+                raise ValueError(f"{path} contains invalid Unicode") from exc
+            if remaining_bytes < 0:
+                raise ValueError(f"{path} exceeds text identity budget")
+            return item
+        if type(item) is int:
+            if item.bit_length() > 4096:
+                raise ValueError(f"{path} exceeds integer identity budget")
+            return item
+        if type(item) is float:
+            if not math.isfinite(item):
+                raise ValueError(f"{path} must contain only finite JSON numbers")
+            return item
+        if isinstance(item, (list, Mapping)):
+            identity = id(item)
+            if identity in active:
+                raise ValueError(f"{path} must not contain recursive containers")
+            if len(item) > remaining_nodes:
+                raise ValueError(f"{path} exceeds structural identity budget")
+            active.add(identity)
+            try:
+                if isinstance(item, list):
+                    return [visit(child, depth + 1) for child in item]
+                canonical: dict[str, Any] = {}
+                for key, child in item.items():
+                    if type(key) is not str:
+                        raise TypeError(f"{path} JSON object keys must be strings")
+                    normalized_key = visit(key, depth + 1)
+                    if normalized_key in canonical:
+                        raise ValueError(f"{path} contains duplicate JSON object keys")
+                    canonical[normalized_key] = visit(child, depth + 1)
+                return canonical
+            finally:
+                active.remove(identity)
+        raise TypeError(f"{path} must contain only JSON-compatible values")
 
-    active = _active_containers if _active_containers is not None else set()
-    if isinstance(value, list):
-        identity = id(value)
-        if identity in active:
-            raise ValueError(f"{path} must not contain recursive containers")
-        active.add(identity)
-        try:
-            return [
-                _canonical_idempotency_value(
-                    item,
-                    path=f"{path}[{index}]",
-                    _active_containers=active,
-                )
-                for index, item in enumerate(value)
-            ]
-        finally:
-            active.remove(identity)
-
-    if isinstance(value, Mapping):
-        identity = id(value)
-        if identity in active:
-            raise ValueError(f"{path} must not contain recursive containers")
-        active.add(identity)
-        try:
-            canonical: dict[str, Any] = {}
-            for key, item in value.items():
-                if not isinstance(key, str):
-                    raise TypeError(f"{path} JSON object keys must be strings")
-                canonical[key] = _canonical_idempotency_value(
-                    item,
-                    path=f"{path}.{key}",
-                    _active_containers=active,
-                )
-            return canonical
-        finally:
-            active.remove(identity)
-
-    raise TypeError(f"{path} must contain only JSON-compatible values")
+    canonical = visit(value, 0)
+    encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+    if len(encoded.encode("utf-8")) > 8_388_608:
+        raise ValueError(f"{path} exceeds encoded identity budget")
+    return canonical
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,8 +194,8 @@ class AgentRuntime:
             self.idempotency_capacity, int
         ):
             raise TypeError("idempotency_capacity must be an integer")
-        if self.idempotency_capacity < 1:
-            raise ValueError("idempotency_capacity must be positive")
+        if not 1 <= self.idempotency_capacity <= 65_536:
+            raise ValueError("idempotency_capacity must be in [1, 65536]")
         if self.memory is not None and self.retriever is not None:
             raise ValueError("configure either memory or retriever, not both")
         if self.retriever is None and self.memory is not None:
@@ -355,10 +360,14 @@ class AgentRuntime:
                 idempotency_key,
                 "idempotency_key",
             )
+            if len(normalized_key) > 256:
+                raise ValueError("idempotency_key exceeds 256 characters")
             canonical_context = _canonical_idempotency_value(
                 normalized_context,
                 path="context",
             )
+            # Dispatch the detached fingerprinted context, not caller aliases.
+            normalized_context = canonical_context
             fingerprint = stable_content_digest(
                 {
                     "agent": agent.name,

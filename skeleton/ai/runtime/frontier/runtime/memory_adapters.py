@@ -188,6 +188,8 @@ class SQLiteCollection:
         path: str | Path = ":memory:",
         *,
         namespace: str = "frontier_memory",
+        capacity: int = 10_000,
+        max_namespace_bytes: int = 64 * 1024 * 1024,
     ) -> None:
         if not isinstance(namespace, str):
             raise TypeError("namespace must be a string")
@@ -197,7 +199,15 @@ class SQLiteCollection:
         if normalized_namespace != namespace:
             raise ValueError("namespace must be normalized")
 
+        if len(namespace) > 128:
+            raise ValueError("namespace must not exceed 128 characters")
+        if type(capacity) is not int or not 1 <= capacity <= 100_000:
+            raise ValueError("capacity must be in [1, 100000]")
+        if type(max_namespace_bytes) is not int or not 1 <= max_namespace_bytes <= 256 * 1024 * 1024:
+            raise ValueError("invalid namespace byte budget")
         self.namespace = namespace
+        self.capacity = capacity
+        self.max_namespace_bytes = max_namespace_bytes
         self._connection = sqlite3.connect(
             str(path),
             check_same_thread=False,
@@ -320,19 +330,51 @@ class SQLiteCollection:
         metadata = self._metadata_from_json(row["metadata_json"])
         return seq, item_id, document, metadata
 
+    def _assert_namespace_budget(self) -> None:
+        count, size = self._connection.execute(
+            """
+            SELECT COUNT(*), COALESCE(SUM(
+                length(CAST(item_id AS BLOB)) +
+                length(CAST(document AS BLOB)) +
+                length(CAST(metadata_json AS BLOB))
+            ), 0)
+            FROM frontier_memory_items WHERE namespace = ?
+            """,
+            (self.namespace,),
+        ).fetchone()
+        if count > self.capacity or size > self.max_namespace_bytes:
+            raise OverflowError("memory namespace capacity exceeded")
+
     def _rows(self) -> list[sqlite3.Row]:
         with self._lock:
-            return list(
-                self._connection.execute(
-                    """
-                    SELECT seq, item_id, document, metadata_json
-                    FROM frontier_memory_items
-                    WHERE namespace = ?
-                    ORDER BY seq DESC
-                    """,
-                    (self.namespace,),
-                )
+            result: list[sqlite3.Row] = []
+            size = 0
+            cursor = self._connection.execute(
+                """
+                SELECT seq, item_id, document, metadata_json
+                FROM frontier_memory_items
+                WHERE namespace = ?
+                ORDER BY seq DESC
+                LIMIT ?
+                """,
+                (self.namespace, self.capacity + 1),
             )
+            try:
+                for row in cursor:
+                    if len(result) >= self.capacity:
+                        raise OverflowError("memory namespace capacity exceeded")
+                    for key in ("item_id", "document", "metadata_json"):
+                        value = row[key]
+                        if isinstance(value, str):
+                            size += len(value.encode("utf-8"))
+                        elif isinstance(value, bytes):
+                            size += len(value)
+                        if size > self.max_namespace_bytes:
+                            raise OverflowError("memory namespace byte budget exceeded")
+                    result.append(row)
+            finally:
+                cursor.close()
+            return result
 
     def add(
         self,
@@ -344,7 +386,10 @@ class SQLiteCollection:
         if not (len(documents) == len(metadatas) == len(ids)):
             raise ValueError("documents, metadatas and ids must have equal lengths")
 
+        if len(ids) > self.capacity:
+            raise OverflowError("memory batch exceeds capacity")
         rows: list[tuple[str, str, str, str]] = []
+        batch_bytes = 0
         for document, metadata, item_id in zip(documents, metadatas, ids):
             if not isinstance(item_id, str):
                 raise TypeError("memory id must be a string")
@@ -355,16 +400,16 @@ class SQLiteCollection:
                 raise TypeError("memory document must be a string")
             if not isinstance(metadata, Mapping):
                 raise TypeError("metadata must be a mapping")
-            rows.append(
-                (
-                    self.namespace,
-                    normalized_id,
-                    document,
-                    self._metadata_json(metadata),
-                )
-            )
+            metadata_json = self._metadata_json(metadata)
+            batch_bytes += sum(len(value.encode("utf-8")) for value in (normalized_id, document, metadata_json))
+            if batch_bytes > self.max_namespace_bytes:
+                raise OverflowError("memory batch exceeds byte budget")
+            rows.append((self.namespace, normalized_id, document, metadata_json))
 
-        with self._lock:
+        # Cross-process serialization: the write and its quota check share
+        # one transaction. A failed quota check rolls back every batch row.
+        with self._lock, self._connection:
+            self._connection.execute("BEGIN IMMEDIATE")
             self._connection.executemany(
                 """
                 INSERT INTO frontier_memory_items(
@@ -376,7 +421,7 @@ class SQLiteCollection:
                 """,
                 rows,
             )
-            self._connection.commit()
+            self._assert_namespace_budget()
 
     def query(
         self,
@@ -466,27 +511,28 @@ class SQLiteCollection:
             return
 
         normalized_where = normalize_memory_filters(where)
-        targets: list[str] = []
-        for row in self._rows():
-            raw_id = row["item_id"]
-            if wanted is not None and raw_id not in wanted:
-                continue
-            _, item_id, _, metadata = self._decoded_row(row)
-            if not self._matches(metadata, normalized_where):
-                continue
-            targets.append(item_id)
+        # Hold the database write reservation across selection and deletion.
+        # A second process cannot change a matched row between these phases.
+        with self._lock, self._connection:
+            self._connection.execute("BEGIN IMMEDIATE")
+            targets: list[str] = []
+            for row in self._rows():
+                raw_id = row["item_id"]
+                if wanted is not None and raw_id not in wanted:
+                    continue
+                _, item_id, _, metadata = self._decoded_row(row)
+                if not self._matches(metadata, normalized_where):
+                    continue
+                targets.append(item_id)
 
-        if not targets:
-            return
-        with self._lock:
-            self._connection.executemany(
-                """
-                DELETE FROM frontier_memory_items
-                WHERE namespace = ? AND item_id = ?
-                """,
-                [(self.namespace, item_id) for item_id in targets],
-            )
-            self._connection.commit()
+            if targets:
+                self._connection.executemany(
+                    """
+                    DELETE FROM frontier_memory_items
+                    WHERE namespace = ? AND item_id = ?
+                    """,
+                    [(self.namespace, item_id) for item_id in targets],
+                )
 
     def count(self) -> int:
         with self._lock:
