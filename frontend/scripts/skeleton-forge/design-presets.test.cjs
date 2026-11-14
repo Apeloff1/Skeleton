@@ -153,3 +153,33 @@ test('no account or provider information is serialized into a design preset', ()
   assert.doesNotMatch(encoded, /accessToken|apiKey|not-an-allowed-field/);
   assert.doesNotMatch(encoded, /"run_payload"|"secret":|"provider_key"/);
 });
+
+const Foundation = load('src/skeletonForge/foundation/model.ts');
+
+test('Studio project custody retains the full advanced questionnaire and run choices', () => {
+  const questionnaire = { ...filled(), playtest: 'require', sourceExport: { enabled: true } };
+  const project = { id: 'p_1', title: 'Starfall', createdAt: '2026-11-14', updatedAt: '2026-11-14',
+    questionnaire, lastRun: null };
+  const restored = Foundation.sanitizeProjects(JSON.parse(JSON.stringify([project])));
+  assert.equal(restored.corrupt, false);
+  assert.deepEqual(Q.buildRunRequest(restored.projects[0].questionnaire), Q.buildRunRequest(questionnaire));
+  assert.equal(restored.projects[0].questionnaire.step, questionnaire.step);
+  assert.equal(restored.projects[0].questionnaire.galaxyProfile.config.art_matrix.kickoff.count, 12);
+});
+
+test('Studio upgrades missing legacy cockpit fields without discarding modern malformed fields', () => {
+  const fresh = Foundation.freshQuestionnaire();
+  assert.deepEqual(fresh.instruments, {});
+  const legacy = { step: 'vision', vision: '', brief: {}, beats: {}, options: fresh.options };
+  const project = { id: 'p_legacy', title: 'Legacy', createdAt: '2026-11-14', updatedAt: '2026-11-14',
+    questionnaire: legacy, lastRun: null };
+  const restored = Foundation.sanitizeProjects([project]);
+  assert.equal(restored.corrupt, false);
+  assert.equal(restored.projects[0].questionnaire.playtest, 'off');
+  for (const invalid of [
+    { instruments: { risk: 2 } }, { instruments: null },
+    { sourceExport: { enabled: 'true' } }, { playtest: 'invalid' },
+  ]) {
+    assert.equal(Foundation.sanitizeProjects([{ ...project, questionnaire: { ...legacy, ...invalid } }]).corrupt, true);
+  }
+});
