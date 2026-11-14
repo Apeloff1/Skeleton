@@ -17,13 +17,16 @@ import asyncio
 import heapq
 import json
 import math
+import os
 import sqlite3
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
-from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteHandle, open_private_sqlite
+from skeleton.ai.model_runtime.private_sqlite import (
+    PrivateSQLiteHandle, PrivateSQLiteUnavailable, open_private_sqlite,
+)
 from skeleton.frontier.runtime.memory import (
     lexical_relevance,
     normalize_memory_filters,
@@ -216,6 +219,7 @@ class SQLiteCollection:
         self.capacity = capacity
         self.max_namespace_bytes = max_namespace_bytes
         self._private_handle = _private_handle
+        self._owner_pid = os.getpid()
         self._lock = threading.RLock()
         if _private_handle is None:
             self._connection = sqlite3.connect(
@@ -277,6 +281,11 @@ class SQLiteCollection:
         except BaseException:
             handle.close()
             raise
+
+    def _require_owner_process(self) -> None:
+        # Reject before acquiring an inherited thread lock after fork.
+        if os.getpid() != self._owner_pid:
+            raise PrivateSQLiteUnavailable("inherited memory collection requires reopening")
 
     def _assert_private_custody(self) -> None:
         if self._private_handle is not None:
@@ -404,6 +413,7 @@ class SQLiteCollection:
             raise OverflowError("memory database capacity exceeded")
 
     def _rows(self) -> list[sqlite3.Row]:
+        self._require_owner_process()
         with self._lock:
             self._assert_private_custody()
             result: list[sqlite3.Row] = []
@@ -442,6 +452,7 @@ class SQLiteCollection:
         metadatas: Sequence[Mapping[str, Any]],
         ids: Sequence[str],
     ) -> None:
+        self._require_owner_process()
         if not (len(documents) == len(metadatas) == len(ids)):
             raise ValueError("documents, metadatas and ids must have equal lengths")
 
@@ -558,6 +569,7 @@ class SQLiteCollection:
         ids: Sequence[str] | None = None,
         where: Mapping[str, Any] | None = None,
     ) -> None:
+        self._require_owner_process()
         wanted = self._normalized_ids(ids)
 
         # Exact or full deletion is also the repair path for corrupt rows and
@@ -609,6 +621,7 @@ class SQLiteCollection:
             self._assert_private_custody()
 
     def count(self) -> int:
+        self._require_owner_process()
         with self._lock:
             self._assert_private_custody()
             row = self._connection.execute(
@@ -622,6 +635,7 @@ class SQLiteCollection:
             return int(row[0])
 
     def close(self) -> None:
+        self._require_owner_process()
         with self._lock:
             if self._private_handle is not None:
                 self._private_handle.close()

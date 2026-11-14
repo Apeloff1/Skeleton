@@ -169,8 +169,7 @@ def submit_authenticated_native_cpu_prompt(
             or owner._backend is not vault
             or type(vault._backend) is not NativeFairStreamBackend
             or vault._backend.registry is not registry
-            or vault._backend.runtime is not runtime
-            or service._session.verify().get("session_id") != registry.session_id):
+            or vault._backend.runtime is not runtime):
         raise ValueError("native app ownership binding mismatch")
     # Serialize staging and durable admission against local planning/cancel.
     guard = service._guard
@@ -179,6 +178,8 @@ def submit_authenticated_native_cpu_prompt(
         raise DispatchDeferred("active dispatch prevents native admission")
     try:
         state = service._session.verify()
+        if state.get("session_id") != registry.session_id:
+            raise ValueError("native app ownership binding mismatch")
         if guard.uncertain or state["checkpoint"]["pending"]:
             raise ValueError("pending dispatch requires reconciliation")
         if any(row["request_id"] == request.request_id for row in state["checkpoint"]["requests"]):

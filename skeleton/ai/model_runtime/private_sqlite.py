@@ -7,7 +7,7 @@ protect against a malicious same-UID process, or certify storage encryption.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 from pathlib import Path
 import re
@@ -89,6 +89,11 @@ class PrivateSQLiteHandle:
     _filename: str
     _max_database_bytes: int
     _closed: bool = False
+    _owner_pid: int = field(default_factory=os.getpid, init=False, repr=False)
+
+    def require_owner_process(self) -> None:
+        if os.getpid() != self._owner_pid:
+            raise PrivateSQLiteUnavailable("inherited SQLite connection requires a fresh authorized open")
 
     def assert_current(self) -> None:
         """Revalidate the exact opened inode before sensitive operations.
@@ -98,6 +103,7 @@ class PrivateSQLiteHandle:
         It does not defend against a malicious same-UID process racing
         between checks; app-account isolation is still mandatory.
         """
+        self.require_owner_process()
         if self._closed:
             raise PrivateSQLiteUnavailable("private SQLite handle closed")
         try:
@@ -131,10 +137,18 @@ class PrivateSQLiteHandle:
             if (type(page_size) is not int or type(pages) is not int
                     or pages * page_size > self._max_database_bytes):
                 raise PrivateSQLiteUnavailable("SQLite page budget exceeded")
+            cap = self.connection.execute("PRAGMA max_page_count").fetchone()[0]
+            mode = self.connection.execute("PRAGMA journal_mode").fetchone()[0]
+            sync = self.connection.execute("PRAGMA synchronous").fetchone()[0]
+            trusted = self.connection.execute("PRAGMA trusted_schema").fetchone()[0]
+            if (type(cap) is not int or cap * page_size > self._max_database_bytes
+                    or mode != "delete" or sync != 2 or trusted != 0):
+                raise PrivateSQLiteUnavailable("SQLite durability or page policy changed")
         except (OSError, sqlite3.Error) as exc:
             raise PrivateSQLiteUnavailable("private SQLite custody unavailable") from exc
 
     def close(self) -> None:
+        self.require_owner_process()
         if self._closed:
             return
         self._closed = True
@@ -147,6 +161,7 @@ class PrivateSQLiteHandle:
                 os.close(self._directory_fd)
 
     def __enter__(self) -> "PrivateSQLiteHandle":
+        self.require_owner_process()
         if self._closed:
             raise PrivateSQLiteUnavailable("private SQLite handle already closed")
         return self

@@ -94,6 +94,32 @@ jobs:
           python -m pip install --disable-pip-version-check -r requirements-dev.txt
           python -m pip install --disable-pip-version-check -r backend/requirements.txt
           python -m pip install --disable-pip-version-check "ruff==0.17.2" "pytest>=8,<9" "pytest-asyncio>=0.24,<2"
+      - name: Reconciliation repair source compile and canonical parity
+        run: |
+          set -euo pipefail
+          python -m compileall -q skeleton/realtime skeleton/frontier/runtime skeleton/ai/model_runtime skeleton/economy/gameplay/industry
+          cmp skeleton/intelligence/execution_runtime.py skeleton/ai/runtime/intelligence/execution_runtime.py
+          cmp skeleton/forge/playable_portal.py skeleton/ai/forge/playable_portal.py
+          python scripts/check_ai_file_tree.py
+      - name: Reconciliation security, memory and replay custody
+        run: >-
+          python -m pytest -q --tb=short
+          tests/test_realtime_audit_hardening_20261114.py
+          tests/test_recovered_runtime_identity_custody.py
+          tests/test_reconciled_resource_boundaries_20261114.py
+          tests/test_recovered_bounded_state_history.py
+          tests/test_frontier_private_memory_custody.py
+      - name: Reconciliation native execution and cancellation custody
+        run: >-
+          python -m pytest -q --tb=short
+          skeleton/testing/test_native_whole_request_custody.py
+          skeleton/testing/test_native_fair_stream_backend.py
+          skeleton/testing/test_native_token_pressure.py
+          skeleton/testing/test_fair_stream_dispatch.py
+          skeleton/testing/test_fair_stream_execution_journal.py
+          skeleton/testing/test_offline_native_fair_stream.py
+      - name: Reconciliation industry restoration and mutation custody
+        run: python -m pytest -q --tb=short skeleton/economy/gameplay/industry/tests
       - name: Focused recovered security and local builder regressions
         run: >-
           python -m pytest -q --tb=short
