@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "base_conversion_07",
+  "domain": "base_conversion",
+  "severity": "high",
+  "objective": "Evaluate exact structured model reasoning for base_conversion case 7",
+  "steps": [
+    {
+      "prompt": "Convert decimal 778 to lowercase hexadecimal without prefix or commentary.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "30a"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

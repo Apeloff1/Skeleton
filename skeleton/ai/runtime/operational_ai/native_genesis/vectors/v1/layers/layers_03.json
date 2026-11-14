@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "layers_03",
+  "category": "layers",
+  "overrides": {
+    "n_layers": 3
+  },
+  "expected": "allowed",
+  "reason": "Admit constrained layers configuration before native weight allocation"
+}

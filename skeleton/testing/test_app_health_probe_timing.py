@@ -8,7 +8,7 @@ from skeleton.app.health import probe_http, probe_local_setup, wait_for_applicat
 
 class InvalidProbeTimingTests(unittest.TestCase):
     def test_http_rejects_malformed_timeout_before_network(self):
-        with patch("skeleton.app.health.urlopen", side_effect=AssertionError("network")):
+        with patch("skeleton.app.health._open_direct_health", side_effect=AssertionError("network")):
             for invalid in (True, False, None, "2", float("nan"), math.inf, -1, 0, 31):
                 with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                     probe_http("backend", "http://127.0.0.1:8000/health", timeout=invalid)
@@ -30,7 +30,7 @@ class InvalidProbeTimingTests(unittest.TestCase):
                     wait_for_application(delay=invalid)
 
     def test_valid_boundaries_do_not_raise_timing_validation(self):
-        with patch("skeleton.app.health.urlopen", side_effect=OSError("offline")):
+        with patch("skeleton.app.health._open_direct_health", side_effect=OSError("offline")):
             self.assertFalse(probe_http("backend", "http://127.0.0.1:8000/health", timeout=0.01).ok)
             self.assertFalse(probe_http("backend", "http://127.0.0.1:8000/health", timeout=30.0).ok)
 

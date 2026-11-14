@@ -34,6 +34,10 @@ GRAVITY_MM_S2 = -9_810
 HARD_IMPACT_MM_S = 6_000
 SHOVE_MM = 50
 MAX_ACTORS = 512
+MAX_STATICS = 4096
+MAX_TICKS = 10_000
+MAX_CONTACTS = 100_000
+MAX_INTENT_MM_S = 1_000_000_000
 
 
 class MultiActorError(SimulationContractError):
@@ -49,10 +53,14 @@ class ActorBody:
     role: str = "npc"
 
     def __post_init__(self) -> None:
-        if any(type(v) is not int or v <= 0 for v in self.half_extent_mm) or len(self.half_extent_mm) != 3:
+        if (len(self.half_extent_mm) != 3 or any(
+                type(v) is not int or not 1 <= v <= MAX_INTENT_MM_S for v in self.half_extent_mm)):
             raise MultiActorError("half extents must be 3 positive ints")
-        if type(self.mass_g) is not int or self.mass_g <= 0:
+        if type(self.mass_g) is not int or not 1 <= self.mass_g <= MAX_INTENT_MM_S:
             raise MultiActorError("mass must be positive grams")
+        if (type(self.vertical_velocity_mm_s) is not int
+                or abs(self.vertical_velocity_mm_s) > MAX_INTENT_MM_S):
+            raise MultiActorError("vertical velocity must be a bounded integer")
         if self.role not in ("player", "npc", "creature", "prop"):
             raise MultiActorError("unknown actor role")
 
@@ -99,13 +107,30 @@ def _with_position(actor: ActorBody, pos: tuple[int, int, int], grounded: bool,
                    vertical_velocity_mm_s=vy)
 
 
-def _digest(tick: int, actors: Sequence[ActorBody], contacts: Iterable, prev: str) -> str:
+def _digest(
+    tick: int, actors: Sequence[ActorBody], contacts: Iterable, prev: str,
+    *, intents: Mapping[str, tuple[int, int]], statics: Sequence[AABB],
+    step_ns: int, floor_y_mm: int,
+) -> str:
+    # A receipt must bind *all* physics-authoritative inputs, not just
+    # positions. Mass, collision extents, speed and world geometry can change
+    # the next tick without changing the current actor coordinates.
     return sha256(json.dumps({
         "tick": tick, "prev": prev,
-        "actors": [[a.actor_id, list(a.controller.position), a.controller.grounded,
-                    a.vertical_velocity_mm_s] for a in actors],
+        "step_ns": step_ns, "floor_y_mm": floor_y_mm,
+        "actors": [
+            [a.actor_id, list(a.controller.position),
+             a.controller.max_speed_per_sec, a.controller.grounded,
+             a.vertical_velocity_mm_s, list(a.half_extent_mm), a.mass_g, a.role]
+            for a in actors
+        ],
+        "intents": [[name, list(intents[name])] for name in sorted(intents)],
+        "statics": [
+            [box.collider_id, list(box.min_xyz), list(box.max_xyz)]
+            for box in sorted(statics, key=lambda box: box.collider_id)
+        ],
         "contacts": sorted(list(c) for c in contacts),
-    }, separators=(",", ":")).encode()).hexdigest()
+    }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def step_actors(
@@ -121,16 +146,48 @@ def step_actors(
 ) -> TickReceipt:
     if not 1 <= len(actors) <= MAX_ACTORS:
         raise MultiActorError("1..512 actors required")
+    if len(statics) > MAX_STATICS:
+        raise MultiActorError("static collider count exceeds bound")
+    if len(intents) > len(actors):
+        raise MultiActorError("actor intent count exceeds bound")
+    if type(prev_contacts) is not frozenset or len(prev_contacts) > MAX_CONTACTS:
+        raise MultiActorError("previous contact count or type exceeds bound")
+    for pair in prev_contacts:
+        if (type(pair) is not tuple or len(pair) != 2
+                or any(type(identity) is not str or not 1 <= len(identity) <= 256
+                       or identity != identity.strip()
+                       or any(ord(char) < 32 for char in identity)
+                       for identity in pair)
+                or pair[0] >= pair[1]):
+            raise MultiActorError("previous contact pair is not canonical")
+    if type(tick) is not int or not 0 <= tick <= MAX_TICKS:
+        raise MultiActorError("simulation tick exceeds bound")
+    if (type(prev_digest) is not str or len(prev_digest) != 64
+            or any(c not in "0123456789abcdef" for c in prev_digest)):
+        raise MultiActorError("previous receipt digest is invalid")
     if type(step_ns) is not int or not 1_000_000 <= step_ns <= 100_000_000:
         raise MultiActorError("step must be 1..100 ms")
+    if type(floor_y_mm) is not int or abs(floor_y_mm) > MAX_INTENT_MM_S:
+        raise MultiActorError("floor height must be a bounded integer")
     ids = [a.actor_id for a in actors]
     if len(set(ids)) != len(ids):
         raise MultiActorError("duplicate actor id")
     if set(intents) - set(ids):
         raise MultiActorError("intent for unknown actor")
+    if any(type(v) not in (tuple, list) or len(v) != 2
+           or any(type(n) is not int or abs(n) > MAX_INTENT_MM_S for n in v)
+           for v in intents.values()):
+        raise MultiActorError("actor intent is not a bounded integer pair")
     static_ids = {s.collider_id for s in statics}
+    if len(static_ids) != len(statics):
+        raise MultiActorError("duplicate static collider id")
     if static_ids & set(ids):
         raise MultiActorError("static collider id collides with actor id")
+    known_ids = set(ids) | static_ids
+    if any(a not in known_ids or b not in known_ids
+           or (a in static_ids and b in static_ids)
+           for a, b in prev_contacts):
+        raise MultiActorError("previous contact references unknown or static-only bodies")
     events: list[SemanticEvent] = []
     moved: dict[str, ActorBody] = {}
     # 1 + 2: controller intent, gravity, floor.
@@ -198,13 +255,17 @@ def step_actors(
     frozen = frozenset(contacts)
     return TickReceipt(tick, ordered, frozen,
                        tuple(sorted(events, key=lambda e: (e.kind, e.actors))),
-                       _digest(tick, ordered, frozen, prev_digest), prev_digest)
+                       _digest(tick, ordered, frozen, prev_digest,
+                               intents=intents, statics=statics, step_ns=step_ns,
+                               floor_y_mm=floor_y_mm), prev_digest)
 
 
 def run_actors(actors: Sequence[ActorBody],
                intents_per_tick: Sequence[Mapping[str, tuple[int, int]]], *,
                step_ns: int, statics: Sequence[AABB] = (),
                floor_y_mm: int = 0) -> tuple[TickReceipt, ...]:
+    if len(intents_per_tick) > MAX_TICKS:
+        raise MultiActorError("simulation tick count exceeds bound")
     receipts: list[TickReceipt] = []
     current = tuple(actors)
     contacts: frozenset[tuple[str, str]] = frozenset()

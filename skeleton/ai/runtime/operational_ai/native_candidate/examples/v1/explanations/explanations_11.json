@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "explanations_11",
+  "domain": "explanations",
+  "prompt": "Give this exact concise training definition of budget for fictional glossary row 11.",
+  "completion": "A maximum resource allowance.",
+  "group_id": "explanations_11",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

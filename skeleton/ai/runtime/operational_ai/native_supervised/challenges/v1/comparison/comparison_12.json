@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "comparison_12",
+  "domain": "comparison",
+  "ordinal": 12,
+  "arguments": {
+    "index": 12,
+    "a": 184,
+    "b": 14,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 12: Is 184 greater than 170? Answer yes or no.",
+  "expected": "yes",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

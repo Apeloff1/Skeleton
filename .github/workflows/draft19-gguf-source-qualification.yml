@@ -16,9 +16,13 @@ on:
       - "skeleton/testing/test_app_offline_archive_schema_parity.py"
       - "skeleton/testing/test_repo_machine_inventory_budget.py"
       - "skeleton/testing/test_app_offline_mixed_game_library_continuity.py"
-      - "skeleton/testing/dialogue_sessions_v1/__init__.py"
-      - "skeleton/testing/questflows_v1/__init__.py"
-      - "skeleton/testing/test_local_ai_gguf_custody.py"
+      - "skeleton/testing/dialogue_sessions_v1/**"
+      - "skeleton/testing/questflows_v1/**"
+      - "skeleton/testing/test_local_ai_model_loader_custody.py"
+      - "tests/test_local_ai_gguf_custody_v6.py"
+      - "tests/test_gguf_artifact_qualification_reconciliation.py"
+      - "scripts/check_draft19_ci_paths.py"
+      - "tests/test_draft19_ci_paths.py"
       - "machine/draft19_reconciliation.json"
       - "scripts/check_draft19_reconciliation.py"
       - "tests/test_draft19_reconciliation.py"
@@ -28,7 +32,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: draft19-gguf-source-${{ github.event.pull_request.number }}
+  group: draft19-gguf-source-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

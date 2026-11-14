@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "evidence_match_04",
+  "domain": "evidence_match",
+  "ordinal": 4,
+  "arguments": {
+    "index": 4,
+    "a": 128,
+    "b": 6,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 4: Observed digest prefix 00000080, pinned prefix 00000080. Reply match or mismatch.",
+  "expected": "match",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

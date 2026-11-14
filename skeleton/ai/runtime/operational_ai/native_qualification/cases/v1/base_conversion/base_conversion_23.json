@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "base_conversion_23",
+  "domain": "base_conversion",
+  "severity": "high",
+  "objective": "Evaluate exact structured model reasoning for base_conversion case 23",
+  "steps": [
+    {
+      "prompt": "Convert decimal 2586 to binary digits only without any prefix.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "101000011010"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

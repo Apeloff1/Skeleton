@@ -83,3 +83,107 @@ def test_event_signals_feed_rpg_environment():
     assert sig["native_contact_count"] == 1.0
     from skeleton.forge.game_frontier_rpg_events import RPG_ENVIRONMENT_SIGNALS
     assert set(sig) <= RPG_ENVIRONMENT_SIGNALS
+
+
+def test_multi_actor_bounded_inputs_and_duplicate_static_ids(monkeypatch):
+    from skeleton.game.simulation import multi_actor_semantic as mod
+
+    a = actor("a", 0)
+    wall = AABB("wall", (0, 0, 0), (100, 100, 100))
+    with pytest.raises(MultiActorError, match="duplicate static"):
+        step_actors((a,), {}, tick=0, step_ns=STEP, statics=(wall, wall))
+    with pytest.raises(MultiActorError, match="bounded integer pair"):
+        step_actors((a,), {"a": (10**100, 0)}, tick=0, step_ns=STEP)
+    with pytest.raises(MultiActorError, match="receipt digest"):
+        step_actors((a,), {}, tick=0, step_ns=STEP, prev_digest="not-a-digest")
+    monkeypatch.setattr(mod, "MAX_TICKS", 1)
+    with pytest.raises(MultiActorError, match="tick count"):
+        run_actors((a,), [{}, {}], step_ns=STEP)
+
+
+def test_semantic_physics_rejects_oversized_intent_and_contact_maps(monkeypatch):
+    from skeleton.game.simulation import multi_actor_semantic as mod
+
+    a = actor("a", 0)
+    with pytest.raises(MultiActorError, match="intent count"):
+        step_actors((a,), {"a": (0, 0), "ghost": (0, 0)}, tick=0, step_ns=STEP)
+    monkeypatch.setattr(mod, "MAX_CONTACTS", 1)
+    contacts = frozenset({("a", "b"), ("c", "d")})
+    with pytest.raises(MultiActorError, match="contact count"):
+        step_actors((a,), {}, tick=0, step_ns=STEP, prev_contacts=contacts)
+
+
+def test_actor_body_rejects_noninteger_and_unbounded_vertical_velocity():
+    controller = CharacterController("vertical", (0, 500, 0), 5000, False)
+    for bad in (True, 1.5, "500", 10**1000, -(10**1000)):
+        with pytest.raises(MultiActorError, match="vertical velocity"):
+            ActorBody(controller, (300, 500, 300), 70000, vertical_velocity_mm_s=bad)
+    valid = ActorBody(controller, (300, 500, 300), 70000,
+                      vertical_velocity_mm_s=-10000)
+    receipt = step_actors((valid,), {}, tick=0, step_ns=STEP)
+    assert len(receipt.state_digest) == 64
+
+
+@pytest.mark.parametrize("invalid", [
+    frozenset({("a",)}),
+    frozenset({("a", 1)}),
+    frozenset({("b", "a")}),
+    frozenset({("a" * 257, "b")}),
+    frozenset({("a\\n", "b")}),
+    frozenset({("a", "a")}),
+])
+def test_semantic_physics_rejects_noncanonical_previous_contacts(invalid):
+    with pytest.raises(MultiActorError, match="previous contact pair"):
+        step_actors((actor("a", 0),), {}, tick=0, step_ns=STEP,
+                    prev_contacts=invalid)
+
+
+def test_semantic_physics_rejects_wrong_previous_contact_container():
+    with pytest.raises(MultiActorError, match="contact count or type"):
+        step_actors((actor("a", 0),), {}, tick=0, step_ns=STEP,
+                    prev_contacts=[("a", "b")])
+
+
+def test_semantic_receipt_binds_physics_authority():
+    """Same coordinates with different physical authority must not share a digest."""
+    from dataclasses import replace
+
+    base = actor("a", 0)
+    variants = [
+        base,
+        replace(base, mass_g=base.mass_g + 1),
+        replace(base, half_extent_mm=(301, 500, 300)),
+        replace(base, role="player"),
+        replace(base, controller=CharacterController(
+            base.actor_id, base.controller.position,
+            base.controller.max_speed_per_sec + 1, True)),
+    ]
+    receipts = [step_actors((body,), {}, tick=0, step_ns=STEP) for body in variants]
+    assert len({receipt.state_digest for receipt in receipts}) == len(variants)
+    assert len({receipt.actors[0].controller.position for receipt in receipts}) == 1
+
+    empty = step_actors((base,), {}, tick=0, step_ns=STEP)
+    changed_intent = step_actors((base,), {"a": (0, 0)}, tick=0, step_ns=STEP)
+    changed_step = step_actors((base,), {}, tick=0, step_ns=STEP + 1)
+    changed_floor = step_actors((base,), {}, tick=0, step_ns=STEP, floor_y_mm=-1)
+    far_wall = AABB("far-wall", (10000, 0, 10000), (11000, 1000, 11000))
+    changed_world = step_actors((base,), {}, tick=0, step_ns=STEP, statics=(far_wall,))
+    assert len({r.state_digest for r in (
+        empty, changed_intent, changed_step, changed_floor, changed_world)}) == 5
+
+
+@pytest.mark.parametrize("floor", [True, 0.5, "0", 10**100, -(10**100)])
+def test_semantic_physics_rejects_noncanonical_floor_height(floor):
+    with pytest.raises(MultiActorError, match="floor height"):
+        step_actors((actor("a", 0),), {}, tick=0, step_ns=STEP, floor_y_mm=floor)
+
+
+def test_previous_contacts_cannot_forge_ghost_or_static_only_transitions():
+    body = actor("a", 0)
+    wall = AABB("wall", (10000, 0, 0), (11000, 1000, 1000))
+    other = AABB("wall2", (20000, 0, 0), (21000, 1000, 1000))
+    for contacts in (frozenset({("a", "ghost")}),
+                     frozenset({("wall", "wall2")})):
+        with pytest.raises(MultiActorError, match="previous contact references"):
+            step_actors((body,), {}, tick=0, step_ns=STEP,
+                        statics=(wall, other), prev_contacts=contacts)

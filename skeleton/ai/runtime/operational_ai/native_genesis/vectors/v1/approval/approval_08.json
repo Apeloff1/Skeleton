@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "approval_08",
+  "category": "approval",
+  "overrides": {
+    "operator_approved": 0
+  },
+  "expected": "denied",
+  "reason": "Reject unsafe model approval without automatic downgrade or privilege escalation"
+}
