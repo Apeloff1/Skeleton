@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import pytest
 
-from skeleton.ecs.script import ScriptLimits
-from skeleton.ecs.script_runtime import (
+from .script import ScriptLimits
+from .script_runtime import (
     CapabilityError,
     CapabilityRegistry,
     QuotaExceededError,
@@ -137,7 +137,7 @@ def test_duplicate_load_and_unknown_script():
 
 
 def test_diagnostics_bounded():
-    from skeleton.ecs import script_runtime as sr
+    from . import script_runtime as sr
     host, _ = make_host()
     for i in range(sr.MAX_DIAGNOSTICS + 10):
         with pytest.raises(ScriptValidationError):
