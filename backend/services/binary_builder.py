@@ -108,20 +108,21 @@ _WINDOWS_RESERVED_MEMBERS = frozenset({
 
 def _bounded_asset_bytes(value: object) -> bytes:
     """Reject unsupported source objects and enforce UTF-8 byte bounds."""
+    limit = min(_MAX_ASSET_BYTES, _MAX_PACKAGE_FILE_BYTES)
     if type(value) is str:
-        if len(value) > _MAX_ASSET_BYTES:
+        if len(value) > limit:
             raise ValueError("package member exceeds byte budget")
         try:
             payload = value.encode("utf-8")
         except UnicodeError as exc:
             raise ValueError("package member is not valid UTF-8") from exc
     elif type(value) in (bytes, bytearray, memoryview):
-        if len(value) > _MAX_ASSET_BYTES:
+        if len(value) > limit:
             raise ValueError("package member exceeds byte budget")
         payload = bytes(value)
     else:
         raise ValueError("package member content must be text or bytes")
-    if len(payload) > _MAX_ASSET_BYTES:
+    if len(payload) > limit:
         raise ValueError("package member exceeds byte budget")
     return payload
 
@@ -216,7 +217,7 @@ def _build_files_iter(build: dict):
             raise ValueError("duplicate package member name")
         seen.add(canonical_name)
         payload = _bounded_asset_bytes(content)
-        if total + len(payload) > _MAX_SOURCE_BYTES:
+        if total + len(payload) > min(_MAX_SOURCE_BYTES, _MAX_PACKAGE_RAW_BYTES):
             raise ValueError("package total payload byte budget exceeded")
         total += len(payload)
         yield relative, payload
