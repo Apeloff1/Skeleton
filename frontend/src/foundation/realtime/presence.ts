@@ -29,14 +29,26 @@ export interface PresenceDeps {
 
 /** Join now, heartbeat on an interval, leave on dispose. Errors never throw to the UI. */
 export function startPresence(scope: string, clientId: string, deps: PresenceDeps, intervalMs = PRESENCE_HEARTBEAT_MS, meta?: Record<string, unknown>): () => void {
-  const send = (a: PresenceAction) => { void Promise.resolve().then(() => deps.post(PRESENCE_PATH, presenceBody(a, scope, clientId, meta))).catch(() => {}); };
-  send('join');
-  const h = deps.setInterval(() => send('heartbeat'), intervalMs);
+  const send = (a: PresenceAction) => Promise.resolve()
+    .then(() => deps.post(PRESENCE_PATH, presenceBody(a, scope, clientId, meta)))
+    .catch(() => undefined);
   let done = false;
+  let pending: Promise<unknown> | null = null;
+  const schedule = (action: PresenceAction) => {
+    const running = send(action);
+    pending = running;
+    void running.finally(() => { if (pending === running) pending = null; });
+  };
+  schedule('join');
+  const h = deps.setInterval(() => {
+    // At most one request in flight; a slow request cannot accumulate heartbeats.
+    if (!done && pending === null) schedule('heartbeat');
+  }, intervalMs);
   return () => {
     if (done) return;
     done = true;
     deps.clearInterval(h);
-    send('leave');
+    // Leave must be ordered after the last join/heartbeat, not race it.
+    void Promise.resolve(pending).then(() => send('leave'));
   };
 }
