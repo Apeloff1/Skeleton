@@ -110,6 +110,15 @@ jobs:
           python -m pytest -q --tb=short "${suites[@]}" \
             tests/test_draft19_reconciliation.py \
             tests/test_repo_machine_budget_20261108.py
+      - name: Focused Frontier assurance and Jeeves learning regressions
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assurance=(tests/test_frontier_assurance_*.py)
+          learning=(tests/test_school_*.py)
+          test "${#assurance[@]}" -ge 13
+          test "${#learning[@]}" -ge 11
+          python -m pytest -q --tb=short "${assurance[@]}" "${learning[@]}" tests/test_frontier_recovered_support.py
       - name: Ruff on skeleton, tests, and backend
         run: python -m ruff check skeleton tests backend
       - name: Pytest on tests, skeleton/testing, and backend/tests
